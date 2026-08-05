@@ -861,3 +861,50 @@ zero REAPI counters; dependency misses that cannot masquerade as the requested
 root-missing terminal; and forbidden evaluator/key/error-parse greps. No new
 retained utility, hashing, interning, compact collection, DICE ownership, or
 lock-across-compute work is authorized.
+
+### Root cquery Starlark-label implementation acceptance (2026-08-04)
+
+**Status: ACCEPTED at `135b0567`.** The exact twelve-file implementation
+lands at 649 formatted net production lines, 293 test lines, and 942 total.
+It retains typed direct-target misses separately from dependency failures,
+drives the existing `RootConfiguredTargetAnalysisKey` through a private
+non-DICE command root, retains the returned `AnalysisResult`, and publishes
+only its canonical label plus newline. The dedicated additive daemon request
+contains only the target and bzlmod inputs. No configuration checksum, second
+graph/evaluator, action execution, or REAPI handoff entered the path.
+
+Focused analysis, parser, core activation, server, and one-shot/daemon CLI
+tests pass. The root activation vector is exactly `13/1/1/1/1/1` for cold,
+warm, missing, recovery, BUILD edit, and `.bzl` edit, with every identity the
+expected `@@//pkg:{probe|missing} [target:first-build]`. Full analysis and
+commands suites pass. Full core, CLI, and server suites retain only the known
+clean-baseline visibility wording, broken-Bzl parser wording, and two root-only
+fixture failures. GNU-Windows no-run passes for analysis, commands, and core;
+the server retains its pre-existing Unix-socket compile boundary. Formatting,
+diff, archive, scope, cap, and forbidden-boundary checks pass. Independent
+final review returned `ACCEPT`.
+
+### Aquery configuration-boundary replan (2026-08-04)
+
+**Status: REPLAN before implementation.** Parallel live-owner and pinned
+Bazel 9.2 formatter audits found that the existing recursive fixture already
+proves three target-owned `FileWrite` actions, and Slug can traverse the same
+`AnalysisResult::{actions,direct_dependencies}` graph without execution.
+However, every Bazel action-query formatter exposes configuration-dependent
+facts that Slug does not own. Text output includes configuration, execution
+platform, action key, and configured `bazel-out` paths; summary still includes
+configurations and execution platforms. Older action-shape fixtures are Bazel
+9.1.1 and are not authority for a Bazel 9 implementation.
+
+Do not add an `aquery` command root, renderer, or wire until target
+configuration identity, configured artifact paths, execution platforms, and
+action identity are truthful. A reduced mnemonic/count/content renderer would
+be a Slug-specific format, while a hard-coded `first-build`, checksum, path, or
+platform would be observably false.
+
+Run next only `WP-6-m2-string-build-setting-transition-oracle`. It must pin the
+first semantic configuration input without exposing a configuration ID: one
+root string build setting, explicit command override, and a user transition
+that rewrites the setting on a dependency edge, observed through exact
+provider values with retained edit/error recovery. No Rust or aquery change is
+authorized by the evidence packet.

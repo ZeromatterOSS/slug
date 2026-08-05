@@ -25,17 +25,17 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions, and exact Bazel 9.2 root cquery label/Starlark-label evidence | general Bazel target-option/configuration identity plus transition, toolchain/platform, repository-mapping, and broader action ownership gates | implement `WP-6-m2-root-cquery-starlark-label-implementation` |
-| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
-| M4: `cquery` | **implementation active** | accepted Stage 6 recursive configured-target evidence, exact default/label evidence, configuration-opaque Starlark-label success/missing/recovery, and accepted thin command design | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | share the active M2 implementation |
-| M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
+| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions, and bounded root Starlark-label cquery in `135b0567` | semantic target configuration inputs/transitions, then general option identity, toolchain/platform, repository-mapping, and broader action ownership gates | run `WP-6-m2-string-build-setting-transition-oracle` |
+| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while `WP-6-m2-string-build-setting-transition-oracle` is current |
+| M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
+| M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | split | Stage 10 plan permits an independent Bazel developer graph | Bazel graph not started; self-hosting awaits M5/M6 | now eligible as a disjoint proposal, but not ahead of the validation-wrapper critical path |
 
 ### Current packet
 
-`WP-6-m2-root-cquery-starlark-label-implementation`.
+`WP-6-m2-string-build-setting-transition-oracle`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -46,6 +46,15 @@ the bounded source-only M1 build vertical; the remaining named M1 gaps are
 terminal, so the current packet pivots to the root configured-target/cquery
 boundary required by the canonical direction reset.
 
+The bounded root Starlark-label cquery implementation is accepted in
+`135b0567`; it directly consumes the existing configured-analysis key and
+publishes exact success/missing/recovery bytes without exposing `first-build`.
+An action-query audit then found no configuration-opaque Bazel formatter, so
+`aquery` remains deferred rather than inventing action keys, configured paths,
+platforms, or configuration text. The active oracle-only packet now pins the
+first semantic configuration discriminator: a string build setting and a user
+transition observed through provider values, never through a checksum.
+
 The retained Bazel 9.2 evidence pins default and explicit `label` output to the
 same `//parent:parent (a7a71fd)` bytes. Pinned source and live audits prove even
 the default checksum depends on fourteen native option fragments, host and
@@ -54,10 +63,11 @@ cannot reproduce it in a bounded packet. That public output remains
 unsupported. Reserved review selected a smaller first consumer whose Starlark
 expression emits only the canonical configured label. Retained Bazel 9.2 now
 pins its exact `@@//parent:parent\n` bytes, missing-target failure, and
-same-server recovery; the active packet designs the narrow command, typed
-error, daemon-wire, and lifecycle boundary. Reserved review accepted its direct
-existing-key route, exact eight-production/five-test allowlists, and
-650/600/1,250 caps, so the active packet now implements that boundary.
+same-server recovery; the accepted implementation retains the narrow command,
+typed error, daemon-wire, and lifecycle boundary. Reserved review accepted its
+direct existing-key route, exact eight-production/five-test allowlists, and
+650/600/1,250 caps. That M4 slice is now preserved while semantic configuration
+work resumes in M2.
 
 The direct-local external exported-source build lifecycle evidence is accepted.
 Pinned Bazel 9.2 proves present/edit/recreate success with no output, deletion
