@@ -379,6 +379,14 @@ pub(crate) fn evaluate_loaded_rule(
             ));
         }
     }
+    if !provider_values
+        .iter()
+        .any(|provider| matches!(provider, ProviderValue::DefaultInfo(_)))
+    {
+        provider_values.push(ProviderValue::DefaultInfo(
+            slug_build_api_v2::DefaultInfo::empty(),
+        ));
+    }
     let providers = ProviderCollection::new(provider_values).map_err(|error| error.to_string())?;
     let declared_outputs = providers
         .default_info()

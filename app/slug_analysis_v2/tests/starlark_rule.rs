@@ -455,6 +455,43 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
 }
 
 #[tokio::test]
+async fn custom_only_starlark_rule_gets_implicit_empty_default_info() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        "CustomInfo = provider(fields = {\"value\": \"custom value\"})\n\ndef _impl(ctx):\n    return [CustomInfo(value = \"custom\")]\n\ncustom_rule = rule(implementation = _impl)\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"custom_rule\")\ncustom_rule(name = \"custom\")\n",
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:custom").unwrap(),
+        ConfigurationKey::target("implicit-default").unwrap(),
+    );
+    let result = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+
+    let custom_id = ProviderId::new("//:defs.bzl", "CustomInfo").unwrap();
+    assert_eq!(
+        result.providers().user(&custom_id).unwrap().field("value"),
+        Some("custom")
+    );
+    assert_eq!(
+        result.providers().default_info(),
+        Some(&slug_build_api_v2::DefaultInfo::empty())
+    );
+    assert!(result.declared_outputs().is_empty());
+    assert!(result.actions().is_empty());
+}
+
+#[tokio::test]
 async fn recursive_custom_rules_preserve_provider_identity_dependency_order_and_local_actions() {
     let workspace = scratch();
     for package in ["rules", "leaf", "parent"] {
