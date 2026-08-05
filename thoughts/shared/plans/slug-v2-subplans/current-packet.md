@@ -1,43 +1,66 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-root-action-closure-boundary-design`
+Packet: `WP-6-m2-root-action-closure-implementation`
 Milestone: M2 recursive configured-target action closure
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: design only the configuration-opaque command-local closure that retains
-actions from requested roots and their recursively analyzed dependencies.
-Predecessor: accepted integrated toolchain resolution/context implementation
-`1533569f` and accepted recursive target-owned action evidence.
+Role: implement the accepted configuration-opaque command-local action
+closure over existing root configured-target analysis values.
+Predecessor: accepted integrated toolchain context `1533569f`, accepted
+recursive target-owned action evidence, and reserved action-closure design
+review.
 
-The live gap is exact: each `AnalysisResult` owns its target-local actions and
-configured dependency identities, but `BuildCommandEvaluation` retains only
-requested-root analyses. Its action count and REAPI consumer therefore omit
-actions owned by recursively analyzed dependencies.
+Change root-analysis success payloads to share `Arc<AnalysisResult>` inside the
+existing outer retained DICE result. Keep each `AnalysisResult` as the sole
+owner of its target-local actions and direct dependency identities. Requested
+build-target records retain those handles; `BuildCommandEvaluation` adds one
+immutable `Arc<[Arc<AnalysisResult>]>` action closure. Its `analyses()` iterator
+must expose that closure so existing declared-action counting and CLI/server
+REAPI consumers include recursively owned actions, while
+`analyzed_target_count()` remains the requested-root count.
 
-Design an ordered, duplicate-safe closure from existing build roots through
-`AnalysisResult::direct_dependencies`. Decide single-root, multi-root, shared
-diamond, and configuration-distinct membership and ordering; preserve each
-`AnalysisResult` as the sole owner of its own actions. Specify Need/error
-precedence, same-DICE lifecycle and A-to-B-to-A equality, dependency
-edit/delete/recreate pruning, and exact analysis/event ownership without a
-second configured graph or duplicate child evaluation.
+Construct the closure inside the existing `BuildCommandRootKey` only after all
+requested branches succeed. Seed unique analyzed roots in command-pattern
+order, then traverse breadth-first frontiers. Within each frontier preserve
+parent and declared dependency order, deduplicate first-seen nodes by the full
+existing opaque `ConfiguredTargetKey`, and batch child reads through the
+existing `RootConfiguredTargetAnalysisKey`. Duplicate roots/shared diamonds
+appear once; the same label under distinct existing configurations remains
+distinct. This is deterministic retention order, not Bazel-generic traversal
+parity or action scheduling.
 
-Reuse `recursive-custom-rule-providers-actions`, specifically the accepted
-`aquery_recursive_target_owned_writes` evidence showing distinct parent and
-two-leaf `FileWrite` actions. Use only the existing `ConfiguredTargetKey`
-identity internally; do not format or invent Bazel configuration identity.
+For every closure frontier, inspect all discovered unique child outcomes,
+union all Needs, and return Need before the first BFS-order terminal analysis
+error. DICE infrastructure failure follows the existing invariant path. Do
+not cross a Need frontier or publish a partial `BuildCommandEvaluation`.
+Re-reading a child key adds the required command invalidation edge but must not
+evaluate its rule twice or create a second event owner/batch.
 
-Documentation allowlist:
+Production allowlist:
 
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `app/slug_analysis_v2/src/dice.rs`
+- `app/slug_core_v2/src/runtime/dice.rs`
 
-Caps are zero production lines, zero test lines, 320 documentation lines, and
-320 total net lines. Return either one exact implementation packet or `REPLAN`
-if a truthful closure requires unmodeled public configuration identity.
+Test allowlist:
 
-Stop for any Rust, test, fixture, or generated-oracle edit; configuration
-checksum/short ID, configured output paths, execution-platform or action-key
-identity, cquery/aquery formatting, general transition/configuration
-substrate, external mapping, patterns, toolchain action breadth,
-execution/REAPI behavior, or any new DICE key/cache/global/lock.
+- `app/slug_analysis_v2/tests/root_analysis.rs`
+- inline tests in `app/slug_core_v2/src/runtime/dice.rs`
+- `app/slug_cli_v2/tests/cli.rs`
+
+Caps are 360 formatted production net lines, 650 test lines, 180 documentation
+lines, and 1,190 total net lines.
+
+Required evidence covers the accepted parent/second/first three-action
+closure; roots-first multi-root layers; duplicate-root and diamond dedupe;
+configuration-distinct same-label nodes without configuration display; cold
+and warm activation with no duplicate evaluation or target-local event batch;
+child-only action edit, delete/recreate, orphan pruning, and full A-to-B-to-A
+command equality; same-frontier Need-before-error; public declared action count
+three; and the existing REAPI iterator observing all three independent fixture
+actions without executing them in the test.
+
+Stop and return `REPLAN` for a third production file, result deep cloning into
+the retained command closure, action aggregation into `AnalysisResult`, a new
+DICE key/cache/global/lock/interner, scheduler or execution behavior,
+configuration formatting/identity, configured paths, action keys/platforms,
+cquery/aquery formatting, cycle semantics, external mapping/patterns,
+toolchain action breadth, fixture/oracle regeneration, or any cap breach.

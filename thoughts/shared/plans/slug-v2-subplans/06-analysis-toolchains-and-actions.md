@@ -1471,3 +1471,40 @@ dependencies. Reuse the accepted recursive target-owned-write evidence and
 design a deterministic, duplicate-safe closure over existing configured
 dependency identities. Do not retry public configuration identity or aquery:
 both remain `REPLAN` until the general configuration substrate exists.
+
+### Root command action-closure boundary design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-6-m2-root-action-closure-implementation`.** The existing root analysis key
+already owns recursive configured-target evaluation and each `AnalysisResult`
+owns its local actions, but `BuildCommandEvaluation` retains only requested
+roots. Its action count and existing REAPI iterator therefore omit recursively
+owned dependency actions even though the accepted Bazel 9.2 recursive record
+proves distinct parent and two-leaf FileWrite ownership.
+
+The accepted design changes successful root-analysis payloads to shared
+`Arc<AnalysisResult>` handles inside the existing outer DICE result. The build
+command retains requested targets plus an immutable command-local action
+closure of those handles. It traverses existing configured dependency keys in
+breadth-first frontiers: requested roots first, then declaration-ordered
+layers, with first-seen deduplication by the complete opaque
+`ConfiguredTargetKey`. This matches the proven parent/second/first case without
+claiming generic Bazel traversal order. Same-label configuration-distinct
+nodes remain distinct without formatting a configuration.
+
+Every frontier reuses the existing root analysis key and joins all unique
+children, so Needs union before the first BFS-order terminal error. Those
+direct command-to-child DICE edges make child-only action edits invalidate the
+command even when a parent provider result compares equal. Reuse may record
+the same child node as reused, but no evaluator or event batch is duplicated.
+`BuildCommandRootKey` remains the sole command owner; no key, graph, cache,
+lock, global, interner, scheduler, or second action owner is added.
+
+Parallel Terra live-owner, accepted-evidence, and Buck2 utility audits plus
+reserved review selected two production owners, three test owners, and caps of
+360 production, 650 test, 180 documentation, and 1,190 total net lines. The
+implementation must cover multi-root/diamond/configuration-distinct ordering,
+Need precedence, target-local events, child edit/delete/recreate/orphan
+pruning and A-to-B-to-A equality, public action count, and the existing
+consumer iterator. Configuration identity, aquery, scheduling/execution,
+cycles, external mapping, and toolchain action breadth remain explicit stops.
