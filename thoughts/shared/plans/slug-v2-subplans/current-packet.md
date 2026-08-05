@@ -1,62 +1,77 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-option-label-context-identity`
+Packet: `WP-6-m2-option-label-context-identity-retry`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: add an identity-owned, mapping-provenance-free resolved option-label
-value plus the closed three-mode option-label parsing/resolution seam needed by
-the accepted 41 contextual label descriptors.
+Result: retain exact non-visible repository identity and add the distinct,
+mapping-provenance-free resolved option-label value plus its closed three-mode
+parser in `slug_identity_v2`.
 
-Predecessors are authoritative: the live provenance-bearing identity types,
-the accepted `287 + 8 + 5 + 41` descriptor partition, pure kernel in
-`e7067bfc`, and Host/repository conversion-context design. Reuse the pinned
-Bazel option-label source paths and existing identity validation. Add no oracle,
-fixture, loader, configuration value, or target behavior.
+Predecessors are authoritative: the live identity APIs, the accepted
+Host/repository context design, the stopped first attempt, and the accepted
+non-visible repository identity/source-order design. Reuse pinned Bazel 9.2
+`RepositoryMapping#get`, `RepositoryName`, `SpellChecker`, label option
+conversion, and natural-order behavior. Add no oracle or fixture.
 
-Preserve `CanonicalLabel` exactly as the loading/resolution value whose derived
-equality/order/hash and `StableSerialize` include `mapping_id`. Do not weaken,
-reinterpret, or migrate that behavior. Add a distinct resolved option-label
-type containing only canonical repository, package, and target identity. Its
-equality, ordering, hashing, Bazel rendering, and stable serialization must be
-independent of repository-mapping provenance.
+Phase 1 is tests and private scaffolding only. Before production behavior,
+activate direct tests for:
 
-Implement one closed parser mode over supplied facts only:
+- existing `RepositoryMapping::resolve`, mapping equality, `CanonicalLabel`
+  provenance equality/hash/order/rendering/stable serialization, and live label
+  parsing remaining unchanged;
+- mapped same-result/different-mapping-ID and different-result cases;
+- unmapped same-apparent main/package owners, unmapped versus direct visible
+  canonical, first-round one-`@` canonical versus second-round apparent lookup,
+  and explicit `@//` versus unqualified `//`;
+- exact non-visible rendering with no suggestion and with
+  ` (did you mean '<candidate>'?)`;
+- source-order tie candidates `baa, aab` for missing `aaa`, and the reversed
+  order, proving first-wins suffix/identity while mapping content equality is
+  unchanged;
+- lawful structural equality/order/hash versus the separate Bazel-natural
+  comparison that may return equal for unequal visible/non-visible or
+  different-owner values; use Java UTF-16 order; and
+- the accepted first-round/main-repository/package grammar matrix: First/Main
+  prepend `//` only when input starts with neither `/` nor `@`, so `pkg/t:bin`
+  becomes root `//pkg/t:bin`, `:bin` is root package, and bare `bin` is
+  `//bin:bin`; Package instead resolves `:bin` and bare `bin` in its base and
+  rejects `pkg/t:bin`; Package `//tools:bin` uses its current repository except
+  special `//conditions:default`, which is main; mapping modes resolve
+  apparent `@repo` (including shorthand), while direct `@@repo` bypasses the
+  mapping and FirstRound treats one-`@` as a visible literal; reject leading
+  single `/`, triple-dot package forms, and invalid repository names.
 
-- `FirstRoundCanonical`: the deliberately mapping-free first option parse; it
-  is not an empty repository mapping and may not reuse second-round output;
-- `MainRepository { mapping }`: second-round option parsing from the main
-  repository through the supplied `RepositoryMapping`; and
-- `Package { base_package, mapping }`: package/Starlark-relative parsing through
-  the supplied `PackageIdentifier` and mapping.
+Independent latest-test review gates Phase 2. Production then:
 
-The seam implements only pinned option-label grammar. It must distinguish
-package-relative, main-repository absolute, apparent-repository, and canonical
-forms exactly; apply Bazel's option-specific main-repository prefixing only in
-the modes that do so; resolve apparent repositories through the supplied
-mapping; and project to the mapping-free option-label result. No mode may load
-a package, materialize or discover a repository, access a filesystem, parse a
-command prefix, or construct a configuration/target.
+1. Retain final unique repository-mapping keys in insertion order beside the
+   existing `BTreeMap`; replacement keeps first position. Preserve `resolve`
+   exactly and implement mapping equality over the existing ID plus entry
+   contents only, ignoring candidate order.
+2. Add an option-only lookup that returns mapped visible identity or exact
+   non-visible requested/owner/did-you-mean-suffix identity. Port only the
+   source spellchecker path: Java-compatible lowercase/UTF-16 length and
+   bounded Levenshtein, strict-better first-wins traversal in retained order,
+   and exact suffix formatting.
+3. Add the distinct resolved option-label value and closed parser modes:
+   `FirstRoundCanonical`, `MainRepository { mapping }`, and
+   `Package { base_package, mapping }`. Main supplies root owner; Package uses
+   `base_package.repo()`; direct `@@` and first-round canonical results are
+   visible. Preserve explicit apparent-root syntax through lookup.
+4. Give the new label lawful structural `Eq`/`Ord`/`Hash`, `Allocative`, exact
+   canonical/unambiguous rendering, and a separate non-key
+   `bazel_natural_cmp`. Do not implement `StableSerialize`; checksum/wire is
+   deferred. Preserve `CanonicalLabel` and every existing identity API.
 
-Required direct tests:
-
-- existing `CanonicalLabel` provenance-sensitive equality, hash, stable
-  serialization, and rendering remain unchanged;
-- different mappings that resolve an apparent spelling to the same canonical
-  repository/package/target produce equal, identically rendered option labels;
-- mappings that resolve differently produce different option labels;
-- first-round, main-repository, and supplied-package parsing are directly
-  discriminated, including package-relative and apparent-repository forms;
-- invalid or mode-inappropriate forms reject without loading or fallback;
-- option-label equality/order/hash/stable rendering use only repository,
-  package, and target; and
-- retained allocation and clone behavior use the existing identity string
-  representations without an interner or hidden map.
+The parser consumes supplied facts only. It does not load a package,
+materialize/discover a repository, access a filesystem, parse a command prefix,
+or construct a configuration/target. Repository-use failure and its later
+`No repository visible...` diagnostic remain deferred.
 
 Allowlist:
 
 - `app/slug_identity_v2/src/lib.rs`
 - `app/slug_identity_v2/src/label.rs`
-- `app/slug_identity_v2/src/serialization.rs`
+- `app/slug_identity_v2/src/repo_mapping.rs`
 - `app/slug_identity_v2/tests/label_roundtrip.rs`
 - terminal scheduling only:
   `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
@@ -66,18 +81,22 @@ Allowlist:
   `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
   `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Caps: 650 formatted production, 450 test, and 1,100 total net lines. Add no
-dependency, Cargo/lockfile change, generated source, runtime registry/map/cache,
-global, interner, fixture, or oracle.
+Caps: 850 formatted production, 550 test, and 1,400 total net lines. Add no
+dependency, Cargo/lockfile change, generated source, second runtime map/cache,
+global, interner, fixture, or oracle. Reuse existing owned repository/name
+strings and `BTreeMap`; one ordered key vector is the accepted retained cost.
+No `Dupe` or per-label `Arc`.
 
-Validation: formatting, serial `cargo test -p slug_identity_v2`, direct
-dependent compile checks for the new public identity seam, applicable
-GNU-Windows no-run, `scripts/v2_archive_status.sh`, `git diff --check`, scope
-and cap checks, then independent latest-diff review.
+Validation: Phase-1 focused test compile/run and independent latest-test
+review; then formatting, serial `cargo test -p slug_identity_v2`, direct
+dependent compile checks for the public seam, applicable GNU-Windows no-run,
+`scripts/v2_archive_status.sh`, `git diff --check`, exact scope/cap checks, and
+independent latest-diff review.
 
-Stop and `REPLAN` on unresolved exact option-label grammar, a required package
-parser/loading call, repository materialization or discovery, a change to
-`CanonicalLabel` provenance semantics, dependency/lockfile expansion, DICE,
-filesystem/Host access, configuration or target construction, command-only
-`RunUnder` tokenization, or any configured-target dependency edge. Cycles
-remain explicitly deferred by user approval.
+Stop and `REPLAN` on source-order loss, source spellchecker ambiguity, a change
+to existing visible mapping/label behavior or stable serialization, a required
+package parser/loading call, repository materialization/discovery, dependency
+or lockfile expansion, cap breach, DICE, filesystem/Host access, configuration
+or target construction, command tokenization, any dependency cycle, or any
+configured-target edge. Configured-target dependency cycles remain explicitly
+deferred by user approval.

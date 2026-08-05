@@ -3693,6 +3693,158 @@ parser seam inside `slug_identity_v2`. Preserve the existing provenance-bearing
 `CanonicalLabel` unchanged and stop on any loading, materialization, DICE,
 configuration, target, command-tokenization, or configured-cycle edge.
 
+### Option-label context identity REPLAN (2026-08-05)
+
+`WP-6-m2-option-label-context-identity` stopped during its pinned-source test
+matrix before production. Bazel does not reject an apparent repository absent
+from the supplied mapping. `RepositoryMapping#get` returns a non-visible
+`RepositoryName` carrying the apparent name plus the current repository; label
+construction succeeds, and repository use fails later with context-sensitive
+identity/diagnostics. Slug's live `RepositoryMapping::resolve` instead falls
+back to an ordinary visible `CanonicalRepoName`, while the planned
+mapping-free `(repository, package, target)` option label had no representation
+for the non-visible state. Constraining mappings to referenced repositories
+would hide observable Bazel behavior and is not accepted.
+
+Root discarded the test-only draft with `apply_patch`; no Rust, test,
+dependency, API, or runtime change remains. No production was written. The
+mapping-provenance distinction remains valid, but the resolved option-label
+repository component must first distinguish visible canonical identity from
+source-equivalent non-visible apparent/owner identity without changing the
+existing loading `CanonicalLabel` or `RepositoryMapping::resolve` contract.
+
+Run next only
+`WP-6-m2-option-label-nonvisible-repository-identity-design`, docs-only. Pin the
+non-visible repository construction, equality/order/hash/rendering/diagnostic
+facts and audit live identity/mapping consumers; then select the smallest
+additive option-label representation and bounded implementation packet or
+`REPLAN`. Add no Rust, source probe, fixture, DICE, loading/materialization,
+configuration, target, command, or configured-cycle behavior.
+
+### Option-label non-visible repository identity design (2026-08-05)
+
+**Decision: ACCEPT a three-field non-visible identity plus source-ordered
+mapping candidates.** Bazel 9.2 `RepositoryMapping#get` returns a mapped
+visible `RepositoryName` when an entry exists. On a miss it constructs
+`RepositoryName.createUnvalidated(requested).toNonVisible(contextRepo,
+SpellChecker.didYouMean(requested, entries.keySet()))`; it does not reject or
+fall back to a visible canonical name. The resulting structural repository
+identity is exactly bare requested apparent name, visible owner/context
+repository, and the produced did-you-mean suffix. `RepositoryName` equality
+and hash include all three fields.
+
+The non-visible canonical, unambiguous, and null-mapping display forms all keep
+the state explicit:
+
+```text
+@@[unknown repo '<requested>' requested from <owner><suffix>]//<package>:<target>
+```
+
+The owner is the mapping context: main for command/main-repository parsing and
+the supplied base package repository for package parsing. Repository use fails
+later, before fetching, with `No repository visible as '@<requested>' from
+<owner-display>`; main renders as `main repository`, while a nonmain owner
+renders as `repository '@@owner+'`. This packet retains the identity and exact
+label rendering only. Repository use/materialization and that later diagnostic
+remain outside the identity parser.
+
+#### Equality, ordering, and suggestion closure
+
+Bazel's natural `Label.compareTo` is deliberately weaker than repository
+equality: `PackageIdentifier.compareTo` compares only the repository's bare
+name, then package and target. A visible `@@missing` label and a non-visible
+`@missing` label, or non-visible labels with different owners/suffixes, may
+therefore compare equal while being unequal and having different hashes. Rust
+`Ord` cannot use that relation. The option-label value must use lawful
+structural `Eq`/`Ord`/`Hash` over visibility and all non-visible fields, and
+expose a separate non-key `bazel_natural_cmp` over bare repository name,
+package, and target using Java UTF-16 string order.
+
+The suffix is also source-order-sensitive. `SpellChecker.suggest` lowercases
+with Java semantics, starts at `min(5, (UTF-16 length + 1) / 2)`, computes
+bounded UTF-16 Levenshtein distance, and replaces the current result only for a
+strictly smaller distance. Equal-distance candidates keep the first
+`ImmutableMap` key. Slug's `RepositoryMapping` currently stores only a
+`BTreeMap`, although every live producer supplies entries serially through
+`insert`; sorted-key traversal is not exact. The retry must retain final unique
+keys in insertion order alongside the existing map. Replacement keeps the
+key's first position. Custom `RepositoryMapping` equality must continue to use
+only its existing ID and entry contents, not candidate order, matching the
+current contract and map equality; `resolve` remains byte-for-byte equivalent.
+Repository names are validated ASCII and Bazel's launcher forces the JVM root
+locale, so the private port needs only source-equivalent ASCII case folding
+while retaining the source threshold and first-wins rules. No second map or
+new dependency is needed.
+
+The accepted additive shape is conceptually:
+
+```text
+OptionRepository =
+  Visible(CanonicalRepoName)
+  | NonVisible {
+      requested: ApparentRepoName,
+      owner: CanonicalRepoName,
+      did_you_mean_suffix: String,
+    }
+
+ResolvedOptionLabel {
+  repository: OptionRepository,
+  package: PackagePath,
+  target: TargetName,
+}
+```
+
+The repository variants and fields may remain crate-private behind the public
+resolved option-label parser/value. The suffix is the exact third Bazel
+identity field, produced only by the private source-equivalent mapping lookup;
+it is not a formatted-label sentinel. Derive `Allocative` and structural
+clone/equality/order/hash on the retained value. Reuse the existing owned
+identity strings and mapping `BTreeMap`; add only the ordered key vector. Add no
+`Dupe`, `Arc` inside each label, interner, cache, global, or runtime identity
+map. Callers share the enclosing mapping/context with the already accepted
+`Arc` boundary.
+
+#### Live boundary and direct discriminators
+
+Keep `CanonicalRepoName`, `CanonicalLabel`, `PackageIdentifier`,
+`RepositoryMapping::resolve`, mapping IDs, and `StableSerialize` unchanged.
+The live `resolve` consumers are loading/analysis identity paths and tests; its
+visible-name fallback is intentionally not retrofitted. `CanonicalLabel`
+continues to include `mapping_id` in derived equality/order/hash and stable
+serialization. `ResolvedOptionLabel` is the separate configuration value and
+gets no `StableSerialize` implementation while checksum/wire ownership is
+deferred. It cannot embed `PackageIdentifier`, which cannot represent a
+non-visible repository.
+
+The retry must directly prove:
+
+- mapped aliases from different mapping IDs resolving to the same canonical
+  repository produce the same resolved option label; different mapped results
+  differ;
+- unmapped `@missing//p:t` from main and from `@@owner+//base` retain different
+  owners and are structurally unequal, while their Bazel natural comparison is
+  equal;
+- unmapped apparent `@missing` differs from direct visible `@@missing`, even
+  though their Bazel natural comparison is equal;
+- first-round canonical parsing treats one-`@` spelling as a visible literal,
+  while second-round main/package parsing performs apparent lookup;
+- explicit apparent-root `@//p:t` is not collapsed with unqualified `//p:t`;
+- candidate order `baa, aab` for missing `aaa` suggests `baa`, while reversed
+  insertion suggests `aab`; the mappings retain current content equality but
+  the non-visible identities, hashes, and renderings differ; and
+- visible root canonical rendering remains `//p:t`, unambiguous rendering is
+  `@@//p:t`, and the non-visible rendering above is exact with and without its
+  ` (did you mean '<candidate>'?)` suffix.
+
+Run next only `WP-6-m2-option-label-context-identity-retry`. It is confined to
+`slug_identity_v2`: retain mapping candidate order without changing existing
+mapping semantics, port the private spellchecker path, and add the distinct
+resolved option-label value plus first-round/main/package parser. Stop on any
+need to change an existing visible identity, load/materialize a repository or
+package, add a dependency/lockfile, serialize configuration wire, or introduce
+a loading/configuration/target/DICE/configured-cycle edge. Configured-target
+dependency cycles remain explicitly deferred by user approval.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
