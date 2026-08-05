@@ -1,57 +1,49 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-byte-contract-ledger`
+Packet: `WP-6-m2-java-guava-renderer-authority-evidence`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze only the source-complete converter/value/equality/Java-byte family
-rules before remapping 287 descriptors or attempting Rust.
-Predecessor: the combined 287-row source-closure ledger reached `REPLAN` after
-its permitted correction still omitted exact renderer owners/bytes and concrete
-default discriminators; the unaccepted Stage 6 diff was discarded cleanly.
+Role: close only the exact Java/JDK/Guava renderer authority used by pure native
+values before retrying the family byte contract.
+Predecessor: the family-byte draft reached `REPLAN` because standard-library and
+Guava renderer chains were still incomplete and pinned source corrected timeout
+map keys from uppercase to lowercase; its unaccepted Stage 6 diff was discarded.
 
-Using pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
-add a Stage 6 family contract for the six built-in type families and every
-explicit pure converter. Do not add descriptor rows in this packet.
+Record a compact renderer authority matrix using:
 
-For each family record:
+- Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a` and Bazel 9.2's
+  actual server runtime from `bazel info java-runtime`;
+- the versioned Java SE API/spec contracts for Boolean, Integer, String,
+  Enum, Duration, AbstractCollection/List, AbstractMap/EnumMap, records, and
+  outer string conversion;
+- Bazel's pinned `com.google.guava:guava:33.5.0-jre` coordinate and
+  `maven_install.json` JAR SHA-256
+  `1e301f0c52ac248b0b14fdc3d12283c77252d4d6f48521d572e7d8c4c2cc4ac7`,
+  bound to the official Guava `v33.5.0` source tag for `ImmutableList`,
+  `Maps.immutableEntry`, and their concrete renderers; and
+- pinned Bazel overrides, especially `CompilationMode`, `StripMode`,
+  `PlatformType`, and `TestTimeout.toString()` lowercase keys.
 
-- exact converter, retained value/type, and Java renderer owner paths/lines,
-  or the named versioned Java SE 21 API anchor for a JDK-owned renderer;
-- complete explicit input grammar, ASCII/case/radix rules, aliases, and
-  rejection boundary;
-- retained semantic kind and structural equality, including typed enum kind
-  plus member/parameter rather than rendered-string identity;
-- exact Java `value.toString()` text and exact outer `OptionsBase.mapToCacheKey`
-  bytes for concrete accepted/rejected discriminators; and
-- special-null/literal/repeat default interaction, while reserving descriptor-
-  specific default mapping for the later 287-row packet.
+Run one nonpersistent temporary Java probe with the exact Bazel 9.2 runtime.
+It may compile/print same-shaped `Set`, `Inherit`, and `Unset` records and the
+standard JDK collection/map/duration/enum cases. Record exact `java -version`,
+commands, stdout bytes, and cleanup. It is evidence only: no persistent fixture,
+Java source/class, JVM dependency, or delegation is Slug architecture. Guava
+outputs must additionally be proved by the cryptographically bound source
+chain; download a temporary verified JAR/source only if needed and delete it.
 
-The contract must cover Boolean, Integer, raw String, TriState, absent-only
-Void, comma list/set, assignment, EnvVar records, DottedVersion, empty list,
-fission, TestTimeout/EnumMap/Duration, open `PlatformType`, nominal/forced
-sharding, and all fifteen finite enum kinds/splits. It must spell exact bytes
-for `Set[name=N, value=V]`, `Inherit[name=N]`, `Unset[name=N]`; default and
-mixed-unit timeout maps; an executable valid-Unicode supplementary-versus-BMP
-UTF-16 sort case; ordinary uppercase enums versus lowercase overrides; full
-BoolOrEnum aliases; and every finite member/output.
+The matrix must close exact renderer/equality authority and bytes for:
 
-Each finite enum entry must name all three chains: exact converter class/owner
-(shared or custom), typed value declaration/identity, and renderer (the
-versioned Java SE 21 `java.lang.Enum#toString` contract for ordinary names or
-the exact override). Sharding must name converter, non-forced
-enum, forced value/renderer, and Integer.decode. DottedVersion must name its
-converter, grammar/value/equality, and raw-string renderer. Duration must name
-the versioned Oracle Java SE 21 API contract for
-`java.time.Duration#toString`,
-<https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/Duration.html#toString()>,
-which specifies `PTnHnMnS` and zero-section omission rather than infer raw
-seconds. Ordinary enum rendering uses the corresponding versioned API anchor,
-<https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Enum.html#toString()>.
-
-Define concrete discriminator IDs for every family and for default routes:
-special-null absence→`NULL`, repeatable special-null→`EMPTY`, and literal
-conversion→the family’s exact quoted/escaped text. Use unambiguous escaped
-Unicode scalars/code units, not labels such as `U+10000` standing in for input.
+- Boolean/Integer/String and outer quote/backslash escaping;
+- empty, singleton-empty, and multi-element immutable lists;
+- immutable `Map.Entry` with an embedded `=`;
+- `Set[name=N, value=V]`, `Inherit[name=N]`, `Unset[name=N]`;
+- ordinary enum names and lowercase Bazel overrides;
+- lowercase-keyed TestTimeout EnumMap text, including
+  `{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}` and a mixed duration;
+  and
+- valid supplementary-versus-BMP Java UTF-16 ordering using actual runtime
+  scalars/code units and exact list bytes.
 
 Allowlist:
 
@@ -61,15 +53,13 @@ Allowlist:
 - `.codex/skills/slug-agent-orchestration/references/routing-log.md`
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Cap: 480 formatted net documentation lines total, at most 380 in the Stage 6
-family section. No descriptor-row ledger, Rust, test, fixture, source
-generation, Cargo/dependency, oracle, command, DICE, registry, or downstream
-change.
+Cap: 300 formatted net documentation lines total, at most 240 in Stage 6. No
+descriptor rows, family grammar beyond renderer authority, Rust, persistent
+test/fixture, generated artifact, dependency, registry, command, DICE, or
+downstream change.
 
-Stop and `REPLAN` if any family lacks a pinned converter/value/renderer chain;
-descriptors thought to share a family differ semantically; exact bytes require
-a live JVM oracle or authority beyond pinned Bazel source and the named
-versioned Java SE 21 API contracts; a new representation,
-dependency, contextual converter, Java regex, Host/repository/loading access,
-command, normalization, checksum, wire, or DICE behavior is needed; or the cap
-is exceeded. Preserve 287/8/5/41 and defer configured-target cycles by approval.
+Stop and `REPLAN` if the Guava source cannot be bound to the pinned JAR; two
+declared Java runtimes disagree; the temporary probe contradicts source/spec;
+exact output needs a persistent Java fixture or production JVM dependency; or
+scope/cap is exceeded. Preserve 287/8/5/41 and defer contextual conversion,
+normalization, checksums, wire, and configured-target cycles.

@@ -2589,3 +2589,28 @@ correction is `REPLAN`. Only after independent acceptance may a later packet
 mechanically map the 287 already classified rows. Rust and every contextual,
 regex, command, normalizer, checksum, wire, DICE, and configured-cycle path
 remain deferred.
+
+### Pure native family byte contract REPLAN (2026-08-04)
+
+`WP-6-m2-pure-native-family-byte-contract-ledger` stopped under its explicit
+missing-renderer-chain rule. Its compact draft still cited interfaces or vague
+JDK behavior for Guava immutable lists/entries, record-generated EnvVar text,
+and EnumMap/AbstractMap output. It also encoded timeout keys as uppercase, but
+pinned `TestTimeout.java:159-162` overrides `toString()` to lowercase, so the
+exact default map is `{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}`.
+The unaccepted Stage 6 diff was discarded with `apply_patch`; HEAD returned
+cleanly to `fd30a708`.
+
+Run next only `WP-6-m2-java-guava-renderer-authority-evidence`. At no more than
+240 Stage 6/300 total documentation lines, bind Bazel 9.2's actual Java runtime,
+versioned Java API/spec renderers, pinned Guava `33.5.0-jre` plus JAR SHA-256
+`1e301f0c52ac248b0b14fdc3d12283c77252d4d6f48521d572e7d8c4c2cc4ac7`,
+and official Guava `v33.5.0` sources into one exact renderer matrix. A temporary
+cleaned Java probe may pin record punctuation and standard collection/map/
+duration bytes; it is evidence only and authorizes no Java/JVM dependency in
+Slug. Freeze exact EnvVar, list/entry, enum, lowercase timeout map, duration,
+UTF-16, and outer escaping bytes. Any source/JAR binding failure, runtime
+disagreement, persistent fixture need, or production-JVM implication is
+`REPLAN`. Descriptor/family conversion grammar, Rust, contextual/regex paths,
+normalization, checksum, wire, DICE, and configured-cycle semantics remain
+deferred.
