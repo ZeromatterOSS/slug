@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gate A: Bazel 9.2/rules_rust 0.73 metadata, three stable locks, and all 19 retained packages build locally | 14 V2 packages and CLI production target are not mapped; tests follow separately; self-hosting still awaits M5/M6 | `WP-10-m8-bazel-cli-production-graph` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B: Bazel 9.2/rules_rust 0.73 metadata, stable Cargo/rendering/module locks, all 33 production packages, hermetic REAPI proto generation, and `//app/slug_cli_v2:slug` build locally | CLI and transitive V2 tests are not mapped; cache/RBE evidence remains separate; self-hosting still awaits M5/M6 | `WP-10-m8-bazel-cli-test-boundary-design` |
 
 ### Current packet
 
-`WP-10-m8-bazel-cli-production-graph`.
+`WP-10-m8-bazel-cli-test-boundary-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

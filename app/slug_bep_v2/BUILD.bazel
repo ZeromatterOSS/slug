@@ -1,0 +1,10 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@slug_crates//:defs.bzl", "crate_edition")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "slug_bep_v2",
+    srcs = glob(["src/**/*.rs"]),
+    edition = crate_edition(),
+)

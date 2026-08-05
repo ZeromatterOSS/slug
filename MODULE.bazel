@@ -7,6 +7,10 @@ bazel_dep(
     name = "rules_rust",
     version = "0.73.0",
 )
+bazel_dep(
+    name = "platforms",
+    version = "1.1.0",
+)
 
 rust = use_extension("@rules_rust//rust:extensions.bzl", "rust")
 rust.toolchain(
@@ -25,4 +29,15 @@ crate.from_cargo(
     lockfile = "//:Cargo.Bazel.lock",
     manifests = ["//:Cargo.toml"],
 )
-use_repo(crate, "slug_crates")
+use_repo(
+    crate,
+    "slug_crates",
+    slug_protoc_linux_aarch64 = "slug_crates__protoc-bin-vendored-linux-aarch_64-3.2.0",
+    slug_protoc_linux_ppcle64 = "slug_crates__protoc-bin-vendored-linux-ppcle_64-3.2.0",
+    slug_protoc_linux_s390x = "slug_crates__protoc-bin-vendored-linux-s390_64-3.2.0",
+    slug_protoc_linux_x86 = "slug_crates__protoc-bin-vendored-linux-x86_32-3.2.0",
+    slug_protoc_linux_x86_64 = "slug_crates__protoc-bin-vendored-linux-x86_64-3.2.0",
+    slug_protoc_macos_aarch64 = "slug_crates__protoc-bin-vendored-macos-aarch_64-3.2.0",
+    slug_protoc_macos_x86_64 = "slug_crates__protoc-bin-vendored-macos-x86_64-3.2.0",
+    slug_protoc_windows_x86_64 = "slug_crates__protoc-bin-vendored-win32-3.2.0",
+)

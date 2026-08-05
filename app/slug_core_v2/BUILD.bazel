@@ -1,0 +1,27 @@
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "slug_core_v2",
+    srcs = glob(["src/**/*.rs"]),
+    aliases = aliases(),
+    edition = crate_edition(),
+    deps = all_crate_deps(normal = True) + [
+        "//allocative/allocative",
+        "//app/slug_analysis_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_events_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_loading_v2",
+        "//app/slug_query_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//dice/dice_futures",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark",
+        "//starlark-rust/starlark_map",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+)

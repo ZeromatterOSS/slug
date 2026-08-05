@@ -1,5 +1,78 @@
 package(default_visibility = ["//visibility:public"])
 
+config_setting(
+    name = "linux_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "linux_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:linux",
+    ],
+)
+
+config_setting(
+    name = "macos_aarch64",
+    constraint_values = [
+        "@platforms//cpu:aarch64",
+        "@platforms//os:macos",
+    ],
+)
+
+config_setting(
+    name = "macos_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:macos",
+    ],
+)
+
+config_setting(
+    name = "windows_x86_64",
+    constraint_values = [
+        "@platforms//cpu:x86_64",
+        "@platforms//os:windows",
+    ],
+)
+
+# This filegroup selects the tool in the build-script's exec configuration. The
+# apparent repository names keep generated crate repository names out of
+# first-party BUILD files.
+filegroup(
+    name = "vendored_protoc",
+    srcs = select({
+        ":linux_aarch64": ["@slug_protoc_linux_aarch64//:bin/protoc"],
+        ":linux_x86_64": ["@slug_protoc_linux_x86_64//:bin/protoc"],
+        ":macos_aarch64": ["@slug_protoc_macos_aarch64//:bin/protoc"],
+        ":macos_x86_64": ["@slug_protoc_macos_x86_64//:bin/protoc"],
+        ":windows_x86_64": ["@slug_protoc_windows_x86_64//:bin/protoc.exe"],
+    }),
+    visibility = ["//app/slug_reapi_v2:__pkg__"],
+)
+
+# rules_rust 0.73 uses cargo_build_script.tools for exec-configured location
+# expansion but omits those files from the runner action's tools depset. Keep
+# every locked raw executable as data so the selected execpath is sandboxed.
+filegroup(
+    name = "vendored_protoc_inputs",
+    srcs = [
+        "@slug_protoc_linux_aarch64//:bin/protoc",
+        "@slug_protoc_linux_ppcle64//:bin/protoc",
+        "@slug_protoc_linux_s390x//:bin/protoc",
+        "@slug_protoc_linux_x86//:bin/protoc",
+        "@slug_protoc_linux_x86_64//:bin/protoc",
+        "@slug_protoc_macos_aarch64//:bin/protoc",
+        "@slug_protoc_macos_x86_64//:bin/protoc",
+        "@slug_protoc_windows_x86_64//:bin/protoc.exe",
+    ],
+    visibility = ["//app/slug_reapi_v2:__pkg__"],
+)
+
 exports_files([
     "Cargo.Bazel.lock",
     "Cargo.lock",

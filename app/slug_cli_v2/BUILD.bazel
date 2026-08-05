@@ -1,0 +1,29 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_library(
+    name = "slug_cli_v2",
+    srcs = glob(
+        ["src/**/*.rs"],
+        exclude = ["src/main.rs"],
+    ),
+    aliases = aliases(),
+    crate_root = "src/lib.rs",
+    edition = crate_edition(),
+    deps = all_crate_deps(normal = True) + [
+        "//app/slug_commands_v2",
+        "//app/slug_core_v2",
+        "//app/slug_reapi_v2",
+        "//app/slug_server_v2",
+    ],
+)
+
+rust_binary(
+    name = "slug",
+    crate_root = "src/main.rs",
+    edition = crate_edition(),
+    srcs = ["src/main.rs"],
+    deps = [":slug_cli_v2"],
+)

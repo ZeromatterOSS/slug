@@ -152,6 +152,40 @@ and gold-linker warnings. The archive checker positively recognizes the fresh
 V2 root metadata. Independent Terra review returned `ACCEPT`; no rc, remote,
 app target, Rust source, or generated source entered the gate.
 
+The first Gate B attempt mapped all 14 V2 packages and reached the REAPI build
+script, then stopped with `REPLAN`: each vendored protoc platform crate embeds
+its compile-sandbox `CARGO_MANIFEST_DIR`, which does not exist in the later
+build-script sandbox. Declaring only the selected executable as a
+`cargo_build_script.tools` input is also insufficient in rules_rust 0.73.0:
+that attribute supplies exec-configured location expansion but is omitted from
+the runner action's tools depset. No Cargo input or lock changed in this stopped
+attempt.
+
+`WP-10-m8-bazel-cli-production-protoc-bridge` corrects only that boundary. The
+module imports stable apparent names for the eight locked platform executable
+repositories; a root target selects by execution OS/CPU without a default, and
+an action-input-bearing data aggregate carries the raw files into the sandbox.
+The REAPI build script receives the selected path through private
+`SLUG_BAZEL_PROTOC`, while ordinary Cargo retains
+`protoc_bin_vendored::protoc_bin_path()`. It continues to consume exactly the
+five checked-in protos from the materialized `CARGO_MANIFEST_DIR`. This packet
+may regenerate only the rendering and module locks before proving the complete
+CLI production build.
+
+Gate B is accepted. The 14 V2 packages now have one production library target
+each, `src/main.rs` is owned only by `//app/slug_cli_v2:slug`, and the reachable
+app closure is exactly those 14 packages. Bzlmod imports all eight locked
+vendored-protoc repositories under stable apparent names; the exec-configured
+tool selection has no unsupported-platform default, while the distinct data
+aggregate supplies every raw executable to the rules_rust 0.73 runner action.
+The credential-free nightly Bazel build exercised REAPI generation and built
+the production binary successfully. Serial Cargo checks for `slug_reapi_v2`
+and `slug_cli_v2` passed through the vendored fallback. Cargo, rendering, and
+module lock hashes remained stable under a final no-repin `bazel mod deps`;
+archive, formatting, diff, scope, and the 444-line handwritten net cap passed.
+Independent reserved review returned `ACCEPT`. No rc, remote, test target,
+generated source, Cargo input, or M2/M5/M6 surface entered the gate.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
