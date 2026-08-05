@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -12,4 +12,38 @@ rust_library(
         "//allocative/allocative",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "slug_identity_v2_test",
+    crate = ":slug_identity_v2",
+    size = "small",
+    visibility = ["//visibility:private"],
+)
+
+rust_test(
+    name = "label_roundtrip_test",
+    srcs = ["tests/label_roundtrip.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_identity_v2"],
+)
+
+rust_test(
+    name = "layout_test",
+    srcs = ["tests/layout.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_identity_v2"],
+)
+
+rust_test(
+    name = "pattern_test",
+    srcs = ["tests/pattern.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_identity_v2"],
 )

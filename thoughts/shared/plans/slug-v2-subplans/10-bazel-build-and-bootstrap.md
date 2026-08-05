@@ -355,6 +355,15 @@ scope, cap, and diff gates passed, and independent latest-diff review returned
 fixture, platform, process, daemon, generated input, or remote surface changed.
 The next packet maps only the fixture-free events and identity tests.
 
+The events/identity packet is accepted. Two crate-mode unit targets and three
+source-owned identity integration targets pass credential-free nightly Bazel
+5/5 and serial Cargo 29/29. The integrations depend only on the identity
+library, and the unit targets reuse the accepted production crates. All three
+lock hashes remain stable after no-repin module evaluation; archive, scope,
+43-net/140-line cap, and diff gates pass. Independent review returned `ACCEPT`
+with no adapter or dependency correction. Next map only the workspace library
+unit target and its declared dev-only Tokio edge.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

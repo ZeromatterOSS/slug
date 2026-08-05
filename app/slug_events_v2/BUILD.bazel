@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -13,4 +13,11 @@ rust_library(
         "//gazebo/dupe",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "slug_events_v2_test",
+    crate = ":slug_events_v2",
+    size = "small",
+    visibility = ["//visibility:private"],
 )

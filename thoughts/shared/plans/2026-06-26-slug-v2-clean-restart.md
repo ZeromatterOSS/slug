@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, and its first six Bazel integration targets pass the same 40 cases as Cargo with stable locks | the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; Bzlmod lockfile scratch and core host-tool ownership need separate designs; cache/RBE and self-hosting remain | `WP-10-m8-bazel-events-identity-tests-implementation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with its first 11 Bazel targets passing 69 Cargo-equivalent cases and stable locks | the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; Bzlmod lockfile scratch and core host-tool ownership need separate designs; cache/RBE and self-hosting remain | `WP-10-m8-bazel-workspace-unit-test-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-events-identity-tests-implementation`.
+`WP-10-m8-bazel-workspace-unit-test-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
