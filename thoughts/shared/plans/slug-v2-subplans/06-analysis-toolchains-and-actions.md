@@ -4229,14 +4229,50 @@ Eq/Ord/Hash mutation coverage. Validation passed: focused configuration tests
 no-Cargo, and diff gates. No converter, core, DICE, driver, capture, Cargo, or
 command/configured-target behavior changed.
 
-Run next only `WP-6-m2-production-native-conversion-schedule-driver-design`,
-docs-only. Audit and freeze the full production command entrypoint: parse
-batches/default memoization/priority/expansion/policy event production,
-request-versus-attempt/retry lifetime, first-input binding, and preflight
-stale-Windows filtering, while preserving core -> configuration direction. Add
-no Rust, Cargo, native capture, converter, DICE, configured-target, or driver
-implementation. Native capture remains **REPLAN** and user-approved
-configured-target-cycle deferral remains unchanged.
+### Production native conversion schedule-driver design REPLAN (2026-08-05)
+
+`WP-6-m2-production-native-conversion-schedule-driver-design` is **REPLAN**
+before Rust. One-shot and daemon build/query/cquery all converge on
+`WorkspaceRuntime::drive_command`. The parser/request entrypoint before that
+one-shot/daemon split must own a chronological typed converter-event plan and
+transport it unchanged on the daemon wire; the shared driver consumes it, never
+reconstructs it. `NativeDemandSessionOwner` must be acquired first, so `Busy`
+precedes Host work, schedule materialization, and generations. It then filters
+inherited Windows-option long-name observations before repository preflight.
+
+The parser-owned immutable event plan is materialized into its schedule plus
+Host bundle, including the first configuration-input binding, exactly once per
+logical request before the first DICE updater or root attempt, and reused
+unchanged across every `Need` retry. A later logical request is fresh; abort
+restores the prior accepted bundle and terminal acceptance publishes exactly
+the new bundle. No lock may span source, observation, or DICE work. The
+chronological source phases are admin CLI,
+each unconditional RC chunk, remaining CLI, project file, config
+expansions/platform config, command `editOptions`, then invocation policy.
+Defaults are memoized, but a cold conversion is a call; a priority-rejected
+single option is no call; repeat resources call left-to-right even before a
+cardinality error. Full global parser parity additionally needs non-Host
+converter ordering/errors, so a five-row shortcut is unsound.
+
+The exact blocker is existing `PathObservationDemand` Windows option identity:
+namespace + normalized path + operation + raw UTF-16 has no `ConverterCallId`.
+The epoch rejects/deduplicates equal demands and selected paths deduplicate, so
+equal raw values at distinct calls cannot retain the distinct outcomes required
+by the accepted schema. The dedicated `WindowsOptionPathLongNameOutcome`
+already retains `Resolved` versus `IOExceptionFallback` before later lexical
+normalization; it is distinct from the older generic `WindowsLongPath` result,
+which carries only a UTF-16 path. Within the dedicated option-path
+representation, missing converter-call identity is the remaining representation
+blocker. The dependency remains core -> configuration: no reverse edge, new
+crate, or cycle. Native capture remains separate **REPLAN** and configured-target
+cycles remain explicitly user-deferred.
+
+Run next only
+`WP-6-m2-windows-option-path-per-converter-call-observation-identity-design`,
+docs-only. Design a producer-free occurrence-keyed Windows observation,
+selection, and rollback boundary without changing accepted generic observation
+semantics. Add no Rust, Cargo, fixtures, DICE, capture, converter, driver, or
+configured-target work.
 
 ### Windows option-path short-name resolution design (2026-08-05)
 
