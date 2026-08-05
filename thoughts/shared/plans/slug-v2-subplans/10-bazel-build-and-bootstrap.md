@@ -364,6 +364,14 @@ lock hashes remain stable after no-repin module evaluation; archive, scope,
 with no adapter or dependency correction. Next map only the workspace library
 unit target and its declared dev-only Tokio edge.
 
+The workspace unit packet is accepted. One private crate-mode target inherits
+the production library and adds only generated `normal_dev` aliases/deps for
+the declared Tokio dev edge. Bazel passes the target; serial Cargo passes all
+39 Linux-active cases while the two Windows-only cases remain source-owned and
+cfg-excluded. The three locks remain stable, and archive, scope, +9-net/80-line,
+diff, and independent review gates pass. Next map only the query library unit
+target and fixture-free six-case parser integration.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

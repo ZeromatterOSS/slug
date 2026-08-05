@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -16,4 +16,13 @@ rust_library(
         "//starlark-rust/starlark_map",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "slug_workspace_v2_test",
+    aliases = aliases(normal_dev = True),
+    crate = ":slug_workspace_v2",
+    deps = all_crate_deps(normal_dev = True),
+    size = "small",
+    visibility = ["//visibility:private"],
 )
