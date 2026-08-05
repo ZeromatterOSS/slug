@@ -399,6 +399,18 @@ All three locks remain stable, and archive, scope, 81-net/190-line, diff, and
 independent review gates pass. Next map only the REAPI integration crate while
 leaving its NativeLink service case ignored by default.
 
+The REAPI integration packet is accepted. Its first compile exposed one exact
+metadata omission: the ignored `#[tokio::test]` function is still compiled, so
+the standalone crate needs the direct Tokio label in addition to REAPI,
+build-API, and `prost`. The bounded correction adds only that label; no broad
+dependency helper, endpoint, service, env, data, tool, or generated-source
+owner enters the target. Credential-free nightly Bazel passes, and serial Cargo
+reports 13 passed/one ignored with `SLUG_V2_NATIVELINK_ENDPOINT` explicitly
+unset. All three lock hashes remain stable; archive, scope, cap, diff, and
+focused correction review gates pass at 30 net lines against the 100-line cap.
+Next map the six loading targets while
+preserving their platform cfgs and synthetic scratch-workspace behavior.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

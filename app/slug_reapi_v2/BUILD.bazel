@@ -1,5 +1,5 @@
 load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -38,4 +38,18 @@ rust_library(
         "//app/slug_build_api_v2",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "reapi_test",
+    srcs = ["tests/reapi.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        ":slug_reapi_v2",
+        "//app/slug_build_api_v2",
+        "@slug_crates//:prost",
+        "@slug_crates//:tokio",
+    ],
 )
