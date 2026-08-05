@@ -1845,6 +1845,7 @@ mod label_only_converter_contract {
 
     use super::super::label_convert::LabelConvertError;
     use super::super::label_convert::LabelFamily;
+    use super::super::label_convert::LabelToStringEntry;
     use super::super::label_convert::LabelValue;
     use super::super::label_convert::LabelValues;
     use super::super::label_convert::classify as classify_label;
@@ -1882,6 +1883,13 @@ mod label_only_converter_contract {
         value
     }
 
+    fn label_to_string_entry(value: Option<LabelValue>) -> LabelToStringEntry {
+        let Some(LabelValue::LabelToStringEntry(value)) = value else {
+            panic!("expected a label-to-string entry")
+        };
+        value
+    }
+
     fn unsupported(name: &str) {
         assert_eq!(classify_label(option(name)), None, "{name}");
         assert_eq!(
@@ -1893,10 +1901,15 @@ mod label_only_converter_contract {
             Err(LabelConvertError::Unsupported),
             "{name}"
         );
+        assert_eq!(
+            materialize_label_default(option(name), OptionLabelContext::FirstRoundCanonical),
+            Err(LabelConvertError::Unsupported),
+            "{name} default"
+        );
     }
 
     #[test]
-    fn admits_exactly_thirty_routes_and_leaves_all_other_cohorts_deferred() {
+    fn admits_exactly_thirty_seven_routes_and_leaves_map_alias_and_other_cohorts_deferred() {
         let mut admitted = 0;
         let mut label_deferred = 0;
         let mut mixed = 0;
@@ -1906,14 +1919,7 @@ mod label_only_converter_contract {
             admitted += usize::from(classify_label(option).is_some());
             label_deferred += usize::from(matches!(
                 option.converter,
-                Some(
-                    "HostPlatformConverter.class"
-                        | "CoreOptionConverters.LabelConverter.class"
-                        | "CoreOptionConverters.EmptyToNullLabelConverter.class"
-                        | "LabelMapConverter.class"
-                        | "LabelToStringEntryConverter.class"
-                        | "CoreOptionConverters.FlagAliasConverter.class"
-                )
+                Some("LabelMapConverter.class" | "CoreOptionConverters.FlagAliasConverter.class")
             ));
             mixed += usize::from(matches!(
                 option.converter,
@@ -1940,7 +1946,7 @@ mod label_only_converter_contract {
         }
         assert_eq!(
             (admitted, label_deferred, mixed, host, regex),
-            (30, 9, 2, 5, 8)
+            (37, 2, 2, 5, 8)
         );
         assert_eq!(admitted + label_deferred + mixed, 41);
         let mut actual = NATIVE_OPTION_DESCRIPTORS
@@ -1979,19 +1985,19 @@ mod label_only_converter_contract {
             "android_platforms",
             "grte_top",
             "host_grte_top",
-        ];
-        actual.sort_unstable();
-        expected.sort_unstable();
-        assert_eq!(actual, expected);
-        for name in [
             "host_platform",
             "proto_compiler",
             "proto_toolchain_for_cc",
             "proto_toolchain_for_j2objc",
             "proto_toolchain_for_java",
             "proto_toolchain_for_javalite",
-            "bytecode_optimizers",
             "experimental_override_platform_cpu_name",
+        ];
+        actual.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(actual, expected);
+        for name in [
+            "bytecode_optimizers",
             "flag_alias",
             "run_under",
             "experimental_propagate_custom_flag",
@@ -2139,12 +2145,20 @@ mod label_only_converter_contract {
     }
 
     #[test]
-    fn admitted_defaults_are_literal_null_or_empty_only_when_their_route_allows_it() {
+    fn original_thirty_route_defaults_are_literal_null_or_empty_only_when_their_route_allows_it() {
         let mut seen = 0;
-        for option in NATIVE_OPTION_DESCRIPTORS
-            .iter()
-            .filter(|option| classify_label(option).is_some())
-        {
+        for option in NATIVE_OPTION_DESCRIPTORS.iter().filter(|option| {
+            matches!(
+                classify_label(option),
+                Some(
+                    LabelFamily::Label
+                        | LabelFamily::EmptyToNull
+                        | LabelFamily::List
+                        | LabelFamily::OrderedSet
+                        | LabelFamily::LibcTop
+                )
+            )
+        }) {
             seen += 1;
             let actual =
                 materialize_label_default(option, OptionLabelContext::FirstRoundCanonical).unwrap();
@@ -2171,13 +2185,220 @@ mod label_only_converter_contract {
             }
         }
         assert_eq!(seen, 30);
-        assert_eq!(
-            materialize_label_default(
-                option("host_platform"),
-                OptionLabelContext::FirstRoundCanonical
-            ),
-            Err(LabelConvertError::Unsupported)
+    }
+
+    #[test]
+    fn seven_routes_pin_literal_defaults_contexts_and_empty_behavior() {
+        let mut mapping = mapping();
+        mapping.insert(
+            ApparentRepoName::new("bazel_tools").unwrap(),
+            CanonicalRepoName::new("mapped_tools").unwrap(),
         );
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        let defaults = [
+            (
+                "host_platform",
+                "DEFAULT_HOST_PLATFORM",
+                "@bazel_tools//tools:host_platform",
+                LabelFamily::HostPlatform,
+            ),
+            (
+                "proto_compiler",
+                "ProtoConstants.DEFAULT_PROTOC_LABEL",
+                "@bazel_tools//tools/proto:protoc",
+                LabelFamily::CoreLabel,
+            ),
+            (
+                "proto_toolchain_for_cc",
+                "ProtoConstants.DEFAULT_CC_PROTO_LABEL",
+                "@bazel_tools//tools/proto:cc_toolchain",
+                LabelFamily::CoreEmptyToNull,
+            ),
+            (
+                "proto_toolchain_for_j2objc",
+                "ProtoConstants.DEFAULT_J2OBJC_PROTO_LABEL",
+                "@bazel_tools//tools/j2objc:j2objc_proto_toolchain",
+                LabelFamily::CoreEmptyToNull,
+            ),
+            (
+                "proto_toolchain_for_java",
+                "ProtoConstants.DEFAULT_JAVA_PROTO_LABEL",
+                "@bazel_tools//tools/proto:java_toolchain",
+                LabelFamily::CoreEmptyToNull,
+            ),
+            (
+                "proto_toolchain_for_javalite",
+                "ProtoConstants.DEFAULT_JAVA_LITE_PROTO_LABEL",
+                "@bazel_tools//tools/proto:javalite_toolchain",
+                LabelFamily::CoreLabel,
+            ),
+        ];
+        for (name, raw_default, literal, family) in defaults {
+            let option = option(name);
+            assert_eq!(option.raw_default, raw_default, "{name}");
+            assert_eq!(classify_label(option), Some(family), "{name}");
+            assert_eq!(
+                scalar(
+                    materialize_label_default(option, OptionLabelContext::FirstRoundCanonical)
+                        .unwrap()
+                ),
+                format!("@@{}", literal.strip_prefix('@').unwrap()),
+                "{name} first round"
+            );
+            assert_eq!(
+                scalar(
+                    materialize_label_default(
+                        option,
+                        OptionLabelContext::MainRepository { mapping: &mapping },
+                    )
+                    .unwrap()
+                ),
+                format!(
+                    "@@mapped_tools{}",
+                    literal.strip_prefix("@bazel_tools").unwrap()
+                ),
+                "{name} mapped main repository"
+            );
+            assert_eq!(
+                scalar(
+                    materialize_label_default(
+                        option,
+                        OptionLabelContext::Package {
+                            base_package: &base,
+                            mapping: &mapping,
+                        },
+                    )
+                    .unwrap()
+                ),
+                format!(
+                    "@@mapped_tools{}",
+                    literal.strip_prefix("@bazel_tools").unwrap()
+                ),
+                "{name} mapped package"
+            );
+        }
+
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    option("host_platform"),
+                    "",
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap()
+            ),
+            "@@bazel_tools//tools:host_platform"
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    option("host_platform"),
+                    "",
+                    OptionLabelContext::MainRepository { mapping: &mapping },
+                )
+                .unwrap()
+            ),
+            "@@mapped_tools//tools:host_platform"
+        );
+        for name in [
+            "proto_toolchain_for_cc",
+            "proto_toolchain_for_j2objc",
+            "proto_toolchain_for_java",
+        ] {
+            assert_eq!(
+                convert_label_occurrence(option(name), "", OptionLabelContext::FirstRoundCanonical),
+                Ok(None),
+                "{name}"
+            );
+        }
+        for name in ["proto_compiler", "proto_toolchain_for_javalite"] {
+            assert_eq!(
+                convert_label_occurrence(option(name), "", OptionLabelContext::FirstRoundCanonical),
+                Err(LabelConvertError::Invalid),
+                "{name} parses empty through the ordinary label path"
+            );
+        }
+    }
+
+    #[test]
+    fn label_to_string_entry_is_exactly_one_untrimmed_assignment() {
+        let option = option("experimental_override_platform_cpu_name");
+        assert_eq!(
+            classify_label(option),
+            Some(LabelFamily::LabelToStringEntry)
+        );
+        assert!(option.allow_multiple);
+        assert_eq!(option.raw_default, "\"null\"");
+        assert_eq!(
+            materialize_label_default(option, OptionLabelContext::FirstRoundCanonical),
+            Ok(None)
+        );
+        for input in [
+            "",
+            "plain",
+            "=value",
+            "label=",
+            "label==value",
+            "label=value=tail",
+        ] {
+            assert_eq!(
+                convert_label_occurrence(option, input, OptionLabelContext::FirstRoundCanonical),
+                Err(LabelConvertError::Invalid),
+                "{input:?}"
+            );
+        }
+
+        let whitespace = label_to_string_entry(
+            convert_label_occurrence(
+                option,
+                "//platforms:one=  exact value\t",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert_eq!(whitespace.label.to_string(), "//platforms:one");
+        assert_eq!(whitespace.value.as_str(), "  exact value\t");
+
+        let mapping = mapping();
+        let mapped = label_to_string_entry(
+            convert_label_occurrence(
+                option,
+                "@alias//platforms:one=value",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert_eq!(mapped.label.to_string(), "@@mapped//platforms:one");
+        assert_eq!(mapped.value.as_str(), "value");
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        let relative = label_to_string_entry(
+            convert_label_occurrence(
+                option,
+                ":relative=value",
+                OptionLabelContext::Package {
+                    base_package: &base,
+                    mapping: &mapping,
+                },
+            )
+            .unwrap(),
+        );
+        assert_eq!(relative.label.to_string(), "@@owner//base:relative");
+        assert_eq!(relative.value.as_str(), "value");
+        let nonvisible = label_to_string_entry(
+            convert_label_occurrence(
+                option,
+                "@missing//platforms:one=value",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            nonvisible.label.to_string(),
+            "@@[unknown repo 'missing' requested from @@]//platforms:one"
+        );
+
+        fn allocative<T: Allocative>() {}
+        allocative::<LabelToStringEntry>();
     }
 
     #[test]

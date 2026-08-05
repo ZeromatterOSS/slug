@@ -4475,6 +4475,25 @@ private additions only to existing `native/label_convert.rs` and `native/tests.r
 (scheduling docs terminal-only), no Cargo/mod/identity or broader work; caps are
 240 production, 420 test, 100 documentation, and 760 total formatted net lines.
 
+### Seven-route label converter implementation ACCEPT (2026-08-05)
+
+`WP-6-m2-label-seven-route-converter-implementation` is **ACCEPT**. It admits
+exactly 37 label routes and leaves LabelMap/FlagAlias as the two deferred label
+routes. The private extension adds the six literal defaults and
+LabelToStringEntry, preserves mapping-free values, and covers first-round, main,
+and package contexts. Its private delimiter failures return `LabelConvertError::Invalid`;
+the fixed source diagnostic and all user-facing diagnostic projection remain
+deferred. User-approved configured-target cycles remain explicitly deferred.
+
+Focused validation reports 24/24 tests, crate check, GNU-Windows tests check,
+formatting, archive, scope, cap, and diff gates green. Formatted net is 128
+production Rust plus 221 test Rust (349 Rust net); the complete five-file diff
+is 357 net. Run next only
+`WP-6-m2-label-map-and-flag-alias-library-semantics-evidence`: docs/source only
+for Guava 33.5.0 Splitter/CharMatcher trimming/order/duplicate behavior and JDK
+25 Pattern `\w` plus exact FlagAlias validation/diagnostics; retain
+converter-versus-command-alias/normalization ownership.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
