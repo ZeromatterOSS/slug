@@ -1095,3 +1095,53 @@ Resume `WP-6-m2-positive-string-build-setting-transition-implementation` from
 this clean baseline under its already accepted root-key graph, seven
 production/three test allowlists, 850/450/1,300 caps, internal-only
 observability, and all general-configuration/public-command/execution stops.
+
+### Positive string build-setting transition implementation acceptance (2026-08-04)
+
+**Status: ACCEPTED at `dfc1705e`.** The eight-file implementation adds one
+compact semantic string-setting overlay and request/resolved modes to the
+existing root configured-analysis key family. Request mode validates the exact
+root setting declaration before resolving explicit/default value. Resolved
+semantic roots retain named direct versus singleton-sequence dependencies,
+apply and validate the one-output user transition before child-key creation,
+deduplicate full configured keys, and recurse only through root keys. Ordinary
+root configurations retain their legacy dependency extractor, and the legacy
+configured-analysis key has zero new activations.
+
+The final patch is 514 formatted production and exactly 450 test lines, 964
+total. A retained-DICE lifecycle proves direct default, command, explicit
+default-equivalent restoration, unchanged warm wrapper reuse, distinct
+left/right children of the same label, transition edit/restoration, BUILD
+default edit/restoration, exact custom provider values, empty actions, and a
+sorted exact 33-event request/resolved activation multiset with zero legacy
+keys. Ten consecutive lifecycle runs pass after correcting sibling activation
+order from an invalid ordered assertion.
+
+All 111 loading tests and 16 analysis tests pass. Full core passes 125/126;
+the sole failure is the documented clean-baseline external visibility wording
+mismatch. GNU-Windows no-run passes for loading, analysis, and core.
+Formatting, archive, diff, scope, cap, forbidden-boundary, and independent
+latest-diff reviews pass. No public build/cquery flag, wire, formatter,
+diagnostic, action, or REAPI behavior changed. The retained utility audit
+accepts `CompactString`, immutable `Arc` slices, and existing ordered
+`SmallMap`/`SmallSet`, with no interner or new hashing.
+
+### First-compatible toolchain evidence replan (2026-08-04)
+
+**Status: REPLAN before production integration.** Parallel live and pinned
+Bazel audits found that the existing toolchain resolver is only hand-built
+pure test data: its registration key is not a DICE key, root module evaluation
+does not retain registrations, loading has none of the native toolchain or
+platform target kinds, `rule()` cannot declare toolchains, and analysis lacks
+`ctx.toolchains`. The two named toolchain fixtures are ungenerated scaffolds
+without Bazel provenance and observe build actions; the other planned fixtures
+do not exist. Wiring the dormant resolver now would create an input with no
+semantic consumer.
+
+Run next only `WP-6-m2-positive-first-compatible-toolchain-oracle`. Rewrite
+the dormant first-platform scaffold as a six-command Bazel 9.2 provider-only
+cquery oracle proving initial/warm/reordered/restored platform selection plus
+registered toolchain marker edit/restoration. It must expose no configuration,
+platform label, action, output, or diagnostic identity. After acceptance,
+design root registration, native declarations, DICE resolution, and prepared
+toolchain context ownership before Rust.
