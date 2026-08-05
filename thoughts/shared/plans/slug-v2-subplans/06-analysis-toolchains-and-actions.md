@@ -1006,3 +1006,31 @@ Implement next only
 `REPLAN` for general options/checksums, broader build settings or transitions,
 public cquery or exact failure diagnostics, another graph, direct filesystem
 or global state, lock-across-compute, an outside file, or a cap breach.
+
+### Positive string build-setting transition implementation replan (2026-08-04)
+
+**Status: REPLAN; partial Rust was discarded and the worktree is clean at
+`7d39c759`.** A Terra worker implemented the bounded representation, loading,
+and root-key path far enough for the focused fixture-shaped analysis test to
+reach provider decoding. `evaluate_loaded_rule` then passed the custom-only
+return to strict `ProviderCollection::new`, which failed exactly with
+`collection did not receive a DefaultInfo provider`. All three accepted
+fixture rules return only custom providers. The worker removed every partial
+edit with `apply_patch`; status, diff, and diff-check are clean.
+
+Live ownership shows an existing permissive `ProviderCollection::from_values`
+constructor and a two-file decoder-only route, but pinned Bazel 9.2 source
+proves that permissive configured-target absence would be inexact. Bazel
+accepts omitted `DefaultInfo`, creates an implicit empty default, and exposes
+it through target indexing, membership, and cquery `providers(target)`. The
+accepted transition fixture proves custom-only returns succeed but does not
+observe that implicit default, so it cannot decide between absence and
+synthesis. Changing the provider representation or fabricating a result inside
+the stopped packet would exceed its allowlist and evidence.
+
+Run next only `WP-6-m2-implicit-default-info-provider-oracle`. Add one isolated
+six-file, four-command positive Bazel 9.2 fixture comparing custom-only,
+explicit-empty, dependency indexing, and warm replay through named semantic
+fields. Do not enumerate providers or add failures, Rust, public cquery, or
+execution behavior. After acceptance, design the exact decoder normalization
+owner before resuming string-setting transitions.

@@ -25,8 +25,8 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active** | recursive configured analysis, bounded root Starlark-label cquery in `135b0567`, positive string build-setting/transition evidence in `b12774b9`, and an accepted single-root-key-family semantic design | implement the bounded semantic configuration owner, then general option and failure-diagnostic identity, toolchain/platform, repository-mapping, and broader action ownership gates | implement `WP-6-m2-positive-string-build-setting-transition-implementation` |
-| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the M2 string-transition implementation is current |
+| M2: analysis graph | **active, replan** | recursive configured analysis, bounded root Starlark-label cquery in `135b0567`, positive string build-setting/transition evidence in `b12774b9`, and an accepted single-root-key-family semantic design | custom-only Starlark returns require evidence for Bazel's implicit empty `DefaultInfo`, then decoder normalization before semantic configuration implementation can resume | run `WP-6-m2-implicit-default-info-provider-oracle` |
+| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the M2 provider-normalization prerequisite is current |
 | M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-6-m2-positive-string-build-setting-transition-implementation`.
+`WP-6-m2-implicit-default-info-provider-oracle`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -64,8 +64,12 @@ reuse, transition edit/restoration, and default edit/restoration are exact and
 checksum-free. The accepted design keeps configuration resolution and
 recursive analysis in request/resolved modes of the existing root key family,
 uses the effective compact string as the new semantic discriminator, and keeps
-all public command observation unchanged. The active implementation is
-internal; invalid transition diagnostics remain deferred.
+all public command observation unchanged. Its implementation stopped cleanly
+at a pre-existing provider decoder invariant: Slug requires an explicitly
+returned `DefaultInfo`, while Bazel accepts custom-only returns and observes an
+implicit empty default. The active positive oracle now pins that normalization
+before a decoder design and the internal transition retry; invalid transition
+diagnostics remain deferred.
 
 The retained Bazel 9.2 evidence pins default and explicit `label` output to the
 same `//parent:parent (a7a71fd)` bytes. Pinned source and live audits prove even
