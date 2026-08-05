@@ -33,9 +33,10 @@ Allowlist:
 - `app/slug_configuration_v2/src/native/registry.rs`
 - `app/slug_configuration_v2/src/native/cache_grammar.rs`
 - `app/slug_configuration_v2/src/native/tests.rs`
+- `scripts/v2_archive_status.sh` (only the new V2 crate allowlist entry)
 
 Caps: 2,400 production, 1,400 test, 3,800 total formatted net lines across
-seven files. The intentionally ignored workspace `Cargo.lock`, existing crates,
+eight files. The intentionally ignored workspace `Cargo.lock`, existing crates,
 generated source/data, fixtures, oracle records, and external dependency
 versions must not change.
 

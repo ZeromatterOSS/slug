@@ -2203,7 +2203,8 @@ schemas. The bounded packet creates `slug_configuration_v2`, retains the exact
 native `NULL`/`EMPTY`/quoted-escape cache-field grammar.
 
 Allow only root `Cargo.toml` and the new crate's `Cargo.toml`, `src/lib.rs`,
-`src/native/{mod,registry,cache_grammar,tests}.rs`: seven files, 2,400
+`src/native/{mod,registry,cache_grammar,tests}.rs`, plus the single new-crate
+allowlist entry in `scripts/v2_archive_status.sh`: eight files, 2,400
 production, 1,400 test, and 3,800 total formatted net lines. The workspace
 intentionally ignores `Cargo.lock`; do not track or modify it. Use a static
 descriptor slice—no generated source, map, interner, cache, global, weak hash,
