@@ -1,59 +1,58 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-bazel-9-target-configuration-input-ledger`
+Packet: `WP-6-m2-native-configuration-metadata-and-cache-grammar`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze the complete Bazel 9.2 input and ownership ledger before any
-configuration implementation packet.
-Predecessor: `WP-6-m2-general-target-configuration-input-chain-design`, which
-returned `REPLAN` after pinned source corrected the native registry from
-fourteen classes to seventeen classes and 341 cache-key options.
+Role: introduce the source-complete native configuration descriptor boundary
+without executing context-dependent option semantics.
+Predecessor: the accepted `WP-6-m2-bazel-9-target-configuration-input-ledger`,
+which records all 17 classes/341 options, every graph-derived input and owner,
+and the required serial implementation route.
 
-This is pinned-source/documentation work only. Build a complete auditable
-ledger for Bazel 9.2 commit `8220c619` that records:
+Create a lowest-level `slug_configuration_v2` crate containing:
 
-- all seventeen registered native `FragmentOptions` classes in fully qualified
-  checksum order, all 341 cache-key options, defaults, converters, repeat/
-  expansion/implicit-requirement/old-name behavior, fragment normalization,
-  and final option-name ordering and encoding;
-- every non-native input before `BuildOptions#checksum`: rc/config expansion,
-  explicit command flags, host/environment observations, CPU and platform
-  defaults, repository-mapped labels, platform mapping source and result,
-  selected-platform flags, canonical Starlark build-setting values and default
-  elision, option scopes, `PROJECT.scl` baselines, and loading Needs;
-- exactly one eventual owner for each input across typed command
-  normalization, one-shot/daemon wire identity, per-attempt DICE injection,
-  Host/loading observations, target-configuration production, and analysis
-  configuration identity/transitions; and
-- the parse/Need/error/invalidation/equality contract, including one-shot C0
-  equality with daemon C0 and exact same-daemon `C0 -> C1 -> C0` restoration
-  for native flags, platform mappings/flags, Starlark values/defaults/scopes,
-  and acyclic recursive transitions.
+- one immutable static descriptor slice for all 341 pinned Bazel 9.2 options,
+  preserving fully qualified class order and option-name order;
+- every ledgered canonical name, old name, raw default literal/source
+  expression, field type, converter identifier, repeat flag, expansion,
+  implicit requirements, and class normalizer identifier; and
+- the exact native cache-field grammar for `NULL`, `EMPTY`, and quoted scalar
+  values with backslash/quote escaping, without computing a mixed checksum.
 
-Freeze a serial implementation sequence and a concrete first implementation
-packet only after every ledger row is source-backed and owned. The expected
-layers are typed native vocabulary/normalization; shared command/wire request
-identity; Host/platform-mapping/platform-flag graph inputs; Starlark values,
-defaults, and scopes; and finally one transactional producer plus checksum,
-analysis-key, transition, build, and cquery integration. Do not collapse those
-layers merely to avoid `REPLAN`.
+The crate may initially use only retained utility dependencies. Apply
+`.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing: prefer a
+static slice and borrowed static strings, with no runtime map, interner, cache,
+global, or invented hash. Preserve descriptor identity structurally.
 
-Documentation allowlist:
+Allowlist:
 
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- scheduling synchronization in this manifest and the canonical plan
-- one terminal routing-log row and its required bounded-history rotation
+- `Cargo.toml`
+- `Cargo.lock` (only the new local workspace-package record)
+- `app/slug_configuration_v2/Cargo.toml`
+- `app/slug_configuration_v2/src/lib.rs`
+- `app/slug_configuration_v2/src/native/mod.rs`
+- `app/slug_configuration_v2/src/native/registry.rs`
+- `app/slug_configuration_v2/src/native/cache_grammar.rs`
+- `app/slug_configuration_v2/src/native/tests.rs`
 
-Cap the ledger at 680 formatted documentation lines. No Rust, test, fixture,
-oracle, dependency, generated-file, command-wire, or DICE change is authorized.
+Caps: 2,400 production, 1,400 test, 3,800 total formatted net lines across
+eight files. Existing crates, generated source/data, fixtures, oracle records,
+and external dependency versions must not change.
 
-Stop on any missing or ambiguous registered option, default, converter,
-normalizer, ordering/encoding rule, host observation, platform mapping/flag,
-Starlark value/default/scope, loading edge, or eventual owner; caller-supplied
-checksum or `first-build`; duplicate one-shot/daemon parsing; failed
-normalization producing an accepted snapshot; a new runtime key/cache/global/
-lock/interner; configured artifacts, execution-platform retention, Bazel
-ActionKey, cquery/aquery formatting, execution/cache/materialization; or cap
-breach. Configured-target dependency-cycle semantics are explicitly deferred
-with user approval; this packet specifies only acyclic recursive configuration
-transitions.
+Acceptance requires source-backed tests for exactly 17 ordered classes and 341
+unique ordered options. Tests must carry an independent compact pinned expected
+row for every descriptor—not expectations derived from the production slice—
+and compare every metadata field. They must also call out the three formerly
+missed rows `test_filter`, `xcode_version`, and `start_end_lib`; old-name,
+repeat, expansion, implicit-requirement, constant-default, and all P/C/T
+normalizer metadata families; and exact `NULL`/`EMPTY`/backslash/quote
+cache-field bytes. Run crate tests, formatting, workspace/archive/scope/cap/
+diff checks, and independent retained-representation review.
+
+Stop on any omitted/duplicated/misordered descriptor or metadata field; source
+ambiguity; converter execution; typed/default value normalization; argv, RC,
+`--config`, Host OS/CPU, repository mapping, label resolution, platform,
+Starlark setting/scope, `PROJECT.scl`, transition, command/wire, DICE, checksum,
+analysis-key, configured-path/platform/ActionKey/aquery/execution work; a new
+map/interner/cache/global/hash; or cap breach. Configured-target dependency
+cycles remain deferred with user approval.

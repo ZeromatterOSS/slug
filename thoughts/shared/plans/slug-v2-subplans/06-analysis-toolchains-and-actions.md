@@ -1726,3 +1726,490 @@ Configured artifacts, per-action execution platforms, Bazel ActionKey,
 cquery/aquery formatting, and execution remain downstream. Configured-target
 dependency-cycle semantics are deferred with user approval; the retained
 closure and the configuration ledger cover acyclic recursion only.
+
+### Bazel 9.2 native target-option ledger (pinned `8220c6198837d5c13d53fea211cf3282aa12408a`)
+
+**Status: complete native inventory — 17 registered `FragmentOptions` classes, 341
+unique canonical cache-key options.** This is an input contract, not Slug
+implementation authorization. Each source value below was read only through
+`git -C ../bazel show 8220c6198837d5c13d53fea211cf3282aa12408a:<path>`; the
+sibling checkout's newer `HEAD` was not consulted.
+
+**Row notation.** Rows are canonical-option-name order within the FQCN-order class
+heading: `t` field type, `d` exact annotation default literal/source expression,
+`c` converter (`-` = annotation's built-in `Converter.class`), `m`
+`allowMultiple`, `old` oldName, `x` expansion, `i` implicitRequirements, `N`
+normalizer, and the exact pinned annotation line. `-` means the annotation's
+empty/default member. `d="null"` has the `Option.java` special default meaning:
+null for non-repeatable fields and `[]` for `m=T`; repeatable flags otherwise
+default to `[]` (their annotation default is ignored). A default is parsed by its
+converter, so the literal/source expression—not a help rendering—is authoritative.
+
+**Registration, ordering, and encoding.** `FragmentRegistry.create` collects fragment
+requirements plus additional options into `ImmutableSortedSet` using
+`BuildOptions.LEXICAL_FRAGMENT_OPTIONS_COMPARATOR` (`Class::getName`): this heading
+order is the required FQCN checksum order. `BuildOptions.Builder.addFragmentOptions`
+first calls `getNormalized`, then sorts fragment-map keys by that comparator;
+`checksum()` fingerprints each native `cacheKey()` in that order, then
+canonical-label-sorted Starlark values and scopes. `OptionsBase.asMap()` uses
+`IsolatedOptionsData.getAllOptionDefinitionsForClass`, whose fields are sorted by
+canonical option name: the row order is therefore the per-fragment cache-key order.
+`mapToCacheKey` emits `name=EMPTY, ` for an empty `List`, `name=NULL, ` for null,
+and otherwise quoted `ESCAPER.escape(value.toString())`; the escaper maps `\` to
+`\\` and `"` to `\"`. Class cache keys are
+`FQCN{<map>}`. Empty native-and-Starlark options checksum to 64 zeroes.
+
+**Normalizer legend.** `I` is inherited identity. `P` clones then makes
+`extraToolchains` non-null and deduplicates keeping last, and keeps only the first
+`platforms` value. `C` clones then dedup/sorts `allowedCpuValues`; keeps-last then
+key-sorts `commandLineBuildVariables` and `commandLineFlagAliases`; canonicalizes
+`defaultFeatures` (sorted enables followed by sorted disables; disable wins); and
+keeps-last environment entries in `actionEnvironment` and `hostActionEnvironment`.
+`T` clones then keeps the last `testEnvironment` entry per variable name. Thus `N`
+is the class-level effect applied before every native cache key, including rows not
+mutated by that particular normalizer.
+
+**Pinned anchors.** Registry: `src/main/java/com/google/devtools/build/lib/analysis/config/FragmentRegistry.java:L28-L54`; class comparator/checksum/normalizing builder: `src/main/java/com/google/devtools/build/lib/analysis/config/BuildOptions.java:L73-L75,L180-L192,L402-L407,L479-L497`; option-name order: `src/main/java/com/google/devtools/common/options/IsolatedOptionsData.java:L63-L82`; cache encoding: `src/main/java/com/google/devtools/common/options/OptionsBase.java:L75-L109`; annotation default/repeat/expansion/old-name semantics: `src/main/java/com/google/devtools/common/options/Option.java:L51-L58,L138-L184`; normalization base/helpers: `src/main/java/com/google/devtools/build/lib/analysis/config/FragmentOptions.java:L61-L129`; P/C/T overrides: the per-class files at `L189-L201`, `L1186-L1257`, and `L407-L411`, respectively.
+
+#### 01. `com.google.devtools.build.lib.analysis.PlatformOptions` — 7 options; N=P; pinned `src/main/java/com/google/devtools/build/lib/analysis/PlatformOptions.java`
+01|`extra_execution_platforms`|t=`List<String>`|d=`""`|c=`CommaSeparatedOptionListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=P|@L66
+02|`extra_toolchains`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=P|@L98
+03|`host_platform`|t=`Label`|d=`DEFAULT_HOST_PLATFORM`|c=`HostPlatformConverter.class`|m=F|old=`"experimental_host_platform"`|x=`-`|i=`-`|N=P|@L52
+04|`incompatible_use_toolchain_resolution_for_java_rules`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=P|@L133
+05|`platform_mappings`|t=`PlatformMappingKey`|d=`""`|c=`PlatformMappingKeyConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=P|@L142
+06|`platforms`|t=`List<Label>`|d=`""`|c=`LabelListConverter.class`|m=F|old=`"experimental_platforms"`|x=`-`|i=`-`|N=P|@L82
+07|`toolchain_resolution_debug`|t=`RegexFilter`|d=`"-.*"`|c=`RegexFilter.RegexFilterConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=P|@L118
+#### 02. `com.google.devtools.build.lib.analysis.ShellConfiguration.Options` — 1 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/analysis/ShellConfiguration.java`
+01|`shell_executable`|t=`PathFragment`|d=`"null"`|c=`PathFragmentConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L72
+#### 03. `com.google.devtools.build.lib.analysis.config.CoreOptions` — 71 options; N=C; pinned `src/main/java/com/google/devtools/build/lib/analysis/config/CoreOptions.java`
+01|`action_env`|t=`List<Converters.EnvVar>`|d=`"null"`|c=`Converters.EnvVarsConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L525
+02|`affected by starlark transition`|t=`List<String>`|d=`""`|c=`EmptyListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L456
+03|`allow_analysis_failures`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L790
+04|`allow_unresolved_symlinks`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`"experimental_allow_unresolved_symlinks"`|x=`-`|i=`-`|N=C|@L877
+05|`allowed_cpu_values`|t=`ImmutableList<String>`|d=`""`|c=`CommaSeparatedOptionSetConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L270
+06|`analysis_testing_deps_limit`|t=`int`|d=`"2000"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L818
+07|`archived_tree_artifact_mnemonics_filter`|t=`RegexFilter`|d=`"-.*"`|c=`RegexFilter.RegexFilterConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1075
+08|`build_runfile_links`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L601
+09|`build_runfile_manifests`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L591
+10|`check_licenses`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L705
+11|`check_visibility`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L661
+12|`collect_code_coverage`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L566
+13|`compilation_mode`|t=`CompilationMode`|d=`"fastbuild"`|c=`CompilationMode.Converter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L396
+14|`cpu`|t=`String`|d=`""`|c=`AutoCpuConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L279
+15|`define`|t=`List<Map.Entry<String, String>>`|d=`"null"`|c=`Converters.AssignmentConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L255
+16|`enable_runfiles`|t=`TriState`|d=`"auto"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L954
+17|`enforce_constraints`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`"experimental_enforce_constraints"`|x=`-`|i=`-`|N=C|@L713
+18|`evaluating for analysis test`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L804
+19|`exec_aspects`|t=`List<String>`|d=`"null"`|c=`Converters.CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L1125
+20|`experimental_action_listener`|t=`List<Label>`|d=`"null"`|c=`LabelListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L724
+21|`experimental_allow_map_directory`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L896
+22|`experimental_collect_code_coverage_for_generated_files`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L580
+23|`experimental_debug_selects_always_succeed`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1087
+24|`experimental_enforce_transitive_visibility`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L670
+25|`experimental_exclude_defines_from_exec_config`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L137
+26|`experimental_exec_config`|t=`String`|d=`"@_builtins//:common/builtin_exec_platforms.bzl%bazel_exec_transition"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L97
+27|`experimental_exec_configuration_distinguisher`|t=`ExecConfigurationDistinguisherScheme`|d=`"off"`|c=`ExecConfigurationDistinguisherSchemeConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L491
+28|`experimental_extended_sanity_checks`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L306
+29|`experimental_output_directory_naming_scheme`|t=`OutputDirectoryNamingScheme`|d=`"diff_against_dynamic_baseline"`|c=`OutputDirectoryNamingSchemeConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L757
+30|`experimental_output_paths`|t=`OutputPathsMode`|d=`"off"`|c=`OutputPathsConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L932
+31|`experimental_override_platform_cpu_name`|t=`List<Map.Entry<Label, String>>`|d=`"null"`|c=`LabelToStringEntryConverter.class`|m=T|old=`"experimental_override_name_platform_in_output_dir"`|x=`-`|i=`-`|N=C|@L196
+32|`experimental_platform_in_output_dir`|t=`TriState`|d=`"Auto"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L162
+33|`experimental_propagate_custom_flag`|t=`List<String>`|d=`"null"`|c=`CoreOptionConverters.CustomFlagConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L121
+34|`experimental_remotable_source_manifests`|t=`boolean`|d=`"false"`|c=`BooleanConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1050
+35|`experimental_strict_fileset_output`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L338
+36|`experimental_throttle_action_cache_check`|t=`boolean`|d=`"true"`|c=`BooleanConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1100
+37|`experimental_use_platforms_in_output_dir_legacy_heuristic`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L182
+38|`experimental_writable_outputs`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L329
+39|`features`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L831
+40|`flag_alias`|t=`List<Map.Entry<String, Label>>`|d=`"null"`|c=`CoreOptionConverters.FlagAliasConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L1060
+41|`host_action_env`|t=`List<Converters.EnvVar>`|d=`"null"`|c=`Converters.EnvVarsConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L547
+42|`host_compilation_mode`|t=`CompilationMode`|d=`"opt"`|c=`CompilationMode.Converter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L406
+43|`host_cpu`|t=`String`|d=`""`|c=`AutoCpuConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L387
+44|`host_features`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L845
+45|`include_config_fragments_provider`|t=`IncludeConfigFragmentsEnum`|d=`"off"`|c=`IncludeConfigFragmentsEnumConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1026
+46|`incompatible_always_include_files_in_data`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L611
+47|`incompatible_auto_exec_groups`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L419
+48|`incompatible_bazel_test_exec_run_under`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1008
+49|`incompatible_bep_cpu_from_platform`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L243
+50|`incompatible_check_testonly_for_output_files`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L690
+51|`incompatible_compact_repo_mapping_manifest`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L626
+52|`incompatible_disable_select_on`|t=`ImmutableList<String>`|d=`""`|c=`CommaSeparatedOptionSetConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L111
+53|`incompatible_exclude_starlark_flags_from_exec_config`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`"experimental_exclude_starlark_flags_from_exec_config"`|x=`-`|i=`-`|N=C|@L150
+54|`incompatible_filegroup_runfiles_for_data`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L66
+55|`incompatible_limit_platforms_in_output_dir_to`|t=`List<Label>`|d=`""`|c=`LabelListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L216
+56|`incompatible_merge_genfiles_directory`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L88
+57|`incompatible_modify_execution_info_additive`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L991
+58|`incompatible_target_cpu_from_platform`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L230
+59|`instrument_test_targets`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L374
+60|`instrumentation_filter`|t=`RegexFilter`|d=`"-/javatests[/:],-/test/java[/:]"`|c=`RegexFilter.RegexFilterConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L359
+61|`is exec configuration`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L781
+62|`min_param_file_size`|t=`int`|d=`"32768"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L294
+63|`modify_execution_info`|t=`List<ExecutionInfoModifier>`|d=`"null"`|c=`ExecutionInfoModifier.Converter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L963
+64|`platform_suffix`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L510
+65|`run_under`|t=`RunUnder`|d=`"null"`|c=`RunUnderConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L640
+66|`scl_config`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L77
+67|`stamp`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L349
+68|`strict_filesets`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L317
+69|`target_environment`|t=`List<Label>`|d=`"null"`|c=`LabelListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=C|@L858
+70|`use_target_platform_for_tests`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L1113
+71|`verbose_visibility_errors`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=C|@L681
+#### 04. `com.google.devtools.build.lib.analysis.test.CoverageConfiguration.CoverageOptions` — 2 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/analysis/test/CoverageConfiguration.java`
+01|`coverage_output_generator`|t=`Label`|d=`"@bazel_tools//tools/test:lcov_merger"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L40
+02|`coverage_report_generator`|t=`Label`|d=`"@bazel_tools//tools/test:coverage_report_generator"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L57
+#### 05. `com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions` — 21 options; N=T; pinned `src/main/java/com/google/devtools/build/lib/analysis/test/TestConfiguration.java`
+01|`allow_local_tests`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L398
+02|`cache_test_results`|t=`TriState`|d=`"auto"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L168
+03|`coverage_support`|t=`Label`|d=`"@bazel_tools//tools/test:coverage_support"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L325
+04|`default_test_resources`|t=`List<Pair<String, Map<TestSize, Double>>>`|d=`"null"`|c=`TestResourcesConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=T|@L125
+05|`experimental_cancel_concurrent_tests`|t=`CancelConcurrentTests`|d=`"never"`|c=`CancelConcurrentTests.Converter.class`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L310
+06|`experimental_fetch_all_coverage_outputs`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L342
+07|`experimental_retain_test_configuration_across_testonly`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L210
+08|`experimental_split_coverage_postprocessing`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L366
+09|`incompatible_check_sharding_support`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L383
+10|`incompatible_exclusive_test_sandboxed`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L353
+11|`runs_per_test`|t=`List<PerLabelOptions>`|d=`"1"`|c=`RunsPerTestConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=T|@L260
+12|`runs_per_test_detects_flakes`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L286
+13|`test_arg`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=T|@L228
+14|`test_env`|t=`List<Converters.EnvVar>`|d=`"null"`|c=`Converters.EnvVarsConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=T|@L90
+15|`test_filter`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L147
+16|`test_result_expiration`|t=`int`|d=`"-1"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L187
+17|`test_runner_fail_fast`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L158
+18|`test_sharding_strategy`|t=`TestShardingStrategy`|d=`"explicit"`|c=`ShardingStrategyConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L243
+19|`test_timeout`|t=`Map<TestTimeout, Duration>`|d=`"-1"`|c=`TestTimeout.TestTimeoutConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L109
+20|`trim_test_configuration`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L195
+21|`zip_undeclared_test_outputs`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=T|@L375
+#### 06. `com.google.devtools.build.lib.bazel.rules.BazelRuleClassProvider.StrictActionEnvOptions` — 1 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/bazel/rules/BazelRuleClassProvider.java`
+01|`incompatible_strict_action_env`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`"experimental_strict_action_env"`|x=`-`|i=`-`|N=I|@L73
+#### 07. `com.google.devtools.build.lib.bazel.rules.python.BazelPythonConfiguration.Options` — 3 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/bazel/rules/python/BazelPythonConfiguration.java`
+01|`experimental_python_import_all_repositories`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L57
+02|`incompatible_remove_ctx_bazel_py_fragment`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L74
+03|`python_path`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L45
+#### 08. `com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options` — 60 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/android/AndroidConfiguration.java`
+01|`Android configuration distinguisher`|t=`ConfigurationDistinguisher`|d=`"MAIN"`|c=`ConfigurationDistinguisherConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L200
+02|`android_compiler`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L209
+03|`android_databinding_use_androidx`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L622
+04|`android_databinding_use_v3_4_args`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L609
+05|`android_dynamic_mode`|t=`DynamicMode`|d=`"off"`|c=`DynamicModeConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L221
+06|`android_fixed_resource_neverlinking`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L661
+07|`android_manifest_merger`|t=`AndroidManifestMerger`|d=`"android"`|c=`AndroidManifestMergerConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L538
+08|`android_manifest_merger_order`|t=`ManifestMergerOrder`|d=`"alphabetical"`|c=`ManifestMergerOrderConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L553
+09|`android_migration_tag_check`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L673
+10|`android_platforms`|t=`List<Label>`|d=`""`|c=`LabelOrderedSetConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L238
+11|`android_resource_shrinking`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L489
+12|`apk_signing_method`|t=`ApkSigningMethod`|d=`"v1_v2"`|c=`ApkSigningMethodConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L571
+13|`break_build_on_parallel_dex2oat_failure`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L382
+14|`desugar_for_android`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`"experimental_desugar_for_android"`|x=`-`|i=`-`|N=I|@L267
+15|`desugar_java8_libs`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`"experimental_desugar_java8_libs"`|x=`-`|i=`-`|N=I|@L280
+16|`dexopts_supported_in_dexmerger`|t=`List<String>`|d=`"--minimal-main-dex,--set-max-idx-number"`|c=`Converters.CommaSeparatedOptionListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L429
+17|`dexopts_supported_in_dexsharder`|t=`List<String>`|d=`"--minimal-main-dex"`|c=`Converters.CommaSeparatedOptionListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L443
+18|`dexopts_supported_in_incremental_dexing`|t=`List<String>`|d=`"--no-optimize,--no-locals"`|c=`Converters.CommaSeparatedOptionListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L415
+19|`experimental_allow_android_library_deps_without_srcs`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L469
+20|`experimental_always_filter_duplicate_classes_from_android_test`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L916
+21|`experimental_android_assume_minsdkversion`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L356
+22|`experimental_android_compress_java_resources`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L584
+23|`experimental_android_databinding_v2`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L596
+24|`experimental_android_library_exports_manifest_default`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L637
+25|`experimental_android_resource_cycle_shrinking`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L500
+26|`experimental_android_resource_name_obfuscation`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L526
+27|`experimental_android_resource_path_shortening`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L514
+28|`experimental_android_resource_shrinking`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L477
+29|`experimental_android_rewrite_dexes_with_rex`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L455
+30|`experimental_android_use_parallel_dex2oat`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L370
+31|`experimental_check_desugar_deps`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L296
+32|`experimental_disable_instrumentation_manifest_merge`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L979
+33|`experimental_filter_library_jar_with_program_jar`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L930
+34|`experimental_filter_r_jars_from_android_test`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L698
+35|`experimental_get_android_java_resources_from_optimized_jar`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L990
+36|`experimental_incremental_dexing_after_proguard`|t=`int`|d=`"50"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L320
+37|`experimental_incremental_dexing_after_proguard_by_default`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L343
+38|`experimental_omit_resources_info_provider_from_android_binary`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L650
+39|`experimental_one_version_enforcement_use_transitive_jars_for_binary_under_test`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L710
+40|`experimental_persistent_aar_extractor`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L724
+41|`experimental_remove_r_classes_from_instrumentation_test_jar`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L903
+42|`experimental_use_dex_splitter_for_incremental_dexing`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L334
+43|`experimental_use_rtxt_from_merged_resources`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L940
+44|`fat_apk_hwasan`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L254
+45|`incompatible_disable_native_android_rules`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L685
+46|`incompatible_remove_ctx_android_fragment`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L1001
+47|`incremental_dexing`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L308
+48|`internal_persistent_android_dex_desugar`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L881
+49|`internal_persistent_busybox_tools`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L851
+50|`internal_persistent_multiplex_android_dex_desugar`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L892
+51|`internal_persistent_multiplex_busybox_tools`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L862
+52|`legacy_main_dex_list_generator`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L957
+53|`non_incremental_per_target_dexopts`|t=`List<String>`|d=`"--positions"`|c=`Converters.CommaSeparatedOptionListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L395
+54|`optimizing_dexer`|t=`Label`|d=`"null"`|c=`EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L970
+55|`output_library_merged_assets`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L949
+56|`persistent_android_dex_desugar`|t=`Void`|d=`"null"`|c=`-`|m=F|old=`-`|x=`{ "--internal_persistent_android_dex_desugar", "--strategy=Desugar=worker", "--strategy=DexBuilder=worker", }`|i=`-`|N=I|@L794
+57|`persistent_android_resource_processor`|t=`Void`|d=`"null"`|c=`-`|m=F|old=`-`|x=`{ "--internal_persistent_busybox_tools", "--strategy=AaptPackage=worker", "--strategy=AndroidResourceParser=worker", "--strategy=AndroidResourceValidator=worker", "--strategy=AndroidResourceCompiler=worker", "--strategy=RClassGenerator=worker", "--strategy=AndroidResourceLink=worker", "--strategy=AndroidAapt2=worker", "--strategy=AndroidAssetMerger=worker", "--strategy=AndroidResourceMerger=worker", "--strategy=AndroidCompiledResourceMerger=worker", "--strategy=ManifestMerger=worker", "--strategy=AndroidManifestMerger=worker", "--strategy=Aapt2Optimize=worker", "--strategy=AARGenerator=worker", "--strategy=ProcessDatabinding=worker", "--strategy=GenerateDataBindingBaseClasses=worker" }`|i=`-`|N=I|@L735
+58|`persistent_multiplex_android_dex_desugar`|t=`Void`|d=`"null"`|c=`-`|m=F|old=`-`|x=`{ "--persistent_android_dex_desugar", "--internal_persistent_multiplex_android_dex_desugar", }`|i=`-`|N=I|@L810
+59|`persistent_multiplex_android_resource_processor`|t=`Void`|d=`"null"`|c=`-`|m=F|old=`-`|x=`{ "--persistent_android_resource_processor", "--modify_execution_info=AaptPackage=+supports-multiplex-workers", "--modify_execution_info=AndroidResourceParser=+supports-multiplex-workers", "--modify_execution_info=AndroidResourceValidator=+supports-multiplex-workers", "--modify_execution_info=AndroidResourceCompiler=+supports-multiplex-workers", "--modify_execution_info=RClassGenerator=+supports-multiplex-workers", "--modify_execution_info=AndroidResourceLink=+supports-multiplex-workers", "--modify_execution_info=AndroidAapt2=+supports-multiplex-workers", "--modify_execution_info=AndroidAssetMerger=+supports-multiplex-workers", "--modify_execution_info=AndroidResourceMerger=+supports-multiplex-workers", "--modify_execution_info=AndroidCompiledResourceMerger=+supports-multiplex-workers", "--modify_execution_info=ManifestMerger=+supports-multiplex-workers", "--modify_execution_info=AndroidManifestMerger=+supports-multiplex-workers", "--modify_execution_info=Aapt2Optimize=+supports-multiplex-workers", "--modify_execution_info=AARGenerator=+supports-multiplex-workers", }`|i=`-`|N=I|@L766
+60|`persistent_multiplex_android_tools`|t=`Void`|d=`"null"`|c=`-`|m=F|old=`-`|x=`{ "--internal_persistent_multiplex_busybox_tools", "--persistent_multiplex_android_resource_processor", "--persistent_multiplex_android_dex_desugar", }`|i=`-`|N=I|@L825
+#### 09. `com.google.devtools.build.lib.rules.android.BazelAndroidConfiguration.Options` — 1 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/android/BazelAndroidConfiguration.java`
+01|`merge_android_manifest_permissions`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L45
+#### 10. `com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions` — 26 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/apple/AppleCommandLineOptions.java`
+01|`apple configuration distinguisher`|t=`ConfigurationDistinguisher`|d=`"UNKNOWN"`|c=`ConfigurationDistinguisherConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L222
+02|`apple_platform_type`|t=`String`|d=`"macos"`|c=`PlatformTypeConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L194
+03|`apple_platforms`|t=`List<Label>`|d=`""`|c=`LabelListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L338
+04|`apple_split_cpu`|t=`String`|d=`""`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L205
+05|`catalyst_cpus`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L283
+06|`experimental_include_xcode_execution_requirements`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L304
+07|`experimental_objc_provider_from_linked`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L37
+08|`experimental_prefer_mutual_xcode`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L158
+09|`host_macos_minimum_os`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L147
+10|`incompatible_enable_apple_toolchain_resolution`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L328
+11|`ios_minimum_os`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L103
+12|`ios_multi_cpus`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L231
+13|`ios_sdk_version`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L59
+14|`macos_cpus`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L273
+15|`macos_minimum_os`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L136
+16|`macos_sdk_version`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L92
+17|`tvos_cpus`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L263
+18|`tvos_minimum_os`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L125
+19|`tvos_sdk_version`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L81
+20|`use_platforms_in_apple_crosstool_transition`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L347
+21|`visionos_cpus`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L243
+22|`watchos_cpus`|t=`List<String>`|d=`"null"`|c=`CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L253
+23|`watchos_minimum_os`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L114
+24|`watchos_sdk_version`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L70
+25|`xcode_version`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L49
+26|`xcode_version_config`|t=`Label`|d=`"@bazel_tools//tools/cpp:host_xcodes"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L293
+#### 11. `com.google.devtools.build.lib.rules.config.ConfigFeatureFlagOptions` — 2 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/config/ConfigFeatureFlagOptions.java`
+01|`all feature flag values are present (internal)`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L48
+02|`enforce_transitive_configs_for_config_feature_flag`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L29
+#### 12. `com.google.devtools.build.lib.rules.cpp.CppOptions` — 78 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/cpp/CppOptions.java`
+01|`apple_generate_dsym`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L850
+02|`build_test_dwp`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L195
+03|`cc_dotd_files`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L948
+04|`cc_include_scanning`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L927
+05|`cc_output_directory_tag`|t=`String`|d=`""`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L133
+06|`compiler`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L113
+07|`conlyopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L257
+08|`copt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L239
+09|`crosstool_top`|t=`Label`|d=`"@bazel_tools//tools/cpp:toolchain"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L102
+10|`cs_fdo_absolute_path`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L396
+11|`cs_fdo_instrument`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`{"--copt=-Wno-error"}`|N=I|@L384
+12|`cs_fdo_profile`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L445
+13|`custom_malloc`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L311
+14|`cxxopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L248
+15|`dynamic_mode`|t=`DynamicMode`|d=`"default"`|c=`DynamicModeConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L205
+16|`enable_propeller_optimize_absolute_paths`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L465
+17|`enable_remaining_fdo_absolute_paths`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L457
+18|`experimental_cc_implementation_deps`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L970
+19|`experimental_cpp_compile_resource_estimation`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L1014
+20|`experimental_cpp_modules`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L981
+21|`experimental_generate_llvm_lcov`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L877
+22|`experimental_inmemory_dotd_files`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L691
+23|`experimental_link_static_libraries_once`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L998
+24|`experimental_omitfp`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L706
+25|`experimental_save_feature_state`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L819
+26|`experimental_unsupported_and_brittle_include_scanning`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L906
+27|`experimental_use_cpp_compile_action_args_params_file`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L895
+28|`experimental_use_llvm_covmap`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L737
+29|`fdo_instrument`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`{"--copt=-Wno-error"}`|N=I|@L349
+30|`fdo_optimize`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L361
+31|`fdo_prefetch_hints`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L420
+32|`fdo_profile`|t=`Label`|d=`"null"`|c=`EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L435
+33|`fission`|t=`List<CompilationMode>`|d=`"no"`|c=`FissionOptionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L179
+34|`force_pic`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L218
+35|`grte_top`|t=`Label`|d=`"null"`|c=`LibcTopLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L669
+36|`host_compiler`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L121
+37|`host_conlyopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L626
+38|`host_copt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L604
+39|`host_cxxopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L615
+40|`host_grte_top`|t=`Label`|d=`"null"`|c=`LibcTopLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L680
+41|`host_linkopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L659
+42|`host_per_file_copt`|t=`List<PerLabelOptions>`|d=`"null"`|c=`PerLabelOptions.PerLabelOptionsConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L637
+43|`incompatible_disable_legacy_cc_provider`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L801
+44|`incompatible_disable_nocopts`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L839
+45|`incompatible_dont_enable_host_nonhost_crosstool_features`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L752
+46|`incompatible_enable_cc_toolchain_resolution`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L810
+47|`incompatible_make_thinlto_command_lines_standalone`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L763
+48|`incompatible_remove_legacy_whole_archive`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L790
+49|`incompatible_require_ctx_in_configure_features`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L772
+50|`incompatible_use_cpp_compile_header_mnemonic`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L886
+51|`incompatible_use_specific_tool_files`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L828
+52|`incompatible_validate_top_level_header_inclusions`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L781
+53|`interface_shared_objects`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L165
+54|`legacy_whole_archive`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L322
+55|`linkopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L275
+56|`ltobackendopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L293
+57|`ltoindexopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L284
+58|`memprof_profile`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L518
+59|`minimum_os_version`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L141
+60|`objc_enable_binary_stripping`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L866
+61|`objc_generate_linkmap`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L858
+62|`objc_use_dotd_pruning`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L960
+63|`objccopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L266
+64|`per_file_copt`|t=`List<PerLabelOptions>`|d=`"null"`|c=`PerLabelOptions.PerLabelOptionsConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L563
+65|`per_file_ltobackendopt`|t=`List<PerLabelOptions>`|d=`"null"`|c=`PerLabelOptions.PerLabelOptionsConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L584
+66|`process_headers_in_dependencies`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L229
+67|`propeller_optimize`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L491
+68|`propeller_optimize_absolute_cc_profile`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L473
+69|`propeller_optimize_absolute_ld_profile`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L482
+70|`proto_profile`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L533
+71|`proto_profile_path`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L541
+72|`save_temps`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L552
+73|`share_native_deps`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L717
+74|`start_end_lib`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L152
+75|`strict_system_includes`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L727
+76|`strip`|t=`StripMode`|d=`"sometimes"`|c=`StripModeConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L337
+77|`stripopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L302
+78|`xbinary_fdo`|t=`Label`|d=`"null"`|c=`EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L407
+#### 13. `com.google.devtools.build.lib.rules.java.JavaOptions` — 36 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/java/JavaOptions.java`
+01|`bytecode_optimization_pass_actions`|t=`int`|d=`"1"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L289
+02|`bytecode_optimizers`|t=`Map<String, Label>`|d=`"Proguard"`|c=`LabelMapConverter.class`|m=F|old=`"experimental_bytecode_optimizers"`|x=`-`|i=`-`|N=I|@L239
+03|`enforce_proguard_file_extension`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L297
+04|`experimental_add_test_support_to_compile_time_deps`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L331
+05|`experimental_enable_jspecify`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L423
+06|`experimental_fix_deps_tool`|t=`String`|d=`"add_dep"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L180
+07|`experimental_inmemory_jdeps_files`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L133
+08|`experimental_java_classpath`|t=`JavaClasspathMode`|d=`"bazel"`|c=`JavaClasspathModeConverter.class`|m=F|old=`"java_classpath"`|x=`-`|i=`-`|N=I|@L122
+09|`experimental_java_test_auto_create_deploy_jar`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L432
+10|`experimental_local_java_optimization_configuration`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L265
+11|`experimental_local_java_optimizations`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L253
+12|`experimental_one_version_enforcement`|t=`OneVersionEnforcementLevel`|d=`"OFF"`|c=`OneVersionEnforcementLevelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L307
+13|`experimental_run_android_lint_on_java_rules`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L342
+14|`experimental_strict_java_deps`|t=`StrictDepsMode`|d=`"default"`|c=`StrictDepsConverter.class`|m=F|old=`"strict_java_deps"`|x=`-`|i=`-`|N=I|@L167
+15|`experimental_turbine_annotation_processing`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L364
+16|`explicit_java_test_deps`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L191
+17|`host_java_launcher`|t=`Label`|d=`"null"`|c=`EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L202
+18|`host_javacopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L60
+19|`host_jvmopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L82
+20|`incompatible_disallow_java_import_exports`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L414
+21|`incompatible_multi_release_deploy_jars`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L405
+22|`java_debug`|t=`Void`|d=`"null"`|c=`-`|m=F|old=`-`|x=`{ "--test_arg=--wrapper_script_flag=--debug", "--test_output=streamed", "--test_strategy=exclusive", "--test_timeout=9999", "--nocache_test_results" }`|i=`-`|N=I|@L149
+23|`java_deps`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L114
+24|`java_header_compilation`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`"experimental_java_header_compilation"`|x=`-`|i=`-`|N=I|@L105
+25|`java_language_version`|t=`String`|d=`""`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L389
+26|`java_launcher`|t=`Label`|d=`"null"`|c=`EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L211
+27|`java_runtime_version`|t=`String`|d=`"local_jdk"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L373
+28|`javacopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L51
+29|`jvmopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L71
+30|`one_version_enforcement_on_java_tests`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L319
+31|`plugin`|t=`List<Label>`|d=`"null"`|c=`LabelListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L354
+32|`proguard_top`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L223
+33|`split_bytecode_optimization_pass`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L276
+34|`tool_java_language_version`|t=`String`|d=`""`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L397
+35|`tool_java_runtime_version`|t=`String`|d=`"remotejdk_11"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L381
+36|`use_ijars`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L94
+#### 14. `com.google.devtools.build.lib.rules.objc.J2ObjcCommandLineOptions` — 2 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/objc/J2ObjcCommandLineOptions.java`
+01|`j2objc_dead_code_report`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L41
+02|`j2objc_translation_flags`|t=`List<String>`|d=`"null"`|c=`Converters.CommaSeparatedOptionListConverter.class`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L31
+#### 15. `com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions` — 13 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/objc/ObjcCommandLineOptions.java`
+01|`device_debug_entitlements`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L93
+02|`experimental_objc_fastbuild_options`|t=`List<String>`|d=`"-O0,-DDEBUG=1"`|c=`CommaSeparatedOptionListConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L60
+03|`incompatible_avoid_hardcoded_objc_compilation_flags`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L104
+04|`incompatible_builtin_objc_strip_action`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L166
+05|`incompatible_disable_native_apple_binary_rule`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L144
+06|`incompatible_disallow_sdk_frameworks_attributes`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L120
+07|`incompatible_objc_alwayslink_by_default`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L131
+08|`incompatible_strip_executable_safely`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L155
+09|`ios_memleaks`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L51
+10|`ios_signing_cert_name`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L70
+11|`ios_simulator_device`|t=`String`|d=`"null"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L40
+12|`ios_simulator_version`|t=`DottedVersion.Option`|d=`"null"`|c=`DottedVersionConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L29
+13|`objc_debug_with_GLIBCXX`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L82
+#### 16. `com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options` — 11 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/proto/ProtoConfiguration.java`
+01|`cc_proto_library_header_suffixes`|t=`List<String>`|d=`".pb.h"`|c=`Converters.CommaSeparatedOptionSetConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L137
+02|`cc_proto_library_source_suffixes`|t=`List<String>`|d=`".pb.cc"`|c=`Converters.CommaSeparatedOptionSetConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L146
+03|`experimental_proto_descriptor_sets_include_source_info`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L58
+04|`proto_compiler`|t=`Label`|d=`ProtoConstants.DEFAULT_PROTOC_LABEL`|c=`CoreOptionConverters.LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L67
+05|`proto_toolchain_for_cc`|t=`Label`|d=`ProtoConstants.DEFAULT_CC_PROTO_LABEL`|c=`CoreOptionConverters.EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L104
+06|`proto_toolchain_for_j2objc`|t=`Label`|d=`ProtoConstants.DEFAULT_J2OBJC_PROTO_LABEL`|c=`CoreOptionConverters.EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L94
+07|`proto_toolchain_for_java`|t=`Label`|d=`ProtoConstants.DEFAULT_JAVA_PROTO_LABEL`|c=`CoreOptionConverters.EmptyToNullLabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L85
+08|`proto_toolchain_for_javalite`|t=`Label`|d=`ProtoConstants.DEFAULT_JAVA_LITE_PROTO_LABEL`|c=`CoreOptionConverters.LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L76
+09|`protocopt`|t=`List<String>`|d=`"null"`|c=`-`|m=T|old=`-`|x=`-`|i=`-`|N=I|@L49
+10|`strict_proto_deps`|t=`StrictDepsMode`|d=`"error"`|c=`CoreOptionConverters.StrictDepsConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L113
+11|`strict_public_imports`|t=`StrictDepsMode`|d=`"off"`|c=`CoreOptionConverters.StrictDepsConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L125
+#### 17. `com.google.devtools.build.lib.rules.python.PythonOptions` — 6 options; N=I; pinned `src/main/java/com/google/devtools/build/lib/rules/python/PythonOptions.java`
+01|`build_python_zip`|t=`TriState`|d=`"auto"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L35
+02|`experimental_py_binaries_include_label`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L83
+03|`incompatible_default_to_explicit_init_py`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L46
+04|`incompatible_python_disallow_native_rules`|t=`boolean`|d=`"false"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L71
+05|`incompatible_remove_ctx_py_fragment`|t=`boolean`|d=`"true"`|c=`-`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L92
+06|`python_native_rules_allowlist`|t=`Label`|d=`"null"`|c=`LabelConverter.class`|m=F|old=`-`|x=`-`|i=`-`|N=I|@L60
+
+### Bazel 9.2 non-native configuration-input and owner ledger
+
+Native fragments are only the first checksum input. Pinned source fixes the
+remaining input order and assigns each retained fact one future Slug owner:
+
+| Input or operation | Pinned Bazel owner and ordering | Eventual Slug owner |
+|---|---|---|
+| RC sections, imports, `--config`, explicit argv, expansions, implicit requirements, old names, repeats | `BlazeOptionHandler#parseArgsAndConfigs` and `ConfigExpander`: flatten in command/RC order before typed native/Starlark parsing; recursive configs cycle-error and missing definitions error | `slug_commands_v2`; it alone creates the ordered normalized request and pre-DICE diagnostics |
+| Platform-specific config selection | `ConfigExpander#getPlatformName`: an enabled host OS selects an existing command-specific config | `slug_workspace_v2` owns the OS observation; `slug_commands_v2` owns expansion |
+| Host CPU defaults | `CoreOptions` plus `AutoCpuConverter`: empty CPU/host CPU becomes an OS/architecture token; explicit values bypass it | `slug_workspace_v2` observation consumed by the future context-aware configuration converter |
+| Target/host platform options | `PlatformOptions#getNormalized` and `BuildConfigurationKeyProducer`: default target is host, keep first target platform, keep-last extra toolchains | typed value in `slug_configuration_v2`; context-free P normalization there after its metadata packet |
+| Repository-mapped labels and flag aliases | `PlatformFunction`, `ParsedFlagsFunction`, `ParsedFlagsValue.Key`: package/main-repo context and mapping participate in the parse key; unavailable dependencies restart | `slug_identity_v2` owns canonical labels; `slug_bzlmod_v2` owns the repository mapping; core producer composes them without reparsing in commands |
+| `platform_mappings` path, bytes, and parse | `PlatformMappingFunction`: workspace-relative path; ordered package-root search; missing default means empty; missing explicit, directory, malformed, or duplicate entry errors | `slug_workspace_v2` owns path observation; `slug_loading_v2` owns mapping-file loading/parsing; core owns the DICE composition |
+| Selected platform `flags` | `PlatformProducer` and `ParsedFlagsFunction`: platform flags win over mapping, parse in the platform package mapping, and merge over source options | `slug_loading_v2` owns platform target/flag loading; core producer owns application |
+| Command Starlark setting values and defaults | `StarlarkOptionsParser`, `BuildOptions#of`, `ParsedFlagsValue`: load canonical setting label/type/default; explicit default elides unless defaults are requested; platform flags may remove a value equal to default | `slug_loading_v2` owns schema/default discovery; typed value lives in `slug_configuration_v2`; core producer owns default elision |
+| Starlark option scopes | `BuildOptionsScopeFunction`: canonical label-to-scope map is separately checksum-encoded; missing project/package dependencies restart | `slug_loading_v2` owns scope discovery; core producer owns the final map |
+| Per-target `PROJECT.scl` scope baseline | `BuildConfigurationKeyProducer#possiblyApplyScopes`: after platform processing, out-of-scope values reset to baseline or disappear if absent there | `slug_loading_v2` owns project discovery/evaluation; core producer owns reset/removal |
+| Top-level `PROJECT.scl` configuration | `BuildTool` and `AnalysisPhaseRunner`: selected project options are reparsed into the initial native/Starlark options before BuildOptions creation | `slug_loading_v2` owns project input; `slug_commands_v2` owns its single ordered merge before request identity |
+| Native and Starlark transitions | `TransitionApplier`, `FunctionTransitionUtil`, and `BuildConfigurationKeyMapProducer`: preserve split-map order, then apply platform/mapping and scope processing independently to every result | `slug_analysis_v2` owns transition evaluation; core configuration producer owns post-transition canonicalization |
+| Per-attempt input injection and final configuration | Bazel creates the key only after the preceding stages | `slug_core_v2::runtime::dice` owns the committed transaction, Needs/retries, and complete result; build/cquery construct roots only from that result |
+
+`BAZEL_SH`, `PATH`, and later shell/action-environment defaults are configured
+or action behavior but are not `BuildOptions#checksum` inputs. They remain a
+downstream Host/execution boundary rather than a hidden row in this producer.
+
+### Configuration ledger result and serial implementation route
+
+**Status: REPLAN to bounded serial packets.** Live Slug preserves raw build
+flags but ignores them, rejects cquery configuration flags, carries no target
+options on the daemon wire, injects only existing bzlmod/repository/path state,
+and constructs `target:first-build` before the command transaction.
+`ConfigurationKey` accepts an opaque checksum, stable serialization omits the
+string-setting side channel, and transitions overlay that side channel without
+recomputing identity.
+
+A new lowest-level `slug_configuration_v2` crate is the sole owner of immutable
+configuration descriptors and values. It may initially depend only on retained
+utility crates; it never owns IO, DICE, command parsing, wire transport, or
+loading. This avoids both a core-to-commands dependency and making commands
+depend on analysis. Commands own argv/RC normalization, server/CLI are lossless
+transport adapters, workspace/bzlmod/loading retain their existing observation
+and graph domains, core owns the committed producer, and analysis consumes only
+a complete configuration for keys and acyclic transitions.
+
+The lifecycle contract is frozen. Parse/normalization failure occurs before
+DICE, injects nothing, and cannot replace an accepted snapshot. During graph
+production, the structural union of Needs precedes all sibling semantic errors;
+Needs are invalid/nonterminal, while complete errors and values are valid and
+structurally equal independent of events. Retry events never publish. Equal
+normalized requests do not invalidate. Native request, Host, repository
+mapping, mapping/platform/BUILD/`.bzl`/`PROJECT.scl`, or setting changes
+invalidate only the producer and downstream roots. Fresh one-shot C0 equals
+daemon C0; same-daemon `C0 -> C1 -> C0` restores the exact structure, key, and
+checksum for native, platform/mapping, Starlark/default/scope, and acyclic
+transition changes. No caller checksum, `first-build`, REAPI digest, direct
+filesystem bypass, lock across DICE, or retry event may substitute.
+
+The implementation order is: metadata/cache grammar; context-free converters,
+typed defaults, and P/C/T normalization; Host/repository-context converters;
+shared command/wire identity; Host/platform graph inputs; Starlark values and
+scopes; transactional producer plus structural checksum/key/acyclic transition
+replacement; and build/cquery root integration. Configured artifacts,
+per-action platforms, Bazel ActionKey, and aquery remain later serial owners.
+
+Run next only `WP-6-m2-native-configuration-metadata-and-cache-grammar`.
+Reserved review rejected executing every converter in this first packet:
+`AutoCpuConverter` needs Host facts, label-family converters need repository
+context, RC/expansion belongs to commands, and Starlark settings need graph
+schemas. The bounded packet creates `slug_configuration_v2`, retains the exact
+341-row descriptor registry, and implements only FQCN/option ordering plus the
+native `NULL`/`EMPTY`/quoted-escape cache-field grammar.
+
+Allow only root `Cargo.toml`, the mechanical new-workspace-package entry in
+`Cargo.lock`, and the new crate's `Cargo.toml`, `src/lib.rs`,
+`src/native/{mod,registry,cache_grammar,tests}.rs`: eight files, 2,400
+production, 1,400 test, and 3,800 total formatted net lines. Use a static
+descriptor slice—no generated source, map, interner, cache, global, weak hash,
+wire, DICE, Host access, converter execution, normalized values, mixed checksum,
+or existing-crate edit. The implementation must apply the Buck2 utility-reuse
+skill and prove 17/341 count and uniqueness, exact class/option ordering, all
+metadata through an independent compact expected row for every descriptor,
+selected complex rows, and cache escaping from the pinned ledger.
+Configured-target dependency cycles remain deferred by user approval.
