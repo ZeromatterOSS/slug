@@ -3415,6 +3415,35 @@ source/oracle evidence, registry/lockfile change, public API, command merge,
 contextual converter, normalization, checksum/wire, DICE, downstream
 activation, or user-deferred configured-target-cycle behavior.
 
+### Pure native kernel retry 4 REPLAN (2026-08-05)
+
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-4` stopped in its
+test-only Phase 1; no production file or dependency changed. Two serial Terra
+writers and root produced a compact literal 287/8/5/41 registry partition and
+active count reconciliation, but the independent pre-production review found
+the behavioral matrix unfit to authorize implementation. It contradicted the
+accepted Runs contract by marking `U("+2")` rejected instead of
+accepted/deferred, checked family/enum strings tautologically rather than
+through discriminators, did not assert attachment order or family/route values,
+and hid missing Bool/Tri/null, Dotted, timeout, UTF-16, Integer, enum, and cache
+cases behind a disabled block of undefined helper shims. The complete
+unaccepted `tests.rs` diff was discarded mechanically; HEAD returned cleanly
+to `28e9ddc9`.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-5` with the same
+seven-file and 1,550 production/1,250 test/2,800 total caps. Preserve the
+two-phase gate, but route Phase 1 to root mechanical transcription from the
+accepted retry-7 and attachment ledgers; Terra is review-only until acceptance.
+The test matrix must enumerate the exact registry partition/order/family/route,
+all finite members/defaults/aliases/renderers, and direct planned-private API
+assertions for every discriminator without checklist text, `todo!`, or
+undefined helper semantics. Runs `U("+2")` is accepted/deferred and must not
+be exposed as a general occurrence. Only after independent acceptance may one
+Terra writer implement the private kernel. Any new material correction is
+`REPLAN`; all contextual, command, normalization, checksum/wire, DICE,
+downstream, and configured-cycle deferrals remain unchanged.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu

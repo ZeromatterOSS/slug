@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-4`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-5`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Result: implement the closed context-free native value/default/cache kernel for
@@ -32,6 +32,14 @@ retry-2/3 discriminator; obtain independent source review of that matrix before
 adding production code. Then implement only the reviewed tests. Tests may use
 parent-module access to child-private items, but no new kernel symbol may be
 publicly re-exported.
+
+Retry 4 was discarded before production because its Phase-1 test draft marked
+accepted-but-deferred Runs `U("+2")` as rejected and substituted checklist
+strings/undefined helper shims for direct discriminators. Retry 5 keeps the
+same serial gate, but root owns the mechanical test transcription from the
+accepted ledgers; Terra is review-only until the matrix is accepted. The
+matrix must be direct enough that Phase 2 only supplies private implementations
+and removes the temporary compile gate—no invented test helper semantics.
 
 Implement one closed `NativeValue` algebra, source-default materializer,
 per-occurrence converter, and exact Java cache projection inside
@@ -109,5 +117,5 @@ surrogate or lossy conversion, Host/repository/loading context, command-layer
 behavior including repeat merging, whole P/C/T normalization, runtime registry/interner/hash, new
 identity issue, dependency/lockfile expansion, cap breach, a production edit
 before test-matrix review, or any new material correction beyond the frozen
-retry-2/3 set above. Defer normalization, checksum/wire integration, DICE, downstream
+retry-2/3/4 set above. Defer normalization, checksum/wire integration, DICE, downstream
 activation, and user-approved later configured-target dependency cycles.
