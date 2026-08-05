@@ -3548,6 +3548,151 @@ configured target, or cycle edge. Java-regex, command flattening, checksum/wire,
 normalization, activation, and user-approved configured-target dependency
 cycles remain deferred.
 
+### Host and repository conversion-context design (2026-08-05)
+
+**Decision: ACCEPT a two-context split with two serial prerequisites before
+contextual conversion.** One 46-field bag would mix process/Host facts with
+package-relative label identity and give `slug_configuration_v2` an implicit
+IO/loading role. Instead conversion consumes supplied immutable values only:
+
+```text
+HostConversionContext {
+  os, cpu, host_cpus, host_ram_mb,
+  host_path_policy, user_home_unicode,
+}
+
+LabelConversionContext =
+  FirstRoundCanonical
+  | MainRepository { mapping }
+  | Package { base_package, mapping }
+```
+
+After the Host-input prerequisite lands, command/request bootstrap will observe
+the Host once and inject the new snapshot through core request assembly toward
+configuration conversion; no such Host conversion snapshot exists today.
+`slug_bzlmod_v2` remains the producer of repository mappings,
+`slug_loading_v2` remains the package/loading owner, and `slug_identity_v2`
+remains the parser/resolver owner. The context carries an `Arc`-shared mapping
+and package identity; conversion does not load a package, evaluate a module,
+read an environment variable, inspect a path, or compute a DICE key.
+
+#### Descriptor-complete contextual routes
+
+The five Host descriptors are closed and disjoint from label context:
+
+| Descriptors | Converter/result | Immutable input |
+| --- | --- | --- |
+| `cpu`, `host_cpu` | `AutoCpuConverter`; explicit text is unchanged, empty maps the finite OS/CPU pair to Bazel's legacy token | `os`, `cpu` |
+| `shell_executable` | `PathFragmentConverter`; special-null default is absent; explicit input starting `~/` replaces every `~` in the full string with `user.home` before lexical Host-policy normalization | `host_path_policy`, valid-Unicode `user_home` |
+| `platform_mappings` | `PlatformMappingKey::{Default, ExplicitWorkspaceRelative}`; empty is default and absolute is rejected | same lexical path inputs; bytes/search/parse remain workspace/loading/core-owned |
+| `default_test_resources` | repeat `(resource name, {SMALL, MEDIUM, LARGE, ENORMOUS -> ResourceAmount})`; one amount broadcasts, four bind in enum order; direct doubles are range-checked, while `HOST_CPUS`/`HOST_RAM` optionally apply source `-`/`*` Float arithmetic without a second bounds check | captured ceil `HOST_CPUS`, ceil `HOST_RAM` MiB |
+
+The 41 repository/package/loading descriptors are complete in the following
+table. `L` is the mapping-provenance-free resolved option-label value specified
+below; every listed label routes through exactly one active
+`LabelConversionContext` mode.
+
+| Converter/result | Exact descriptors |
+| --- | --- |
+| `HostPlatformConverter -> L`; empty uses the symbolic Host default | `host_platform` |
+| `LabelListConverter -> Arc<[L]>`, comma order, empty pieces omitted | `platforms`, `experimental_action_listener`, `incompatible_limit_platforms_in_output_dir_to`, `target_environment`, `apple_platforms`, `plugin` |
+| `LabelOrderedSetConverter -> Arc<[L]>`, first occurrence wins | `android_platforms` |
+| `LabelMapConverter -> Arc<[(CompactString, Option<L>)]>`, insertion order and duplicate-key rejection | `bytecode_optimizers` |
+| `LabelToStringEntryConverter -> (L, CompactString)` | `experimental_override_platform_cpu_name` |
+| ordinary `LabelConverter -> L` after special-null default handling | `coverage_output_generator`, `coverage_report_generator`, `coverage_support`, `legacy_main_dex_list_generator`, `xcode_version_config`, `crosstool_top`, `cs_fdo_profile`, `custom_malloc`, `fdo_prefetch_hints`, `memprof_profile`, `propeller_optimize`, `proto_profile_path`, `experimental_local_java_optimization_configuration`, `proguard_top`, `j2objc_dead_code_report`, `python_native_rules_allowlist` |
+| `EmptyToNullLabelConverter -> Option<L>` | `optimizing_dexer`, `fdo_profile`, `xbinary_fdo`, `host_java_launcher`, `java_launcher` |
+| core `LabelConverter -> L`; finite symbolic default | `proto_compiler`, `proto_toolchain_for_javalite` |
+| core `EmptyToNullLabelConverter -> Option<L>`; finite symbolic default | `proto_toolchain_for_cc`, `proto_toolchain_for_j2objc`, `proto_toolchain_for_java` |
+| `LibcTopLabelConverter -> Option<L>`; exact `default` is absent, other input must start `//` and target becomes `everything` | `grte_top`, `host_grte_top` |
+| `RunUnder::{Label { original, suffix, label: L }, Command { original, suffix, command }}` after source-equivalent shell tokenization | `run_under` |
+| `CustomFlagConverter -> CompactString`; nonlabel define is raw, label branch canonicalizes including `/...` | `experimental_propagate_custom_flag` |
+| `FlagAliasConverter -> (CompactString, L)` after exact alias validation | `flag_alias` |
+
+The repository counts are `1 + 6 + 1 + 1 + 1 + 16 + 5 + 2 + 3 + 2 + 1 + 1 + 1 = 41`;
+with the Host `2 + 1 + 1 + 1 = 5`, the accepted
+`287 + 8 + 5 + 41 = 341` partition is unchanged. `RunUnder` and `CustomFlag`
+have genuine nonlabel branches; they are inventoried here but may not be
+silently forced through label conversion.
+
+#### Exact context and retained-value boundaries
+
+`FirstRoundCanonical` preserves Bazel's deliberately mapping-free first parse;
+it is not an empty mapping and must not be replaced by second-round output.
+`MainRepository` implements second-round command parsing from the main
+repository plus its mapping. `Package` implements Starlark/package-relative
+forms with the supplied base package and mapping. The converter prepends the
+accepted main-repository form only where Bazel's option converter does; it may
+not reuse the stricter existing absolute-only `ApparentLabel::parse` for all
+three modes.
+
+The six symbolic defaults are a private finite enum/table, never caller text:
+`DEFAULT_HOST_PLATFORM` plus the five Proto defaults for protoc, CC, J2ObjC,
+Java, and Java Lite. Each expands to its pinned `@bazel_tools` source spelling
+and then uses the active label context. Java constant names never enter a
+runtime cache field or diagnostic as option input.
+
+Retained `L` contains only canonical repository, package, and target identity.
+The live `CanonicalLabel` cannot substitute: its derived equality/order/hash
+and stable serialization include `mapping_id`; only `bazel_natural_cmp`
+ignores provenance. `slug_identity_v2` must therefore own a distinct
+mapping-free resolved option-label projection and the three-mode parser seam
+before configuration stores any label. Loading's provenance-bearing label
+remains unchanged.
+
+Host paths are valid-Unicode lexical `PathFragment` values, not filesystem
+paths and not `slug_workspace_v2::NormalizedAbsolutePath` (which cannot
+represent the required relative values). Retain their normalized spelling in
+`CompactString` with an explicit finite Host path policy. Reject a lone
+surrogate or lossy host conversion. Resource amounts wrap Java double bits so
+Rust provides lawful Java `Double`-shaped equality/order/rendering. Direct
+numeric input accepts only the source range `[0, Double.MAX_VALUE]`; keyword
+arithmetic may produce negative or infinite results because Bazel does not call
+`checkAndLimit` after applying the source `-`/`*` Float operand. The four-key
+result is an ordered fixed aggregate, never a hash map.
+
+Use `Arc` for the Host snapshot, mapping, immutable label collections, and
+ordered entry collections. Derive `Allocative` on retained values and `Dupe`
+only for Arc-backed aggregate wrappers; do not deep-clone `RepositoryMapping`
+or introduce a runtime descriptor map, interner, cache, global, or hash.
+
+Conversion-before-normalization remains mandatory. P cannot truncate
+`platforms` and C cannot deduplicate `flag_alias` until every contextual
+occurrence has converted successfully. Command flattening, old-name handling,
+boolean negation, repetition, expansion, and implicit requirements remain
+`slug_commands_v2` work. No converter constructs a target or configuration,
+so this design adds no dependency edge and leaves configured-target cycles at
+the user-approved later boundary.
+
+#### Bounded serial implementation sequence
+
+1. `WP-6-m2-option-label-context-identity`: in `slug_identity_v2` only, add the
+   mapping-free resolved option-label value and source-pinned three-mode parsing
+   primitives. Prove package-relative/main-repository/first-round distinctions,
+   mapping resolution, equality/order/hash/rendering without provenance, and no
+   loading/configuration/target dependency.
+2. A Host-input prerequisite defines the Arc-backed observation schema and
+   lexical path policy, then separately connects existing request/bootstrap
+   observation to core request assembly. It must pin OS/CPU legacy tokens,
+   valid-Unicode home handling, CPU/RAM capture timing, and one-shot/daemon
+   structural equality before any contextual converter consumes it.
+3. Only then may bounded configuration packets add the 41 label/conditional
+   routes and five Host routes, followed later by full-fragment P/C/T
+   normalization. Java-regex, checksum/wire, DICE producer ownership,
+   downstream activation, and configured-target cycles remain deferred.
+
+Independent read-only source, live-substrate, and Buck2-utility audits accept
+the descriptor counts and two-context split. The live audit found both serial
+prerequisites genuinely absent: no Host CPU/RAM/home snapshot exists, current
+absolute label parsing lacks `PackageContext`, and the only live resolved label
+retains mapping provenance. Implementing converters first would invent
+ownership or encode the wrong configuration identity.
+
+Run next only `WP-6-m2-option-label-context-identity`: add the mapping-free
+resolved option-label value and closed first-round/main-repository/package
+parser seam inside `slug_identity_v2`. Preserve the existing provenance-bearing
+`CanonicalLabel` unchanged and stop on any loading, materialization, DICE,
+configuration, target, command-tokenization, or configured-cycle edge.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
