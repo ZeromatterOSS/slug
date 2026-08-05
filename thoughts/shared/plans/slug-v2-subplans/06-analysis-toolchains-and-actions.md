@@ -4369,6 +4369,38 @@ normalization, checksum, wire, configured-target, loader, or new-context work.
 Stop with REPLAN on Host/capture dependence, a new context/loader, a reverse
 edge/cycle, or violation of conversion-before-normalization.
 
+### Repository label conversion route split ACCEPT (2026-08-05)
+
+`WP-6-m2-repository-label-conversion-route-split-design` is **ACCEPT**. The
+41 repository/package routes partition exactly into `30 + 9 + 2`: admit now
+ordinary `LabelConverter` 16, `EmptyToNullLabelConverter` 5,
+`LabelListConverter` 6, `LabelOrderedSetConverter` 1, and
+`LibcTopLabelConverter` 2; defer six symbolic defaults (`host_platform` and
+five Proto routes) plus incomplete `LabelMap`, `LabelToStringEntry`, and
+`FlagAlias` composite grammars; retain mixed command/tokenization routes
+`RunUnder` and `CustomFlag`. The five Host routes remain terminal Unsupported,
+and the eight Java-regex routes remain separate.
+
+For these 30 only, this supersedes the older all-contextual Host-first serial
+step: they need no Host fact. Conceptual `LabelConversionContext` is the
+existing `OptionLabelContext`; no context or loader is added, and existing
+`ResolvedOptionLabel` is the sole mapping-free retained label. Literal/null/
+empty defaults are closed; mappings are borrowed, never retained; conversion
+precedes any list/set normalization. A direct configuration-to-identity edge is
+acyclic. Retain Arc-backed ordered label slices, derive `Allocative`, and use
+`Dupe` only on Arc wrappers; add no map, interner, cache, or global.
+
+Run next only `WP-6-m2-label-only-30-route-converter-implementation`. Its
+private API accepts `OptionLabelContext` and handles only the 30 routes and
+their defaults. Its exact implementation files are configuration `Cargo.toml`,
+`native/mod.rs`, new `native/label_convert.rs`, and `native/tests.rs`; the three
+scheduling documents may change only for terminal disposition. No Cargo.lock,
+root, identity, registry, convert, defaults, value, cache, command, loading,
+DICE, normalization, checksum, wire, configured-target, or Host work is
+allowed. Caps are 320 production, 600 test, 100 documentation, and 920 total
+formatted net lines. User-approved configured-target-cycle deferral remains
+explicit.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
