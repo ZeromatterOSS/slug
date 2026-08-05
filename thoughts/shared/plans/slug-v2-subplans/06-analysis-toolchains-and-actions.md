@@ -2947,6 +2947,76 @@ Preserve `287 + 8 + 5 + 41`, 380/480 caps, hard stops, all deferrals including
 user-approved later configured-target dependency cycles. After acceptance run
 only mechanical 287 attachment.
 
+### Pure native family byte-contract ledger retry 7 (2026-08-05)
+
+This docs-only synthesis uses accepted `[R]` renderer, `[I]` identity, `[S]`
+routes, and closed Stage 6 value/Dotted facts. Unless a row differs, retained
+values use structural equality/order for semantic `BuildOptions` identity; raw
+parser-object matching is deferred. The 17 `F-*` rows freeze contracts;
+source-known AllowColonList and NonEmptyCommaList have no admitted attachment
+or `A`. F-Runs-default is default-materializer-only, never a pure attachment.
+
+| Family | Exact grammar, route/value, and cache bytes |
+| --- | --- |
+| F-Bool | Case-folded `true,1,yes,t,y` / `false,0,no,f,n`; `null→false`, else `X`; `D("false")=false`, `E("yes")=true`, `C(true)=x="true", `. |
+| F-Int | Signed-i32 `Integer.decode` decimal/`0x`/`#`/octal; malformed/overflow → `X`; `D(s)`, `E("-16")=-16`, `C(-16)=x="-16", `. |
+| F-Text | Scalar `"null"` is `N=None→x=NULL, `; ordinary `D/E(s)=s`. Only admitted built-in `m=T List<String>` repeats: `N=[]→x=EMPTY, `, ordered `A[E(a),E(b)]=[a,b]→x="[a, b]", `. |
+| F-Tri | `null→AUTO`; case-folded `auto` and Bool aliases → `AUTO|YES|NO`, else `X`; `D("auto")=AUTO`, `E("yes")=YES`, `C(YES)=x="YES", `. |
+| F-Void | `N=None→x=NULL, `; `E("null")=None→x=NULL, `; other scalar → `X`. |
+| F-Duration | `0` or nonnegative decimal plus `d|h|m|s|ms|ns`, else `X`; structural `Duration`; `D(s)`, `E("3661s")=PT1H1M1S→x="PT1H1M1S", `. |
+| F-AllowCommaList | Nonrepeat `D(s)=split(s)`: `D("")=Ø→x=EMPTY, `, `D("-O0,-DDEBUG=1")=[-O0,-DDEBUG=1]→x="[-O0, -DDEBUG=1]", `, `E("a,,b")=[a,"",b]→x="[a, , b]", `. Admitted repeat `N=[]→x=EMPTY, `, `A[E("a,,b"),E("c")]=[a,"",b,c]→x="[a, , b, c]", `. |
+| F-StringSet | Nonrepeat scalar-list: `D("")=Ø→x=EMPTY, `; `D(s)` comma-splits, de-duplicates, Java UTF-16-sorts; reverse `E(U+E000,U+10000)=[𐀀, ]→x="[𐀀, ]", `. |
+| F-Entry | First `=` after nonempty key: `a=b=c→(a,b=c)`; `=v`/no `=` → `X`; `N=[]→x=EMPTY, `, `A[E(a=b),E(c=d)]=[a=b,c=d]→x="[a=b, c=d]", `. |
+| F-Env | `N=V→Set(N,V)`, `N→Inherit(N)`, `=N→Unset(N)`; empty/`=` → `X`; `N=[]→x=EMPTY, `, `A[E(N=V),E(N),E(=N)]→x="[Set[name=N, value=V], Inherit[name=N], Unset[name=N]]", `. |
+| F-Dotted | Case-insensitive component `(\d+)([a-z0-9]*?)?(\d+)?`, descriptive `([a-z]\w*)`, signed-i32 `Integer.parseInt`; first descriptive (including underscore) stops component parsing and later components do not affect parsed sequence, yet the full original input controls structural equality/hash/cache/rendering. Only `N=None→x=NULL, ` default; distinct `E("1.0")`/`E("1")` retain text, `C(1.0)=x="1.0", `. |
+| F-Timeout | `.limit(6)` seconds: `2,`/`2,,3,4,5` accept, `1,2,,3,4` → `X`; nonpositive entries individually fall back in enum-order map. `D("-1")→{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}→x="{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}", `; `E("3661,61,900,3600")→{short=PT1H1M1S, moderate=PT1M1S, long=PT15M, eternal=PT1H}→x="{short=PT1H1M1S, moderate=PT1M1S, long=PT15M, eternal=PT1H}", `; `E("3661,0,0,0")→{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}→x="{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}", `. |
+| F-Runs-default | Default-materializer-only, not a pure attachment: `D("1")` retains `[(?:(?>.*)) Options: [1]]→x="[(?:(?>.*)) Options: [1]]", `; `U("+2")` is accepted/deferred retaining `"+2"`; no general numeric/regex `E` or `A`. |
+| F-Shard | `D("explicit")=EXPLICIT→x="EXPLICIT", `. ASCII-case-folded `forced=` accepts nonnegative signed `Integer.decode` decimal/`0x`/`#`/octal; malformed/negative → `X`; `E("FORCED=+0x10")=Forced(16)→x="forced=16", `; structural `Forced(i32)`, raw Java object identity deferred. |
+| F-Fission | Nonrepeat scalar-list: `D("no")=Ø→x=EMPTY, `; `E("yes")=[fastbuild, dbg, opt]→x="[fastbuild, dbg, opt]", `; comma `E("dbg,fastbuild")=[dbg, fastbuild]→x="[dbg, fastbuild]", `; invalid mode → `X`. |
+| F-Platform | `D(s)=E(s)=ASCII-lower(s)`: `MÄCOS→mÄcos`, never Unicode fold; structural `String`; `C(mÄcos)=x="mÄcos", `. |
+| F-EmptyList | Nonrepeat scalar-list: every `D(s)`/`E(s)`/`Ø` is `[]→x=EMPTY, `. |
+
+Every listed enum default `D(s)` case-folds through its ordinary route; `E` is
+concrete nondefault and `X(other)` rejects. Ordinary cache is Java
+`Enum#toString`; Compilation and Strip alone override lowercase.
+
+| Enum route | Actual generic defaults, nondefault route, and exact cache |
+| --- | --- |
+| F-Enum-StrictDeps | `D(s∈{default,error,off})`; `E("warn")=WARN`; `C(DEFAULT)=x="DEFAULT", `. |
+| F-Enum-ExecConfigurationDistinguisher | `D(s∈{off})=OFF`; `E("legacy")=LEGACY`; `C(OFF)=x="OFF", `. |
+| F-Enum-OutputDirectoryNaming | `D(s∈{diff_against_dynamic_baseline})=DIFF_AGAINST_DYNAMIC_BASELINE`; `E("legacy")=LEGACY`; `C(DIFF_AGAINST_DYNAMIC_BASELINE)=x="DIFF_AGAINST_DYNAMIC_BASELINE", `. |
+| F-Enum-OutputPaths | `D(s∈{off})=OFF`; `E("strip")=STRIP`; `C(OFF)=x="OFF", `. |
+| F-Enum-IncludeConfigFragments | `D(s∈{off})=OFF`; `E("direct")=DIRECT`; `C(OFF)=x="OFF", `. |
+| F-Enum-AndroidConfigurationDistinguisher | `D(s∈{MAIN})=MAIN`; `E("android")=ANDROID`; `C(MAIN)=x="MAIN", `. |
+| F-Enum-ApkSigningMethod | `D(s∈{v1_v2})=V1_V2`; `E("v2")=V2`; `C(V1_V2)=x="V1_V2", `. |
+| F-Enum-AndroidManifestMerger | `D(s∈{android})=ANDROID`; `E("legacy")=LEGACY`; `C(ANDROID)=x="ANDROID", `. |
+| F-Enum-ManifestMergerOrder | `D(s∈{alphabetical})=ALPHABETICAL`; `E("dependency")=DEPENDENCY`; `C(ALPHABETICAL)=x="ALPHABETICAL", `. |
+| F-Enum-AppleConfigurationDistinguisher | `D(s∈{UNKNOWN})=UNKNOWN`; `E("applebin_ios")=APPLEBIN_IOS`; filesystem accessor is not renderer; `C(UNKNOWN)=x="UNKNOWN", `. |
+| F-Enum-DynamicMode | `D(s∈{off,default})`; `E("fully")=FULLY`; `C(OFF)=x="OFF", `. |
+| F-Enum-JavaClasspathMode | `D(s∈{bazel})=BAZEL`; `E("off")=OFF`; `C(BAZEL)=x="BAZEL", `. |
+| F-Enum-JavaOneVersionLevel | `D(s∈{OFF})=OFF`; `E("warning")=WARNING`; `C(OFF)=x="OFF", `. |
+| F-Enum-Cancel | `D(s∈{never})=NEVER`; `E("on_failed")=ON_FAILED`, aliases `E(true)=ON_PASSED`/`E(false)=NEVER`; `C(NEVER)=x="NEVER", `. |
+| F-Enum-CompilationMode | `D(s∈{fastbuild,opt})`; `E("dbg")=DBG`; lowercase `C(FASTBUILD)=x="fastbuild", `. |
+| F-Enum-StripMode | `D(s∈{sometimes})=SOMETIMES`; `E("always")=ALWAYS`; lowercase `C(SOMETIMES)=x="sometimes", `. |
+
+This is disjoint from `287 + 8 + 5 + 41 = 341` and independent
+repeat/old-name/expansion/implicit metadata. After acceptance attach only the
+287 pure descriptors mechanically; raw parser matching, contextual/regex/Host/
+repository conversion, normalization, checksum/wire, DICE, and user-approved
+later configured-target dependency cycles remain deferred.
+
+Independent terminal review accepted retry 7: its 17 family and 16 enum rows,
+global structural retained-value identity/order rule, raw parser-object
+deferral, unadmitted-list boundary, Runs exception, Dotted full-input identity,
+and exact Fission `yes`/`no`/comma routes close the pure byte contract. No
+source, probe, descriptor, Rust, or runtime change occurred.
+
+Run next only `WP-6-m2-pure-native-descriptor-family-attachment-ledger`: a
+docs-only, mechanical 287-row attachment map from the committed 341 registry
+and accepted cohort/family ledgers. It must retain `287 + 8 + 5 + 41`, keep
+Runs-default outside the 287, and stop rather than invent a route. After its
+acceptance, advance only to bounded pure-native kernel implementation planning.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu

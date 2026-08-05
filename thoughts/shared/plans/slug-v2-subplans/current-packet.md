@@ -1,115 +1,58 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-7`
+Packet: `WP-6-m2-pure-native-descriptor-family-attachment-ledger`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze all accepted pure-family byte contracts with the terminal
-retained-value identity/order rule and Fission-`yes` bytes before mechanical
-descriptor attachment.
-Predecessors: exact Java/Guava renderer authority, forced-sharding structural
-semantic identity, and the full family-source/16-enum route anchor table are
-accepted. Retry 6 was discarded at independent terminal review; this packet performs no
-new source discovery. F-Runs-default is default-materializer-only, never a
-pure descriptor attachment.
+Role: mechanically attach every admitted pure descriptor to its frozen family
+contract before bounded pure-native kernel implementation planning.
+Predecessors: the committed 17-class/341-option registry, accepted cohort
+routing, accepted exact Java/Guava renderer authority, forced-sharding
+structural identity, source-anchor/16-enum routes, and retry-7 family byte
+contract are authoritative. No source discovery is authorized.
 
-Write one compact `F-*` contract row for every distinct pure semantic family,
-citing only accepted `[R]` renderer, `[I]` identity, `[S]` source-route, and
-already closed Stage 6 value-algebra/Dotted-discriminator sections. Do not
-repeat full paths/ranges, inventories, probes, or 287 descriptor rows. Freeze
-exact grammar, structural semantic equality/order, `N`/`D`/`Ø`/`E`/`A`/`U`
-routes, and exact field cache bytes.
+Create exactly 287 compact descriptor rows, one per committed pure descriptor,
+in accepted registry order. Key each row by the two-digit class-local ordinal
+from the 17-class ledger plus `FQCN#name`; do not invent a global or zero-based
+ordinal. Record its exact `F-*` family or enum route and a compact scalar versus
+repeat/default route token. Field type, converter, raw default, and repeat bit
+remain authoritative in the existing metadata row and are referenced rather
+than copied unless needed to disambiguate the attachment. The rows are a
+mechanical attachment, not a new converter or route inventory. Add one separate
+F-Runs-default materializer-exception record outside the 287; `runs_per_test`
+remains in the Java-regex cohort and is never a pure row.
 
-Unless a row differs, retained values use structural equality/order for
-semantic `BuildOptions` identity; raw parser-object matching remains deferred.
+The registry partition must prove exactly `287 + 8 + 5 + 41 = 341`: retain the
+eight Java-regex, five Host, and 41 repository/loading owners outside this
+ledger. Preserve the orthogonal 45 repeatable, 13 old-name, six expansion, and
+two implicit metadata rows without folding them into a value family.
 
-Mandatory facts are immutable:
-
-- Bool `null→false`, `D("false")=false`; Tri `null→AUTO`,
-  `D("auto")=AUTO`; scalar Text and Dotted `N=None`; Void `N=None` plus
-  `E("null")=None`;
-- every admitted repeat starts `N=[]→x=EMPTY, ` and then uses ordered
-  post-conversion `A` with whole-field bytes: F-Text
-  `A[E(a),E(b)]=[a, b]→x="[a, b]", `; F-AllowCommaList ordered flattening
-  `A[E("a,,b"),E("c")]=[a,"",b,c]→x="[a, , b, c]", `; F-Entry exactly
-  `A[E(a=b),E(c=d)]→x="[a=b, c=d]", `; F-Env
-  `A[E(N=V),E(N),E(=N)]` retains Set/Inherit/Unset and yields
-  `x="[Set[name=N, value=V], Inherit[name=N], Unset[name=N]]", `;
-- source-known AllowColonList and NonEmptyCommaList have no admitted attachment
-  and no `A`;
-  StringSet, Fission, and EmptyList are nonrepeat scalar-list routes;
-- StringSet has `D(s)`, duplicate elimination, and the actual reverse
-  U+E000/U+10000 UTF-16 case; timeout keeps `.limit(6)`, `2,` and `2,,3,4,5`
-  accepts, `1,2,,3,4` rejection,
-  `D("-1")→{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}` with
-  `x="{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}", `, and
-  `3661,61,900,3600→{short=PT1H1M1S, moderate=PT1M1S, long=PT15M, eternal=PT1H}`
-  with `x="{short=PT1H1M1S, moderate=PT1M1S, long=PT15M, eternal=PT1H}", `;
-- Shard uses nonnegative `Integer.decode` decimal/`0x`/`#`/octal grammar with
-  canonical decimal `forced=N` rendering and structural `Forced(i32)` semantic
-  identity; Fission records `D("no")=Ø→x=EMPTY, `, exact `E("yes")=[fastbuild, dbg, opt]→x="[fastbuild, dbg, opt]", `,
-  and nonempty comma-mode `[dbg, fastbuild]→x="[dbg, fastbuild]", `;
-- all 16 enum rows remain separate and use explicit substitution or a concrete
-  cache example such as `C(OFF)=x="OFF", `, never literal `m`; and
-- runs remains only default materialization `D("1")` plus deferred `U("+2")`,
-  with no general numeric/regex occurrence decoder.
-- F-AllowCommaList has distinct nonrepeat `D("")=Ø→x=EMPTY, ` and
-  `E("a,,b")=[a,"",b]→x="[a, , b]", ` routes before any admitted repeat
-  flattening;
-  F-Text repeat attaches only to admitted built-in `m=T List<String>`;
-  F-StringSet has `D("")=Ø→x=EMPTY, ` and
-  `E(U+E000,U+10000)=[𐀀, ]→x="[𐀀, ]", `;
-- F-Shard has `D("explicit")=EXPLICIT→x="EXPLICIT", `, an ASCII-case-folded
-  `forced=` prefix, full nonnegative `Integer.decode` radix/sign grammar, and
-  canonical decimal `forced=N` rendering; F-Fission has
-  `D("no")=Ø→x=EMPTY, ` plus its exact nonempty bytes;
-- timeout nonpositive entries fall back individually, including
-  `E("3661,0,0,0")→{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}`
-  and `x="{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}", `;
-- Dotted uses case-insensitive component `(\d+)([a-z0-9]*?)?(\d+)?` and
-  descriptive `([a-z]\w*)` patterns, `Integer.parseInt` capture bounds, and
-  first-descriptive early-stop including underscore: later components do not
-  affect the parsed sequence, but the full original input controls equality,
-  hash, cache, and rendering; runs
-  `D("1")` is retained/cache `[(?:(?>.*)) Options: [1]]→x="[(?:(?>.*)) Options: [1]]", `
-  while `U("+2")` remains deferred with no general `E/A`; and
-- Platform has `D(s)=E(s)=ASCII-lower(s)`.
-- Every enum `D(s)` case-folds through its normal route. Actual defaults are:
-  StrictDeps `{default,error,off}`; Exec `{off}`;
-  OutputDirectoryNaming `{diff_against_dynamic_baseline}`; OutputPaths `{off}`;
-  Include `{off}`; AndroidConfig `{MAIN}`; Apk `{v1_v2}`;
-  AndroidManifest `{android}`; ManifestOrder `{alphabetical}`;
-  AppleConfig `{UNKNOWN}`; DynamicMode `{off,default}`; JavaClasspath `{bazel}`;
-  OneVersion `{OFF}`; Cancel `{never}`; Compilation `{fastbuild,opt}`; and
-  Strip `{sometimes}`. Keep concrete nondefault `E` and exact bytes, with
-  lowercase overrides only for Compilation and Strip;
-- F-AllowCommaList additionally has generic nonrepeat `D(s)=split(s)` and
-  `D("-O0,-DDEBUG=1")=[-O0,-DDEBUG=1]→x="[-O0, -DDEBUG=1]", ` alongside
-  empty/default and repeat routes; F-Dotted has only `N=None` defaults and
-  distinct `E("1.0")`/`E("1")`, never `D("1.0")`; and
-- runs `U("+2")` is accepted but deferred while retaining original text.
-
-Preserve the disjoint `287 + 8 + 5 + 41 = 341` routing and independent
-repeat/old-name/expansion/implicit metadata. The table must let a later packet
-attach each of the 287 pure descriptors mechanically; source-known
-AllowColonList/NonEmptyCommaList remain unattached, and runs remains attached
-only by the default materializer, not a pure descriptor.
+Use the accepted retry-7 family ledger verbatim for all value rules: retained
+values are structural equality/order semantic `BuildOptions` identity unless
+the row says otherwise; raw parser-object matching remains deferred. Keep the
+source-known AllowColonList/NonEmptyCommaList no-attachment/no-`A` boundary,
+F-Runs-default exception, Dotted original-input identity, all exact defaults,
+repeat `A` routes/cache bytes, timeout/shard/Fission cases, Platform ASCII
+lowering, and the 16 separate enum routes. Reference that ledger rather than
+copying its grammar or cache tables into descriptor rows.
 
 Allowlist:
 
 - `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
+- terminal scheduling only:
+  `thoughts/shared/plans/slug-v2-subplans/current-packet.md` and
+  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- routing only on `REPLAN`:
+  `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
+  `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`.
 
-Cap: 480 formatted net documentation lines total, at most 380 in Stage 6. No
-source re-audit, descriptor map, Java/JVM probe, Rust, fixture, artifact,
-dependency, registry, command, DICE, or downstream change.
+Cap: at most 380 formatted Stage 6 and 480 total documentation lines. No
+source lookup, Java/JVM probe, Rust, fixture, descriptor implementation,
+registry edit, command, DICE, dependency, artifact, or downstream change.
 
-Stop and `REPLAN` on any undefined default/route/cache byte, combined distinct
-grammar/enum route, new identity issue, reopened evidence, material correction,
-or scope/cap breach. After independent acceptance advance only to the
-mechanical 287-descriptor attachment ledger. Defer raw parser matching,
+Stop and `REPLAN` on a count mismatch, an ambiguous or unattached descriptor,
+an invented family/route/default judgment, source reopening, or scope/cap
+breach. After independent acceptance, advance only to bounded pure-native
+kernel implementation planning/packet. Defer raw parser matching,
 contextual/regex/Host/repository conversion, normalization, checksum/wire
 implementation, DICE changes, and user-approved later configured-target
 dependency cycles.
