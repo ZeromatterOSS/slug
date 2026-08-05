@@ -1,0 +1,600 @@
+use super::CacheFieldValue;
+use super::NATIVE_OPTION_DESCRIPTORS;
+use super::NativeOptionDescriptor;
+use super::format_cache_field;
+
+/// Deliberately independent, compact pinned source expectation rows. Do not
+/// derive this table from the production registry: it guards every field and
+/// its cache-key position against an accidental registry edit.
+#[derive(Clone, Copy, Debug)]
+struct ExpectedDescriptor {
+    class_name: &'static str,
+    canonical_name: &'static str,
+    field_type: &'static str,
+    raw_default: &'static str,
+    converter: Option<&'static str>,
+    allow_multiple: bool,
+    old_name: Option<&'static str>,
+    expansion: Option<&'static str>,
+    implicit_requirements: Option<&'static str>,
+    normalizer: &'static str,
+}
+
+macro_rules! expected_descriptor {
+    ($class:expr; $name:expr; $field_type:expr; $raw_default:expr; $converter:expr; $allow_multiple:expr; $old_name:expr; $expansion:expr; $implicit_requirements:expr; $normalizer:expr) => {
+        ExpectedDescriptor {
+            class_name: $class,
+            canonical_name: $name,
+            field_type: $field_type,
+            raw_default: $raw_default,
+            converter: $converter,
+            allow_multiple: $allow_multiple,
+            old_name: $old_name,
+            expansion: $expansion,
+            implicit_requirements: $implicit_requirements,
+            normalizer: $normalizer,
+        }
+    };
+}
+
+#[rustfmt::skip]
+const EXPECTED: &[ExpectedDescriptor] = &[
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "extra_execution_platforms"; "List<String>"; "\"\""; Some("CommaSeparatedOptionListConverter.class"); false; None; None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "extra_toolchains"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "host_platform"; "Label"; "DEFAULT_HOST_PLATFORM"; Some("HostPlatformConverter.class"); false; Some("\"experimental_host_platform\""); None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "incompatible_use_toolchain_resolution_for_java_rules"; "boolean"; "\"true\""; None; false; None; None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "platform_mappings"; "PlatformMappingKey"; "\"\""; Some("PlatformMappingKeyConverter.class"); false; None; None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "platforms"; "List<Label>"; "\"\""; Some("LabelListConverter.class"); false; Some("\"experimental_platforms\""); None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.PlatformOptions"; "toolchain_resolution_debug"; "RegexFilter"; "\"-.*\""; Some("RegexFilter.RegexFilterConverter.class"); false; None; None; None; "P"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.ShellConfiguration.Options"; "shell_executable"; "PathFragment"; "\"null\""; Some("PathFragmentConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "action_env"; "List<Converters.EnvVar>"; "\"null\""; Some("Converters.EnvVarsConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "affected by starlark transition"; "List<String>"; "\"\""; Some("EmptyListConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "allow_analysis_failures"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "allow_unresolved_symlinks"; "boolean"; "\"true\""; None; false; Some("\"experimental_allow_unresolved_symlinks\""); None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "allowed_cpu_values"; "ImmutableList<String>"; "\"\""; Some("CommaSeparatedOptionSetConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "analysis_testing_deps_limit"; "int"; "\"2000\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "archived_tree_artifact_mnemonics_filter"; "RegexFilter"; "\"-.*\""; Some("RegexFilter.RegexFilterConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "build_runfile_links"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "build_runfile_manifests"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "check_licenses"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "check_visibility"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "collect_code_coverage"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "compilation_mode"; "CompilationMode"; "\"fastbuild\""; Some("CompilationMode.Converter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "cpu"; "String"; "\"\""; Some("AutoCpuConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "define"; "List<Map.Entry<String, String>>"; "\"null\""; Some("Converters.AssignmentConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "enable_runfiles"; "TriState"; "\"auto\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "enforce_constraints"; "boolean"; "\"true\""; None; false; Some("\"experimental_enforce_constraints\""); None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "evaluating for analysis test"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "exec_aspects"; "List<String>"; "\"null\""; Some("Converters.CommaSeparatedOptionListConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_action_listener"; "List<Label>"; "\"null\""; Some("LabelListConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_allow_map_directory"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_collect_code_coverage_for_generated_files"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_debug_selects_always_succeed"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_enforce_transitive_visibility"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_exclude_defines_from_exec_config"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_exec_config"; "String"; "\"@_builtins//:common/builtin_exec_platforms.bzl%bazel_exec_transition\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_exec_configuration_distinguisher"; "ExecConfigurationDistinguisherScheme"; "\"off\""; Some("ExecConfigurationDistinguisherSchemeConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_extended_sanity_checks"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_output_directory_naming_scheme"; "OutputDirectoryNamingScheme"; "\"diff_against_dynamic_baseline\""; Some("OutputDirectoryNamingSchemeConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_output_paths"; "OutputPathsMode"; "\"off\""; Some("OutputPathsConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_override_platform_cpu_name"; "List<Map.Entry<Label, String>>"; "\"null\""; Some("LabelToStringEntryConverter.class"); true; Some("\"experimental_override_name_platform_in_output_dir\""); None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_platform_in_output_dir"; "TriState"; "\"Auto\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_propagate_custom_flag"; "List<String>"; "\"null\""; Some("CoreOptionConverters.CustomFlagConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_remotable_source_manifests"; "boolean"; "\"false\""; Some("BooleanConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_strict_fileset_output"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_throttle_action_cache_check"; "boolean"; "\"true\""; Some("BooleanConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_use_platforms_in_output_dir_legacy_heuristic"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "experimental_writable_outputs"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "features"; "List<String>"; "\"null\""; None; true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "flag_alias"; "List<Map.Entry<String, Label>>"; "\"null\""; Some("CoreOptionConverters.FlagAliasConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "host_action_env"; "List<Converters.EnvVar>"; "\"null\""; Some("Converters.EnvVarsConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "host_compilation_mode"; "CompilationMode"; "\"opt\""; Some("CompilationMode.Converter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "host_cpu"; "String"; "\"\""; Some("AutoCpuConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "host_features"; "List<String>"; "\"null\""; None; true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "include_config_fragments_provider"; "IncludeConfigFragmentsEnum"; "\"off\""; Some("IncludeConfigFragmentsEnumConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_always_include_files_in_data"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_auto_exec_groups"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_bazel_test_exec_run_under"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_bep_cpu_from_platform"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_check_testonly_for_output_files"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_compact_repo_mapping_manifest"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_disable_select_on"; "ImmutableList<String>"; "\"\""; Some("CommaSeparatedOptionSetConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_exclude_starlark_flags_from_exec_config"; "boolean"; "\"false\""; None; false; Some("\"experimental_exclude_starlark_flags_from_exec_config\""); None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_filegroup_runfiles_for_data"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_limit_platforms_in_output_dir_to"; "List<Label>"; "\"\""; Some("LabelListConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_merge_genfiles_directory"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_modify_execution_info_additive"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "incompatible_target_cpu_from_platform"; "boolean"; "\"true\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "instrument_test_targets"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "instrumentation_filter"; "RegexFilter"; "\"-/javatests[/:],-/test/java[/:]\""; Some("RegexFilter.RegexFilterConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "is exec configuration"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "min_param_file_size"; "int"; "\"32768\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "modify_execution_info"; "List<ExecutionInfoModifier>"; "\"null\""; Some("ExecutionInfoModifier.Converter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "platform_suffix"; "String"; "\"null\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "run_under"; "RunUnder"; "\"null\""; Some("RunUnderConverter.class"); false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "scl_config"; "String"; "\"null\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "stamp"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "strict_filesets"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "target_environment"; "List<Label>"; "\"null\""; Some("LabelListConverter.class"); true; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "use_target_platform_for_tests"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.config.CoreOptions"; "verbose_visibility_errors"; "boolean"; "\"false\""; None; false; None; None; None; "C"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.CoverageConfiguration.CoverageOptions"; "coverage_output_generator"; "Label"; "\"@bazel_tools//tools/test:lcov_merger\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.CoverageConfiguration.CoverageOptions"; "coverage_report_generator"; "Label"; "\"@bazel_tools//tools/test:coverage_report_generator\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "allow_local_tests"; "boolean"; "\"true\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "cache_test_results"; "TriState"; "\"auto\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "coverage_support"; "Label"; "\"@bazel_tools//tools/test:coverage_support\""; Some("LabelConverter.class"); false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "default_test_resources"; "List<Pair<String, Map<TestSize, Double>>>"; "\"null\""; Some("TestResourcesConverter.class"); true; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "experimental_cancel_concurrent_tests"; "CancelConcurrentTests"; "\"never\""; Some("CancelConcurrentTests.Converter.class"); false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "experimental_fetch_all_coverage_outputs"; "boolean"; "\"false\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "experimental_retain_test_configuration_across_testonly"; "boolean"; "\"true\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "experimental_split_coverage_postprocessing"; "boolean"; "\"false\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "incompatible_check_sharding_support"; "boolean"; "\"true\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "incompatible_exclusive_test_sandboxed"; "boolean"; "\"true\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "runs_per_test"; "List<PerLabelOptions>"; "\"1\""; Some("RunsPerTestConverter.class"); true; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "runs_per_test_detects_flakes"; "boolean"; "\"false\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_arg"; "List<String>"; "\"null\""; None; true; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_env"; "List<Converters.EnvVar>"; "\"null\""; Some("Converters.EnvVarsConverter.class"); true; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_filter"; "String"; "\"null\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_result_expiration"; "int"; "\"-1\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_runner_fail_fast"; "boolean"; "\"false\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_sharding_strategy"; "TestShardingStrategy"; "\"explicit\""; Some("ShardingStrategyConverter.class"); false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "test_timeout"; "Map<TestTimeout, Duration>"; "\"-1\""; Some("TestTimeout.TestTimeoutConverter.class"); false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "trim_test_configuration"; "boolean"; "\"true\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions"; "zip_undeclared_test_outputs"; "boolean"; "\"false\""; None; false; None; None; None; "T"),
+    expected_descriptor!("com.google.devtools.build.lib.bazel.rules.BazelRuleClassProvider.StrictActionEnvOptions"; "incompatible_strict_action_env"; "boolean"; "\"true\""; None; false; Some("\"experimental_strict_action_env\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.bazel.rules.python.BazelPythonConfiguration.Options"; "experimental_python_import_all_repositories"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.bazel.rules.python.BazelPythonConfiguration.Options"; "incompatible_remove_ctx_bazel_py_fragment"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.bazel.rules.python.BazelPythonConfiguration.Options"; "python_path"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "Android configuration distinguisher"; "ConfigurationDistinguisher"; "\"MAIN\""; Some("ConfigurationDistinguisherConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_compiler"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_databinding_use_androidx"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_databinding_use_v3_4_args"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_dynamic_mode"; "DynamicMode"; "\"off\""; Some("DynamicModeConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_fixed_resource_neverlinking"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_manifest_merger"; "AndroidManifestMerger"; "\"android\""; Some("AndroidManifestMergerConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_manifest_merger_order"; "ManifestMergerOrder"; "\"alphabetical\""; Some("ManifestMergerOrderConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_migration_tag_check"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_platforms"; "List<Label>"; "\"\""; Some("LabelOrderedSetConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "android_resource_shrinking"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "apk_signing_method"; "ApkSigningMethod"; "\"v1_v2\""; Some("ApkSigningMethodConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "break_build_on_parallel_dex2oat_failure"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "desugar_for_android"; "boolean"; "\"true\""; None; false; Some("\"experimental_desugar_for_android\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "desugar_java8_libs"; "boolean"; "\"false\""; None; false; Some("\"experimental_desugar_java8_libs\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "dexopts_supported_in_dexmerger"; "List<String>"; "\"--minimal-main-dex,--set-max-idx-number\""; Some("Converters.CommaSeparatedOptionListConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "dexopts_supported_in_dexsharder"; "List<String>"; "\"--minimal-main-dex\""; Some("Converters.CommaSeparatedOptionListConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "dexopts_supported_in_incremental_dexing"; "List<String>"; "\"--no-optimize,--no-locals\""; Some("Converters.CommaSeparatedOptionListConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_allow_android_library_deps_without_srcs"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_always_filter_duplicate_classes_from_android_test"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_assume_minsdkversion"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_compress_java_resources"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_databinding_v2"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_library_exports_manifest_default"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_resource_cycle_shrinking"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_resource_name_obfuscation"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_resource_path_shortening"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_resource_shrinking"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_rewrite_dexes_with_rex"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_android_use_parallel_dex2oat"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_check_desugar_deps"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_disable_instrumentation_manifest_merge"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_filter_library_jar_with_program_jar"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_filter_r_jars_from_android_test"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_get_android_java_resources_from_optimized_jar"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_incremental_dexing_after_proguard"; "int"; "\"50\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_incremental_dexing_after_proguard_by_default"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_omit_resources_info_provider_from_android_binary"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_one_version_enforcement_use_transitive_jars_for_binary_under_test"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_persistent_aar_extractor"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_remove_r_classes_from_instrumentation_test_jar"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_use_dex_splitter_for_incremental_dexing"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "experimental_use_rtxt_from_merged_resources"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "fat_apk_hwasan"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "incompatible_disable_native_android_rules"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "incompatible_remove_ctx_android_fragment"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "incremental_dexing"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "internal_persistent_android_dex_desugar"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "internal_persistent_busybox_tools"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "internal_persistent_multiplex_android_dex_desugar"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "internal_persistent_multiplex_busybox_tools"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "legacy_main_dex_list_generator"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "non_incremental_per_target_dexopts"; "List<String>"; "\"--positions\""; Some("Converters.CommaSeparatedOptionListConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "optimizing_dexer"; "Label"; "\"null\""; Some("EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "output_library_merged_assets"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "persistent_android_dex_desugar"; "Void"; "\"null\""; None; false; None; Some("{ \"--internal_persistent_android_dex_desugar\", \"--strategy=Desugar=worker\", \"--strategy=DexBuilder=worker\", }"); None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "persistent_android_resource_processor"; "Void"; "\"null\""; None; false; None; Some("{ \"--internal_persistent_busybox_tools\", \"--strategy=AaptPackage=worker\", \"--strategy=AndroidResourceParser=worker\", \"--strategy=AndroidResourceValidator=worker\", \"--strategy=AndroidResourceCompiler=worker\", \"--strategy=RClassGenerator=worker\", \"--strategy=AndroidResourceLink=worker\", \"--strategy=AndroidAapt2=worker\", \"--strategy=AndroidAssetMerger=worker\", \"--strategy=AndroidResourceMerger=worker\", \"--strategy=AndroidCompiledResourceMerger=worker\", \"--strategy=ManifestMerger=worker\", \"--strategy=AndroidManifestMerger=worker\", \"--strategy=Aapt2Optimize=worker\", \"--strategy=AARGenerator=worker\", \"--strategy=ProcessDatabinding=worker\", \"--strategy=GenerateDataBindingBaseClasses=worker\" }"); None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "persistent_multiplex_android_dex_desugar"; "Void"; "\"null\""; None; false; None; Some("{ \"--persistent_android_dex_desugar\", \"--internal_persistent_multiplex_android_dex_desugar\", }"); None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "persistent_multiplex_android_resource_processor"; "Void"; "\"null\""; None; false; None; Some("{ \"--persistent_android_resource_processor\", \"--modify_execution_info=AaptPackage=+supports-multiplex-workers\", \"--modify_execution_info=AndroidResourceParser=+supports-multiplex-workers\", \"--modify_execution_info=AndroidResourceValidator=+supports-multiplex-workers\", \"--modify_execution_info=AndroidResourceCompiler=+supports-multiplex-workers\", \"--modify_execution_info=RClassGenerator=+supports-multiplex-workers\", \"--modify_execution_info=AndroidResourceLink=+supports-multiplex-workers\", \"--modify_execution_info=AndroidAapt2=+supports-multiplex-workers\", \"--modify_execution_info=AndroidAssetMerger=+supports-multiplex-workers\", \"--modify_execution_info=AndroidResourceMerger=+supports-multiplex-workers\", \"--modify_execution_info=AndroidCompiledResourceMerger=+supports-multiplex-workers\", \"--modify_execution_info=ManifestMerger=+supports-multiplex-workers\", \"--modify_execution_info=AndroidManifestMerger=+supports-multiplex-workers\", \"--modify_execution_info=Aapt2Optimize=+supports-multiplex-workers\", \"--modify_execution_info=AARGenerator=+supports-multiplex-workers\", }"); None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options"; "persistent_multiplex_android_tools"; "Void"; "\"null\""; None; false; None; Some("{ \"--internal_persistent_multiplex_busybox_tools\", \"--persistent_multiplex_android_resource_processor\", \"--persistent_multiplex_android_dex_desugar\", }"); None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.android.BazelAndroidConfiguration.Options"; "merge_android_manifest_permissions"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "apple configuration distinguisher"; "ConfigurationDistinguisher"; "\"UNKNOWN\""; Some("ConfigurationDistinguisherConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "apple_platform_type"; "String"; "\"macos\""; Some("PlatformTypeConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "apple_platforms"; "List<Label>"; "\"\""; Some("LabelListConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "apple_split_cpu"; "String"; "\"\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "catalyst_cpus"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "experimental_include_xcode_execution_requirements"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "experimental_objc_provider_from_linked"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "experimental_prefer_mutual_xcode"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "host_macos_minimum_os"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "incompatible_enable_apple_toolchain_resolution"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "ios_minimum_os"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "ios_multi_cpus"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "ios_sdk_version"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "macos_cpus"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "macos_minimum_os"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "macos_sdk_version"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "tvos_cpus"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "tvos_minimum_os"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "tvos_sdk_version"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "use_platforms_in_apple_crosstool_transition"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "visionos_cpus"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "watchos_cpus"; "List<String>"; "\"null\""; Some("CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "watchos_minimum_os"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "watchos_sdk_version"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "xcode_version"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions"; "xcode_version_config"; "Label"; "\"@bazel_tools//tools/cpp:host_xcodes\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.config.ConfigFeatureFlagOptions"; "all feature flag values are present (internal)"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.config.ConfigFeatureFlagOptions"; "enforce_transitive_configs_for_config_feature_flag"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "apple_generate_dsym"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "build_test_dwp"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cc_dotd_files"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cc_include_scanning"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cc_output_directory_tag"; "String"; "\"\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "compiler"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "conlyopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "copt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "crosstool_top"; "Label"; "\"@bazel_tools//tools/cpp:toolchain\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cs_fdo_absolute_path"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cs_fdo_instrument"; "String"; "\"null\""; None; false; None; None; Some("{\"--copt=-Wno-error\"}"); "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cs_fdo_profile"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "custom_malloc"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "cxxopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "dynamic_mode"; "DynamicMode"; "\"default\""; Some("DynamicModeConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "enable_propeller_optimize_absolute_paths"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "enable_remaining_fdo_absolute_paths"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_cc_implementation_deps"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_cpp_compile_resource_estimation"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_cpp_modules"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_generate_llvm_lcov"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_inmemory_dotd_files"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_link_static_libraries_once"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_omitfp"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_save_feature_state"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_unsupported_and_brittle_include_scanning"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_use_cpp_compile_action_args_params_file"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "experimental_use_llvm_covmap"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "fdo_instrument"; "String"; "\"null\""; None; false; None; None; Some("{\"--copt=-Wno-error\"}"); "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "fdo_optimize"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "fdo_prefetch_hints"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "fdo_profile"; "Label"; "\"null\""; Some("EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "fission"; "List<CompilationMode>"; "\"no\""; Some("FissionOptionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "force_pic"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "grte_top"; "Label"; "\"null\""; Some("LibcTopLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_compiler"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_conlyopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_copt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_cxxopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_grte_top"; "Label"; "\"null\""; Some("LibcTopLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_linkopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "host_per_file_copt"; "List<PerLabelOptions>"; "\"null\""; Some("PerLabelOptions.PerLabelOptionsConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_disable_legacy_cc_provider"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_disable_nocopts"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_dont_enable_host_nonhost_crosstool_features"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_enable_cc_toolchain_resolution"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_make_thinlto_command_lines_standalone"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_remove_legacy_whole_archive"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_require_ctx_in_configure_features"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_use_cpp_compile_header_mnemonic"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_use_specific_tool_files"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "incompatible_validate_top_level_header_inclusions"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "interface_shared_objects"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "legacy_whole_archive"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "linkopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "ltobackendopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "ltoindexopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "memprof_profile"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "minimum_os_version"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "objc_enable_binary_stripping"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "objc_generate_linkmap"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "objc_use_dotd_pruning"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "objccopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "per_file_copt"; "List<PerLabelOptions>"; "\"null\""; Some("PerLabelOptions.PerLabelOptionsConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "per_file_ltobackendopt"; "List<PerLabelOptions>"; "\"null\""; Some("PerLabelOptions.PerLabelOptionsConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "process_headers_in_dependencies"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "propeller_optimize"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "propeller_optimize_absolute_cc_profile"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "propeller_optimize_absolute_ld_profile"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "proto_profile"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "proto_profile_path"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "save_temps"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "share_native_deps"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "start_end_lib"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "strict_system_includes"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "strip"; "StripMode"; "\"sometimes\""; Some("StripModeConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "stripopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.cpp.CppOptions"; "xbinary_fdo"; "Label"; "\"null\""; Some("EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "bytecode_optimization_pass_actions"; "int"; "\"1\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "bytecode_optimizers"; "Map<String, Label>"; "\"Proguard\""; Some("LabelMapConverter.class"); false; Some("\"experimental_bytecode_optimizers\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "enforce_proguard_file_extension"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_add_test_support_to_compile_time_deps"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_enable_jspecify"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_fix_deps_tool"; "String"; "\"add_dep\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_inmemory_jdeps_files"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_java_classpath"; "JavaClasspathMode"; "\"bazel\""; Some("JavaClasspathModeConverter.class"); false; Some("\"java_classpath\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_java_test_auto_create_deploy_jar"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_local_java_optimization_configuration"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_local_java_optimizations"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_one_version_enforcement"; "OneVersionEnforcementLevel"; "\"OFF\""; Some("OneVersionEnforcementLevelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_run_android_lint_on_java_rules"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_strict_java_deps"; "StrictDepsMode"; "\"default\""; Some("StrictDepsConverter.class"); false; Some("\"strict_java_deps\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "experimental_turbine_annotation_processing"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "explicit_java_test_deps"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "host_java_launcher"; "Label"; "\"null\""; Some("EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "host_javacopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "host_jvmopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "incompatible_disallow_java_import_exports"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "incompatible_multi_release_deploy_jars"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "java_debug"; "Void"; "\"null\""; None; false; None; Some("{ \"--test_arg=--wrapper_script_flag=--debug\", \"--test_output=streamed\", \"--test_strategy=exclusive\", \"--test_timeout=9999\", \"--nocache_test_results\" }"); None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "java_deps"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "java_header_compilation"; "boolean"; "\"true\""; None; false; Some("\"experimental_java_header_compilation\""); None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "java_language_version"; "String"; "\"\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "java_launcher"; "Label"; "\"null\""; Some("EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "java_runtime_version"; "String"; "\"local_jdk\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "javacopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "jvmopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "one_version_enforcement_on_java_tests"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "plugin"; "List<Label>"; "\"null\""; Some("LabelListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "proguard_top"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "split_bytecode_optimization_pass"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "tool_java_language_version"; "String"; "\"\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "tool_java_runtime_version"; "String"; "\"remotejdk_11\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.java.JavaOptions"; "use_ijars"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.J2ObjcCommandLineOptions"; "j2objc_dead_code_report"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.J2ObjcCommandLineOptions"; "j2objc_translation_flags"; "List<String>"; "\"null\""; Some("Converters.CommaSeparatedOptionListConverter.class"); true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "device_debug_entitlements"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "experimental_objc_fastbuild_options"; "List<String>"; "\"-O0,-DDEBUG=1\""; Some("CommaSeparatedOptionListConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "incompatible_avoid_hardcoded_objc_compilation_flags"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "incompatible_builtin_objc_strip_action"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "incompatible_disable_native_apple_binary_rule"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "incompatible_disallow_sdk_frameworks_attributes"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "incompatible_objc_alwayslink_by_default"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "incompatible_strip_executable_safely"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "ios_memleaks"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "ios_signing_cert_name"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "ios_simulator_device"; "String"; "\"null\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "ios_simulator_version"; "DottedVersion.Option"; "\"null\""; Some("DottedVersionConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions"; "objc_debug_with_GLIBCXX"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "cc_proto_library_header_suffixes"; "List<String>"; "\".pb.h\""; Some("Converters.CommaSeparatedOptionSetConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "cc_proto_library_source_suffixes"; "List<String>"; "\".pb.cc\""; Some("Converters.CommaSeparatedOptionSetConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "experimental_proto_descriptor_sets_include_source_info"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "proto_compiler"; "Label"; "ProtoConstants.DEFAULT_PROTOC_LABEL"; Some("CoreOptionConverters.LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "proto_toolchain_for_cc"; "Label"; "ProtoConstants.DEFAULT_CC_PROTO_LABEL"; Some("CoreOptionConverters.EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "proto_toolchain_for_j2objc"; "Label"; "ProtoConstants.DEFAULT_J2OBJC_PROTO_LABEL"; Some("CoreOptionConverters.EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "proto_toolchain_for_java"; "Label"; "ProtoConstants.DEFAULT_JAVA_PROTO_LABEL"; Some("CoreOptionConverters.EmptyToNullLabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "proto_toolchain_for_javalite"; "Label"; "ProtoConstants.DEFAULT_JAVA_LITE_PROTO_LABEL"; Some("CoreOptionConverters.LabelConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "protocopt"; "List<String>"; "\"null\""; None; true; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "strict_proto_deps"; "StrictDepsMode"; "\"error\""; Some("CoreOptionConverters.StrictDepsConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options"; "strict_public_imports"; "StrictDepsMode"; "\"off\""; Some("CoreOptionConverters.StrictDepsConverter.class"); false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.python.PythonOptions"; "build_python_zip"; "TriState"; "\"auto\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.python.PythonOptions"; "experimental_py_binaries_include_label"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.python.PythonOptions"; "incompatible_default_to_explicit_init_py"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.python.PythonOptions"; "incompatible_python_disallow_native_rules"; "boolean"; "\"false\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.python.PythonOptions"; "incompatible_remove_ctx_py_fragment"; "boolean"; "\"true\""; None; false; None; None; None; "I"),
+    expected_descriptor!("com.google.devtools.build.lib.rules.python.PythonOptions"; "python_native_rules_allowlist"; "Label"; "\"null\""; Some("LabelConverter.class"); false; None; None; None; "I"),
+];
+
+const EXPECTED_CLASS_COUNTS: &[(&str, usize)] = &[
+    ("com.google.devtools.build.lib.analysis.PlatformOptions", 7),
+    (
+        "com.google.devtools.build.lib.analysis.ShellConfiguration.Options",
+        1,
+    ),
+    (
+        "com.google.devtools.build.lib.analysis.config.CoreOptions",
+        71,
+    ),
+    (
+        "com.google.devtools.build.lib.analysis.test.CoverageConfiguration.CoverageOptions",
+        2,
+    ),
+    (
+        "com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions",
+        21,
+    ),
+    (
+        "com.google.devtools.build.lib.bazel.rules.BazelRuleClassProvider.StrictActionEnvOptions",
+        1,
+    ),
+    (
+        "com.google.devtools.build.lib.bazel.rules.python.BazelPythonConfiguration.Options",
+        3,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options",
+        60,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.android.BazelAndroidConfiguration.Options",
+        1,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions",
+        26,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.config.ConfigFeatureFlagOptions",
+        2,
+    ),
+    ("com.google.devtools.build.lib.rules.cpp.CppOptions", 78),
+    ("com.google.devtools.build.lib.rules.java.JavaOptions", 36),
+    (
+        "com.google.devtools.build.lib.rules.objc.J2ObjcCommandLineOptions",
+        2,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions",
+        13,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options",
+        11,
+    ),
+    (
+        "com.google.devtools.build.lib.rules.python.PythonOptions",
+        6,
+    ),
+];
+
+#[test]
+fn pinned_registry_has_every_metadata_field_in_order() {
+    assert_eq!(NATIVE_OPTION_DESCRIPTORS.len(), 341);
+    assert_eq!(EXPECTED.len(), 341);
+    for (actual, expected) in NATIVE_OPTION_DESCRIPTORS.iter().zip(EXPECTED) {
+        assert_eq!(actual.class_name, expected.class_name);
+        assert_eq!(actual.canonical_name, expected.canonical_name);
+        assert_eq!(actual.field_type, expected.field_type);
+        assert_eq!(actual.raw_default, expected.raw_default);
+        assert_eq!(actual.converter, expected.converter);
+        assert_eq!(actual.allow_multiple, expected.allow_multiple);
+        assert_eq!(actual.old_name, expected.old_name);
+        assert_eq!(actual.expansion, expected.expansion);
+        assert_eq!(actual.implicit_requirements, expected.implicit_requirements);
+        assert_eq!(actual.normalizer, expected.normalizer);
+    }
+}
+
+#[test]
+fn pinned_classes_and_options_are_ordered_and_unique() {
+    assert_eq!(EXPECTED_CLASS_COUNTS.len(), 17);
+    let mut start = 0;
+    for &(class_name, count) in EXPECTED_CLASS_COUNTS {
+        let end = start + count;
+        let class_rows = &NATIVE_OPTION_DESCRIPTORS[start..end];
+        assert!(
+            class_rows
+                .iter()
+                .all(|descriptor| descriptor.class_name == class_name)
+        );
+        assert!(
+            class_rows
+                .windows(2)
+                .all(|pair| pair[0].canonical_name < pair[1].canonical_name)
+        );
+        start = end;
+    }
+    assert_eq!(start, NATIVE_OPTION_DESCRIPTORS.len());
+    for (index, descriptor) in NATIVE_OPTION_DESCRIPTORS.iter().enumerate() {
+        assert!(NATIVE_OPTION_DESCRIPTORS[..index].iter().all(|prior| {
+            (prior.class_name, prior.canonical_name)
+                != (descriptor.class_name, descriptor.canonical_name)
+        }));
+    }
+}
+
+fn descriptor(class_name: &str, canonical_name: &str) -> &'static NativeOptionDescriptor {
+    NATIVE_OPTION_DESCRIPTORS
+        .iter()
+        .find(|descriptor| {
+            descriptor.class_name == class_name && descriptor.canonical_name == canonical_name
+        })
+        .expect("pinned descriptor")
+}
+
+#[test]
+fn formerly_missed_and_complex_metadata_rows_are_pinned() {
+    let test_filter = descriptor(
+        "com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions",
+        "test_filter",
+    );
+    assert_eq!(test_filter.field_type, "String");
+    assert_eq!(test_filter.raw_default, "\"null\"");
+    assert_eq!(test_filter.normalizer, "T");
+
+    let xcode_version = descriptor(
+        "com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions",
+        "xcode_version",
+    );
+    assert_eq!(xcode_version.field_type, "String");
+    assert_eq!(xcode_version.raw_default, "\"null\"");
+    assert_eq!(xcode_version.normalizer, "I");
+
+    let start_end_lib = descriptor(
+        "com.google.devtools.build.lib.rules.cpp.CppOptions",
+        "start_end_lib",
+    );
+    assert_eq!(start_end_lib.field_type, "boolean");
+    assert_eq!(start_end_lib.raw_default, "\"true\"");
+    assert_eq!(start_end_lib.normalizer, "I");
+
+    let host_platform = descriptor(
+        "com.google.devtools.build.lib.analysis.PlatformOptions",
+        "host_platform",
+    );
+    assert_eq!(
+        host_platform.old_name,
+        Some("\"experimental_host_platform\"")
+    );
+    assert_eq!(host_platform.raw_default, "DEFAULT_HOST_PLATFORM");
+
+    let extra_toolchains = descriptor(
+        "com.google.devtools.build.lib.analysis.PlatformOptions",
+        "extra_toolchains",
+    );
+    assert!(extra_toolchains.allow_multiple);
+    assert_eq!(extra_toolchains.normalizer, "P");
+
+    let action_env = descriptor(
+        "com.google.devtools.build.lib.analysis.config.CoreOptions",
+        "action_env",
+    );
+    assert!(action_env.allow_multiple);
+    assert_eq!(action_env.normalizer, "C");
+
+    let fdo_instrument = descriptor(
+        "com.google.devtools.build.lib.rules.cpp.CppOptions",
+        "fdo_instrument",
+    );
+    assert_eq!(
+        fdo_instrument.implicit_requirements,
+        Some("{\"--copt=-Wno-error\"}")
+    );
+    let java_debug = descriptor(
+        "com.google.devtools.build.lib.rules.java.JavaOptions",
+        "java_debug",
+    );
+    assert_eq!(
+        java_debug.expansion,
+        Some(
+            "{ \"--test_arg=--wrapper_script_flag=--debug\", \"--test_output=streamed\", \
+             \"--test_strategy=exclusive\", \"--test_timeout=9999\", \"--nocache_test_results\" }"
+        )
+    );
+
+    let proto_compiler = descriptor(
+        "com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options",
+        "proto_compiler",
+    );
+    assert_eq!(
+        proto_compiler.raw_default,
+        "ProtoConstants.DEFAULT_PROTOC_LABEL"
+    );
+}
+
+#[test]
+fn cache_field_grammar_preserves_null_empty_and_scalar_bytes() {
+    assert_eq!(
+        format_cache_field("option", CacheFieldValue::Null),
+        "option=NULL, "
+    );
+    assert_eq!(
+        format_cache_field("option", CacheFieldValue::Empty),
+        "option=EMPTY, "
+    );
+    assert_eq!(
+        format_cache_field("option", CacheFieldValue::Scalar("plain")),
+        "option=\"plain\", "
+    );
+    assert_eq!(
+        format_cache_field("option", CacheFieldValue::Scalar("slash\\quote\"")),
+        "option=\"slash\\\\quote\\\"\", "
+    );
+}
