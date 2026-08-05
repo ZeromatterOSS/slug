@@ -2764,6 +2764,30 @@ run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-2`. Preserve
 normalization, checksum/wire implementation, DICE changes, and
 configured-target cycles.
 
+### Pure native family source-anchor evidence REPLAN (2026-08-04)
+
+`WP-6-m2-pure-native-family-source-anchor-and-enum-route-evidence` split all
+concrete enums, recorded scalar String special-null and runs `+2`, removed an
+unadmitted assignment-list family, and corrected its first source-range audit.
+Terminal review still found five class-versus-method citation failures:
+ShardingStrategy, FissionOption, EmptyList, TestTimeout, and the combined
+PerLabelOptions constructor/toString span. Because exact inclusive ownership
+was the packet's acceptance criterion and its correction was exhausted, the
+entire unaccepted Stage 6 table was discarded.
+
+Run next only
+`WP-6-m2-pure-native-family-source-anchor-and-enum-route-evidence-retry` under
+the same 190 Stage 6/260 total documentation cap. Rebuild the source-only table
+with all accepted correction facts plus these frozen anchors: shard interface
+22-24, converter class 26-59/`convert` 35-58, forced class 17-33, ordinary enum
+19-33; Fission class 39-58/`convert` 41-52; EmptyList class 436-447/`convert`
+438-440; TestTimeout converter class 201-247/`convert` 207-241; PerLabelOptions
+constructor 88-91 and `toString` 119-122. Do not recreate family bytes,
+descriptors, accepted evidence, Java, or Rust. Any remaining path/class/method
+range mismatch or second correction is `REPLAN`. On acceptance run only
+`WP-6-m2-pure-native-family-byte-contract-ledger-retry-2`; preserve 287/8/5/41
+and all existing deferrals, including configured-target cycles.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
