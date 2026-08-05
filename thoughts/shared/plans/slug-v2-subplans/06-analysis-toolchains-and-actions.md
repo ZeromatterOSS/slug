@@ -2666,6 +2666,35 @@ binding, cleanup, scope, and cap. Run next only
 renderer authority and freeze one compact row per pure conversion/value/default
 family, without repeating the 287 descriptor rows or adding Rust.
 
+### Pure native family byte-contract ledger retry REPLAN (2026-08-04)
+
+`WP-6-m2-pure-native-family-byte-contract-ledger-retry` produced a compact
+family/route table, then source and two independent reviews exposed a new
+retained-equality boundary. `TestShardingStrategyForced` allocates a fresh
+object per `forced=N` conversion and defines no `equals` or `hashCode`, while
+`OptionsBase.equals` compares option fields with `Objects.equals`. Two fresh
+`forced=0` objects therefore have identical count and cache text but Java
+identity inequality, contradicting the previously assumed structural native
+`Forced(i32)` value. The draft also combined allow-empty and reject-empty list
+grammars, omitted the repeatable assignment `N=[]` route, lacked the timeout
+split-limit/empty-token discriminators, and left finite enum attachments
+non-mechanical. The entire unaccepted Stage 6 ledger was discarded; no Rust,
+probe, or generated artifact existed.
+
+Run next only `WP-6-m2-forced-sharding-identity-evidence`. At no more than 150
+Stage 6/220 total documentation lines, trace fresh parse, clone, equality,
+hashing, cache key/checksum, BuildOptions/configuration identity, configured
+key, and warm-daemon reuse at pinned Bazel source and live Slug owners. Decide
+whether forced-object identity is discarded before semantic configuration
+identity or survives and requires new scoped ownership. Do not invent a global
+counter, interner, pointer identity, mutable singleton, or hidden DICE state.
+If identity is canonicalized away, resume the corrected family ledger with a
+structural forced-count value; if it survives, `REPLAN` to a separate retained
+identity representation design. Preserve 287/8/5/41 and defer every family or
+descriptor reconstruction, Rust, contextual/regex/Host/repository conversion,
+normalization, checksum/wire implementation, DICE change, and configured-target
+cycle semantic.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
