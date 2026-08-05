@@ -54,6 +54,7 @@ use crate::attrs::AttributeProvenance;
 use crate::attrs::AttributeSchema;
 use crate::attrs::AttributeValue;
 use crate::attrs::CoercedAttributeValue;
+use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
 use crate::glob::GlobError;
@@ -345,6 +346,7 @@ pub struct StarlarkRuleImplementation {
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
+    root_string_build_setting: bool,
 }
 
 impl PartialEq for StarlarkRuleImplementation {
@@ -355,6 +357,7 @@ impl PartialEq for StarlarkRuleImplementation {
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
+            && self.root_string_build_setting == other.root_string_build_setting
     }
 }
 
@@ -375,6 +378,19 @@ impl StarlarkRuleImplementation {
 
     pub fn values(&self) -> &[AttributeValue] {
         &self.values
+    }
+    pub fn is_root_string_build_setting(&self) -> bool {
+        self.root_string_build_setting
+    }
+    pub fn root_string_build_setting_default(&self) -> Option<&str> {
+        self.root_string_build_setting.then(|| {
+            self.value("build_setting_default")
+                .and_then(|value| match value.value.as_ref() {
+                    CoercedAttributeValue::String(value) => Some(value.as_str()),
+                    _ => None,
+                })
+                .expect("string build setting has a string default")
+        })
     }
 
     fn value(&self, name: &str) -> Option<&AttributeValue> {
@@ -649,6 +665,7 @@ impl PackageRecorder {
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
+        root_string_build_setting: bool,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
         let mut dependencies = Vec::new();
@@ -677,6 +694,7 @@ impl PackageRecorder {
                 schema,
                 values,
                 capability,
+                root_string_build_setting,
             }),
             self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
@@ -1376,9 +1394,11 @@ fn coerce_starlark_value(
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative, Trace)]
 struct RuleDefinitionGen<V> {
     implementation: V,
-    schema: Arc<[RuleAttributeSchema]>,
+    #[trace(unsafe_ignore)]
+    schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
+    root_string_build_setting: bool,
     #[trace(unsafe_ignore)]
     rule_class: OnceCell<CompactString>,
 }
@@ -1388,8 +1408,9 @@ struct RuleDefinitionGen<V> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct FrozenRuleDefinition {
     implementation: FrozenValue,
-    schema: Arc<[RuleAttributeSchema]>,
+    schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
+    root_string_build_setting: bool,
 }
 
 type RuleDefinition<'v> = RuleDefinitionGen<Value<'v>>;
@@ -1419,12 +1440,19 @@ impl<'v> Freeze for RuleDefinition<'v> {
         };
         Ok(FrozenRuleDefinition {
             implementation: self.implementation.freeze(freezer)?,
-            schema: self.schema,
+            schema: self
+                .schema
+                .iter()
+                .cloned()
+                .map(|schema| schema.freeze(freezer))
+                .collect::<FreezeResult<Vec<_>>>()?
+                .into(),
             capability: Arc::new(RuleCapability {
                 rule_class,
                 executable: self.executable || self.test,
                 test_kind: self.test.then_some(TestRuleKind::Test),
             }),
+            root_string_build_setting: self.root_string_build_setting,
         })
     }
 }
@@ -1468,33 +1496,113 @@ enum RawAttributeValue {
     Dict(Arc<[(RawAttributeValue, RawAttributeValue)]>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct RuleAttributeSchema {
+#[derive(Debug, Clone, Trace, Allocative)]
+struct RuleAttributeSchemaGen<V> {
+    #[trace(unsafe_ignore)]
     name: CompactString,
+    #[trace(unsafe_ignore)]
     kind: AttributeKind,
+    #[trace(unsafe_ignore)]
     mandatory: bool,
+    #[trace(unsafe_ignore)]
     configurable: bool,
+    #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
+    transition: Option<TransitionDefinitionGen<V>>,
+}
+type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
+type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
+
+#[derive(
+    Debug,
+    Clone,
+    Trace,
+    Freeze,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative
+)]
+struct TransitionDefinitionGen<V> {
+    implementation: V,
+    #[trace(unsafe_ignore)]
+    #[freeze(identity)]
+    output: CompactString,
+}
+type TransitionDefinition<'v> = TransitionDefinitionGen<Value<'v>>;
+type FrozenTransitionDefinition = TransitionDefinitionGen<FrozenValue>;
+starlark::starlark_complex_values!(TransitionDefinition);
+impl<V> fmt::Display for TransitionDefinitionGen<V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("transition")
+    }
+}
+#[starlark_value(type = "transition")]
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for TransitionDefinitionGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenTransitionDefinition;
 }
 
-#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct AttributeDefinition {
+#[derive(Debug, Clone, Trace, ProvidesStaticType, NoSerialize, Allocative)]
+struct AttributeDefinitionGen<V> {
+    #[trace(unsafe_ignore)]
     kind: AttributeKind,
+    #[trace(unsafe_ignore)]
     mandatory: bool,
+    #[trace(unsafe_ignore)]
     configurable: bool,
+    #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
+    transition: Option<TransitionDefinitionGen<V>>,
 }
-
-starlark::starlark_simple_value!(AttributeDefinition);
-
-impl fmt::Display for AttributeDefinition {
+type AttributeDefinition<'v> = AttributeDefinitionGen<Value<'v>>;
+type FrozenAttributeDefinition = AttributeDefinitionGen<FrozenValue>;
+starlark::starlark_complex_values!(AttributeDefinition);
+impl<V> fmt::Display for AttributeDefinitionGen<V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "attr.{:?}()", self.kind)
     }
 }
 
 #[starlark_value(type = "attribute")]
-impl<'v> StarlarkValue<'v> for AttributeDefinition {}
+impl<'v, V: ValueLike<'v>> StarlarkValue<'v> for AttributeDefinitionGen<V>
+where
+    Self: ProvidesStaticType<'v>,
+{
+    type Canonical = FrozenAttributeDefinition;
+}
+impl<'v> Freeze for AttributeDefinition<'v> {
+    type Frozen = FrozenAttributeDefinition;
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(AttributeDefinitionGen {
+            kind: self.kind,
+            mandatory: self.mandatory,
+            configurable: self.configurable,
+            default: self.default,
+            transition: self
+                .transition
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
+        })
+    }
+}
+impl<'v> Freeze for RuleAttributeSchema<'v> {
+    type Frozen = FrozenRuleAttributeSchema;
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(RuleAttributeSchemaGen {
+            name: self.name,
+            kind: self.kind,
+            mandatory: self.mandatory,
+            configurable: self.configurable,
+            default: self.default,
+            transition: self
+                .transition
+                .map(|value| value.freeze(freezer))
+                .transpose()?,
+        })
+    }
+}
 
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 struct SelectorBranchGen<V> {
@@ -1645,13 +1753,14 @@ impl fmt::Display for AttrModule {
     }
 }
 
-fn attribute_definition(
+fn attribute_definition<'v>(
     kind: AttributeKind,
     mandatory: bool,
     configurable: bool,
-    default: Option<Value>,
-    eval: &Evaluator<'_, '_, '_>,
-) -> anyhow::Result<AttributeDefinition> {
+    default: Option<Value<'v>>,
+    cfg: Option<Value<'v>>,
+    eval: &Evaluator<'v, '_, '_>,
+) -> anyhow::Result<AttributeDefinition<'v>> {
     let default = default
         .map(|value| {
             let raw = raw_attribute_value(value)?;
@@ -1666,124 +1775,144 @@ fn attribute_definition(
         mandatory,
         configurable,
         default,
+        transition: cfg
+            .map(|value| {
+                TransitionDefinition::from_value(value)
+                    .into_iter()
+                    .find_map(|value| match value {
+                        starlark::__macro_refs::Either::Left(value) => Some(value.clone()),
+                        starlark::__macro_refs::Either::Right(_) => None,
+                    })
+                    .ok_or_else(|| anyhow::anyhow!("attr.label cfg must be a transition"))
+            })
+            .transpose()?,
     })
 }
 
 #[starlark_module]
 fn attr_methods(builder: &mut MethodsBuilder) {
-    fn label(
-        #[starlark(this)] _attr: Value,
+    fn label<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
-        default: Option<Value>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        default: Option<Value<'v>>,
+        cfg: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            cfg,
             eval,
         )
     }
-    fn label_list(
-        #[starlark(this)] _attr: Value,
+    fn label_list<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
-        default: Option<Value>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::LabelList,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            None,
             eval,
         )
     }
-    fn string_keyed_label_dict(
-        #[starlark(this)] _attr: Value,
+    fn string_keyed_label_dict<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
-        default: Option<Value>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::StringKeyedLabelDict,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            None,
             eval,
         )
     }
-    fn label_keyed_string_dict(
-        #[starlark(this)] _attr: Value,
+    fn label_keyed_string_dict<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
-        default: Option<Value>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            None,
             eval,
         )
     }
-    fn label_list_dict(
-        #[starlark(this)] _attr: Value,
+    fn label_list_dict<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
-        default: Option<Value>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::LabelListDict,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            None,
             eval,
         )
     }
-    fn output(
-        #[starlark(this)] _attr: Value,
+    fn output<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::Output,
             mandatory.unwrap_or(false),
             false,
             None,
+            None,
             eval,
         )
     }
-    fn output_list(
-        #[starlark(this)] _attr: Value,
+    fn output_list<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::OutputList,
             mandatory.unwrap_or(false),
             false,
             None,
+            None,
             eval,
         )
     }
-    fn string(
-        #[starlark(this)] _attr: Value,
+    fn string<'v>(
+        #[starlark(this)] _attr: Value<'v>,
         mandatory: Option<bool>,
         #[starlark(default = true)] configurable: bool,
-        default: Option<Value>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<AttributeDefinition> {
+        default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::String,
             mandatory.unwrap_or(false),
             configurable,
             default,
+            None,
             eval,
         )
     }
@@ -1794,6 +1923,44 @@ impl<'v> StarlarkValue<'v> for AttrModule {
     fn get_methods() -> Option<&'static Methods> {
         static METHODS: MethodsStatic = MethodsStatic::new();
         METHODS.methods(attr_methods)
+    }
+}
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct ConfigModule;
+starlark::starlark_simple_value!(ConfigModule);
+impl fmt::Display for ConfigModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config")
+    }
+}
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct RootStringBuildSetting;
+starlark::starlark_simple_value!(RootStringBuildSetting);
+impl fmt::Display for RootStringBuildSetting {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("config.string")
+    }
+}
+#[starlark_value(type = "config_string")]
+impl<'v> StarlarkValue<'v> for RootStringBuildSetting {}
+#[starlark_module]
+fn config_methods(builder: &mut MethodsBuilder) {
+    fn string(
+        #[starlark(this)] _config: Value,
+        #[starlark(default = false)] flag: bool,
+    ) -> anyhow::Result<RootStringBuildSetting> {
+        if !flag {
+            anyhow::bail!("only config.string(flag = True) is supported")
+        }
+        Ok(RootStringBuildSetting)
+    }
+}
+#[starlark_value(type = "config")]
+impl<'v> StarlarkValue<'v> for ConfigModule {
+    fn get_methods() -> Option<&'static Methods> {
+        static METHODS: MethodsStatic = MethodsStatic::new();
+        METHODS.methods(config_methods)
     }
 }
 
@@ -1872,6 +2039,12 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 .clone()
                                 .unwrap_or_else(|| intrinsic_default(declaration.kind)),
                         ),
+                        declaration.transition.as_ref().map(|transition| {
+                            LoadingTransitionDefinition::new(
+                                transition.implementation,
+                                transition.output.clone(),
+                            )
+                        }),
                     );
                     // Keep the full declaration schema even for an omitted
                     // optional value. Stage 8 must distinguish absent-looking
@@ -1928,6 +2101,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                     capability,
                     schema,
                     values,
+                    self.root_string_build_setting,
                     visibility,
                 )?;
                 for output in generated {
@@ -2030,9 +2204,16 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn rule<'v>(
         implementation: Value<'v>,
         attrs: Option<SmallMap<String, Value<'v>>>,
+        build_setting: Option<Value<'v>>,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
     ) -> anyhow::Result<RuleDefinition<'v>> {
+        let root_string_build_setting = build_setting
+            .map(|value| RootStringBuildSetting::from_value(value).is_some())
+            .unwrap_or(false);
+        if build_setting.is_some() && !root_string_build_setting {
+            anyhow::bail!("only rule(build_setting = config.string(flag = True)) is supported")
+        }
         let mut schema = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
@@ -2040,6 +2221,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     anyhow::bail!("rule attribute `{name}` is built in and cannot be redeclared");
                 }
                 let definition = AttributeDefinition::from_value(value)
+                    .and_then(|value| match value {
+                        starlark::__macro_refs::Either::Left(value) => Some(value),
+                        starlark::__macro_refs::Either::Right(_) => None,
+                    })
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
                 schema.push(RuleAttributeSchema {
                     name: CompactString::new(name),
@@ -2047,8 +2232,19 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     mandatory: definition.mandatory,
                     configurable: definition.configurable,
                     default: definition.default.clone(),
+                    transition: definition.transition.clone(),
                 });
             }
+        }
+        if root_string_build_setting {
+            schema.push(RuleAttributeSchema {
+                name: CompactString::const_new("build_setting_default"),
+                kind: AttributeKind::String,
+                mandatory: true,
+                configurable: false,
+                default: None,
+                transition: None,
+            });
         }
         schema.push(RuleAttributeSchema {
             name: CompactString::const_new("tags"),
@@ -2056,6 +2252,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             mandatory: false,
             configurable: false,
             default: Some(CoercedAttributeValue::StringList(Arc::from([]))),
+            transition: None,
         });
         if test {
             schema.push(RuleAttributeSchema {
@@ -2066,6 +2263,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 default: Some(CoercedAttributeValue::String(CompactString::const_new(
                     "medium",
                 ))),
+                transition: None,
             });
         }
         Ok(RuleDefinition {
@@ -2073,6 +2271,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
             schema: schema.into(),
             executable,
             test,
+            root_string_build_setting,
             rule_class: OnceCell::new(),
         })
     }
@@ -2082,6 +2281,19 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<UserProviderCallable> {
         UserProviderCallable::from_evaluator(fields, eval)
+    }
+    fn transition<'v>(
+        implementation: Value<'v>,
+        outputs: UnpackListOrTuple<&str>,
+        #[starlark(default = UnpackListOrTuple::default())] inputs: UnpackListOrTuple<&str>,
+    ) -> anyhow::Result<TransitionDefinition<'v>> {
+        if !list(inputs).is_empty() || list(outputs) != ["//:setting"] {
+            anyhow::bail!("only transition(inputs = [], outputs = [\"//:setting\"]) is supported")
+        }
+        Ok(TransitionDefinitionGen {
+            implementation,
+            output: CompactString::const_new("//:setting"),
+        })
     }
 }
 
@@ -2220,6 +2432,7 @@ pub(crate) fn loading_globals() -> Globals {
         .with(select_globals);
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
+    globals.set("config", ConfigModule);
     globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));
     globals.build()

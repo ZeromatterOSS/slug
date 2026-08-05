@@ -11,6 +11,7 @@
 use std::fmt;
 
 use allocative::Allocative;
+use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::serialization::StableSerialize;
 
@@ -67,14 +68,31 @@ impl fmt::Display for ConfigurationChecksum {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub struct RootStringSettingValue(CompactString);
+
+impl RootStringSettingValue {
+    pub fn new(value: impl Into<CompactString>) -> Self {
+        Self(value.into())
+    }
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ConfigurationKey {
     kind: ConfigurationKind,
     checksum: ConfigurationChecksum,
+    root_string_setting: Option<RootStringSettingValue>,
 }
 
 impl ConfigurationKey {
     pub fn new(kind: ConfigurationKind, checksum: ConfigurationChecksum) -> Self {
-        Self { kind, checksum }
+        Self {
+            kind,
+            checksum,
+            root_string_setting: None,
+        }
     }
 
     pub fn target(checksum: impl Into<String>) -> Result<Self, String> {
@@ -104,6 +122,17 @@ impl ConfigurationKey {
 
     pub fn checksum(&self) -> &ConfigurationChecksum {
         &self.checksum
+    }
+
+    pub fn with_root_string_setting(&self, value: RootStringSettingValue) -> Self {
+        Self {
+            kind: self.kind,
+            checksum: self.checksum.clone(),
+            root_string_setting: Some(value),
+        }
+    }
+    pub fn root_string_setting(&self) -> Option<&RootStringSettingValue> {
+        self.root_string_setting.as_ref()
     }
 
     pub fn stable_serialize(&self) -> String {

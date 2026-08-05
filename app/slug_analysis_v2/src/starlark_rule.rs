@@ -13,6 +13,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use allocative::Allocative;
+use compact_str::CompactString;
 use dupe::Dupe;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::CtxActions;
@@ -51,6 +52,7 @@ struct AnalysisContext {
     target_name: String,
     package_path: String,
     dependencies: Arc<[PreparedDependency]>,
+    build_setting_value: Option<CompactString>,
 }
 
 impl fmt::Display for AnalysisContext {
@@ -75,6 +77,10 @@ impl<'v> StarlarkValue<'v> for AnalysisContext {
             "attr" => Some(heap.alloc_simple(AnalysisAttributes {
                 dependencies: self.dependencies.clone(),
             })),
+            "build_setting_value" => self
+                .build_setting_value
+                .as_ref()
+                .map(|value| heap.alloc_str(value).to_value()),
             _ => None,
         }
     }
@@ -84,6 +90,8 @@ impl<'v> StarlarkValue<'v> for AnalysisContext {
 pub(crate) struct PreparedDependency {
     pub(crate) key: ConfiguredTargetKey,
     pub(crate) providers: ProviderCollection,
+    pub(crate) attribute: CompactString,
+    pub(crate) sequence: bool,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -102,14 +110,19 @@ starlark::starlark_simple_value!(AnalysisAttributes);
 #[starlark_value(type = "analysis_attrs")]
 impl<'v> StarlarkValue<'v> for AnalysisAttributes {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "deps").then(|| {
-            heap.alloc(
-                self.dependencies
-                    .iter()
-                    .cloned()
-                    .map(AnalysisDependency)
-                    .collect::<Vec<_>>(),
-            )
+        let dependencies = self
+            .dependencies
+            .iter()
+            .filter(|dependency| attribute == "deps" || dependency.attribute == attribute)
+            .cloned()
+            .map(AnalysisDependency)
+            .collect::<Vec<_>>();
+        (!dependencies.is_empty()).then(|| {
+            if attribute != "deps" && !dependencies[0].0.sequence {
+                heap.alloc_simple(dependencies.into_iter().next().expect("nonempty"))
+            } else {
+                heap.alloc(dependencies)
+            }
         })
     }
 }
@@ -325,6 +338,13 @@ pub(crate) fn evaluate_loaded_rule(
         target_name: target.name.clone(),
         package_path: package_path.to_owned(),
         dependencies: dependencies.into(),
+        build_setting_value: implementation.is_root_string_build_setting().then(|| {
+            key.configuration()
+                .root_string_setting()
+                .expect("root setting key carries value")
+                .as_str()
+                .into()
+        }),
     });
     let returned = {
         let mut evaluator = Evaluator::new(&module);

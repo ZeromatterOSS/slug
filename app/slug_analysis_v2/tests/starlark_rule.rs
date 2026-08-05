@@ -11,6 +11,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::sync::atomic::AtomicUsize;
 use std::time::SystemTime;
 
 use dice::ActivationData;
@@ -22,16 +23,21 @@ use dice::DynKey;
 use dice::RichActivation;
 use dice::UserComputationData;
 use dupe::Dupe;
+use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::RootConfiguredTargetAnalysisKey;
+use slug_analysis_v2::key::RootStringSettingValue;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
+use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -44,9 +50,20 @@ use slug_loading_v2::keys::WorkspaceDirectoryValue;
 use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathLstat;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationDemand;
+use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochKey;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathObservationOperation;
+use slug_workspace_v2::PathObservationResult;
+use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::WorkspaceRawFileValue;
 use slug_workspace_v2::WorkspaceRawSnapshot;
 use slug_workspace_v2::WorkspaceRawSnapshotKey;
+use starlark_map::small_map::SmallMap;
 
 #[derive(Debug, Clone, Copy, Eq, Ord, PartialEq, PartialOrd)]
 enum EventKind {
@@ -254,6 +271,374 @@ fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnaps
                 .collect(),
         ),
     })
+}
+
+fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
+    let mut entries = SmallMap::new();
+    for (path, value) in workspace_snapshot(root).files.iter() {
+        let demand = |operation| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path.clone()).unwrap(),
+                operation,
+            )
+        };
+        entries.insert(
+            demand(PathObservationOperation::Lstat),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                1,
+                1,
+                1,
+                0o644,
+            ))),
+        );
+        if let WorkspaceFileValue::Present(value) = value {
+            entries.insert(
+                demand(PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    value.as_bytes(),
+                ))),
+            );
+        }
+    }
+    let mut path = Some(root);
+    while let Some(directory) = path {
+        entries.insert(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(directory.to_path_buf()).unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::Directory,
+                1,
+                1,
+                1,
+                1,
+                0o755,
+            ))),
+        );
+        path = directory.parent();
+    }
+    for name in ["REPO.bazel", ".bazelignore", "BUILD"] {
+        entries.insert(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(root.join(name)).unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        );
+    }
+    PathObservationEpoch::new(entries).unwrap()
+}
+
+#[derive(Default)]
+struct RootActivationTracker {
+    activations: Mutex<Vec<(String, ActivationKind)>>,
+    legacy: AtomicUsize,
+}
+
+impl RootActivationTracker {
+    fn take(&self) -> (Vec<(String, ActivationKind)>, usize) {
+        (
+            std::mem::take(&mut *self.activations.lock().unwrap()),
+            self.legacy.load(std::sync::atomic::Ordering::Relaxed),
+        )
+    }
+}
+
+fn root_activation_identity(key: &RootConfiguredTargetAnalysisKey) -> String {
+    if let Some(configured_target) = key.resolved_configured_target() {
+        return format!(
+            "resolved/{}={}",
+            configured_target.label(),
+            configured_target
+                .configuration()
+                .root_string_setting()
+                .unwrap()
+                .as_str()
+        );
+    }
+    let (requested, explicit) = key.root_string_setting_request_parts().unwrap();
+    format!(
+        "request/{requested}={}",
+        explicit.map_or("<default>", RootStringSettingValue::as_str)
+    )
+}
+
+fn activation_codes(activations: &[(String, ActivationKind)]) -> Vec<String> {
+    let mut codes = activations
+        .iter()
+        .map(|(identity, kind)| {
+            format!(
+                "{identity}:{}",
+                match kind {
+                    ActivationKind::Evaluated => 'E',
+                    ActivationKind::Reused => 'R',
+                }
+            )
+        })
+        .collect::<Vec<_>>();
+    codes.sort();
+    codes
+}
+
+impl ActivationTracker for RootActivationTracker {
+    fn key_activated(
+        &self,
+        key: &DynKey,
+        _deps: &mut dyn Iterator<Item = &DynKey>,
+        _activation: ActivationData,
+    ) {
+        if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
+            self.legacy
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
+            self.legacy
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        }
+        if let Some(root_key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() {
+            self.activations
+                .lock()
+                .unwrap()
+                .push((root_activation_identity(root_key), activation.kind()));
+        }
+    }
+}
+
+async fn root_string_request_result(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    explicit: Option<&str>,
+    tracker: Arc<RootActivationTracker>,
+) -> Result<AnalysisResult, String> {
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    });
+    updater
+        .changed_to(vec![(PathObservationEpochKey, root_epoch(workspace))])
+        .unwrap();
+    let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            root.clone(),
+            [root],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let outcome = transaction
+        .compute(
+            &RootConfiguredTargetAnalysisKey::root_string_setting_request(
+                NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+                CanonicalLabel::parse(target).unwrap(),
+                explicit.map(RootStringSettingValue::new),
+            ),
+        )
+        .await
+        .map_err(|error| error.to_string())?;
+    let AnalysisPreparationOutcome::Complete(value) = outcome else {
+        return Err("root request returned Needs".to_owned());
+    };
+    value
+        .as_ref()
+        .as_ref()
+        .cloned()
+        .map_err(|error| error.to_string())
+}
+
+async fn root_string_request(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    explicit: Option<&str>,
+    tracker: Arc<RootActivationTracker>,
+) -> AnalysisResult {
+    root_string_request_result(dice, workspace, target, explicit, tracker)
+        .await
+        .unwrap()
+}
+
+fn provider_value(result: &AnalysisResult, provider: &ProviderId) -> String {
+    result
+        .providers()
+        .user(provider)
+        .unwrap()
+        .field("value")
+        .unwrap()
+        .to_owned()
+}
+
+fn root_setting_value(key: &ConfiguredTargetKey) -> &str {
+    key.configuration().root_string_setting().unwrap().as_str()
+}
+
+#[tokio::test]
+async fn root_string_setting_requests_preserve_lifecycle_transition_and_identity() {
+    let workspace = scratch();
+    let defs = workspace.join("defs.bzl");
+    let build = workspace.join("BUILD.bazel");
+    let defs_source = r#"ConsumerInfo = provider(fields = {"value": "value"})
+ParentInfo = provider(fields = {"value": "value"})
+SettingInfo = provider(fields = {"value": "value"})
+def _setting(ctx): return [SettingInfo(value = ctx.build_setting_value)]
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _consumer(ctx): return [ConsumerInfo(value = ctx.attr._setting[SettingInfo].value)]
+consumer = rule(implementation = _consumer, attrs = {"_setting": attr.label(default = "//:setting")})
+def _left_transition(settings, attr): return {"//:setting": "left"}
+def _right_transition(settings, attr): return {"//:setting": "right"}
+left_transition = transition(implementation = _left_transition, inputs = [], outputs = ["//:setting"])
+right_transition = transition(implementation = _right_transition, inputs = [], outputs = ["//:setting"])
+def _parent(ctx): return [ParentInfo(value = ctx.attr.left[0][ConsumerInfo].value + "," + ctx.attr.right[0][ConsumerInfo].value)]
+parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_transition), "right": attr.label(cfg = right_transition)})
+"#;
+    let build_source = "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n";
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(&defs, defs_source).unwrap();
+    fs::write(&build, build_source).unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootActivationTracker::default());
+    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+    let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
+    let default =
+        root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
+    assert_eq!(provider_value(&default, &consumer), "default");
+    let default_key = default.key().clone();
+    let warm_default =
+        root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
+    assert_eq!(provider_value(&warm_default, &consumer), "default");
+    assert_eq!(default_key, *warm_default.key());
+    let command = root_string_request(
+        &dice,
+        &workspace,
+        "@@//:consumer",
+        Some("command"),
+        tracker.clone(),
+    )
+    .await;
+    assert_eq!(provider_value(&command, &consumer), "command");
+    assert_ne!(default_key, *command.key());
+    let restored_command = root_string_request(
+        &dice,
+        &workspace,
+        "@@//:consumer",
+        Some("default"),
+        tracker.clone(),
+    )
+    .await;
+    assert_eq!(provider_value(&restored_command, &consumer), "default");
+    assert_eq!(default_key, *restored_command.key());
+    let original_parent =
+        root_string_request(&dice, &workspace, "@@//:parent", None, tracker.clone()).await;
+    assert_eq!(provider_value(&original_parent, &parent), "left,right");
+    let original_parent_key = original_parent.key().clone();
+    let parent_deps = original_parent.direct_dependencies();
+    assert_eq!(parent_deps.len(), 2);
+    assert_eq!(parent_deps[0].label(), parent_deps[1].label());
+    assert_ne!(
+        parent_deps[0].configuration(),
+        parent_deps[1].configuration()
+    );
+    assert_eq!(
+        parent_deps
+            .iter()
+            .map(root_setting_value)
+            .collect::<Vec<_>>(),
+        ["left", "right"]
+    );
+    fs::write(&defs, defs_source.replacen("\"left\"", "\"changed\"", 1)).unwrap();
+    let edited_parent =
+        root_string_request(&dice, &workspace, "@@//:parent", None, tracker.clone()).await;
+    assert_eq!(provider_value(&edited_parent, &parent), "changed,right");
+    let edited_deps = edited_parent.direct_dependencies();
+    assert_ne!(edited_deps[0], parent_deps[0]);
+    assert_eq!(edited_deps[1], parent_deps[1]);
+
+    fs::write(&defs, defs_source).unwrap();
+    let restored_parent =
+        root_string_request(&dice, &workspace, "@@//:parent", None, tracker.clone()).await;
+    assert_eq!(provider_value(&restored_parent, &parent), "left,right");
+    assert_eq!(original_parent_key, *restored_parent.key());
+    assert_eq!(parent_deps, restored_parent.direct_dependencies());
+
+    fs::write(
+        &build,
+        build_source.replacen("\"default\"", "\"edited-default\"", 1),
+    )
+    .unwrap();
+    let edited_default =
+        root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
+    assert_eq!(provider_value(&edited_default, &consumer), "edited-default");
+
+    fs::write(&build, build_source).unwrap();
+    let restored_default =
+        root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
+    assert_eq!(provider_value(&restored_default, &consumer), "default");
+    assert_eq!(default_key, *restored_default.key());
+
+    let (activations, legacy) = tracker.take();
+    assert_eq!(legacy, 0, "legacy analysis key activated: {activations:#?}");
+    assert_eq!(
+        activation_codes(&activations),
+        r#"request/@@//:consumer=<default>:E request/@@//:consumer=<default>:E request/@@//:consumer=<default>:E request/@@//:consumer=<default>:R
+request/@@//:consumer=command:E request/@@//:consumer=default:E request/@@//:parent=<default>:E request/@@//:parent=<default>:E request/@@//:parent=<default>:E
+resolved/@@//:consumer=changed:E resolved/@@//:consumer=command:E resolved/@@//:consumer=default:E resolved/@@//:consumer=default:E resolved/@@//:consumer=default:R
+resolved/@@//:consumer=edited-default:E resolved/@@//:consumer=left:E resolved/@@//:consumer=left:E resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E
+resolved/@@//:parent=default:E resolved/@@//:parent=default:E resolved/@@//:parent=default:E resolved/@@//:setting=changed:E resolved/@@//:setting=command:E
+resolved/@@//:setting=default:E resolved/@@//:setting=default:E resolved/@@//:setting=edited-default:E resolved/@@//:setting=left:E resolved/@@//:setting=left:E
+resolved/@@//:setting=right:E resolved/@@//:setting=right:E resolved/@@//:setting=right:E"#
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>(),
+    );
+
+    fs::write(
+        &build,
+        build_source.replacen(
+            "string_setting(name = \"setting\", build_setting_default = \"default\")",
+            "consumer(name = \"setting\")",
+            1,
+        ),
+    )
+    .unwrap();
+    assert!(
+        root_string_request_result(
+            &dice,
+            &workspace,
+            "@@//:consumer",
+            Some("command"),
+            Arc::new(RootActivationTracker::default()),
+        )
+        .await
+        .is_err()
+    );
 }
 
 async fn analyze_revision(

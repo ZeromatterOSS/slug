@@ -19,6 +19,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
+use starlark::values::FrozenValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum AttributeKind {
@@ -59,6 +60,7 @@ pub struct AttributeSchema {
     configurable: bool,
     label_reachable: bool,
     default: Option<Arc<CoercedAttributeValue>>,
+    transition: Option<TransitionDefinition>,
 }
 
 impl AttributeSchema {
@@ -68,6 +70,7 @@ impl AttributeSchema {
         mandatory: bool,
         configurable: bool,
         default: Option<CoercedAttributeValue>,
+        transition: Option<TransitionDefinition>,
     ) -> Self {
         let declaration_name = declaration_name.into();
         let query_name = declaration_name
@@ -82,6 +85,7 @@ impl AttributeSchema {
             configurable,
             label_reachable: kind.reaches_labels(),
             default: default.map(Arc::new),
+            transition,
         }
     }
 
@@ -106,7 +110,37 @@ impl AttributeSchema {
     pub fn default(&self) -> Option<&CoercedAttributeValue> {
         self.default.as_deref()
     }
+    pub fn transition(&self) -> Option<&TransitionDefinition> {
+        self.transition.as_ref()
+    }
 }
+
+#[derive(Debug, Clone, Allocative)]
+pub struct TransitionDefinition {
+    #[allocative(skip)]
+    implementation: FrozenValue,
+    output: CompactString,
+}
+impl TransitionDefinition {
+    pub fn new(implementation: FrozenValue, output: impl Into<CompactString>) -> Self {
+        Self {
+            implementation,
+            output: output.into(),
+        }
+    }
+    pub fn implementation(&self) -> FrozenValue {
+        self.implementation
+    }
+    pub fn output(&self) -> &str {
+        &self.output
+    }
+}
+impl PartialEq for TransitionDefinition {
+    fn eq(&self, other: &Self) -> bool {
+        self.output == other.output
+    }
+}
+impl Eq for TransitionDefinition {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
 pub enum AttributeProvenance {

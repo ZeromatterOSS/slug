@@ -4149,6 +4149,7 @@ mod tests {
     use dice::ActivationTracker;
     use dice::DynKey;
     use dice::RootActivation;
+    use slug_analysis_v2::key::RootStringSettingValue;
     use slug_events_v2::CaptureEvaluationEvents;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -7106,6 +7107,70 @@ mod tests {
         )
         .unwrap();
         updater.commit().await
+    }
+
+    #[tokio::test]
+    async fn root_string_setting_request_keeps_distinct_transitioned_children() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut epoch = BuildRootEpoch::base(1);
+        epoch.file(
+            "/workspace/defs.bzl",
+            r#"ConsumerInfo = provider(fields = {"value": "value"})
+ParentInfo = provider(fields = {"value": "value"})
+SettingInfo = provider(fields = {"value": "value"})
+def _setting(ctx): return [SettingInfo(value = ctx.build_setting_value)]
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _consumer(ctx): return [ConsumerInfo(value = ctx.attr._setting[SettingInfo].value)]
+consumer = rule(implementation = _consumer, attrs = {"_setting": attr.label(default = "//:setting")})
+def _left(settings, attr): return {"//:setting": "left"}
+def _right(settings, attr): return {"//:setting": "right"}
+left = transition(implementation = _left, inputs = [], outputs = ["//:setting"])
+right = transition(implementation = _right, inputs = [], outputs = ["//:setting"])
+def _parent(ctx): return [ParentInfo(value = "%s,%s" % (ctx.attr.left[0][ConsumerInfo].value, ctx.attr.right[0][ConsumerInfo].value))]
+parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left), "right": attr.label(cfg = right)})
+"#,
+            1,
+        );
+        epoch.package("", "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n", 1);
+        let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let parent = RootConfiguredTargetAnalysisKey::root_string_setting_request(
+            workspace.clone(),
+            CanonicalLabel::parse("@@//:parent").unwrap(),
+            None,
+        );
+        let consumer = RootConfiguredTargetAnalysisKey::root_string_setting_request(
+            workspace,
+            CanonicalLabel::parse("@@//:consumer").unwrap(),
+            Some(RootStringSettingValue::new("command")),
+        );
+        let parent = transaction.compute(&parent).await.unwrap();
+        let consumer = transaction.compute(&consumer).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(parent) = parent else {
+            panic!("root request retained Needs")
+        };
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(consumer) = consumer else {
+            panic!("root request retained Needs")
+        };
+        assert!(
+            parent
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .providers()
+                .names()
+                .any(|name| name.as_str() == "ParentInfo")
+        );
+        assert!(
+            consumer
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .providers()
+                .names()
+                .any(|name| name.as_str() == "ConsumerInfo")
+        );
+        assert!(parent.as_ref().as_ref().unwrap().actions().is_empty());
     }
 
     #[derive(Default)]
