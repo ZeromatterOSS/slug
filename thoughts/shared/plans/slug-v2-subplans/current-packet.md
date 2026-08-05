@@ -1,46 +1,62 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-integrated-toolchain-resolution-context-design`
+Packet: `WP-6-m2-integrated-toolchain-resolution-context-implementation`
 Milestone: M2 successful toolchain/platform selection
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: design one real DICE-owned selection and prepared `ctx.toolchains`
-vertical
-Predecessor: accepted Bazel 9.2 first-compatible evidence `ed4baf08`, ordered
-root registrations `4a3af8df`, native declarations `6a457406`, and frozen rule
-requirements/load-only ToolchainInfo `1d6106bd`.
+Role: implement the accepted fixture-bounded real selection and prepared
+`ctx.toolchains` vertical
+Predecessor: accepted evidence `ed4baf08`, registrations `4a3af8df`, native
+loading `6a457406`, rule/provider-symbol loading `1d6106bd`, and reserved
+integration design review.
 
-This packet is read-only design. Inspect the live root registration anchor,
-root package-loading value, native declaration representation, frozen
-`required_toolchains`, configured-analysis recursion, provider decoder, rule
-context preparation, and dormant toolchain scaffolding. Read
-`docs/developers/dice.md` before proposing DICE ownership or locking.
+Keep selection inline in `RootConfiguredTargetAnalysisKey`. For a root
+Starlark requester with zero requirements, preserve the existing path. For
+exactly one requirement, compute the existing root registration anchor and
+all required `RootPackageLoadKey` values, unioning Needs before semantic
+errors. Canonicalize root-only apparent registrations, validate exact native
+type/platform/constraint/toolchain/reference kinds, reject duplicate settings,
+and select in execution-platform outer/toolchain inner MODULE order.
 
-The design must specify one bounded vertical that:
+Analyze the selected NODEP implementation with the existing root configured
+analysis key and unchanged configuration. It must be a leaf Starlark rule with
+no ordinary dependencies, requirements, transition/build-setting role,
+actions, outputs, or providers beyond builtin ToolchainInfo plus implicit empty
+DefaultInfo. Add no DICE key, digest, cache, global, lock, direct file read, or
+second source graph.
 
-- maps ordered root execution-platform and registered-toolchain labels to
-  canonical root package targets without losing MODULE order;
-- validates the exact accepted declaration kinds and constraint references;
-- selects the first compatible execution platform and matching registered
-  toolchain for the one mandatory requested type;
-- analyzes the selected implementation through the existing configured target
-  owner;
-- decodes one dedicated builtin ToolchainInfo value without masquerading as a
-  user provider; and
-- prepares the requesting Starlark context so
-  `ctx.toolchains["//:demo_type"].marker` observes the accepted marker.
+Add builtin `ProviderValue::ToolchainInfo` with exactly one compact string
+marker and builtin-specific ProviderCollection lookup. Phase-gate the existing
+loading callable through analysis evaluator state: loading invocation remains
+unsupported; analysis accepts no positional arguments and exactly one named
+string marker. Add only string `ctx.attr.marker` and a one-entry
+`ctx.toolchains` index accepting the exact root-apparent required-type string
+and exposing `.marker`. User providers remain distinct.
 
-Freeze exact DICE key/value ownership, dependency direction, semantic equality,
-Need/error/event precedence, canonical/apparent identity handling, first-match
-ordering, implementation allowlist, line caps, and discriminating cold/warm,
-reorder/edit/A-to-B-to-A/delete/recreate tests. Reuse the six accepted oracle
-rows; request new Bazel evidence only for a demonstrated semantic gap.
+Production allowlist:
 
-Reject a dormant resolver-only key, the existing digest-string
-`RegisteredToolchainsKey` as owner, a second package/source graph, lock held
-across DICE compute, user-provider ToolchainInfo, configuration checksum,
-query/cquery/aquery expansion, public failure diagnostics, optional/multiple
-types, aliases, external repositories, host fallback, target-platform
-constraints, exec groups, actions, execution, REAPI, or JVM/Bazel delegation.
+- `app/slug_analysis_v2/Cargo.toml`
+- `app/slug_analysis_v2/src/dice.rs`
+- `app/slug_analysis_v2/src/starlark_rule.rs`
+- `app/slug_build_api_v2/src/providers/mod.rs`
+- `app/slug_loading_v2/src/provider.rs`
 
-No Rust, fixture, oracle, or generated evidence change is authorized until the
-design and an independent reserved-boundary review return `ACCEPT`.
+Test allowlist:
+
+- `app/slug_analysis_v2/tests/starlark_rule.rs`
+- `app/slug_build_api_v2/tests/providers.rs`
+
+Caps are 540 formatted production net lines, 700 test lines, and 1,240 total.
+
+Required evidence covers the exact six accepted marker observations; warm,
+registration reorder/restoration, marker edit/restoration, BUILD
+delete/recreate, A-to-B-to-A equality, root/anchor/package/selected-child event
+and activation ownership, no legacy analysis activation, every exact native
+kind/reference and leaf-guard failure, builtin/user separation, unchanged
+loading-time invocation failure, and zero actions/outputs/manifests.
+
+Stop and return `REPLAN` for optional/multiple types, external repositories or
+mapping, patterns, command-line registrations, aliases, host fallback,
+target-platform constraints, exec groups, general scalar attrs or
+ToolchainInfo fields, non-leaf implementations, public query/cquery/aquery or
+diagnostic formatting, actions/execution/REAPI, configuration expansion,
+dormant resolver scaffolding, or any new DICE key/cache/global/lock.

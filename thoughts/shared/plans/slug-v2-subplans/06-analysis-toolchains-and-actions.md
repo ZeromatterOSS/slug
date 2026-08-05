@@ -1363,3 +1363,39 @@ vertical. It must decide canonical lookup/mapping, first-compatible ordering,
 selected implementation analysis, a dedicated builtin ToolchainInfo value,
 and `ctx.toolchains` access together. Do not create a dormant resolver-only key
 or infer authority for Rust implementation from this acceptance.
+
+### Integrated toolchain resolution/context design (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-6-m2-integrated-toolchain-resolution-context-implementation`.** Selection
+stays inline in the existing `RootConfiguredTargetAnalysisKey`; no context,
+resolver, digest, or cache key is added. The root analysis owner consumes the
+ordered registration anchor and existing root package values, validates the
+exact native declaration/reference graph, preserves platform-outer and
+toolchain-inner MODULE order, then analyzes the selected NODEP implementation
+through the same root key and existing configuration.
+
+The provider boundary adds a dedicated builtin `ProviderValue::ToolchainInfo`
+with exactly one compact string marker and builtin-specific collection lookup.
+The existing `platform_common.ToolchainInfo` callable is phase-gated through
+the analysis evaluator: loading invocation remains unsupported, while analysis
+accepts exactly one named string marker. The requesting context adds only
+string `ctx.attr.marker` and a one-entry `ctx.toolchains` index for the exact
+root-apparent requested type. User providers remain distinct.
+
+Selected implementations are fixture-bounded leaves: root Starlark rules with
+no ordinary dependencies, toolchain requirements, transition/build-setting
+role, actions, outputs, or nonempty providers beyond builtin ToolchainInfo plus
+implicit empty DefaultInfo. Guards run before recursive analysis where
+possible. Package Needs are unioned before semantic errors; existing anchor,
+package, child-analysis, and requester event owners remain unchanged. No lock
+crosses a DICE computation.
+
+Parallel Terra live-owner, pinned Bazel, and adversarial audits found the six
+accepted rows sufficient. Reserved review rejected a separate
+`RootToolchainContextKey` and a private marker outside ProviderCollection,
+selected the inline real-consumer path, and fixed the five-production/two-test
+allowlist at 540 production, 700 test, and 1,240 total formatted net lines.
+Optional/multiple types, externals, aliases, host/target fallback, exec groups,
+general attributes/providers, public diagnostics/query expansion, actions,
+execution, REAPI, and configuration expansion remain stops.
