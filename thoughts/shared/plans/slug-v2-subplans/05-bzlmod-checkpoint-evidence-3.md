@@ -19082,3 +19082,38 @@ diagnostic plus present/edit/delete/recreate behavior. It changes no fixture or
 oracle record. Independent Terra found the DICE route bounded but identified
 the shared source-completion renderer prerequisite; reserved Sol correction
 review accepted the combined root/external completion class and evidence gate.
+
+### WP-5-m1 direct-local external build source-target evidence (2026-08-04)
+
+**Status: ACCEPTED; implement only
+`WP-5-m1-direct-local-external-build-source-target-activation-implementation`.**
+An isolated `/usr/bin/bazel` 9.2.0 retained-server probe at pinned commit
+`8220c619…` used one direct `local_path_override`, one output base, and serial
+present/edit/delete/recreate/wrong-kind states for
+`build @dep//:target.txt`. The first build alone started the server; it was shut
+down and the temporary workspace/output base were removed. No checkout,
+fixture, oracle, harness, or credential changed.
+
+Present bytes, edited bytes, and recreated different bytes each exited 0 with
+empty stdout, no `bazel-bin` or manifest output, the canonical
+`@@dep+//:target.txt is a source file, nothing will be built for it` warning,
+`Found 1 target`, and successful completion. Warm edit/recreate reported zero
+loaded/configured targets. Byte content is therefore irrelevant to semantic
+success, but exact existence remains an invalidation input.
+
+Deletion exited 1 with empty stdout and no output. Its stable diagnostic shape
+was `@@dep+//:target.txt: missing input file '@@dep+//:target.txt'`, followed by
+`1 input file(s) do not exist` and unsuccessful completion. Recreation
+recovered in the same server. Replacing `target.txt` with a directory still
+exited 0 and was indistinguishable from the present-source warning/success;
+there is no Bazel wrong-kind error to emulate for this surface. The direct
+external materialization remained a symlink to the local dependency throughout.
+
+This extends the checked-in `module-local-override` and
+`module-root-dev-dependency-visibility` rows without new oracle growth. The
+accepted implementation must observe path existence, not bytes or regular-file
+kind: external source observation may use the accepted Host repository source
+owner but must project its directory-present state compatibly, while root uses
+the existing exact native path observation owner. It must not invalidate its
+terminal equality for content-only edits, must fail on absence, and must recover
+on recreation. Independent Terra evidence review returned `ACCEPT`.
