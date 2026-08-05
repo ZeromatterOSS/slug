@@ -1834,7 +1834,10 @@ mod retry7_private_kernel_contract {
 }
 
 mod label_only_converter_contract {
+    use std::sync::Arc;
+
     use allocative::Allocative;
+    use compact_str::CompactString;
     use dupe::Dupe;
     use slug_identity_v2::ApparentRepoName;
     use slug_identity_v2::CanonicalRepoName;
@@ -1850,9 +1853,16 @@ mod label_only_converter_contract {
     use super::super::label_convert::LabelToStringEntry;
     use super::super::label_convert::LabelValue;
     use super::super::label_convert::LabelValues;
+    use super::super::label_convert::MixedFamily;
+    use super::super::label_convert::MixedValue;
+    use super::super::label_convert::RunUnder;
+    use super::super::label_convert::RunUnderSuffix;
     use super::super::label_convert::classify as classify_label;
+    use super::super::label_convert::classify_mixed;
     use super::super::label_convert::convert_label_occurrence;
+    use super::super::label_convert::convert_mixed_occurrence;
     use super::super::label_convert::materialize_label_default;
+    use super::super::label_convert::materialize_mixed_default;
     use super::*;
 
     fn option(name: &str) -> &'static NativeOptionDescriptor {
@@ -1904,6 +1914,20 @@ mod label_only_converter_contract {
             panic!("expected a flag alias entry")
         };
         value
+    }
+
+    fn run_under(value: Option<MixedValue>) -> RunUnder {
+        let Some(MixedValue::RunUnder(value)) = value else {
+            panic!("expected a run-under value")
+        };
+        value
+    }
+
+    fn custom_flag(value: Option<MixedValue>) -> String {
+        let Some(MixedValue::CustomFlag(value)) = value else {
+            panic!("expected a custom flag")
+        };
+        value.to_string()
     }
 
     fn unsupported(name: &str) {
@@ -2667,6 +2691,432 @@ mod label_only_converter_contract {
 
         fn allocative<T: Allocative>() {}
         allocative::<FlagAliasEntry>();
+    }
+
+    #[test]
+    fn mixed_converter_classifier_is_exactly_two_routes_without_changing_label_membership() {
+        let routes = NATIVE_OPTION_DESCRIPTORS
+            .iter()
+            .filter_map(|option| {
+                classify_mixed(option).map(|family| (option.canonical_name, family))
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            routes,
+            [
+                (
+                    "experimental_propagate_custom_flag",
+                    MixedFamily::CustomFlag
+                ),
+                ("run_under", MixedFamily::RunUnder),
+            ]
+        );
+        assert_eq!(
+            NATIVE_OPTION_DESCRIPTORS
+                .iter()
+                .filter(|option| classify_label(option).is_some())
+                .count(),
+            39
+        );
+        for name in ["run_under", "experimental_propagate_custom_flag"] {
+            assert_eq!(classify_label(option(name)), None, "{name}");
+        }
+    }
+
+    #[test]
+    fn run_under_tokenizes_before_deciding_label_and_retains_raw_original_and_suffix() {
+        let option = option("run_under");
+        assert_eq!(classify_mixed(option), Some(MixedFamily::RunUnder));
+        assert!(!option.allow_multiple);
+        assert_eq!(option.raw_default, "\"null\"");
+        assert_eq!(
+            materialize_mixed_default(option, OptionLabelContext::FirstRoundCanonical),
+            Ok(None)
+        );
+
+        let explicit_null = run_under(
+            convert_mixed_occurrence(option, "null", OptionLabelContext::FirstRoundCanonical)
+                .unwrap(),
+        );
+        assert!(matches!(
+            explicit_null,
+            RunUnder::Command {
+                ref original,
+                ref suffix,
+                ref command,
+            } if original.as_str() == "null" && suffix.0.is_empty() && command.as_str() == "null"
+        ));
+
+        let command = run_under(
+            convert_mixed_occurrence(
+                option,
+                " cmd\tone  two ",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        let RunUnder::Command {
+            original,
+            suffix,
+            command,
+        } = command
+        else {
+            panic!("expected command run-under")
+        };
+        assert_eq!(original.as_str(), " cmd\tone  two ");
+        assert_eq!(command.as_str(), "cmd");
+        assert_eq!(
+            suffix
+                .0
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["one", "two"]
+        );
+
+        let quoted = run_under(
+            convert_mixed_occurrence(
+                option,
+                r#"head' one'" two" '' """#,
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        let RunUnder::Command {
+            command, suffix, ..
+        } = quoted
+        else {
+            panic!("expected command run-under")
+        };
+        assert_eq!(command.as_str(), "head one two");
+        assert_eq!(
+            suffix
+                .0
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            ["", ""]
+        );
+
+        let escapes = run_under(
+            convert_mixed_occurrence(
+                option,
+                r#"cm\ d 'one\ two' "tri\q" "four\\five" "six\"seven" seven\\eight 'op"quote' "op'quote""#,
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        let RunUnder::Command {
+            command, suffix, ..
+        } = escapes
+        else {
+            panic!("expected command run-under")
+        };
+        assert_eq!(command.as_str(), "cm d");
+        assert_eq!(
+            suffix
+                .0
+                .iter()
+                .map(CompactString::as_str)
+                .collect::<Vec<_>>(),
+            [
+                "one\\ two",
+                "tri\\q",
+                "four\\five",
+                "six\"seven",
+                "seven\\eight",
+                "op\"quote",
+                "op'quote",
+            ]
+        );
+
+        for input in ["", " \t", r"cmd\", "\"cmd", "'cmd", r#""cmd\"#] {
+            assert_eq!(
+                convert_mixed_occurrence(option, input, OptionLabelContext::FirstRoundCanonical),
+                Err(LabelConvertError::Invalid),
+                "{input:?}"
+            );
+        }
+        let newline = run_under(
+            convert_mixed_occurrence(option, "one\ntwo", OptionLabelContext::FirstRoundCanonical)
+                .unwrap(),
+        );
+        let unicode_space = run_under(
+            convert_mixed_occurrence(
+                option,
+                "one\u{00a0}two",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert!(
+            matches!(newline, RunUnder::Command { command, suffix, .. } if command.as_str() == "one\ntwo" && suffix.0.is_empty())
+        );
+        assert!(
+            matches!(unicode_space, RunUnder::Command { command, suffix, .. } if command.as_str() == "one\u{00a0}two" && suffix.0.is_empty())
+        );
+
+        let decoded_label = run_under(
+            convert_mixed_occurrence(
+                option,
+                r"\//p:t suffix",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        let RunUnder::Label {
+            original,
+            suffix,
+            label,
+        } = decoded_label
+        else {
+            panic!("expected decoded label run-under")
+        };
+        assert_eq!(original.as_str(), r"\//p:t suffix");
+        assert_eq!(label.to_string(), "//p:t");
+        assert_eq!(suffix.0[0].as_str(), "suffix");
+
+        let quoted_label = run_under(
+            convert_mixed_occurrence(
+                option,
+                r#""//pkg:t" suffix"#,
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert!(
+            matches!(quoted_label, RunUnder::Label { label, suffix, .. } if label.to_string() == "//pkg:t" && suffix.0[0].as_str() == "suffix")
+        );
+        let suffix_only_label = run_under(
+            convert_mixed_occurrence(option, "cmd //...", OptionLabelContext::FirstRoundCanonical)
+                .unwrap(),
+        );
+        assert!(
+            matches!(suffix_only_label, RunUnder::Command { command, suffix, .. } if command.as_str() == "cmd" && suffix.0[0].as_str() == "//...")
+        );
+        for (input, expected) in [(r"cmd\🦀", "cmd🦀"), (r#""cmd\🦀""#, "cmd\\🦀")] {
+            assert!(matches!(
+                run_under(
+                    convert_mixed_occurrence(option, input, OptionLabelContext::FirstRoundCanonical)
+                        .unwrap()
+                ),
+                RunUnder::Command { command, suffix, .. } if command.as_str() == expected && suffix.0.is_empty()
+            ));
+        }
+    }
+
+    #[test]
+    fn run_under_label_contexts_and_retained_suffix_traits_are_exact() {
+        let option = option("run_under");
+        let mapping = mapping();
+        let first = run_under(
+            convert_mixed_occurrence(
+                option,
+                "@alias//p:t one",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        let mapped = run_under(
+            convert_mixed_occurrence(
+                option,
+                "@alias//p:t one",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        let package = run_under(
+            convert_mixed_occurrence(
+                option,
+                "@alias//p:t one",
+                OptionLabelContext::Package {
+                    base_package: &base,
+                    mapping: &mapping,
+                },
+            )
+            .unwrap(),
+        );
+        let package_root = run_under(
+            convert_mixed_occurrence(
+                option,
+                "//pkg:t",
+                OptionLabelContext::Package {
+                    base_package: &base,
+                    mapping: &mapping,
+                },
+            )
+            .unwrap(),
+        );
+        let nonvisible = run_under(
+            convert_mixed_occurrence(
+                option,
+                "@missing//p:t",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert!(
+            matches!(first, RunUnder::Label { label, .. } if label.to_string() == "@@alias//p:t")
+        );
+        assert!(
+            matches!(mapped, RunUnder::Label { label, .. } if label.to_string() == "@@mapped//p:t")
+        );
+        assert!(
+            matches!(package, RunUnder::Label { label, .. } if label.to_string() == "@@mapped//p:t")
+        );
+        assert!(
+            matches!(package_root, RunUnder::Label { label, .. } if label.to_string() == "@@owner//pkg:t")
+        );
+        assert!(
+            matches!(nonvisible, RunUnder::Label { label, .. } if label.to_string() == "@@[unknown repo 'missing' requested from @@]//p:t")
+        );
+        assert!(matches!(
+            run_under(
+                convert_mixed_occurrence(option, ":relative", OptionLabelContext::FirstRoundCanonical)
+                    .unwrap()
+            ),
+            RunUnder::Command { command, .. } if command.as_str() == ":relative"
+        ));
+
+        fn allocative<T: Allocative>() {}
+        fn dupe<T: Dupe>() {}
+        allocative::<RunUnderSuffix>();
+        allocative::<RunUnder>();
+        dupe::<RunUnderSuffix>();
+        let suffix = RunUnderSuffix(Arc::from([CompactString::new("arg")]));
+        let copied = suffix.dupe();
+        assert_eq!(suffix, copied);
+        assert_eq!(suffix.0.as_ptr(), copied.0.as_ptr());
+    }
+
+    #[test]
+    fn custom_flag_keeps_raw_defines_and_canonicalizes_labels_and_subpackages() {
+        let option = option("experimental_propagate_custom_flag");
+        assert_eq!(classify_mixed(option), Some(MixedFamily::CustomFlag));
+        assert!(option.allow_multiple);
+        assert_eq!(option.raw_default, "\"null\"");
+        assert_eq!(
+            materialize_mixed_default(option, OptionLabelContext::FirstRoundCanonical),
+            Ok(None)
+        );
+        for raw in ["", ":relative", "null", "define=value", "/not/a/label"] {
+            assert_eq!(
+                custom_flag(
+                    convert_mixed_occurrence(option, raw, OptionLabelContext::FirstRoundCanonical)
+                        .unwrap()
+                ),
+                raw,
+                "{raw}"
+            );
+        }
+        assert_eq!(
+            custom_flag(
+                convert_mixed_occurrence(
+                    option,
+                    "//pkg:target",
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap()
+            ),
+            "@@//pkg:target"
+        );
+
+        let mapping = mapping();
+        for input in ["@alias//pkg/...", "@alias//pkg:__subpackages__"] {
+            assert_eq!(
+                custom_flag(
+                    convert_mixed_occurrence(
+                        option,
+                        input,
+                        OptionLabelContext::MainRepository { mapping: &mapping },
+                    )
+                    .unwrap()
+                ),
+                "@@mapped//pkg/...",
+                "{input}"
+            );
+        }
+        for input in ["//pkg/...", "//pkg:__subpackages__"] {
+            assert_eq!(
+                custom_flag(
+                    convert_mixed_occurrence(
+                        option,
+                        input,
+                        OptionLabelContext::MainRepository { mapping: &mapping },
+                    )
+                    .unwrap()
+                ),
+                "@@//pkg/...",
+                "{input}"
+            );
+        }
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        for input in ["//pkg/...", "//pkg:__subpackages__"] {
+            assert_eq!(
+                custom_flag(
+                    convert_mixed_occurrence(
+                        option,
+                        input,
+                        OptionLabelContext::Package {
+                            base_package: &base,
+                            mapping: &mapping,
+                        },
+                    )
+                    .unwrap()
+                ),
+                "@@owner//pkg/...",
+                "{input}"
+            );
+        }
+        assert_eq!(
+            custom_flag(
+                convert_mixed_occurrence(
+                    option,
+                    "@missing//pkg/...",
+                    OptionLabelContext::MainRepository { mapping: &mapping },
+                )
+                .unwrap()
+            ),
+            "@@[unknown repo 'missing' requested from @@]//pkg/..."
+        );
+        for input in ["//...", "@alias//..."] {
+            assert_eq!(
+                convert_mixed_occurrence(
+                    option,
+                    input,
+                    OptionLabelContext::MainRepository { mapping: &mapping }
+                ),
+                Err(LabelConvertError::Invalid),
+                "{input}"
+            );
+        }
+        assert_eq!(
+            custom_flag(
+                convert_mixed_occurrence(
+                    option,
+                    "@alias",
+                    OptionLabelContext::MainRepository { mapping: &mapping },
+                )
+                .unwrap()
+            ),
+            "@@mapped//:alias"
+        );
+
+        let source = include_str!("label_convert.rs");
+        for excluded in [
+            "trimForNonTestConfiguration",
+            "RunfilesSupport",
+            "DICE",
+            "checksum",
+            "renderer",
+            "ShellUtils",
+        ] {
+            assert!(
+                !source.contains(excluded),
+                "deferred source surface: {excluded}"
+            );
+        }
     }
 
     #[test]

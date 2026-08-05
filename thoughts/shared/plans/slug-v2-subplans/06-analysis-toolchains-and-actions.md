@@ -4641,6 +4641,46 @@ rules—never renderer/cache, full Java strings, activation, or a new dependency
 Caps: 300 production, 500 test, 100 documentation, 900 total formatted net
 lines.
 
+### RunUnder and CustomFlag converter implementation ACCEPT (2026-08-05)
+
+`WP-6-m2-run-under-and-custom-flag-converter-implementation` is **ACCEPT**.
+The existing label classifier remains exact 39/0; `classify_mixed` adds exactly
+the two mixed routes and no label membership. The private valid-Unicode
+ShellUtils state machine preserves space/tab splitting, quote concatenation and
+empty tokens, single/double-backslash behavior and failure order, then classifies
+decoded token zero. It retains the raw original plus
+`RunUnderSuffix(Arc<[CompactString]>)`; its Label/Command payload is the
+existing `ResolvedOptionLabel` or `CompactString`. First-round, mapped,
+PackageContext/current-repository, and non-visible contexts pass; special-null
+defaults are absent and explicit `null` remains literal.
+
+CustomFlag preserves raw nonlabel defines and finishes as `CompactString`; its
+`/...` sentinel/rewrite retains the `:__subpackages__` collision, unambiguous
+main/mapped/package output, and bare `@repo` shorthand. All converter failures
+remain private `LabelConvertError::Invalid`; user diagnostics stay deferred.
+The allocation correction retains first token separately from the suffix rather
+than removing element zero, and transfers the owned unambiguous string directly
+to `CompactString`. `RunUnderSuffix` is the only new Arc-backed `Dupe` wrapper;
+no new utility, cache, or interner is added.
+
+No renderer/cache claim, full Java-String/lone-surrogate support, command
+activation, runfiles/non-test trim, normalization, loader, checksum, wire, DICE,
+or configured-cycle work is introduced. Exact RunUnder record renderer/cache
+and full Java String remain **REPLAN**; configured-target cycles remain
+user-deferred. Validation is 30/30 focused tests, crate test/check,
+GNU-Windows tests check, formatting, archive, scope, cap, and diff gates green.
+Formatted net is 180 production plus 450 test Rust, 630 Rust net.
+
+Run next only `WP-6-m2-java-regex-route-source-closure-evidence`, docs/source
+only. Inventory and pin `RegexFilter` (3), `ExecutionInfoModifier` (1),
+`PerLabelOptions` (3), and `RunsPerTest` (1): Bazel 9.2 grammar/default/error/
+order/duplicate/render/cache behavior and JDK 25 `Pattern`/`Matcher` dependence.
+Decide bounded subsets or REPLAN without a JVM, runtime regex dependency, Rust,
+Cargo, probes, or artifacts. Keep Host terminal Unsupported and command,
+activation, loading, DICE, normalization, checksum, wire, and user-deferred
+configured cycles excluded; only the three scheduling docs may change, at 260
+documentation/total net lines.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the

@@ -47,6 +47,29 @@ pub(super) struct FlagAliasEntry {
     pub(super) label: ResolvedOptionLabel,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative, Dupe)]
+pub(super) struct RunUnderSuffix(pub(super) Arc<[CompactString]>);
+
+#[derive(Clone, Debug, Eq, PartialEq, Allocative)]
+pub(super) enum RunUnder {
+    Label {
+        original: CompactString,
+        suffix: RunUnderSuffix,
+        label: ResolvedOptionLabel,
+    },
+    Command {
+        original: CompactString,
+        suffix: RunUnderSuffix,
+        command: CompactString,
+    },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Allocative)]
+pub(super) enum MixedValue {
+    RunUnder(RunUnder),
+    CustomFlag(CompactString),
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative)]
 pub(super) enum LabelValue {
     Label(ResolvedOptionLabel),
@@ -54,6 +77,12 @@ pub(super) enum LabelValue {
     LabelToStringEntry(LabelToStringEntry),
     LabelMap(LabelMapValues),
     FlagAlias(FlagAliasEntry),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum MixedFamily {
+    RunUnder,
+    CustomFlag,
 }
 
 struct LiteralDefault {
@@ -142,6 +171,24 @@ pub(super) fn classify(option: &NativeOptionDescriptor) -> Option<LabelFamily> {
     }
 }
 
+pub(super) fn classify_mixed(option: &NativeOptionDescriptor) -> Option<MixedFamily> {
+    match option.converter {
+        Some("RunUnderConverter.class")
+            if option.class_name == "com.google.devtools.build.lib.analysis.config.CoreOptions"
+                && option.canonical_name == "run_under" =>
+        {
+            Some(MixedFamily::RunUnder)
+        }
+        Some("CoreOptionConverters.CustomFlagConverter.class")
+            if option.class_name == "com.google.devtools.build.lib.analysis.config.CoreOptions"
+                && option.canonical_name == "experimental_propagate_custom_flag" =>
+        {
+            Some(MixedFamily::CustomFlag)
+        }
+        _ => None,
+    }
+}
+
 pub(super) fn convert_label_occurrence(
     option: &NativeOptionDescriptor,
     input: &str,
@@ -220,6 +267,39 @@ pub(super) fn materialize_label_default(
         | LabelFamily::LabelToStringEntry
         | LabelFamily::FlagAlias => Err(LabelConvertError::Invalid),
         _ => convert_label_occurrence(option, input, context),
+    }
+}
+
+pub(super) fn convert_mixed_occurrence(
+    option: &NativeOptionDescriptor,
+    input: &str,
+    context: OptionLabelContext<'_>,
+) -> Result<Option<MixedValue>, LabelConvertError> {
+    match classify_mixed(option).ok_or(LabelConvertError::Unsupported)? {
+        MixedFamily::RunUnder => {
+            run_under(input, context).map(|value| Some(MixedValue::RunUnder(value)))
+        }
+        MixedFamily::CustomFlag => {
+            custom_flag(input, context).map(|value| Some(MixedValue::CustomFlag(value)))
+        }
+    }
+}
+
+pub(super) fn materialize_mixed_default(
+    option: &NativeOptionDescriptor,
+    context: OptionLabelContext<'_>,
+) -> Result<Option<MixedValue>, LabelConvertError> {
+    let family = classify_mixed(option).ok_or(LabelConvertError::Unsupported)?;
+    let Some(input) = option
+        .raw_default
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+    else {
+        return Err(LabelConvertError::Unsupported);
+    };
+    match family {
+        MixedFamily::RunUnder | MixedFamily::CustomFlag if input == "null" => Ok(None),
+        _ => convert_mixed_occurrence(option, input, context),
     }
 }
 
@@ -378,6 +458,106 @@ fn flag_alias(
         alias: CompactString::new(short_form),
         label: label(long_form, context)?,
     })
+}
+
+fn run_under(input: &str, context: OptionLabelContext<'_>) -> Result<RunUnder, LabelConvertError> {
+    let (command, suffix) = shell_tokens(input)?;
+    let command = command.ok_or(LabelConvertError::Invalid)?;
+    let suffix = RunUnderSuffix(Arc::from(suffix));
+    let original = CompactString::new(input);
+    if command.starts_with("//") || command.starts_with('@') {
+        Ok(RunUnder::Label {
+            original,
+            suffix,
+            label: label(&command, context)?,
+        })
+    } else {
+        Ok(RunUnder::Command {
+            original,
+            suffix,
+            command,
+        })
+    }
+}
+
+fn shell_tokens(
+    input: &str,
+) -> Result<(Option<CompactString>, Vec<CompactString>), LabelConvertError> {
+    let mut first = None;
+    let mut suffix = Vec::new();
+    let mut token = CompactString::new("");
+    let mut force_token = false;
+    let mut quotation = None;
+    let mut characters = input.chars();
+    while let Some(character) = characters.next() {
+        if let Some(quote) = quotation {
+            if character == quote {
+                quotation = None;
+            } else if character == '\\' && quote == '"' {
+                let escaped = characters.next().ok_or(LabelConvertError::Invalid)?;
+                if escaped != '\\' && escaped != '"' {
+                    token.push('\\');
+                }
+                token.push(escaped);
+            } else {
+                token.push(character);
+            }
+        } else if character == '\'' || character == '"' {
+            quotation = Some(character);
+            force_token = true;
+        } else if character == ' ' || character == '\t' {
+            if force_token || !token.is_empty() {
+                push_shell_token(
+                    &mut first,
+                    &mut suffix,
+                    std::mem::replace(&mut token, CompactString::new("")),
+                );
+                force_token = false;
+            }
+        } else if character == '\\' {
+            token.push(characters.next().ok_or(LabelConvertError::Invalid)?);
+        } else {
+            token.push(character);
+        }
+    }
+    if quotation.is_some() {
+        return Err(LabelConvertError::Invalid);
+    }
+    if force_token || !token.is_empty() {
+        push_shell_token(&mut first, &mut suffix, token);
+    }
+    Ok((first, suffix))
+}
+
+fn push_shell_token(
+    first: &mut Option<CompactString>,
+    suffix: &mut Vec<CompactString>,
+    token: CompactString,
+) {
+    if first.is_none() {
+        *first = Some(token);
+    } else {
+        suffix.push(token);
+    }
+}
+
+fn custom_flag(
+    input: &str,
+    context: OptionLabelContext<'_>,
+) -> Result<CompactString, LabelConvertError> {
+    if !input.starts_with("//") && !input.starts_with('@') {
+        return Ok(CompactString::new(input));
+    }
+    let mut unambiguous = if let Some(prefix) = input.strip_suffix("/...") {
+        label(&format!("{prefix}:__subpackages__"), context)?.unambiguous_form()
+    } else {
+        label(input, context)?.unambiguous_form()
+    };
+    if unambiguous.ends_with(":__subpackages__") {
+        unambiguous.truncate(unambiguous.len() - ":__subpackages__".len());
+        unambiguous.push_str("/...");
+    }
+    Ok(CompactString::from(unambiguous))
 }
 
 fn empty() -> LabelValues {
