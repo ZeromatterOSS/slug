@@ -2323,7 +2323,7 @@ metadata identifiers.
 | `Converters.AssignmentConverter` | 1 | One ordered `String=String` entry. |
 | `Converters.EnvVarsConverter` | 3 | `Set`, `Inherit`, or `Unset` environment occurrence. |
 | `CoreOptionConverters.StrictDepsConverter` | 2 | Finite enum. |
-| `DottedVersionConverter` | 10 | Parsed dotted-version option retaining Bazel's canonical string. |
+| `DottedVersionConverter` | 10 | Parsed dotted-version option retaining Bazel's original raw input string. |
 | `EmptyListConverter` | 1 | The one typed empty string list. |
 | `FissionOptionConverter` | 1 | Ordered list of distinct compilation-mode enum values. |
 | `TestTimeout.TestTimeoutConverter` | 1 | Ordered four-key timeout/duration map. |
@@ -2397,7 +2397,7 @@ equality and the Java `value.toString()` input to the already accepted outer
 
 | Variant | Equality / retained order | Exact Java cache text before outer quoting |
 |---|---|---|
-| `Bool`, `Int`, `Text`, `TriState`, finite `Enum`, `DottedVersion` | Exact variant/value equality. | Java primitive/string spelling; `TriState` renders `AUTO`, `YES`, `NO`; enums render their declared Java name; dotted version renders its canonical `stringRepresentation`. |
+| `Bool`, `Int`, `Text`, `TriState`, finite `Enum`, `DottedVersion` | Exact variant/value equality; dotted-version equality uses its original raw input string. | Java primitive/string spelling; `TriState` renders `AUTO`, `YES`, `NO`; enums render their declared Java name; dotted version renders its original raw `stringRepresentation`. |
 | `List(Arc<[NativeValue]>)` | Length and element equality, insertion order. | Java list form: `[` + element cache text joined by `, ` + `]`. Only a zero-length list routes to outer `EMPTY`; `[""]` renders `[]`-style element text rather than `EMPTY`. |
 | `Entry { key, value }` | Both fields equal. | `key=value`, matching Java map-entry rendering. This is used by `--define`. |
 | `OrderedMap(Arc<[(NativeValue, NativeValue)]>)` | Length, pair order, and pair equality. | `{` + entry texts joined by `, ` + `}`. It is admitted only where the source fixes construction order: the `TestTimeout` enum order is `short`, `moderate`, `long`, `eternal`. No generic unordered-map adapter is admitted. |
@@ -2446,7 +2446,8 @@ linear/static-slice concern until command routing supplies an ordered request.
 
 #### Serial successor packet
 
-Run next only `WP-6-m2-pure-native-value-default-and-rendering-kernel`.
+Historical successor, superseded by the implementation REPLAN below:
+`WP-6-m2-pure-native-value-default-and-rendering-kernel`.
 
 - Owner/result: one `slug_configuration_v2` private pure value algebra, source
   default materializer, per-occurrence conversion for the 287 admitted paths,
@@ -2483,3 +2484,42 @@ first define ownership and exact value types. Only after all fields of a
 fragment are valid and typed may a small full-fragment P/C/T normalization
 packet run; it must prove convert-before-normalize errors and does not belong
 in the pure kernel.
+
+### Pure native kernel implementation REPLAN (2026-08-04)
+
+`WP-6-m2-pure-native-value-default-and-rendering-kernel` stopped after its one
+permitted correction. The first independent review found decimal-only timeout
+parsing, lowercase `StripMode`, empty-fission `EMPTY`, positive/private runs
+seeds, and Void-as-absence corrections. Root source review added canonical
+`Duration.toString()` and uppercase `TestTimeout` enum-map keys. The corrected
+seven-file draft passed 13 focused tests, check, formatting, archive, scope,
+cap, and diff gates, but the terminal pinned-source audit then found a second
+material miss: its DottedVersion parser neither enforced Java signed-`int`
+bounds for numeric components/suffixes nor accepted underscore-bearing
+descriptive components. Per packet and orchestration stops, the entire
+unaccepted Rust diff was discarded with `apply_patch`; the worktree returned
+to accepted commit `a5d135de`.
+
+Pinned Bazel source is complete enough for a retry without a JVM oracle or a
+new representation decision. `DottedVersion` uses component pattern
+`(\\d+)([a-z0-9]*?)?(\\d+)?` and descriptive pattern `([a-z]\\w*)`, both
+case-insensitive; each numeric capture passes through `Integer.parseInt`, the
+first descriptive component terminates parsing, and the value retains the
+entire original source string for equality and `toString()`. Discriminators are
+maximum-versus-overflowing leading and suffix integers,
+`1.internal_build`, ignored later bytes in `1.2.internal_build.!`, and exact
+retention of trailing-zero text such as `1.0.0`.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry`. It restores the
+same seven-file, 1,550 production/1,250 test/2,800 total implementation boundary
+and all accepted 287/8/5/41, value, default, rendering, UTF-16, and refusal
+decisions. In addition to the original acceptance matrix, tests must freeze the
+entire correction set above: Java decimal/splitting timeout behavior, uppercase
+timeout keys, canonical duration units, lowercase strip text, empty fission,
+positive/private runs seed, absent-only Void, DottedVersion integer bounds,
+descriptive underscore/early stop, and original-string retention. Any further
+material source/rendering correction is another `REPLAN`; do not broaden into
+an oracle, general `PerLabelOptions`/`runs_per_test` regex branch, contextual
+converter, normalizer, checksum, command, wire, or DICE packet.
+Configured-target dependency cycles remain user-deferred.
