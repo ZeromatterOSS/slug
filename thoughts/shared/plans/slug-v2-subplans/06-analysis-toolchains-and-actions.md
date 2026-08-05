@@ -1200,3 +1200,37 @@ registrations, native target loading/declarations, constraint selection,
 actions, REAPI, a new DICE key/digest, or process-global state. Direct-local
 MODULE dependency cycles remain the user-approved unsupported boundary for a
 later packet.
+
+### Root toolchain registration-retention implementation acceptance (2026-08-04)
+
+**Status: ACCEPTED at `4a3af8df`.** The four-file implementation adds the
+compact ordered `RootModuleRegistrations` value, records root
+`register_execution_platforms` and `register_toolchains` calls under the
+existing dev-dependency command policy, and exposes the result through the
+existing Need-aware loading anchor. It adds no DICE key, digest, cache,
+resolver, target loader, mapping rewrite, configuration identity, or public
+command surface.
+
+The final formatted net change is 83 production and 166 test lines, 249 total.
+Tests prove exact multi-call order, root/apparent direct labels, retained
+literal-ellipsis target names, fail-closed relative/non-string/recursive/
+wildcard patterns, default→ignore→restore dev policy, order A→B→A restoration,
+unchanged warm pointer reuse, sole Host event ownership, and the anchor's
+unchanged single dependency. Two focused registration tests and the focused
+anchor lifecycle pass. The full bzlmod crate passes 463 tests with only its
+known clean-baseline nonroot source-span assertion failure. GNU-Windows no-run,
+downstream core checking, formatting, archive, diff, scope, and cap gates pass.
+
+Independent review found and corrected an overbroad `contains("...")` guard:
+only no-target recursive spellings and exact package wildcard names are now
+rejected, while a direct label with literal ellipses is retained. Corrected
+latest-diff review returned `ACCEPT`; no retained utility or representation
+outside the accepted compact slices changed.
+
+Design next only `WP-6-m2-native-toolchain-declaration-loading-design`. Decide
+the smallest serial owners for fixture-bounded native constraint setting/value,
+platform, toolchain type, toolchain declaration, Starlark `rule(toolchains=)`
+requirements, and `platform_common.ToolchainInfo`. Keep DICE selection,
+implementation analysis, prepared `ctx.toolchains`, failure diagnostics,
+patterns, externals, host fallback, public commands, actions, and REAPI out of
+scope until separately accepted.

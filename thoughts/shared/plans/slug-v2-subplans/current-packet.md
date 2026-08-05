@@ -1,55 +1,38 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-root-toolchain-registration-retention-implementation`
+Packet: `WP-6-m2-native-toolchain-declaration-loading-design`
 Milestone: M2 successful toolchain/platform selection
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: retain ordered direct root MODULE registrations through the existing
-Need-aware loading anchor
-Predecessor: accepted first-compatible Bazel 9.2 toolchain oracle `ed4baf08`.
+Role: read-only design for the smallest native declaration/loading prerequisite
+Predecessor: accepted ordered root registration retention `4a3af8df`.
 
-Implement the accepted serial prerequisite only:
+Inspect the accepted first-compatible Bazel 9.2 fixture, pinned source, and live
+Stage 4/6 owners. Freeze the smallest exact serial implementation boundary for:
 
-1. Add `RootModuleRegistrations` to `EvaluatedRootModule`, with separate
-   immutable ordered execution-platform and toolchain label slices and slice
-   accessors.
-2. Record root `register_execution_platforms` and `register_toolchains` calls
-   in exact argument and call order, with no sort or deduplication.
-3. Retain a dev registration exactly when
-   `!dev_dependency || !ignore_dev_dependency`, using the existing root command
-   policy and ordering validation.
-4. Fail closed before retention unless each argument is a direct absolute
-   apparent label. Reject recursive, package-wide, and wildcard patterns
-   locally; do not extend or depend on target-pattern expansion.
-5. Freeze evaluator-local vectors into the semantic root-module value and
-   expose registrations through the existing `RootModuleLoadingAnchor` only.
+1. native `constraint_setting`, `constraint_value`, `platform`,
+   `toolchain_type`, and `toolchain` declarations in the fixture's root BUILD;
+2. the one mandatory `rule(toolchains = ["//:demo_type"])` requirement;
+3. typed labels, ordered registration/declaration semantics, constraint mapping,
+   and structural equality/invalidation; and
+4. `platform_common.ToolchainInfo(marker = <string>)` ownership, deciding
+   explicitly whether it belongs with loading or a later selected-implementation
+   analysis/context packet.
 
-Required tests prove exact multi-call order, root and apparent-repository label
-retention, non-string/relative/pattern rejection without claiming public
-diagnostic parity, default→ignore→restore dev policy, registration order
-A→B→A restoration, unchanged warm structural equality, Host-only event
-ownership, and the anchor's existing sole dependency.
+The design must identify exact production and test owners, DICE/loading handoff,
+caps, lifecycle evidence, source anchors, utility reuse, and stop conditions.
+Prefer serial prerequisites when semantic values can be retained truthfully
+without inventing a consumer. Return `REPLAN` if any proposed slice would only
+wire dormant digest/event scaffolding, represent a builtin provider as a user
+provider, add a second graph/evaluator, or claim diagnostics absent from the
+accepted positive oracle.
 
-Production allowlist:
+Do not edit Rust, Cargo, fixtures, harness, commands, or public behavior in this
+packet. Keep real toolchain selection, selected implementation analysis,
+prepared `ctx.toolchains`, configuration identity, command-line registration,
+patterns, external repositories, aliases, host fallback, optional/multiple
+types, target constraints, exec groups, actions, aquery, REAPI, and failure
+diagnostics deferred. Direct-local MODULE dependency cycles remain the
+user-approved unsupported boundary for later.
 
-- `app/slug_bzlmod_v2/src/module_eval.rs`
-- `app/slug_bzlmod_v2/src/host_module.rs`
-- `app/slug_bzlmod_v2/src/lib.rs`
-
-Test allowlist additionally permits:
-
-- inline tests in `app/slug_bzlmod_v2/src/host_module.rs`
-- `app/slug_bzlmod_v2/tests/root_module_dice.rs`
-
-Caps are 220 formatted production net lines, 300 test lines, and 520 total.
-
-Stop and return `REPLAN` for pattern expansion, external repository
-materialization or mapping, command-line registrations, registered target
-loading, native platform/toolchain declarations, constraint resolution,
-`ToolchainInfo`, `ctx.toolchains`, configuration checksum/display changes,
-public cquery or formatter behavior, actions, REAPI, a new DICE key, a digest
-bridge, or process-global state. Direct-local MODULE dependency cycles remain
-the user-approved unsupported boundary for later.
-
-After acceptance, design the next serial owner for the fixture-bounded native
-constraint/platform/toolchain declarations before real DICE resolution and
-prepared `ctx.toolchains` ownership.
+After parallel pinned-source, live-owner, and retained-utility audits, obtain a
+reserved boundary review before authorizing Rust.
