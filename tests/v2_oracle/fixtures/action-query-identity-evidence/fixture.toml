@@ -1,0 +1,165 @@
+[fixture]
+name = "action-query-identity-evidence"
+description = "Bazel 9.2 action-query identity changes and restores across target configuration, the default execution platform, FileWrite content, and its declared output path."
+comparison = "message_shape"
+oracle_notes = "Oracle-only M2 identity discriminator. Paired text/jsonproto commands observe each state in one retained Bazel server; observed checksums, path fragments, platform labels, and ActionKeys are evidence values rather than Slug algorithms."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/config/BuildOptions.java#checksum",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/BuildConfigurationValue.java#shortId",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/OutputDirectories.java#getOutputDirName",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkActionFactory.java#write",
+  "src/main/java/com/google/devtools/build/lib/analysis/actions/FileWriteAction.java#create(ActionConstructionContext)",
+  "src/main/java/com/google/devtools/build/lib/analysis/RuleContext.java#getActionOwner",
+  "src/main/java/com/google/devtools/build/lib/analysis/RuleContext.java#getExecutionPlatform(String)",
+  "src/main/java/com/google/devtools/build/lib/actions/AbstractAction.java#getExecutionPlatform",
+  "src/main/java/com/google/devtools/build/lib/actions/ActionKeyComputer.java#getKey",
+  "src/main/java/com/google/devtools/build/lib/analysis/actions/FileWriteAction.java#computeKey",
+  "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/actiongraph/v2/ActionGraphDump.java",
+  "src/main/protobuf/analysis_v2.proto",
+]
+translation_notes = "The only requested action is one FileWrite in the default execution group. Two registered platforms have distinct constraint values; mutating the sole required toolchain's exec_compatible_with value isolates P0/P1 selection without changing registration order. Compilation mode isolates C0/C1. BUILD mutations change only the toolchain constraint, FileWrite content, or declared output name and run before the observing text row; the immediately following jsonproto row has no mutation."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture action-query-identity-evidence --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture action-query-identity-evidence --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "baseline_c0_p0_content_a_path_a_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+[[commands]]
+name = "baseline_c0_p0_content_a_path_a_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "configuration_c1_text"
+argv = ["aquery", "//:probe", "--compilation_mode=opt", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-opt", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-opt/bin/path-A\\.txt\\]"]
+
+[[commands]]
+name = "configuration_c1_jsonproto"
+argv = ["aquery", "//:probe", "--compilation_mode=opt", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "configuration_restored_c0_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+[[commands]]
+name = "configuration_restored_c0_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "platform_p1_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p1", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'exec_compatible_with = [":p0v"]'
+  replace = 'exec_compatible_with = [":p1v"]'
+
+[[commands]]
+name = "platform_p1_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p1"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "platform_restored_p0_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'exec_compatible_with = [":p1v"]'
+  replace = 'exec_compatible_with = [":p0v"]'
+
+[[commands]]
+name = "platform_restored_p0_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "content_b_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'content = "content-A"'
+  replace = 'content = "content-B"'
+
+[[commands]]
+name = "content_b_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "content_restored_a_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'content = "content-B"'
+  replace = 'content = "content-A"'
+
+[[commands]]
+name = "content_restored_a_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']
+
+[[commands]]
+name = "output_path_b_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-B\\.txt\\]"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'output_name = "path-A.txt"'
+  replace = 'output_name = "path-B.txt"'
+
+[[commands]]
+name = "output_path_b_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-B\.txt"']
+
+[[commands]]
+name = "output_path_restored_a_text"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["Mnemonic: FileWrite", "Configuration: k8-fastbuild", "Execution platform: //:p0", "ActionKey: [0-9a-f]{64}", "Outputs: \\[bazel-out/k8-fastbuild/bin/path-A\\.txt\\]"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'output_name = "path-B.txt"'
+  replace = 'output_name = "path-A.txt"'
+
+[[commands]]
+name = "output_path_restored_a_jsonproto"
+argv = ["aquery", "//:probe", "--output=jsonproto"]
+expected_exit = 0
+stdout_patterns = ['"mnemonic": "FileWrite"', '"checksum": "[0-9a-f]{64}"', '"executionPlatform": "//:p0"', '"label": "path-A\.txt"']

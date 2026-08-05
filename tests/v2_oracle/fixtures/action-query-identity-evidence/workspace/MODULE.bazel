@@ -1,0 +1,4 @@
+module(name = "action_query_identity_evidence")
+
+register_execution_platforms("//:p0", "//:p1")
+register_toolchains("//:demo_toolchain")

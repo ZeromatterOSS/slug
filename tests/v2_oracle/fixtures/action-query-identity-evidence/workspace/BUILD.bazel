@@ -1,0 +1,40 @@
+load(":defs.bzl", "demo_toolchain_impl", "probe_rule")
+
+constraint_setting(name = "platform_choice")
+
+constraint_value(
+    name = "p0v",
+    constraint_setting = ":platform_choice",
+)
+
+constraint_value(
+    name = "p1v",
+    constraint_setting = ":platform_choice",
+)
+
+platform(
+    name = "p0",
+    constraint_values = [":p0v"],
+)
+
+platform(
+    name = "p1",
+    constraint_values = [":p1v"],
+)
+
+toolchain_type(name = "demo_type")
+
+demo_toolchain_impl(name = "demo_impl")
+
+toolchain(
+    name = "demo_toolchain",
+    exec_compatible_with = [":p0v"],
+    toolchain = ":demo_impl",
+    toolchain_type = ":demo_type",
+)
+
+probe_rule(
+    name = "probe",
+    content = "content-A",
+    output_name = "path-A.txt",
+)

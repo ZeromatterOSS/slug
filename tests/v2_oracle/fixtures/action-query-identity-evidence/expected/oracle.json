@@ -1,0 +1,562 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "baseline_c0_p0_content_a_path_a_text",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 437 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/action-query-identity-evidence/20260805-012117-1887742-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/action-query-identity-evidence/20260805-012243-1893805-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: d984c0e4-170b-4bbe-9e06-033650879f2f\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d984c0e4-170b-4bbe-9e06-033650879f2f\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 437 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 5.160s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/d984c0e4-170b-4bbe-9e06-033650879f2f\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "baseline_c0_p0_content_a_path_a_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 437 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 8b39ab87-322e-4d92-ab2d-7ccf043069ab\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8b39ab87-322e-4d92-ab2d-7ccf043069ab\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 437 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.251s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8b39ab87-322e-4d92-ab2d-7ccf043069ab\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--compilation_mode=opt",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--compilation_mode=opt",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "configuration_c1_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --compilation_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 393 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-opt\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-opt/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 0e95ae77-da05-4cb9-b382-c6eac855596d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/0e95ae77-da05-4cb9-b382-c6eac855596d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --compilation_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 393 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.076s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/0e95ae77-da05-4cb9-b382-c6eac855596d\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-opt\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-opt/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--compilation_mode=opt",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--compilation_mode=opt",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "configuration_c1_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-opt\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"bf3a44eb59a38421358926558b1f02de09809e935f67c7349f4148d5d8c644dc\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-opt\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: aa0f8dfb-9ef3-4c1a-b64e-56c430cca282\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/aa0f8dfb-9ef3-4c1a-b64e-56c430cca282\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.035s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/aa0f8dfb-9ef3-4c1a-b64e-56c430cca282\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-opt\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"bf3a44eb59a38421358926558b1f02de09809e935f67c7349f4148d5d8c644dc\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-opt\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "configuration_restored_c0_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --compilation_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 393 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: a07adbc8-f2ed-4984-a697-22083fb42aae\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a07adbc8-f2ed-4984-a697-22083fb42aae\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --compilation_mode has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 393 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.058s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a07adbc8-f2ed-4984-a697-22083fb42aae\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "configuration_restored_c0_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 67616a60-a35e-4f8b-9a8e-fb8e2f998242\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/67616a60-a35e-4f8b-9a8e-fb8e2f998242\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.028s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/67616a60-a35e-4f8b-9a8e-fb8e2f998242\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "exec_compatible_with = [\":p0v\"]",
+          "old_digest_hint": "713",
+          "path": "BUILD.bazel",
+          "replace": "exec_compatible_with = [\":p1v\"]"
+        }
+      ],
+      "name": "platform_p1_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p1\n  ActionKey: d7f42e2a9ae23739f3804d83240a30408c92944801cdcf37694467f0ca13e5fb\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: b464f775-fc4f-4b8e-b9bb-a30b97884553\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b464f775-fc4f-4b8e-b9bb-a30b97884553\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.047s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/b464f775-fc4f-4b8e-b9bb-a30b97884553\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p1\n  ActionKey: d7f42e2a9ae23739f3804d83240a30408c92944801cdcf37694467f0ca13e5fb\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "platform_p1_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"d7f42e2a9ae23739f3804d83240a30408c92944801cdcf37694467f0ca13e5fb\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p1\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 2b57712c-7b77-4ae8-9a2c-2744fdeef6a0\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2b57712c-7b77-4ae8-9a2c-2744fdeef6a0\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.029s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2b57712c-7b77-4ae8-9a2c-2744fdeef6a0\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"d7f42e2a9ae23739f3804d83240a30408c92944801cdcf37694467f0ca13e5fb\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p1\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "exec_compatible_with = [\":p1v\"]",
+          "old_digest_hint": "713",
+          "path": "BUILD.bazel",
+          "replace": "exec_compatible_with = [\":p0v\"]"
+        }
+      ],
+      "name": "platform_restored_p0_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 0cddb50b-8a94-4487-ad89-de48275584ef\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/0cddb50b-8a94-4487-ad89-de48275584ef\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.041s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/0cddb50b-8a94-4487-ad89-de48275584ef\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "platform_restored_p0_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 8782b95f-24ee-4232-9c42-2337b0714df5\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8782b95f-24ee-4232-9c42-2337b0714df5\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.026s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8782b95f-24ee-4232-9c42-2337b0714df5\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "content = \"content-A\"",
+          "old_digest_hint": "713",
+          "path": "BUILD.bazel",
+          "replace": "content = \"content-B\""
+        }
+      ],
+      "name": "content_b_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: da346b95ba903052a5be03dc26338fe2b90a6a569fdbc3f25cec33a208e53eb8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 84cdafd4-69d0-49ea-a50a-2d6d52d2b2b9\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/84cdafd4-69d0-49ea-a50a-2d6d52d2b2b9\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.043s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/84cdafd4-69d0-49ea-a50a-2d6d52d2b2b9\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: da346b95ba903052a5be03dc26338fe2b90a6a569fdbc3f25cec33a208e53eb8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "content_b_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"da346b95ba903052a5be03dc26338fe2b90a6a569fdbc3f25cec33a208e53eb8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: fefec3c4-72f9-4998-adc6-def68b02b89a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/fefec3c4-72f9-4998-adc6-def68b02b89a\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.023s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/fefec3c4-72f9-4998-adc6-def68b02b89a\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"da346b95ba903052a5be03dc26338fe2b90a6a569fdbc3f25cec33a208e53eb8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "content = \"content-B\"",
+          "old_digest_hint": "713",
+          "path": "BUILD.bazel",
+          "replace": "content = \"content-A\""
+        }
+      ],
+      "name": "content_restored_a_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: a8c96e46-563f-4bdb-a331-85d857937a2c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a8c96e46-563f-4bdb-a331-85d857937a2c\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.037s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a8c96e46-563f-4bdb-a331-85d857937a2c\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "content_restored_a_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 2df5e17c-9f9e-44b8-8c93-842a888d97f8\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2df5e17c-9f9e-44b8-8c93-842a888d97f8\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.031s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2df5e17c-9f9e-44b8-8c93-842a888d97f8\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "output_name = \"path-A.txt\"",
+          "old_digest_hint": "713",
+          "path": "BUILD.bazel",
+          "replace": "output_name = \"path-B.txt\""
+        }
+      ],
+      "name": "output_path_b_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-B.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-B.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: ba642f30-2b87-4213-9a2f-603a4397a33d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ba642f30-2b87-4213-9a2f-603a4397a33d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.034s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ba642f30-2b87-4213-9a2f-603a4397a33d\n",
+      "stdout": "action 'Writing file path-B.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-B.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "output_path_b_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-B.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 257e0029-d3b1-45fe-b9f3-47cb98f19c50\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/257e0029-d3b1-45fe-b9f3-47cb98f19c50\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.028s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/257e0029-d3b1-45fe-b9f3-47cb98f19c50\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-B.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "output_name = \"path-B.txt\"",
+          "old_digest_hint": "713",
+          "path": "BUILD.bazel",
+          "replace": "output_name = \"path-A.txt\""
+        }
+      ],
+      "name": "output_path_restored_a_text",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: ebcf6db4-86bf-455b-a3cc-ace10feae2a8\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ebcf6db4-86bf-455b-a3cc-ace10feae2a8\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 162 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ebcf6db4-86bf-455b-a3cc-ace10feae2a8\n",
+      "stdout": "action 'Writing file path-A.txt'\n  Mnemonic: FileWrite\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:p0\n  ActionKey: db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/path-A.txt]\n  IsExecutable: false\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=jsonproto"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "output_path_restored_a_jsonproto",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 80b799a4-f0f4-469a-908a-879a2535121d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/80b799a4-f0f4-469a-908a-879a2535121d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.034s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/80b799a4-f0f4-469a-908a-879a2535121d\n",
+      "stdout": "{\n  \"artifacts\": [{\n    \"id\": 1,\n    \"pathFragmentId\": 1\n  }],\n  \"actions\": [{\n    \"targetId\": 1,\n    \"actionKey\": \"db52cb731f412b398cbe464d3125670d2ca3a341c4994ac5bc6a05bfc3aed4c8\",\n    \"mnemonic\": \"FileWrite\",\n    \"configurationId\": 1,\n    \"outputIds\": [1],\n    \"primaryOutputId\": 1,\n    \"executionPlatform\": \"//:p0\"\n  }],\n  \"targets\": [{\n    \"id\": 1,\n    \"label\": \"//:probe\",\n    \"ruleClassId\": 1\n  }],\n  \"configuration\": [{\n    \"id\": 1,\n    \"mnemonic\": \"k8-fastbuild\",\n    \"platformName\": \"k8\",\n    \"checksum\": \"a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\"\n  }],\n  \"ruleClasses\": [{\n    \"id\": 1,\n    \"name\": \"probe_rule\"\n  }],\n  \"pathFragments\": [{\n    \"id\": 4,\n    \"label\": \"bazel-out\"\n  }, {\n    \"id\": 3,\n    \"label\": \"k8-fastbuild\",\n    \"parentId\": 4\n  }, {\n    \"id\": 2,\n    \"label\": \"bin\",\n    \"parentId\": 3\n  }, {\n    \"id\": 1,\n    \"label\": \"path-A.txt\",\n    \"parentId\": 2\n  }]\n}\n"
+    }
+  ],
+  "fixture": "action-query-identity-evidence",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}
