@@ -138,6 +138,7 @@ pub use module_eval::RootModuleLockfileMode;
 pub use module_eval::RootModuleLockfileModeKey;
 pub use module_eval::RootModuleOverride;
 pub use module_eval::RootModuleOverrides;
+pub use module_eval::RootModuleRegistrations;
 pub use module_eval::VisibleLockfileKey;
 pub use module_eval::inject_root_module_request_inputs;
 pub use module_eval::inspect_nonroot_module_file;

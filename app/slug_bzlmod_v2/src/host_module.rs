@@ -43,6 +43,7 @@ use crate::RepoSpec;
 use crate::RootModuleBootstrapRequest;
 use crate::RootModuleOverride;
 use crate::RootModuleOverrides;
+use crate::RootModuleRegistrations;
 use crate::SourcePreparationNeeds;
 use crate::SourcePreparationOutcome;
 use crate::host_file::HostFileBytes;
@@ -380,6 +381,18 @@ pub struct RootModuleLoadingAnchor {
 impl fmt::Debug for RootModuleLoadingAnchor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("RootModuleLoadingAnchor")
+    }
+}
+
+impl RootModuleLoadingAnchor {
+    pub fn registrations(&self) -> &RootModuleRegistrations {
+        &self
+            .carrier
+            .as_ref()
+            .as_ref()
+            .expect("root module loading anchor retains a successful carrier")
+            .module
+            .registrations
     }
 }
 
@@ -824,6 +837,7 @@ mod tests {
             module: EvaluatedRootModule {
                 header: None,
                 dependencies: [].into(),
+                registrations: Default::default(),
             },
             overrides: RootModuleOverrides::default(),
             module_file_paths: ["MODULE.bazel".into()].into(),
@@ -1309,6 +1323,13 @@ mod tests {
     async fn loading_anchor_retained_dice_lifecycle_and_event_closure_are_exact() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let tracker = Arc::new(EventTracker::default());
+        let source = |reversed: bool| {
+            if reversed {
+                "print('ANCHOR_EVENT')\nregister_execution_platforms('//:second', '//:first')\n"
+            } else {
+                "print('ANCHOR_EVENT')\nregister_execution_platforms('//:first', '//:second')\n"
+            }
+        };
 
         let first_path = observed_anchor(&dice, EpochBuilder::default().build(), &tracker).await;
         let SourcePreparationOutcome::Need(first_path_need) = &first_path else {
@@ -1354,11 +1375,26 @@ mod tests {
 
         let success = observed_anchor(
             &dice,
-            EpochBuilder::root("print('ANCHOR_EVENT')\n", 2).build(),
+            EpochBuilder::root(source(false), 2).build(),
             &tracker,
         )
         .await;
         assert!(matches!(success, SourcePreparationOutcome::Complete(ref value) if value.is_ok()));
+        let SourcePreparationOutcome::Complete(success_value) = &success else {
+            unreachable!()
+        };
+        assert_eq!(
+            success_value
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .registrations()
+                .execution_platforms()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            ["//:first", "//:second"]
+        );
         let success_events = tracker.take();
         let wrapper = success_events
             .iter()
@@ -1378,9 +1414,30 @@ mod tests {
             vec![vec![String::from("host-root-module-file:\"/workspace\"")]]
         );
 
+        let reversed =
+            observed_anchor(&dice, EpochBuilder::root(source(true), 3).build(), &tracker).await;
+        assert!(!RootModuleLoadingAnchorKey::equality(&success, &reversed));
+        let SourcePreparationOutcome::Complete(reversed_value) = &reversed else {
+            unreachable!()
+        };
+        assert_eq!(
+            reversed_value
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .registrations()
+                .execution_platforms()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            ["//:second", "//:first"]
+        );
+        tracker.take();
+        tracker.take_anchor_dependencies();
+
         let error = observed_anchor(
             &dice,
-            EpochBuilder::root("unknown_identifier\n", 3).build(),
+            EpochBuilder::root("unknown_identifier\n", 4).build(),
             &tracker,
         )
         .await;
@@ -1390,7 +1447,7 @@ mod tests {
 
         let restored = observed_anchor(
             &dice,
-            EpochBuilder::root("print('ANCHOR_EVENT')\n", 4).build(),
+            EpochBuilder::root(source(false), 5).build(),
             &tracker,
         )
         .await;
@@ -1400,7 +1457,7 @@ mod tests {
 
         let warm = observed_anchor(
             &dice,
-            EpochBuilder::root("print('ANCHOR_EVENT')\n", 4).build(),
+            EpochBuilder::root(source(false), 5).build(),
             &tracker,
         )
         .await;

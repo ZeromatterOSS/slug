@@ -873,10 +873,27 @@ impl RootModuleLockfileMode {
 
 /// The aggregate semantic result of executing the root MODULE.bazel and its
 /// complete inline include closure.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe, Default)]
+pub struct RootModuleRegistrations {
+    execution_platforms: Arc<[ApparentLabel]>,
+    toolchains: Arc<[ApparentLabel]>,
+}
+
+impl RootModuleRegistrations {
+    pub fn execution_platforms(&self) -> &[ApparentLabel] {
+        &self.execution_platforms
+    }
+
+    pub fn toolchains(&self) -> &[ApparentLabel] {
+        &self.toolchains
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct EvaluatedRootModule {
     pub header: Option<RootModuleHeader>,
     pub dependencies: Arc<[RootModuleDependency]>,
+    pub registrations: RootModuleRegistrations,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -4006,6 +4023,8 @@ struct RecordedRootModule {
     header: Option<RootModuleHeader>,
     non_module_called: bool,
     dependencies: Vec<RootModuleDependency>,
+    execution_platforms: Vec<ApparentLabel>,
+    toolchains: Vec<ApparentLabel>,
     overrides: SmallMap<CompactString, RecordedRootModuleOverride>,
     ignore_dev_dependency: bool,
     current_file: usize,
@@ -4037,6 +4056,24 @@ fn root_evaluation_context<'a>(
     eval.extra
         .and_then(|value| value.downcast_ref())
         .context("MODULE.bazel global invoked without root evaluation context")
+}
+
+fn direct_registration_labels<'v>(labels: Value<'v>) -> anyhow::Result<Vec<ApparentLabel>> {
+    let labels = TupleRef::from_value(labels).context("registration expects labels")?;
+    labels
+        .iter()
+        .map(|label| {
+            let label = label
+                .unpack_str()
+                .context("registration labels must be strings")?;
+            let target = label.rsplit_once(':').map(|(_, target)| target);
+            let recursive = target.is_none() && label.ends_with("/...");
+            if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
+                anyhow::bail!("registration labels must name direct targets")
+            }
+            ApparentLabel::parse(label).map_err(anyhow::Error::msg)
+        })
+        .collect()
 }
 
 #[starlark_module]
@@ -4123,6 +4160,32 @@ fn module_globals(builder: &mut GlobalsBuilder) {
                 nodep,
                 dev_dependency,
             });
+        }
+        Ok(NoneType)
+    }
+    fn register_execution_platforms<'v>(
+        #[starlark(args)] labels: Value<'v>,
+        #[starlark(require = named, default = false)] dev_dependency: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let labels = direct_registration_labels(labels)?;
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
+        state.non_module_called = true;
+        if !dev_dependency || !state.ignore_dev_dependency {
+            state.execution_platforms.extend(labels);
+        }
+        Ok(NoneType)
+    }
+    fn register_toolchains<'v>(
+        #[starlark(args)] labels: Value<'v>,
+        #[starlark(require = named, default = false)] dev_dependency: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let labels = direct_registration_labels(labels)?;
+        let mut state = root_evaluation_context(eval)?.state.borrow_mut();
+        state.non_module_called = true;
+        if !dev_dependency || !state.ignore_dev_dependency {
+            state.toolchains.extend(labels);
         }
         Ok(NoneType)
     }
@@ -4378,6 +4441,8 @@ fn evaluate_root_module_closure(
             header: None,
             non_module_called: false,
             dependencies: Vec::new(),
+            execution_platforms: Vec::new(),
+            toolchains: Vec::new(),
             overrides: SmallMap::new(),
             ignore_dev_dependency,
             current_file: 0,
@@ -4408,6 +4473,10 @@ fn evaluate_root_module_closure(
         module: EvaluatedRootModule {
             header: state.header,
             dependencies: state.dependencies.into(),
+            registrations: RootModuleRegistrations {
+                execution_platforms: state.execution_platforms.into(),
+                toolchains: state.toolchains.into(),
+            },
         },
         module_file_paths,
         overrides: RootModuleOverrides(Arc::new(overrides)),

@@ -582,6 +582,128 @@ async fn root_graph_allows_an_omitted_module_declaration() {
 }
 
 #[tokio::test]
+async fn root_registrations_preserve_direct_order_policy_and_a_b_a_equality() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let source = |reversed: bool| {
+        let platforms = if reversed {
+            "register_execution_platforms('@tools//platforms:second', '//:first')"
+        } else {
+            "register_execution_platforms('//:first', '@tools//platforms:second')"
+        };
+        snapshot([(
+            "MODULE.bazel",
+            WorkspaceFileValue::Present(Arc::new(format!(
+                "module(name = 'root')\n\
+                 {platforms}\n\
+                 register_execution_platforms('//pkg:third')\n\
+                 register_execution_platforms('//:dev_platform', dev_dependency = True)\n\
+                 register_toolchains('//:first_toolchain')\n\
+                 register_toolchains('@tools//toolchains:second', '//pkg:third_toolchain', '//:literal...toolchain')\n\
+                 register_toolchains('//:dev_toolchain', dev_dependency = True)\n"
+            ))),
+        )])
+    };
+    let strings = |labels: &[slug_identity_v2::ApparentLabel]| {
+        labels.iter().map(ToString::to_string).collect::<Vec<_>>()
+    };
+
+    let first_value = graph_value(&dice, source(false)).await;
+    let first = first_value.as_ref().as_ref().unwrap();
+    assert_eq!(
+        strings(first.module.registrations.execution_platforms()),
+        [
+            "//:first",
+            "@tools//platforms:second",
+            "//pkg:third",
+            "//:dev_platform",
+        ]
+    );
+    assert_eq!(
+        strings(first.module.registrations.toolchains()),
+        [
+            "//:first_toolchain",
+            "@tools//toolchains:second",
+            "//pkg:third_toolchain",
+            "//:literal...toolchain",
+            "//:dev_toolchain",
+        ]
+    );
+
+    let warm = graph_value(&dice, source(false)).await;
+    assert!(Arc::ptr_eq(&first_value, &warm));
+
+    let reversed = graph(&dice, source(true)).await.unwrap();
+    assert_eq!(
+        strings(reversed.module.registrations.execution_platforms()),
+        [
+            "@tools//platforms:second",
+            "//:first",
+            "//pkg:third",
+            "//:dev_platform",
+        ]
+    );
+    assert_ne!(&reversed, first);
+
+    let restored = graph(&dice, source(false)).await.unwrap();
+    assert_eq!(&restored, first);
+
+    let ignored = graph_and_module_value(
+        &dice,
+        source(false),
+        RequestInputs {
+            command: Some(BzlmodCommandPolicyKey::from_flags(None, true).unwrap()),
+            ..RequestInputs::defaults()
+        },
+    )
+    .await
+    .0;
+    let ignored = ignored.as_ref().as_ref().unwrap();
+    assert_eq!(
+        strings(ignored.module.registrations.execution_platforms()),
+        ["//:first", "@tools//platforms:second", "//pkg:third"]
+    );
+    assert_eq!(
+        strings(ignored.module.registrations.toolchains()),
+        [
+            "//:first_toolchain",
+            "@tools//toolchains:second",
+            "//pkg:third_toolchain",
+            "//:literal...toolchain",
+        ]
+    );
+
+    let retained_again = graph(&dice, source(false)).await.unwrap();
+    assert_eq!(retained_again, restored);
+}
+
+#[tokio::test]
+async fn root_registrations_reject_non_string_relative_and_pattern_arguments() {
+    for registration in [
+        "register_execution_platforms(1)",
+        "register_toolchains('relative')",
+        "register_execution_platforms('//...')",
+        "register_toolchains('@tools//...')",
+        "register_execution_platforms('//pkg/...')",
+        "register_toolchains('//pkg:all')",
+        "register_execution_platforms('//pkg:*')",
+        "register_toolchains('//pkg:all-targets')",
+    ] {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let result = graph(
+            &dice,
+            snapshot([(
+                "MODULE.bazel",
+                WorkspaceFileValue::Present(Arc::new(format!(
+                    "module(name = 'root')\n{registration}\n"
+                ))),
+            )]),
+        )
+        .await;
+        assert!(result.is_err(), "{registration}");
+    }
+}
+
+#[tokio::test]
 async fn root_graph_discovers_breadth_first_but_executes_inline_with_isolated_bindings() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let root = WorkspaceFileValue::Present(Arc::new("module(name = 'root')\nversion = '1.0'\ninclude('//:one.MODULE.bazel')\ninclude('//:two.MODULE.bazel')\nbazel_dep(name = 'dep', version = version)\nlocal_path_override(module_name = 'dep', path = '../dep')\n".to_owned()));
