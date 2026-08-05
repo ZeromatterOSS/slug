@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, route package horizon, shared nested-horizon preflight, the private support-gated cycle-pruned closure in `f2b626f2`, the trusted nonregistry evaluator adapter in `c683c239`, and the private nonregistry DICE/event owner in `3cf0e441`, plus the accepted 20-row macro and seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | The user-approved Slug-owned query-only unsupported-cycle source gate is designed and accepted; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement `WP-5-m1-direct-local-public-unsupported-cycle-boundary-implementation` |
+| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, route package horizon, shared nested-horizon preflight, the private support-gated cycle-pruned closure in `f2b626f2`, the trusted nonregistry evaluator adapter in `c683c239`, the private nonregistry DICE/event owner in `3cf0e441`, and the query-only public unsupported-cycle boundary in `ea2019f8`, plus the accepted 20-row macro and seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | External build activation still rejects nonroot target patterns before its DICE root; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | design `WP-5-m1-direct-local-external-build-source-target-activation-design` |
 | M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
 | M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
@@ -35,10 +35,20 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-public-unsupported-cycle-boundary-implementation`.
+`WP-5-m1-direct-local-external-build-source-target-activation-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
+
+The direct-local public unsupported-cycle boundary is accepted in `ea2019f8`
+at 210 production/493 test/703 total formatted net lines. It preserves typed
+ordinary failures and projects only private cycle capability through both
+query load consumers to the exact query-only Slug-owned unsupported terminal;
+build and root loading remain unchanged. Independent Terra latest-text review
+returned `ACCEPT`. The current packet is read-only design for the smallest
+separately reserved external-build activation: one explicit exported source
+target in a direct local override, with no configured analysis or action
+breadth.
 
 The external Restricted-visibility typed implementation is accepted in
 `fc022925`. Native-Windows glob ordering reached `REPLAN`: no native runtime is

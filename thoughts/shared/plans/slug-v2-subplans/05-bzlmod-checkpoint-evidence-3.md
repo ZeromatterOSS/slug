@@ -18983,3 +18983,42 @@ provenance consumer that the draft omitted. The corrected design adds
 `loading_environment.rs`, preserves its typed discriminator, and mandates
 discriminating public coverage without expanding the cap. Sol correction
 rereview and independent Terra latest-text review returned `ACCEPT`.
+
+### WP-5-m1 public unsupported-cycle boundary implementation (2026-08-04)
+
+**Status: ACCEPTED in `ea2019f8`.** The exact ten-file implementation is 210
+production lines, 493 test lines, and 703 total formatted net lines, within the
+accepted 260/900/1160 caps. `RepositoryPackageSourceKey` is the sole current
+product gate: supported direct-local MODULE evaluation continues to selected
+BUILD loading, ordinary evaluation failures retain their typed source chain,
+and only the private cycle capability projects to the exact Slug-owned
+`UnsupportedFeature` terminal. Both package-graph and `buildfiles()` /
+`loadfiles()` provenance consumers preserve that discriminator through query,
+CLI, and daemon rendering.
+
+The Host source anchor records the already-validated exact materialization
+request as a direct provenance dependency only after `HostRepositoryPathKey`
+succeeds. The path key remains the sole validation/materialization owner, so
+invalid-path, initial-Need, and ordinary-error precedence remain unchanged and
+the new package-source-to-evaluation-to-lower-source direction stays acyclic.
+The private evaluation/capability representations remain unexported; build,
+root loading, fixtures, and Bazel oracles are unchanged.
+
+Focused support/error, query, one-shot, retained-daemon, event-replay, and
+cycle-recovery tests passed. `slug_loading_v2` passed 57/57, affected
+GNU-Windows crates compiled, formatting/archive/diff/scope gates passed, and
+the full `slug_bzlmod_v2` result was 277/278 with only the unchanged
+`records_exact_proxy_tag_and_innate_call_spans` clean-HEAD baseline. The full
+server result retained only its two documented untouched root-only fixture
+failures. Independent Terra latest-text review returned `ACCEPT`.
+
+The next packet is read-only design:
+`WP-5-m1-direct-local-external-build-source-target-activation-design`. The
+three other named M1 gaps remain at their accepted terminal boundaries:
+external Starlark test-base/`@bazel_tools` closure and JVM-dependent registry
+directory transport remain unsupported, while native-Windows Host glob
+ordering remains `REPLAN`. The successor decides only whether an explicit
+single target naming an `exports_files` source in one direct
+`local_path_override` repository can enter the existing external package load
+and build root without activating configured analysis, actions, patterns, or a
+second source graph.
