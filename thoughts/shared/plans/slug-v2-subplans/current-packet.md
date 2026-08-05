@@ -1,14 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-5`
+Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-6`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze actual enum defaults and remaining pure-family default-route facts
-before mechanical descriptor attachment.
+Role: freeze all accepted pure-family byte contracts with the terminal
+attachment and Dotted-identity distinctions before mechanical descriptor
+attachment.
 Predecessors: exact Java/Guava renderer authority, forced-sharding structural
 semantic identity, and the full family-source/16-enum route anchor table are
-accepted. Retry 4 was discarded at terminal review; this packet performs no
-new source discovery.
+accepted. Retry 5 was discarded at terminal review; this packet performs no
+new source discovery. F-Runs-default is default-materializer-only, never a
+pure descriptor attachment.
 
 Write one compact `F-*` contract row for every distinct pure semantic family,
 citing only accepted `[R]` renderer, `[I]` identity, `[S]` source-route, and
@@ -29,7 +31,8 @@ Mandatory facts are immutable:
   `A[E(a=b),E(c=d)]→x="[a=b, c=d]", `; F-Env
   `A[E(N=V),E(N),E(=N)]` retains Set/Inherit/Unset and yields
   `x="[Set[name=N, value=V], Inherit[name=N], Unset[name=N]]", `;
-- AllowColonList and NonEmptyCommaList admit no attachment and no `A`;
+- source-known AllowColonList and NonEmptyCommaList have no admitted attachment
+  and no `A`;
   StringSet, Fission, and EmptyList are nonrepeat scalar-list routes;
 - StringSet has `D(s)`, duplicate elimination, and the actual reverse
   U+E000/U+10000 UTF-16 case; timeout keeps `.limit(6)`, `2,` and `2,,3,4,5`
@@ -61,7 +64,9 @@ Mandatory facts are immutable:
   and `x="{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}", `;
 - Dotted uses case-insensitive component `(\d+)([a-z0-9]*?)?(\d+)?` and
   descriptive `([a-z]\w*)` patterns, `Integer.parseInt` capture bounds, and
-  first-descriptive early-stop including underscore/ignored later bytes; runs
+  first-descriptive early-stop including underscore: later components do not
+  affect the parsed sequence, but the full original input controls equality,
+  hash, cache, and rendering; runs
   `D("1")` is retained/cache `[(?:(?>.*)) Options: [1]]→x="[(?:(?>.*)) Options: [1]]", `
   while `U("+2")` remains deferred with no general `E/A`; and
 - Platform has `D(s)=E(s)=ASCII-lower(s)`.
@@ -82,7 +87,8 @@ Mandatory facts are immutable:
 
 Preserve the disjoint `287 + 8 + 5 + 41 = 341` routing and independent
 repeat/old-name/expansion/implicit metadata. The table must let a later packet
-attach each of the 287 pure descriptors mechanically; runs remains attached
+attach each of the 287 pure descriptors mechanically; source-known
+AllowColonList/NonEmptyCommaList remain unattached, and runs remains attached
 only by the default materializer, not a pure descriptor.
 
 Allowlist:

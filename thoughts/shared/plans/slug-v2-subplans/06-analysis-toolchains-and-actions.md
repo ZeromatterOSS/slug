@@ -2911,6 +2911,25 @@ and accepted-but-deferred runs `U("+2")`. Preserve `287 + 8 + 5 + 41`, caps,
 hard stops, and all deferrals including user-approved later configured-target
 dependency cycles. After acceptance run only mechanical 287 attachment.
 
+### Pure native family byte-contract ledger retry 5 REPLAN (2026-08-04)
+
+Terminal review discarded the unaccepted 59-line retry-5 ledger. It did not
+make clear that source-known `AllowColonList` and `NonEmptyCommaList` have no
+admitted attachment or `A`; it treated F-Runs-default as an admitted pure
+attachment instead of a default-materializer-only exception; and its Dotted
+early-stop wording lost the full-input equality/hash/cache/rendering owner.
+No source lookup, probe, descriptor, Rust, or runtime change occurred.
+
+Run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-6`, a
+docs-only synthesis of the same accepted `[R]`/`[I]`/`[S]` and closed Stage 6
+facts. Preserve every retry-5 freeze, state both unadmitted list families
+explicitly, exempt F-Runs-default from pure descriptor attachment in the
+opening, and distinguish Dotted parsed-component early-stop from full original
+input semantic identity/rendering. Preserve `287 + 8 + 5 + 41`, the 380/480
+caps, hard stops, and all deferrals including user-approved later
+configured-target dependency cycles. After acceptance run only mechanical 287
+attachment.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
