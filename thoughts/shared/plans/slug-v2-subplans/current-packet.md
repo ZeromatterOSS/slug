@@ -1,33 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-host-request-observation-projection-design`
+Packet: `WP-6-m2-native-conversion-schedule-and-host-fact-redesign`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: docs-only request-observation projection contract; no Rust or Host read.
+Result: docs-only converter-call and producer-free Host-fact redesign; no Rust.
 
 ## Goal
 
-Freeze the request bridge that projects already-owned process facts into the
-configuration boundary without changing lifetime, cache, or activation
-semantics. The accepted `ProcessHostOwner` stays non-reading; native capture is
-still **REPLAN**.
+Freeze the real command-owned schedule that determines whether a native
+converter is called. Replace the invalid raw-deduplicated Host-fact assumption
+before proposing a core-to-configuration bridge. Native capture remains
+**REPLAN**.
 
 ## Required design record
 
-Specify the request pre-scan: which eligible request occurrences demand OS,
-conditional CPU, capacity, fresh home, or Windows facts, and the exact order in
-which it observes them. Define fresh home and Windows fact projection without
-turning either into a process-global cache; preserve lossless UTF-16, terminal
-errors, and the accepted Windows resolved-versus-`IOExceptionFallback` shape.
+Record each relevant default-validation checkpoint, `FieldOptionDefinition`
+default memoization boundary, priority selection, single-value acceptance, and
+expansion order that controls a converter call. Define per-accepted-occurrence
+identity for fresh home and Windows raw/outcome facts: equal raw UTF-16 inputs
+must remain distinct and may have different resolution outcomes. Classify exact
+capacity eligibility through `ResourceConverter`, not descriptor shape.
 
-Freeze the single one-way core -> configuration dependency and ownership: core
-retains the injected owner, configuration consumes only an explicit
-request-scoped projection, and neither layer creates another owner. Define the
-DICE contract precisely: epoch/input identity, owner and projection lifetime,
-success/error caching and invalidation, failure replay or retry, and observable
-ordering. The design must cite the accepted Host lifetime partition and
-conversion-input schema, and explain why the bridge neither introduces a DICE
-cycle nor changes the user-approved configured-target-cycle deferral.
+Revise the producer-free configuration schema and identify the smallest future
+bridge prerequisites: the command-owned event schedule, occurrence ordering,
+error timing, and request/attempt lifetime. Preserve only core ->
+configuration direction and explain why no DICE cycle or configured-target
+cycle is introduced. Native capture and the production native-demand driver
+remain absent and out of scope.
 
 ## Allowed paths
 
@@ -40,21 +39,19 @@ cycle nor changes the user-approved configured-target-cycle deferral.
 
 ## Stop conditions
 
-Do not edit Rust, add a Host source/capture/read, change `ProcessHostOwner`,
-add a converter, configuration implementation, DICE key/compute, request
-activation, command/configured-target behavior, Cargo/dependency, fixture, or
-generated output. Stop and REPLAN if the contract requires a native
-HotSpot-equivalent mapping, converter semantics, or an unresolved
-configured-target cycle.
+Do not edit Rust, Cargo, schemas, converters, DICE keys/computes, request or
+native-demand drivers, command/configured-target behavior, fixtures, or
+generated output. Stop and REPLAN if an exact schedule requires native capture,
+a live production driver, a reverse configuration dependency, or a configured-
+target cycle.
 
 ## Completion and next boundary
 
-Complete only with the bounded design record and synchronized scheduling.
-Native capture remains REPLAN; implementation requires a separately accepted
-packet after this contract is reviewed.
+Complete only with the bounded schedule/schema redesign and synchronized
+scheduling. Any implementation requires separate acceptance after native
+capture/driver and converter-call prerequisites are proven.
 
 ## Diff budget
 
 - Documentation: at most 160 net lines.
-- No Rust or Cargo changes; no generated, fixture, baseline, or unrelated
-  changes.
+- No Rust, Cargo, fixture, generated, baseline, or unrelated changes.

@@ -4158,6 +4158,33 @@ core-to-configuration dependency, and DICE epoch/lifetime/error/order
 contracts. It adds no Rust, Host capture, converter, activation, command, or
 configured-target behavior.
 
+### Host request observation projection design REPLAN (2026-08-05)
+
+`WP-6-m2-host-request-observation-projection-design` is **REPLAN** before
+Rust. Pinned converter review shows that Bazel validates defaults at multiple
+parse checkpoints and `FieldOptionDefinition` memoizes them. Conversion is not
+a generic pre-scan: only priority-accepted, single-value occurrences reach the
+converter after their exact default/expansion route. Capacity is eligible only
+through the exact `ResourceConverter` route, not merely because a descriptor
+names a capacity-shaped option.
+
+The accepted producer-free `HostConversionInputs` schema also cannot preserve
+the observed Windows semantics: identical raw UTF-16 values resolve once per
+accepted occurrence and may produce different outcomes. Its raw-keyed
+deduplication therefore loses both occurrence identity and result multiplicity.
+Fresh home has the same converter-call ownership problem. Native capture and a
+production native-demand driver remain absent, so no live bridge, DICE input,
+or configuration conversion is authorized. No Rust changed. Native capture
+remains **REPLAN** and user-approved configured-target cycle deferral remains
+unchanged.
+
+Run next only `WP-6-m2-native-conversion-schedule-and-host-fact-redesign`,
+docs-only. Freeze the command-owned actual converter-call event schedule
+(default checkpoints, priorities, and expansions), per-occurrence home/Windows
+identity and outcomes, exact capacity eligibility, and a revised producer-free
+schema plus bridge prerequisites. Add no Rust, Host capture, converter,
+native-demand driver, DICE/command activation, or configured-target behavior.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
