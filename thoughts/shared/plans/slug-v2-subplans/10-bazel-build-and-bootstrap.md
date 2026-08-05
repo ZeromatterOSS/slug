@@ -241,6 +241,15 @@ The library unit test is independent of every blocked env/runfile boundary.
 library-test commands. After that bounded target, inventory the other 13 V2
 packages separately while the CLI integration redesign remains explicit.
 
+The CLI library unit target is accepted. It reuses the production crate through
+`rust_test(crate = ":slug_cli_v2")`, is private and small, and adds no source,
+dependency restatement, binary, fixture, env, data, platform, process, daemon,
+or integration adapter. The focused credential-free nightly Bazel test and
+serial Cargo library test each ran the one case successfully. A no-repin module
+evaluation left all three lock hashes stable; formatting, archive, scope, cap,
+and diff gates passed. The two integration crates remain exactly at the C0
+`REPLAN` boundary.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
