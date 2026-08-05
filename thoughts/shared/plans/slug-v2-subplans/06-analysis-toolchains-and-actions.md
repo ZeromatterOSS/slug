@@ -4563,6 +4563,84 @@ label `/...` canonicalization/default/error/context; decide a bounded successor
 without command activation, normalization, loader, checksum, wire, DICE, or
 configured-target work.
 
+### RunUnder and CustomFlag source closure; renderer REPLAN (2026-08-05)
+
+`WP-6-m2-run-under-and-custom-flag-source-closure-evidence` is **ACCEPT** for
+private conversion over well-formed Unicode input and **REPLAN** only for exact
+RunUnder record rendering/cache and the full Java `String` domain. All Bazel
+anchors below are pinned `9.2.0` (`8220c6198837d5c13d53fea211cf3282aa12408a`).
+
+`RunUnderConverter.java:29-62` tokenizes into a fresh list, rejects no tokens
+with `Empty command`, takes token zero as command/label candidate and the rest
+as ordered suffix, and retains the unmodified input. A decoded first token
+beginning `//` or `@` label-converts through the supplied context; every other
+first token is a command. Tokenizer errors are wrapped exactly as `Not a valid
+command prefix ` plus `ShellUtils`'s message; label errors are `Not a valid
+label ` plus the label error. `RunUnder.java:22-62` supplies the raw original,
+suffix, and label/command payload records. `ShellUtils.java:90-143` is a
+self-contained UTF-16 state machine: only unquoted space/tab split; quote
+fragments concatenate and force empty quoted tokens; single quotes make backslash
+literal; unquoted backslash consumes the next code unit; double-quote backslash
+removes it only before backslash or quote and otherwise retains it. Its exact errors are
+`backslash at end of string` and `unterminated quotation`. `CoreOptions.java:
+640-659` declares default `"null"`; `Option.java:63-70` assigns that literal its
+special-default meaning and `FieldOptionDefinition.java:337-339` returns null
+without invoking the converter. Thus absent RunUnder is null, while literal
+command-line `null` converts as command `null`.
+
+The label context is `CoreOptionConverters.java:331-360`: PackageContext first,
+otherwise mapping-free canonical parse for null context or main-repository
+mapping parse. `CoreOptionConverters.java:275-302` (enclosed by `:270-308`)
+returns inputs not beginning `//` or `@` raw as defines. Its label branch
+substitutes trailing `/...` with
+`:__subpackages__`, converts through that same helper, renders
+`Label.getUnambiguousCanonicalForm()` (`Label.java:468-469`), and rewrites any
+result ending `:__subpackages__` to `/...`. In main-repository contexts, both
+`//pkg/...` and the valid label `//pkg:__subpackages__` result in `@@//pkg/...`.
+Corresponding `@apparent//pkg/...` and `@apparent//pkg:__subpackages__` result
+in mapped/resolved `@@repo//pkg/...`; PackageContext omits `@` for its current
+repository. This collision is required. `CoreOptions.java:121-135` is a
+repeatable `"null"` default; `Option.java:63-70` and
+`FieldOptionDefinition.java:337-339` therefore own its absent/empty result
+without converter invocation. Explicit command-line `null` is literal. The raw
+branch adds no error; label failures are the helper's unwrapped
+`OptionsParsingException` message.
+
+The conversion slice has no JDK Unicode-table dependency: for every valid
+Unicode scalar string, Rust `&str` scanning is equivalent because only ASCII
+control characters are inspected and all other text is copied. Java allows lone
+UTF-16 surrogates, which Rust `&str` cannot represent; UTF-16/WTF-8 ingestion
+and the full Java-String domain remain deferred.
+
+The records in `RunUnder.java:52-62` have implicit Java `toString`. Bazel's
+`OptionsBase.java:86-116` cache key calls `value.toString()` for every non-null
+option. OpenJDK jdk25u tag `jdk-25.0.2+10` (tag
+`935ed5353de37bad0b021a5df15e30e8db7de2fd`, source
+`405a5699ebd097464ed3fc9345414b0774a2edc9`) documents in `Record.java:186-193`
+that precise record rendering may change; its `ObjectMethods.java:237-307`
+shows the upstream implementation only. Active Zulu renderer provenance is
+unclosed and this packet forbids a JVM/probe, so no Rust record renderer or
+cache-key claim is authorized.
+
+Command activation, runfiles, non-test trim, normalization, loader, checksum,
+wire, DICE, new dependencies, and user-deferred configured-target cycles remain
+out of scope. Run next only
+`WP-6-m2-run-under-and-custom-flag-converter-implementation`: private changes
+to existing `app/slug_configuration_v2/src/native/label_convert.rs` and
+`app/slug_configuration_v2/src/native/tests.rs`, then the three scheduling docs
+terminal-only. Preserve classifier 39/0 and add two separate mixed 2/0 private
+functions. `RunUnderSuffix(Arc<[CompactString]>)` is the sole `Dupe` wrapper;
+the private `Allocative` `RunUnder` is either
+`Label { original: CompactString, suffix: RunUnderSuffix, label: ResolvedOptionLabel }`
+or `Command { original: CompactString, suffix: RunUnderSuffix, command: CompactString }`.
+CustomFlag finishes as `CompactString`. Preserve source tokenizer state/error
+ordering but map all failures to private `LabelConvertError::Invalid`; source
+texts remain evidence and user diagnostic projection stays deferred. Implement
+only the valid-Unicode source tokenizer, raw/suffix/context and `/...` collision
+rules—never renderer/cache, full Java strings, activation, or a new dependency.
+Caps: 300 production, 500 test, 100 documentation, 900 total formatted net
+lines.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
