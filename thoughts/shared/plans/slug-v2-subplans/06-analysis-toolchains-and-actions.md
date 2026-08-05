@@ -691,3 +691,44 @@ for the accepted fixture, identify every semantic input and invalidation edge,
 and return `REPLAN` rather than approximate or embed Bazel's observed digest.
 No Rust, tests, wire schema, fixture, or new oracle command is authorized by
 this evidence checkpoint.
+
+### Root configuration identity design result (2026-08-04)
+
+**Status: REPLAN; no implementation exists for this packet.** Pinned Bazel
+9.2 source and two live Slug audits prove that even the no-extra-flags target
+configuration is not a bounded constant. Bazel registers fourteen native
+`FragmentOptions` classes, sorts them by fully qualified class name, and hashes
+every option cache key—including defaults—in alphabetical option-name order,
+then hashes canonical Starlark options and option scopes. The native set spans
+platform, shell, core, strict-action-environment, Python, Android, Apple, C++,
+Java, J2ObjC, ObjC, and proto options. CPU/host CPU, Apple defaults, target and
+host platforms, platform mappings, and platform-selected flags introduce host
+and graph inputs before the final configuration key.
+
+Live Slug has no matching producer. `ConfigurationKey` is only an opaque
+validated checksum carrier. The retained build root and the legacy one-shot
+analysis entry each construct `target:first-build`; recursive analysis then
+correctly clones that identity to every dependency. Command normalization and
+the daemon wire own only bzlmod policy/environment, lockfile mode, and registry
+URLs. `--config` is parse-only, and Slug has no native option inventory,
+Starlark build-setting/scope model, platform mapping, transition/toolchain
+selection input, or Bazel `OptionsBase.cacheKey()` serialization. Existing
+SHA-256 values belong to unrelated bzlmod, repository, or REAPI domains.
+
+A future exact prerequisite is therefore the general Bazel-9 target-option and
+configuration-identity substrate, not a line-bounded root checksum key. Once
+that substrate exists, a DICE-owned producer may compute a full checksum inside
+the command transaction before either root key is constructed. It must reject
+every unmodeled configuration-affecting input before analysis and prove native
+option, Starlark option/scope, and same-daemon `C0 -> C1 -> C0` identity and
+recursive reuse transitions. This packet does not authorize that broad work.
+
+Reserved review accepted the REPLAN and preserved a smaller cquery consumer
+that does not display configuration identity: one root literal with
+`--output=starlark --starlark:expr=str(target.label)`, driven directly through
+the existing `RootConfiguredTargetAnalysisKey`. The old standalone
+`cquery-provider-starlark` record is Bazel 9.1.1 and is not authority for this
+packet, while the accepted recursive Bazel 9.2 fixture uses a Starlark file and
+does not pin the exact expression/lifecycle contract. Run only
+`WP-6-m2-root-cquery-starlark-label-evidence` next. Default/explicit `label`
+output remains unsupported until the full configuration substrate exists.

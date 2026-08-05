@@ -1,48 +1,45 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-root-configuration-identity-design`
-Milestone: M2 configuration identity prerequisite for the first M4 cquery consumer
+Packet: `WP-6-m2-root-cquery-starlark-label-evidence`
+Milestone: M2 analysis graph with the first configuration-opaque M4 consumer
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: design-only authoritative root target configuration boundary
-Evidence: accepted recursive configured analysis; retained Bazel 9.2 default,
-explicit-label, missing-target, and same-server recovery evidence; pinned Bazel
-9.2 `BuildOptions` checksum ownership; two independent live-code REPLAN audits.
+Role: evidence-only retained Bazel 9.2 Starlark-label discriminator
+Evidence: accepted recursive configured analysis and Bazel 9.2 fixture;
+accepted configuration-identity REPLAN; reserved review selecting the
+configuration-opaque Starlark expression boundary.
 
-Do not edit Rust, tests, fixtures, generated oracle records, wire schema, or
-harness code. Audit the current `ConfigurationKey`, its two `first-build`
-production constructors, command input normalization, configured-analysis key
-identity, and retained transaction input ownership. Reconcile them with pinned
-Bazel 9.2 `BuildOptions.checksum()`/`shortId()` semantics.
+Do not edit Rust, tests, fixtures, generated oracle records, or harness code.
+Copy the existing `recursive-custom-rule-providers-actions` workspace into an
+isolated temporary root and use one retained Bazel 9.2 output base. After
+confirming `/usr/bin/bazel` is exactly 9.2.0, run these commands serially:
 
-The design must answer all of these before any implementation packet:
+1. `cquery //parent:parent --output=starlark --starlark:expr=str(target.label)`
+2. `cquery //parent:missing --output=starlark --starlark:expr=str(target.label)`
+3. `cquery //parent:parent --output=starlark --starlark:expr=str(target.label)`
 
-1. What bounded V2-owned value represents every option input needed for the
-   accepted no-extra-flags root target configuration, without embedding the
-   observed `a7a71fd` digest or delegating to Bazel/Java?
-2. Which DICE input/key owns that value, and which command-line, Starlark build
-   setting, scope, platform/toolchain, repository-mapping, and environment
-   changes must invalidate it now versus remain explicit unsupported inputs?
-3. Can Bazel 9.2 native fragment `cacheKey()` ordering/defaults be reproduced
-   exactly within a bounded Rust packet, or does even the default fixture
-   require a broader configuration-model prerequisite?
-4. How does the authoritative checksum replace `first-build` in both existing
-   entry points while preserving configured-target equality, recursive
-   dependency reuse, and no lock across DICE computation?
-5. Which focused checksum discriminator and retained lifecycle tests would
-   prove identity changes, equality restoration, and cquery short-ID output?
+Use ordinary RC discovery, but never inspect or copy `~/.bazelrc`. Capture each
+exact exit code, raw stdout, relevant raw stderr, and command order. Record the
+exact canonical-label bytes, prove that no configuration checksum/mnemonic is
+exposed, pin the missing-target diagnostic under this formatter, and prove
+successful same-server recovery. Compare the first and third stdout
+byte-for-byte and record warm loaded/configured counts.
 
-Preserve the accepted later route: cquery will drive the existing
-`RootConfiguredTargetAnalysisKey` through `NativeCommandRoot`, format its
-accepted result, and perform no second analysis/evaluator call. A dedicated
-daemon cquery request is a later public schema packet, not part of this design.
+Shut down the retained Bazel server and remove the temporary workspace/output
+base. Compare the successful configured label with the accepted recursive
+fixture's Starlark-file output, but do not regenerate or edit that fixture. The
+old standalone `cquery-provider-starlark` Bazel 9.1.1 record is orientation
+only, not acceptance authority.
 
-Return `ACCEPT` only with a complete, exact, line-bounded producer/consumer
-contract and file allowlist. Return `REPLAN` if exact default configuration
-identity needs the unmodeled general Bazel option universe. Never truncate
-`first-build`, substitute a mnemonic, hard-code oracle bytes, or weaken the
-accepted default/explicit-label contract.
+At `ACCEPT`, record exact evidence/provenance in the Stage 6 owner plan and
+resume `WP-6-m2-root-cquery-starlark-label-boundary-design`. That design must
+drive `RootConfiguredTargetAnalysisKey` directly through `NativeCommandRoot`,
+with no second graph/key/evaluator call. It may support only one root literal,
+explicit `--output=starlark`, and the exact
+`--starlark:expr=str(target.label)` expression. Default/explicit `label`,
+arbitrary expressions/files, patterns, and general configuration stay
+unsupported.
 
-Stops: no code or fixture change; no new oracle command without a reviewed
-evidence successor; no transition, toolchain/platform, repository-mapping,
-provider, aquery, action, execution, REAPI, or cycle implementation; no
-credential inspection or Bazel delegation.
+Stops: no checkout asset or production change; no fixture/oracle growth; no
+default/label output, alternate expression, Starlark file, external label,
+pattern, transition, toolchain, provider, aquery, action, execution, REAPI, or
+cycle probe; no credentials; no parallel Bazel command or second output base.
