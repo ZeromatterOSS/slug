@@ -361,6 +361,18 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
     assert!(RootConfiguredTargetAnalysisKey::equality(
         &complete, &complete
     ));
+    let warm = complete_transaction.compute(&key).await.unwrap();
+    let (
+        AnalysisPreparationOutcome::Complete(complete_value),
+        AnalysisPreparationOutcome::Complete(warm_value),
+    ) = (&complete, &warm)
+    else {
+        unreachable!();
+    };
+    assert!(Arc::ptr_eq(
+        complete_value.as_ref().as_ref().unwrap(),
+        warm_value.as_ref().as_ref().unwrap(),
+    ));
     let provider = ProviderId::new("//rules:defs.bzl", "MarkerInfo").unwrap();
     assert_eq!(marker_value(&complete, &provider), "v1-right,v1-left");
     let AnalysisPreparationOutcome::Complete(value) = &complete else {

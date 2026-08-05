@@ -127,6 +127,7 @@ use slug_workspace_v2::WorkspaceRawSnapshotKey;
 use slug_workspace_v2::WorkspaceSnapshot;
 use slug_workspace_v2::WorkspaceSnapshotKey;
 use starlark_map::small_map::SmallMap;
+use starlark_map::small_set::SmallSet;
 
 use super::RuntimeMode;
 use super::demands::SelectedWorkspaceDemands;
@@ -1526,7 +1527,7 @@ struct CqueryCommandRoot {
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct CqueryCommandEvaluation {
-    analysis: AnalysisResult,
+    analysis: Arc<AnalysisResult>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -1551,13 +1552,14 @@ enum BuildCommandRequestError {
 pub struct BuildCommandEvaluation {
     anchor: RootModuleLoadingAnchor,
     targets: Arc<[BuildRequestedTarget]>,
+    action_closure: Arc<[Arc<AnalysisResult>]>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 struct BuildRequestedTarget {
     pattern: Arc<str>,
     package: LoadedPackage,
-    analysis: Option<AnalysisResult>,
+    analysis: Option<Arc<AnalysisResult>>,
     completion: BuildTargetCompletion,
 }
 
@@ -1602,6 +1604,13 @@ enum BuildCommandErrorKind {
 type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
     Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
 >;
+
+type BuildActionClosureOutcome =
+    slug_bzlmod_v2::SourcePreparationOutcome<Result<Arc<[Arc<AnalysisResult>]>, BuildCommandError>>;
+type BuildActionAnalysisOutcome =
+    slug_bzlmod_v2::SourcePreparationOutcome<Arc<Result<Arc<AnalysisResult>, AnalysisError>>>;
+type BuildActionFrontierOutcome =
+    slug_bzlmod_v2::SourcePreparationOutcome<Result<Vec<Arc<AnalysisResult>>, AnalysisError>>;
 
 enum BuildBranchResult {
     Outcome(
@@ -1664,9 +1673,7 @@ impl BuildCommandEvaluation {
     }
 
     pub fn analyses(&self) -> impl Iterator<Item = &AnalysisResult> {
-        self.targets
-            .iter()
-            .filter_map(|target| target.analysis.as_ref())
+        self.action_closure.iter().map(Arc::as_ref)
     }
 
     pub fn is_observed_exported_source(&self) -> bool {
@@ -1922,6 +1929,124 @@ fn collect_build_branches(
             targets.into(),
         )))
     }
+}
+
+fn collect_build_action_frontier(
+    outcomes: Vec<(ConfiguredTargetKey, BuildActionAnalysisOutcome)>,
+) -> Result<BuildActionFrontierOutcome, Arc<str>> {
+    let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
+    let mut first_error = None;
+    let mut layer = Vec::with_capacity(outcomes.len());
+    for (configured_target, outcome) in outcomes {
+        match outcome {
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                needs = Some(match needs {
+                    Some(current) => current
+                        .try_union(&need)
+                        .map_err(|error| Arc::from(format!("{error:?}")))?,
+                    None => need,
+                });
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(analysis) => {
+                    assert_eq!(
+                        analysis.key(),
+                        &configured_target,
+                        "root analysis returned a mismatched configured target"
+                    );
+                    layer.push(analysis.dupe());
+                }
+                Err(error) if first_error.is_none() => {
+                    first_error = Some(error.clone());
+                }
+                Err(_) => {}
+            },
+        }
+    }
+    if let Some(need) = needs {
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need))
+    } else if let Some(error) = first_error {
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+            error,
+        )))
+    } else {
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(
+            layer,
+        )))
+    }
+}
+
+async fn compute_build_action_closure(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    targets: &[BuildRequestedTarget],
+) -> Result<BuildActionClosureOutcome, Arc<str>> {
+    let mut seen = SmallSet::new();
+    let mut closure = Vec::new();
+    let mut frontier = Vec::new();
+
+    for analysis in targets.iter().filter_map(|target| target.analysis.as_ref()) {
+        if !seen.insert(analysis.key().clone()) {
+            continue;
+        }
+        closure.push(analysis.dupe());
+    }
+    for analysis in &closure {
+        for dependency in analysis.direct_dependencies() {
+            if seen.insert(dependency.clone()) {
+                frontier.push(dependency.clone());
+            }
+        }
+    }
+
+    while !frontier.is_empty() {
+        let outcomes = ctx
+            .compute_join(frontier, |ctx, configured_target| {
+                Box::pin(async move {
+                    let value = ctx
+                        .compute(&RootConfiguredTargetAnalysisKey::new(
+                            workspace.dupe(),
+                            configured_target.clone(),
+                        ))
+                        .await;
+                    (configured_target, value)
+                })
+            })
+            .await;
+        let mut completed = Vec::with_capacity(outcomes.len());
+        for (configured_target, outcome) in outcomes {
+            match outcome {
+                Err(error) => return Err(Arc::from(error.to_string())),
+                Ok(outcome) => completed.push((configured_target, outcome)),
+            }
+        }
+        let layer = match collect_build_action_frontier(completed)? {
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need));
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                    BuildCommandError::new(BuildCommandErrorKind::Analysis(error)),
+                )));
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(layer)) => layer,
+        };
+
+        let mut next = Vec::new();
+        for analysis in layer {
+            for dependency in analysis.direct_dependencies() {
+                if seen.insert(dependency.clone()) {
+                    next.push(dependency.clone());
+                }
+            }
+            closure.push(analysis);
+        }
+        frontier = next;
+    }
+
+    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(
+        closure.into(),
+    )))
 }
 
 #[allow(dead_code)]
@@ -2252,7 +2377,24 @@ impl Key for BuildCommandRootKey {
                 build_complete(Err(error))
             }
             Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(targets))) => {
-                build_complete(Ok(BuildCommandEvaluation { anchor, targets }))
+                match compute_build_action_closure(ctx, &self.workspace, &targets).await {
+                    Err(error) => {
+                        panic!("build action-closure infrastructure invariant failed: {error}")
+                    }
+                    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+                        slug_bzlmod_v2::SourcePreparationOutcome::Need(need)
+                    }
+                    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error))) => {
+                        build_complete(Err(error))
+                    }
+                    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(action_closure))) => {
+                        build_complete(Ok(BuildCommandEvaluation {
+                            anchor,
+                            targets,
+                            action_closure,
+                        }))
+                    }
+                }
             }
         }
     }
@@ -7171,6 +7313,84 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
                 .any(|name| name.as_str() == "ConsumerInfo")
         );
         assert!(parent.as_ref().as_ref().unwrap().actions().is_empty());
+
+        let build_key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//:parent").unwrap()],
+            ConfigurationKey::target("first-build")
+                .unwrap()
+                .with_root_string_setting(RootStringSettingValue::new("default")),
+        )
+        .unwrap();
+        let outcome = transaction.compute(&build_key).await.unwrap();
+        let evaluation = complete_build_evaluation(&outcome);
+        assert_eq!(
+            evaluation
+                .analyses()
+                .map(|analysis| analysis.key().label().to_string())
+                .collect::<Vec<_>>(),
+            [
+                "@@//:parent",
+                "@@//:consumer",
+                "@@//:consumer",
+                "@@//:setting",
+                "@@//:setting",
+            ]
+        );
+        let configured = evaluation
+            .analyses()
+            .map(|analysis| analysis.key())
+            .collect::<Vec<_>>();
+        assert_ne!(configured[1], configured[2]);
+        assert_eq!(configured[1].label(), configured[2].label());
+        assert_ne!(configured[3], configured[4]);
+        assert_eq!(configured[3].label(), configured[4].label());
+    }
+
+    #[derive(Default)]
+    struct ActionClosureTracker {
+        roots: Mutex<Vec<(String, dice::ActivationKind, Option<EventBatch>)>>,
+        legacy: AtomicUsize,
+    }
+
+    impl ActionClosureTracker {
+        fn take(&self) -> Vec<(String, dice::ActivationKind, Option<EventBatch>)> {
+            std::mem::take(&mut *self.roots.lock().unwrap())
+        }
+    }
+
+    impl ActivationTracker for ActionClosureTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+            if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
+                self.legacy.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
+                self.legacy.fetch_add(1, Ordering::Relaxed);
+            }
+            let Some(key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() else {
+                return;
+            };
+            self.roots.lock().unwrap().push((
+                key.configured_target().label().to_string(),
+                activation.kind(),
+                activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            ));
+        }
     }
 
     #[derive(Default)]
@@ -7255,6 +7475,64 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
                 PathObservationOperation::Lstat,
             )),
         )
+    }
+
+    const ACTION_CLOSURE_DEFS: &str = r#"NodeInfo = provider(fields = {"value": "target name"})
+def _node(ctx):
+    print(ctx.label.name)
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, ctx.attr.marker + "\n")
+    return [DefaultInfo(files = depset([out])), NodeInfo(value = ctx.label.name)]
+node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker": attr.string()})
+"#;
+
+    fn action_closure_epoch(
+        variant: i64,
+        shared_marker: &str,
+        link_shared: bool,
+        shared_present: bool,
+    ) -> PathObservationEpoch {
+        let mut epoch = BuildRootEpoch::base(variant);
+        epoch.package("rules", "", variant);
+        epoch.file("/workspace/rules/defs.bzl", ACTION_CLOSURE_DEFS, variant);
+        epoch.package(
+            "top",
+            "load(\"//rules:defs.bzl\", \"node\")\nnode(name = \"top\", deps = [\"//left:left\", \"//right:right\"], marker = \"top\")\n",
+            variant,
+        );
+        for side in ["left", "right"] {
+            let deps = if link_shared {
+                "deps = [\"//shared:shared\"], "
+            } else {
+                ""
+            };
+            epoch.package(
+                side,
+                &format!(
+                    "load(\"//rules:defs.bzl\", \"node\")\nnode(name = \"{side}\", {deps}marker = \"{side}\")\n"
+                ),
+                variant,
+            );
+        }
+        if shared_present {
+            epoch.package(
+                "shared",
+                &format!(
+                    "load(\"//rules:defs.bzl\", \"node\")\nnode(name = \"shared\", marker = \"{shared_marker}\")\n"
+                ),
+                variant,
+            );
+        } else {
+            epoch.deleted_package("shared", variant);
+        }
+        epoch.build()
+    }
+
+    fn complete_build_evaluation(outcome: &BuildCommandOutcome) -> &BuildCommandEvaluation {
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("build command retained Needs")
+        };
+        value.as_ref().as_ref().unwrap()
     }
 
     #[test]
@@ -7404,6 +7682,257 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
             ["//second:all", "//first:t", "//first:t"]
         );
         assert!(targets.iter().all(|target| target.analysis.is_none()));
+    }
+
+    #[tokio::test]
+    async fn build_action_closure_is_roots_first_breadth_first_and_deduplicates_diamonds() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[
+                TargetPattern::parse("//top:top").unwrap(),
+                TargetPattern::parse("//left:left").unwrap(),
+                TargetPattern::parse("//top:top").unwrap(),
+            ],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let tracker = Arc::new(ActionClosureTracker::default());
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut transaction = build_root_transaction_with_data(
+            &dice,
+            action_closure_epoch(1, "shared-a", true, true),
+            user_data,
+        )
+        .await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let evaluation = complete_build_evaluation(&outcome);
+        assert_eq!(evaluation.analyzed_target_count(), 3);
+        assert_eq!(evaluation.declared_action_count(), 4);
+        assert_eq!(
+            evaluation
+                .analyses()
+                .map(|analysis| analysis.key().label().to_string())
+                .collect::<Vec<_>>(),
+            [
+                "@@//top:top",
+                "@@//left:left",
+                "@@//right:right",
+                "@@//shared:shared",
+            ]
+        );
+        assert_eq!(
+            evaluation
+                .analyses()
+                .map(|analysis| analysis.actions()[0].outputs()[0].path())
+                .collect::<Vec<_>>(),
+            [
+                "top/top.txt",
+                "left/left.txt",
+                "right/right.txt",
+                "shared/shared.txt",
+            ]
+        );
+        assert!(Arc::ptr_eq(
+            evaluation.targets[0].analysis.as_ref().unwrap(),
+            &evaluation.action_closure[0],
+        ));
+        assert!(Arc::ptr_eq(
+            evaluation.targets[1].analysis.as_ref().unwrap(),
+            &evaluation.action_closure[1],
+        ));
+        assert!(Arc::ptr_eq(
+            evaluation.targets[0].analysis.as_ref().unwrap(),
+            evaluation.targets[2].analysis.as_ref().unwrap(),
+        ));
+        let activations = tracker.take();
+        let mut evaluated = activations
+            .iter()
+            .filter(|(_, kind, _)| *kind == dice::ActivationKind::Evaluated)
+            .map(|(label, _, batch)| {
+                assert_eq!(
+                    batch.as_ref().map(|batch| batch.events().len()),
+                    Some(1),
+                    "target-local event batch for {label}"
+                );
+                label.as_str()
+            })
+            .collect::<Vec<_>>();
+        evaluated.sort();
+        assert_eq!(
+            evaluated,
+            [
+                "@@//left:left",
+                "@@//right:right",
+                "@@//shared:shared",
+                "@@//top:top",
+            ]
+        );
+        assert_eq!(tracker.legacy.load(Ordering::Relaxed), 0);
+
+        let mut warm_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        warm_data.data.set(CaptureEvaluationEvents);
+        let mut warm_transaction = build_root_transaction_with_data(
+            &dice,
+            action_closure_epoch(1, "shared-a", true, true),
+            warm_data,
+        )
+        .await;
+        let warm = warm_transaction.compute(&key).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&outcome, &warm));
+        assert!(tracker.take().is_empty());
+    }
+
+    #[tokio::test]
+    async fn build_action_closure_retains_accepted_parent_second_first_actions() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut epoch = BuildRootEpoch::base(5);
+        epoch.package("rules", "", 5);
+        epoch.file("/workspace/rules/defs.bzl", ACTION_CLOSURE_DEFS, 5);
+        epoch.package(
+            "leaf",
+            "load(\"//rules:defs.bzl\", \"node\")\nnode(name = \"first\", marker = \"first\")\nnode(name = \"second\", marker = \"second\")\n",
+            5,
+        );
+        epoch.package(
+            "parent",
+            "load(\"//rules:defs.bzl\", \"node\")\nnode(name = \"parent\", deps = [\"//leaf:second\", \"//leaf:first\"], marker = \"parent\")\n",
+            5,
+        );
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//parent:parent").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let evaluation = complete_build_evaluation(&outcome);
+        assert_eq!(evaluation.analyzed_target_count(), 1);
+        assert_eq!(evaluation.declared_action_count(), 3);
+        assert_eq!(
+            evaluation
+                .analyses()
+                .map(|analysis| analysis.key().label().to_string())
+                .collect::<Vec<_>>(),
+            ["@@//parent:parent", "@@//leaf:second", "@@//leaf:first"]
+        );
+    }
+
+    #[tokio::test]
+    async fn build_action_frontier_need_precedes_an_earlier_sibling_analysis_error() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let configuration = build_test_configuration("target");
+        let error_target = ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//error:missing").unwrap(),
+            configuration.clone(),
+        );
+        let mut epoch = BuildRootEpoch::base(6);
+        epoch.package("error", "", 6);
+        let mut transaction = build_root_transaction(&dice, epoch.build()).await;
+        let error = transaction
+            .compute(&RootConfiguredTargetAnalysisKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                error_target.clone(),
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            error,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if value.as_ref().is_err()
+        ));
+
+        let need_target = ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//need:child").unwrap(),
+            configuration,
+        );
+        let reduced = collect_build_action_frontier(vec![
+            (error_target, error),
+            (
+                need_target,
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(build_test_need("/workspace/need")),
+            ),
+        ])
+        .unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) = reduced else {
+            panic!("same-frontier analysis error won over sibling Need")
+        };
+        assert_eq!(
+            needs.path_observations().unwrap().demands()[0]
+                .path()
+                .as_path(),
+            Path::new("/workspace/need")
+        );
+    }
+
+    #[tokio::test]
+    async fn build_action_closure_tracks_child_actions_prunes_orphans_and_restores_equality() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//top:top").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut first_transaction =
+            build_root_transaction(&dice, action_closure_epoch(10, "shared-a", true, true)).await;
+        let first = first_transaction.compute(&key).await.unwrap();
+        let first_evaluation = complete_build_evaluation(&first);
+        let first_parent = first_evaluation.action_closure[0].dupe();
+        let first_shared = first_evaluation.action_closure[3].dupe();
+
+        let mut warm_transaction =
+            build_root_transaction(&dice, action_closure_epoch(10, "shared-a", true, true)).await;
+        let warm = warm_transaction.compute(&key).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&first, &warm));
+
+        let mut edited_transaction =
+            build_root_transaction(&dice, action_closure_epoch(11, "shared-b", true, true)).await;
+        let edited = edited_transaction.compute(&key).await.unwrap();
+        let edited_evaluation = complete_build_evaluation(&edited);
+        assert!(!BuildCommandRootKey::equality(&first, &edited));
+        assert_eq!(
+            first_parent.as_ref(),
+            edited_evaluation.action_closure[0].as_ref()
+        );
+        assert_ne!(
+            first_shared.as_ref(),
+            edited_evaluation.action_closure[3].as_ref()
+        );
+
+        let mut orphaned_transaction =
+            build_root_transaction(&dice, action_closure_epoch(12, "shared-b", false, true)).await;
+        let orphaned = orphaned_transaction.compute(&key).await.unwrap();
+        assert_eq!(
+            complete_build_evaluation(&orphaned).declared_action_count(),
+            3
+        );
+        let mut pruned_transaction =
+            build_root_transaction(&dice, action_closure_epoch(12, "shared-c", false, true)).await;
+        let pruned = pruned_transaction.compute(&key).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&orphaned, &pruned));
+
+        let mut deleted_transaction =
+            build_root_transaction(&dice, action_closure_epoch(13, "shared-b", true, false)).await;
+        let deleted = deleted_transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            deleted,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(ref value)
+                if value.as_ref().is_err()
+        ));
+
+        let mut restored_transaction =
+            build_root_transaction(&dice, action_closure_epoch(14, "shared-a", true, true)).await;
+        let restored = restored_transaction.compute(&key).await.unwrap();
+        assert!(BuildCommandRootKey::equality(&first, &restored));
     }
 
     #[tokio::test]

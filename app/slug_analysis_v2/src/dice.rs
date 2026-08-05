@@ -211,7 +211,8 @@ impl fmt::Display for RootConfiguredTargetAnalysisKey {
     }
 }
 
-type RootAnalysisKeyValue = LoadingPreparationOutcome<Arc<Result<AnalysisResult, AnalysisError>>>;
+type RootAnalysisKeyValue =
+    LoadingPreparationOutcome<Arc<Result<Arc<AnalysisResult>, AnalysisError>>>;
 
 #[derive(Default)]
 struct AnalysisPrintCapture {
@@ -326,6 +327,22 @@ struct DeclaredDependencyKey {
     key: ConfiguredTargetKey,
 }
 
+trait ComputedAnalysis {
+    fn result(&self) -> &AnalysisResult;
+}
+
+impl ComputedAnalysis for AnalysisResult {
+    fn result(&self) -> &AnalysisResult {
+        self
+    }
+}
+
+impl ComputedAnalysis for Arc<AnalysisResult> {
+    fn result(&self) -> &AnalysisResult {
+        self
+    }
+}
+
 fn legacy_declared_dependency_keys(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
@@ -342,16 +359,19 @@ fn legacy_declared_dependency_keys(
         .collect())
 }
 
-fn finish_analysis(
+fn finish_analysis<T>(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
     declared_dependency_keys: &[DeclaredDependencyKey],
-    computed: &SmallMap<ConfiguredTargetKey, AnalysisResult>,
+    computed: &SmallMap<ConfiguredTargetKey, T>,
     marker: Option<CompactString>,
     toolchain: Option<PreparedToolchain>,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
-) -> Result<AnalysisResult, AnalysisError> {
+) -> Result<AnalysisResult, AnalysisError>
+where
+    T: ComputedAnalysis,
+{
     let _implementation = starlark_rule_implementation(package, configured_target)?;
     let dependencies = declared_dependency_keys
         .iter()
@@ -364,7 +384,7 @@ fn finish_analysis(
             })?;
             Ok(PreparedDependency {
                 key: dependency.key.clone(),
-                providers: result.providers().clone(),
+                providers: result.result().providers().clone(),
                 attribute: dependency.attribute.clone(),
                 sequence: dependency.sequence,
             })
@@ -499,7 +519,7 @@ impl ConfiguredTargetAnalysisKey {
 }
 
 fn root_analysis_complete(result: Result<AnalysisResult, AnalysisError>) -> RootAnalysisKeyValue {
-    LoadingPreparationOutcome::Complete(Arc::new(result))
+    LoadingPreparationOutcome::Complete(Arc::new(result.map(Arc::new)))
 }
 
 type PreparedToolchainOutcome = LoadingPreparationOutcome<Result<PreparedToolchain, AnalysisError>>;
@@ -1232,7 +1252,7 @@ impl RootConfiguredTargetAnalysisKey {
                 }
                 Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
                     Ok(result) => {
-                        computed.insert(configured_target, result.clone());
+                        computed.insert(configured_target, result.dupe());
                     }
                     Err(error) => {
                         if first_error.is_none() {

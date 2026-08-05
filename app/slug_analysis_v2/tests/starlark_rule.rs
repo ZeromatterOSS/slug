@@ -493,7 +493,7 @@ async fn root_string_request_result(
     target: &str,
     explicit: Option<&str>,
     tracker: Arc<RootActivationTracker>,
-) -> Result<AnalysisResult, String> {
+) -> Result<Arc<AnalysisResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -549,7 +549,7 @@ async fn root_string_request(
     target: &str,
     explicit: Option<&str>,
     tracker: Arc<RootActivationTracker>,
-) -> AnalysisResult {
+) -> Arc<AnalysisResult> {
     root_string_request_result(dice, workspace, target, explicit, tracker)
         .await
         .unwrap()
@@ -560,7 +560,7 @@ async fn root_target_request(
     workspace: &std::path::Path,
     target: &str,
     tracker: Arc<RootActivationTracker>,
-) -> Result<AnalysisResult, String> {
+) -> Result<Arc<AnalysisResult>, String> {
     let mut user_data = UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -643,7 +643,11 @@ request = rule(implementation = _request, toolchains = ["//:type"])
 "#;
 const TOOLCHAIN_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\nconstraint_value(name = \"other\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":linux\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\ntoolchain(name = \"first\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":linux\"])\ntoolchain(name = \"second\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":linux\"])\nrequest(name = \"request\")\n";
 
-async fn toolchain_case(module: &str, defs: &str, build: &str) -> Result<AnalysisResult, String> {
+async fn toolchain_case(
+    module: &str,
+    defs: &str,
+    build: &str,
+) -> Result<Arc<AnalysisResult>, String> {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), module).unwrap();
     fs::write(workspace.join("defs.bzl"), defs).unwrap();

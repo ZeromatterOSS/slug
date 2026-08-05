@@ -11,6 +11,11 @@
 use std::process::Command;
 use std::time::SystemTime;
 
+use slug_commands_v2::build::BuildRequest;
+use slug_commands_v2::normalize_bzlmod_environment_value;
+use slug_core_v2::runtime::TerminalOutput;
+use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
+
 fn slug() -> Command {
     Command::new(env!("CARGO_BIN_EXE_slug"))
 }
@@ -719,6 +724,56 @@ fn simple_rule_fixture_enters_the_dice_starlark_runtime_before_analysis() {
     assert!(stderr.contains("\"analyzed_target_count\":1"));
     assert!(stderr.contains("\"declared_action_count\":1"));
     assert!(stderr.contains("\"completed_boundary\":\"dice_starlark_rule_analysis\""));
+}
+
+#[test]
+fn recursive_action_fixture_reports_all_three_actions_without_execution() {
+    let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
+    let request = BuildRequest::parse(&["//parent:parent"]).unwrap();
+    let environment = normalize_bzlmod_environment_value(None).unwrap();
+    let accepted = evaluate_workspace_build_command_with_bzlmod_inputs(
+        &workspace,
+        &request.targets,
+        request.bzlmod_policy,
+        environment,
+        request.lockfile_mode,
+        &request.registry_urls,
+    )
+    .unwrap();
+    let mut outputs = Vec::new();
+    let projected = accepted.project(|terminal| {
+        let evaluation = terminal.as_ref().as_ref().unwrap();
+        outputs.extend(
+            evaluation
+                .analyses()
+                .flat_map(|analysis| analysis.actions())
+                .flat_map(|action| action.outputs())
+                .map(|output| output.path().to_owned()),
+        );
+        TerminalOutput::new(0, String::new(), String::new())
+    });
+    let (_terminal, exit_code, stdout, stderr) = projected.publish().into_parts();
+
+    assert_eq!(exit_code, 0);
+    assert!(stdout.is_empty());
+    assert!(stderr.is_empty(), "{stderr}");
+    assert_eq!(
+        outputs,
+        ["parent/parent.txt", "leaf/second.txt", "leaf/first.txt"]
+    );
+
+    let output = slug()
+        .current_dir(workspace)
+        .args(["build", "//parent:parent", "--unknown_flag"])
+        .output()
+        .unwrap();
+    assert_eq!(output.status.code(), Some(2), "{output:?}");
+    assert!(output.stdout.is_empty());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("\"analyzed_target_count\":1"), "{stderr}");
+    assert!(stderr.contains("\"declared_action_count\":3"), "{stderr}");
+    assert!(stderr.contains("\"completed_boundary\":\"dice_starlark_rule_analysis\""));
+    assert!(stderr.contains("--unknown_flag"));
 }
 
 #[test]
