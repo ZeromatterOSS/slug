@@ -1,52 +1,48 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-cli-test-boundary-design`
+Packet: `WP-10-m8-bazel-cli-library-unit-test-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an exact, implementation-ready boundary for the CLI library unit test
-and its two integration-test binaries over the accepted production graph.
+Result: Bazel 9.2 runs the one in-crate `slug_cli_v2` unit test over the accepted
+production library without entering the blocked integration-runfiles boundary.
 
 ## Goal
 
-Inventory the live `slug_cli_v2` unit and integration tests, their Cargo-only
-compile-time environment, binary and fixture runfiles, external/local deps, and
-daemon/process cleanup needs. Split them into the smallest honest Bazel test
-implementation packets. Do not map tests or edit Rust in this design packet.
+Add exactly one rules_rust unit-test target for `slug_cli_v2` through the
+existing production library target and run it locally. Do not map either CLI
+integration source or any fixture.
 
-## Required design
+## Required implementation
 
-Reconcile `app/slug_cli_v2/Cargo.toml`, `src/**/*.rs`, `tests/cli.rs`, and
-`tests/graph_output.rs` with the accepted `BUILD.bazel`. Freeze target
-ownership, exact `CARGO_BIN_EXE_slug` and `CARGO_MANIFEST_DIR` adaptation,
-fixture/runfile inventory, environment isolation, serial/daemon-sensitive test
-constraints, local and external dependency edges, and validation commands.
-Distinguish the small library-unit target from each integration binary and
-partition implementation if either integration surface cannot fit one bounded
-review packet. Name the later transitive-package test inventory separately.
+Load `rust_test` in `app/slug_cli_v2/BUILD.bazel` and add one private
+`slug_cli_v2_test` with `crate = ":slug_cli_v2"`. Reuse the library's sources,
+edition, dependency graph, and crate-universe resolution through the `crate`
+edge; do not restate or broaden them. Add no data, env, fixture, binary, wrapper,
+test suite, process, daemon, platform, or runfiles adapter.
 
 ## Allowed paths
 
+- `app/slug_cli_v2/BUILD.bazel`
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-## Required validation
+## Required tests and validation
 
-Inspect only the live Cargo manifest, accepted Bazel metadata, CLI test source,
-and referenced repository fixtures. Prove every compile-time env consumer and
-fixture path has one proposed declared Bazel owner. Run documentation, scope,
-cap, archive, credential-pattern, and `git diff --check` gates. No Cargo or
-Bazel build/test command is needed.
+Run Bazel 9.2 with `--ignore_all_rc_files` and the explicit nightly channel for
+`//app/slug_cli_v2:slug_cli_v2_test`. Run serial
+`cargo test -q -p slug_cli_v2 --lib`, a no-repin `bazel mod deps` lock-stability
+check, archive, scope, cap, credential-pattern, formatting, and
+`git diff --check` gates. Record no integration, fixture, or remote evidence.
 
 ## Stop conditions
 
-Stop with REPLAN if exact test adaptation requires rewriting test semantics,
-copying fixtures, using Cargo as a Bazel executor, repository-layout/canonical
-external paths, ambient daemon state, rc/credential inspection, or coupling to
-M2/M5/M6/self-hosting. Do not add BUILD/source/fixture/lock/Cargo changes, test
-targets, WORKSPACE, `.bazelrc`, CI, BuildBuddy/cache/RBE, query, cquery, or
-aquery surface.
+Stop with REPLAN on any Rust/Cargo/lock/fixture/root BUILD change, integration
+source or target, `CARGO_BIN_EXE_slug`, `CARGO_MANIFEST_DIR`, runfiles/data/env
+adapter, test semantic change, rc/credential inspection or consumption, or
+M2/M5/M6/self-hosting coupling. Do not add a WORKSPACE, `.bazelrc`, CI,
+BuildBuddy/cache/RBE, query, cquery, or aquery surface.
 
 ## Diff budget
 
-- Documentation only: at most 560 net lines. No production, test, BUILD, Cargo,
-  lock, fixture, generated-source, CI, or unrelated change.
+- BUILD metadata and documentation: at most 120 net lines. No Rust, Cargo,
+  lock, fixture, generated-source, integration-test, CI, or unrelated change.

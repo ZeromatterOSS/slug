@@ -186,6 +186,61 @@ archive, formatting, diff, scope, and the 444-line handwritten net cap passed.
 Independent reserved review returned `ACCEPT`. No rc, remote, test target,
 generated source, Cargo input, or M2/M5/M6 surface entered the gate.
 
+#### Gate C0 CLI test runfiles design (2026-08-05)
+
+`WP-10-m8-bazel-cli-test-runfiles-design` inventories one library unit case,
+39 cases in `tests/cli.rs`, and three in `tests/graph_output.rs`. Both
+integration crates use compile-time `env!("CARGO_BIN_EXE_slug")`; rules_rust
+0.73 supplies that exact variable automatically when the `slug` binary is in a
+`rust_test.data` edge, preserving its platform extension and runfile-relative
+short path. Both also use compile-time `env!("CARGO_MANIFEST_DIR")` to reach
+repository fixtures. A literal `rustc_env` value `app/slug_cli_v2` would retain
+the Cargo-relative `../../tests/...` spelling under Bazel's test runfiles root;
+an absolute compile-sandbox path is rejected. Windows additionally requires a
+real runfiles tree rather than manifest-only lookup, as pinned by rules_rust's
+own `CARGO_MANIFEST_DIR` test boundary.
+
+The fixture owner is not implementable under the packet's frozen constraints.
+The CLI tests reference exactly these 14 existing workspaces and 163 files:
+
+| Files | Fixture workspace |
+|------:|-------------------|
+| 4 | `simple-rule-action` |
+| 7 | `recursive-custom-rule-providers-actions` |
+| 6 | `build-file-loading` |
+| 4 | `query-parser-and-sets` |
+| 21 | `tests-query-expansion` |
+| 30 | `query-visible-visibility` |
+| 26 | `query-build-load-files-provenance` |
+| 10 | `query-siblings-build-file-node` |
+| 12 | `query-loading-thin-vertical` |
+| 11 | `query-labels-attribute-metadata` |
+| 10 | `query-executables-rule-capability` |
+| 13 | `query-rdeps-and-subtree-patterns` |
+| 4 | `query-path-topology` |
+| 5 | `query-some-selection` |
+
+Those files span 105 nested Bazel packages. Root `glob`/`filegroup` ownership
+cannot cross them, and the explicit Bazel 9.2 source-directory alternative was
+discriminated in an isolated scratch module: exporting a workspace directory
+analyzed, but an action traversing it failed because the directory artifact
+crossed into the first nested package. A local runfiles tree can instead expose
+such a directory as one recursive symlink, but Bazel 9.2's `Artifact` source
+documents that source-directory access has no declared Skyframe dependencies,
+is not incrementally invalidated, and is not a supported remote input. It is
+therefore not hermetic evidence. Package-local exports would edit oracle BUILD
+inputs and add query-visible targets; copying/archiving, undeclared repository
+reads, Cargo execution, ambient source paths, or a Windows-only runfiles flag
+would violate the frozen semantics. Therefore the two integration targets
+remain `REPLAN` until a deliberate fixture-ownership or test-runfiles semantic
+redesign is accepted; no partial target or platform exclusion is claimed.
+
+The library unit test is independent of every blocked env/runfile boundary.
+`WP-10-m8-bazel-cli-library-unit-test-implementation` adds exactly one
+`rust_test(crate = ":slug_cli_v2")` and proves it with focused Bazel and Cargo
+library-test commands. After that bounded target, inventory the other 13 V2
+packages separately while the CLI integration redesign remains explicit.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
