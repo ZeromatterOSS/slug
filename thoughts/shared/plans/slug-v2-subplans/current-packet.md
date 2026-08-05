@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-6`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-7`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Result: implement the closed context-free native value/default/cache kernel for
@@ -60,6 +60,29 @@ reviewer must compare every binding with the accepted attachment, registry,
 and family ledgers before Phase 2. The matrix must remain direct enough that
 Phase 2 only supplies private implementations and removes the temporary
 compile gate—no invented helper semantics or production before acceptance.
+
+Retry 6 was discarded after terminal production review. Its independently
+accepted 1,155-line matrix and 677-line private implementation passed 13 tests,
+crate/check/format/GNU-Windows/archive gates, but the latest-diff audit exposed
+five new material contradictions: list-valued occurrences ignored
+`allow_multiple`; Dotted descriptions were lowercase-only; timeout used one
+literal rejection instead of the accepted `.limit(6)` grammar and treated
+malformed values as fallback; total-`u64` nanoseconds did not preserve Java
+signed-long duration range; and Fission case-folded the exact `yes`/`no`
+specials. The whole seven-file diff was discarded.
+
+Retry 7 restores the same root-owned test-only Phase 1 and Terra review-only
+gate, reusing every retry-6 binding and behavioral discriminator. Before
+acceptance, add direct tests that nonrepeat AllowComma/StringSet/Fission/
+EmptyList return scalar `NativeValue::List` while only repeat comma occurrences
+return `NativeOccurrence::List`; uppercase `A` and `A_internal` are valid
+Dotted descriptive early stops; timeout implements the general `.limit(6)`
+split/arity/decimal-validation path with fallback only for successfully parsed
+nonpositive entries; duration uses Java signed-long input bounds and a
+seconds-plus-nanos representation that admits large valid values without total
+nanosecond overflow; and only exact lowercase Fission `yes`/`no` are special,
+so `YES`/`No` reject through compilation-mode conversion. Independent review
+must accept those tests before any production edit.
 
 Implement one closed `NativeValue` algebra, source-default materializer,
 per-occurrence converter, and exact Java cache projection inside
@@ -137,5 +160,5 @@ surrogate or lossy conversion, Host/repository/loading context, command-layer
 behavior including repeat merging, whole P/C/T normalization, runtime registry/interner/hash, new
 identity issue, dependency/lockfile expansion, cap breach, a production edit
 before test-matrix review, or any new material correction beyond the frozen
-retry-2/3/4/5 set above. Defer normalization, checksum/wire integration, DICE, downstream
+retry-2/3/4/5/6 set above. Defer normalization, checksum/wire integration, DICE, downstream
 activation, and user-approved later configured-target dependency cycles.

@@ -3477,6 +3477,44 @@ Terra writer implement the private kernel. Any new material correction is
 downstream, and user-approved configured-target-cycle deferrals remain
 unchanged.
 
+### Pure native kernel retry 6 REPLAN (2026-08-05)
+
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-6` completed its
+serial gate but failed terminal production review. Root built a 1,155-line
+test-only matrix that actively bound every 287 attachment's ordinal and exact
+registry tuple to its family, route, materialized outcome, and cache bytes,
+retained exact 8/5/41 exclusions, and covered the private behavior surface.
+Independent Terra review accepted it after bounded test-only corrections. One
+authorized Terra writer then supplied 677 production lines; all 13 tests,
+crate check, formatting, GNU-Windows no-run, archive, scope, cap, and diff gates
+passed.
+
+Latest-diff review nevertheless found five new material contradictions. The
+converter returned occurrence lists for all list-valued families instead of
+distinguishing nonrepeat scalar lists from repeat expansion lists. Dotted
+descriptive matching rejected uppercase despite its case-insensitive pattern.
+Timeout special-cased one rejected string instead of implementing the accepted
+`.limit(6)` split/arity/decimal-validation grammar and incorrectly defaulted
+malformed entries. Total `u64` nanoseconds both admitted inputs beyond Java
+signed-long parsing and rejected or overflowed valid large Java durations.
+Fission case-folded exact `yes`/`no` specials, admitting `YES`/`No`. Root
+discarded the entire unaccepted seven-file diff; HEAD returned cleanly to
+`875b4006`.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-7` with the same
+seven-file and 1,550 production/1,250 test/2,800 total caps. Restore the
+accepted retry-6 matrix under the same root-owned Phase-1/Terra-review gate and
+add direct discriminators for all five failures before production: repeat-bit
+occurrence shape; uppercase Dotted descriptive early stop; general `.limit(6)`
+timeout splitting with malformed rejection and nonpositive-only fallback;
+Java signed-long parsing plus seconds/nanos retained duration range; and exact
+case-sensitive Fission specials. Only after independent acceptance may one
+Terra writer implement the private kernel. Any new material correction is
+`REPLAN`; all contextual, command, normalization, checksum/wire, DICE,
+downstream, and user-approved configured-target-cycle deferrals remain
+unchanged.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
