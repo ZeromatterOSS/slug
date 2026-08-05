@@ -4317,6 +4317,58 @@ fixtures, probes, artifacts, DICE, driver, bridge, or configured-target work;
 REPLAN or Unsupported any unprovable/JVM-delegation boundary without user
 approval.
 
+### Process Host native-capture source boundary evidence REPLAN (2026-08-05)
+
+`WP-6-m2-process-host-native-capture-source-boundary-evidence` is terminal
+**REPLAN/Unsupported**. Bazel 9.2 is pinned at
+`8220c6198837d5c13d53fea211cf3282aa12408a`: `OS.java:48,67-85` reads
+`blaze.os` before `os.name`, `CPU.java:46,55-65` reads `os.arch`, and
+`OptionsUtils.java:169-174` reads `user.home` for every eligible conversion.
+The actual oracle is Zulu `25.0.2+10`. Its closest official upstream source is
+`jdk25u` tag object `935ed5353de37bad0b021a5df15e30e8db7de2fd`, peeled commit
+`405a5699ebd097464ed3fc9345414b0774a2edc9`; no Azul artifact-to-source,
+patch-set, or VM-flag mapping is proven.
+
+That upstream has VM/`-D` values before platform defaults
+(`SystemProps.java:64-75,104-111,284-322`), a mutable/replaced property table
+(`System.java:711-815`), and platform-string conversion
+(`System.c:79-89,115-139,210-214,240-249`; `jni_util.c:819-835`). Java strings
+can retain arbitrary UTF-16 code units (`String.java:273-320`). Therefore no
+environment, `uname`, home helper, `sysconf`, `/proc`, or cgroup-file backend
+can reconstruct the JVM-observable properties. JDK 25 removed the
+SecurityManager property callback: fixed-key property reads have no Java 21
+security-error branch, so none is claimed here.
+
+`LocalHostResource.java:23-38` initializes RAM then CPU once; its physical or
+container memory is divided as a Java `double`. `Runtime.availableProcessors`
+depends on VM configuration including `ActiveProcessorCount`,
+`UseContainerSupport`, affinity, cgroup quota/cpuset and mount discovery,
+short-lived caches, and platform fallbacks. External Rust lacks the selected
+VM flags and vendor provenance, making an exact cross-platform backend
+unbounded. `LocalHostResource` first failure is an erroneous class;
+`LocalHostCapacity.java:28-55` assigns only after get/log success, and
+`ResourceConverter.java:51-54` performs later `ceil`/narrowing. The current
+`after_resource` callback is only a private owner publication/test seam, never
+a native fact.
+
+JLS 25 §12.4.2 requires same-thread recursive initialization to complete
+normally and distinguishes initiating failure from later erroneous reuse. The
+current private `SameThreadReentry` and fallible `after_resource` differ from
+that parity, but production has only the non-reading `UnsupportedSource`, so
+neither is reachable nor a native mapping. Do not expose, correct, or schedule
+them now. A future callback or fallible post-step first requires an owner
+correction design. Keep `ProcessHostOwner` non-reading and Unsupported; the
+user-approved configured-target-cycle deferral remains unchanged.
+
+Run next only `WP-6-m2-repository-label-conversion-route-split-design`,
+docs-only. Detach the 41 supplied repository/package-label routes from the
+terminal five Host routes using accepted `LabelConversionContext` and
+`ResolvedOptionLabel`, and decide a bounded label-only converter successor.
+Add no Rust, Cargo, fixtures, source lookup, Host/capture, DICE, command,
+normalization, checksum, wire, configured-target, loader, or new-context work.
+Stop with REPLAN on Host/capture dependence, a new context/loader, a reverse
+edge/cycle, or violation of conversion-before-normalization.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the

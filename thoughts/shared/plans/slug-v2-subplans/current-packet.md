@@ -1,28 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-process-host-native-capture-source-boundary-evidence`
+Packet: `WP-6-m2-repository-label-conversion-route-split-design`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: docs/source-evidence-only native process-host capture boundary.
+Result: docs-only label-route split and bounded successor decision.
 
 ## Goal
 
-Pin the exact bounded Rust equivalence contract for Bazel/HotSpot native
-process-host capture before any implementation.
+Detach the 41 supplied repository/package-label routes from the terminal five
+Host routes, then decide the bounded label-only converter successor.
 
 ## Required design record
 
-Establish property precedence, mutation, and lossless platform strings; OS/CPU/
-path-policy class initialization and failures; physical-memory,
-available-processor, container/cgroup semantics; and RAM-before-CPU,
-post-completion timing on every supported platform. Decide exact native source
-APIs and error/latching mappings.
+Use the accepted `LabelConversionContext` and `ResolvedOptionLabel` boundary to
+partition the 41 supplied label routes without adding a context, loader, or
+Host/capture dependency. Preserve conversion before normalization and decide
+whether a bounded label-only converter can own the successor.
 
-This is source evidence only. It authorizes no Rust, Cargo, fixtures, probes,
-artifacts, DICE, driver, bridge, or configured-target work. Stop with REPLAN or
-Unsupported on any unprovable boundary or need for JVM/delegation; user approval
-for that architecture is absent. The user-approved configured-target-cycle
-deferral remains unchanged.
+This is design-only. It authorizes no Rust, Cargo, fixtures, source lookup,
+Host/capture, DICE, command, normalization, checksum, wire, or configured-target
+work. Stop with REPLAN on a Host/capture dependency, a new context or loader,
+a reverse edge/cycle, or violation of conversion-before-normalization. The
+user-approved configured-target-cycle deferral remains unchanged.
 
 ## Allowed paths
 
@@ -32,17 +31,18 @@ deferral remains unchanged.
 
 ## Required tests and validation
 
-Pin source anchors and complete platform/lifetime/error evidence. Run archive,
+Record the 41-versus-five route split and successor decision. Run archive,
 scope, cap, no-Cargo, and `git diff --check` gates.
 
 ## Stop conditions
 
-Do not edit Rust or Cargo, create probes/artifacts, add capture, driver, bridge,
-DICE, command/configured-target behavior, fixtures, or generated output. Stop
-and REPLAN or Unsupported on an unprovable native/JVM boundary.
+Do not edit Rust or Cargo, create probes/artifacts, add source discovery,
+Host/capture, DICE, command, normalization, checksum, wire, configured-target
+behavior, fixtures, or generated output. Stop and REPLAN on the listed boundary
+violations.
 
 ## Diff budget
 
-- Documentation: at most 180 net lines.
-- Total: at most 180 net lines; no Rust, Cargo, fixture, generated, baseline,
+- Documentation: at most 140 net lines.
+- Total: at most 140 net lines; no Rust, Cargo, fixture, generated, baseline,
   or unrelated changes.
