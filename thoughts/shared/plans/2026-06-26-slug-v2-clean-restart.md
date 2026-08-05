@@ -25,7 +25,7 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active** | recursive configured analysis, bounded root cquery in `135b0567`, implicit empty-default normalization in `7c6eeae5`, and internal string build-setting transitions in `dfc1705e` | exact toolchain registration/selection ownership, then general identity and action gates | run `WP-6-m2-positive-first-compatible-toolchain-oracle` |
+| M2: analysis graph | **active** | recursive configured analysis, bounded root cquery in `135b0567`, implicit empty-default normalization in `7c6eeae5`, internal string build-setting transitions in `dfc1705e`, and first-compatible toolchain evidence in `ed4baf08` | root registration retention, native toolchain declarations, real DICE selection/context ownership, then general identity and action gates | implement `WP-6-m2-root-toolchain-registration-retention-implementation` |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while M2 toolchain evidence is current |
 | M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-6-m2-positive-first-compatible-toolchain-oracle`.
+`WP-6-m2-root-toolchain-registration-retention-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -71,9 +71,16 @@ implicit empty default. The active positive oracle now pins that normalization
 as `d4e7e47e`; the accepted one-function decoder design now restores Bazel's
 implicit empty default while preserving Slug's strict collection invariant.
 That decoder is accepted in `7c6eeae5`, so the internal transition
-implementation is accepted in `dfc1705e`. The next positive-only oracle now
-pins first-compatible execution-platform/toolchain selection before any dormant
-resolver integration; invalid transition diagnostics remain deferred.
+implementation is accepted in `dfc1705e`. The positive-only toolchain oracle
+is accepted in `ed4baf08`; it pins first-compatible execution-platform and
+toolchain selection through provider markers without exposing configuration,
+platform, toolchain, path, or action identity. Reserved review accepted a
+serial prerequisite before native loading and resolution: retain only guarded
+direct root registration labels in semantic MODULE evaluation order, preserve
+the existing root `dev_dependency` policy, and expose them through the existing
+Need-aware loading anchor without a digest or new DICE key. That bounded
+registration-retention implementation is current; invalid transition and
+toolchain failure diagnostics remain deferred.
 
 The retained Bazel 9.2 evidence pins default and explicit `label` output to the
 same `//parent:parent (a7a71fd)` bytes. Pinned source and live audits prove even

@@ -1,77 +1,55 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-positive-first-compatible-toolchain-oracle`
+Packet: `WP-6-m2-root-toolchain-registration-retention-implementation`
 Milestone: M2 successful toolchain/platform selection
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: rewrite one dormant scaffold as an exact Bazel 9.2 positive oracle
-Predecessor: accepted internal string build-setting transition implementation
-`dfc1705e`.
+Role: retain ordered direct root MODULE registrations through the existing
+Need-aware loading anchor
+Predecessor: accepted first-compatible Bazel 9.2 toolchain oracle `ed4baf08`.
 
-Rewrite exactly the six files under
-`tests/v2_oracle/fixtures/toolchain-resolution-first-platform/`:
-`fixture.toml`, generated `expected/oracle.json`, and workspace
-`MODULE.bazel`, `BUILD.bazel`, `defs.bzl`, and new `cquery_format.bzl`. The
-existing fixture is ungenerated action-based scaffolding and is not protected
-evidence. Do not edit Rust, Cargo, the harness, another fixture, commands, or
-plans in the evidence worker.
+Implement the accepted serial prerequisite only:
 
-Model exactly:
+1. Add `RootModuleRegistrations` to `EvaluatedRootModule`, with separate
+   immutable ordered execution-platform and toolchain label slices and slice
+   accessors.
+2. Record root `register_execution_platforms` and `register_toolchains` calls
+   in exact argument and call order, with no sort or deduplication.
+3. Retain a dev registration exactly when
+   `!dev_dependency || !ignore_dev_dependency`, using the existing root command
+   policy and ordering validation.
+4. Fail closed before retention unless each argument is a direct absolute
+   apparent label. Reject recursive, package-wide, and wildcard patterns
+   locally; do not extend or depend on target-pattern expansion.
+5. Freeze evaluator-local vectors into the semantic root-module value and
+   expose registrations through the existing `RootModuleLoadingAnchor` only.
 
-1. one fixture-local constraint setting with mutually exclusive `first` and
-   `second` values;
-2. two execution platforms carrying those values, registered in explicit
-   order while the host platform matches neither;
-3. one mandatory toolchain type and two registered toolchains, each compatible
-   with exactly one execution platform;
-4. two Starlark toolchain implementations returning
-   `platform_common.ToolchainInfo(marker = <attribute value>)`; and
-5. one probe rule declaring that toolchain type and returning only
-   `ProbeInfo(marker = ctx.toolchains["//:demo_type"].marker)`.
+Required tests prove exact multi-call order, root and apparent-repository label
+retention, non-string/relative/pattern rejection without claiming public
+diagnostic parity, default→ignore→restore dev policy, registration order
+A→B→A restoration, unchanged warm structural equality, Host-only event
+ownership, and the anchor's existing sole dependency.
 
-The fixture-local cquery Starlark formatter reads only the exact
-`//:defs.bzl%ProbeInfo` key and emits
-`label=@@//:probe provider=ProbeInfo marker=<value>`. It must not enumerate
-providers or print configuration, platform, toolchain label, action, or path
-identity.
+Production allowlist:
 
-Record exactly six successful commands against one retained Bazel 9.2 server:
+- `app/slug_bzlmod_v2/src/module_eval.rs`
+- `app/slug_bzlmod_v2/src/host_module.rs`
+- `app/slug_bzlmod_v2/src/lib.rs`
 
-1. the initial execution-platform registration order selects `first`;
-2. an unchanged warm replay is byte-identical `first`;
-3. mutating only `register_execution_platforms` order selects `second`;
-4. restoring that order selects `first`;
-5. mutating only the first toolchain implementation marker in `BUILD.bazel`
-   yields `edited-first`; and
-6. restoring the marker yields `first` again.
+Test allowlist additionally permits:
 
-Every row uses `cquery //:probe --output=starlark` with the fixture formatter,
-exits zero, and has exact stdout/stderr. Every row must retain zero actions and
-no output or manifest observation.
+- inline tests in `app/slug_bzlmod_v2/src/host_module.rs`
+- `app/slug_bzlmod_v2/tests/root_module_dice.rs`
 
-Pin Bazel 9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-sources for `ModuleFileGlobals#registerExecutionPlatforms`, registered
-execution platforms and toolchains functions,
-`PlatformKeys#findExecutionPlatformKeys`, single/multi-toolchain constraint
-resolution and candidate selection, `ResolvedToolchainContext#load`, Starlark
-rule/toolchain context exposure and indexing, `ToolchainInfo`, and the cquery
-Starlark formatter. Generate and no-update replay with `/usr/bin/bazel` 9.2;
-run fixture list, JSON, inventory/cap, provenance, credential-pattern,
-archive, and diff checks and obtain independent fixture review.
+Caps are 220 formatted production net lines, 300 test lines, and 520 total.
 
-Caps are exactly six regular files, zero links, 220 authored non-generated
-lines, 500 total generated lines, and six commands. Rewriting this named
-dormant scaffold is the bounded hygiene action for the demonstrated Stage 6
-gap; add no aggregate fixture breadth.
+Stop and return `REPLAN` for pattern expansion, external repository
+materialization or mapping, command-line registrations, registered target
+loading, native platform/toolchain declarations, constraint resolution,
+`ToolchainInfo`, `ctx.toolchains`, configuration checksum/display changes,
+public cquery or formatter behavior, actions, REAPI, a new DICE key, a digest
+bridge, or process-global state. Direct-local MODULE dependency cycles remain
+the user-approved unsupported boundary for later.
 
-Stop if any successful output exposes a configuration token, configured path,
-platform/toolchain label, action key, mnemonic, action, output, or manifest; if
-selection order cannot be proved solely by the semantic provider marker; or if
-the packet needs host fallback, aliases, optional or multiple toolchain types,
-target constraints, exec groups, execution properties, missing-toolchain
-diagnostics, command-line registration, external repositories, public Slug
-cquery, native option identity, Rust, execution, aquery, REAPI, another graph,
-direct filesystem discovery, or process-global registration state.
-
-After acceptance, design the exact root registration, native declaration,
-real DICE resolution, and prepared `ctx.toolchains` ownership before
-authorizing Rust.
+After acceptance, design the next serial owner for the fixture-bounded native
+constraint/platform/toolchain declarations before real DICE resolution and
+prepared `ctx.toolchains` ownership.

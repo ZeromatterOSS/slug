@@ -1145,3 +1145,58 @@ registered toolchain marker edit/restoration. It must expose no configuration,
 platform label, action, output, or diagnostic identity. After acceptance,
 design root registration, native declarations, DICE resolution, and prepared
 toolchain context ownership before Rust.
+
+### First-compatible toolchain oracle acceptance (2026-08-04)
+
+**Status: ACCEPTED at `ed4baf08`.** The rewritten Bazel 9.2 fixture has six
+regular files, zero links, six successful retained-server commands, 161
+authored lines, and 381 generated-plus-authored lines. Provider-only cquery
+observes `first`, unchanged warm `first`, registration-order `second`, restored
+`first`, BUILD-marker `edited-first`, and restored `first`. All rows exit zero,
+retain empty manifests and zero actions, and expose no configuration, platform,
+toolchain label, path, output, action key, or mnemonic.
+
+Generation and two no-update replays pass with Bazel 9.2.0 at pinned commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`. Inventory, caps, provenance,
+credential-pattern, whitespace, archive, and diff checks pass; independent
+latest-diff review returned `ACCEPT`. Pinned source establishes ordered root
+registration, earliest candidate selection, constraint filtering, selected
+implementation loading, and `ctx.toolchains` exposure. Failure diagnostics,
+patterns, external registrations, host fallback, aliases, optional or multiple
+types, target constraints, exec groups, actions, and public Slug cquery remain
+outside the evidence.
+
+### Root toolchain registration-retention design (2026-08-04)
+
+**Status: ACCEPTED as a serial semantic prerequisite.** Add one compact
+`RootModuleRegistrations` value to `EvaluatedRootModule`: separate ordered
+`Arc<[ApparentLabel]>` slices for execution platforms and toolchains, frozen
+from evaluator-local vectors. Root `register_execution_platforms` and
+`register_toolchains` retain argument and call order without sorting or
+deduplication, use the existing root command policy to retain a dev registration
+iff `!dev_dependency || !ignore_dev_dependency`, and set the existing
+`non_module_called` ordering flag.
+
+The retention boundary is direct-label-only and fail-closed. A minimal local
+guard rejects recursive, package-wide, and wildcard target patterns before
+`ApparentLabel::parse`; pattern expansion is deferred. Derived structural
+equality carries registration order through root evaluation, files, graph, the
+Host carrier, and the existing Need-aware `RootModuleLoadingAnchorKey`. The
+anchor gains only a slice-value accessor. There is no registration digest, new
+DICE key, global state, mapping rewrite, target loading, resolver, or public
+surface. A→B→A order restoration, unchanged warm equality, exact multi-call
+order, direct apparent labels, fail-closed invalid inputs, the default→ignore→
+restore dev policy, sole Host event ownership, and the anchor's existing single
+dependency are the required evidence.
+
+Implement next only
+`WP-6-m2-root-toolchain-registration-retention-implementation`. Production may
+edit only `module_eval.rs`, `host_module.rs`, and `lib.rs`; tests may additionally
+edit `tests/root_module_dice.rs` and inline `host_module.rs` tests. Caps are 220
+formatted production net lines, 300 test lines, and 520 total. Return `REPLAN`
+for pattern expansion, external materialization/mapping, command-line
+registrations, native target loading/declarations, constraint selection,
+`ToolchainInfo`, `ctx.toolchains`, configuration identity, public formatting,
+actions, REAPI, a new DICE key/digest, or process-global state. Direct-local
+MODULE dependency cycles remain the user-approved unsupported boundary for a
+later packet.
