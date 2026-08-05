@@ -1,102 +1,81 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-option-label-context-identity-retry`
+Packet: `WP-6-m2-host-input-observation-contract-design`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: retain exact non-visible repository identity and add the distinct,
-mapping-provenance-free resolved option-label value plus its closed three-mode
-parser in `slug_identity_v2`.
+Result: docs-only design for the smallest supplied immutable Host observation
+contract needed by the five accepted Host-context native option routes.
 
-Predecessors are authoritative: the live identity APIs, the accepted
-Host/repository context design, the stopped first attempt, and the accepted
-non-visible repository identity/source-order design. Reuse pinned Bazel 9.2
-`RepositoryMapping#get`, `RepositoryName`, `SpellChecker`, label option
-conversion, and natural-order behavior. Add no oracle or fixture.
+Predecessors are authoritative: the accepted 287/8/5/41 partition, private
+pure native kernel, two-context Host/repository design, and option-label seam
+in `b035dfbb`. The five Host descriptors remain `cpu`, `host_cpu`,
+`shell_executable`, `platform_mappings`, and `default_test_resources`. Add no
+Rust, probe, fixture, converter, or runtime behavior.
 
-Phase 1 is tests and private scaffolding only. Before production behavior,
-activate direct tests for:
+Pin exact Bazel 9.2/JDK source contracts for:
 
-- existing `RepositoryMapping::resolve`, mapping equality, `CanonicalLabel`
-  provenance equality/hash/order/rendering/stable serialization, and live label
-  parsing remaining unchanged;
-- mapped same-result/different-mapping-ID and different-result cases;
-- unmapped same-apparent main/package owners, unmapped versus direct visible
-  canonical, first-round one-`@` canonical versus second-round apparent lookup,
-  and explicit `@//` versus unqualified `//`;
-- exact non-visible rendering with no suggestion and with
-  ` (did you mean '<candidate>'?)`;
-- source-order tie candidates `baa, aab` for missing `aaa`, and the reversed
-  order, proving first-wins suffix/identity while mapping content equality is
-  unchanged;
-- lawful structural equality/order/hash versus the separate Bazel-natural
-  comparison that may return equal for unequal visible/non-visible or
-  different-owner values; use Java UTF-16 order; and
-- the accepted first-round/main-repository/package grammar matrix: First/Main
-  prepend `//` only when input starts with neither `/` nor `@`, so `pkg/t:bin`
-  becomes root `//pkg/t:bin`, `:bin` is root package, and bare `bin` is
-  `//bin:bin`; Package instead resolves `:bin` and bare `bin` in its base and
-  rejects `pkg/t:bin`; Package `//tools:bin` uses its current repository except
-  special `//conditions:default`, which is main; mapping modes resolve
-  apparent `@repo` (including shorthand), while direct `@@repo` bypasses the
-  mapping and FirstRound treats one-`@` as a visible literal; reject leading
-  single `/`, triple-dot package forms, and invalid repository names.
+- the finite OS/CPU inputs and legacy `AutoCpuConverter` tokens used when
+  `cpu` or `host_cpu` is empty;
+- Host CPU and RAM observation APIs, units, rounding/ceil timing, and the
+  doubles supplied to `HOST_CPUS`/`HOST_RAM` resource expressions;
+- valid-Unicode `user.home`, the exact input-starts-`~/` trigger, and the
+  source replace-all-`~` behavior before lexical path normalization; and
+- the finite lexical Host path policy required by `shell_executable` and
+  workspace-relative `platform_mappings`, without filesystem access.
 
-Independent latest-test review gates Phase 2. Production then:
+Audit live Slug crate dependencies and every one-shot/daemon request assembly
+path that could produce, carry, or consume the snapshot. Decide one lowest
+lawful public owner and a one-way producer -> core request -> configuration
+consumer handoff. `slug_configuration_v2` is currently an isolated leaf while
+`slug_core_v2` owns request/DICE assembly without a configuration dependency;
+the design must not assume a new reverse edge or hide Host IO in configuration.
 
-1. Retain final unique repository-mapping keys in insertion order beside the
-   existing `BTreeMap`; replacement keeps first position. Preserve `resolve`
-   exactly and implement mapping equality over the existing ID plus entry
-   contents only, ignoring candidate order.
-2. Add an option-only lookup that returns mapped visible identity or exact
-   non-visible requested/owner/did-you-mean-suffix identity. Port only the
-   source spellchecker path: Java-compatible lowercase/UTF-16 length and
-   bounded Levenshtein, strict-better first-wins traversal in retained order,
-   and exact suffix formatting.
-3. Add the distinct resolved option-label value and closed parser modes:
-   `FirstRoundCanonical`, `MainRepository { mapping }`, and
-   `Package { base_package, mapping }`. Main supplies root owner; Package uses
-   `base_package.repo()`; direct `@@` and first-round canonical results are
-   visible. Preserve explicit apparent-root syntax through lookup.
-4. Give the new label lawful structural `Eq`/`Ord`/`Hash`, `Allocative`, exact
-   canonical/unambiguous rendering, and a separate non-key
-   `bazel_natural_cmp`. Do not implement `StableSerialize`; checksum/wire is
-   deferred. Preserve `CanonicalLabel` and every existing identity API.
+Freeze one structural retained shape equivalent to:
 
-The parser consumes supplied facts only. It does not load a package,
-materialize/discover a repository, access a filesystem, parse a command prefix,
-or construct a configuration/target. Repository-use failure and its later
-`No repository visible...` diagnostic remain deferred.
+```text
+HostConversionInputs {
+  os, cpu, host_cpus, host_ram_mb,
+  host_path_policy, user_home_unicode,
+}
+```
+
+Specify field types, invalid/unsupported boundaries, structural
+equality/order/hash, `Allocative`, Arc sharing/clone cost, and whether capture
+occurs once per process, daemon lifetime, or request. One-shot and daemon modes
+must receive structurally equivalent supplied snapshots for the same observed
+Host; a converter may not reread process state. `Dupe` is allowed only for an
+Arc-backed wrapper, not for deep snapshot clones. Add no global, cache,
+interner, map, descriptor registry, or DICE key.
+
+Return the smallest bounded implementation sequence or `REPLAN`. Separate the
+pure retained schema from any later producer/request wiring if their owners or
+validation differ. Contextual native conversion remains later.
 
 Allowlist:
 
-- `app/slug_identity_v2/src/lib.rs`
-- `app/slug_identity_v2/src/label.rs`
-- `app/slug_identity_v2/src/repo_mapping.rs`
-- `app/slug_identity_v2/tests/label_roundtrip.rs`
-- terminal scheduling only:
-  `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
-  `thoughts/shared/plans/slug-v2-subplans/current-packet.md`, and
-  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
 - routing only on `REPLAN`:
   `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
   `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Caps: 850 formatted production, 550 test, and 1,400 total net lines. Add no
-dependency, Cargo/lockfile change, generated source, second runtime map/cache,
-global, interner, fixture, or oracle. Reuse existing owned repository/name
-strings and `BTreeMap`; one ordered key vector is the accepted retained cost.
-No `Dupe` or per-label `Arc`.
+Caps: 360 net documentation lines and 420 total changed lines. No Rust, test,
+Cargo/lockfile, dependency, fixture, oracle run, Host probe, generated source,
+filesystem/environment read, serializer/wire, DICE, loading/materialization,
+configuration conversion, target, command-tokenization, or downstream
+activation edit.
 
-Validation: Phase-1 focused test compile/run and independent latest-test
-review; then formatting, serial `cargo test -p slug_identity_v2`, direct
-dependent compile checks for the public seam, applicable GNU-Windows no-run,
-`scripts/v2_archive_status.sh`, `git diff --check`, exact scope/cap checks, and
-independent latest-diff review.
+Acceptance requires exact pinned source anchors, a live dependency/owner audit,
+one immutable representation/capture policy, retained-cost rules, direct future
+one-shot/daemon discriminators, and bounded implementation allowlists/caps/
+validation/stops. Independent latest-text review is mandatory.
 
-Stop and `REPLAN` on source-order loss, source spellchecker ambiguity, a change
-to existing visible mapping/label behavior or stable serialization, a required
-package parser/loading call, repository materialization/discovery, dependency
-or lockfile expansion, cap breach, DICE, filesystem/Host access, configuration
-or target construction, command tokenization, any dependency cycle, or any
-configured-target edge. Configured-target dependency cycles remain explicitly
-deferred by user approval.
+Stop and `REPLAN` if source cannot close the OS/CPU/RAM/home contract without
+executing a Host probe; if the selected owner requires a core/configuration
+cycle, new shared crate, or unapproved dependency; or if exact capture requires
+filesystem/env IO, a DICE producer, daemon lifecycle mutation, configuration
+conversion, repository/package loading, command tokenization, wire/checksum,
+target construction, any dependency cycle, or any configured-target edge.
+Configured-target dependency cycles remain explicitly deferred by user
+approval.

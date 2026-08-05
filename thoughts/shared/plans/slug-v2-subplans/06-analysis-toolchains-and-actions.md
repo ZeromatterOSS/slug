@@ -3845,6 +3845,37 @@ package, add a dependency/lockfile, serialize configuration wire, or introduce
 a loading/configuration/target/DICE/configured-cycle edge. Configured-target
 dependency cycles remain explicitly deferred by user approval.
 
+### Option-label context identity retry implementation (2026-08-05)
+
+**Decision: ACCEPT.** Commit `b035dfbb` adds the public
+`OptionLabelContext`/`ResolvedOptionLabel` seam inside `slug_identity_v2` while
+keeping its visible/non-visible repository variant private. Mapping IDs do not
+enter the new label identity. Existing `CanonicalLabel`, stable serialization,
+and `RepositoryMapping::resolve` behavior are unchanged.
+
+`RepositoryMapping` now retains final unique keys in insertion order beside its
+existing `BTreeMap`; replacement preserves first position, while manual mapping
+equality still uses only ID and entries. The option-only raw-string lookup uses
+that order for the exact strict-better Bazel spellchecker path and returns the
+three-field non-visible requested/owner/suffix identity on a miss. This closes
+mapped, unmapped, apparent-root, direct-canonical, first-round, package-relative,
+special-main-package, exact repository/package validation, target-triple-dot,
+rendering, structural-order, and Java UTF-16 natural-order discriminators.
+
+The four-file change is 365 production, 447 test, and 812 total net lines.
+Twenty crate tests, direct dependent checks, GNU-Windows no-run, formatting,
+archive, scope, cap, and diff checks pass. Independent Terra source and
+representation reviews returned `ACCEPT` after the test-first gate and bounded
+validation/triple-dot corrections. No dependency, lockfile, serializer, DICE,
+loading/materialization, configuration, target, command, or configured-cycle
+edge was added.
+
+Run next only `WP-6-m2-host-input-observation-contract-design`, docs-only.
+Freeze the smallest supplied immutable Host snapshot, exact capture timing, and
+one-way ownership/dependency handoff before adding any Host observation or
+contextual converter. Configured-target dependency cycles remain explicitly
+deferred by user approval.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
