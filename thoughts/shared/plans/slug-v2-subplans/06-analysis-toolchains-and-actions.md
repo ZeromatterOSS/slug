@@ -1604,3 +1604,47 @@ platform discriminator, protected-fixture edits, unstable identity treated as
 a constant, any Slug command/wire/DICE/formatter change, REAPI reuse,
 execution/cache/materialization work, broader action kinds or exec groups, or
 cap breach.
+
+### Action-query identity evidence accepted (2026-08-04)
+
+Commit `f00e99db` accepts `WP-6-m2-action-query-identity-evidence` as one
+isolated five-file Bazel 9.2 fixture at 227 authored lines. Its 18 commands are
+nine immediately paired text/jsonproto states in one retained server:
+configuration `C0 -> C1 -> C0`, default execution platform `P0 -> P1 -> P0`,
+FileWrite content A-to-B-to-A, and declared output path A-to-B-to-A. The
+protected recursive action-ownership fixture is unchanged.
+
+The evidence separates the four identity domains. Changing compilation mode
+changes the full BuildOptions checksum and `bazel-out` configuration root but
+leaves the FileWrite ActionKey unchanged. Changing the selected default-
+exec-group platform changes that platform and the ActionKey while preserving
+configuration and output. Changing content changes only the ActionKey.
+Changing the declared output name changes the configured artifact path but
+leaves the ActionKey unchanged. Every restoration returns exact baseline
+text and structured fields, and each text/jsonproto pair agrees.
+
+Pinned Bazel 9.2 source confirms the ownership: `BuildOptions` supplies the
+configuration checksum; `BuildConfigurationValue` and `OutputDirectories`
+derive configured roots; Starlark FileWrite construction takes the default
+exec-group `RuleContext` action owner; `ActionKeyComputer` fingerprints the
+selected execution platform after action-specific material; and
+`FileWriteAction#computeKey` fingerprints its GUID, executable bit, and
+contents. The protocol REAPI digest remains unrelated.
+
+Generation and two fresh no-update Bazel 9.2 replays passed. Independent review
+accepted the exact matrix, source anchors, restoration facts, zero credential
+matches, protected scope, and 227/340 authored cap. Generated `oracle.json` is
+the retained record and is excluded from the authored cap; no Slug Rust, test,
+wire, DICE, dependency, or formatter changed.
+
+Design next only `WP-6-m2-general-target-configuration-input-chain-design`.
+Enumerate every native `FragmentOptions` default/cache-key input plus canonical
+Starlark option/scope and host/platform/mapping input, map each to a shared
+one-shot/daemon/transaction owner, and freeze exact Need/error/invalidation/
+equality behavior before either build or cquery constructs a root key. Return
+`REPLAN` if complete ownership cannot fit one bounded implementation packet.
+
+This successor is documentation/source-only at a 380-line cap. It authorizes
+no Rust, tests, fixtures, oracle run, dependency, command wire, DICE owner, or
+checksum. Configured artifacts, per-action platform, Bazel ActionKey, public
+cquery/aquery formatting, and execution remain downstream stops.
