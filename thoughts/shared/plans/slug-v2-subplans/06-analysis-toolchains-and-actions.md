@@ -4035,6 +4035,87 @@ no Rust, Host access, dependency, DICE, request scan, converter, command, or
 configured-target behavior. Configured-target cycle deferral remains
 unchanged.
 
+### Process Host owner capture design ACCEPT (2026-08-05)
+
+`WP-6-m2-process-host-owner-capture-design` is **ACCEPT** for the core state
+and injection shape. Actual native capture is an explicit **Unsupported**
+boundary, not permission to approximate JVM behavior with ordinary Rust OS,
+home, CPU, memory, or cgroup APIs.
+
+The pinned Bazel 9.2 (`8220c6198837d5c13d53fea211cf3282aa12408a`) anchors are
+`src/main/java/com/google/devtools/build/lib/util/OS.java:48,67-85`
+(`blaze.os` before `os.name`), `.../util/CPU.java:46,55-65`,
+`.../analysis/config/AutoCpuConverter.java:30-64`, and
+`.../vfs/OsPathPolicy.java:66-85`/`PathFragment.java:60`;
+`.../util/OptionsUtils.java:169-174` for the fresh `user.home` read;
+`.../actions/LocalHostResource.java:23-38` for RAM then CPU;
+`.../actions/LocalHostCapacity.java:28-55` for success-only assignment; and
+`.../util/ResourceConverter.java:51-54` for post-`ceil` narrowing. Selected
+OpenJDK 21 `src/java.base/share/classes/jdk/internal/util/SystemProps.java:60-98`
+owns default/overridden properties;
+`src/jdk.management/share/classes/com/sun/management/OperatingSystemMXBean.java:102-120`,
+`src/jdk.management/unix/classes/com/sun/management/internal/OperatingSystemImpl.java:228-235`,
+and `src/java.base/share/classes/java/lang/Runtime.java:667-678` own
+container-aware memory and VM-available processors. A Rust environment lookup,
+`sysconf`, `/proc`, cgroup-file read, or home-directory helper does not prove
+that contract and is not an exact substitute.
+
+`ProcessHostSource` is injected into one non-global core `ProcessHostOwner`.
+Its property read result is lossless UTF-16
+`Present(Arc<[u16]>) | Absent | ReadError(SourceError)`; raw capture exposes
+signed Java-long memory bytes and processor count before Java-derived
+conversion, plus a post-resource completion hook that can fail before capacity
+assignment. The owner is one source Arc, independent OS/CPU/resource
+`ClassCell`s, and one capacity success cell behind the outer shared Arc.
+`ClassCellState<T>` is exactly `Vacant | Initializing { thread } | Ready(T) |
+Failed(Arc<ClassInitFailure>)`; capacity uses the same first three states but
+returns a retryable pre-assignment failure to `Vacant`. The initializing caller
+receives `InitialFailure`, while every later access receives the distinct
+`ErroneousReuse`; same-thread reentry is a typed internal error, never a wait.
+`HostPathFlavor` is derived
+only from the OS cell. `AutoCpu` obtains OS first and invokes CPU only for its
+supported OS branches. `LocalHostResource` is another class-state evaluation
+that reads RAM bytes, immediately divides to a memory-MiB `double`, then reads
+processors into its `ResourceSet`. `LocalHostCapacity` stores only that
+successful resource value after the post-resource completion hook; a retryable
+failure before assignment remains unassigned, while an erroneous resource
+class is replayed as its class error. The route-specific CPU/RAM keyword
+derivation later applies only `ceil` and Java `double`-to-`int` narrowing; the
+process owner does not pretend Bazel caches post-ceiling integers.
+Home has no cell and asks the source afresh on every eligible occurrence. Source calls
+occur after releasing the mutex; a condition wait is confined to owner-local
+publication, and no guard can cross a source call, DICE compute, or retry.
+Mutex poison or an unwinding source must fail closed with a typed core owner
+error, notify waiters, and never strand `Initializing`. The source trait and
+raw state types remain core-private; only the Arc owner and its non-reading
+constructor cross into server/runtime ownership. Cloning
+`Arc<ProcessHostOwner>` shares one owner and never clones source state;
+`WorkspaceRuntime` does not become `Clone`.
+
+The first implementation owns the state machine and an injectable test source.
+Its only native source is a non-reading placeholder that returns the typed
+`Unsupported` error for every native demand. It must perform no Host I/O. A
+future native backend is **REPLAN** until a HotSpot-equivalent mapping proves
+property overrides/mutation, lossless platform-string handling, physical-memory
+and processor semantics, cgroup behavior, error timing, and each platform's
+source boundary.
+
+The owner topology is fixed: six one-shot production construction sites—four
+in `app/slug_core_v2/src/runtime/mod.rs` and two in
+`app/slug_core_v2/src/runtime/dice.rs`—create an owner before constructing the
+runtime. `app/slug_server_v2/src/lib.rs:Daemon::new` is the sole daemon-owner
+constructor; `app/slug_server_v2/src/server.rs:serve` remains unchanged and
+creates none. `WorkspaceRuntime` accepts only `Arc<ProcessHostOwner>`.
+
+Run next `WP-6-m2-process-host-owner-state-and-injection`. It may implement
+only the state machine, unsupported native placeholder, and six-site/daemon
+runtime Arc injection. It adds no configuration dependency, DICE/request
+bridge, converter, command activation, or real Host I/O. Test state/error
+order, conditional CPU, capacity retry/latching, fresh mutable home, owner
+isolation, runtime Arc identity, and daemon ownership. Later native capture
+remains REPLAN; only a later request bridge may add core -> configuration.
+Configured-target cycle deferral remains unchanged.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
