@@ -1501,10 +1501,16 @@ the same child node as reused, but no evaluator or event batch is duplicated.
 lock, global, interner, scheduler, or second action owner is added.
 
 Parallel Terra live-owner, accepted-evidence, and Buck2 utility audits plus
-reserved review selected two production owners, three test owners, and caps of
+reserved review selected two production owners, four test owners, and caps of
 360 production, 650 test, 180 documentation, and 1,190 total net lines. The
 implementation must cover multi-root/diamond/configuration-distinct ordering,
 Need precedence, target-local events, child edit/delete/recreate/orphan
 pruning and A-to-B-to-A equality, public action count, and the existing
 consumer iterator. Configuration identity, aquery, scheduling/execution,
 cycles, external mapping, and toolchain action breadth remain explicit stops.
+
+Pre-edit compile review added `app/slug_analysis_v2/tests/starlark_rule.rs` as
+a mechanical fourth test owner under the unchanged caps. Its existing root
+request helpers must return shared `Arc<AnalysisResult>` handles after the
+root-key payload change; cloning an owned result there would violate the
+accepted no-deep-clone boundary. No fixture or assertion semantics may change.

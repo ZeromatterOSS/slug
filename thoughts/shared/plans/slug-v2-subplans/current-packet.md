@@ -43,6 +43,8 @@ Production allowlist:
 Test allowlist:
 
 - `app/slug_analysis_v2/tests/root_analysis.rs`
+- `app/slug_analysis_v2/tests/starlark_rule.rs` for mechanical successful
+  helper return-type adaptation only
 - inline tests in `app/slug_core_v2/src/runtime/dice.rs`
 - `app/slug_cli_v2/tests/cli.rs`
 
