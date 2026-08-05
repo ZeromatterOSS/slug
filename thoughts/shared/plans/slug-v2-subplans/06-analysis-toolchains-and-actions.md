@@ -4494,6 +4494,49 @@ for Guava 33.5.0 Splitter/CharMatcher trimming/order/duplicate behavior and JDK
 25 Pattern `\w` plus exact FlagAlias validation/diagnostics; retain
 converter-versus-command-alias/normalization ownership.
 
+### LabelMap and FlagAlias library semantics evidence ACCEPT (2026-08-05)
+
+`WP-6-m2-label-map-and-flag-alias-library-semantics-evidence` is **ACCEPT**.
+Pinned Bazel `9.2.0` is `8220c619`; its MODULE selects Guava `33.5.0-jre`, and
+official Guava `v33.5.0` is `8868c096`. [Its root POM](https://github.com/google/guava/blob/8868c096cfdabbe38170b6e395369c315cfb72a1/pom.xml#L6-L10)
+pins that JRE version; [`trimResults`](https://github.com/google/guava/blob/8868c096cfdabbe38170b6e395369c315cfb72a1/guava/src/com/google/common/base/Splitter.java#L291-L342)
+and [the iterator](https://github.com/google/guava/blob/8868c096cfdabbe38170b6e395369c315cfb72a1/guava/src/com/google/common/base/Splitter.java#L550-L611)
+trim before omission and iterate left-to-right; [`CharMatcher`](https://github.com/google/guava/blob/8868c096cfdabbe38170b6e395369c315cfb72a1/guava/src/com/google/common/base/CharMatcher.java#L1232-L1265)
+pins the 25 BMP whitespace characters: `U+0009-U+000D`, `U+0020`, `U+0085`,
+`U+00A0`, `U+1680`, `U+2000-U+200A`, `U+2028-U+2029`, `U+202F`, `U+205F`,
+and `U+3000`.
+
+Bazel's [LabelMap converter](https://github.com/bazelbuild/bazel/blob/8220c6198837d5c13d53fea211cf3282aa12408a/src/main/java/com/google/devtools/build/lib/analysis/config/CoreOptionConverters.java#L196-L220)
+is manual, not MapSplitter: every comma piece is whitespace-trimmed before
+empty omission, then it splits the first `=` with no separate key/RHS trim,
+parses a nonempty label before duplicate detection, retains LinkedHashMap
+insertion order, returns an unmodifiable map, defaults `bytecode_optimizers` to
+`Proguard`, and reports `Key '<key>' appears twice`. Guava MapSplitter's
+separate malformed/duplicate rules are not substituted. Official OpenJDK
+`jdk-25.0.2+10` tag object `935ed5353de37bad0b021a5df15e30e8db7de2fd` peels to
+`405a5699ebd097464ed3fc9345414b0774a2edc9`: [Pattern's default `\w` table](https://github.com/openjdk/jdk25u/blob/405a5699ebd097464ed3fc9345414b0774a2edc9/src/java.base/share/classes/java/util/regex/Pattern.java#L182-L186)
+and [Pattern.matches](https://github.com/openjdk/jdk25u/blob/405a5699ebd097464ed3fc9345414b0774a2edc9/src/java.base/share/classes/java/util/regex/Pattern.java#L1202-L1224)
+fix unflagged `\w` to `[a-zA-Z_0-9]` and reject non-ASCII; [`Matcher.matches`](https://github.com/openjdk/jdk25u/blob/405a5699ebd097464ed3fc9345414b0774a2edc9/src/java.base/share/classes/java/util/regex/Matcher.java#L746-L753)
+is whole-region. This establishes the Java SE 25 contract; vendor-build source
+provenance remains unclosed, and no JVM/runtime dependency is claimed.
+
+FlagAlias source validation is ordered: require nonempty left of the first `=`
+(`Flag alias definitions must be in the form of a 'name=label' assignment`),
+then build the `--flag_alias=` diagnostic prefix; require `\w*`
+(`{short} should only consist of word characters to be a valid alias name.`);
+reject later `=` (`--flag_alias does not support flag value assignment.`); only
+then require the `--` target to start `--//`, `--no//`, `--@`, or `--no@`
+(`--flag_alias only supports Starlark build settings.`); then parse the label
+with the supplied context. Its repeatable-null default is absent. Later C
+last-wins/sort and command alias expansion remain outside converter scope.
+Configured-target cycles remain user-deferred.
+
+Run next only `WP-6-m2-label-map-and-flag-alias-converter-implementation`:
+private 39/0 extension in existing `native/label_convert.rs` and `native/tests.rs`
+only (scheduling docs terminal-only), exact Unicode trim and no Guava/JDK/regex/
+dependency; caps are 280 production, 440 test, 100 documentation, and 820 total
+formatted net lines.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the

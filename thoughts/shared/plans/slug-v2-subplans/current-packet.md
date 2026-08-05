@@ -1,43 +1,52 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-label-map-and-flag-alias-library-semantics-evidence`
+Packet: `WP-6-m2-label-map-and-flag-alias-converter-implementation`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: source-only library-semantics closure for the remaining LabelMap and
-FlagAlias routes.
+Result: private exact 39/0 label-route converter extension.
 
 ## Goal
 
-Pin Guava 33.5.0 `Splitter`/`CharMatcher` trimming, order, and duplicate
-behavior, plus JDK 25 `Pattern` `\w` domain and exact FlagAlias validation and
-diagnostics. Preserve the distinction between conversion and later command
-alias expansion/C normalization, then decide a bounded successor.
+Implement LabelMap and FlagAlias while retaining their exact source-closed
+conversion scope. Do not activate downstream normalization or command aliases.
 
 ## Required design record
 
-Use source evidence only; do not infer Java/Guava behavior. Keep the converter
-separate from downstream command alias expansion and C normalization. The
-user-approved configured-target-cycle deferral remains explicit.
+Extend only the private converter with exact 25-character trim logic, without a
+Guava/JDK/regex/dependency. LabelMap retains an Arc ordered slice of
+`(CompactString, Option<ResolvedOptionLabel>)`; FlagAlias retains each
+unnormalized `(CompactString, ResolvedOptionLabel)` occurrence. Derive
+`Allocative` and use `Dupe` only on Arc wrappers. Use the existing
+`OptionLabelContext` and mapping-free labels; retain no map/cache/interner or
+downstream aggregation. Preserve validation order, but return private `Invalid`;
+user-facing diagnostics remain deferred. Keep LabelMap/FlagAlias normalization,
+command expansion, loader behavior, and user-approved configured-target cycles
+untouched.
 
 ## Allowed paths
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `app/slug_configuration_v2/src/native/label_convert.rs`
+- `app/slug_configuration_v2/src/native/tests.rs`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, terminal only
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`, terminal only
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`, terminal only
 
 ## Required tests and validation
 
-Record pinned source provenance and exact behavioral discriminators. Run source
-provenance, archive, scope, cap, no-Cargo, and `git diff --check` gates.
+Test all three contexts/defaults/malformed inputs, Unicode trim/order/duplicate
+behavior, ASCII `\w`, prefix gate, mapping/non-visible labels, and the exact
+39/0 partition. Run focused test/check, GNU-Windows no-run, formatting, archive,
+scope, cap, and diff gates.
 
 ## Stop conditions
 
-Stop with REPLAN on missing Guava/JDK authority, a JVM need, unclosed grammar,
-new context/loader, reverse edge/cycle, or command/normalization ownership
-ambiguity. Do not edit Rust, Cargo, fixtures, or create probes/artifacts, or do
-command, loading, DICE, normalization, checksum, wire, or configured-target work.
+Stop on external grammar, mixed/Host/regex work, new dependency/context/public
+API, map/interner/cache, command/loading/DICE/normalization/checksum/wire/
+configured-target work, an outside file, or cap. Do not edit Cargo, `mod.rs`,
+identity, registry, convert/defaults/value/cache, or create fixtures/probes/
+artifacts.
 
 ## Diff budget
 
-- Documentation and total: at most 180 net lines. No Rust, Cargo, fixture,
-  generated, baseline, or unrelated changes.
+- Production: 280; tests: 440; documentation: 100; total formatted net: 820.
+  No Cargo, fixture, generated, baseline, or unrelated changes.
