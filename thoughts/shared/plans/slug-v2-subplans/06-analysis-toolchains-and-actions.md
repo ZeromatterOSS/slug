@@ -4274,6 +4274,49 @@ selection, and rollback boundary without changing accepted generic observation
 semantics. Add no Rust, Cargo, fixtures, DICE, capture, converter, driver, or
 configured-target work.
 
+### Per-converter-call Windows option-path observation identity ACCEPT (2026-08-05)
+
+`WP-6-m2-windows-option-path-per-converter-call-observation-identity-design`
+is **ACCEPT**. The existing dedicated workspace outcome already preserves
+`Resolved` versus `IOExceptionFallback` before lexical normalization. Do not
+change generic `PathObservationDemand` or its Eq/Ord/Hash, `Need`,
+`PathObservationEpoch`, `SelectedWorkspaceDemands`, or add a DICE key.
+
+After lease acquisition and repository begin, core clones
+`prior.selected.unscoped_paths()` into a separate preflight input, filters only
+`WindowsOptionPathLongName` from that clone before preflight, and keeps the
+prior accepted snapshot intact. After preflight, core
+processes each eligible converter call chronologically as a singleton existing
+`WindowsOptionPathLongName` generic observation, with that call's
+producer-derived normalized absolute identity and exact expanded raw UTF-16.
+It extracts the one outcome immediately and never merges a singleton epoch into
+`NativeDemandCommand.path_observations`, generic `Need` progress, selected
+paths, or repository validation. Equal generic/raw demands at distinct call IDs
+therefore invoke the resolver independently and may have distinct outcomes.
+
+Core retains only an ephemeral ordered occurrence assembly
+(ordinal/path/raw/outcome): it rejects duplicate or out-of-order IDs and permits
+duplicate raw values. The final retained identity is the existing
+configuration-owned `WindowsOptionPathFact`/`HostConversionInputs`; no second
+retained collection is introduced. A sole one-way core -> configuration bridge
+later maps the ordinal exactly to `ConverterCallId`; workspace and configuration
+remain independent. The complete new Host input bundle is made once before the
+first updater/root, retries reuse it, acceptance retains the exact current
+bundle, abort restores the exact prior bundle, and the next request is fresh.
+No lock spans observation or DICE. No bounded Rust sidecar is useful before a
+live schedule and consumer, so no implementation is authorized. Native capture
+remains **REPLAN** and configured-target cycles remain user-deferred.
+
+Run next only `WP-6-m2-process-host-native-capture-source-boundary-evidence`,
+docs/source-evidence-only. Pin exact bounded Rust equivalence for Bazel/HotSpot
+property precedence/mutation/lossless platform strings, OS/CPU/path-policy
+initialization/failures, physical-memory/available-processor/container/cgroup
+semantics, and RAM-before-CPU/post-completion timing across supported
+platforms; decide source APIs and error/latching mapping. Add no Rust, Cargo,
+fixtures, probes, artifacts, DICE, driver, bridge, or configured-target work;
+REPLAN or Unsupported any unprovable/JVM-delegation boundary without user
+approval.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
