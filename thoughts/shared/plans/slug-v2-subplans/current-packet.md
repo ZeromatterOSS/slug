@@ -1,40 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-loading-tests-implementation`
+Packet: `WP-10-m8-bazel-bzlmod-fixture-free-tests-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: six private Bazel targets covering all 118 source-declared loading unit
-and integration cases with their native platform cfg behavior preserved.
+Result: eleven private Bazel targets covering the 442 Bzlmod unit and
+fixture-free integration cases.
 
 ## Goal
 
-Map the loading library unit tests through one crate-mode target and preserve
-each of its five integration sources as a standalone crate. Run all
-platform-applicable cases under credential-free nightly Bazel and serial Cargo.
+Map the Bzlmod library unit tests through one crate-mode target and preserve ten
+fixture-free integration sources as standalone crates. Run all 442 cases under
+credential-free nightly Bazel and serial Cargo.
 
 ## Required design
 
-Add one private, small `rust_test(crate = ":slug_loading_v2")`. Add one private,
-small standalone target for each of `build_file_loading.rs`,
-`bzl_invalidation.rs`, `glob_boundaries.rs`, `glob_invalidation.rs`, and
-`native_removed_rules.rs`; each uses the Cargo edition and only its directly
-imported local/external crates through exact labels/helpers. Preserve Unix and
-Windows source cfgs. Tests synthesize uniquely named workspaces under the test
-temporary directory; do not rewrite source paths, serialize targets, or add a
-checked-in fixture, env, data, tool, process, daemon, or platform exclusion.
+Add one private `rust_test(crate = ":slug_bzlmod_v2")` and one private
+standalone target for each of `dice_inputs.rs`, `nonroot_module_eval.rs`,
+`parser.rs`, `registry_dice.rs`, `registry_mvs.rs`, `registry_snapshot.rs`,
+`registry_source.rs`, `resolution.rs`, `root_module_dice.rs`, and
+`source_preparation_dice.rs`. Each target uses the Cargo edition and only exact
+direct local/external dependencies. Preserve Unix cfgs and the unit test that
+re-executes `current_exe()` with its private child marker. Do not map
+`lockfile.rs`: its 22 cases remain deferred pending a writable
+manifest-relative scratch adapter. Do not add env/data/tools/fixtures,
+serialization, platform exclusions, external processes, or a broad helper.
 
 ## Allowed paths
 
-- `app/slug_loading_v2/BUILD.bazel`
+- `app/slug_bzlmod_v2/BUILD.bazel`
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Run the six labels in one credential-free Bazel command with
+Run the eleven labels in one credential-free Bazel command with
 `--ignore_all_rc_files` and the pinned nightly channel. Run the package's
-library and integration tests in one serial Cargo command. Run no-repin
-`bazel mod deps` and
+library tests plus only the ten named integrations in serial Cargo commands;
+do not run `lockfile`. Run no-repin `bazel mod deps` and
 prove the Cargo, rendering, and module lock hashes unchanged. Run formatting,
 archive, scope, cap, credential-pattern, and `git diff --check` gates. Clean
 stale `slugd` before and after test execution even though these tests must not
@@ -42,15 +44,16 @@ activate it.
 
 ## Stop conditions
 
-Stop with REPLAN on any Rust/Cargo/lock/fixture/generated-source change, suite,
-shared macro, broad dependency restatement, scratch-path rewrite,
-serialization, env/data/tool input, platform exclusion, process/daemon
-behavior, Cargo execution from Bazel, rc or
+Stop with REPLAN on any Rust/Cargo/lock/fixture/generated-source change,
+`lockfile.rs` target or execution, suite/shared macro, broad dependency
+restatement, scratch-path rewrite, serialization, env/data/tool input,
+platform exclusion, external process/daemon behavior, Cargo execution from
+Bazel, rc or
 credential inspection, or M2/M5/M6/self-hosting coupling. Do not add a
 WORKSPACE, `.bazelrc`, CI, BuildBuddy/cache/RBE, query, cquery, or aquery
 surface.
 
 ## Diff budget
 
-- At most 190 net metadata/documentation lines. No Rust, Cargo, lock, fixture,
+- At most 380 net metadata/documentation lines. No Rust, Cargo, lock, fixture,
   generated-source, CI, or unrelated change.

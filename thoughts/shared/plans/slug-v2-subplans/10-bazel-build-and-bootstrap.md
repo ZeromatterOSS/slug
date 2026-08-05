@@ -411,6 +411,18 @@ focused correction review gates pass at 30 net lines against the 100-line cap.
 Next map the six loading targets while
 preserving their platform cfgs and synthetic scratch-workspace behavior.
 
+The loading packet is accepted. One crate-mode unit target and five
+source-owned integration targets pass credential-free nightly Bazel and serial
+Cargo with the same 117 Linux-active cases; the remaining source-declared case
+is Windows-only and stays cfg-owned. Exact direct dependency labels cover the
+test sources without a broad helper. The source-defined unique temporary
+workspaces work inside Bazel's sandbox without path rewrites, serialization,
+fixtures, env, data, tools, processes, or platform exclusions. All three lock
+hashes remain stable; archive, scope, cap, diff, and independent platform review
+gates pass at 93 net lines against the 190-line cap. Next map the Bzlmod unit
+target and ten fixture-free integrations,
+leaving the writable manifest-relative lockfile integration deferred.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

@@ -1,5 +1,5 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
-load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -22,4 +22,81 @@ rust_library(
         "//starlark-rust/starlark_map",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "slug_loading_v2_test",
+    crate = ":slug_loading_v2",
+    deps = crate_deps(["tokio"]),
+    size = "small",
+    visibility = ["//visibility:private"],
+)
+
+rust_test(
+    name = "build_file_loading_test",
+    srcs = ["tests/build_file_loading.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["anyhow", "tokio"]) + [
+        ":slug_loading_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_events_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//gazebo/dupe",
+    ],
+)
+
+rust_test(
+    name = "bzl_invalidation_test",
+    srcs = ["tests/bzl_invalidation.rs"],
+    edition = crate_edition(),
+    proc_macro_deps = crate_deps(["async-trait"]),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["anyhow", "tokio"]) + [
+        ":slug_loading_v2",
+        "//allocative/allocative",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_events_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark_map",
+    ],
+)
+
+rust_test(
+    name = "glob_boundaries_test",
+    srcs = ["tests/glob_boundaries.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["compact_str"]) + [":slug_loading_v2"],
+)
+
+rust_test(
+    name = "glob_invalidation_test",
+    srcs = ["tests/glob_invalidation.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["tokio"]) + [
+        ":slug_loading_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+    ],
+)
+
+rust_test(
+    name = "native_removed_rules_test",
+    srcs = ["tests/native_removed_rules.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_loading_v2"],
 )
