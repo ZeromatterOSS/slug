@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -23,4 +23,77 @@ rust_library(
         "//starlark-rust/starlark_map",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "slug_analysis_v2_test",
+    crate = ":slug_analysis_v2",
+    deps = all_crate_deps(normal_dev = True),
+    size = "small",
+    visibility = ["//visibility:private"],
+)
+
+rust_test(
+    name = "configured_target_test",
+    srcs = ["tests/configured_target.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        ":slug_analysis_v2",
+        "//app/slug_build_api_v2",
+        "//app/slug_identity_v2",
+    ],
+)
+
+rust_test(
+    name = "root_analysis_test",
+    srcs = ["tests/root_analysis.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = all_crate_deps(normal_dev = True) + [
+        ":slug_analysis_v2",
+        "//app/slug_build_api_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_events_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_loading_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark_map",
+    ],
+)
+
+rust_test(
+    name = "starlark_rule_test",
+    srcs = ["tests/starlark_rule.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = all_crate_deps(normal_dev = True) + [
+        ":slug_analysis_v2",
+        "//app/slug_build_api_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_events_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_loading_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark_map",
+    ],
+)
+
+rust_test(
+    name = "toolchain_test",
+    srcs = ["tests/toolchain.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        ":slug_analysis_v2",
+        "//app/slug_identity_v2",
+    ],
 )

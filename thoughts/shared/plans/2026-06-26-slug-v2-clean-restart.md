@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 13 accepted Bazel targets covering 116 source cases and passing all 114 Linux-active Cargo cases with stable locks | query unit is whole-target **REPLAN** at its clean-baseline `PreparationRestart`; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; Bzlmod lockfile scratch and core host-tool ownership need separate designs; cache/RBE and self-hosting remain | `WP-10-m8-bazel-analysis-tests-implementation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 18 accepted Bazel targets covering 140 source cases and passing all 138 Linux-active Cargo cases with stable locks | query unit is whole-target **REPLAN** at its clean-baseline `PreparationRestart`; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; Bzlmod lockfile scratch and core host-tool ownership need separate designs; cache/RBE and self-hosting remain | `WP-10-m8-bazel-reapi-integration-test-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-analysis-tests-implementation`.
+`WP-10-m8-bazel-reapi-integration-test-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

@@ -392,6 +392,13 @@ gates pass. The 28-case library target and 53-case loading integration remain
 absent at their distinct semantic and fixture `REPLAN` boundaries. Next map the
 one analysis unit target and four source-owned analysis integrations.
 
+The analysis packet is accepted. Five private targets pass credential-free
+nightly Bazel 5/5 and serial Cargo 24/24. Each integration owns one source and
+only its direct imports; the async targets use the declared Tokio dev edge.
+All three locks remain stable, and archive, scope, 81-net/190-line, diff, and
+independent review gates pass. Next map only the REAPI integration crate while
+leaving its NativeLink service case ignored by default.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
