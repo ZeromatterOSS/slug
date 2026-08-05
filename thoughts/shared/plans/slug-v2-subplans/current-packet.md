@@ -1,48 +1,52 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-source-anchor-and-enum-route-evidence-retry`
+Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-2`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: retry the exact source-anchor and concrete finite-enum route ledger with
-all class/method inclusive ranges frozen before family-contract retry 2.
-Predecessor: the first source-anchor table reached terminal `REPLAN` after its
-correction because five rows still labeled class spans as method spans. Its
-unaccepted table was discarded.
+Role: synthesize the complete pure-family grammar/value/default/cache-byte
+contract from accepted evidence before mechanical descriptor attachment.
+Predecessors: exact Java/Guava renderer authority, forced-sharding structural
+semantic identity, and the full family-source/16-enum route anchor table are
+accepted. This packet performs no new source discovery.
 
-Rebuild source evidence only at Bazel commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`:
+Write one compact `F-*` contract row for every distinct pure semantic family,
+citing only those accepted sections. Do not repeat full paths/ranges, enum
+member inventories, renderer probes, or 287 descriptor rows. Each row must
+freeze:
 
-- one exact future-family anchor row with full path, explicit class inclusive
-  range, explicit method inclusive range, returned Java owner, and distinct
-  parameterized subclass boundary;
-- scalar `F-Text N=None` for annotation default `"null"`;
-- one stable `F-Enum-*` row per concrete enum, with converter class/method,
-  returned enum owner, complete members, alias/case rule, ordinary/override
-  renderer, and standard `D/E/X` template; and
-- default-only runs `D("1")` and deferred `U("+2")`, both preserving original
-  option text, without a general occurrence decoder.
+- accepted/rejected grammar, aliases/casing, separator/radix/range, null/empty
+  behavior, and exact discriminators;
+- retained Java kind and semantic `BuildOptions` equality/order plus the
+  accepted future native structural boundary;
+- `N`, converted annotation `D(s)`, explicit empty `Ø`, one nondefault `E(s)`,
+  ordered repeat accumulation `A[...]`, or deferred `U(s)` as applicable; and
+- exact `toString()` plus outer cache bytes by accepted renderer reference.
 
-Carry every correction from the discarded table, including exact Bool/Int/
-Text/Tri/Void/Duration/List/Set/Entry/Env/Dotted/Platform/generic-enum and enum
-class endpoints, removal of unadmitted `F-AssignmentList`, separated Android
-and Java enum families, full Cancel members, and Compilation enum/toString
-versus converter ownership.
+Mandatory distinctions are frozen:
 
-The five terminal anchors are immutable:
+- separate allow-empty comma/colon lists from reject-empty nonempty lists,
+  using `a,,b` as acceptance/rejection discriminator;
+- StringSet duplicate elimination and actual reverse U+E000/U+10000 Java
+  UTF-16 sort; assignment first-`=`/embedded-`=` with repeat `N=[]` and ordered
+  post-conversion accumulation;
+- one contract row per each of the 16 accepted `F-Enum-*` routes, plus
+  TriState, with concrete default/nondefault route templates and ordinary
+  versus lowercase-override rendering;
+- timeout `.limit(6)` and exact `2,` / `2,,3,4,5` accepts versus
+  `1,2,,3,4` rejection;
+- structural `Forced(i32)` for semantic configuration equality with raw Java
+  parser-object identity explicitly deferred;
+- scalar String `N=None`, Void absence, empty fission as `EMPTY`,
+  DottedVersion signed-i32 captures plus original-text equality/rendering, all
+  EnvVar record shapes, PlatformType ASCII-only lowering, and EmptyList; and
+- runs only as default-source materialization: `D("1")`; deferred `U("+2")`
+  retains original text; no general numeric or regex occurrence decoder.
 
-- shard interface `TestShardingStrategy.java:22-24`, converter class `26-59`
-  and `convert 35-58`, forced class `TestShardingStrategyForced.java:17-33`,
-  ordinary enum `TestShardingStrategyNotForced.java:19-33`;
-- Fission class `CppOptions.java:39-58`, `convert 41-52`;
-- EmptyList class `CoreOptions.java:436-447`, `convert 438-440`;
-- TestTimeout converter class `TestTimeout.java:201-247`, `convert 207-241`;
-  and
-- PerLabelOptions constructor `88-91`, `toString 119-122` as separate anchors.
-
-Do not recreate the family byte contract or reopen accepted renderer,
-reverse-UTF-16, list/Entry/timeout, or forced-identity evidence. Add no
-descriptor rows, Java/JVM probe, Rust, fixture, artifact, dependency, registry,
-command, DICE, or downstream change.
+Preserve the disjoint `287 + 8 + 5 + 41 = 341` routing and independent
+repeat/old-name/expansion/implicit metadata. The table must let a later packet
+attach each of the 287 pure descriptors to exactly one family/route without
+source lookup or semantic judgment; the runs default record remains an explicit
+exception attached only by the default materializer, not a pure descriptor.
 
 Allowlist:
 
@@ -52,11 +56,14 @@ Allowlist:
 - `.codex/skills/slug-agent-orchestration/references/routing-log.md`
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Cap: 260 formatted net documentation lines total, at most 190 in Stage 6.
+Cap: 480 formatted net documentation lines total, at most 380 in Stage 6. No
+source re-audit, descriptor map, Java/JVM probe, Rust, fixture, artifact,
+dependency, registry, command, DICE, or downstream change.
 
-Stop and `REPLAN` on any remaining path/class/method/range mismatch,
-unverifiable owner/member/alias, grouped enum, scope leak, second correction,
-or cap breach. On independent acceptance run only
-`WP-6-m2-pure-native-family-byte-contract-ledger-retry-2`. Preserve 287/8/5/41
-and defer contextual/regex/Host/repository conversion, normalization,
-checksum/wire implementation, DICE changes, and configured-target cycles.
+Stop and `REPLAN` on any family not mechanically backed by accepted anchors,
+combined distinct grammar/enum route, undefined default/route/cache bytes, new
+representation/identity issue, reopening accepted evidence, material
+correction, or scope/cap breach. After independent acceptance advance only to
+the mechanical 287-descriptor attachment ledger. Defer raw parser matching,
+contextual/regex/Host/repository conversion, normalization, checksum/wire
+implementation, DICE changes, and configured-target cycles.
