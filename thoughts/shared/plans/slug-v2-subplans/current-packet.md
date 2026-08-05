@@ -1,51 +1,62 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-developer-graph-boundary-design`
+Packet: `WP-10-m8-bazel-retained-foundation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a bounded implementation design for the first Bazel 9 Rust target
-closure, without starting self-hosting or changing repository metadata.
+Result: a credential-free Bazel 9.2/rules_rust foundation that builds the
+retained `dice` and `starlark` roots in the accepted CLI closure.
 
 ## Goal
 
-Inspect the live Cargo workspace and pinned Bazel 9.2/rules_rust requirements.
-Freeze the smallest `slug_cli_v2` transitive developer graph: package/target
-ownership, focused test mapping, toolchain and dependency pins, Cargo/Bazel
-synchronization, and generated/build-script/proc-macro treatment. Select an
-exact implementation allowlist and validation boundary.
+Add the accepted root bzlmod/toolchain/dependency-lock boundary and fresh
+rules_rust targets for exactly the 19 retained packages in the production CLI
+closure. Build the retained `dice` and `starlark` roots locally. Do not add any
+V2 app targets yet.
 
-## Required design record
+## Required implementation
 
-Pin Bazel at `9.2.0`/`8220c619` and select a Bazel-9-compatible rules_rust
-boundary without writing it. Keep Cargo supported and define a reviewed lock/
-dependency synchronization policy. Record only a credential-safe BuildBuddy
-boundary; do not open either repository or home `.bazelrc`, and claim no remote
-cache/RBE evidence. The developer graph is independent of M2 configuration;
-self-hosting remains gated on M5/M6.
+Pin `.bazelversion` to 9.2.0 and rules_rust to 0.73.0/BCR integrity. Register
+`nightly/2025-09-14`; pass the nightly channel explicitly. Track the validated
+root `Cargo.lock`, crate_universe `Cargo.Bazel.lock`, and `MODULE.bazel.lock`
+under the accepted synchronization policy. Use `cargo_build_script` for the
+three compiler-channel probes and LALRPOP generation, and ordinary
+`rust_proc_macro` ownership for the five local derive crates. Replace all 19
+intersecting Buck/fbcode BUILD files; do not reuse their macros.
 
 ## Allowed paths
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `.gitignore`
+- `.bazelversion`
+- `MODULE.bazel`
+- `MODULE.bazel.lock`
+- `BUILD.bazel`
+- `Cargo.lock`
+- `Cargo.Bazel.lock`
+- `scripts/v2_archive_status.sh`
+- `allocative/{allocative,allocative_derive}/BUILD.bazel`
+- `dice/{dice,dice_error,dice_futures}/BUILD.bazel`
+- `gazebo/{cmp_any,display_container,dupe,dupe_derive,gazebo,gazebo_derive,strong_hash,strong_hash_derive}/BUILD.bazel`
+- `shed/{lock_free_hashtable,lock_free_vec}/BUILD.bazel`
+- `starlark-rust/{starlark,starlark_derive,starlark_map,starlark_syntax}/BUILD.bazel`
+- the canonical plan, Stage 10 owner, and this manifest
 
 ## Required tests and validation
 
-Record a complete live Cargo workspace/`slug_cli_v2` closure inventory, pinned
-primary source for Bazel/rules_rust choices, target/test ownership, dependency
-synchronization, and the credential-safe local/BuildBuddy split. Run source,
-archive, scope, cap, no-Cargo, and `git diff --check` gates only.
+Run Bazel 9.2 with `--ignore_all_rc_files` and the explicit nightly channel to
+build the retained `dice` and `starlark` library roots. Run the matching serial
+Cargo checks, formatting, source/archive, scope, cap, lock-diff, credential
+pattern, and `git diff --check` gates. Record no remote evidence.
 
 ## Stop conditions
 
-Stop with REPLAN on credential or user-rc inspection, an unbounded Bazel-9/
-rules_rust mapping, unresolved generated/proc-macro/dependency-sync ownership
-beyond one CLI closure, or coupling to M2/M5/M6 semantics. Do not edit or add
-MODULE/BUILD/.bazelversion/.bazelrc files, Rust, Cargo/lockfiles, dependencies,
-fixtures, CI, or generated data; do not run Bazel/Cargo, BuildBuddy/RBE, query,
-cquery, aquery, execution, materialization, or self-hosting.
+Stop with REPLAN on any rc/credential inspection or consumption, private
+registry need, untracked/unsynchronized lock, build script or proc macro that
+cannot be expressed in the allowlist, Cargo execution from Bazel, V2 app target,
+source/generated-source edit, or M2/M5/M6/self-hosting coupling. Do not add a
+WORKSPACE, `.bazelrc`, app BUILD, fixture, CI, BuildBuddy/cache/RBE, query,
+cquery, or aquery surface.
 
 ## Diff budget
 
-- Documentation and total: at most 220 net lines. No code, metadata, fixture,
-  generated, dependency, lockfile, or unrelated changes.
+- Bazel metadata/lock/BUILD and total: at most 900 net lines. No Rust, Cargo
+  manifest, generated-source, fixture, CI, or unrelated change.

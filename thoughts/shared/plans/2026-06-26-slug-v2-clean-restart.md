@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | Stage 10 permits the Bazel developer graph independently of M1-M5 | Bazel graph not started; self-hosting still awaits M5/M6 | docs-only `WP-10-m8-bazel-developer-graph-boundary-design` |
+| M8: bootstrap | **active (developer graph)** | Stage 10 permits the Bazel developer graph independently of M1-M5; the exact 33-package CLI boundary, rules_rust/toolchain/lock policy, generated-source ownership, and local-only validation split are accepted | Gate A metadata and 19 retained targets are not implemented; self-hosting still awaits M5/M6 | `WP-10-m8-bazel-retained-foundation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-developer-graph-boundary-design`.
+`WP-10-m8-bazel-retained-foundation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

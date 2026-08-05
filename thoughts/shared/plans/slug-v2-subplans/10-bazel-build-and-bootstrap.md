@@ -25,8 +25,10 @@ manifests reach the fixed point below.
 - Pin the bootstrap oracle/tool to Bazel 9.2.0 at
   `8220c6198837d5c13d53fea211cf3282aa12408a` and add a root
   `.bazelversion` with `9.2.0` when implementation begins.
-- Use bzlmod and a Bazel-9-compatible pinned `rules_rust`; no WORKSPACE file,
-  legacy repository rules, or native language-rule fallback.
+- Use bzlmod and `rules_rust` 0.73.0 from the BCR archive with integrity
+  `sha256-LQyLlnthnVcXvoIQ9SokxapiTjIpo43EBxcS2x3VIvI=`. Its registry
+  presubmit includes Bazel 9.x. No WORKSPACE file, legacy repository rules, or
+  native language-rule fallback is allowed.
 - Keep Cargo as a supported development path while the Bazel graph matures.
   `Cargo.lock` and the Bazel Rust dependency graph must have an explicit,
   reviewed synchronization policy rather than drifting silently.
@@ -63,6 +65,78 @@ manifests reach the fixed point below.
   V1 paths or introduce `buck-out`-shaped outputs.
 - Add a deterministic build-info input so bootstrap comparisons can normalize
   the expected compiler/version stamp without hiding semantic differences.
+
+#### Accepted first-closure design (2026-08-05)
+
+`WP-10-m8-bazel-developer-graph-boundary-design` inspected the live manifests
+without running Cargo or Bazel and accepts this finite production boundary:
+
+- `slug_cli_v2` reaches exactly 14 V2 packages: `slug_cli_v2`,
+  `slug_commands_v2`, `slug_core_v2`, `slug_reapi_v2`, `slug_server_v2`,
+  `slug_analysis_v2`, `slug_bep_v2`, `slug_build_api_v2`, `slug_bzlmod_v2`,
+  `slug_events_v2`, `slug_identity_v2`, `slug_loading_v2`, `slug_query_v2`, and
+  `slug_workspace_v2`. `slug_configuration_v2` is not in this closure.
+- It reaches exactly 19 retained packages: `allocative`, `allocative_derive`,
+  `cmp_any`, `dice`, `dice_error`, `dice_futures`, `display_container`, `dupe`,
+  `dupe_derive`, `gazebo`, `gazebo_derive`, `lock_free_hashtable`,
+  `lock_free_vec`, `starlark`, `starlark_derive`, `starlark_map`,
+  `starlark_syntax`, `strong_hash`, and `strong_hash_derive`.
+  `starlark_map` does not enable its optional `pagable` feature, so `pagable`,
+  `pagable_derive`, and `static_interner` are excluded. The locked external git
+  package `sorted_vector_map` remains pinned at `84a82026...`.
+- The five local proc-macro targets are `allocative_derive`, `dupe_derive`,
+  `gazebo_derive`, `starlark_derive`, and `strong_hash_derive`. External proc
+  macros belong to the generated crate universe.
+
+The toolchain is the repository's `nightly/2025-09-14`, with edition `2024`
+on 2024 crates and edition `2021` on `slug_server_v2`. Until a later reviewed
+repository configuration exists, every credential-free local command passes
+`--@rules_rust//rust/toolchain/channel=nightly` explicitly because the
+rules_rust channel setting defaults to stable.
+
+Cargo stays authoritative for dependency declarations and resolution.
+Implementation removes the root `Cargo.lock` ignore, validates and commits
+that lock, and gives crate_universe the root manifest and lock with
+`isolated = True` and `generate_build_scripts = True`. A separate checked-in
+`Cargo.Bazel.lock` owns reproducible rendering, and `MODULE.bazel.lock` owns
+bzlmod resolution. Manifest/toolchain changes update and review Cargo inputs
+first; only an explicit `CARGO_BAZEL_REPIN=1 bazel sync --only=slug_crates`
+may then update the rendering lock, and all affected lock diffs are reviewed
+together. The generated external repository may cover more than the CLI
+closure because the root manifest names the full workspace; only the owned
+first-party Bazel target graph is claimed to be closure-limited.
+
+Generated-source ownership is explicit and remains within the same closure:
+
+- `cargo_build_script` carries the `rust_nightly` cfg emitted by the
+  `allocative`, `starlark`, and `starlark_map` build scripts from the pinned
+  compiler, rather than replacing it with an ambient host probe.
+- A first-party build-script target runs LALRPOP for
+  `starlark_syntax/src/syntax/grammar.lalrpop`; generated Rust stays in Bazel
+  outputs.
+- A first-party build-script target runs vendored protoc plus tonic-build for
+  the five checked-in `slug_reapi_v2` protos consumed through `OUT_DIR`;
+  generated Rust is neither handwritten nor checked in.
+
+The implementation is split into three reviewable gates. Gate A owns only root
+module/toolchain/lock metadata and BUILD files for the 19 retained packages;
+it replaces all 19 live Buck/fbcode-shaped BUILD files in that closure,
+updates the archive checker so fresh root `MODULE.bazel`/`BUILD.bazel` are no
+longer mistaken for archived V1 metadata, and builds the retained `dice` and
+`starlark` roots. Gate B adds BUILD files for the 14 V2 packages, the REAPI
+proto generation, `slug_cli_v2` library, and
+`//app/slug_cli_v2:slug`, then proves the first complete production build.
+Gate C maps the CLI unit and integration tests and then every unit/integration
+test owned by the transitive V2 packages. The CLI integration targets must
+adapt compile-time `CARGO_BIN_EXE_slug`/`CARGO_MANIFEST_DIR` with declared
+binary and fixture runfiles; they may not silently drop, rewrite, or use Cargo
+as an executor.
+
+Gates A-C use local Bazel with `--ignore_all_rc_files`; no repository or home
+rc is inspected or consumed, and no BuildBuddy/cache/RBE claim is made. A later
+credential-reviewed cache-only packet may add a non-secret opt-in repository
+configuration; RBE remains a distinct evidence packet. Query, cquery, aquery,
+self-hosting, and M2/M5/M6 semantics remain outside this developer-graph work.
 
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
