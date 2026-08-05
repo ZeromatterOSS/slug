@@ -1,20 +1,21 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-3`
+Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-4`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze the terminal missing pure-family default/repeat/cache-byte facts
-before mechanical descriptor attachment.
+Role: freeze terminal nonrepeat/attachment, default, discriminator, and cache
+facts before mechanical descriptor attachment.
 Predecessors: exact Java/Guava renderer authority, forced-sharding structural
 semantic identity, and the full family-source/16-enum route anchor table are
-accepted. Retry 2 was discarded at terminal review; this packet performs no
+accepted. Retry 3 was discarded at terminal review; this packet performs no
 new source discovery.
 
 Write one compact `F-*` contract row for every distinct pure semantic family,
-citing only accepted `[R]` renderer, `[I]` identity, and `[S]` source-route
-sections. Do not repeat full paths/ranges, inventories, probes, or 287
-descriptor rows. Freeze exact grammar, structural semantic equality/order,
-`N`/`D`/`Ø`/`E`/`A`/`U` routes, and exact field cache bytes.
+citing only accepted `[R]` renderer, `[I]` identity, `[S]` source-route, and
+already closed Stage 6 value-algebra/Dotted-discriminator sections. Do not
+repeat full paths/ranges, inventories, probes, or 287 descriptor rows. Freeze
+exact grammar, structural semantic equality/order, `N`/`D`/`Ø`/`E`/`A`/`U`
+routes, and exact field cache bytes.
 
 Mandatory facts are immutable:
 
@@ -45,6 +46,25 @@ Mandatory facts are immutable:
   cache example such as `C(OFF)=x="OFF", `, never literal `m`; and
 - runs remains only default materialization `D("1")` plus deferred `U("+2")`,
   with no general numeric/regex occurrence decoder.
+- F-AllowCommaList has distinct nonrepeat `D("")=Ø→x=EMPTY, ` and
+  `E("a,,b")=[a,"",b]→x="[a, , b]", ` routes before any admitted repeat
+  flattening;
+  F-Text repeat attaches only to admitted built-in `m=T List<String>`;
+  F-StringSet has `D("")=Ø→x=EMPTY, ` and
+  `E(U+E000,U+10000)=[𐀀, ]→x="[𐀀, ]", `;
+- F-Shard has `D("explicit")=EXPLICIT→x="EXPLICIT", `, an ASCII-case-folded
+  `forced=` prefix, full nonnegative `Integer.decode` radix/sign grammar, and
+  canonical decimal `forced=N` rendering; F-Fission has
+  `D("no")=Ø→x=EMPTY, ` plus its exact nonempty bytes;
+- timeout nonpositive entries fall back individually, including
+  `E("3661,0,0,0")→{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}`
+  and `x="{short=PT1H1M1S, moderate=PT5M, long=PT15M, eternal=PT1H}", `;
+- Dotted uses case-insensitive component `(\d+)([a-z0-9]*?)?(\d+)?` and
+  descriptive `([a-z]\w*)` patterns, `Integer.parseInt` capture bounds, and
+  first-descriptive early-stop including underscore/ignored later bytes; runs
+  `D("1")` is retained/cache `[(?:(?>.*)) Options: [1]]→x="[(?:(?>.*)) Options: [1]]", `
+  while `U("+2")` remains deferred with no general `E/A`; and
+- Platform has `D(s)=E(s)=ASCII-lower(s)`.
 
 Preserve the disjoint `287 + 8 + 5 + 41 = 341` routing and independent
 repeat/old-name/expansion/implicit metadata. The table must let a later packet

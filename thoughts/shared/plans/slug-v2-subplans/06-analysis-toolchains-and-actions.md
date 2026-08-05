@@ -2875,6 +2875,26 @@ user-approved later configured-target dependency cycles. Stop again on any
 undefined route, byte, identity, scope, or cap fact; after acceptance, run
 only mechanical 287-descriptor attachment.
 
+### Pure native family byte-contract ledger retry 3 REPLAN (2026-08-04)
+
+The unaccepted 59-line retry-3 ledger was discarded: terminal review found it
+did not freeze nonrepeat versus attachment routes, repeat scope, empty/default
+forms, full shard grammar, per-entry timeout fallback, dotted discriminators,
+runs cache bytes, or explicit platform/default paths. No source lookup, probe,
+descriptor, Rust, or runtime change occurred.
+
+Run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-4`, docs-only
+synthesis from accepted `[R]`/`[I]`/`[S]` plus the already closed Stage 6 value
+algebra and Dotted discriminator evidence. Preserve every retry-3 freeze and
+add AllowComma nonrepeat `D("")=Ø`/`EMPTY` versus repeat flattening; built-in
+`m=T List<String>` Text repeat scope; StringSet `D("")=Ø` and reverse `E`;
+Shard `D("explicit")`, ASCII prefix, full nonnegative `Integer.decode` forms
+and decimal rendering; Fission `D("no")=Ø`; timeout per-entry fallback;
+Dotted regex/descriptive early-stop; exact retained/cache runs `D("1")`; and
+Platform `D/E` ASCII lower. Preserve `287 + 8 + 5 + 41` and cycle deferral.
+Stop again on undefined grammar, default, byte, identity, scope, or cap fact;
+after acceptance run only mechanical 287-descriptor attachment.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
