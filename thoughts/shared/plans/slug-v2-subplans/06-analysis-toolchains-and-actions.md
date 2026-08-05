@@ -908,3 +908,25 @@ root string build setting, explicit command override, and a user transition
 that rewrites the setting on a dependency edge, observed through exact
 provider values with retained edit/error recovery. No Rust or aquery change is
 authorized by the evidence packet.
+
+### String build-setting transition diagnostic replan (2026-08-04)
+
+**Status: REPLAN; the stopped fixture was discarded.** A six-file, eight-row
+Bazel 9.2 fixture generated and replayed successfully for direct default and
+command values, two distinct transitioned edges to the same child, warm reuse,
+transition edit, build-setting default edit, invalid output, and recovery. The
+mandated invalid-transition diagnostic names the configured edge as
+`//:parent (a7a71fd) -|left|-> //:consumer`; both raw and normalized stderr
+therefore expose the unavailable configuration checksum. Hiding it would
+require forbidden normalization or an inexact diagnostic.
+
+The worker removed all six untracked fixture files and restored a clean
+worktree. Reserved review accepts a positive-only successor because every
+successful row exposes only semantic provider values and stable labels; invalid
+transition programs remain gated on general public configuration identity.
+
+Run next only `WP-6-m2-positive-string-build-setting-transition-oracle`.
+Retain the same fixture-only scope and caps, replace the invalid/recovery pair
+with transition-value restoration and build-setting-default restoration, and
+stop if any successful output exposes configuration identity. No Rust,
+normalization, or failure-diagnostic claim is authorized.

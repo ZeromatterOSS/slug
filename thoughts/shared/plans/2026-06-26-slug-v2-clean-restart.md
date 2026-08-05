@@ -25,8 +25,8 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions, and bounded root Starlark-label cquery in `135b0567` | semantic target configuration inputs/transitions, then general option identity, toolchain/platform, repository-mapping, and broader action ownership gates | run `WP-6-m2-string-build-setting-transition-oracle` |
-| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while `WP-6-m2-string-build-setting-transition-oracle` is current |
+| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions, and bounded root Starlark-label cquery in `135b0567` | successful semantic target configuration inputs/transitions, then general option and failure-diagnostic identity, toolchain/platform, repository-mapping, and broader action ownership gates | run `WP-6-m2-positive-string-build-setting-transition-oracle` |
+| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while `WP-6-m2-positive-string-build-setting-transition-oracle` is current |
 | M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-6-m2-string-build-setting-transition-oracle`.
+`WP-6-m2-positive-string-build-setting-transition-oracle`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -53,7 +53,11 @@ An action-query audit then found no configuration-opaque Bazel formatter, so
 `aquery` remains deferred rather than inventing action keys, configured paths,
 platforms, or configuration text. The active oracle-only packet now pins the
 first semantic configuration discriminator: a string build setting and a user
-transition observed through provider values, never through a checksum.
+transition observed through provider values, never through a checksum. The
+first evidence attempt proved that Bazel's invalid-transition diagnostic itself
+prints the unavailable checksum and was discarded; the positive-only successor
+keeps successful semantic configuration evidence separate from that blocked
+failure envelope.
 
 The retained Bazel 9.2 evidence pins default and explicit `label` output to the
 same `//parent:parent (a7a71fd)` bytes. Pinned source and live audits prove even
