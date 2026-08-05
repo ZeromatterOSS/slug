@@ -696,8 +696,11 @@ this evidence checkpoint.
 
 **Status: REPLAN; no implementation exists for this packet.** Pinned Bazel
 9.2 source and two live Slug audits prove that even the no-extra-flags target
-configuration is not a bounded constant. Bazel registers fourteen native
-`FragmentOptions` classes, sorts them by fully qualified class name, and hashes
+configuration is not a bounded constant. This historical design originally
+counted fourteen native `FragmentOptions` classes. A complete follow-up audit
+corrected the Bazel 9.2 registry to seventeen classes; the omitted classes were
+coverage, test, and config-feature-flag options. Bazel sorts the registry by
+fully qualified class name and hashes
 every option cache key—including defaults—in alphabetical option-name order,
 then hashes canonical Starlark options and option scopes. The native set spans
 platform, shell, core, strict-action-environment, Python, Android, Apple, C++,
@@ -1648,3 +1651,78 @@ This successor is documentation/source-only at a 380-line cap. It authorizes
 no Rust, tests, fixtures, oracle run, dependency, command wire, DICE owner, or
 checksum. Configured artifacts, per-action platform, Bazel ActionKey, public
 cquery/aquery formatting, and execution remain downstream stops.
+
+### General target-configuration input-chain design result (2026-08-04)
+
+**Status: REPLAN; no Rust implementation is authorized.** The complete pinned
+Bazel 9.2 registry contains seventeen native `FragmentOptions` classes and 341
+cache-key options, not the fourteen classes assumed by the predecessor. In
+fully qualified class-name checksum order, the classes and option counts are:
+
+1. `PlatformOptions` (7)
+2. `ShellConfiguration.Options` (1)
+3. `CoreOptions` (71)
+4. `CoverageConfiguration.CoverageOptions` (2)
+5. `TestConfiguration.TestOptions` (21)
+6. `BazelRuleClassProvider.StrictActionEnvOptions` (1)
+7. `BazelPythonConfiguration.Options` (3)
+8. `AndroidConfiguration.Options` (60)
+9. `BazelAndroidConfiguration.Options` (1)
+10. `AppleCommandLineOptions` (26)
+11. `ConfigFeatureFlagOptions` (2)
+12. `CppOptions` (78)
+13. `JavaOptions` (36)
+14. `J2ObjcCommandLineOptions` (2)
+15. `ObjcCommandLineOptions` (13)
+16. `ProtoConfiguration.Options` (11)
+17. `PythonOptions` (6)
+
+The Bazel rule-class provider supplies rule-set-required fragments plus
+`CoreOptions` to `FragmentRegistry.create`. `BuildOptions` sorts native classes
+by fully qualified name and fingerprints each normalized fragment cache key,
+then canonical-label-sorted Starlark values and scopes. `OptionsBase` orders
+option fields alphabetically and encodes empty lists, nulls, and escaped string
+forms distinctly. Defaults, converters, repeat/expansion behavior, and
+fragment-specific normalization are therefore semantic inputs rather than
+parser details.
+
+The final configuration also depends on inputs outside that registry. Bazel's
+configuration-key producer applies target-platform flags or platform mappings,
+resolves Starlark option scopes including project-baseline reset/removal, and
+only then creates the key. Host CPU/default observations, repository-mapped
+labels, mapping-file contents, platform targets, BUILD and `.bzl` definitions,
+typed build-setting defaults and explicit values, and `PROJECT.scl` can all
+participate before the checksum.
+
+Live Slug has none of that complete chain. Build preserves raw configuration
+flags but runtime ignores them; cquery rejects them; daemon requests carry no
+target options. The per-attempt input bundle injects only bzlmod/registry
+inputs. Build and cquery construct `target:first-build` before entering the
+command transaction. `ConfigurationKey` accepts an opaque checksum, its stable
+serialization omits the existing string-setting side channel, and transitions
+overlay that side channel without recomputing identity. A truthful producer
+must instead run inside the committed command transaction, return unioned
+Needs before semantic errors, and allow roots to be constructed only from a
+complete canonical configuration.
+
+The required serial implementation layers are: complete typed native
+vocabulary and normalization; shared one-shot/daemon request identity; Host,
+platform mapping, and platform-flag DICE inputs; Starlark values/defaults/
+scopes; then transactional production, checksum/key/transition replacement,
+and build/cquery integration. A single implementation packet cannot own those
+surfaces with a complete 341-option contract.
+
+Run next only `WP-6-m2-bazel-9-target-configuration-input-ledger`. It must
+inventory all seventeen classes and 341 options with defaults, converters,
+normalizers, ordering, and encoding; enumerate every non-native input; and map
+each row to exactly one eventual command, wire, Host/loading, DICE, or analysis
+owner. Freeze pre-DICE parse errors, Need-before-error, complete-result
+validity, structural equality, invalidation, and one-shot/same-daemon
+`C0 -> C1 -> C0` restoration before naming the first Rust packet.
+
+The ledger is documentation/source-only at 680 formatted lines. It authorizes
+zero Rust, tests, fixtures, oracle, generated data, wire, or DICE changes.
+Configured artifacts, per-action execution platforms, Bazel ActionKey,
+cquery/aquery formatting, and execution remain downstream. Configured-target
+dependency-cycle semantics are deferred with user approval; the retained
+closure and the configuration ledger cover acyclic recursion only.
