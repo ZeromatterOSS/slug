@@ -7,10 +7,12 @@ use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_identity_v2::OptionLabelContext;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
+use slug_identity_v2::ResolvedOptionLabel;
 use slug_identity_v2::TargetName;
 use slug_identity_v2::serialization::StableSerialize;
 
@@ -397,4 +399,449 @@ fn labels_reject_invalid_target_name_characters_and_segments() {
     ] {
         assert!(CanonicalLabel::parse(label).is_err(), "{label:?}");
     }
+}
+
+#[test]
+fn option_label_mapping_identity_and_nonvisible_rendering_match_bazel() {
+    let mut first = RepositoryMapping::new(RepositoryMappingId::new("first").unwrap());
+    first.insert(
+        ApparentRepoName::new("alias").unwrap(),
+        CanonicalRepoName::new("real+").unwrap(),
+    );
+    first.insert(
+        ApparentRepoName::root(),
+        CanonicalRepoName::new("ignored+").unwrap(),
+    );
+    let mut second = RepositoryMapping::new(RepositoryMappingId::new("second").unwrap());
+    second.insert(
+        ApparentRepoName::new("alias").unwrap(),
+        CanonicalRepoName::new("real+").unwrap(),
+    );
+    second.insert(
+        ApparentRepoName::root(),
+        CanonicalRepoName::new("ignored+").unwrap(),
+    );
+    assert_ne!(first, second);
+    assert_eq!(
+        first
+            .resolve(&ApparentRepoName::new("missing").unwrap())
+            .as_str(),
+        "missing"
+    );
+    assert_eq!(first.resolve(&ApparentRepoName::root()).as_str(), "");
+
+    let visible = ResolvedOptionLabel::parse(
+        "@alias//p:t",
+        OptionLabelContext::MainRepository { mapping: &first },
+    )
+    .unwrap();
+    let same_visible = ResolvedOptionLabel::parse(
+        "@alias//p:t",
+        OptionLabelContext::MainRepository { mapping: &second },
+    )
+    .unwrap();
+    let direct = ResolvedOptionLabel::parse(
+        "@@real+//p:t",
+        OptionLabelContext::MainRepository { mapping: &first },
+    )
+    .unwrap();
+    assert_eq!(direct.to_string(), "@@real+//p:t");
+    assert_eq!(visible, direct);
+    assert_eq!(visible, same_visible);
+    assert_ne!(
+        ApparentLabel::parse("@alias//p:t").unwrap().resolve(&first),
+        ApparentLabel::parse("@alias//p:t")
+            .unwrap()
+            .resolve(&second)
+    );
+
+    let main = RepositoryMapping::new(RepositoryMappingId::new("main").unwrap());
+    let package = RepositoryMapping::new(RepositoryMappingId::new("package").unwrap());
+    let base = PackageIdentifier::new(
+        CanonicalRepoName::new("owner+").unwrap(),
+        PackagePath::parse("base").unwrap(),
+    );
+    let missing_main = ResolvedOptionLabel::parse(
+        "@missing//p:t",
+        OptionLabelContext::MainRepository { mapping: &main },
+    )
+    .unwrap();
+    let missing_package = ResolvedOptionLabel::parse(
+        "@missing//p:t",
+        OptionLabelContext::Package {
+            base_package: &base,
+            mapping: &package,
+        },
+    )
+    .unwrap();
+    assert_eq!(
+        missing_main.to_string(),
+        "@@[unknown repo 'missing' requested from @@]//p:t"
+    );
+    assert_eq!(
+        missing_package.to_string(),
+        "@@[unknown repo 'missing' requested from @@owner+]//p:t"
+    );
+    assert_ne!(missing_main, missing_package);
+    assert_ne!(value_hash(&missing_main), value_hash(&missing_package));
+    assert_eq!(
+        missing_main.bazel_natural_cmp(&missing_package),
+        Ordering::Equal
+    );
+
+    let direct_missing = ResolvedOptionLabel::parse(
+        "@@missing//p:t",
+        OptionLabelContext::MainRepository { mapping: &main },
+    )
+    .unwrap();
+    let first_round =
+        ResolvedOptionLabel::parse("@missing//p:t", OptionLabelContext::FirstRoundCanonical)
+            .unwrap();
+    assert_eq!(direct_missing.to_string(), "@@missing//p:t");
+    assert_eq!(direct_missing, first_round);
+    assert_ne!(direct_missing, missing_main);
+    assert_eq!(
+        direct_missing.bazel_natural_cmp(&missing_main),
+        Ordering::Equal
+    );
+
+    let mut ordered = RepositoryMapping::new(RepositoryMappingId::new("tie").unwrap());
+    ordered.insert(
+        ApparentRepoName::new("baa").unwrap(),
+        CanonicalRepoName::new("old+").unwrap(),
+    );
+    ordered.insert(
+        ApparentRepoName::new("aab").unwrap(),
+        CanonicalRepoName::new("two+").unwrap(),
+    );
+    ordered.insert(
+        ApparentRepoName::new("baa").unwrap(),
+        CanonicalRepoName::new("one+").unwrap(),
+    );
+    let mut reversed = RepositoryMapping::new(RepositoryMappingId::new("tie").unwrap());
+    reversed.insert(
+        ApparentRepoName::new("aab").unwrap(),
+        CanonicalRepoName::new("two+").unwrap(),
+    );
+    reversed.insert(
+        ApparentRepoName::new("baa").unwrap(),
+        CanonicalRepoName::new("one+").unwrap(),
+    );
+    assert_eq!(ordered, reversed);
+    assert_eq!(
+        ResolvedOptionLabel::parse(
+            "@baa//p:t",
+            OptionLabelContext::MainRepository { mapping: &ordered }
+        )
+        .unwrap()
+        .to_string(),
+        "@@one+//p:t"
+    );
+    let ordered_missing = ResolvedOptionLabel::parse(
+        "@aaa//p:t",
+        OptionLabelContext::MainRepository { mapping: &ordered },
+    )
+    .unwrap();
+    let reversed_missing = ResolvedOptionLabel::parse(
+        "@aaa//p:t",
+        OptionLabelContext::MainRepository { mapping: &reversed },
+    )
+    .unwrap();
+    assert_eq!(
+        ordered_missing.to_string(),
+        "@@[unknown repo 'aaa' requested from @@ (did you mean 'baa'?)]//p:t"
+    );
+    assert_eq!(
+        reversed_missing.to_string(),
+        "@@[unknown repo 'aaa' requested from @@ (did you mean 'aab'?)]//p:t"
+    );
+    assert_ne!(ordered_missing, reversed_missing);
+    assert_ne!(value_hash(&ordered_missing), value_hash(&reversed_missing));
+}
+
+#[test]
+fn option_label_context_parses_the_three_bazel_modes() {
+    let mut mapping = RepositoryMapping::new(RepositoryMappingId::new("grammar").unwrap());
+    mapping.insert(
+        ApparentRepoName::root(),
+        CanonicalRepoName::new("explicit+").unwrap(),
+    );
+    mapping.insert(
+        ApparentRepoName::new("dep").unwrap(),
+        CanonicalRepoName::new("dep+").unwrap(),
+    );
+    let base = PackageIdentifier::new(
+        CanonicalRepoName::new("owner+").unwrap(),
+        PackagePath::parse("base/pkg").unwrap(),
+    );
+    let package = OptionLabelContext::Package {
+        base_package: &base,
+        mapping: &mapping,
+    };
+    assert_eq!(
+        ResolvedOptionLabel::parse("@//p:t", OptionLabelContext::FirstRoundCanonical)
+            .unwrap()
+            .to_string(),
+        "//p:t"
+    );
+    for (input, expected) in [
+        ("pkg/t:bin", "//pkg/t:bin"),
+        (":bin", "//:bin"),
+        ("bin", "//bin:bin"),
+        ("//conditions:default", "//conditions:default"),
+    ] {
+        for context in [
+            OptionLabelContext::FirstRoundCanonical,
+            OptionLabelContext::MainRepository { mapping: &mapping },
+        ] {
+            assert_eq!(context.parse(input).unwrap().to_string(), expected);
+        }
+    }
+    assert!(package.parse("pkg/t:bin").is_err());
+    for input in [":bin", "bin"] {
+        assert_eq!(
+            package.parse(input).unwrap().to_string(),
+            "@@owner+//base/pkg:bin"
+        );
+    }
+    assert_eq!(
+        package.parse("//tools:bin").unwrap().to_string(),
+        "@@owner+//tools:bin"
+    );
+    for context in [
+        OptionLabelContext::FirstRoundCanonical,
+        OptionLabelContext::MainRepository { mapping: &mapping },
+    ] {
+        assert_eq!(
+            context.parse("//p:foo/...").unwrap().to_string(),
+            "//p:foo/..."
+        );
+    }
+    assert_eq!(
+        package.parse("//p:foo/...").unwrap().to_string(),
+        "@@owner+//p:foo/..."
+    );
+    assert_eq!(
+        package.parse(":foo/...").unwrap().to_string(),
+        "@@owner+//base/pkg:foo/..."
+    );
+    assert_eq!(
+        ResolvedOptionLabel::parse("@dep//p:foo/...", OptionLabelContext::FirstRoundCanonical)
+            .unwrap()
+            .to_string(),
+        "@@dep//p:foo/..."
+    );
+    for context in [
+        OptionLabelContext::MainRepository { mapping: &mapping },
+        package,
+    ] {
+        assert_eq!(
+            context.parse("@dep//p:foo/...").unwrap().to_string(),
+            "@@dep+//p:foo/..."
+        );
+    }
+    for special in ["conditions", "visibility"] {
+        assert_eq!(
+            package
+                .parse(&format!("//{special}:default"))
+                .unwrap()
+                .to_string(),
+            format!("//{special}:default")
+        );
+    }
+    assert_eq!(
+        package.parse("foo/bar").unwrap().to_string(),
+        "@@owner+//base/pkg:foo/bar"
+    );
+
+    let explicit_package = package.parse("@//p:t").unwrap();
+    let unqualified_package = package.parse("//p:t").unwrap();
+    assert_eq!(explicit_package.to_string(), "@@explicit+//p:t");
+    assert_eq!(explicit_package.unambiguous_form(), "@@explicit+//p:t");
+    assert_ne!(explicit_package, unqualified_package);
+    let main_explicit = ResolvedOptionLabel::parse(
+        "@//p:t",
+        OptionLabelContext::MainRepository { mapping: &mapping },
+    )
+    .unwrap();
+    let main_unqualified = ResolvedOptionLabel::parse(
+        "//p:t",
+        OptionLabelContext::MainRepository { mapping: &mapping },
+    )
+    .unwrap();
+    assert_eq!(main_explicit.to_string(), "@@explicit+//p:t");
+    assert_eq!(main_unqualified.to_string(), "//p:t");
+    assert_eq!(main_unqualified.unambiguous_form(), "@@//p:t");
+
+    let mut collapse_main =
+        RepositoryMapping::new(RepositoryMappingId::new("collapse-main").unwrap());
+    collapse_main.insert(ApparentRepoName::root(), CanonicalRepoName::root());
+    let mut collapse_package =
+        RepositoryMapping::new(RepositoryMappingId::new("collapse-package").unwrap());
+    collapse_package.insert(
+        ApparentRepoName::root(),
+        CanonicalRepoName::new("owner+").unwrap(),
+    );
+    let collapsed_main = ResolvedOptionLabel::parse(
+        "@//p:t",
+        OptionLabelContext::MainRepository {
+            mapping: &collapse_main,
+        },
+    )
+    .unwrap();
+    let collapsed_package = ResolvedOptionLabel::parse(
+        "@//p:t",
+        OptionLabelContext::Package {
+            base_package: &base,
+            mapping: &collapse_package,
+        },
+    )
+    .unwrap();
+    assert_eq!(collapsed_main, main_unqualified);
+    assert_eq!(collapsed_main.to_string(), "//p:t");
+    assert_eq!(collapsed_package, unqualified_package);
+    assert_eq!(collapsed_package.to_string(), "@@owner+//p:t");
+
+    let absent = RepositoryMapping::new(RepositoryMappingId::new("absent").unwrap());
+    assert_eq!(
+        ResolvedOptionLabel::parse(
+            "@//p:t",
+            OptionLabelContext::MainRepository { mapping: &absent }
+        )
+        .unwrap()
+        .to_string(),
+        "@@[unknown repo '' requested from @@]//p:t"
+    );
+    assert_eq!(
+        ResolvedOptionLabel::parse(
+            "@//p:t",
+            OptionLabelContext::Package {
+                base_package: &base,
+                mapping: &absent
+            }
+        )
+        .unwrap()
+        .to_string(),
+        "@@[unknown repo '' requested from @@owner+]//p:t"
+    );
+
+    assert_eq!(
+        ResolvedOptionLabel::parse("@dep", OptionLabelContext::FirstRoundCanonical)
+            .unwrap()
+            .to_string(),
+        "@@dep//:dep"
+    );
+    for context in [
+        OptionLabelContext::MainRepository { mapping: &mapping },
+        package,
+    ] {
+        assert_eq!(context.parse("@dep").unwrap().to_string(), "@@dep+//:dep");
+    }
+    for context in [
+        OptionLabelContext::FirstRoundCanonical,
+        OptionLabelContext::MainRepository { mapping: &mapping },
+        package,
+    ] {
+        assert_eq!(context.parse("@@dep").unwrap().to_string(), "@@dep//:dep");
+        assert_eq!(
+            context.parse("@@dep//p:t").unwrap().to_string(),
+            "@@dep//p:t"
+        );
+    }
+    for spelling in ["/tmp:bin", "//pkg/...", "pkg/...", "@bad!//p:t"] {
+        for context in [
+            OptionLabelContext::FirstRoundCanonical,
+            OptionLabelContext::MainRepository { mapping: &mapping },
+            package,
+        ] {
+            assert!(context.parse(spelling).is_err(), "{spelling}");
+        }
+    }
+}
+
+#[test]
+fn option_label_private_bazel_validators_cover_option_only_spellings() {
+    let mapping = RepositoryMapping::new(RepositoryMappingId::new("validator").unwrap());
+    let base = PackageIdentifier::new(
+        CanonicalRepoName::new("owner+").unwrap(),
+        PackagePath::parse("base").unwrap(),
+    );
+    let package = OptionLabelContext::Package {
+        base_package: &base,
+        mapping: &mapping,
+    };
+    for repo in [".foo", "foo.", "repo.."] {
+        assert_eq!(
+            ResolvedOptionLabel::parse(
+                &format!("@{repo}//p:t"),
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap()
+            .to_string(),
+            format!("@@{repo}//p:t")
+        );
+        for context in [
+            OptionLabelContext::MainRepository { mapping: &mapping },
+            package,
+        ] {
+            assert_eq!(
+                context
+                    .parse(&format!("@@{repo}//p:t"))
+                    .unwrap()
+                    .to_string(),
+                format!("@@{repo}//p:t")
+            );
+        }
+    }
+    for input in [
+        "@.//p:t",
+        "@@..//p:t",
+        "@repo~name//p:t",
+        "@@repo~name//p:t",
+        "//pkg\\name:t",
+        "//p\u{e9}:t",
+    ] {
+        for context in [
+            OptionLabelContext::FirstRoundCanonical,
+            OptionLabelContext::MainRepository { mapping: &mapping },
+            package,
+        ] {
+            assert!(context.parse(input).is_err(), "{input}");
+        }
+    }
+}
+
+#[test]
+fn option_labels_are_structurally_ordered_but_naturally_utf16_compared() {
+    let mapping = RepositoryMapping::new(RepositoryMappingId::new("missing").unwrap());
+    let visible = ResolvedOptionLabel::parse(
+        "@@missing//p:t",
+        OptionLabelContext::MainRepository { mapping: &mapping },
+    )
+    .unwrap();
+    let nonvisible = ResolvedOptionLabel::parse(
+        "@missing//p:t",
+        OptionLabelContext::MainRepository { mapping: &mapping },
+    )
+    .unwrap();
+    assert_ne!(visible, nonvisible);
+    assert_ne!(visible.cmp(&nonvisible), Ordering::Equal);
+    assert_eq!(visible.bazel_natural_cmp(&nonvisible), Ordering::Equal);
+    let supplementary = ResolvedOptionLabel::parse(
+        "@@missing//p:\u{10000}",
+        OptionLabelContext::FirstRoundCanonical,
+    )
+    .unwrap();
+    let bmp = ResolvedOptionLabel::parse(
+        "@@missing//p:\u{e000}",
+        OptionLabelContext::FirstRoundCanonical,
+    )
+    .unwrap();
+    assert_eq!(supplementary.bazel_natural_cmp(&bmp), Ordering::Less);
+}
+
+fn value_hash<T: Hash>(value: &T) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
 }

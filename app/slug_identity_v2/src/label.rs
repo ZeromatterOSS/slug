@@ -18,8 +18,38 @@ use crate::package::PackagePath;
 use crate::package::TargetName;
 use crate::repo::ApparentRepoName;
 use crate::repo::CanonicalRepoName;
+use crate::repo_mapping::OptionMappingLookup;
 use crate::repo_mapping::RepositoryMapping;
 use crate::repo_mapping::RepositoryMappingId;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
+enum OptionRepository {
+    Visible(CanonicalRepoName),
+    NonVisible {
+        requested: String,
+        owner: CanonicalRepoName,
+        did_you_mean_suffix: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
+pub struct ResolvedOptionLabel {
+    repository: OptionRepository,
+    package: PackagePath,
+    target: TargetName,
+}
+
+#[derive(Clone, Copy)]
+pub enum OptionLabelContext<'a> {
+    FirstRoundCanonical,
+    MainRepository {
+        mapping: &'a RepositoryMapping,
+    },
+    Package {
+        base_package: &'a PackageIdentifier,
+        mapping: &'a RepositoryMapping,
+    },
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative)]
 pub struct ApparentLabel {
@@ -33,6 +63,256 @@ pub struct CanonicalLabel {
     package: PackageIdentifier,
     target: TargetName,
     mapping_id: Option<RepositoryMappingId>,
+}
+
+impl<'a> OptionLabelContext<'a> {
+    pub fn parse(self, value: &str) -> Result<ResolvedOptionLabel, String> {
+        ResolvedOptionLabel::parse(value, self)
+    }
+}
+
+impl ResolvedOptionLabel {
+    pub fn parse(value: &str, context: OptionLabelContext<'_>) -> Result<Self, String> {
+        let value = match context {
+            OptionLabelContext::FirstRoundCanonical | OptionLabelContext::MainRepository { .. }
+                if !value.starts_with('/') && !value.starts_with('@') =>
+            {
+                format!("//{value}")
+            }
+            _ => value.to_owned(),
+        };
+        if value.starts_with('/') && !value.starts_with("//") {
+            return Err("absolute label must begin with '@' or '//'".to_owned());
+        }
+        let (spelling, package, target, relative) = parse_option_label_spelling(&value)?;
+        if package
+            .as_str()
+            .split('/')
+            .any(|component| component == "...")
+        {
+            return Err("package name cannot contain '...'".to_owned());
+        }
+        let (repository, package) = match context {
+            OptionLabelContext::FirstRoundCanonical => (spelling.into_visible()?, package),
+            OptionLabelContext::MainRepository { mapping } => (
+                spelling.resolve(mapping, &CanonicalRepoName::root()),
+                package,
+            ),
+            OptionLabelContext::Package {
+                base_package,
+                mapping,
+            } => {
+                let repository = match spelling {
+                    OptionRepoSpelling::None => {
+                        if matches!(package.as_str(), "conditions" | "visibility") {
+                            OptionRepository::Visible(CanonicalRepoName::root())
+                        } else {
+                            OptionRepository::Visible(base_package.repo().clone())
+                        }
+                    }
+                    spelling => spelling.resolve(mapping, base_package.repo()),
+                };
+                (
+                    repository,
+                    if relative {
+                        base_package.package().clone()
+                    } else {
+                        package
+                    },
+                )
+            }
+        };
+        Ok(Self {
+            repository,
+            package,
+            target,
+        })
+    }
+
+    pub fn unambiguous_form(&self) -> String {
+        match &self.repository {
+            OptionRepository::Visible(repository) if repository.is_root() => {
+                format!("@@//{}:{}", self.package, self.target)
+            }
+            _ => self.to_string(),
+        }
+    }
+
+    pub fn bazel_natural_cmp(&self, other: &Self) -> Ordering {
+        java_utf16_cmp(self.repository_name(), other.repository_name())
+            .then_with(|| java_utf16_cmp(self.package.as_str(), other.package.as_str()))
+            .then_with(|| java_utf16_cmp(self.target.as_str(), other.target.as_str()))
+    }
+
+    fn repository_name(&self) -> &str {
+        match &self.repository {
+            OptionRepository::Visible(repository) => repository.as_str(),
+            OptionRepository::NonVisible { requested, .. } => requested,
+        }
+    }
+}
+
+impl fmt::Display for ResolvedOptionLabel {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.repository {
+            OptionRepository::Visible(repository) if repository.is_root() => {
+                write!(f, "//{}:{}", self.package, self.target)
+            }
+            OptionRepository::Visible(repository) => {
+                write!(
+                    f,
+                    "@@{}//{}:{}",
+                    repository.as_str(),
+                    self.package,
+                    self.target
+                )
+            }
+            OptionRepository::NonVisible {
+                requested,
+                owner,
+                did_you_mean_suffix,
+            } => write!(
+                f,
+                "@@[unknown repo '{}' requested from @@{}{}]//{}:{}",
+                requested,
+                owner.as_str(),
+                did_you_mean_suffix,
+                self.package,
+                self.target
+            ),
+        }
+    }
+}
+
+enum OptionRepoSpelling {
+    None,
+    Apparent(String),
+    Canonical(CanonicalRepoName),
+}
+
+impl OptionRepoSpelling {
+    fn into_visible(self) -> Result<OptionRepository, String> {
+        match self {
+            Self::None => Ok(OptionRepository::Visible(CanonicalRepoName::root())),
+            Self::Apparent(apparent) => Ok(OptionRepository::Visible(
+                CanonicalRepoName::new_for_bazel_package_identifier(&apparent)?,
+            )),
+            Self::Canonical(canonical) => Ok(OptionRepository::Visible(canonical)),
+        }
+    }
+
+    fn resolve(self, mapping: &RepositoryMapping, owner: &CanonicalRepoName) -> OptionRepository {
+        match self {
+            Self::None => OptionRepository::Visible(CanonicalRepoName::root()),
+            Self::Canonical(canonical) => OptionRepository::Visible(canonical),
+            Self::Apparent(requested) => match mapping.option_lookup(&requested) {
+                OptionMappingLookup::Visible(canonical) => OptionRepository::Visible(canonical),
+                OptionMappingLookup::NonVisible {
+                    did_you_mean_suffix,
+                } => OptionRepository::NonVisible {
+                    requested,
+                    owner: owner.clone(),
+                    did_you_mean_suffix,
+                },
+            },
+        }
+    }
+}
+
+fn parse_option_label_spelling(
+    value: &str,
+) -> Result<(OptionRepoSpelling, PackagePath, TargetName, bool), String> {
+    if let Some(rest) = value.strip_prefix("@@") {
+        return parse_option_absolute(rest, true);
+    }
+    if let Some(rest) = value.strip_prefix('@') {
+        return parse_option_absolute(rest, false);
+    }
+    if let Some(rest) = value.strip_prefix("//") {
+        let (package, target) = split_option_package_and_target(rest)?;
+        return Ok((OptionRepoSpelling::None, package, target, false));
+    }
+    let target = value.strip_prefix(':').unwrap_or(value);
+    if !value.starts_with(':') && (value == "..." || value.ends_with("/...")) {
+        return Err("package name cannot contain '...'".to_owned());
+    }
+    if value.contains(':') && !value.starts_with(':') {
+        return Err("absolute label must begin with '@' or '//'".to_owned());
+    }
+    Ok((
+        OptionRepoSpelling::None,
+        PackagePath::root(),
+        TargetName::parse(target)?,
+        true,
+    ))
+}
+
+fn parse_option_absolute(
+    rest: &str,
+    canonical: bool,
+) -> Result<(OptionRepoSpelling, PackagePath, TargetName, bool), String> {
+    let (repository, value) = if let Some((repository, value)) = rest.split_once("//") {
+        (repository, value)
+    } else {
+        if rest.is_empty() {
+            return Err("empty target name".to_owned());
+        }
+        let repository = option_repo_spelling(rest, canonical)?;
+        return Ok((
+            repository,
+            PackagePath::root(),
+            TargetName::parse(rest)?,
+            false,
+        ));
+    };
+    let repository = option_repo_spelling(repository, canonical)?;
+    let (package, target) = split_option_package_and_target(value)?;
+    Ok((repository, package, target, false))
+}
+
+fn option_repo_spelling(value: &str, canonical: bool) -> Result<OptionRepoSpelling, String> {
+    let repository = CanonicalRepoName::new_for_bazel_package_identifier(value)?;
+    Ok(if canonical {
+        OptionRepoSpelling::Canonical(repository)
+    } else {
+        OptionRepoSpelling::Apparent(value.to_owned())
+    })
+}
+
+fn split_option_package_and_target(value: &str) -> Result<(PackagePath, TargetName), String> {
+    let (package, target) = match value.split_once(':') {
+        Some((package, target)) => (
+            parse_option_package_path(package)?,
+            TargetName::parse(target)?,
+        ),
+        None => {
+            let package = parse_option_package_path(value)?;
+            let target = package.default_target_name()?;
+            (package, target)
+        }
+    };
+    Ok((package, target))
+}
+
+fn parse_option_package_path(value: &str) -> Result<PackagePath, String> {
+    if !value.is_empty()
+        && (!value
+            .bytes()
+            .all(|byte| (b' '..=b'~').contains(&byte) && !matches!(byte, b':' | b'\\'))
+            || value.starts_with('/')
+            || value.ends_with('/')
+            || value.contains("//")
+            || value
+                .split('/')
+                .any(|component| component.bytes().all(|byte| byte == b'.')))
+    {
+        return Err("invalid Bazel option package path".to_owned());
+    }
+    PackagePath::parse(value)
+}
+
+fn java_utf16_cmp(left: &str, right: &str) -> Ordering {
+    left.encode_utf16().cmp(right.encode_utf16())
 }
 
 impl ApparentLabel {

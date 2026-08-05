@@ -18,6 +18,8 @@ pub mod serialization;
 
 pub use label::ApparentLabel;
 pub use label::CanonicalLabel;
+pub use label::OptionLabelContext;
+pub use label::ResolvedOptionLabel;
 pub use package::PackageIdentifier;
 pub use package::PackagePath;
 pub use package::TargetName;
