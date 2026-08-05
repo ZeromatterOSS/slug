@@ -25,6 +25,8 @@ pub(super) enum LabelFamily {
     CoreLabel,
     CoreEmptyToNull,
     LabelToStringEntry,
+    LabelMap,
+    FlagAlias,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative, Dupe)]
@@ -36,11 +38,22 @@ pub(super) struct LabelToStringEntry {
     pub(super) value: CompactString,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative, Dupe)]
+pub(super) struct LabelMapValues(pub(super) Arc<[(CompactString, Option<ResolvedOptionLabel>)]>);
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative)]
+pub(super) struct FlagAliasEntry {
+    pub(super) alias: CompactString,
+    pub(super) label: ResolvedOptionLabel,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Allocative)]
 pub(super) enum LabelValue {
     Label(ResolvedOptionLabel),
     Labels(LabelValues),
     LabelToStringEntry(LabelToStringEntry),
+    LabelMap(LabelMapValues),
+    FlagAlias(FlagAliasEntry),
 }
 
 struct LiteralDefault {
@@ -113,6 +126,18 @@ pub(super) fn classify(option: &NativeOptionDescriptor) -> Option<LabelFamily> {
         {
             Some(LabelFamily::LabelToStringEntry)
         }
+        Some("LabelMapConverter.class")
+            if option.class_name == "com.google.devtools.build.lib.rules.java.JavaOptions"
+                && option.canonical_name == "bytecode_optimizers" =>
+        {
+            Some(LabelFamily::LabelMap)
+        }
+        Some("CoreOptionConverters.FlagAliasConverter.class")
+            if option.class_name == "com.google.devtools.build.lib.analysis.config.CoreOptions"
+                && option.canonical_name == "flag_alias" =>
+        {
+            Some(LabelFamily::FlagAlias)
+        }
         _ => None,
     }
 }
@@ -156,6 +181,12 @@ pub(super) fn convert_label_occurrence(
         }
         LabelFamily::LabelToStringEntry => label_to_string_entry(input, context)
             .map(|value| Some(LabelValue::LabelToStringEntry(value))),
+        LabelFamily::LabelMap => {
+            label_map(input, context).map(|value| Some(LabelValue::LabelMap(value)))
+        }
+        LabelFamily::FlagAlias => {
+            flag_alias(input, context).map(|value| Some(LabelValue::FlagAlias(value)))
+        }
     }
 }
 
@@ -183,9 +214,11 @@ pub(super) fn materialize_label_default(
             Ok(None)
         }
         LabelFamily::LabelToStringEntry if input == "null" && option.allow_multiple => Ok(None),
-        LabelFamily::List | LabelFamily::OrderedSet | LabelFamily::LabelToStringEntry => {
-            Err(LabelConvertError::Invalid)
-        }
+        LabelFamily::FlagAlias if input == "null" && option.allow_multiple => Ok(None),
+        LabelFamily::List
+        | LabelFamily::OrderedSet
+        | LabelFamily::LabelToStringEntry
+        | LabelFamily::FlagAlias => Err(LabelConvertError::Invalid),
         _ => convert_label_occurrence(option, input, context),
     }
 }
@@ -264,6 +297,86 @@ fn label_to_string_entry(
     Ok(LabelToStringEntry {
         label: label(name, context)?,
         value: CompactString::new(value),
+    })
+}
+
+fn label_map(
+    input: &str,
+    context: OptionLabelContext<'_>,
+) -> Result<LabelMapValues, LabelConvertError> {
+    let mut entries: Vec<(CompactString, Option<ResolvedOptionLabel>)> = Vec::new();
+    for raw_entry in input.split(',') {
+        let entry = trim_guava_whitespace(raw_entry);
+        if entry.is_empty() {
+            continue;
+        }
+        let (key, value) = entry
+            .split_once('=')
+            .map_or((entry, None), |(key, value)| (key, Some(value)));
+        let label = value
+            .filter(|value| !value.is_empty())
+            .map(|value| label(value, context))
+            .transpose()?;
+        if entries.iter().any(|(existing, _)| existing.as_str() == key) {
+            return Err(LabelConvertError::Invalid);
+        }
+        entries.push((CompactString::new(key), label));
+    }
+    Ok(LabelMapValues(Arc::from(entries)))
+}
+
+fn trim_guava_whitespace(input: &str) -> &str {
+    input.trim_matches(is_guava_whitespace)
+}
+
+fn is_guava_whitespace(character: char) -> bool {
+    matches!(
+        character,
+        '\u{0009}'..='\u{000d}'
+            | '\u{0020}'
+            | '\u{0085}'
+            | '\u{00a0}'
+            | '\u{1680}'
+            | '\u{2000}'..='\u{200a}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}'
+    )
+}
+
+fn flag_alias(
+    input: &str,
+    context: OptionLabelContext<'_>,
+) -> Result<FlagAliasEntry, LabelConvertError> {
+    let Some(position) = input.find('=') else {
+        return Err(LabelConvertError::Invalid);
+    };
+    if position == 0 {
+        return Err(LabelConvertError::Invalid);
+    }
+    let short_form = &input[..position];
+    let long_form = &input[position + 1..];
+    if !short_form
+        .bytes()
+        .all(|character| character.is_ascii_alphanumeric() || character == b'_')
+    {
+        return Err(LabelConvertError::Invalid);
+    }
+    if long_form.contains('=') {
+        return Err(LabelConvertError::Invalid);
+    }
+    if !(long_form.starts_with("//")
+        || long_form.starts_with("no//")
+        || long_form.starts_with('@')
+        || long_form.starts_with("no@"))
+    {
+        return Err(LabelConvertError::Invalid);
+    }
+    Ok(FlagAliasEntry {
+        alias: CompactString::new(short_form),
+        label: label(long_form, context)?,
     })
 }
 

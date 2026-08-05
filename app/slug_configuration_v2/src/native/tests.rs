@@ -1843,8 +1843,10 @@ mod label_only_converter_contract {
     use slug_identity_v2::RepositoryMapping;
     use slug_identity_v2::RepositoryMappingId;
 
+    use super::super::label_convert::FlagAliasEntry;
     use super::super::label_convert::LabelConvertError;
     use super::super::label_convert::LabelFamily;
+    use super::super::label_convert::LabelMapValues;
     use super::super::label_convert::LabelToStringEntry;
     use super::super::label_convert::LabelValue;
     use super::super::label_convert::LabelValues;
@@ -1890,6 +1892,20 @@ mod label_only_converter_contract {
         value
     }
 
+    fn label_map(value: Option<LabelValue>) -> LabelMapValues {
+        let Some(LabelValue::LabelMap(value)) = value else {
+            panic!("expected an immutable ordered label map")
+        };
+        value
+    }
+
+    fn flag_alias(value: Option<LabelValue>) -> FlagAliasEntry {
+        let Some(LabelValue::FlagAlias(value)) = value else {
+            panic!("expected a flag alias entry")
+        };
+        value
+    }
+
     fn unsupported(name: &str) {
         assert_eq!(classify_label(option(name)), None, "{name}");
         assert_eq!(
@@ -1909,18 +1925,13 @@ mod label_only_converter_contract {
     }
 
     #[test]
-    fn admits_exactly_thirty_seven_routes_and_leaves_map_alias_and_other_cohorts_deferred() {
+    fn admits_exactly_thirty_nine_routes_and_leaves_only_mixed_and_other_cohorts_deferred() {
         let mut admitted = 0;
-        let mut label_deferred = 0;
         let mut mixed = 0;
         let mut host = 0;
         let mut regex = 0;
         for option in NATIVE_OPTION_DESCRIPTORS {
             admitted += usize::from(classify_label(option).is_some());
-            label_deferred += usize::from(matches!(
-                option.converter,
-                Some("LabelMapConverter.class" | "CoreOptionConverters.FlagAliasConverter.class")
-            ));
             mixed += usize::from(matches!(
                 option.converter,
                 Some("RunUnderConverter.class" | "CoreOptionConverters.CustomFlagConverter.class")
@@ -1944,11 +1955,8 @@ mod label_only_converter_contract {
                 )
             ));
         }
-        assert_eq!(
-            (admitted, label_deferred, mixed, host, regex),
-            (37, 2, 2, 5, 8)
-        );
-        assert_eq!(admitted + label_deferred + mixed, 41);
+        assert_eq!((admitted, mixed, host, regex), (39, 2, 5, 8));
+        assert_eq!(admitted + mixed, 41);
         let mut actual = NATIVE_OPTION_DESCRIPTORS
             .iter()
             .filter(|option| classify_label(option).is_some())
@@ -1992,13 +2000,13 @@ mod label_only_converter_contract {
             "proto_toolchain_for_java",
             "proto_toolchain_for_javalite",
             "experimental_override_platform_cpu_name",
+            "bytecode_optimizers",
+            "flag_alias",
         ];
         actual.sort_unstable();
         expected.sort_unstable();
         assert_eq!(actual, expected);
         for name in [
-            "bytecode_optimizers",
-            "flag_alias",
             "run_under",
             "experimental_propagate_custom_flag",
             "cpu",
@@ -2399,6 +2407,266 @@ mod label_only_converter_contract {
 
         fn allocative<T: Allocative>() {}
         allocative::<LabelToStringEntry>();
+    }
+
+    #[test]
+    fn label_map_trims_guava_whitespace_before_omitting_and_preserves_ordered_entries() {
+        let option = option("bytecode_optimizers");
+        assert_eq!(classify_label(option), Some(LabelFamily::LabelMap));
+        assert_eq!(option.raw_default, "\"Proguard\"");
+        let default = label_map(
+            materialize_label_default(option, OptionLabelContext::FirstRoundCanonical).unwrap(),
+        );
+        assert_eq!(default.0.len(), 1);
+        assert_eq!(default.0[0].0.as_str(), "Proguard");
+        assert!(default.0[0].1.is_none());
+
+        for whitespace in [
+            '\u{0009}', '\u{000a}', '\u{000b}', '\u{000c}', '\u{000d}', '\u{0020}', '\u{0085}',
+            '\u{00a0}', '\u{1680}', '\u{2000}', '\u{2001}', '\u{2002}', '\u{2003}', '\u{2004}',
+            '\u{2005}', '\u{2006}', '\u{2007}', '\u{2008}', '\u{2009}', '\u{200a}', '\u{2028}',
+            '\u{2029}', '\u{202f}', '\u{205f}', '\u{3000}',
+        ] {
+            let map = label_map(
+                convert_label_occurrence(
+                    option,
+                    &format!("{whitespace}key=//p:t{whitespace}"),
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap(),
+            );
+            assert_eq!(map.0[0].0.as_str(), "key");
+            assert_eq!(map.0[0].1.as_ref().unwrap().to_string(), "//p:t");
+
+            let omitted = label_map(
+                convert_label_occurrence(
+                    option,
+                    &format!("{whitespace},{whitespace}key{whitespace},{whitespace}"),
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap(),
+            );
+            assert_eq!(
+                omitted
+                    .0
+                    .iter()
+                    .map(|(key, value)| (key.as_str(), value.is_none()))
+                    .collect::<Vec<_>>(),
+                [("key", true)]
+            );
+        }
+        for non_whitespace in ['\u{180e}', '\u{200b}'] {
+            let map = label_map(
+                convert_label_occurrence(
+                    option,
+                    &format!("{non_whitespace}key{non_whitespace}"),
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap(),
+            );
+            assert_eq!(
+                map.0[0].0.as_str(),
+                format!("{non_whitespace}key{non_whitespace}")
+            );
+        }
+
+        let map = label_map(
+            convert_label_occurrence(
+                option,
+                ", bare ,, key= , =//root:target , extra=//p:t=tail ,",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            map.0
+                .iter()
+                .map(|(key, value)| (key.as_str(), value.as_ref().map(ToString::to_string)))
+                .collect::<Vec<_>>(),
+            [
+                ("bare", None),
+                ("key", None),
+                ("", Some("//root:target".to_owned())),
+                ("extra", Some("//p:t=tail".to_owned())),
+            ]
+        );
+        let no_key_trim = label_map(
+            convert_label_occurrence(
+                option,
+                "  key =//p:t  ",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert_eq!(no_key_trim.0[0].0.as_str(), "key ");
+        assert_eq!(
+            convert_label_occurrence(
+                option,
+                "key= //p:t",
+                OptionLabelContext::FirstRoundCanonical,
+            ),
+            Err(LabelConvertError::Invalid)
+        );
+        for input in ["same=//p:t,same=//q:t", "same=//p:t,same=//bad:"] {
+            assert_eq!(
+                convert_label_occurrence(option, input, OptionLabelContext::FirstRoundCanonical),
+                Err(LabelConvertError::Invalid),
+                "{input}"
+            );
+        }
+
+        let mapping = mapping();
+        let first_round = label_map(
+            convert_label_occurrence(
+                option,
+                "one=@alias//p:t",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            first_round.0[0].1.as_ref().unwrap().to_string(),
+            "@@alias//p:t"
+        );
+        let mapped = label_map(
+            convert_label_occurrence(
+                option,
+                "one=@alias//p:t",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert_eq!(mapped.0[0].1.as_ref().unwrap().to_string(), "@@mapped//p:t");
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        let relative = label_map(
+            convert_label_occurrence(
+                option,
+                "one=:relative",
+                OptionLabelContext::Package {
+                    base_package: &base,
+                    mapping: &mapping,
+                },
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            relative.0[0].1.as_ref().unwrap().to_string(),
+            "@@owner//base:relative"
+        );
+        let nonvisible = label_map(
+            convert_label_occurrence(
+                option,
+                "one=@missing//p:t",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            nonvisible.0[0].1.as_ref().unwrap().to_string(),
+            "@@[unknown repo 'missing' requested from @@]//p:t"
+        );
+
+        fn allocative<T: Allocative>() {}
+        fn dupe<T: Dupe>() {}
+        allocative::<LabelMapValues>();
+        dupe::<LabelMapValues>();
+        let copied = mapped.dupe();
+        assert_eq!(mapped, copied);
+        assert_eq!(mapped.0.as_ptr(), copied.0.as_ptr());
+    }
+
+    #[test]
+    fn flag_alias_uses_ascii_validation_prefix_gate_and_contextual_label_parse() {
+        let option = option("flag_alias");
+        assert_eq!(classify_label(option), Some(LabelFamily::FlagAlias));
+        assert!(option.allow_multiple);
+        assert_eq!(option.raw_default, "\"null\"");
+        assert_eq!(
+            materialize_label_default(option, OptionLabelContext::FirstRoundCanonical),
+            Ok(None)
+        );
+        let ascii = flag_alias(
+            convert_label_occurrence(
+                option,
+                "A_z09=//p:t",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert_eq!(ascii.alias.as_str(), "A_z09");
+        assert_eq!(ascii.label.to_string(), "//p:t");
+        for input in [
+            "no_equals",
+            "=//p:t",
+            "alias=",
+            "alias-=//p:t",
+            "fóo=//p:t",
+            "fóo=//p:t=tail",
+            "alias=//p:t=tail",
+            "alias=plain",
+            "alias=//bad:",
+        ] {
+            assert_eq!(
+                convert_label_occurrence(option, input, OptionLabelContext::FirstRoundCanonical),
+                Err(LabelConvertError::Invalid),
+                "{input}"
+            );
+        }
+        for input in ["alias=no//p:t", "alias=no@alias//p:t"] {
+            assert_eq!(
+                convert_label_occurrence(option, input, OptionLabelContext::FirstRoundCanonical),
+                Err(LabelConvertError::Invalid),
+                "{input} passes the alias prefix gate but fails label parsing"
+            );
+        }
+
+        let mapping = mapping();
+        let first_round = flag_alias(
+            convert_label_occurrence(
+                option,
+                "alias=@alias//p:t",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        assert_eq!(first_round.label.to_string(), "@@alias//p:t");
+        let mapped = flag_alias(
+            convert_label_occurrence(
+                option,
+                "alias=@alias//p:t",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert_eq!(mapped.label.to_string(), "@@mapped//p:t");
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        let package_context = flag_alias(
+            convert_label_occurrence(
+                option,
+                "alias=@alias//p:t",
+                OptionLabelContext::Package {
+                    base_package: &base,
+                    mapping: &mapping,
+                },
+            )
+            .unwrap(),
+        );
+        assert_eq!(package_context.label.to_string(), "@@mapped//p:t");
+        let nonvisible = flag_alias(
+            convert_label_occurrence(
+                option,
+                "alias=@missing//p:t",
+                OptionLabelContext::MainRepository { mapping: &mapping },
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            nonvisible.label.to_string(),
+            "@@[unknown repo 'missing' requested from @@]//p:t"
+        );
+
+        fn allocative<T: Allocative>() {}
+        allocative::<FlagAliasEntry>();
     }
 
     #[test]

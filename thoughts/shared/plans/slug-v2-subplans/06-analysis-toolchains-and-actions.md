@@ -4537,6 +4537,32 @@ only (scheduling docs terminal-only), exact Unicode trim and no Guava/JDK/regex/
 dependency; caps are 280 production, 440 test, 100 documentation, and 820 total
 formatted net lines.
 
+### LabelMap and FlagAlias converter implementation ACCEPT (2026-08-05)
+
+`WP-6-m2-label-map-and-flag-alias-converter-implementation` is **ACCEPT**:
+the private converter reaches the exact 39/0 label partition. LabelMap retains
+an Arc ordered `(CompactString, Option<ResolvedOptionLabel>)` slice, applies
+the exact 25-character trim before omission, takes the first `=` without
+key/RHS trim, converts a label before linear duplicate rejection, and materializes
+the `Proguard` default. FlagAlias retains an unnormalized per-occurrence compact
+scalar, uses allocation-free ASCII/prefix checks, and materializes its
+repeatable-null default as absent. Both use supplied context with mapping and
+non-visible identity; private `Invalid` remains the boundary and user diagnostics
+remain deferred. No downstream normalization, command activation, loader, or new
+dependency is added. The Buck reuse boundary is unchanged: retained Arc/
+CompactString values only, with no new hot-path utility, map, cache, or interner.
+Configured-target cycles remain user-deferred.
+
+Focused validation reports 26/26 tests, crate test/check, GNU-Windows test
+check, formatting, archive, scope, cap, and diff gates green. Formatted net is
+113 production plus 268 test Rust, 381 Rust net. Run next only
+`WP-6-m2-run-under-and-custom-flag-source-closure-evidence`, docs/source only:
+pin Bazel 9.2 RunUnder value/converter/default/error/rendering and ShellUtils
+tokenization/original-suffix/context split, plus CustomFlag raw-define versus
+label `/...` canonicalization/default/error/context; decide a bounded successor
+without command activation, normalization, loader, checksum, wire, DICE, or
+configured-target work.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
