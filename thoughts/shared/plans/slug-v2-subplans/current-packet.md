@@ -1,48 +1,60 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-forced-sharding-identity-evidence`
+Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: decide whether forced-sharding Java object identity reaches semantic
-configuration/incremental identity or is canonicalized away before that point.
-Predecessor: the family-contract retry reached `REPLAN` because each
-`forced=N` conversion allocates a Java object without `equals`/`hashCode`,
-contradicting the assumed structural native `Forced(i32)` equality. Its
-unaccepted ledger was discarded.
+Role: freeze one exact source/conversion/value/default/cache-byte contract per
+pure native semantic-configuration family before descriptor attachment.
+Predecessor: `WP-6-m2-forced-sharding-identity-evidence` proved fresh forced
+objects have transient raw Java identity, but `BuildOptions` checksum/equality
+and configured keys converge by cache text. Structural `Forced(i32)` is
+authorized for semantic configuration identity; raw `OptionsBase` and
+`BuildOptions.matches` behavior remains deferred parser/command work.
 
-Trace this bounded chain at Bazel commit
+Write a compact documentation ledger for every distinct family used by the
+already classified 287 pure descriptors. Do not repeat descriptor rows. Each
+family row must bind at Bazel commit
 `8220c6198837d5c13d53fea211cf3282aa12408a`:
 
-- `TestShardingStrategy.ShardingStrategyConverter` and
-  `TestShardingStrategyForced`: fresh allocation, count, text, and missing
-  equality/hash overrides;
-- `OptionsBase.equals`, `hashCode`, and `cacheKey` field semantics;
-- `FragmentOptions.clone` and any option-field cloning or reconstruction;
-- `BuildOptions` construction, clone, equality/hash, checksum, and
-  configuration identity;
-- configured-target key consumers of that identity; and
-- the corresponding live Slug configuration/root-key and daemon-replay owners.
+- exact concrete converter owner/class, all finite members or parameterized
+  branches, aliases/casing, separator/radix/range, null/empty handling, and
+  accepted/rejected discriminators;
+- exact retained Java kind and semantic `BuildOptions` equality/order, plus the
+  already accepted future native boundary;
+- special-null, converted annotation default, explicit empty, and one
+  discriminating nondefault route ID/value; and
+- exact renderer/cache bytes by citation to accepted renderer authority.
 
-Freeze one exact question: for identical `forced=0` source text, are two fresh
-parses unequal while a clone preserves reference equality; do their object
-hashes, cache keys, BuildOptions checksums/configuration IDs, or configured keys
-differ; and can any difference affect warm daemon reuse?
+The rejected draft's corrections are mandatory:
 
-Pinned source is primary. If it cannot close parse/clone/hash/checksum behavior,
-one nonpersistent temporary Bazel-classpath Java probe may compare two fresh
-parses and a clone, including field identity/equality, object hashes, cache
-keys, and configuration identity under Bazel 9.2's exact runtime. Record exact
-commands/output and delete every source/class/artifact. No broad command oracle,
-persistent fixture, JVM dependency, or Java/Bazel delegation is Slug
-architecture.
+- split allow-empty comma/colon list grammars from the reject-empty nonempty
+  list grammar; `a,,b` must discriminate acceptance versus rejection;
+- give repeatable assignment/immutable `Map.Entry` the `N=[]` route and ordered
+  explicit accumulation, plus first-`=` and embedded-`=` behavior;
+- record timeout `Splitter.limit(6)` and the exact empty-token rule, with `2,`
+  and `2,,3,4,5` accepted but `1,2,,3,4` rejected;
+- bind every finite enum family's concrete converter, value owner, complete
+  member set, and ordinary-versus-overridden rendering so later descriptor
+  attachment is mechanical; and
+- use structural `Forced(i32)` for semantic configuration/cache equality while
+  citing the accepted raw-object identity boundary and adding no identity token.
 
-Because this concerns retained identity and incremental keys, follow the
-Buck2-utility reuse boundary: do not choose a global counter, interner, mutable
-singleton, `Arc` pointer identity, custom hash map, `Dupe` wrapper, or hidden
-DICE state without exact lifecycle evidence. This packet designs no Rust and
-does not edit the Stage 9 reuse ledger. Any later retained representation must
-reuse existing compact/shared utilities where appropriate and preserve
-`Allocative` before implementation review.
+Also distinguish Boolean/Integer/String, TriState, Void, ordinary repeated
+strings, `StringSet` dedup plus Java UTF-16 ordering, BoolOrEnum cancellation,
+fission, PlatformType, CompilationMode, StripMode, DottedVersion, EnvVar
+records, TestTimeout/Duration maps, EmptyList, and the numeric default-seed-only
+pure branch of runs-per-test. Preserve all previously frozen corner cases:
+Integer.decode/i32 bounds, uppercase ordinary enums versus explicit lowercase
+overrides, empty fission as `EMPTY`, nonnegative forced sharding with decimal
+rendering, DottedVersion i32 captures and original-text equality/rendering,
+three EnvVar shapes, Void absence, and positive runs seed with regex occurrence
+conversion outside the pure cohort.
+
+Use actual reverse U+E000 then U+10000 source scalars for any ordering
+discriminator and cite the accepted reverse-order renderer evidence. Preserve
+the disjoint `287 + 8 + 5 + 41 = 341` routes and independent repeat/old-name/
+expansion/implicit command metadata. The result must let a later packet attach
+each pure descriptor to exactly one family row without semantic judgment.
 
 Allowlist:
 
@@ -52,19 +64,15 @@ Allowlist:
 - `.codex/skills/slug-agent-orchestration/references/routing-log.md`
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Cap: 220 formatted net documentation lines total, at most 150 in Stage 6. No
-family/descriptor ledger reconstruction, Rust, production/protected fixture,
-dependency, registry, command, DICE, or downstream change.
+Cap: 480 formatted net documentation lines total, at most 380 in Stage 6. No
+descriptor map, Rust, Java/JVM probe, fixture, generated artifact, dependency,
+registry, command, DICE, or downstream change.
 
-Stop and `REPLAN` if identity survives into BuildOptions/configured-key/DICE
-semantics and needs scoped ownership, allocator/interner/cache design; source,
-probe, and live Slug lifecycle disagree; clone/replay scope remains ambiguous;
-another material identity distinction appears; or scope/cap is exceeded.
-
-On acceptance record exactly one outcome: if identity is discarded or
-canonicalized before semantic configuration identity, resume
-`WP-6-m2-pure-native-family-byte-contract-ledger-retry` with structural
-`Forced(i32)` and the evidence citation. If identity survives, advance only to
-a forced-sharding retained-identity representation design. Preserve 287/8/5/41
-and defer contextual/regex/Host/repository conversion, normalization,
-checksum/wire implementation, DICE changes, and configured-target cycles.
+Stop and `REPLAN` on any missing concrete owner/member set, combined distinct
+grammar, undefined default/route discriminator, new semantic representation or
+identity distinction, reliance on live JVM behavior beyond accepted evidence,
+any second material correction, or scope/cap breach. After independent
+acceptance, advance only to the mechanical 287-descriptor attachment ledger.
+Defer raw parser-object matching, contextual/regex/Host/repository conversion,
+normalization, checksum/wire implementation, DICE changes, and configured-target
+cycles.

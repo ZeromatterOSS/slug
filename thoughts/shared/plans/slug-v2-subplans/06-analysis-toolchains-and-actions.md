@@ -2695,6 +2695,47 @@ descriptor reconstruction, Rust, contextual/regex/Host/repository conversion,
 normalization, checksum/wire implementation, DICE change, and configured-target
 cycle semantic.
 
+### Forced-sharding semantic-identity evidence (2026-08-04)
+
+**Outcome 1 — structural `Forced(i32)` is authorized for the future semantic
+configuration key.** No counter, interner, pointer identity, mutable singleton,
+or hidden DICE state is permitted. This source-only decision is pinned to Bazel
+`8220c6198837d5c13d53fea211cf3282aa12408a`; no probe is needed.
+
+`ShardingStrategyConverter` allocates `new TestShardingStrategyForced(count)`
+for every accepted `forced=` input (`TestShardingStrategy.java:25-59`). The
+forced class stores the count and defines only `toString() -> "forced=" + count`
+(`TestShardingStrategyForced.java:17-32`): it inherits `Object.equals/hashCode`.
+Thus two fresh `forced=0` parses are unequal and may have different inherited
+object hashes, while their text is identically `forced=0`. This identity is
+real but is not semantic configuration identity.
+
+| Boundary | Fresh `forced=0` versus fresh `forced=0` | Clone / semantic consequence |
+| --- | --- | --- |
+| Raw option object | unequal under inherited `Object.equals`; object hash need not match | `FragmentOptions.clone()` is shallow (`FragmentOptions.java:31-41`), and `BuildOptions.clone()` clones fragments but preserves that field reference (`BuildOptions.java:252-269`), so a clone remains reference-equal to its source. |
+| `OptionsBase` direct comparison | unequal: fields use `Objects.equals` (`OptionsBase.java:119-140`); its map hash incorporates the forced object's inherited hash | `cacheKey()` does **not** use object equality/hash: it calls `value.toString()` (`OptionsBase.java:86-116`), yielding identical `forced=0` field text. |
+| Raw `BuildOptions.matches` | unequal when it directly compares a stored field with a newly parsed converted value using `Objects.equals` (`BuildOptions.java:331-369`) | This is parsed-command matching, not the retained semantic configuration family or configured-target key; it stays outside the future pure converter/key boundary. |
+| `BuildOptions` semantic identity | equal: checksum fingerprints fragment `cacheKey()` text (`BuildOptions.java:178-195`), then `equals/hashCode` use only that checksum (`BuildOptions.java:271-285`) | same checksum; the checksum cache keeps one representative by `putIfAbsent` (`BuildOptions.java:665-678`). |
+| configuration/configured-target key | equal and convergent: `BuildConfigurationKey.create` interns keys and delegates equality/hash to `BuildOptions` (`BuildConfigurationKey.java:29-86`); `ConfiguredTargetKey` compares that configuration key and interns its result (`ConfiguredTargetKey.java:122-139,291-310`) | no identity distinction reaches configured-key identity or warm reuse. |
+
+The live Slug key boundary is likewise structural: `ConfigurationKey` derives
+`Eq`, `Hash`, and ordering over kind/checksum/root setting
+(`app/slug_analysis_v2/src/key.rs:83-142`), and
+`RootConfiguredTargetAnalysisKey` derives `Eq`/`Hash` over workspace plus the
+resolved key (`app/slug_analysis_v2/src/dice.rs:125-215`). Its warm replay test
+recomputes the same key and observes the same `Arc` value
+(`app/slug_analysis_v2/tests/root_analysis.rs:345-385`). The existing cache
+formatter is text-only (`app/slug_configuration_v2/src/native/cache_grammar.rs:1-34`);
+it has no pointer/allocator channel. Therefore structural count equality is
+both Bazel's configuration-key behavior and Slug's live retained-key boundary.
+
+Resume only `WP-6-m2-pure-native-family-byte-contract-ledger-retry`, corrected
+to use structural `Forced(i32)` for semantic configuration/cache identity while
+documenting the raw Java `OptionsBase`/`BuildOptions.matches` boundary as
+deferred command/parser behavior. Preserve 287/8/5/41 and defer contextual,
+regex, Host/repository, normalization, checksum/wire implementation, DICE
+changes, and configured-target-cycle work.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
