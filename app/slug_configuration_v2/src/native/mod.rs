@@ -2,6 +2,7 @@ mod cache_grammar;
 mod convert;
 mod defaults;
 pub mod host;
+mod label_convert;
 mod registry;
 mod value;
 

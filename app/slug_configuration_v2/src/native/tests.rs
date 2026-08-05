@@ -1832,3 +1832,430 @@ mod retry7_private_kernel_contract {
         );
     }
 }
+
+mod label_only_converter_contract {
+    use allocative::Allocative;
+    use dupe::Dupe;
+    use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalRepoName;
+    use slug_identity_v2::OptionLabelContext;
+    use slug_identity_v2::PackageIdentifier;
+    use slug_identity_v2::RepositoryMapping;
+    use slug_identity_v2::RepositoryMappingId;
+
+    use super::super::label_convert::LabelConvertError;
+    use super::super::label_convert::LabelFamily;
+    use super::super::label_convert::LabelValue;
+    use super::super::label_convert::LabelValues;
+    use super::super::label_convert::classify as classify_label;
+    use super::super::label_convert::convert_label_occurrence;
+    use super::super::label_convert::materialize_label_default;
+    use super::*;
+
+    fn option(name: &str) -> &'static NativeOptionDescriptor {
+        NATIVE_OPTION_DESCRIPTORS
+            .iter()
+            .find(|option| option.canonical_name == name)
+            .unwrap()
+    }
+
+    fn mapping() -> RepositoryMapping {
+        let mut mapping = RepositoryMapping::new(RepositoryMappingId::new("test").unwrap());
+        mapping.insert(
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("mapped").unwrap(),
+        );
+        mapping
+    }
+
+    fn scalar(value: Option<LabelValue>) -> String {
+        let Some(LabelValue::Label(value)) = value else {
+            panic!("expected one resolved label")
+        };
+        value.to_string()
+    }
+
+    fn labels(value: Option<LabelValue>) -> LabelValues {
+        let Some(LabelValue::Labels(value)) = value else {
+            panic!("expected an immutable label slice")
+        };
+        value
+    }
+
+    fn unsupported(name: &str) {
+        assert_eq!(classify_label(option(name)), None, "{name}");
+        assert_eq!(
+            convert_label_occurrence(
+                option(name),
+                "//p:t",
+                OptionLabelContext::FirstRoundCanonical,
+            ),
+            Err(LabelConvertError::Unsupported),
+            "{name}"
+        );
+    }
+
+    #[test]
+    fn admits_exactly_thirty_routes_and_leaves_all_other_cohorts_deferred() {
+        let mut admitted = 0;
+        let mut label_deferred = 0;
+        let mut mixed = 0;
+        let mut host = 0;
+        let mut regex = 0;
+        for option in NATIVE_OPTION_DESCRIPTORS {
+            admitted += usize::from(classify_label(option).is_some());
+            label_deferred += usize::from(matches!(
+                option.converter,
+                Some(
+                    "HostPlatformConverter.class"
+                        | "CoreOptionConverters.LabelConverter.class"
+                        | "CoreOptionConverters.EmptyToNullLabelConverter.class"
+                        | "LabelMapConverter.class"
+                        | "LabelToStringEntryConverter.class"
+                        | "CoreOptionConverters.FlagAliasConverter.class"
+                )
+            ));
+            mixed += usize::from(matches!(
+                option.converter,
+                Some("RunUnderConverter.class" | "CoreOptionConverters.CustomFlagConverter.class")
+            ));
+            host += usize::from(matches!(
+                option.converter,
+                Some(
+                    "AutoCpuConverter.class"
+                        | "PathFragmentConverter.class"
+                        | "PlatformMappingKeyConverter.class"
+                        | "TestResourcesConverter.class"
+                )
+            ));
+            regex += usize::from(matches!(
+                option.converter,
+                Some(
+                    "RegexFilter.RegexFilterConverter.class"
+                        | "ExecutionInfoModifier.Converter.class"
+                        | "PerLabelOptions.PerLabelOptionsConverter.class"
+                        | "RunsPerTestConverter.class"
+                )
+            ));
+        }
+        assert_eq!(
+            (admitted, label_deferred, mixed, host, regex),
+            (30, 9, 2, 5, 8)
+        );
+        assert_eq!(admitted + label_deferred + mixed, 41);
+        let mut actual = NATIVE_OPTION_DESCRIPTORS
+            .iter()
+            .filter(|option| classify_label(option).is_some())
+            .map(|option| option.canonical_name)
+            .collect::<Vec<_>>();
+        let mut expected = vec![
+            "coverage_output_generator",
+            "coverage_report_generator",
+            "coverage_support",
+            "legacy_main_dex_list_generator",
+            "xcode_version_config",
+            "crosstool_top",
+            "cs_fdo_profile",
+            "custom_malloc",
+            "fdo_prefetch_hints",
+            "memprof_profile",
+            "propeller_optimize",
+            "proto_profile_path",
+            "experimental_local_java_optimization_configuration",
+            "proguard_top",
+            "j2objc_dead_code_report",
+            "python_native_rules_allowlist",
+            "optimizing_dexer",
+            "fdo_profile",
+            "xbinary_fdo",
+            "host_java_launcher",
+            "java_launcher",
+            "platforms",
+            "experimental_action_listener",
+            "incompatible_limit_platforms_in_output_dir_to",
+            "target_environment",
+            "apple_platforms",
+            "plugin",
+            "android_platforms",
+            "grte_top",
+            "host_grte_top",
+        ];
+        actual.sort_unstable();
+        expected.sort_unstable();
+        assert_eq!(actual, expected);
+        for name in [
+            "host_platform",
+            "proto_compiler",
+            "proto_toolchain_for_cc",
+            "proto_toolchain_for_j2objc",
+            "proto_toolchain_for_java",
+            "proto_toolchain_for_javalite",
+            "bytecode_optimizers",
+            "experimental_override_platform_cpu_name",
+            "flag_alias",
+            "run_under",
+            "experimental_propagate_custom_flag",
+            "cpu",
+            "host_cpu",
+            "shell_executable",
+            "platform_mappings",
+            "default_test_resources",
+            "toolchain_resolution_debug",
+            "archived_tree_artifact_mnemonics_filter",
+            "instrumentation_filter",
+            "modify_execution_info",
+            "host_per_file_copt",
+            "per_file_copt",
+            "per_file_ltobackendopt",
+            "runs_per_test",
+        ] {
+            unsupported(name);
+        }
+    }
+
+    #[test]
+    fn supplied_context_controls_every_label_parse_without_becoming_output_state() {
+        let label = option("custom_malloc");
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    label,
+                    "@alias//p:t",
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap()
+            ),
+            "@@alias//p:t"
+        );
+
+        let mut mapping = mapping();
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    label,
+                    "@alias//p:t",
+                    OptionLabelContext::MainRepository { mapping: &mapping },
+                )
+                .unwrap()
+            ),
+            "@@mapped//p:t"
+        );
+        let retained = convert_label_occurrence(
+            label,
+            "@alias//p:t",
+            OptionLabelContext::MainRepository { mapping: &mapping },
+        )
+        .unwrap();
+        mapping.insert(
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("changed").unwrap(),
+        );
+        assert_eq!(scalar(retained), "@@mapped//p:t");
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    label,
+                    "@missing//p:t",
+                    OptionLabelContext::MainRepository { mapping: &mapping },
+                )
+                .unwrap()
+            ),
+            "@@[unknown repo 'missing' requested from @@]//p:t"
+        );
+
+        let base = PackageIdentifier::parse_bazel_package_identifier("@@owner//base").unwrap();
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    label,
+                    ":relative",
+                    OptionLabelContext::Package {
+                        base_package: &base,
+                        mapping: &mapping,
+                    },
+                )
+                .unwrap()
+            ),
+            "@@owner//base:relative"
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    label,
+                    "@alias//p:t",
+                    OptionLabelContext::Package {
+                        base_package: &base,
+                        mapping: &mapping,
+                    },
+                )
+                .unwrap()
+            ),
+            "@@changed//p:t"
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    label,
+                    "@missing//p:t",
+                    OptionLabelContext::Package {
+                        base_package: &base,
+                        mapping: &mapping,
+                    },
+                )
+                .unwrap()
+            ),
+            "@@[unknown repo 'missing' requested from @@owner]//p:t"
+        );
+    }
+
+    #[test]
+    fn list_and_ordered_set_convert_every_piece_before_retaining_ordered_arcs() {
+        let mapping = mapping();
+        let context = OptionLabelContext::MainRepository { mapping: &mapping };
+        let list = labels(
+            convert_label_occurrence(option("platforms"), "//a:x,,@alias//b:y,", context).unwrap(),
+        );
+        assert_eq!(
+            list.0.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            ["//a:x", "@@mapped//b:y"]
+        );
+
+        let set = labels(
+            convert_label_occurrence(
+                option("android_platforms"),
+                "@alias//p:x,@@mapped//p:x,//q:y",
+                context,
+            )
+            .unwrap(),
+        );
+        assert_eq!(
+            set.0.iter().map(ToString::to_string).collect::<Vec<_>>(),
+            ["@@mapped//p:x", "//q:y"]
+        );
+        assert_eq!(
+            convert_label_occurrence(option("android_platforms"), "//good:x,//bad:", context),
+            Err(LabelConvertError::Invalid)
+        );
+    }
+
+    #[test]
+    fn admitted_defaults_are_literal_null_or_empty_only_when_their_route_allows_it() {
+        let mut seen = 0;
+        for option in NATIVE_OPTION_DESCRIPTORS
+            .iter()
+            .filter(|option| classify_label(option).is_some())
+        {
+            seen += 1;
+            let actual =
+                materialize_label_default(option, OptionLabelContext::FirstRoundCanonical).unwrap();
+            let raw = option
+                .raw_default
+                .strip_prefix('"')
+                .and_then(|value| value.strip_suffix('"'))
+                .unwrap();
+            match (classify_label(option).unwrap(), raw) {
+                (LabelFamily::List, "") | (LabelFamily::OrderedSet, "") => {
+                    assert!(labels(actual).0.is_empty(), "{}", option.canonical_name);
+                }
+                (LabelFamily::List, "null") if option.allow_multiple => {
+                    assert!(labels(actual).0.is_empty(), "{}", option.canonical_name);
+                }
+                (_, "null") => assert!(actual.is_none(), "{}", option.canonical_name),
+                _ => assert_eq!(
+                    actual,
+                    convert_label_occurrence(option, raw, OptionLabelContext::FirstRoundCanonical)
+                        .unwrap(),
+                    "{}",
+                    option.canonical_name
+                ),
+            }
+        }
+        assert_eq!(seen, 30);
+        assert_eq!(
+            materialize_label_default(
+                option("host_platform"),
+                OptionLabelContext::FirstRoundCanonical
+            ),
+            Err(LabelConvertError::Unsupported)
+        );
+    }
+
+    #[test]
+    fn libc_top_rewrites_only_absolute_package_spellings_and_retained_traits_are_exact() {
+        let libc = option("grte_top");
+        assert_eq!(
+            convert_label_occurrence(libc, "default", OptionLabelContext::FirstRoundCanonical),
+            Ok(None)
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    libc,
+                    "//toolchain",
+                    OptionLabelContext::FirstRoundCanonical
+                )
+                .unwrap()
+            ),
+            "//toolchain:everything"
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    libc,
+                    "//toolchain:old",
+                    OptionLabelContext::FirstRoundCanonical
+                )
+                .unwrap()
+            ),
+            "//toolchain:everything"
+        );
+        assert_eq!(
+            convert_label_occurrence(libc, "toolchain", OptionLabelContext::FirstRoundCanonical),
+            Err(LabelConvertError::Invalid)
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(libc, "//", OptionLabelContext::FirstRoundCanonical)
+                    .unwrap()
+            ),
+            "//:everything"
+        );
+        assert_eq!(
+            convert_label_occurrence(
+                option("fdo_profile"),
+                "",
+                OptionLabelContext::FirstRoundCanonical,
+            ),
+            Ok(None)
+        );
+        assert_eq!(
+            scalar(
+                convert_label_occurrence(
+                    option("fdo_profile"),
+                    "//profiles:sample",
+                    OptionLabelContext::FirstRoundCanonical,
+                )
+                .unwrap()
+            ),
+            "//profiles:sample"
+        );
+
+        fn allocative<T: Allocative>() {}
+        fn dupe<T: Dupe>() {}
+        allocative::<LabelValue>();
+        allocative::<LabelValues>();
+        dupe::<LabelValues>();
+        let values = labels(
+            convert_label_occurrence(
+                option("platforms"),
+                "//a:x",
+                OptionLabelContext::FirstRoundCanonical,
+            )
+            .unwrap(),
+        );
+        let copied = values.dupe();
+        assert_eq!(values, copied);
+        assert_eq!(values.0.as_ptr(), copied.0.as_ptr());
+        assert!(values <= copied);
+    }
+}

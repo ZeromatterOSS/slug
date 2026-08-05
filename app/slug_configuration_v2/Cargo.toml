@@ -10,3 +10,4 @@ version = "0.1.0"
 allocative = { workspace = true }
 compact_str = { workspace = true }
 dupe = { workspace = true }
+slug_identity_v2 = { workspace = true }

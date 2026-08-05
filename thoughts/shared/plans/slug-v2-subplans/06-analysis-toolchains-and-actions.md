@@ -4401,6 +4401,36 @@ allowed. Caps are 320 production, 600 test, 100 documentation, and 920 total
 formatted net lines. User-approved configured-target-cycle deferral remains
 explicit.
 
+### Label-only 30-route converter implementation ACCEPT (2026-08-05)
+
+`WP-6-m2-label-only-30-route-converter-implementation` is **ACCEPT**. The
+exact code files are configuration `Cargo.toml`, `native/mod.rs`, new private
+`native/label_convert.rs`, and `native/tests.rs`: 145 production Rust, 427 test
+Rust, and 573 total formatted net lines including one Cargo line. The only new
+dependency is direct, acyclic configuration-to-identity.
+
+The private module uses unqualified family classification and the existing
+`OptionLabelContext`; it retains only mapping-free `ResolvedOptionLabel` values,
+with Arc label slices, `Allocative`, and wrapper-only `Dupe`. It converts every
+ordered-set item before linear first-wins retention; materializes closed
+literal/null/empty defaults; and implements LibcTop `default` absence plus
+`//` package/colon rewriting to `:everything`. Exactly 30 routes are admitted;
+the nine label, two mixed, five Host, and eight regex routes remain Unsupported.
+There is no public API, mapping retention, map/interner/cache/global,
+normalization, command, loading, DICE, checksum, wire, configured-target, or
+Cargo.lock work.
+
+Focused validation reports 22/22 tests, check, GNU-Windows tests check, and
+formatting green; archive, scope, cap, and diff gates pass. Independent source
+and representation review accepted after the root LibcTop discriminator and
+membership/EmptyToNull test-only correction. User-approved configured cycles
+remain deferred.
+
+Run next only `WP-6-m2-label-nine-route-source-closure-evidence`, docs/source
+evidence only: pin exact Bazel 9.2 spellings for six symbolic defaults and exact
+`LabelMap`, `LabelToStringEntry`, and `FlagAlias` grammars/defaults/errors/order/
+duplicate/alias validation, then decide a bounded nine-route successor.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
