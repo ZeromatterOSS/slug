@@ -639,3 +639,55 @@ Bazel 9.2 sequence: default literal, explicit label literal, missing literal,
 then explicit label recovery. Record raw exit/stdout/stderr separately and do
 not normalize away configuration identifiers. No analysis-error row is needed
 unless later implementation reveals distinct translation.
+
+### Root cquery label-output evidence and configuration-identity REPLAN (2026-08-04)
+
+`WP-6-m2-root-cquery-label-output-evidence` is accepted from an isolated copy
+of `recursive-custom-rule-providers-actions` under `/usr/bin/bazel` 9.2.0 and
+one retained output base. The exact serial observations were:
+
+1. `cquery //parent:parent` exited 0 and wrote exactly
+   `//parent:parent (a7a71fd)\n` to stdout.
+2. `cquery //parent:parent --output=label` exited 0 with byte-identical stdout.
+3. `cquery //parent:missing` exited 1 with empty stdout and the stable pair
+   `ERROR: Skipping '//parent:missing': no such target
+   '//parent:missing': target 'missing' not declared in package 'parent'
+   defined by <workspace>/parent/BUILD.bazel` and `ERROR: no such target
+   '//parent:missing': target 'missing' not declared in package 'parent'
+   defined by <workspace>/parent/BUILD.bazel`, followed by the unsuccessful
+   completion line.
+4. Repeating the explicit-label command in the same server exited 0, restored
+   the exact successful stdout, and reported zero newly loaded/configured
+   targets.
+
+The successful stderr reported one analyzed target on the cold request and the
+ordinary successful completion summary. Default and explicit `label` output
+are therefore the same contract; neither offers a configuration-free slice.
+The temporary workspace/output base was removed after server shutdown, and no
+fixture or generated oracle record changed.
+
+Pinned Bazel 9.2 source explains the suffix.
+`LabelAndConfigurationOutputFormatterCallback` formats the label plus
+`BuildConfigurationValue.shortId()`; `BuildConfigurationValue` delegates to
+`BuildOptions`, whose checksum is the SHA-256 fingerprint of every native
+fragment option cache key plus canonical Starlark options and option scopes.
+`shortId()` is the first seven hexadecimal characters. Thus `a7a71fd` is
+authoritative configured-target identity, not a cquery mnemonic or
+formatter-local token.
+
+**Status: REPLAN before Rust.** Slug's `ConfigurationKey` currently validates
+and stores an opaque caller-supplied checksum, while both production root
+analysis entry points supply the placeholder `first-build`. Slug has no
+BuildOptions inventory, native option cache-key serialization, Starlark build
+setting/scope input, or authoritative checksum producer. Truncating the current
+placeholder or hard-coding `a7a71fd` would be a fixture shim, not Bazel parity.
+The existing `RootConfiguredTargetAnalysisKey` remains the accepted later
+cquery command root, with no second graph, new cquery DICE key, or evaluator
+call, but public formatting and daemon-wire work stay deferred.
+
+Design next only `WP-6-m2-root-configuration-identity-design`. It must decide
+whether a bounded exact root target configuration input/checksum owner exists
+for the accepted fixture, identify every semantic input and invalidation edge,
+and return `REPLAN` rather than approximate or embed Bazel's observed digest.
+No Rust, tests, wire schema, fixture, or new oracle command is authorized by
+this evidence checkpoint.
