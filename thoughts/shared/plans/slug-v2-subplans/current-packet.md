@@ -13,16 +13,24 @@ Keep selection inline in `RootConfiguredTargetAnalysisKey`. For a root
 Starlark requester with zero requirements, preserve the existing path. For
 exactly one requirement, compute the existing root registration anchor and
 all required `RootPackageLoadKey` values, unioning Needs before semantic
-errors. Canonicalize root-only apparent registrations, validate exact native
-type/platform/constraint/toolchain/reference kinds, reject duplicate settings,
-and select in execution-platform outer/toolchain inner MODULE order.
+errors. Record external-registration errors without projecting or loading the
+external label, but still load all discoverable root registration and required
+type packages in that round and return their unioned Need first. Apply the same
+Need-first rule to sibling DICE errors and every later reference-discovery
+round. Canonicalize root-only apparent registrations, validate exact native
+type/platform/constraint/toolchain/reference kinds, reject duplicate settings
+within both platforms and toolchain execution constraints, and select in
+execution-platform outer/toolchain inner MODULE order.
 
 Analyze the selected NODEP implementation with the existing root configured
-analysis key and unchanged configuration. It must be a leaf Starlark rule with
-no ordinary dependencies, requirements, transition/build-setting role,
-actions, outputs, or providers beyond builtin ToolchainInfo plus implicit empty
-DefaultInfo. Add no DICE key, digest, cache, global, lock, direct file read, or
-second source graph.
+analysis key and unchanged configuration. It must be a non-executable,
+non-test leaf Starlark rule whose exact supported schema/value is one string
+`marker`, with no ordinary dependencies, requirements,
+transition/build-setting role, actions, outputs, diagnostics, or providers
+beyond exactly builtin ToolchainInfo plus implicit empty DefaultInfo. Verify
+the exact two builtin provider keys and cardinality; provider names are not an
+identity check. Add no DICE key, digest, cache, global, lock, direct file read,
+or second source graph.
 
 Add builtin `ProviderValue::ToolchainInfo` with exactly one compact string
 marker and builtin-specific ProviderCollection lookup. Phase-gate the existing
@@ -45,14 +53,23 @@ Test allowlist:
 - `app/slug_analysis_v2/tests/starlark_rule.rs`
 - `app/slug_build_api_v2/tests/providers.rs`
 
-Caps are 540 formatted production net lines, 700 test lines, and 1,240 total.
+Corrected caps are 740 formatted production net lines, 760 test lines, and
+1,500 total. The seven-file allowlist remains exact. The first sizing
+prototype is corrected in place: splitting would leave dormant
+resolver/provider substrate, while reconstruction would reproduce the same
+atomic owner boundary.
 
-Required evidence covers the exact six accepted marker observations; warm,
-registration reorder/restoration, marker edit/restoration, BUILD
-delete/recreate, A-to-B-to-A equality, root/anchor/package/selected-child event
-and activation ownership, no legacy analysis activation, every exact native
-kind/reference and leaf-guard failure, builtin/user separation, unchanged
-loading-time invocation failure, and zero actions/outputs/manifests.
+Required evidence covers the exact six accepted marker observations with a
+requester that reads only `ctx.toolchains`; warm, registration
+reorder/restoration, marker edit/restoration, BUILD delete/recreate,
+A-to-B-to-A full-result equality, root/anchor/package/selected-child event and
+activation ownership, no legacy analysis activation, external-error Need
+precedence, every exact native kind/reference, duplicate-setting, selection,
+capability and leaf/post-analysis failure, builtin/user separation, callable
+argument and context-index failures, unchanged loading-time invocation failure,
+an explicit zero-requirement no-anchor path, and zero
+actions/outputs/diagnostics/manifests. Reuse the accepted oracle for manifest
+evidence rather than inventing a new result surface.
 
 Stop and return `REPLAN` for optional/multiple types, external repositories or
 mapping, patterns, command-line registrations, aliases, host fallback,

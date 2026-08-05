@@ -1399,3 +1399,33 @@ allowlist at 540 production, 700 test, and 1,240 total formatted net lines.
 Optional/multiple types, externals, aliases, host/target fallback, exec groups,
 general attributes/providers, public diagnostics/query expansion, actions,
 execution, REAPI, and configuration expansion remain stops.
+
+#### Integrated implementation cap correction (2026-08-04)
+
+The first uncommitted sizing prototype proved that the accepted vertical is
+atomic but the original production cap was not realistic. Reserved Terra
+review accepted correction in place at **740 production, 760 test, and 1,500
+total formatted net lines**, retaining the exact five-production/two-test
+allowlist. Splitting would create dormant resolver or provider/context
+substrate; reconstruction would reproduce the same owner boundary.
+
+Before final review, every discovery round must inspect all sibling root
+package outcomes, union Needs, and return Need before recorded semantic or DICE
+errors. An external registration records an error without loading/projecting
+the external label, while discoverable root registrations and the required
+type still participate in that round's Need union. Toolchain execution
+constraints reject duplicate settings. Selected leaves require exactly one
+string `marker` schema/value, no executable/test capability, and the existing
+dependency/requirement/transition/build-setting/action/output/diagnostic
+guards. Post-analysis provider validation uses exact builtin keys and exact
+two-entry cardinality for empty DefaultInfo plus ToolchainInfo, never names.
+Zero-requirement requesters bypass anchor/resolution and retain the existing
+activation/result path; selected children still use the same existing root key.
+
+The positive requester must match the accepted oracle and observe only
+`ctx.toolchains["//:demo_type"].marker`. Evidence also covers full lifecycle
+and A-to-B-to-A result equality, root/anchor/package/child ownership, zero
+legacy activation, all native/reference/selection/leaf failures, external Need
+precedence, builtin/user identity, callable/index errors, explicit
+zero-requirement no-anchor behavior, and zero actions, outputs, diagnostics,
+and oracle manifests.
