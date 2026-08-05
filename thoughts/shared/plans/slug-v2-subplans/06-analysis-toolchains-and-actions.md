@@ -958,3 +958,51 @@ claiming general cquery Starlark-file support or failure diagnostics. No Rust
 is authorized until the semantic value/equality, DICE input, loading/evaluator,
 dependency-transition, command-observability, utility, allowlist, and cap
 boundaries are independently accepted.
+
+### Positive string build-setting transition design (2026-08-04)
+
+**Status: ACCEPTED; implement the bounded internal vertical.** Parallel
+pinned-source/utility and live-owner audits, root synthesis, and independent
+correction review selected one semantic overlay on the existing target
+configuration. `RootStringSettingValue(CompactString)` owns the effective
+value's equality, ordinary hash, and `Allocative` behavior. The existing
+opaque `first-build` token remains only a private legacy base discriminator;
+it is not parsed, displayed, exposed, or claimed as Bazel's checksum. The
+packet-fixed `@@//:setting` label is not duplicated in every configuration.
+
+The graph remains exclusively `RootConfiguredTargetAnalysisKey`. An internal
+request mode resolves an optional explicit value or the loaded
+`build_setting_default` through `RootPackageLoadKey`, constructs the semantic
+configured key, and computes the existing resolved root mode. Resolved mode
+continues to own root loading Needs and events, recursive dependency analysis,
+full-key `SmallSet` deduplication, and result assembly. The legacy
+`ConfiguredTargetAnalysisKey` route receives no change and must have zero new
+activations. This correction avoids a parallel package-loading/event route.
+
+Loading and evaluation are limited to the accepted fixture: one flagged
+`config.string`, one string default, `ctx.build_setting_value`, one inherited
+implicit setting dependency, and two declared-order user-transition label
+attributes with empty inputs and exactly one string `//:setting` output.
+`_setting` remains a direct dependency/provider lookup; `left` and `right` are
+singleton transitioned sequences. Each transition overlays the parent value
+before its recursively resolved child key is built, so two edges to the same
+label remain distinct without a second graph. Frozen callables and semantic
+metadata stay under the existing loaded-module lifetime and source
+fingerprint. Public build/cquery flags, wire, Starlark-file/provider rendering,
+outputs, diagnostics, actions, and REAPI remain unchanged.
+
+The retained utility boundary uses `CompactString`, immutable `Arc` slices,
+and the existing ordered `SmallMap`/`SmallSet`; it adds no duplicated label,
+global interner/cache, default hash collection, `Hashed`, SHA, or new hasher.
+Independent review accepted exact seven-production/three-test allowlists and
+raised feasibility-reviewed caps to 850 production, 450 test, and 1,300 total
+formatted net lines. Acceptance must freeze observed request/resolved
+activation identities and counts and prove semantic A-to-B-to-A restoration,
+distinct/restored transitioned keys, exact provider values, zero legacy-key
+activation, zero action execution, and zero REAPI reach.
+
+Implement next only
+`WP-6-m2-positive-string-build-setting-transition-implementation`. Return
+`REPLAN` for general options/checksums, broader build settings or transitions,
+public cquery or exact failure diagnostics, another graph, direct filesystem
+or global state, lock-across-compute, an outside file, or a cap breach.
