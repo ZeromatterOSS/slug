@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-5`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-6`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Result: implement the closed context-free native value/default/cache kernel for
@@ -35,11 +35,31 @@ publicly re-exported.
 
 Retry 4 was discarded before production because its Phase-1 test draft marked
 accepted-but-deferred Runs `U("+2")` as rejected and substituted checklist
-strings/undefined helper shims for direct discriminators. Retry 5 keeps the
-same serial gate, but root owns the mechanical test transcription from the
-accepted ledgers; Terra is review-only until the matrix is accepted. The
-matrix must be direct enough that Phase 2 only supplies private implementations
-and removes the temporary compile gate—no invented test helper semantics.
+strings/undefined helper shims for direct discriminators. Retry 5 reached an
+independently accepted direct matrix, but Phase 2 exposed a material default
+association error: the test used empty-default
+`PlatformOptions#extra_execution_platforms` while asserting the nonempty
+`[-O0, -DDEBUG=1]` default owned by
+`ObjcCommandLineOptions#experimental_objc_fastbuild_options`. All retry-5 Rust
+was discarded; no production was retained.
+
+Retry 6 keeps root-owned mechanical transcription and the serial review gate.
+Before behavioral acceptance, add one active literal binding row for every one
+of the 287 attachments, keyed by exact attachment ordinal, FQCN, and canonical
+name. Each row states the exact registry field type/raw default/converter/repeat
+bit, accepted family/route, and expected materialized-default outcome/cache;
+the test first resolves that descriptor by FQCN/name and asserts the complete
+registry tuple before materializing it. No constructed descriptor,
+family/converter-only lookup, or unbound family expected value may substitute.
+Review duplicate-family collision rows explicitly. In particular,
+`extra_execution_platforms` owns `D("")`/empty-list cache bytes, while
+`experimental_objc_fastbuild_options` owns
+`D("-O0,-DDEBUG=1")`/`[-O0, -DDEBUG=1]`. Keep the Runs default-only seed outside
+the 287 table and the 8/5/41 exclusions assertion-only. The independent
+reviewer must compare every binding with the accepted attachment, registry,
+and family ledgers before Phase 2. The matrix must remain direct enough that
+Phase 2 only supplies private implementations and removes the temporary
+compile gate—no invented helper semantics or production before acceptance.
 
 Implement one closed `NativeValue` algebra, source-default materializer,
 per-occurrence converter, and exact Java cache projection inside
@@ -117,5 +137,5 @@ surrogate or lossy conversion, Host/repository/loading context, command-layer
 behavior including repeat merging, whole P/C/T normalization, runtime registry/interner/hash, new
 identity issue, dependency/lockfile expansion, cap breach, a production edit
 before test-matrix review, or any new material correction beyond the frozen
-retry-2/3/4 set above. Defer normalization, checksum/wire integration, DICE, downstream
+retry-2/3/4/5 set above. Defer normalization, checksum/wire integration, DICE, downstream
 activation, and user-approved later configured-target dependency cycles.

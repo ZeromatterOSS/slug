@@ -3444,6 +3444,39 @@ Terra writer implement the private kernel. Any new material correction is
 `REPLAN`; all contextual, command, normalization, checksum/wire, DICE,
 downstream, and configured-cycle deferrals remain unchanged.
 
+### Pure native kernel retry 5 REPLAN (2026-08-05)
+
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-5` stopped after
+its serial test-only Phase 1; no production file or dependency is retained.
+Root transcribed an active direct 287/8/5/41 matrix within the test cap, and an
+independent Terra review accepted it after correcting temporary-reference,
+duration, and enum-default misses. The authorized Phase-2 writer then found a
+new material contradiction: the matrix used empty-default
+`PlatformOptions#extra_execution_platforms` while expecting the nonempty
+`[-O0, -DDEBUG=1]` value owned by
+`ObjcCommandLineOptions#experimental_objc_fastbuild_options`. Root discarded
+the complete unaccepted 1,021-line `tests.rs` addition; HEAD returned cleanly
+to `a64f0661`.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-6` with the same
+seven-file and 1,550 production/1,250 test/2,800 total caps. Preserve the
+root-owned test-only Phase 1, Terra review-only gate, exact private API and all
+retry-5 freezes. Before behavioral acceptance, add an active literal binding
+row for every one of the 287 attachments: exact attachment ordinal, FQCN,
+canonical name, registry field type/raw default/converter/repeat bit, accepted
+family/route, and expected materialized-default outcome/cache. Each row must
+resolve the descriptor by FQCN/name and assert its registry tuple before
+materialization; no constructed descriptor or family-only expected value may
+stand in for that binding. Review same-family collision rows explicitly,
+including the empty `extra_execution_platforms` default versus the nonempty
+ObjC fastbuild-options default. Keep Runs' default-only seed separate and the
+8/5/41 exclusions assertion-only. Only after independent acceptance may one
+Terra writer implement the private kernel. Any new material correction is
+`REPLAN`; all contextual, command, normalization, checksum/wire, DICE,
+downstream, and user-approved configured-target-cycle deferrals remain
+unchanged.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
