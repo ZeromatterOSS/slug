@@ -4431,6 +4431,50 @@ evidence only: pin exact Bazel 9.2 spellings for six symbolic defaults and exact
 `LabelMap`, `LabelToStringEntry`, and `FlagAlias` grammars/defaults/errors/order/
 duplicate/alias validation, then decide a bounded nine-route successor.
 
+### Nine-route source closure evidence REPLAN (2026-08-05)
+
+`WP-6-m2-label-nine-route-source-closure-evidence` is **REPLAN** under pinned
+Bazel `9.2.0` commit `8220c619`. `PlatformOptions.java:46,53-66,218-227` fixes
+`host_platform` to `@bazel_tools//tools:host_platform`: its explicit empty input
+uses that same default, not a Host fact. `ProtoConstants.java:44,47,50-58` and
+`ProtoConfiguration.java:67-110` fix the other bytes: protoc
+`@bazel_tools//tools/proto:protoc`; CC `@bazel_tools//tools/proto:cc_toolchain`;
+J2ObjC `@bazel_tools//tools/j2objc:j2objc_proto_toolchain`; Java
+`@bazel_tools//tools/proto:java_toolchain`; JavaLite
+`@bazel_tools//tools/proto:javalite_toolchain`.
+
+`FieldOptionDefinition.java:324-357` converts a non-null default with the
+supplied active context then memoizes it. All six defaults are nonempty and use
+the normal label path; the three core EmptyToNull Proto routes return null only
+for explicit empty input, while compiler and JavaLite ordinary Label empty
+inputs parse normally. Label syntax diagnostics are the helper's
+`OptionsParsingException` message, wrapped for default construction.
+
+`LabelToStringEntryConverter` is closed (`CoreOptionConverters.java:247-269`):
+exactly one `=`, neither side empty, context-parsed lhs, and untrimmed
+`CompactString` rhs,
+and `Variable definitions must be in the form of a 'name=value' assignment.
+'name' and 'value' must be non-empty and may not include '='.`; its repeatable
+null default is absent. Seven
+routes are therefore bounded without a loader, Host fact, command, or JVM.
+`LabelMap` (`:196-244`) preserves linked insertion order and parses label values
+before duplicate-key rejection; `JavaOptions.java:239-247` sets
+`bytecode_optimizers` default `Proguard`. Its exact trim grammar depends on
+Guava `Splitter`/`CharMatcher`,
+outside the Bazel-only authority. `FlagAlias` (`:363-405`) validates `=` shape,
+`--flag_alias=` diagnostic prefix, `\\w*`, embedded `=`, Starlark prefixes, and
+then label-parses; exact Java Pattern word-domain evidence is likewise absent.
+Its converter remains distinct from downstream command alias expansion and C
+normalization.
+
+Thus the full nine is REPLAN: defer LabelMap and FlagAlias to later Guava/JDK
+evidence; keep the five Host routes Unsupported, RunUnder/CustomFlag mixed, and
+eight regex routes deferred. No JVM need is claimed; configured cycles remain
+user-deferred. Run next only `WP-6-m2-label-seven-route-converter-implementation`:
+private additions only to existing `native/label_convert.rs` and `native/tests.rs`
+(scheduling docs terminal-only), no Cargo/mod/identity or broader work; caps are
+240 production, 420 test, 100 documentation, and 760 total formatted net lines.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
