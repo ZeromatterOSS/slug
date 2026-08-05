@@ -1,16 +1,51 @@
-load(":defs.bzl", "linux_toolchain_impl", "probe_rule")
+load(":defs.bzl", "demo_toolchain_impl", "probe_rule")
 
-constraint_setting(name = "os")
-constraint_value(name = "linux", constraint_setting = ":os")
-constraint_value(name = "macos", constraint_setting = ":os")
-platform(name = "exec_macos", constraint_values = [":macos"])
-platform(name = "exec_linux", constraint_values = [":linux"])
+constraint_setting(name = "selection")
+
+constraint_value(
+    name = "first",
+    constraint_setting = ":selection",
+)
+
+constraint_value(
+    name = "second",
+    constraint_setting = ":selection",
+)
+
+platform(
+    name = "first_platform",
+    constraint_values = [":first"],
+)
+
+platform(
+    name = "second_platform",
+    constraint_values = [":second"],
+)
+
 toolchain_type(name = "demo_type")
-linux_toolchain_impl(name = "linux_impl")
+
+demo_toolchain_impl(
+    name = "first_impl",
+    marker = "first",
+)
+
+demo_toolchain_impl(
+    name = "second_impl",
+    marker = "second",
+)
+
 toolchain(
-    name = "linux_toolchain",
-    exec_compatible_with = [":linux"],
-    toolchain = ":linux_impl",
+    name = "first_toolchain",
+    exec_compatible_with = [":first"],
+    toolchain = ":first_impl",
     toolchain_type = ":demo_type",
 )
+
+toolchain(
+    name = "second_toolchain",
+    exec_compatible_with = [":second"],
+    toolchain = ":second_impl",
+    toolchain_type = ":demo_type",
+)
+
 probe_rule(name = "probe")

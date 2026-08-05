@@ -1,7 +1,220 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "initial_first_platform",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:probe provider=ProbeInfo marker=first",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 4dfe1c4f-ac62-4d1f-aeba-118027ec72f5\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4dfe1c4f-ac62-4d1f-aeba-118027ec72f5\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 5.158s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/4dfe1c4f-ac62-4d1f-aeba-118027ec72f5\n",
+      "stdout": "label=@@//:probe provider=ProbeInfo marker=first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "warm_first_platform",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:probe provider=ProbeInfo marker=first",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 041ee14c-af7e-47b6-bbda-8a792cfdb433\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/041ee14c-af7e-47b6-bbda-8a792cfdb433\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.254s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/041ee14c-af7e-47b6-bbda-8a792cfdb433\n",
+      "stdout": "label=@@//:probe provider=ProbeInfo marker=first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "register_execution_platforms(\"//:first_platform\", \"//:second_platform\")",
+          "old_digest_hint": "171",
+          "path": "MODULE.bazel",
+          "replace": "register_execution_platforms(\"//:second_platform\", \"//:first_platform\")"
+        }
+      ],
+      "name": "reversed_platform_order_selects_second",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:probe provider=ProbeInfo marker=second",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: bcfaa91b-4a38-4338-b03f-d92b445b9ce6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/bcfaa91b-4a38-4338-b03f-d92b445b9ce6\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.194s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/bcfaa91b-4a38-4338-b03f-d92b445b9ce6\n",
+      "stdout": "label=@@//:probe provider=ProbeInfo marker=second\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "register_execution_platforms(\"//:second_platform\", \"//:first_platform\")",
+          "old_digest_hint": "171",
+          "path": "MODULE.bazel",
+          "replace": "register_execution_platforms(\"//:first_platform\", \"//:second_platform\")"
+        }
+      ],
+      "name": "restored_platform_order_selects_first",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:probe provider=ProbeInfo marker=first",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 9b3f7f28-a9ce-4fdd-8aba-edcc1edb2a3d\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/9b3f7f28-a9ce-4fdd-8aba-edcc1edb2a3d\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 438 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.167s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/9b3f7f28-a9ce-4fdd-8aba-edcc1edb2a3d\n",
+      "stdout": "label=@@//:probe provider=ProbeInfo marker=first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "marker = \"first\"",
+          "old_digest_hint": "923",
+          "path": "BUILD.bazel",
+          "replace": "marker = \"edited-first\""
+        }
+      ],
+      "name": "edited_first_toolchain_marker",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 163 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:probe provider=ProbeInfo marker=edited-first",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: e5054545-9702-47e6-9fff-0ce5d288f461\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e5054545-9702-47e6-9fff-0ce5d288f461\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 163 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.044s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/e5054545-9702-47e6-9fff-0ce5d288f461\n",
+      "stdout": "label=@@//:probe provider=ProbeInfo marker=edited-first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:probe",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "marker = \"edited-first\"",
+          "old_digest_hint": "930",
+          "path": "BUILD.bazel",
+          "replace": "marker = \"first\""
+        }
+      ],
+      "name": "restored_first_toolchain_marker",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 163 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:probe provider=ProbeInfo marker=first",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: f84b7b7f-236e-4e17-8d20-448d603b97c6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f84b7b7f-236e-4e17-8d20-448d603b97c6\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 163 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.041s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f84b7b7f-236e-4e17-8d20-448d603b97c6\n",
+      "stdout": "label=@@//:probe provider=ProbeInfo marker=first\n"
+    }
+  ],
   "fixture": "toolchain-resolution-first-platform",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

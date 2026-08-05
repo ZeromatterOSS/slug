@@ -1,12 +1,17 @@
-def _tc_impl(ctx):
-    return [platform_common.ToolchainInfo(value = "linux")]
+ProbeInfo = provider(fields = {"marker": "selected toolchain marker"})
 
-linux_toolchain_impl = rule(implementation = _tc_impl)
+def _demo_toolchain_impl(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+
+demo_toolchain_impl = rule(
+    implementation = _demo_toolchain_impl,
+    attrs = {
+        "marker": attr.string(mandatory = True),
+    },
+)
 
 def _probe_impl(ctx):
-    out = ctx.actions.declare_file(ctx.label.name + ".txt")
-    ctx.actions.write(out, ctx.toolchains["//:demo_type"].value + "\n")
-    return [DefaultInfo(files = depset([out]))]
+    return [ProbeInfo(marker = ctx.toolchains["//:demo_type"].marker)]
 
 probe_rule = rule(
     implementation = _probe_impl,

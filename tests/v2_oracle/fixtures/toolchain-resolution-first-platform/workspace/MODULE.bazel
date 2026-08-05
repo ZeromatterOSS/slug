@@ -1,3 +1,4 @@
-module(name = "toolchain_probe", version = "0.0")
-register_execution_platforms("//:exec_linux", "//:exec_macos")
-register_toolchains("//:linux_toolchain")
+module(name = "toolchain_probe")
+
+register_execution_platforms("//:first_platform", "//:second_platform")
+register_toolchains("//:first_toolchain", "//:second_toolchain")

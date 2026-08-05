@@ -1,12 +1,81 @@
 [fixture]
 name = "toolchain-resolution-first-platform"
-description = "Registered execution platform order selects the first compatible toolchain platform."
-comparison = "semantic"
-manifest_roots = ["bazel-bin"]
-oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 toolchain resolution exists."
+description = "Bazel 9.2 selects the first compatible registered execution platform and exposes its Starlark toolchain value."
+comparison = "message_shape"
+oracle_notes = "Oracle-only M2 positive discriminator: one mandatory type has one matching toolchain on each of two explicitly ordered execution platforms. Exact cquery output exposes only the selected semantic marker while retained mutations prove platform-order selection and toolchain-provider invalidation without actions, outputs, manifests, or identity formatting."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java#registerExecutionPlatforms",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredExecutionPlatformsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredToolchainsFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/PlatformKeys.java#findExecutionPlatformKeys",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/SingleToolchainResolutionFunction.java#resolveConstraints",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/ToolchainResolutionFunction.java#findExecutionPlatformForToolchains",
+  "src/main/java/com/google/devtools/build/lib/analysis/ResolvedToolchainContext.java#load",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContext.java#toolchains",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkToolchainContext.java#getIndex",
+  "src/main/java/com/google/devtools/build/lib/analysis/platform/ToolchainInfo.java",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/StarlarkOutputFormatterCallback.java#providers",
+]
+translation_notes = "Root-module registration supplies ordered execution-platform candidates and registered toolchain declarations. Constraint resolution leaves exactly one matching toolchain per fixture platform, multi-toolchain selection chooses the first suitable candidate, ResolvedToolchainContext loads that ToolchainInfo, and the prepared Starlark rule context indexes it by the mandatory type label. The cquery formatter is evidence only for the exact ProbeInfo marker and grants no public formatter or platform identity surface."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture toolchain-resolution-first-platform --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture toolchain-resolution-first-platform --tool bazel --bazel /usr/bin/bazel"
 
 [[commands]]
-name = "build_probe"
-argv = ["build", "//:probe"]
-compare = "semantic"
+name = "initial_first_platform"
+argv = ["cquery", "//:probe", "--output=starlark", "--starlark:file=cquery_format.bzl"]
 expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=first\\Z"]
+
+[[commands]]
+name = "warm_first_platform"
+argv = ["cquery", "//:probe", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=first\\Z"]
+
+[[commands]]
+name = "reversed_platform_order_selects_second"
+argv = ["cquery", "//:probe", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=second\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'register_execution_platforms("//:first_platform", "//:second_platform")'
+  replace = 'register_execution_platforms("//:second_platform", "//:first_platform")'
+
+[[commands]]
+name = "restored_platform_order_selects_first"
+argv = ["cquery", "//:probe", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=first\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'register_execution_platforms("//:second_platform", "//:first_platform")'
+  replace = 'register_execution_platforms("//:first_platform", "//:second_platform")'
+
+[[commands]]
+name = "edited_first_toolchain_marker"
+argv = ["cquery", "//:probe", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=edited-first\\Z"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'marker = "first"'
+  replace = 'marker = "edited-first"'
+
+[[commands]]
+name = "restored_first_toolchain_marker"
+argv = ["cquery", "//:probe", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=first\\Z"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'marker = "edited-first"'
+  replace = 'marker = "first"'
