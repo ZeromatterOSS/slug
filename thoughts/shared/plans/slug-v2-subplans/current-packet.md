@@ -1,45 +1,43 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-m1-direct-local-external-build-source-target-activation-design`
+Packet: `WP-5-m1-direct-local-external-build-source-target-evidence`
 Milestone: M1, one semantic loading spine
 Owner: `slug-v2-subplans/05-bzlmod-checkpoint-evidence-3.md`
-Role: read-only reserved design for the smallest direct-local external build
-activation
-Evidence: accepted external package source/loading and query owners; accepted
-query-only unsupported-cycle boundary in `ea2019f8`; and the explicit Stage 5
-reservation that future external-build activation requires a separate design.
+Role: evidence-only retained Bazel 9.2 source-target lifecycle discriminator
+Evidence: accepted external build source-target activation design; checked-in
+`module-root-dev-dependency-visibility` and `module-local-override` present
+source successes at Bazel 9.2 commit `8220c619…`.
 
-Do not implement or edit Rust, tests, fixtures, or oracle assets. Audit the live
-build command/root and accepted external loading path, obtain the reserved Sol
-pre-review, and record `ACCEPT`, `REPLAN`, or a narrower successor design in the
-canonical and owner plans.
+Do not edit Rust, tests, fixtures, generated oracle records, or harness code.
+Run one isolated retained-server Bazel 9.2 probe for a direct
+`local_path_override` repository whose BUILD declares
+`exports_files(["target.txt"])`. Record commands, exit status, normalized
+diagnostic shape, stdout, and relevant stderr for these serial states:
 
-The candidate observable slice is one explicit command target,
-`build @dep//:file`, where `dep` is a direct `local_path_override` repository
-and `file` is declared by `exports_files`. Decide from live code and pinned
-Bazel 9.2 evidence whether this can reuse
-`RepositoryPackageLoadKey -> RepositoryPackageSourceKey`, the existing build
-root, accepted-command retry/event ownership, and current source-target output
-semantics without a new source graph or configured analysis.
+1. present source;
+2. byte edit;
+3. delete;
+4. recreate with different bytes; and
+5. a wrong-kind source path if Bazel distinguishes it from absence.
 
-The design must enumerate typed propagation of ordinary external package-load
-failures versus the accepted unsupported-cycle status into `BuildCommandError`;
-mixed root/external Need and failure precedence; accepted-demand, event, and
-retained-daemon lifecycle; exact outputs for a source target; and one-shot /
-daemon recovery across MODULE, BUILD, and source create/edit/delete states.
-Use an ad hoc pinned Bazel 9.2 probe only if existing accepted evidence does not
-discriminate the observable result. Add no fixture or generated oracle record.
+Use ordinary RC discovery without reading or copying `~/.bazelrc`. Pin Bazel
+9.2.0/`8220c619…`, use an isolated temporary workspace/output base, and clean
+its retained server afterward. Do not invoke a MODULE include cycle.
 
-Freeze the smallest likely public boundary before implementation: exact allowed
-production/test files, DICE direction and identities, equality/invalidation
-contract, public error/rendering contract, focused evidence, formatted net
-caps, and platform constraints. Verify whether a single route can be carried
-through existing root/configured-target identities; do not assume that query's
-request-local identity is sufficient for build analysis.
+The evidence must decide whether source byte edits are semantically successful
+no-ops, the exact missing/wrong-kind exit and diagnostic, whether recreation
+succeeds in the same server, and whether stdout/manifest remain empty. Compare
+the present result with the two checked-in accepted rows; do not regenerate
+them.
 
-Stops: no implementation; no new DICE key; no package-all, recursive, or mixed
-pattern breadth; no external dependency traversal, `filegroup`, `alias`,
-Starlark-rule configured analysis, actions, execution, `run`, `test`, `cquery`,
-or `aquery`; no registry/contextual mapping/`@bazel_tools`; no root-loader
-rewrite; no private evaluator export or standalone `ExternalBzlModuleEvalKey`
-caller; and no reopening the accepted native-Windows or JVM boundaries.
+At acceptance, append the exact evidence and provenance to the Stage 5 owner
+plan, advance the manifest/canonical status to
+`WP-5-m1-direct-local-external-build-source-target-activation-implementation`,
+and preserve its accepted five-file allowlist and 280/850/1130 formatted net
+caps. If the evidence requires configured analysis, actions, a new DICE key,
+or a broader source/output contract, record `REPLAN` instead.
+
+Stops: no implementation or repository asset change; no registry, contextual
+mapping, dependency traversal, filegroup/rule activation, analysis, action,
+execution, REAPI, command breadth, fixture, or oracle growth; no credential
+inspection; and no cycle probe.

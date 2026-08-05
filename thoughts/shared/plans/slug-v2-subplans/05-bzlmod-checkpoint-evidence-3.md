@@ -19022,3 +19022,63 @@ single target naming an `exports_files` source in one direct
 `local_path_override` repository can enter the existing external package load
 and build root without activating configured analysis, actions, patterns, or a
 second source graph.
+
+### WP-5-m1 direct-local external build source-target activation design (2026-08-04)
+
+**Status: ACCEPTED; run only
+`WP-5-m1-direct-local-external-build-source-target-evidence`.** The existing
+build root may admit a nonroot pattern only when the whole request is exactly
+one `TargetPattern::Single`. Mixed root/external, multiple-target external,
+package-all, and recursive requests remain rejected before the DICE root.
+After the root anchor succeeds, the external branch computes the existing
+`RootRepositoryRouteKey -> RepositoryPackageLoadKey`, finds the selected target,
+and accepts only `PackageTargetKind::ExportedFile`. Every other external target
+kind receives a build-local typed unsupported-kind error and activates no
+configured analysis.
+
+No new DICE key or source graph is permitted. Before success, the external
+branch must compute `HostRepositorySourceFileKey` for the exact package/target
+path; the corresponding root exported-source branch uses the existing
+`PathObservationKey` FileBytes demand through the native command driver. Thus
+missing, wrong-kind, and read-error states remain DICE-owned Needs or ordinary
+terminal failures. The dependency direction is root anchor, then external
+route, package load, target kind, and source bytes. It is acyclic and preserves
+the existing infrastructure, Need-union, first semantic-error, child-event,
+retry, and accepted-demand precedence.
+
+`BuildRequestedTarget` retains a private completion class distinguishing an
+analyzed target from an observed exported source. Renderers consume that class,
+never `analyzed_target_count == 0`. Root and external observed
+`ExportedFile` targets therefore share one zero-action success terminal, while
+root filegroup/package-all and every rule path remain at their current boundary.
+One-shot success is exit 0, empty stdout, no REAPI invocation, and stderr:
+
+`{"success":true,"command":"build","target_count":1,"loaded_package_count":1,"analyzed_target_count":0,"declared_action_count":0,"runtime_mode":"one-shot","completed_boundary":"dice_exported_source_file"}`
+
+Daemon success uses the same field order with
+`"runtime_mode":"daemon","invalidated_files":N` before
+`completed_boundary`. Ordinary route, load, source, and unsupported-target-kind
+failures remain exit 2 `build_runtime_error`. Only the accepted typed MODULE
+cycle status uses exit 7, `unsupported_feature`, the exact accepted Slug-owned
+message, empty stdout, no context suffix, and the existing daemon
+`invalidated_files` field.
+
+The later implementation may edit only
+`app/slug_core_v2/src/runtime/dice.rs`,
+`app/slug_cli_v2/src/commands/build.rs`,
+`app/slug_cli_v2/tests/cli.rs`, `app/slug_server_v2/src/lib.rs`, and
+`app/slug_server_v2/src/tests.rs`, within 280 production, 850 test, and 1130
+total formatted net lines. Stops are: no new key, loading/query semantic
+change, dependency traversal, filegroup/alias/rule external activation,
+configured analysis, action, execution, REAPI, run/test/cquery/aquery,
+registry/contextual mapping/`@bazel_tools`, root-loader rewrite, evaluator
+export, direct filesystem access, fixture, or oracle-record growth.
+
+The checked-in Bazel 9.2 `module-root-dev-dependency-visibility` and
+`module-local-override` evidence already proves present local-override source
+success, empty stdout/manifest, and route policy restoration. Before Rust, one
+evidence-only retained-server probe must record exact missing-source status and
+diagnostic plus present/edit/delete/recreate behavior. It changes no fixture or
+oracle record. Independent Terra found the DICE route bounded but identified
+the shared source-completion renderer prerequisite; reserved Sol correction
+review accepted the combined root/external completion class and evidence gate.
