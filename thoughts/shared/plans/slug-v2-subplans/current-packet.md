@@ -1,58 +1,90 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-descriptor-family-attachment-ledger`
+Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-2`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: mechanically attach every admitted pure descriptor to its frozen family
-contract before bounded pure-native kernel implementation planning.
-Predecessors: the committed 17-class/341-option registry, accepted cohort
-routing, accepted exact Java/Guava renderer authority, forced-sharding
-structural identity, source-anchor/16-enum routes, and retry-7 family byte
-contract are authoritative. No source discovery is authorized.
+Result: implement the closed context-free native value/default/cache kernel for
+the accepted 287 pure descriptors plus the default-materializer-only Runs seed.
 
-Create exactly 287 compact descriptor rows, one per committed pure descriptor,
-in accepted registry order. Key each row by the two-digit class-local ordinal
-from the 17-class ledger plus `FQCN#name`; do not invent a global or zero-based
-ordinal. Record its exact `F-*` family or enum route and a compact scalar versus
-repeat/default route token. Field type, converter, raw default, and repeat bit
-remain authoritative in the existing metadata row and are referenced rather
-than copied unless needed to disambiguate the attachment. The rows are a
-mechanical attachment, not a new converter or route inventory. Add one separate
-F-Runs-default materializer-exception record outside the 287; `runs_per_test`
-remains in the Java-regex cohort and is never a pure row.
+Predecessors are authoritative: the committed 341 registry, accepted
+`287 + 8 + 5 + 41` cohort, renderer and forced-identity evidence, retry-7
+family contracts, and 287-row attachment ledger. Reuse them; add no source or
+oracle evidence.
 
-The registry partition must prove exactly `287 + 8 + 5 + 41 = 341`: retain the
-eight Java-regex, five Host, and 41 repository/loading owners outside this
-ledger. Preserve the orthogonal 45 repeatable, 13 old-name, six expansion, and
-two implicit metadata rows without folding them into a value family.
+Implement one closed `NativeValue` algebra, source-default materializer,
+per-occurrence converter, and exact Java cache projection inside
+`slug_configuration_v2`. Repeat merging remains command-owned: the kernel must
+return the accepted scalar-versus-list occurrence shape but expose no argv,
+priority, or accumulation API. Routing must be a bounded match over the static
+descriptor/type/converter metadata, not a runtime registry map, generated table,
+global interner, cache, hash, or hidden mutable state.
 
-Use the accepted retry-7 family ledger verbatim for all value rules: retained
-values are structural equality/order semantic `BuildOptions` identity unless
-the row says otherwise; raw parser-object matching remains deferred. Keep the
-source-known AllowColonList/NonEmptyCommaList no-attachment/no-`A` boundary,
-F-Runs-default exception, Dotted original-input identity, all exact defaults,
-repeat `A` routes/cache bytes, timeout/shard/Fission cases, Platform ASCII
-lowering, and the 16 separate enum routes. Reference that ledger rather than
-copying its grammar or cache tables into descriptor rows.
+Representation is frozen by the accepted Stage 6 design and Buck2 utility
+boundary:
+
+- dynamic valid-Unicode text uses `CompactString`;
+- immutable lists and ordered maps use `Arc<[NativeValue]>` and
+  `Arc<[(NativeValue, NativeValue)]>`;
+- retained value/container types derive `Allocative`;
+- use `Dupe` only for an aggregate newtype whose clone is pointer-cheap; and
+- keep descriptor names borrowed `&'static str`; add no interner or unordered
+  value map. Java UTF-16 comparison is an explicit helper, never Rust byte/code
+  point ordering.
+
+Implement exactly the accepted default and per-occurrence routes: special null
+versus explicit `null`; `D/E/N/Ø`; Bool/Int/Text/Tri/Void; all 16 enum routes and overrides;
+comma-list flattening, UTF-16 set sorting/dedup, Entry, Env records, Dotted
+full-input identity, timeout/duration fallback, structural forced sharding,
+Fission `no`/`yes`/comma order, Platform ASCII lowering, EmptyList, outer
+`NULL`/`EMPTY`/escaping, and the private `RunsPerTestSeed D("1")` exact
+cache text. `U("+2")` and every general runs/regex occurrence remain
+unsupported.
+
+Tests must independently cover:
+
+- all 287 attachments and the exact excluded 8/5/41 partition;
+- every annotation-default family, special-null versus explicit-null, and
+  repeat empty default plus scalar-versus-list per-occurrence shapes needed by
+  the frozen later `A` routes;
+- every enum member/alias/rendering override and all retry-7 discriminators;
+- exact list/entry/env/map/duration/Dotted/shard/Fission/Platform/cache bytes;
+- Java UTF-16 reverse U+E000/U+10000 ordering and duplicate removal;
+- structural equality/order, cheap aggregate clone, and retained allocation
+  shape; and
+- explicit refusal of Java-regex, Host, repository/loading, command/argv,
+  normalization, and checksum/wire; plus a type-level valid-Unicode boundary
+  with no lossy surrogate replacement API.
 
 Allowlist:
 
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+- `app/slug_configuration_v2/Cargo.toml`
+- `app/slug_configuration_v2/src/native/mod.rs`
+- `app/slug_configuration_v2/src/native/cache_grammar.rs`
+- `app/slug_configuration_v2/src/native/value.rs`
+- `app/slug_configuration_v2/src/native/defaults.rs`
+- `app/slug_configuration_v2/src/native/convert.rs`
+- `app/slug_configuration_v2/src/native/tests.rs`
 - terminal scheduling only:
-  `thoughts/shared/plans/slug-v2-subplans/current-packet.md` and
+  `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
+  `thoughts/shared/plans/slug-v2-subplans/current-packet.md`, and
   `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
 - routing only on `REPLAN`:
   `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
   `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`.
 
-Cap: at most 380 formatted Stage 6 and 480 total documentation lines. No
-source lookup, Java/JVM probe, Rust, fixture, descriptor implementation,
-registry edit, command, DICE, dependency, artifact, or downstream change.
+Caps: 1,550 formatted production, 1,250 test, and 2,800 total net lines across
+the seven crate files. Add only existing workspace `compact_str`,
+`allocative`, and `dupe` dependencies required by the frozen
+representation. No registry edit, root/workspace dependency edit, lockfile
+change, fixture, Java/JVM, generated source, oracle, or downstream edit.
 
-Stop and `REPLAN` on a count mismatch, an ambiguous or unattached descriptor,
-an invented family/route/default judgment, source reopening, or scope/cap
-breach. After independent acceptance, advance only to bounded pure-native
-kernel implementation planning/packet. Defer raw parser matching,
-contextual/regex/Host/repository conversion, normalization, checksum/wire
-implementation, DICE changes, and user-approved later configured-target
-dependency cycles.
+Validation: serial `cargo test -p slug_configuration_v2`, crate check,
+formatting, applicable GNU-Windows no-run check, `scripts/v2_archive_status.sh`,
+`git diff --check`, scope/cap checks, then independent latest-diff review.
+
+Stop and `REPLAN` on a route/count/byte disagreement, Java-regex need, lone
+surrogate or lossy conversion, Host/repository/loading context, command-layer
+behavior including repeat merging, whole P/C/T normalization, runtime registry/interner/hash, new
+identity issue, dependency/lockfile expansion, cap breach, or a second material
+correction. Defer normalization, checksum/wire integration, DICE, downstream
+activation, and user-approved later configured-target dependency cycles.

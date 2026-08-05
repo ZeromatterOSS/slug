@@ -3017,6 +3017,348 @@ and accepted cohort/family ledgers. It must retain `287 + 8 + 5 + 41`, keep
 Runs-default outside the 287, and stop rather than invent a route. After its
 acceptance, advance only to bounded pure-native kernel implementation planning.
 
+### Pure native descriptor-family attachment ledger (2026-08-05)
+
+This is a mechanical projection of the committed 341-row registry through the
+accepted cohort and retry-7 family ledgers. Class marker `Axx` is the accepted
+17-class registry order; the two-digit row key is that class's existing local
+ordinal, including gaps occupied by excluded cohorts. Together the heading,
+ordinal, and canonical name identify `FQCN#name` without a new global ordinal.
+
+Route `S:N/E` is a scalar special-null default plus explicit occurrence;
+`S:D/E` is a converted annotation default plus explicit occurrence; and
+`R:N/A` is a repeatable special-null empty default plus the family-specific
+ordered accumulation. The accepted family row supplies all grammar, retained
+value, equality/order, rendering, and exact cache bytes.
+
+#### A01 `com.google.devtools.build.lib.analysis.PlatformOptions`
+01|`extra_execution_platforms`|`F-AllowCommaList`|`S:D/E`
+02|`extra_toolchains`|`F-AllowCommaList`|`R:N/A`
+04|`incompatible_use_toolchain_resolution_for_java_rules`|`F-Bool`|`S:D/E`
+#### A03 `com.google.devtools.build.lib.analysis.config.CoreOptions`
+01|`action_env`|`F-Env`|`R:N/A`
+02|`affected by starlark transition`|`F-EmptyList`|`S:D/E`
+03|`allow_analysis_failures`|`F-Bool`|`S:D/E`
+04|`allow_unresolved_symlinks`|`F-Bool`|`S:D/E`
+05|`allowed_cpu_values`|`F-StringSet`|`S:D/E`
+06|`analysis_testing_deps_limit`|`F-Int`|`S:D/E`
+08|`build_runfile_links`|`F-Bool`|`S:D/E`
+09|`build_runfile_manifests`|`F-Bool`|`S:D/E`
+10|`check_licenses`|`F-Bool`|`S:D/E`
+11|`check_visibility`|`F-Bool`|`S:D/E`
+12|`collect_code_coverage`|`F-Bool`|`S:D/E`
+13|`compilation_mode`|`F-Enum-CompilationMode`|`S:D/E`
+15|`define`|`F-Entry`|`R:N/A`
+16|`enable_runfiles`|`F-Tri`|`S:D/E`
+17|`enforce_constraints`|`F-Bool`|`S:D/E`
+18|`evaluating for analysis test`|`F-Bool`|`S:D/E`
+19|`exec_aspects`|`F-AllowCommaList`|`R:N/A`
+21|`experimental_allow_map_directory`|`F-Bool`|`S:D/E`
+22|`experimental_collect_code_coverage_for_generated_files`|`F-Bool`|`S:D/E`
+23|`experimental_debug_selects_always_succeed`|`F-Bool`|`S:D/E`
+24|`experimental_enforce_transitive_visibility`|`F-Bool`|`S:D/E`
+25|`experimental_exclude_defines_from_exec_config`|`F-Bool`|`S:D/E`
+26|`experimental_exec_config`|`F-Text`|`S:D/E`
+27|`experimental_exec_configuration_distinguisher`|`F-Enum-ExecConfigurationDistinguisher`|`S:D/E`
+28|`experimental_extended_sanity_checks`|`F-Bool`|`S:D/E`
+29|`experimental_output_directory_naming_scheme`|`F-Enum-OutputDirectoryNaming`|`S:D/E`
+30|`experimental_output_paths`|`F-Enum-OutputPaths`|`S:D/E`
+32|`experimental_platform_in_output_dir`|`F-Tri`|`S:D/E`
+34|`experimental_remotable_source_manifests`|`F-Bool`|`S:D/E`
+35|`experimental_strict_fileset_output`|`F-Bool`|`S:D/E`
+36|`experimental_throttle_action_cache_check`|`F-Bool`|`S:D/E`
+37|`experimental_use_platforms_in_output_dir_legacy_heuristic`|`F-Bool`|`S:D/E`
+38|`experimental_writable_outputs`|`F-Bool`|`S:D/E`
+39|`features`|`F-Text`|`R:N/A`
+41|`host_action_env`|`F-Env`|`R:N/A`
+42|`host_compilation_mode`|`F-Enum-CompilationMode`|`S:D/E`
+44|`host_features`|`F-Text`|`R:N/A`
+45|`include_config_fragments_provider`|`F-Enum-IncludeConfigFragments`|`S:D/E`
+46|`incompatible_always_include_files_in_data`|`F-Bool`|`S:D/E`
+47|`incompatible_auto_exec_groups`|`F-Bool`|`S:D/E`
+48|`incompatible_bazel_test_exec_run_under`|`F-Bool`|`S:D/E`
+49|`incompatible_bep_cpu_from_platform`|`F-Bool`|`S:D/E`
+50|`incompatible_check_testonly_for_output_files`|`F-Bool`|`S:D/E`
+51|`incompatible_compact_repo_mapping_manifest`|`F-Bool`|`S:D/E`
+52|`incompatible_disable_select_on`|`F-StringSet`|`S:D/E`
+53|`incompatible_exclude_starlark_flags_from_exec_config`|`F-Bool`|`S:D/E`
+54|`incompatible_filegroup_runfiles_for_data`|`F-Bool`|`S:D/E`
+56|`incompatible_merge_genfiles_directory`|`F-Bool`|`S:D/E`
+57|`incompatible_modify_execution_info_additive`|`F-Bool`|`S:D/E`
+58|`incompatible_target_cpu_from_platform`|`F-Bool`|`S:D/E`
+59|`instrument_test_targets`|`F-Bool`|`S:D/E`
+61|`is exec configuration`|`F-Bool`|`S:D/E`
+62|`min_param_file_size`|`F-Int`|`S:D/E`
+64|`platform_suffix`|`F-Text`|`S:N/E`
+66|`scl_config`|`F-Text`|`S:N/E`
+67|`stamp`|`F-Bool`|`S:D/E`
+68|`strict_filesets`|`F-Bool`|`S:D/E`
+70|`use_target_platform_for_tests`|`F-Bool`|`S:D/E`
+71|`verbose_visibility_errors`|`F-Bool`|`S:D/E`
+#### A05 `com.google.devtools.build.lib.analysis.test.TestConfiguration.TestOptions`
+01|`allow_local_tests`|`F-Bool`|`S:D/E`
+02|`cache_test_results`|`F-Tri`|`S:D/E`
+05|`experimental_cancel_concurrent_tests`|`F-Enum-Cancel`|`S:D/E`
+06|`experimental_fetch_all_coverage_outputs`|`F-Bool`|`S:D/E`
+07|`experimental_retain_test_configuration_across_testonly`|`F-Bool`|`S:D/E`
+08|`experimental_split_coverage_postprocessing`|`F-Bool`|`S:D/E`
+09|`incompatible_check_sharding_support`|`F-Bool`|`S:D/E`
+10|`incompatible_exclusive_test_sandboxed`|`F-Bool`|`S:D/E`
+12|`runs_per_test_detects_flakes`|`F-Bool`|`S:D/E`
+13|`test_arg`|`F-Text`|`R:N/A`
+14|`test_env`|`F-Env`|`R:N/A`
+15|`test_filter`|`F-Text`|`S:N/E`
+16|`test_result_expiration`|`F-Int`|`S:D/E`
+17|`test_runner_fail_fast`|`F-Bool`|`S:D/E`
+18|`test_sharding_strategy`|`F-Shard`|`S:D/E`
+19|`test_timeout`|`F-Timeout`|`S:D/E`
+20|`trim_test_configuration`|`F-Bool`|`S:D/E`
+21|`zip_undeclared_test_outputs`|`F-Bool`|`S:D/E`
+#### A06 `com.google.devtools.build.lib.bazel.rules.BazelRuleClassProvider.StrictActionEnvOptions`
+01|`incompatible_strict_action_env`|`F-Bool`|`S:D/E`
+#### A07 `com.google.devtools.build.lib.bazel.rules.python.BazelPythonConfiguration.Options`
+01|`experimental_python_import_all_repositories`|`F-Bool`|`S:D/E`
+02|`incompatible_remove_ctx_bazel_py_fragment`|`F-Bool`|`S:D/E`
+03|`python_path`|`F-Text`|`S:N/E`
+#### A08 `com.google.devtools.build.lib.rules.android.AndroidConfiguration.Options`
+01|`Android configuration distinguisher`|`F-Enum-AndroidConfigurationDistinguisher`|`S:D/E`
+02|`android_compiler`|`F-Text`|`S:N/E`
+03|`android_databinding_use_androidx`|`F-Bool`|`S:D/E`
+04|`android_databinding_use_v3_4_args`|`F-Bool`|`S:D/E`
+05|`android_dynamic_mode`|`F-Enum-DynamicMode`|`S:D/E`
+06|`android_fixed_resource_neverlinking`|`F-Bool`|`S:D/E`
+07|`android_manifest_merger`|`F-Enum-AndroidManifestMerger`|`S:D/E`
+08|`android_manifest_merger_order`|`F-Enum-ManifestMergerOrder`|`S:D/E`
+09|`android_migration_tag_check`|`F-Bool`|`S:D/E`
+11|`android_resource_shrinking`|`F-Bool`|`S:D/E`
+12|`apk_signing_method`|`F-Enum-ApkSigningMethod`|`S:D/E`
+13|`break_build_on_parallel_dex2oat_failure`|`F-Bool`|`S:D/E`
+14|`desugar_for_android`|`F-Bool`|`S:D/E`
+15|`desugar_java8_libs`|`F-Bool`|`S:D/E`
+16|`dexopts_supported_in_dexmerger`|`F-AllowCommaList`|`S:D/E`
+17|`dexopts_supported_in_dexsharder`|`F-AllowCommaList`|`S:D/E`
+18|`dexopts_supported_in_incremental_dexing`|`F-AllowCommaList`|`S:D/E`
+19|`experimental_allow_android_library_deps_without_srcs`|`F-Bool`|`S:D/E`
+20|`experimental_always_filter_duplicate_classes_from_android_test`|`F-Bool`|`S:D/E`
+21|`experimental_android_assume_minsdkversion`|`F-Bool`|`S:D/E`
+22|`experimental_android_compress_java_resources`|`F-Bool`|`S:D/E`
+23|`experimental_android_databinding_v2`|`F-Bool`|`S:D/E`
+24|`experimental_android_library_exports_manifest_default`|`F-Bool`|`S:D/E`
+25|`experimental_android_resource_cycle_shrinking`|`F-Bool`|`S:D/E`
+26|`experimental_android_resource_name_obfuscation`|`F-Bool`|`S:D/E`
+27|`experimental_android_resource_path_shortening`|`F-Bool`|`S:D/E`
+28|`experimental_android_resource_shrinking`|`F-Bool`|`S:D/E`
+29|`experimental_android_rewrite_dexes_with_rex`|`F-Bool`|`S:D/E`
+30|`experimental_android_use_parallel_dex2oat`|`F-Bool`|`S:D/E`
+31|`experimental_check_desugar_deps`|`F-Bool`|`S:D/E`
+32|`experimental_disable_instrumentation_manifest_merge`|`F-Bool`|`S:D/E`
+33|`experimental_filter_library_jar_with_program_jar`|`F-Bool`|`S:D/E`
+34|`experimental_filter_r_jars_from_android_test`|`F-Bool`|`S:D/E`
+35|`experimental_get_android_java_resources_from_optimized_jar`|`F-Bool`|`S:D/E`
+36|`experimental_incremental_dexing_after_proguard`|`F-Int`|`S:D/E`
+37|`experimental_incremental_dexing_after_proguard_by_default`|`F-Bool`|`S:D/E`
+38|`experimental_omit_resources_info_provider_from_android_binary`|`F-Bool`|`S:D/E`
+39|`experimental_one_version_enforcement_use_transitive_jars_for_binary_under_test`|`F-Bool`|`S:D/E`
+40|`experimental_persistent_aar_extractor`|`F-Bool`|`S:D/E`
+41|`experimental_remove_r_classes_from_instrumentation_test_jar`|`F-Bool`|`S:D/E`
+42|`experimental_use_dex_splitter_for_incremental_dexing`|`F-Bool`|`S:D/E`
+43|`experimental_use_rtxt_from_merged_resources`|`F-Bool`|`S:D/E`
+44|`fat_apk_hwasan`|`F-Bool`|`S:D/E`
+45|`incompatible_disable_native_android_rules`|`F-Bool`|`S:D/E`
+46|`incompatible_remove_ctx_android_fragment`|`F-Bool`|`S:D/E`
+47|`incremental_dexing`|`F-Bool`|`S:D/E`
+48|`internal_persistent_android_dex_desugar`|`F-Bool`|`S:D/E`
+49|`internal_persistent_busybox_tools`|`F-Bool`|`S:D/E`
+50|`internal_persistent_multiplex_android_dex_desugar`|`F-Bool`|`S:D/E`
+51|`internal_persistent_multiplex_busybox_tools`|`F-Bool`|`S:D/E`
+53|`non_incremental_per_target_dexopts`|`F-AllowCommaList`|`S:D/E`
+55|`output_library_merged_assets`|`F-Bool`|`S:D/E`
+56|`persistent_android_dex_desugar`|`F-Void`|`S:N/E`
+57|`persistent_android_resource_processor`|`F-Void`|`S:N/E`
+58|`persistent_multiplex_android_dex_desugar`|`F-Void`|`S:N/E`
+59|`persistent_multiplex_android_resource_processor`|`F-Void`|`S:N/E`
+60|`persistent_multiplex_android_tools`|`F-Void`|`S:N/E`
+#### A09 `com.google.devtools.build.lib.rules.android.BazelAndroidConfiguration.Options`
+01|`merge_android_manifest_permissions`|`F-Bool`|`S:D/E`
+#### A10 `com.google.devtools.build.lib.rules.apple.AppleCommandLineOptions`
+01|`apple configuration distinguisher`|`F-Enum-AppleConfigurationDistinguisher`|`S:D/E`
+02|`apple_platform_type`|`F-Platform`|`S:D/E`
+04|`apple_split_cpu`|`F-Text`|`S:D/E`
+05|`catalyst_cpus`|`F-AllowCommaList`|`R:N/A`
+06|`experimental_include_xcode_execution_requirements`|`F-Bool`|`S:D/E`
+07|`experimental_objc_provider_from_linked`|`F-Bool`|`S:D/E`
+08|`experimental_prefer_mutual_xcode`|`F-Bool`|`S:D/E`
+09|`host_macos_minimum_os`|`F-Dotted`|`S:N/E`
+10|`incompatible_enable_apple_toolchain_resolution`|`F-Bool`|`S:D/E`
+11|`ios_minimum_os`|`F-Dotted`|`S:N/E`
+12|`ios_multi_cpus`|`F-AllowCommaList`|`R:N/A`
+13|`ios_sdk_version`|`F-Dotted`|`S:N/E`
+14|`macos_cpus`|`F-AllowCommaList`|`R:N/A`
+15|`macos_minimum_os`|`F-Dotted`|`S:N/E`
+16|`macos_sdk_version`|`F-Dotted`|`S:N/E`
+17|`tvos_cpus`|`F-AllowCommaList`|`R:N/A`
+18|`tvos_minimum_os`|`F-Dotted`|`S:N/E`
+19|`tvos_sdk_version`|`F-Dotted`|`S:N/E`
+20|`use_platforms_in_apple_crosstool_transition`|`F-Bool`|`S:D/E`
+21|`visionos_cpus`|`F-AllowCommaList`|`R:N/A`
+22|`watchos_cpus`|`F-AllowCommaList`|`R:N/A`
+23|`watchos_minimum_os`|`F-Dotted`|`S:N/E`
+24|`watchos_sdk_version`|`F-Dotted`|`S:N/E`
+25|`xcode_version`|`F-Text`|`S:N/E`
+#### A11 `com.google.devtools.build.lib.rules.config.ConfigFeatureFlagOptions`
+01|`all feature flag values are present (internal)`|`F-Bool`|`S:D/E`
+02|`enforce_transitive_configs_for_config_feature_flag`|`F-Bool`|`S:D/E`
+#### A12 `com.google.devtools.build.lib.rules.cpp.CppOptions`
+01|`apple_generate_dsym`|`F-Bool`|`S:D/E`
+02|`build_test_dwp`|`F-Bool`|`S:D/E`
+03|`cc_dotd_files`|`F-Bool`|`S:D/E`
+04|`cc_include_scanning`|`F-Bool`|`S:D/E`
+05|`cc_output_directory_tag`|`F-Text`|`S:D/E`
+06|`compiler`|`F-Text`|`S:N/E`
+07|`conlyopt`|`F-Text`|`R:N/A`
+08|`copt`|`F-Text`|`R:N/A`
+10|`cs_fdo_absolute_path`|`F-Text`|`S:N/E`
+11|`cs_fdo_instrument`|`F-Text`|`S:N/E`
+14|`cxxopt`|`F-Text`|`R:N/A`
+15|`dynamic_mode`|`F-Enum-DynamicMode`|`S:D/E`
+16|`enable_propeller_optimize_absolute_paths`|`F-Bool`|`S:D/E`
+17|`enable_remaining_fdo_absolute_paths`|`F-Bool`|`S:D/E`
+18|`experimental_cc_implementation_deps`|`F-Bool`|`S:D/E`
+19|`experimental_cpp_compile_resource_estimation`|`F-Bool`|`S:D/E`
+20|`experimental_cpp_modules`|`F-Bool`|`S:D/E`
+21|`experimental_generate_llvm_lcov`|`F-Bool`|`S:D/E`
+22|`experimental_inmemory_dotd_files`|`F-Bool`|`S:D/E`
+23|`experimental_link_static_libraries_once`|`F-Bool`|`S:D/E`
+24|`experimental_omitfp`|`F-Bool`|`S:D/E`
+25|`experimental_save_feature_state`|`F-Bool`|`S:D/E`
+26|`experimental_unsupported_and_brittle_include_scanning`|`F-Bool`|`S:D/E`
+27|`experimental_use_cpp_compile_action_args_params_file`|`F-Bool`|`S:D/E`
+28|`experimental_use_llvm_covmap`|`F-Bool`|`S:D/E`
+29|`fdo_instrument`|`F-Text`|`S:N/E`
+30|`fdo_optimize`|`F-Text`|`S:N/E`
+33|`fission`|`F-Fission`|`S:D/E`
+34|`force_pic`|`F-Bool`|`S:D/E`
+36|`host_compiler`|`F-Text`|`S:N/E`
+37|`host_conlyopt`|`F-Text`|`R:N/A`
+38|`host_copt`|`F-Text`|`R:N/A`
+39|`host_cxxopt`|`F-Text`|`R:N/A`
+41|`host_linkopt`|`F-Text`|`R:N/A`
+43|`incompatible_disable_legacy_cc_provider`|`F-Bool`|`S:D/E`
+44|`incompatible_disable_nocopts`|`F-Bool`|`S:D/E`
+45|`incompatible_dont_enable_host_nonhost_crosstool_features`|`F-Bool`|`S:D/E`
+46|`incompatible_enable_cc_toolchain_resolution`|`F-Bool`|`S:D/E`
+47|`incompatible_make_thinlto_command_lines_standalone`|`F-Bool`|`S:D/E`
+48|`incompatible_remove_legacy_whole_archive`|`F-Bool`|`S:D/E`
+49|`incompatible_require_ctx_in_configure_features`|`F-Bool`|`S:D/E`
+50|`incompatible_use_cpp_compile_header_mnemonic`|`F-Bool`|`S:D/E`
+51|`incompatible_use_specific_tool_files`|`F-Bool`|`S:D/E`
+52|`incompatible_validate_top_level_header_inclusions`|`F-Bool`|`S:D/E`
+53|`interface_shared_objects`|`F-Bool`|`S:D/E`
+54|`legacy_whole_archive`|`F-Bool`|`S:D/E`
+55|`linkopt`|`F-Text`|`R:N/A`
+56|`ltobackendopt`|`F-Text`|`R:N/A`
+57|`ltoindexopt`|`F-Text`|`R:N/A`
+59|`minimum_os_version`|`F-Text`|`S:N/E`
+60|`objc_enable_binary_stripping`|`F-Bool`|`S:D/E`
+61|`objc_generate_linkmap`|`F-Bool`|`S:D/E`
+62|`objc_use_dotd_pruning`|`F-Bool`|`S:D/E`
+63|`objccopt`|`F-Text`|`R:N/A`
+66|`process_headers_in_dependencies`|`F-Bool`|`S:D/E`
+68|`propeller_optimize_absolute_cc_profile`|`F-Text`|`S:N/E`
+69|`propeller_optimize_absolute_ld_profile`|`F-Text`|`S:N/E`
+70|`proto_profile`|`F-Bool`|`S:D/E`
+72|`save_temps`|`F-Bool`|`S:D/E`
+73|`share_native_deps`|`F-Bool`|`S:D/E`
+74|`start_end_lib`|`F-Bool`|`S:D/E`
+75|`strict_system_includes`|`F-Bool`|`S:D/E`
+76|`strip`|`F-Enum-StripMode`|`S:D/E`
+77|`stripopt`|`F-Text`|`R:N/A`
+#### A13 `com.google.devtools.build.lib.rules.java.JavaOptions`
+01|`bytecode_optimization_pass_actions`|`F-Int`|`S:D/E`
+03|`enforce_proguard_file_extension`|`F-Bool`|`S:D/E`
+04|`experimental_add_test_support_to_compile_time_deps`|`F-Bool`|`S:D/E`
+05|`experimental_enable_jspecify`|`F-Bool`|`S:D/E`
+06|`experimental_fix_deps_tool`|`F-Text`|`S:D/E`
+07|`experimental_inmemory_jdeps_files`|`F-Bool`|`S:D/E`
+08|`experimental_java_classpath`|`F-Enum-JavaClasspathMode`|`S:D/E`
+09|`experimental_java_test_auto_create_deploy_jar`|`F-Bool`|`S:D/E`
+11|`experimental_local_java_optimizations`|`F-Bool`|`S:D/E`
+12|`experimental_one_version_enforcement`|`F-Enum-JavaOneVersionLevel`|`S:D/E`
+13|`experimental_run_android_lint_on_java_rules`|`F-Bool`|`S:D/E`
+14|`experimental_strict_java_deps`|`F-Enum-StrictDeps`|`S:D/E`
+15|`experimental_turbine_annotation_processing`|`F-Bool`|`S:D/E`
+16|`explicit_java_test_deps`|`F-Bool`|`S:D/E`
+18|`host_javacopt`|`F-Text`|`R:N/A`
+19|`host_jvmopt`|`F-Text`|`R:N/A`
+20|`incompatible_disallow_java_import_exports`|`F-Bool`|`S:D/E`
+21|`incompatible_multi_release_deploy_jars`|`F-Bool`|`S:D/E`
+22|`java_debug`|`F-Void`|`S:N/E`
+23|`java_deps`|`F-Bool`|`S:D/E`
+24|`java_header_compilation`|`F-Bool`|`S:D/E`
+25|`java_language_version`|`F-Text`|`S:D/E`
+27|`java_runtime_version`|`F-Text`|`S:D/E`
+28|`javacopt`|`F-Text`|`R:N/A`
+29|`jvmopt`|`F-Text`|`R:N/A`
+30|`one_version_enforcement_on_java_tests`|`F-Bool`|`S:D/E`
+33|`split_bytecode_optimization_pass`|`F-Bool`|`S:D/E`
+34|`tool_java_language_version`|`F-Text`|`S:D/E`
+35|`tool_java_runtime_version`|`F-Text`|`S:D/E`
+36|`use_ijars`|`F-Bool`|`S:D/E`
+#### A14 `com.google.devtools.build.lib.rules.objc.J2ObjcCommandLineOptions`
+02|`j2objc_translation_flags`|`F-AllowCommaList`|`R:N/A`
+#### A15 `com.google.devtools.build.lib.rules.objc.ObjcCommandLineOptions`
+01|`device_debug_entitlements`|`F-Bool`|`S:D/E`
+02|`experimental_objc_fastbuild_options`|`F-AllowCommaList`|`S:D/E`
+03|`incompatible_avoid_hardcoded_objc_compilation_flags`|`F-Bool`|`S:D/E`
+04|`incompatible_builtin_objc_strip_action`|`F-Bool`|`S:D/E`
+05|`incompatible_disable_native_apple_binary_rule`|`F-Bool`|`S:D/E`
+06|`incompatible_disallow_sdk_frameworks_attributes`|`F-Bool`|`S:D/E`
+07|`incompatible_objc_alwayslink_by_default`|`F-Bool`|`S:D/E`
+08|`incompatible_strip_executable_safely`|`F-Bool`|`S:D/E`
+09|`ios_memleaks`|`F-Bool`|`S:D/E`
+10|`ios_signing_cert_name`|`F-Text`|`S:N/E`
+11|`ios_simulator_device`|`F-Text`|`S:N/E`
+12|`ios_simulator_version`|`F-Dotted`|`S:N/E`
+13|`objc_debug_with_GLIBCXX`|`F-Bool`|`S:D/E`
+#### A16 `com.google.devtools.build.lib.rules.proto.ProtoConfiguration.Options`
+01|`cc_proto_library_header_suffixes`|`F-StringSet`|`S:D/E`
+02|`cc_proto_library_source_suffixes`|`F-StringSet`|`S:D/E`
+03|`experimental_proto_descriptor_sets_include_source_info`|`F-Bool`|`S:D/E`
+09|`protocopt`|`F-Text`|`R:N/A`
+10|`strict_proto_deps`|`F-Enum-StrictDeps`|`S:D/E`
+11|`strict_public_imports`|`F-Enum-StrictDeps`|`S:D/E`
+#### A17 `com.google.devtools.build.lib.rules.python.PythonOptions`
+01|`build_python_zip`|`F-Tri`|`S:D/E`
+02|`experimental_py_binaries_include_label`|`F-Bool`|`S:D/E`
+03|`incompatible_default_to_explicit_init_py`|`F-Bool`|`S:D/E`
+04|`incompatible_python_disallow_native_rules`|`F-Bool`|`S:D/E`
+05|`incompatible_remove_ctx_py_fragment`|`F-Bool`|`S:D/E`
+
+**Default-materializer exception outside the 287:** registry
+`A05.11#runs_per_test` remains in the Java-regex cohort; only its accepted
+`F-Runs-default D("1")` seed is admitted, with deferred `U("+2")`. It is not
+a pure descriptor attachment.
+
+The table contains exactly 287 unique registry keys: 227 built-in attachments
+plus 60 explicit pure-converter attachments. The 54 omitted registry rows remain
+exactly eight Java-regex, five Host, and 41 repository/loading descriptors, so
+`287 + 8 + 5 + 41 = 341`. The independent 45 repeatable, 13 old-name, six
+expansion, and two implicit-requirement metadata rows are unchanged and are not
+value families. No source, converter, default, or route was inferred beyond the
+accepted ledgers.
+
+Independent terminal review accepted all 287 registry-order attachments: 227
+built-in plus 60 explicit pure rows, with route totals `33 R:N/A + 221 S:D/E +
+33 S:N/E`, no duplicate key, and the exact excluded `8 + 5 + 41`. Runs remains
+default-materializer-only and the orthogonal `45/13/6/2` metadata is unchanged.
+No source, registry, runtime, or Rust change occurred.
+
+Run next only
+`WP-6-m2-pure-native-value-default-and-rendering-kernel-retry-2`: implement the
+now-closed 287-family/default/cache contract in the bounded seven-file
+`slug_configuration_v2` owner. Preserve all contextual, normalization,
+checksum/wire, DICE, and configured-target-cycle deferrals.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
