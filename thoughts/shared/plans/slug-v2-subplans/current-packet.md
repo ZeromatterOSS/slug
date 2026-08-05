@@ -1,59 +1,53 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-native-configuration-metadata-and-cache-grammar`
+Packet: `WP-6-m2-native-value-cohort-and-rendering-design`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: introduce the source-complete native configuration descriptor boundary
-without executing context-dependent option semantics.
-Predecessor: the accepted `WP-6-m2-bazel-9-target-configuration-input-ledger`,
-which records all 17 classes/341 options, every graph-derived input and owner,
-and the required serial implementation route.
+Role: freeze the exact pure native-value boundary before executing converters
+or retaining dynamic configuration values.
+Predecessor: accepted metadata/cache grammar `b043d54d` and the complete Bazel
+9.2 target-configuration input ledger `0887d2b2`.
 
-Create a lowest-level `slug_configuration_v2` crate containing:
+This is pinned-source/documentation design only. It must:
 
-- one immutable static descriptor slice for all 341 pinned Bazel 9.2 options,
-  preserving fully qualified class order and option-name order;
-- every ledgered canonical name, old name, raw default literal/source
-  expression, field type, converter identifier, repeat flag, expansion,
-  implicit requirements, and class normalizer identifier; and
-- the exact native cache-field grammar for `NULL`, `EMPTY`, and quoted scalar
-  values with backslash/quote escaping, without computing a mixed checksum.
+- route all 341 descriptors into disjoint converter cohorts and reconcile the
+  audited 288 pure / 7 unsupported Java-regex / 5 Host-dependent / 41
+  repository-package-loading split, recording every exception;
+- separately inventory the command-owned occurrence metadata—45 repeatable,
+  13 old-name, six expansion, and two implicit-requirement rows—and freeze that
+  `slug_configuration_v2` consumes only command-flattened ordered occurrences;
+  it never expands RC/`--config`, old names, boolean negation, repeats,
+  expansions, implicit requirements, or aliases;
+- define special annotation `"null"` behavior, repeatable empty defaults,
+  `runs_per_test`'s converted default, and the six symbolic label defaults;
+- define a closed structural value algebra and exact Java `value.toString()`
+  projection for every admitted pure family, including list/entry/map/env/enum/
+  duration behavior, `NULL` versus empty-list `EMPTY`, escaping, equality, and
+  deterministic Java UTF-16 ordering; and
+- separate pure P/C/T members from label-bearing `platforms` and `flag_alias`
+  while preserving Bazel's convert-every-occurrence-before-normalize errors.
 
-The crate may initially use only retained utility dependencies. Apply
-`.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing: prefer a
-static slice and borrowed static strings, with no runtime map, interner, cache,
-global, or invented hash. Preserve descriptor identity structurally.
+Apply `.codex/skills/slug-buck2-utility-reuse/SKILL.md`. Decide, with source
+and size evidence, whether dynamic values use `CompactString`, immutable
+`Arc<[T]>`, `Dupe`, and `Allocative`; prohibit a runtime descriptor map, global
+interner, cache, weak identity hash, accidental deep cloning, or Rust-derived
+`Debug`/`Display` cache bytes.
 
-Allowlist:
+Documentation allowlist:
 
-- `Cargo.toml`
-- `app/slug_configuration_v2/Cargo.toml`
-- `app/slug_configuration_v2/src/lib.rs`
-- `app/slug_configuration_v2/src/native/mod.rs`
-- `app/slug_configuration_v2/src/native/registry.rs`
-- `app/slug_configuration_v2/src/native/cache_grammar.rs`
-- `app/slug_configuration_v2/src/native/tests.rs`
-- `scripts/v2_archive_status.sh` (only the new V2 crate allowlist entry)
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+- scheduling synchronization in this manifest and the canonical plan
+- one terminal routing row and required bounded-history rotation
 
-Caps: 2,400 production, 1,400 test, 3,800 total formatted net lines across
-eight files. The intentionally ignored workspace `Cargo.lock`, existing crates,
-generated source/data, fixtures, oracle records, and external dependency
-versions must not change.
+Cap the design at 720 formatted documentation lines. No Rust, tests, fixtures,
+oracle, dependency, generated data, command/wire, DICE, checksum, analysis,
+configured-path/platform/ActionKey/aquery, execution, or lockfile change is
+authorized.
 
-Acceptance requires source-backed tests for exactly 17 ordered classes and 341
-unique ordered options. Tests must carry an independent compact pinned expected
-row for every descriptor—not expectations derived from the production slice—
-and compare every metadata field. They must also call out the three formerly
-missed rows `test_filter`, `xcode_version`, and `start_end_lib`; old-name,
-repeat, expansion, implicit-requirement, constant-default, and all P/C/T
-normalizer metadata families; and exact `NULL`/`EMPTY`/backslash/quote
-cache-field bytes. Run crate tests, formatting, workspace/archive/scope/cap/
-diff checks, and independent retained-representation review.
-
-Stop on any omitted/duplicated/misordered descriptor or metadata field; source
-ambiguity; converter execution; typed/default value normalization; argv, RC,
-`--config`, Host OS/CPU, repository mapping, label resolution, platform,
-Starlark setting/scope, `PROJECT.scl`, transition, command/wire, DICE, checksum,
-analysis-key, configured-path/platform/ActionKey/aquery/execution work; a new
-map/interner/cache/global/hash; or cap breach. Configured-target dependency
-cycles remain deferred with user approval.
+Stop on unresolved Java regex generation/rendering; a silent Rust UTF-8/lone-
+surrogate substitution; any converter whose Host or repository context is
+ambiguous; partial normalization that can hide an invalid later occurrence;
+generic map/record rendering without source-backed order; configuration-owned
+argv expansion/repeat/alias logic; an incomplete cohort; retained-state
+ownership ambiguity; or cap breach. Configured-target dependency cycles remain
+deferred with user approval.

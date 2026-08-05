@@ -2187,11 +2187,12 @@ checksum for native, platform/mapping, Starlark/default/scope, and acyclic
 transition changes. No caller checksum, `first-build`, REAPI digest, direct
 filesystem bypass, lock across DICE, or retry event may substitute.
 
-The implementation order is: metadata/cache grammar; context-free converters,
-typed defaults, and P/C/T normalization; Host/repository-context converters;
-shared command/wire identity; Host/platform graph inputs; Starlark values and
-scopes; transactional producer plus structural checksum/key/acyclic transition
-replacement; and build/cquery root integration. Configured artifacts,
+The implementation order is: metadata/cache grammar; native value-cohort and
+rendering design; a pure converter/default and context-free normalization
+kernel; Host/repository-context converters; shared command/wire identity;
+Host/platform graph inputs; Starlark values and scopes; complete-fragment P/C/T
+normalization and a transactional producer plus structural checksum/key/acyclic
+transition replacement; and build/cquery root integration. Configured artifacts,
 per-action platforms, Bazel ActionKey, and aquery remain later serial owners.
 
 Run next only `WP-6-m2-native-configuration-metadata-and-cache-grammar`.
@@ -2214,3 +2215,71 @@ skill and prove 17/341 count and uniqueness, exact class/option ordering, all
 metadata through an independent compact expected row for every descriptor,
 selected complex rows, and cache escaping from the pinned ledger.
 Configured-target dependency cycles remain deferred by user approval.
+
+### Native configuration metadata/cache grammar accepted (2026-08-04)
+
+Commit `b043d54d` accepts the new lowest-level `slug_configuration_v2` crate.
+Its immutable static slice retains all seventeen FQCN-ordered classes and 341
+option-name-ordered descriptors, including every pinned name/old name, field
+type, raw default, converter identifier, repeat/expansion/implicit metadata,
+and I/P/C/T normalizer marker. An independent compact 341-row test table
+compares every field. The three previously omitted source rows are explicit.
+
+The crate also owns only the outer Bazel `OptionsBase` cache-field grammar:
+distinct `NULL`, empty-list `EMPTY`, and quoted scalars escaping backslash and
+double quote. It executes no converter or normalizer and computes no class or
+mixed checksum. Buck2 utility review selected borrowed static strings and a
+static slice; no dependency, map, interner, cache, global, or hash was added.
+The archive guard received only the new V2 crate exclusion, while the ignored
+workspace lockfile remains untracked and unchanged.
+
+Root validation passed four crate tests plus doctests, focused check,
+formatting, an exact source-ledger comparison, archive, scope, cap, and diff
+checks. Independent retained-representation review matched all 341 rows
+against pinned Bazel `8220c619`, accepted the cache bytes and eight-file scope,
+and measured 446 production/600 test/1,047 total formatted net lines against
+2,400/1,400/3,800 caps.
+
+### Native value/converter successor REPLAN (2026-08-04)
+
+**Status: design before Rust.** The proposed combined context-free converters,
+typed defaults, and whole P/C/T normalization packet was not truthful. The 341
+rows partition into 288 apparently pure rows, seven Java-regex-dependent rows,
+five Host-dependent rows, and 41 repository/package/loading-dependent rows.
+`AutoCpuConverter`, path handling, and test resource macros observe Host state;
+label families require package/repository context; six symbolic label defaults
+are source expressions rather than parsed literals.
+
+Even the normalizers cross that boundary. P truncates the label-valued
+`platforms` list and C deduplicates label-valued `flag_alias`; doing so before
+repository-context conversion can hide an invalid discarded value. T and the
+remaining P/C members appear pure, but Bazel converts every occurrence before
+`BuildOptions` invokes `getNormalized`. Command-owned old names, repeats,
+boolean negation, six expansions, and two implicit requirements must likewise
+be flattened in order before configuration conversion, not reimplemented in
+the configuration crate.
+
+The existing formatter proves only outer escaping, not Java `toString()` for
+forty field types. Lists, entries/maps, enum spellings, environment values,
+duration maps, per-label values, and regexes need explicit structural equality
+and rendering rules. Java regex generation and lone UTF-16 surrogate behavior
+are named stops; Rust regex or UTF-8 lexical order cannot silently substitute.
+
+Run next only `WP-6-m2-native-value-cohort-and-rendering-design`. Classify every
+descriptor into disjoint pure, Host, repository/loading, or unsupported
+converter cohorts; separately inventory the 45 repeatable, 13 old-name, six
+expansion, and two implicit-requirement command rows; freeze the command-
+flattened-occurrence precondition; pin default special-null/empty behavior and
+the six symbolic defaults; define the closed value algebra and exact Java
+rendering/equality for every admitted pure family; and separate context-free
+P/C/T members from label-bearing members without changing Bazel's convert-
+before-normalize error semantics.
+
+The design must select retained representations under the Buck2 utility skill,
+including compact dynamic strings, immutable shared slices, clone cost, memory
+accounting, deterministic Java UTF-16 ordering, and no runtime registry map or
+global interner. It must return a bounded pure-codec implementation packet or
+`REPLAN`. Allow only Stage 6 plus current/canonical scheduling and one terminal
+routing row at 720 formatted documentation lines. No Rust, test, fixture,
+dependency, oracle, generated data, command/wire, DICE, checksum, or downstream
+work is authorized. Configured-target cycles remain user-deferred.
