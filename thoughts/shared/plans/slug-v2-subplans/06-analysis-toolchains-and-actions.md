@@ -609,3 +609,15 @@ transitions/configuration selection, general attributes/providers, native
 rules, toolchains, query formatting/traversal, execution, and materialization
 remain later packets. The migration observer still scans the workspace before
 injecting immutable inputs; analysis itself performs no filesystem discovery.
+
+### WP-6-m2 root configured-target command boundary design (2026-08-04)
+
+**Status: ACTIVE, read-only.** Decide whether the first root-only literal
+`cquery` result can consume the existing sole
+`ConfiguredTargetAnalysisKey { workspace, configured_target }` and its ordered
+dependency results without a second command graph, new configuration
+representation, or analysis re-evaluation. Reuse the accepted
+`recursive-custom-rule-providers-actions` Bazel 9.2 cquery evidence unless one
+literal-label discriminator is genuinely absent. No Rust, test, fixture, or
+oracle edit is authorized until reserved Sol review accepts a complete
+identity/ownership/error/output/lifecycle boundary.

@@ -19117,3 +19117,39 @@ owner but must project its directory-present state compatibly, while root uses
 the existing exact native path observation owner. It must not invalidate its
 terminal equality for content-only edits, must fail on absence, and must recover
 on recreation. Independent Terra evidence review returned `ACCEPT`.
+
+### WP-5-m1 direct-local external build source-target activation (2026-08-04)
+
+**Status: ACCEPTED in `42f4a64b`.** The exact five-file implementation is 259
+production lines, 186 test lines, and 445 total formatted net lines, within the
+accepted 280/850/1130 caps. A single explicit direct-local external
+`ExportedFile` now reuses the root anchor, route-keyed repository package load,
+Host source observation, and accepted command driver. Mixed, multiple,
+package-all, recursive, filegroup, and Starlark-rule external build requests
+remain outside the slice; no configured analysis, action, execution, or REAPI
+path was activated.
+
+The private retained completion class keeps the preexisting pattern and loaded
+package in build-root equality while excluding source bytes. Present, content
+edit, directory, and recreated source states therefore share the zero-action
+success terminal; absence becomes the exact canonical missing-input failure.
+Root exported sources share only this observed-source completion, while root
+filegroup/package-all and rule behavior remains unchanged. Ordinary typed
+route/load errors retain their source chain; only the accepted direct-local
+MODULE cycle becomes exit 7 `unsupported_feature` for build.
+
+Focused core, CLI, server, lifecycle, event-order, request-shape, rule, and
+REAPI-stop tests passed. Full core was 123/124 with only the untouched external
+visibility wording baseline; full CLI was 36/37 with only the untouched
+broken-Bzl parser wording baseline; full server was 29/31 with the two
+documented untouched root-only fixture failures. GNU-Windows core check,
+formatting, archive, diff, scope, process cleanup, and forbidden-new-key/direct-
+filesystem checks passed. Independent Terra latest-diff correction review
+returned `ACCEPT`. The retained fieldless enum and existing `Arc`/`Allocative`
+representation follow the matching Stage 9 configured-analysis utility row;
+no utility import or ledger change was needed.
+
+The next packet pivots to the canonical configured-graph chain rather than
+adding another unconfigured external build kind:
+`WP-6-m2-root-configured-target-command-boundary-design`. The remaining named
+M1 gaps stay at their accepted terminal unsupported/`REPLAN` boundaries.

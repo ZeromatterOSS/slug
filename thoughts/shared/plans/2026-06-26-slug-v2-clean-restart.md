@@ -24,10 +24,10 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **active** | Host loading observations, dormant typed root-loading/root-analysis boundaries, accepted preactivation Host closure gate, opaque accepted-command publication, source-aware command events, typed one-shot/daemon query and build activation, accepted direct local-override external source-file, `filegroup`, direct `alias`, `config_setting`, suite-only `test_suite`, standalone `package_group`, sole explicit-public dependency-free non-test external Starlark-rule queries, and same-package Restricted-visibility generic query consumers, plus accepted Host-only external source, request-local external query package identity, the route-keyed external Bzl owner, accepted external Bzl package/query activation, accepted direct-local MODULE source handoff, parser inspection, route package horizon, shared nested-horizon preflight, the private support-gated cycle-pruned closure in `f2b626f2`, the trusted nonregistry evaluator adapter in `c683c239`, the private nonregistry DICE/event owner in `3cf0e441`, and the query-only public unsupported-cycle boundary in `ea2019f8`, plus accepted external source-build present/edit/delete/recreate evidence and the accepted 20-row macro and seven-row Restricted-visibility external query oracles; full evidence is in the Stage 5 owner plan | The bounded external exported-source build implementation is accepted but not landed; external Starlark test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported | implement `WP-5-m1-direct-local-external-build-source-target-activation-implementation` |
-| M2: analysis graph | partial | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | no new M2 packet while the M1 source-input owner is current |
+| M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
+| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions | configuration, transition, toolchain/platform, repository-mapping, and broader action ownership gates remain | design `WP-6-m2-root-configured-target-command-boundary-design` |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
-| M4: `cquery` | not started | command/parser placeholder only | M3 and configured-target breadth | none |
+| M4: `cquery` | **design active** | command/parser placeholder plus accepted Stage 6 recursive configured-target evidence | exact root-only command/result ownership | share `WP-6-m2-root-configured-target-command-boundary-design` with M2 |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
@@ -35,10 +35,16 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-5-m1-direct-local-external-build-source-target-activation-implementation`.
+`WP-6-m2-root-configured-target-command-boundary-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
+
+The direct-local external exported-source build activation is accepted in
+`42f4a64b` at 259 production/186 test/445 total formatted net lines. It closes
+the bounded source-only M1 build vertical; the remaining named M1 gaps are
+terminal, so the current packet pivots to the root configured-target/cquery
+boundary required by the canonical direction reset.
 
 The direct-local external exported-source build lifecycle evidence is accepted.
 Pinned Bazel 9.2 proves present/edit/recreate success with no output, deletion
