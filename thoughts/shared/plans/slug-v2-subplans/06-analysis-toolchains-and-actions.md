@@ -1417,9 +1417,9 @@ type still participate in that round's Need union. Toolchain execution
 constraints reject duplicate settings. Selected leaves require exactly one
 user string `marker` schema/value plus only the loader-invariant defaulted
 empty `tags` entry, no executable/test capability, and the existing dependency/
-requirement/transition/build-setting/action/output/diagnostic guards. Post-analysis
-provider validation uses exact builtin keys and exact two-entry cardinality
-for empty DefaultInfo plus ToolchainInfo, never names.
+requirement/transition/build-setting/action/output/diagnostic guards.
+Post-analysis provider validation uses exact builtin keys and exact two-entry
+cardinality for empty DefaultInfo plus ToolchainInfo, never names.
 Zero-requirement requesters bypass anchor/resolution and retain the existing
 activation/result path; selected children still use the same existing root key.
 
@@ -1430,3 +1430,44 @@ legacy activation, all native/reference/selection/leaf failures, external Need
 precedence, builtin/user identity, callable/index errors, explicit
 zero-requirement no-anchor behavior, and zero actions, outputs, diagnostics,
 and oracle manifests.
+
+### Integrated toolchain resolution/context implementation (2026-08-04)
+
+**Status: ACCEPTED in `1533569f`.** The exact seven-file implementation is
+724 production lines, 630 test lines, and 1,354 total formatted net lines,
+within the corrected 740/760/1,500 caps. Root analysis now consumes ordered
+root registrations, validates the complete root native declaration/reference
+graph, selects the first compatible platform/toolchain pair in MODULE order,
+and analyzes the selected NODEP implementation through the ordinary existing
+root configured-target key.
+
+The implementation adds a dedicated builtin ToolchainInfo value and exact
+builtin-key collection lookups, phase-gates its callable to analysis, and
+prepares only the accepted string marker plus one-entry `ctx.toolchains`
+surface. Selected implementations are exact non-executable, non-test marker
+leaves with loader-defaulted empty tags, zero dependencies, requirements,
+actions, outputs, and diagnostics, and exactly builtin empty DefaultInfo plus
+builtin ToolchainInfo. Zero-requirement requesters bypass resolution. Every
+root package discovery round unions Needs before recorded semantic or DICE
+errors; external registrations and native references are never projected as
+root labels.
+
+The accepted matrix covers first-compatible selection and restoration,
+marker/BUILD lifecycle and full result equality, exact root/anchor/package/
+selected-child activation and event ownership, native/reference/constraint/
+selection failures, external and later-round Need precedence, leaf/capability/
+provider/callable/context failures, builtin/user collisions, and the
+zero-requirement no-anchor edge. Root serial validation passed 24 analysis,
+22 build-API, and 117 loading tests, `slug_core_v2` check, formatting, diff,
+scope, cap, archive, and three GNU-Windows no-run gates with existing warnings
+only. Independent Terra latest-diff review returned `ACCEPT` after corrections
+for external-reference projection, defaulted-tag provenance, exact builtin
+DefaultInfo identity, and the omitted-marker guard.
+
+Design next only `WP-6-m2-root-action-closure-boundary-design`. Live
+`BuildCommandEvaluation` retains requested roots only, so its declared-action
+count and REAPI iteration omit actions owned by recursively analyzed
+dependencies. Reuse the accepted recursive target-owned-write evidence and
+design a deterministic, duplicate-safe closure over existing configured
+dependency identities. Do not retry public configuration identity or aquery:
+both remain `REPLAN` until the general configuration substrate exists.

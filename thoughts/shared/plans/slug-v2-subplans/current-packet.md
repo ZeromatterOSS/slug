@@ -1,81 +1,43 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-integrated-toolchain-resolution-context-implementation`
-Milestone: M2 successful toolchain/platform selection
+Packet: `WP-6-m2-root-action-closure-boundary-design`
+Milestone: M2 recursive configured-target action closure
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: implement the accepted fixture-bounded real selection and prepared
-`ctx.toolchains` vertical
-Predecessor: accepted evidence `ed4baf08`, registrations `4a3af8df`, native
-loading `6a457406`, rule/provider-symbol loading `1d6106bd`, and reserved
-integration design review.
+Role: design only the configuration-opaque command-local closure that retains
+actions from requested roots and their recursively analyzed dependencies.
+Predecessor: accepted integrated toolchain resolution/context implementation
+`1533569f` and accepted recursive target-owned action evidence.
 
-Keep selection inline in `RootConfiguredTargetAnalysisKey`. For a root
-Starlark requester with zero requirements, preserve the existing path. For
-exactly one requirement, compute the existing root registration anchor and
-all required `RootPackageLoadKey` values, unioning Needs before semantic
-errors. Record external-registration errors without projecting or loading the
-external label, but still load all discoverable root registration and required
-type packages in that round and return their unioned Need first. Apply the same
-Need-first rule to sibling DICE errors and every later reference-discovery
-round. Canonicalize root-only apparent registrations, validate exact native
-type/platform/constraint/toolchain/reference kinds, reject duplicate settings
-within both platforms and toolchain execution constraints, and select in
-execution-platform outer/toolchain inner MODULE order.
+The live gap is exact: each `AnalysisResult` owns its target-local actions and
+configured dependency identities, but `BuildCommandEvaluation` retains only
+requested-root analyses. Its action count and REAPI consumer therefore omit
+actions owned by recursively analyzed dependencies.
 
-Analyze the selected NODEP implementation with the existing root configured
-analysis key and unchanged configuration. It must be a non-executable,
-non-test leaf Starlark rule whose exact supported user schema/value is one
-string `marker` plus only the loader-invariant defaulted empty `tags` entry,
-with no
-ordinary dependencies, requirements,
-transition/build-setting role, actions, outputs, diagnostics, or providers
-beyond exactly builtin ToolchainInfo plus implicit empty DefaultInfo. Verify
-the exact two builtin provider keys and cardinality; provider names are not an
-identity check. Add no DICE key, digest, cache, global, lock, direct file read,
-or second source graph.
+Design an ordered, duplicate-safe closure from existing build roots through
+`AnalysisResult::direct_dependencies`. Decide single-root, multi-root, shared
+diamond, and configuration-distinct membership and ordering; preserve each
+`AnalysisResult` as the sole owner of its own actions. Specify Need/error
+precedence, same-DICE lifecycle and A-to-B-to-A equality, dependency
+edit/delete/recreate pruning, and exact analysis/event ownership without a
+second configured graph or duplicate child evaluation.
 
-Add builtin `ProviderValue::ToolchainInfo` with exactly one compact string
-marker and builtin-specific ProviderCollection lookup. Phase-gate the existing
-loading callable through analysis evaluator state: loading invocation remains
-unsupported; analysis accepts no positional arguments and exactly one named
-string marker. Add only string `ctx.attr.marker` and a one-entry
-`ctx.toolchains` index accepting the exact root-apparent required-type string
-and exposing `.marker`. User providers remain distinct.
+Reuse `recursive-custom-rule-providers-actions`, specifically the accepted
+`aquery_recursive_target_owned_writes` evidence showing distinct parent and
+two-leaf `FileWrite` actions. Use only the existing `ConfiguredTargetKey`
+identity internally; do not format or invent Bazel configuration identity.
 
-Production allowlist:
+Documentation allowlist:
 
-- `app/slug_analysis_v2/Cargo.toml`
-- `app/slug_analysis_v2/src/dice.rs`
-- `app/slug_analysis_v2/src/starlark_rule.rs`
-- `app/slug_build_api_v2/src/providers/mod.rs`
-- `app/slug_loading_v2/src/provider.rs`
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
 
-Test allowlist:
+Caps are zero production lines, zero test lines, 320 documentation lines, and
+320 total net lines. Return either one exact implementation packet or `REPLAN`
+if a truthful closure requires unmodeled public configuration identity.
 
-- `app/slug_analysis_v2/tests/starlark_rule.rs`
-- `app/slug_build_api_v2/tests/providers.rs`
-
-Corrected caps are 740 formatted production net lines, 760 test lines, and
-1,500 total. The seven-file allowlist remains exact. The first sizing
-prototype is corrected in place: splitting would leave dormant
-resolver/provider substrate, while reconstruction would reproduce the same
-atomic owner boundary.
-
-Required evidence covers the exact six accepted marker observations with a
-requester that reads only `ctx.toolchains`; warm, registration
-reorder/restoration, marker edit/restoration, BUILD delete/recreate,
-A-to-B-to-A full-result equality, root/anchor/package/selected-child event and
-activation ownership, no legacy analysis activation, external-error Need
-precedence, every exact native kind/reference, duplicate-setting, selection,
-capability and leaf/post-analysis failure, builtin/user separation, callable
-argument and context-index failures, unchanged loading-time invocation failure,
-an explicit zero-requirement no-anchor path, and zero
-actions/outputs/diagnostics/manifests. Reuse the accepted oracle for manifest
-evidence rather than inventing a new result surface.
-
-Stop and return `REPLAN` for optional/multiple types, external repositories or
-mapping, patterns, command-line registrations, aliases, host fallback,
-target-platform constraints, exec groups, general scalar attrs or
-ToolchainInfo fields, non-leaf implementations, public query/cquery/aquery or
-diagnostic formatting, actions/execution/REAPI, configuration expansion,
-dormant resolver scaffolding, or any new DICE key/cache/global/lock.
+Stop for any Rust, test, fixture, or generated-oracle edit; configuration
+checksum/short ID, configured output paths, execution-platform or action-key
+identity, cquery/aquery formatting, general transition/configuration
+substrate, external mapping, patterns, toolchain action breadth,
+execution/REAPI behavior, or any new DICE key/cache/global/lock.
