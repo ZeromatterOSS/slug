@@ -2563,3 +2563,29 @@ new representation/context/oracle needs, count changes, or cap breach are
 `REPLAN`. Host, repository/loading, Java-regex/`PerLabelOptions`, command,
 normalization, checksum, wire, DICE, and configured-cycle semantics remain
 deferred.
+
+### Pure native converter source-closure ledger REPLAN (2026-08-04)
+
+The combined `WP-6-m2-pure-native-converter-source-closure-ledger` produced a
+correctly counted 287-row draft and one compact family table, then exhausted
+its permitted correction without closing the byte contract. Its final review
+still found incomplete concrete enum converter/value/renderer chains, no exact
+EnvVar record strings or EnumMap/Duration bytes, ambiguous supplementary/BMP
+UTF-16 input notation, and undefined default-route discriminator IDs. These are
+material source-closure gaps, not formatting. The entire unaccepted Stage 6
+diff was discarded with `apply_patch`; HEAD returned cleanly to `a9c05049`.
+
+Run next only `WP-6-m2-pure-native-family-byte-contract-ledger`. Do not repeat
+the 287 descriptor rows. At no more than 380 Stage 6/480 total documentation
+lines, freeze every pure family’s complete converter, typed-value/equality, and
+Java-renderer owner chain plus exact input/rejection and cache-byte
+discriminators. In particular pin the versioned Java SE 21 `Enum#toString` and
+`Duration#toString` API contracts versus Bazel's lowercase overrides; each
+exact shared/custom converter class and value owner; full BoolOrEnum, sharding, fission,
+and PlatformType branches; exact EnvVar records; exact default/mixed Duration
+map text; executable UTF-16 ordering; and concrete null/empty/literal default
+IDs. Any missing chain, semantic family split, live-JVM need, or new material
+correction is `REPLAN`. Only after independent acceptance may a later packet
+mechanically map the 287 already classified rows. Rust and every contextual,
+regex, command, normalizer, checksum, wire, DICE, and configured-cycle path
+remain deferred.
