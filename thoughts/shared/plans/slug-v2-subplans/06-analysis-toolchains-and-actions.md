@@ -3876,6 +3876,47 @@ one-way ownership/dependency handoff before adding any Host observation or
 contextual converter. Configured-target dependency cycles remain explicitly
 deferred by user approval.
 
+### Windows option-path long-name observation primitive (2026-08-05)
+
+`WP-6-m2-windows-option-path-long-name-observation-primitive` adds the
+producer-free option-specific Host/DICE fact in the existing observation
+layers. `WindowsOptionPathLongNameOutcome` retains exact pre-lexical UTF-16 as
+either `Resolved(Arc<[u16]>)` or distinct `IOExceptionFallback`; demand
+identity includes Host namespace, operation, normalized identity path, and one
+shared raw UTF-16 Arc. Generic demands reject both UTF-16 operations, while
+the exact injected epoch preserves mismatch/duplicate rejection, transient
+`Need`, and A -> B -> A success/fallback/payload replay.
+
+The core native adapter reuses the pinned resolver eligibility, sizing/fill,
+extended-prefix, and slash-transform helpers. It returns fallback for every
+ineligible/native failure and performs no lexical normalization for the new
+operation. The Unix adapter is a defensive no-IO fallback. The accepted
+repository-oriented `WindowsLongPath` keeps its original direct resolver ->
+transform -> lexical-normalization flow; the implementation review restored
+that direct flow rather than adding an Arc-to-Vec copy on the existing path.
+All non-owner edits are exhaustive impossible-result arms or structural
+validation of the new outcome.
+
+The exact eight-file change is 86 production, 302 test, and 388 total net
+lines. Focused workspace observation tests pass 18/18, new core tests 3/3,
+existing `WindowsLongPath` guards 5/5, full workspace tests 39/39, bzlmod
+check, GNU-Windows workspace/core/bzlmod no-run, formatting, archive, scope,
+cap, no-Cargo, and diff gates pass. The full core suite reached 131/132; its
+sole failure is an untouched external-query assertion expecting the older
+`external repository visibility edges are deferred` text while the already
+committed query owner returns the more specific wrong-kind-group diagnostic.
+An isolated clean-HEAD compile intended to confirm that baseline exhausted
+temporary disk quota and its disposable worktree/build output was removed.
+The affected focused suites and two independent source-equivalence plus
+retained-DICE/representation reviews returned `ACCEPT`.
+
+Run next only `WP-6-m2-host-input-observation-contract-design-retry`,
+docs-only. Select the immutable OS/CPU/resource/home snapshot, exact
+process/daemon capture owner, one-way core -> configuration handoff, and the
+separate complete option-path fact projection. Add no Host read, DICE,
+configuration, request, wire, or activation behavior. Configured-target
+dependency cycles remain explicitly deferred.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the

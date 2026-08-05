@@ -258,6 +258,7 @@ pub enum PathObservationOperation {
     FileBytes,
     DirectoryEntries,
     WindowsLongPath,
+    WindowsOptionPathLongName,
 }
 
 /// One exact operation requested from the outside-DICE observer.
@@ -266,6 +267,7 @@ pub struct PathObservationDemand {
     namespace: PathObservationNamespace,
     path: NormalizedAbsolutePath,
     operation: PathObservationOperation,
+    // Both Windows long-name operations share one lossless input allocation.
     windows_long_path_input: Option<Arc<[u16]>>,
 }
 
@@ -276,8 +278,9 @@ impl PathObservationDemand {
         operation: PathObservationOperation,
     ) -> Self {
         assert!(
-            operation != PathObservationOperation::WindowsLongPath,
-            "WindowsLongPath requires its dedicated Host demand constructor"
+            operation != PathObservationOperation::WindowsLongPath
+                && operation != PathObservationOperation::WindowsOptionPathLongName,
+            "Windows UTF-16 operations require their dedicated Host demand constructors"
         );
         Self {
             namespace,
@@ -297,6 +300,21 @@ impl PathObservationDemand {
             namespace: PathObservationNamespace::Host,
             path,
             operation: PathObservationOperation::WindowsLongPath,
+            windows_long_path_input: Some(windows_long_path_input),
+        }
+    }
+
+    /// Requests the pre-lexical long-name branch used by Windows option-path
+    /// conversion. The result distinguishes native resolution from Bazel's
+    /// caught-`IOException` fallback.
+    pub fn windows_option_path_long_name(
+        path: NormalizedAbsolutePath,
+        windows_long_path_input: Arc<[u16]>,
+    ) -> Self {
+        Self {
+            namespace: PathObservationNamespace::Host,
+            path,
+            operation: PathObservationOperation::WindowsOptionPathLongName,
             windows_long_path_input: Some(windows_long_path_input),
         }
     }
@@ -499,6 +517,18 @@ pub enum PathOperationResult<T> {
     Error(PathObservationError),
 }
 
+/// The source-visible branch of a Windows option-path long-name lookup.
+///
+/// `Resolved` is the exact UTF-16 spelling returned by the native resolver
+/// after its extended-prefix/slash transformation but before lexical path
+/// normalization. Bazel catches `IOException` and instead keeps the caller's
+/// raw input, represented here by the distinct fallback value.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
+pub enum WindowsOptionPathLongNameOutcome {
+    Resolved(Arc<[u16]>),
+    IOExceptionFallback,
+}
+
 /// One validated raw directory entry name.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PathDirectoryName {
@@ -620,6 +650,7 @@ pub enum PathObservationResult {
     FileBytes(PathOperationResult<Arc<[u8]>>),
     DirectoryEntries(PathOperationResult<PathDirectoryEntries>),
     WindowsLongPath(Arc<[u16]>),
+    WindowsOptionPathLongName(WindowsOptionPathLongNameOutcome),
 }
 
 impl PathObservationResult {
@@ -630,6 +661,9 @@ impl PathObservationResult {
             Self::FileBytes(_) => PathObservationOperation::FileBytes,
             Self::DirectoryEntries(_) => PathObservationOperation::DirectoryEntries,
             Self::WindowsLongPath(_) => PathObservationOperation::WindowsLongPath,
+            Self::WindowsOptionPathLongName(_) => {
+                PathObservationOperation::WindowsOptionPathLongName
+            }
         }
     }
 }
@@ -836,6 +870,7 @@ mod tests {
     use super::PathObservationResult;
     use super::PathOperationResult;
     use super::PathOutcome;
+    use super::WindowsOptionPathLongNameOutcome;
 
     fn path(value: &str) -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new(value).unwrap()
@@ -978,12 +1013,68 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "WindowsLongPath requires its dedicated Host demand constructor")]
-    fn generic_demand_constructor_rejects_windows_long_path() {
+    fn windows_option_path_long_name_demand_retains_raw_input_and_kind_in_identity() {
+        let raw: Arc<[u16]> = Arc::from([
+            b'C' as u16,
+            b':' as u16,
+            b'/' as u16,
+            0xD800,
+            b'~' as u16,
+            b'1' as u16,
+        ]);
+        let option = PathObservationDemand::windows_option_path_long_name(
+            path("/workspace/option-a"),
+            raw.dupe(),
+        );
+        let other_path = PathObservationDemand::windows_option_path_long_name(
+            path("/workspace/option-b"),
+            raw.dupe(),
+        );
+        let other_spelling = PathObservationDemand::windows_option_path_long_name(
+            path("/workspace/option-a"),
+            Arc::from([
+                b'C' as u16,
+                b':' as u16,
+                b'\\' as u16,
+                0xD800,
+                b'~' as u16,
+                b'1' as u16,
+            ]),
+        );
+        let existing = PathObservationDemand::windows_long_path(path("/workspace/option-a"), raw);
+
+        assert_eq!(option.namespace(), PathObservationNamespace::Host);
+        assert_eq!(
+            option.operation(),
+            PathObservationOperation::WindowsOptionPathLongName
+        );
+        assert_eq!(option.windows_long_path_input().unwrap()[3], 0xD800);
+        assert_ne!(option, other_path);
+        assert_ne!(option, other_spelling);
+        assert_ne!(option, existing);
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Windows UTF-16 operations require their dedicated Host demand constructors"
+    )]
+    fn generic_demand_constructor_rejects_windows_utf16_operations() {
         let _ = PathObservationDemand::new(
             PathObservationNamespace::Host,
             path("/workspace/windows-long-path"),
             PathObservationOperation::WindowsLongPath,
+        );
+    }
+
+    #[test]
+    #[should_panic(
+        expected = "Windows UTF-16 operations require their dedicated Host demand constructors"
+    )]
+    fn generic_demand_constructor_rejects_windows_option_path_long_name() {
+        let _ = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/workspace/windows-option-path"),
+            PathObservationOperation::WindowsOptionPathLongName,
         );
     }
 
@@ -1118,6 +1209,9 @@ mod tests {
             PathObservationResult::WindowsLongPath(Arc::from(
                 "C:/Program Files".encode_utf16().collect::<Vec<_>>(),
             )),
+            PathObservationResult::WindowsOptionPathLongName(
+                WindowsOptionPathLongNameOutcome::IOExceptionFallback,
+            ),
         ];
         assert_eq!(
             results.map(|result| result.operation()),
@@ -1127,6 +1221,7 @@ mod tests {
                 PathObservationOperation::FileBytes,
                 PathObservationOperation::DirectoryEntries,
                 PathObservationOperation::WindowsLongPath,
+                PathObservationOperation::WindowsOptionPathLongName,
             ]
         );
         assert_ne!(io, wrong_kind);
@@ -1173,6 +1268,37 @@ mod tests {
             PathObservationEpoch::new([(
                 demand,
                 PathObservationResult::Lstat(PathOperationResult::Missing),
+            )]),
+            Err(PathObservationEpochError::OperationMismatch { .. })
+        ));
+
+        let option = PathObservationDemand::windows_option_path_long_name(
+            path("/workspace/option"),
+            Arc::from("C:/PROGRA~1".encode_utf16().collect::<Vec<_>>()),
+        );
+        assert!(matches!(
+            PathObservationEpoch::new([
+                (
+                    option.dupe(),
+                    PathObservationResult::WindowsOptionPathLongName(
+                        WindowsOptionPathLongNameOutcome::IOExceptionFallback,
+                    ),
+                ),
+                (
+                    option.dupe(),
+                    PathObservationResult::WindowsOptionPathLongName(
+                        WindowsOptionPathLongNameOutcome::IOExceptionFallback,
+                    ),
+                ),
+            ]),
+            Err(PathObservationEpochError::DuplicateDemand(_))
+        ));
+        assert!(matches!(
+            PathObservationEpoch::new([(
+                option,
+                PathObservationResult::WindowsLongPath(Arc::from(
+                    "C:/Program Files".encode_utf16().collect::<Vec<_>>(),
+                )),
             )]),
             Err(PathObservationEpochError::OperationMismatch { .. })
         ));
@@ -1372,6 +1498,72 @@ mod tests {
                         result.as_ref(),
                         PathObservationResult::WindowsLongPath(actual)
                             if actual == &expected
+                    )
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn windows_option_path_long_name_dice_replays_outcomes_without_collapsing_fallback() {
+        let input: Arc<[u16]> = Arc::from("C:/PROGRA~1".encode_utf16().collect::<Vec<_>>());
+        let demand = PathObservationDemand::windows_option_path_long_name(
+            path("/workspace/windows-option"),
+            input,
+        );
+        let a = WindowsOptionPathLongNameOutcome::Resolved(Arc::from(
+            "C:/Program Files".encode_utf16().collect::<Vec<_>>(),
+        ));
+        let fallback = WindowsOptionPathLongNameOutcome::IOExceptionFallback;
+        let b = WindowsOptionPathLongNameOutcome::Resolved(Arc::from(
+            "C:/Programs".encode_utf16().collect::<Vec<_>>(),
+        ));
+        assert_ne!(a, fallback);
+        let raw_equivalent = WindowsOptionPathLongNameOutcome::Resolved(Arc::from(
+            "C:/PROGRA~1".encode_utf16().collect::<Vec<_>>(),
+        ));
+        // A successful lookup can retain an identical spelling. The later
+        // lexical path is then equal to fallback, but the source branch is not.
+        assert_ne!(raw_equivalent, fallback);
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let needed = transaction
+            .compute(&PathObservationKey::new(demand.dupe()))
+            .await
+            .unwrap();
+        assert!(matches!(needed, PathOutcome::Need(_)));
+        assert!(!PathObservationKey::validity(&needed));
+        assert!(!PathObservationKey::equality(&needed, &needed));
+
+        for expected in [a.dupe(), fallback, b, a] {
+            let mut updater = transaction.into_updater();
+            updater
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    PathObservationEpoch::new([(
+                        demand.dupe(),
+                        PathObservationResult::WindowsOptionPathLongName(expected.dupe()),
+                    )])
+                    .unwrap(),
+                )])
+                .unwrap();
+            transaction = updater.commit().await;
+            let observed = transaction
+                .compute(&PathObservationKey::new(demand.dupe()))
+                .await
+                .unwrap();
+            assert!(matches!(
+                observed,
+                PathOutcome::Complete(result)
+                    if matches!(
+                        result.as_ref(),
+                        PathObservationResult::WindowsOptionPathLongName(actual) if actual == &expected
                     )
             ));
         }

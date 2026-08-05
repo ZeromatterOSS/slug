@@ -32,6 +32,7 @@ use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use slug_workspace_v2::WindowsOptionPathLongNameOutcome;
 
 #[derive(Debug, PartialEq, Eq, Allocative)]
 struct RetainedMaterializationRoot {
@@ -133,6 +134,8 @@ trait ObservationOperations {
     ) -> Result<PathDirectoryEntries, PrimaryFailure>;
 
     fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]>;
+
+    fn windows_option_path_long_name(&mut self, input: &[u16]) -> WindowsOptionPathLongNameOutcome;
 }
 
 fn observe_with(
@@ -221,6 +224,14 @@ fn observe_one(
                 .windows_long_path_input()
                 .expect("WindowsLongPath demand must retain its resolver input");
             PathObservationResult::WindowsLongPath(operations.windows_long_path(input))
+        }
+        PathObservationOperation::WindowsOptionPathLongName => {
+            let input = demand
+                .windows_long_path_input()
+                .expect("WindowsOptionPathLongName demand must retain its resolver input");
+            PathObservationResult::WindowsOptionPathLongName(
+                operations.windows_option_path_long_name(input),
+            )
         }
     }
 }
@@ -339,6 +350,13 @@ impl ObservationOperations for UnixPathObservationAdapter {
 
     fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]> {
         Arc::from(windows_pure::windows_lexical_normalize(input))
+    }
+
+    fn windows_option_path_long_name(
+        &mut self,
+        _input: &[u16],
+    ) -> WindowsOptionPathLongNameOutcome {
+        WindowsOptionPathLongNameOutcome::IOExceptionFallback
     }
 }
 
@@ -1079,6 +1097,21 @@ mod windows_pure {
             .map(|path| windows_remove_prefix_and_use_slashes(&path))
             .unwrap_or_else(|| input.to_vec());
         Arc::from(windows_lexical_normalize(&effective))
+    }
+
+    /// Performs only Bazel's long-name resolver step. The caller owns the
+    /// later Windows lexical normalization, so a caught native failure remains
+    /// observable as a distinct fact.
+    pub(super) fn observe_windows_option_path_long_name_with(
+        input: &[u16],
+        api: &mut impl WindowsLongPathApi,
+    ) -> WindowsOptionPathLongNameOutcome {
+        match resolve_windows_long_path_with(input, api) {
+            Some(path) => WindowsOptionPathLongNameOutcome::Resolved(Arc::from(
+                windows_remove_prefix_and_use_slashes(&path),
+            )),
+            None => WindowsOptionPathLongNameOutcome::IOExceptionFallback,
+        }
     }
 
     pub(super) fn find_name(raw: &[u16; 260]) -> Result<Vec<u16>, PrimaryFailure> {
@@ -1832,6 +1865,13 @@ mod windows_native {
         fn windows_long_path(&mut self, input: &[u16]) -> Arc<[u16]> {
             observe_windows_long_path_with(input, &mut KernelLongPathApi)
         }
+
+        fn windows_option_path_long_name(
+            &mut self,
+            input: &[u16],
+        ) -> WindowsOptionPathLongNameOutcome {
+            observe_windows_option_path_long_name_with(input, &mut KernelLongPathApi)
+        }
     }
 
     #[cfg(test)]
@@ -2067,6 +2107,76 @@ mod windows_tests {
                 LongPathCall::Fill(query, 32)
             ]
         );
+    }
+
+    #[test]
+    fn windows_option_path_long_name_preserves_prelexical_success_and_fallback() {
+        let input = wide("c:/PROGRA~1/tool");
+        let query = wide("\\\\?\\c:\\PROGRA~1\\tool\0");
+        let returned = [
+            b'\\' as u16,
+            b'\\' as u16,
+            b'?' as u16,
+            b'\\' as u16,
+            b'c' as u16,
+            b':' as u16,
+            b'\\' as u16,
+            0xD800,
+            b'\\' as u16,
+            b'.' as u16,
+            b'\\' as u16,
+            b't' as u16,
+            b'o' as u16,
+            b'o' as u16,
+            b'l' as u16,
+            0,
+        ];
+        let mut api = scripted_long_path(32, 15, &returned);
+        let resolved = observe_windows_option_path_long_name_with(&input, &mut api);
+        assert_eq!(
+            resolved,
+            WindowsOptionPathLongNameOutcome::Resolved(Arc::from([
+                b'c' as u16,
+                b':' as u16,
+                b'/' as u16,
+                0xD800,
+                b'/' as u16,
+                b'.' as u16,
+                b'/' as u16,
+                b't' as u16,
+                b'o' as u16,
+                b'o' as u16,
+                b'l' as u16,
+            ]))
+        );
+        assert_eq!(
+            api.calls,
+            [
+                LongPathCall::Size(query.clone()),
+                LongPathCall::Fill(query, 32)
+            ]
+        );
+
+        let ineligible = wide("c:/base/../PROGRA~1//");
+        let mut unused = scripted_long_path(10, 9, &wide("\\\\?\\C:\\long\0"));
+        assert_eq!(
+            observe_windows_option_path_long_name_with(&ineligible, &mut unused),
+            WindowsOptionPathLongNameOutcome::IOExceptionFallback
+        );
+        assert!(unused.calls.is_empty());
+
+        for mut api in [
+            scripted_long_path(0, 0, &[]),
+            scripted_long_path(WINDOWS_EXTENDED_PATH_MAX_UNITS + 1, 0, &[]),
+            scripted_long_path(8, 0, &[]),
+            scripted_long_path(8, 8, &wide("\\\\?\\C:\0")),
+            scripted_long_path(8, 7, &wide("\\\\?\\C:xy")),
+        ] {
+            assert_eq!(
+                observe_windows_option_path_long_name_with(&wide("c:/PROGRA~1"), &mut api),
+                WindowsOptionPathLongNameOutcome::IOExceptionFallback
+            );
+        }
     }
 
     #[test]
@@ -2812,6 +2922,7 @@ mod tests {
         FileBytes(NormalizedAbsolutePath),
         DirectoryEntries(NormalizedAbsolutePath),
         WindowsLongPath(Arc<[u16]>),
+        WindowsOptionPathLongName(Arc<[u16]>),
     }
 
     struct ScriptedOperations {
@@ -2823,6 +2934,7 @@ mod tests {
         file_bytes: VecDeque<Result<Arc<[u8]>, PrimaryFailure>>,
         directory_entries: VecDeque<Result<PathDirectoryEntries, PrimaryFailure>>,
         windows_long_paths: VecDeque<Arc<[u16]>>,
+        windows_option_path_long_names: VecDeque<WindowsOptionPathLongNameOutcome>,
     }
 
     impl ScriptedOperations {
@@ -2836,6 +2948,7 @@ mod tests {
                 file_bytes: VecDeque::new(),
                 directory_entries: VecDeque::new(),
                 windows_long_paths: VecDeque::new(),
+                windows_option_path_long_names: VecDeque::new(),
             }
         }
 
@@ -2896,6 +3009,17 @@ mod tests {
             self.windows_long_paths
                 .pop_front()
                 .expect("script must supply a Windows long-path result")
+        }
+
+        fn windows_option_path_long_name(
+            &mut self,
+            input: &[u16],
+        ) -> WindowsOptionPathLongNameOutcome {
+            self.calls
+                .push(Call::WindowsOptionPathLongName(Arc::from(input.to_vec())));
+            self.windows_option_path_long_names
+                .pop_front()
+                .expect("script must supply a Windows option-path long-name result")
         }
     }
 
@@ -3119,6 +3243,64 @@ mod tests {
     }
 
     #[test]
+    fn windows_option_path_long_name_dispatches_lossless_input_once_without_lstat_refinement() {
+        let temp = tempfile::tempdir().unwrap();
+        let owner = ();
+        let retained = RetainedMaterializationRoots::new(&owner, []).unwrap();
+        let input: Arc<[u16]> = Arc::from([
+            b'C' as u16,
+            b':' as u16,
+            b'\\' as u16,
+            0xD800,
+            b'~' as u16,
+            b'1' as u16,
+        ]);
+        let result = WindowsOptionPathLongNameOutcome::Resolved(Arc::from([
+            b'C' as u16,
+            b':' as u16,
+            b'/' as u16,
+            0xD800,
+        ]));
+        let demand = PathObservationDemand::windows_option_path_long_name(
+            path(temp.path(), "identity"),
+            input.clone(),
+        );
+        let mut operations = ScriptedOperations::unsupported();
+        operations
+            .windows_option_path_long_names
+            .push_back(result.clone());
+
+        let epoch = observe_with(&retained, [demand.clone()], &mut operations).unwrap();
+
+        assert_eq!(operations.support_queries, 0);
+        assert_eq!(operations.calls, [Call::WindowsOptionPathLongName(input)]);
+        assert!(matches!(
+            epoch.get(&demand).unwrap().as_ref(),
+            PathObservationResult::WindowsOptionPathLongName(observed) if observed == &result
+        ));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn unix_option_path_long_name_is_defensive_fallback_without_path_access() {
+        let owner = ();
+        let retained = RetainedMaterializationRoots::new(&owner, []).unwrap();
+        let demand = PathObservationDemand::windows_option_path_long_name(
+            NormalizedAbsolutePath::new("/never/observed/windows-option").unwrap(),
+            Arc::from("C:/PROGRA~1".encode_utf16().collect::<Vec<_>>()),
+        );
+
+        let epoch = observe_unix(&retained, [demand.clone()]).unwrap();
+
+        assert!(matches!(
+            epoch.get(&demand).unwrap().as_ref(),
+            PathObservationResult::WindowsOptionPathLongName(
+                WindowsOptionPathLongNameOutcome::IOExceptionFallback
+            )
+        ));
+    }
+
+    #[test]
     fn shuffled_demands_execute_in_exact_ord_order_and_errors_continue() {
         let temp = tempfile::tempdir().unwrap();
         let owner = ();
@@ -3336,7 +3518,9 @@ mod tests {
                 PathObservationOperation::DirectoryEntries => operations
                     .directory_entries
                     .push_back(Err(PrimaryFailure::Final(original))),
-                PathObservationOperation::Lstat | PathObservationOperation::WindowsLongPath => {
+                PathObservationOperation::Lstat
+                | PathObservationOperation::WindowsLongPath
+                | PathObservationOperation::WindowsOptionPathLongName => {
                     unreachable!()
                 }
             }

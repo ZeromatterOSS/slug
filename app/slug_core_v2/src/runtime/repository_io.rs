@@ -1065,6 +1065,10 @@ fn observation_is_dirty(
             PathObservationResult::WindowsLongPath(previous),
             PathObservationResult::WindowsLongPath(observed),
         ) => previous != observed,
+        (
+            PathObservationResult::WindowsOptionPathLongName(previous),
+            PathObservationResult::WindowsOptionPathLongName(observed),
+        ) => previous != observed,
         _ => true,
     }
 }
@@ -1085,6 +1089,7 @@ fn observation_has_error(result: &PathObservationResult) -> bool {
             matches!(result, PathOperationResult::Error(_))
         }
         PathObservationResult::WindowsLongPath(_) => false,
+        PathObservationResult::WindowsOptionPathLongName(_) => false,
     }
 }
 

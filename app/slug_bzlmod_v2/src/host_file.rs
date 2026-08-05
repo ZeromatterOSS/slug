@@ -199,7 +199,8 @@ impl Key for HostFileBytesKey {
                 PathObservationResult::Lstat(_)
                 | PathObservationResult::ReadLink(_)
                 | PathObservationResult::DirectoryEntries(_)
-                | PathObservationResult::WindowsLongPath(_) => {
+                | PathObservationResult::WindowsLongPath(_)
+                | PathObservationResult::WindowsOptionPathLongName(_) => {
                     unreachable!("FileBytes demand must return a FileBytes observation")
                 }
             },

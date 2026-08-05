@@ -49,6 +49,7 @@ pub use path_observation::PathObservationResult;
 pub use path_observation::PathOperationResult;
 pub use path_observation::PathOutcome;
 pub use path_observation::PathResult;
+pub use path_observation::WindowsOptionPathLongNameOutcome;
 pub use path_resolution::PathDirectoryListing;
 pub use path_resolution::PathDirectoryListingError;
 pub use path_resolution::PathDirectoryListingKey;

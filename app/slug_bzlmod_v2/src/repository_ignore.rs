@@ -768,7 +768,8 @@ async fn parse_ignore_file(
                     PathObservationResult::Lstat(_)
                     | PathObservationResult::ReadLink(_)
                     | PathObservationResult::FileBytes(_)
-                    | PathObservationResult::DirectoryEntries(_) => {
+                    | PathObservationResult::DirectoryEntries(_)
+                    | PathObservationResult::WindowsOptionPathLongName(_) => {
                         unreachable!(
                             "WindowsLongPath demand must return a WindowsLongPath observation"
                         )
