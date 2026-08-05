@@ -2930,6 +2930,23 @@ caps, hard stops, and all deferrals including user-approved later
 configured-target dependency cycles. After acceptance run only mechanical 287
 attachment.
 
+### Pure native family byte-contract ledger retry 6 REPLAN (2026-08-04)
+
+Independent review discarded the unaccepted 57-line retry-6 ledger despite its
+reserved acceptance. It lacked a global retained-value structural
+equality/order rule and did not freeze Fission's exact `yes` result/cache.
+No source lookup, probe, descriptor, Rust, or runtime change occurred.
+
+Run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-7`, docs-only
+from the same accepted `[R]`/`[I]`/`[S]` and closed Stage 6 facts. Preserve
+retry-6's unadmitted-list, Runs, and Dotted distinctions; unless a row differs,
+retained values use structural equality/order for semantic `BuildOptions`
+identity and raw parser-object matching remains deferred; add exact
+`F-Fission E("yes")=[fastbuild, dbg, opt]→x="[fastbuild, dbg, opt]", `.
+Preserve `287 + 8 + 5 + 41`, 380/480 caps, hard stops, all deferrals including
+user-approved later configured-target dependency cycles. After acceptance run
+only mechanical 287 attachment.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu

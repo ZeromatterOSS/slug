@@ -1,14 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-6`
+Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-7`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Role: freeze all accepted pure-family byte contracts with the terminal
-attachment and Dotted-identity distinctions before mechanical descriptor
-attachment.
+retained-value identity/order rule and Fission-`yes` bytes before mechanical
+descriptor attachment.
 Predecessors: exact Java/Guava renderer authority, forced-sharding structural
 semantic identity, and the full family-source/16-enum route anchor table are
-accepted. Retry 5 was discarded at terminal review; this packet performs no
+accepted. Retry 6 was discarded at independent terminal review; this packet performs no
 new source discovery. F-Runs-default is default-materializer-only, never a
 pure descriptor attachment.
 
@@ -18,6 +18,9 @@ already closed Stage 6 value-algebra/Dotted-discriminator sections. Do not
 repeat full paths/ranges, inventories, probes, or 287 descriptor rows. Freeze
 exact grammar, structural semantic equality/order, `N`/`D`/`Ø`/`E`/`A`/`U`
 routes, and exact field cache bytes.
+
+Unless a row differs, retained values use structural equality/order for
+semantic `BuildOptions` identity; raw parser-object matching remains deferred.
 
 Mandatory facts are immutable:
 
@@ -43,8 +46,8 @@ Mandatory facts are immutable:
   with `x="{short=PT1H1M1S, moderate=PT1M1S, long=PT15M, eternal=PT1H}", `;
 - Shard uses nonnegative `Integer.decode` decimal/`0x`/`#`/octal grammar with
   canonical decimal `forced=N` rendering and structural `Forced(i32)` semantic
-  identity; Fission records both empty `no` and nonempty comma-mode
-  `[dbg, fastbuild]→x="[dbg, fastbuild]", `;
+  identity; Fission records `D("no")=Ø→x=EMPTY, `, exact `E("yes")=[fastbuild, dbg, opt]→x="[fastbuild, dbg, opt]", `,
+  and nonempty comma-mode `[dbg, fastbuild]→x="[dbg, fastbuild]", `;
 - all 16 enum rows remain separate and use explicit substitution or a concrete
   cache example such as `C(OFF)=x="OFF", `, never literal `m`; and
 - runs remains only default materialization `D("1")` plus deferred `U("+2")`,
