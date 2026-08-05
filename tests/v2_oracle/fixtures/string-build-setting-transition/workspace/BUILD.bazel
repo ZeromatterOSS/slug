@@ -1,0 +1,14 @@
+load(":defs.bzl", "consumer_rule", "parent_rule", "string_setting")
+
+string_setting(
+    name = "setting",
+    build_setting_default = "default",
+)
+
+consumer_rule(name = "consumer")
+
+parent_rule(
+    name = "parent",
+    left = ":consumer",
+    right = ":consumer",
+)

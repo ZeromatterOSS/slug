@@ -1,0 +1,282 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "direct_default",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:consumer (5 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:consumer provider=ConsumerInfo value=default",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/string-build-setting-transition/20260804-200146-1637556-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/string-build-setting-transition/20260804-200708-1641879-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: 2acd306d-387a-404e-a683-ec7752249535\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2acd306d-387a-404e-a683-ec7752249535\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:consumer (5 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.852s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/2acd306d-387a-404e-a683-ec7752249535\n",
+      "stdout": "label=@@//:consumer provider=ConsumerInfo value=default\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:consumer",
+        "--//:setting=command",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:consumer",
+        "--//:setting=command",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "direct_explicit_flag",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --//:setting has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:consumer (4 packages loaded, 6 targets configured)\nINFO: Analyzed target //:consumer (4 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:consumer provider=ConsumerInfo value=command",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: a07aaee7-2ddb-483f-a7cd-df7759e780f6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a07aaee7-2ddb-483f-a7cd-df7759e780f6\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --//:setting has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:consumer (4 packages loaded, 6 targets configured)\nINFO: Analyzed target //:consumer (4 packages loaded, 8 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.100s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a07aaee7-2ddb-483f-a7cd-df7759e780f6\n",
+      "stdout": "label=@@//:consumer provider=ConsumerInfo value=command\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "parent_distinct_transitions",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --//:setting has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:parent (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (1 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:parent provider=ParentInfo value=left,right",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 93d54c99-df8f-45fe-83ad-4303b4871231\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/93d54c99-df8f-45fe-83ad-4303b4871231\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Build option --//:setting has changed, discarding analysis cache (this can be expensive, see https://bazel.build/advanced/performance/iteration-speed).\nAnalyzing: target //:parent (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (1 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.048s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/93d54c99-df8f-45fe-83ad-4303b4871231\n",
+      "stdout": "label=@@//:parent provider=ParentInfo value=left,right\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "parent_warm_replay",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:parent (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:parent provider=ParentInfo value=left,right",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: ada7db16-a242-4657-8193-7d71c87b782a\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ada7db16-a242-4657-8193-7d71c87b782a\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:parent (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.023s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ada7db16-a242-4657-8193-7d71c87b782a\n",
+      "stdout": "label=@@//:parent provider=ParentInfo value=left,right\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "return {\"//:setting\": \"left\"}",
+          "old_digest_hint": "1448",
+          "path": "defs.bzl",
+          "replace": "return {\"//:setting\": \"changed\"}"
+        }
+      ],
+      "name": "parent_after_transition_edit",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:parent (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (1 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:parent provider=ParentInfo value=changed,right",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 341c82c9-26b3-4906-9c2a-48d199160dfe\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/341c82c9-26b3-4906-9c2a-48d199160dfe\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:parent (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (1 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.035s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/341c82c9-26b3-4906-9c2a-48d199160dfe\n",
+      "stdout": "label=@@//:parent provider=ParentInfo value=changed,right\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:parent",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "return {\"//:setting\": \"changed\"}",
+          "old_digest_hint": "1451",
+          "path": "defs.bzl",
+          "replace": "return {\"//:setting\": \"left\"}"
+        }
+      ],
+      "name": "parent_after_transition_restore",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:parent (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (1 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:parent provider=ParentInfo value=left,right",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 1aafcfeb-9fd7-484f-9f66-225f54ebf692\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1aafcfeb-9fd7-484f-9f66-225f54ebf692\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:parent (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:parent (1 packages loaded, 5 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.029s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1aafcfeb-9fd7-484f-9f66-225f54ebf692\n",
+      "stdout": "label=@@//:parent provider=ParentInfo value=left,right\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "build_setting_default = \"default\"",
+          "old_digest_hint": "268",
+          "path": "BUILD.bazel",
+          "replace": "build_setting_default = \"edited-default\""
+        }
+      ],
+      "name": "direct_after_default_edit",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (1 packages loaded, 2 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:consumer provider=ConsumerInfo value=edited-default",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 011584d1-c0c3-4167-96ea-9fda63b0ce18\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/011584d1-c0c3-4167-96ea-9fda63b0ce18\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (1 packages loaded, 2 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.026s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/011584d1-c0c3-4167-96ea-9fda63b0ce18\n",
+      "stdout": "label=@@//:consumer provider=ConsumerInfo value=edited-default\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "build_setting_default = \"edited-default\"",
+          "old_digest_hint": "275",
+          "path": "BUILD.bazel",
+          "replace": "build_setting_default = \"default\""
+        }
+      ],
+      "name": "direct_after_default_restore_replay",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (1 packages loaded, 2 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:consumer provider=ConsumerInfo value=default",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 30d26994-4b9d-4542-931e-96e17b11004c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/30d26994-4b9d-4542-931e-96e17b11004c\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (1 packages loaded, 2 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.025s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/30d26994-4b9d-4542-931e-96e17b11004c\n",
+      "stdout": "label=@@//:consumer provider=ConsumerInfo value=default\n"
+    }
+  ],
+  "fixture": "string-build-setting-transition",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

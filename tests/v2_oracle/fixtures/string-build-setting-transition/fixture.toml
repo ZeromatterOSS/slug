@@ -1,0 +1,88 @@
+[fixture]
+name = "string-build-setting-transition"
+description = "A root string build setting reaches a provider-visible consumer through direct flags and two distinct user-transition edges."
+comparison = "message_shape"
+oracle_notes = "Oracle-only M2 positive discriminator: cquery Starlark formatting exposes only labels and custom-provider string values while one retained Bazel server observes command input, transition edits, and build-setting default edits."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/config/BuildOptions.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkConfig.java#stringSetting",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java#transition",
+  "src/main/java/com/google/devtools/build/lib/analysis/config/transitions/StarlarkTransitionCache.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/ConfiguredTargetKey.java",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/StarlarkOutputFormatterCallback.java",
+]
+translation_notes = "The parent provider reads each configured child provider in attribute order, proving two edges to the same label carry distinct setting values without formatting configuration identities. Each mutation runs before its observing command in the retained oracle workspace."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture string-build-setting-transition --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture string-build-setting-transition --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "direct_default"
+argv = ["cquery", "//:consumer", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:consumer provider=ConsumerInfo value=default\\Z"]
+
+[[commands]]
+name = "direct_explicit_flag"
+argv = ["cquery", "//:consumer", "--//:setting=command", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:consumer provider=ConsumerInfo value=command\\Z"]
+
+[[commands]]
+name = "parent_distinct_transitions"
+argv = ["cquery", "//:parent", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:parent provider=ParentInfo value=left,right\\Z"]
+
+[[commands]]
+name = "parent_warm_replay"
+argv = ["cquery", "//:parent", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:parent provider=ParentInfo value=left,right\\Z"]
+
+[[commands]]
+name = "parent_after_transition_edit"
+argv = ["cquery", "//:parent", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:parent provider=ParentInfo value=changed,right\\Z"]
+
+  [[commands.mutations]]
+  path = "defs.bzl"
+  find = 'return {"//:setting": "left"}'
+  replace = 'return {"//:setting": "changed"}'
+
+[[commands]]
+name = "parent_after_transition_restore"
+argv = ["cquery", "//:parent", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:parent provider=ParentInfo value=left,right\\Z"]
+
+  [[commands.mutations]]
+  path = "defs.bzl"
+  find = 'return {"//:setting": "changed"}'
+  replace = 'return {"//:setting": "left"}'
+
+[[commands]]
+name = "direct_after_default_edit"
+argv = ["cquery", "//:consumer", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:consumer provider=ConsumerInfo value=edited-default\\Z"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'build_setting_default = "default"'
+  replace = 'build_setting_default = "edited-default"'
+
+[[commands]]
+name = "direct_after_default_restore_replay"
+argv = ["cquery", "//:consumer", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:consumer provider=ConsumerInfo value=default\\Z"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'build_setting_default = "edited-default"'
+  replace = 'build_setting_default = "default"'
