@@ -1,57 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-native-conversion-schedule-and-host-fact-redesign`
+Packet: `WP-6-m2-host-conversion-inputs-event-schema-correction`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: docs-only converter-call and producer-free Host-fact redesign; no Rust.
+Result: producer-free Host-fact event-schema correction only.
 
 ## Goal
 
-Freeze the real command-owned schedule that determines whether a native
-converter is called. Replace the invalid raw-deduplicated Host-fact assumption
-before proposing a core-to-configuration bridge. Native capture remains
-**REPLAN**.
+Correct `HostConversionInputs` so its facts preserve actual converter-call
+identity without adding a converter, core bridge, or Host read.
 
-## Required design record
+## Required implementation
 
-Record each relevant default-validation checkpoint, `FieldOptionDefinition`
-default memoization boundary, priority selection, single-value acceptance, and
-expansion order that controls a converter call. Define per-accepted-occurrence
-identity for fresh home and Windows raw/outcome facts: equal raw UTF-16 inputs
-must remain distinct and may have different resolution outcomes. Classify exact
-capacity eligibility through `ResourceConverter`, not descriptor shape.
-
-Revise the producer-free configuration schema and identify the smallest future
-bridge prerequisites: the command-owned event schedule, occurrence ordering,
-error timing, and request/attempt lifetime. Preserve only core ->
-configuration direction and explain why no DICE cycle or configured-target
-cycle is introduced. Native capture and the production native-demand driver
-remain absent and out of scope.
+Add dense checked `ConverterCallId(u32)`. Give every `HomeFact` its call ID and
+every Windows fact its call ID, raw UTF-16, and resolved/fallback outcome.
+Require call IDs to be strictly ascending and unique within each stream; permit
+duplicate Windows raw values and distinct outcomes, and permit the same call ID
+in both streams. Retain optional shared AutoCPU/path-flavor/capacity facts and
+publish only complete successful schedules.
 
 ## Allowed paths
 
+- `app/slug_configuration_v2/src/native/host.rs`
 - `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
 - `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- routing only on `REPLAN`:
-  `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
-  `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
+
+## Required tests and validation
+
+Test dense IDs; stream ordering/duplicates; same-ID home/Windows facts;
+duplicate raw Windows values with distinct outcomes; optional process facts;
+Arc-backed structural equality, ordering, and hashing; and invalid streams.
+Run focused configuration tests/check, GNU-Windows no-run, formatting, archive,
+scope, cap, no-Cargo, and `git diff --check`.
 
 ## Stop conditions
 
-Do not edit Rust, Cargo, schemas, converters, DICE keys/computes, request or
-native-demand drivers, command/configured-target behavior, fixtures, or
-generated output. Stop and REPLAN if an exact schedule requires native capture,
-a live production driver, a reverse configuration dependency, or a configured-
-target cycle.
-
-## Completion and next boundary
-
-Complete only with the bounded schedule/schema redesign and synchronized
-scheduling. Any implementation requires separate acceptance after native
-capture/driver and converter-call prerequisites are proven.
+Do not edit Cargo, core, server, converters, DICE, drivers, command/configured-
+target behavior, fixtures, or generated output. Stop and REPLAN on any need for
+native capture, a production driver, a core bridge, a reverse dependency, or a
+cycle. Native capture and user-approved configured-target-cycle deferral remain
+unchanged.
 
 ## Diff budget
 
-- Documentation: at most 160 net lines.
-- No Rust, Cargo, fixture, generated, baseline, or unrelated changes.
+- Production Rust: at most 150 net lines.
+- Test Rust: at most 220 net lines.
+- Documentation: at most 120 net lines.
+- Total: at most 490 net lines; no Cargo, fixture, generated, baseline, or
+  unrelated changes.

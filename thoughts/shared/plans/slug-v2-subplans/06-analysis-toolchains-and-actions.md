@@ -4185,6 +4185,39 @@ identity and outcomes, exact capacity eligibility, and a revised producer-free
 schema plus bridge prerequisites. Add no Rust, Host capture, converter,
 native-demand driver, DICE/command activation, or configured-target behavior.
 
+### Native conversion schedule and Host-fact redesign ACCEPT (2026-08-05)
+
+`WP-6-m2-native-conversion-schedule-and-host-fact-redesign` is **ACCEPT**.
+Converter calls belong to chronological parser batches: default validation
+checkpoints, process-wide memoized defaults, full `OptionPriority` acceptance,
+and expansion/config/policy boundaries decide whether a converter runs. Only an
+actual call receives a dense checked request-local `ConverterCallId(u32)`; a
+cold converted default is a call, while a memoized default read is not. Repeat
+resource components retain source
+and left-to-right component order, including calls made before a later
+component-count failure. Full parser and native-demand driver behavior remain
+prerequisites for producing this schedule.
+
+The producer-free schema correction is fixed. `HomeFact` carries its call ID.
+`WindowsFact` carries call ID, raw UTF-16, and outcome; each fact stream is
+strictly call-ID ascending and unique, duplicate raw values are allowed and may
+have different outcomes, and the same call may occur in both streams. OS/CPU/
+path-flavor/capacity remain optional shared process facts; a successful capacity
+value remains in `ProcessHostOwner` even if the request later fails. The
+aggregate publishes only after the complete request schedule succeeds. The
+direction remains core -> configuration only, with no DICE or configured-target
+cycle. Native capture and the production driver remain prerequisites for the
+first consumer; user-approved configured-target-cycle deferral is unchanged.
+
+Run next `WP-6-m2-host-conversion-inputs-event-schema-correction`. It changes
+only `app/slug_configuration_v2/src/native/host.rs` plus the three scheduling
+documents, within 150 production/220 test/120 documentation/490 total net
+lines. Test call-ID ordering/duplicates, same-ID cross-stream facts, duplicate
+raw distinct outcomes, optional process facts, structural Arc identity/order/
+hash, and rejected invalid streams; run focused configuration tests/check,
+GNU-Windows no-run, formatting, archive/scope/cap/no-Cargo/diff gates. Add no
+core, Cargo, converter, DICE, driver, command, or native-capture work.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
