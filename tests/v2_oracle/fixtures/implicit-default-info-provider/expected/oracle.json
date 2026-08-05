@@ -1,0 +1,132 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "//:implicit",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:implicit",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "implicit_custom_only_default_info",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:implicit (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:implicit (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:implicit provider=CustomInfo value=implicit default_present=true default_files=0",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a0f312ca-c9a1-40de-a391-a0bb811da5dd\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a0f312ca-c9a1-40de-a391-a0bb811da5dd\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:implicit (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:implicit (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.440s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a0f312ca-c9a1-40de-a391-a0bb811da5dd\n",
+      "stdout": "label=@@//:implicit provider=CustomInfo value=implicit default_present=true default_files=0\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:explicit",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:explicit",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "explicit_empty_default_info",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:explicit (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:explicit (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:explicit provider=CustomInfo value=explicit default_present=true default_files=0",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: ac32f7d4-0af4-4d15-8c5a-708cbd058dcb\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ac32f7d4-0af4-4d15-8c5a-708cbd058dcb\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:explicit (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:explicit (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.108s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/ac32f7d4-0af4-4d15-8c5a-708cbd058dcb\n",
+      "stdout": "label=@@//:explicit provider=CustomInfo value=explicit default_present=true default_files=0\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "consumer_dependency_default_info",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (0 packages loaded, 2 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:consumer provider=SummaryInfo implicit=implicit explicit=explicit implicit_default_files=0 explicit_default_files=0 default_present=true default_files=0",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: a33bd3db-0941-40cd-8d45-18868f70e163\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a33bd3db-0941-40cd-8d45-18868f70e163\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (0 packages loaded, 2 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.032s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a33bd3db-0941-40cd-8d45-18868f70e163\n",
+      "stdout": "label=@@//:consumer provider=SummaryInfo implicit=implicit explicit=explicit implicit_default_files=0 explicit_default_files=0 default_present=true default_files=0\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//:consumer",
+        "--output=starlark",
+        "--starlark:file=cquery_format.bzl"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "consumer_warm_replay",
+      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stdout": "label=@@//:consumer provider=SummaryInfo implicit=implicit explicit=explicit implicit_default_files=0 explicit_default_files=0 default_present=true default_files=0",
+      "startup_argv": [],
+      "stderr": "INFO: Invocation ID: 8e1c707f-b8ba-4767-9a12-ec267a00bae1\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8e1c707f-b8ba-4767-9a12-ec267a00bae1\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:consumer (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:consumer (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.023s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/8e1c707f-b8ba-4767-9a12-ec267a00bae1\n",
+      "stdout": "label=@@//:consumer provider=SummaryInfo implicit=implicit explicit=explicit implicit_default_files=0 explicit_default_files=0 default_present=true default_files=0\n"
+    }
+  ],
+  "fixture": "implicit-default-info-provider",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

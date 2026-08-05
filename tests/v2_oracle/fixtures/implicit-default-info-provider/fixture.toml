@@ -1,0 +1,46 @@
+[fixture]
+name = "implicit-default-info-provider"
+description = "Bazel 9.2 cquery exposes an empty DefaultInfo when a Starlark rule returns only a custom provider."
+comparison = "message_shape"
+oracle_notes = "Oracle-only M2 provider-normalization discriminator: a custom-only return and an explicit empty DefaultInfo both expose named DefaultInfo with zero files. The consumer proves dependency indexing through exported constructors, while cquery reads only exact known provider keys; it is observable evidence, not provider-enumeration or formatter breadth."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleConfiguredTargetUtil.java#addProviders",
+  "src/main/java/com/google/devtools/build/lib/analysis/DefaultInfo.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/AbstractConfiguredTarget.java#getIndex",
+  "src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/AbstractConfiguredTarget.java#containsKey",
+  "src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/AbstractConfiguredTarget.java#toProvidersDictForQuery",
+  "src/main/java/com/google/devtools/build/lib/packages/StarlarkProvider.java#Key",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/StarlarkOutputFormatterCallback.java#providers",
+  "src/test/shell/integration/configured_query_test.sh#test_starlark_output_providers_starlark_provider",
+]
+translation_notes = "StarlarkRuleConfiguredTargetUtil parses omitted DefaultInfo fields as an empty default, and AbstractConfiguredTarget synthesizes that observable default for dependency indexing, membership, and the cquery provider dictionary. StarlarkProvider.Key explains the qualified custom-provider dictionary keys; the formatter callback and integration test establish that providers(target) is the cquery projection used here. This evidence does not authorize provider enumeration, output/runfiles/executable semantics, or general cquery support."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture implicit-default-info-provider --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture implicit-default-info-provider --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "implicit_custom_only_default_info"
+argv = ["cquery", "//:implicit", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:implicit provider=CustomInfo value=implicit default_present=true default_files=0\\Z"]
+
+[[commands]]
+name = "explicit_empty_default_info"
+argv = ["cquery", "//:explicit", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:explicit provider=CustomInfo value=explicit default_present=true default_files=0\\Z"]
+
+[[commands]]
+name = "consumer_dependency_default_info"
+argv = ["cquery", "//:consumer", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:consumer provider=SummaryInfo implicit=implicit explicit=explicit implicit_default_files=0 explicit_default_files=0 default_present=true default_files=0\\Z"]
+
+[[commands]]
+name = "consumer_warm_replay"
+argv = ["cquery", "//:consumer", "--output=starlark", "--starlark:file=cquery_format.bzl"]
+expected_exit = 0
+stdout_patterns = ["\\Alabel=@@//:consumer provider=SummaryInfo implicit=implicit explicit=explicit implicit_default_files=0 explicit_default_files=0 default_present=true default_files=0\\Z"]

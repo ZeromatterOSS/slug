@@ -1,0 +1,11 @@
+load(":defs.bzl", "consumer_rule", "explicit_rule", "implicit_rule")
+
+implicit_rule(name = "implicit")
+
+explicit_rule(name = "explicit")
+
+consumer_rule(
+    name = "consumer",
+    implicit = ":implicit",
+    explicit = ":explicit",
+)
