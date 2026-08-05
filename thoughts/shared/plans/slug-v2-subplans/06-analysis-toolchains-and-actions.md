@@ -1073,3 +1073,25 @@ strict generic collection rejection. No retained utility changes.
 Implement next only `WP-6-m2-implicit-default-info-decoder-implementation`.
 After acceptance, resume the already accepted positive string build-setting
 transition implementation from a clean baseline.
+
+### Implicit DefaultInfo decoder implementation (2026-08-04)
+
+**Status: ACCEPTED at `7c6eeae5`.** The Starlark rule decoder now appends the
+existing empty `DefaultInfo` only when successful return decoding found no
+explicit default, then calls unchanged strict `ProviderCollection::new`.
+Explicit defaults, declared files, actions, duplicate rejection, dependencies,
+events, and build-API collection semantics are unchanged.
+
+The two-file patch is 8 formatted production and 37 test lines, 45 total. A
+custom-only rule regression proves exported-provider retrieval, present
+structurally empty default, and empty declared outputs/actions. The existing
+explicit-default/write-action regression and strict build-API rejection pass.
+All five Starlark-rule tests, four configured-target tests, the full analysis
+suite, formatting, diff/scope/cap checks, and GNU-Windows analysis no-run pass
+with existing warnings only. Independent latest-diff review returned
+`ACCEPT`; no retained utility changed.
+
+Resume `WP-6-m2-positive-string-build-setting-transition-implementation` from
+this clean baseline under its already accepted root-key graph, seven
+production/three test allowlists, 850/450/1,300 caps, internal-only
+observability, and all general-configuration/public-command/execution stops.
