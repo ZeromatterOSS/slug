@@ -1234,3 +1234,62 @@ requirements, and `platform_common.ToolchainInfo`. Keep DICE selection,
 implementation analysis, prepared `ctx.toolchains`, failure diagnostics,
 patterns, externals, host fallback, public commands, actions, and REAPI out of
 scope until separately accepted.
+
+### Native toolchain declaration-loading design (2026-08-04)
+
+**Status: ACCEPTED as two serial loading packets before one integrated
+resolution/context vertical.** Native constraint, platform, toolchain-type, and
+toolchain declarations are real BUILD targets, not a side list. The first
+packet adds one compact `NativeToolchainTarget` enum behind
+`PackageTargetKind::NativeToolchain`, preserving the ordinary target namespace,
+BUILD order, duplicate-name behavior, canonical package-context labels,
+structural package equality, fixed native rule capabilities, and future target
+lookup. The fixture-bounded variants are `ConstraintSetting`,
+`ConstraintValue { constraint_setting }`,
+`Platform { constraint_values }`, `ToolchainType`, and
+`Toolchain { toolchain_type, implementation, exec_compatible_with }`.
+
+All label lists use immutable ordered slices. The native `toolchain`
+implementation label is retained as NODEP semantics and never enters ordinary
+dependency edges. Root registration order remains solely owned by the accepted
+MODULE anchor; declarations are not joined to registrations or resolved here.
+The existing `RootPackageLoadKey` remains the only Need/error/event/invalidation
+owner. Root query must fail closed before projecting any package graph when a
+native toolchain declaration is present; silently omitting or partially
+projecting these targets is forbidden. External loading classifies the new
+variant through its existing unsupported-kind boundary. No Bazel diagnostic
+wording is claimed by these private/deferred stops.
+
+The second serial packet adds ordered required toolchain-type labels to frozen
+rule definitions and `StarlarkRuleImplementation`, resolving them relative to
+the defining `.bzl` package and keeping them separate from ordinary
+dependencies. It also binds only a freeze-capable load symbol for
+`platform_common.ToolchainInfo`; invocation stays explicitly unsupported. It
+must not add a ToolchainInfo provider/value, user-provider masquerade, decoder,
+`ProviderCollection` change, selection, or `ctx.toolchains`. After both loading
+values are accepted, one integrated DICE packet must consume the root anchor,
+root package declarations, selected implementation analysis with a dedicated
+builtin ToolchainInfo value, and the prepared requesting context. The dormant
+digest-string `RegisteredToolchainsKey` is not an owner and remains unused.
+
+Implement next only `WP-6-m2-native-toolchain-target-loading-implementation`.
+Production may edit `app/slug_loading_v2/src/package.rs`,
+`app/slug_loading_v2/src/bzl_module.rs`, and
+`app/slug_query_v2/src/graph.rs`. Tests may additionally edit
+`app/slug_loading_v2/tests/build_file_loading.rs`, inline
+`host_package_load_tests.rs`, inline query graph tests, and
+`app/slug_query_v2/tests/loading_query.rs`. Caps are 360 formatted production
+net lines, 520 test lines, and 880 total. Required evidence covers exact five-
+class order/capabilities/canonical labels/list order/NODEP separation,
+duplicate-name behavior, wrong types/patterns/externals/unmodeled attributes,
+RootPackageLoad cold/warm/edit/A→B→A/delete/recreate ownership, explicit root
+query deferral, and existing external-kind deferral.
+
+Return `REPLAN` for rule requirements, `platform_common`, ToolchainInfo,
+registered-target lookup, target-kind/provider validation, constraint
+normalization or resolution, command-line registration, external mapping,
+aliases, host fallback, optional/multiple types, target constraints/settings,
+exec groups, public query projection, cquery, diagnostics, configuration
+identity, actions, REAPI, a new key/digest/cache/interner, or process-global
+state. No new oracle is needed: `ed4baf08` pins the successful syntax and
+pinned Bazel 9.2 rule definitions pin attribute kinds and NODEP ownership.

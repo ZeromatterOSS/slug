@@ -1,38 +1,67 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-native-toolchain-declaration-loading-design`
+Packet: `WP-6-m2-native-toolchain-target-loading-implementation`
 Milestone: M2 successful toolchain/platform selection
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: read-only design for the smallest native declaration/loading prerequisite
-Predecessor: accepted ordered root registration retention `4a3af8df`.
+Role: retain the fixture's five native platform/toolchain target classes
+Predecessor: accepted ordered root registration retention `4a3af8df` and
+accepted serial declaration-loading design.
 
-Inspect the accepted first-compatible Bazel 9.2 fixture, pinned source, and live
-Stage 4/6 owners. Freeze the smallest exact serial implementation boundary for:
+Implement exactly one `Allocative`, structurally equal
+`NativeToolchainTarget` enum behind `PackageTargetKind::NativeToolchain`:
 
-1. native `constraint_setting`, `constraint_value`, `platform`,
-   `toolchain_type`, and `toolchain` declarations in the fixture's root BUILD;
-2. the one mandatory `rule(toolchains = ["//:demo_type"])` requirement;
-3. typed labels, ordered registration/declaration semantics, constraint mapping,
-   and structural equality/invalidation; and
-4. `platform_common.ToolchainInfo(marker = <string>)` ownership, deciding
-   explicitly whether it belongs with loading or a later selected-implementation
-   analysis/context packet.
+- `ConstraintSetting`;
+- `ConstraintValue { constraint_setting: CanonicalLabel }`;
+- `Platform { constraint_values: Arc<[CanonicalLabel]> }`;
+- `ToolchainType`; and
+- `Toolchain { toolchain_type: CanonicalLabel, implementation: CanonicalLabel,
+  exec_compatible_with: Arc<[CanonicalLabel]> }`.
 
-The design must identify exact production and test owners, DICE/loading handoff,
-caps, lifecycle evidence, source anchors, utility reuse, and stop conditions.
-Prefer serial prerequisites when semantic values can be retained truthfully
-without inventing a consumer. Return `REPLAN` if any proposed slice would only
-wire dormant digest/event scaffolding, represent a builtin provider as a user
-provider, add a second graph/evaluator, or claim diagnostics absent from the
-accepted positive oracle.
+Add fixture-bounded BUILD globals for `constraint_setting`, `constraint_value`,
+`platform`, `toolchain_type`, and `toolchain`. Accept only the attributes and
+string/root-label shapes used by the accepted fixture. Resolve through the
+existing BUILD package context; reject patterns and external labels. Preserve
+ordinary package target order and duplicate-name behavior plus input list order.
+The toolchain implementation is retained as NODEP data and must not enter
+ordinary dependencies. Give every subtype its exact fixed native rule
+capability name.
 
-Do not edit Rust, Cargo, fixtures, harness, commands, or public behavior in this
-packet. Keep real toolchain selection, selected implementation analysis,
-prepared `ctx.toolchains`, configuration identity, command-line registration,
-patterns, external repositories, aliases, host fallback, optional/multiple
-types, target constraints, exec groups, actions, aquery, REAPI, and failure
-diagnostics deferred. Direct-local MODULE dependency cycles remain the
-user-approved unsupported boundary for later.
+Use the existing `RootPackageLoadKey` without a new key, digest, cache, scanner,
+or filesystem owner. Tests must prove exact declaration values/order,
+capabilities, canonical labels, list order, duplicate-name behavior,
+wrong-type/pattern/external/unmodeled rejection, cold/warm semantic reuse,
+declaration edit and A→B→A restoration, delete/recreate, sole Host event
+ownership, and the unchanged anchor dependency.
 
-After parallel pinned-source, live-owner, and retained-utility audits, obtain a
-reserved boundary review before authorizing Rust.
+Root query graph construction must return one explicit Slug-owned deferred
+boundary before projecting any package graph containing the new native targets.
+It must never silently omit or partially project them. External loading must
+classify them through its existing unsupported-kind boundary.
+
+Production allowlist:
+
+- `app/slug_loading_v2/src/package.rs`
+- `app/slug_loading_v2/src/bzl_module.rs`
+- `app/slug_query_v2/src/graph.rs`
+
+Test allowlist:
+
+- `app/slug_loading_v2/tests/build_file_loading.rs`
+- inline tests in `app/slug_loading_v2/src/host_package_load_tests.rs`
+- inline tests in `app/slug_query_v2/src/graph.rs`
+- `app/slug_query_v2/tests/loading_query.rs`
+
+Caps are 360 formatted production net lines, 520 test lines, and 880 total.
+
+Stop and return `REPLAN` for Starlark `rule(toolchains=)`, `platform_common`,
+ToolchainInfo, registered-target lookup, target existence/kind/provider
+validation, duplicate constraint-setting validation, constraint normalization
+or resolution, command-line registration, external mapping/materialization,
+aliases, host fallback, optional/multiple types, target constraints/settings,
+exec groups, public query projection, cquery formatting, Bazel diagnostic
+claims, configuration identity, actions, REAPI, a new DICE key/digest/cache/
+interner, or process-global state.
+
+After acceptance, implement the separately reviewed frozen rule-requirement and
+load-only `platform_common.ToolchainInfo` symbol packet before designing the
+integrated real DICE resolution/prepared-context vertical.

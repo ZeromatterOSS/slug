@@ -25,7 +25,7 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active** | recursive configured analysis, bounded root cquery in `135b0567`, implicit empty-default normalization in `7c6eeae5`, internal string build-setting transitions in `dfc1705e`, first-compatible toolchain evidence in `ed4baf08`, and ordered root registration retention in `4a3af8df` | native toolchain declarations, real DICE selection/context ownership, then general identity and action gates | design `WP-6-m2-native-toolchain-declaration-loading-design` |
+| M2: analysis graph | **active** | recursive configured analysis, bounded root cquery in `135b0567`, implicit empty-default normalization in `7c6eeae5`, internal string build-setting transitions in `dfc1705e`, first-compatible toolchain evidence in `ed4baf08`, and ordered root registration retention in `4a3af8df` | native toolchain declarations, rule requirements/builtin loading, real DICE selection/context ownership, then general identity and action gates | implement `WP-6-m2-native-toolchain-target-loading-implementation` |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while M2 toolchain evidence is current |
 | M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-6-m2-native-toolchain-declaration-loading-design`.
+`WP-6-m2-native-toolchain-target-loading-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -82,8 +82,11 @@ Need-aware loading anchor without a digest or new DICE key. That bounded
 registration-retention implementation is accepted in `4a3af8df`. The current
 read-only design packet now isolates fixture-bounded native constraint,
 platform, toolchain-type, toolchain-declaration, and rule-class requirement
-loading before any DICE selection or prepared `ctx.toolchains`; invalid
-transition and toolchain failure diagnostics remain deferred.
+loading before any DICE selection or prepared `ctx.toolchains`. Reserved review
+accepted two serial loading owners: first the five native target declarations
+with fail-closed query boundaries, then frozen Starlark rule requirements plus
+a load-only `platform_common.ToolchainInfo` symbol. The native target packet is
+current; invalid transition and toolchain failure diagnostics remain deferred.
 
 The retained Bazel 9.2 evidence pins default and explicit `label` output to the
 same `//parent:parent (a7a71fd)` bytes. Pinned source and live audits prove even
