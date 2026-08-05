@@ -53,6 +53,8 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::RootConfiguredTargetAnalysisKey;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::HostRepositorySourceFileKey;
+use slug_bzlmod_v2::HostRepositorySourceFileValue;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
 use slug_bzlmod_v2::RegistryRequestGenerationKey;
@@ -63,6 +65,7 @@ use slug_bzlmod_v2::RepositoryMaterializationRequest;
 use slug_bzlmod_v2::RepositoryMaterializationRequestId;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
 use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RootModuleCommandPolicyKey;
 use slug_bzlmod_v2::RootModuleEnvironmentPolicyKey;
 use slug_bzlmod_v2::RootModuleGraph;
@@ -73,6 +76,8 @@ use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
+use slug_bzlmod_v2::RootRepositoryRouteError;
+use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
@@ -84,6 +89,8 @@ use slug_identity_v2::TargetName;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::RepositoryPackageLoadError;
+use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RootPackageLoadError;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::bzl_load_cycle_detector;
@@ -101,10 +108,15 @@ use slug_query_v2::QueryPolicy;
 use slug_query_v2::RootQueryCommandKey;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
 use slug_workspace_v2::PathObservationKey;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathObservationOperation;
+use slug_workspace_v2::PathObservationResult;
+use slug_workspace_v2::PathOperationResult;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
@@ -1441,7 +1453,6 @@ pub struct WorkspaceBuildEvaluation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
-#[allow(dead_code)] // Activated by the later shared command driver.
 struct BuildCommandRootKey {
     workspace: NormalizedAbsolutePath,
     targets: Arc<[Arc<str>]>,
@@ -1449,7 +1460,6 @@ struct BuildCommandRootKey {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-#[allow(dead_code)] // Constructor diagnostics remain private until activation.
 enum BuildCommandRequestError {
     ExternalRepository { pattern: Arc<str> },
     RecursivePattern { pattern: Arc<str> },
@@ -1462,11 +1472,18 @@ pub struct BuildCommandEvaluation {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-#[allow(dead_code)]
 struct BuildRequestedTarget {
     pattern: Arc<str>,
     package: LoadedPackage,
     analysis: Option<AnalysisResult>,
+    completion: BuildTargetCompletion,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
+enum BuildTargetCompletion {
+    Analyzed,
+    ObservedExportedSource,
+    LoadedOnly,
 }
 
 #[derive(Clone, Eq, PartialEq, Allocative)]
@@ -1477,20 +1494,20 @@ pub struct BuildCommandError {
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 enum BuildCommandErrorKind {
     RootAnchor(RootModuleLoadingAnchorError),
-    Package {
-        pattern: Arc<str>,
-        error: RootPackageLoadError,
-    },
+    Package(RootPackageLoadError),
+    RepositoryRoute(RootRepositoryRouteError),
+    RepositoryPackage(RepositoryPackageLoadError),
+    RepositorySource(RepositorySourceFileError),
+    SourceMissing(CanonicalLabel),
+    RootSource(PathObservationResult),
+    ExternalTargetKind,
     TargetNotFound {
         pattern: Arc<str>,
         package: PackagePath,
         target: TargetName,
         build_file: PathBuf,
     },
-    Analysis {
-        pattern: Arc<str>,
-        error: AnalysisError,
-    },
+    Analysis(AnalysisError),
     ExternalRepository {
         pattern: Arc<str>,
     },
@@ -1500,12 +1517,10 @@ enum BuildCommandErrorKind {
     Infrastructure(Arc<str>),
 }
 
-#[allow(dead_code)]
 type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
     Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
 >;
 
-#[allow(dead_code)]
 enum BuildBranchResult {
     Outcome(
         slug_bzlmod_v2::SourcePreparationOutcome<Result<BuildRequestedTarget, BuildCommandError>>,
@@ -1514,12 +1529,15 @@ enum BuildBranchResult {
 }
 
 impl BuildCommandRootKey {
-    #[allow(dead_code)]
     fn new(
         workspace: NormalizedAbsolutePath,
         targets: &[TargetPattern],
         configuration: ConfigurationKey,
     ) -> Result<Self, BuildCommandRequestError> {
+        let permits_one_external_single = matches!(
+            targets,
+            [TargetPattern::Single(label)] if !label.repo().is_root()
+        );
         let mut canonical = Vec::with_capacity(targets.len());
         for target in targets {
             let pattern: Arc<str> = Arc::from(target.to_string());
@@ -1529,7 +1547,7 @@ impl BuildCommandRootKey {
                     repo
                 }
             };
-            if !repo.is_root() {
+            if !repo.is_root() && !permits_one_external_single {
                 return Err(BuildCommandRequestError::ExternalRepository { pattern });
             }
             if matches!(target, TargetPattern::Recursive { .. }) {
@@ -1568,6 +1586,16 @@ impl BuildCommandEvaluation {
             .iter()
             .filter_map(|target| target.analysis.as_ref())
     }
+
+    pub fn is_observed_exported_source(&self) -> bool {
+        matches!(
+            self.targets.as_ref(),
+            [BuildRequestedTarget {
+                completion: BuildTargetCompletion::ObservedExportedSource,
+                ..
+            }]
+        )
+    }
 }
 
 impl fmt::Debug for BuildCommandEvaluation {
@@ -1581,16 +1609,8 @@ impl fmt::Debug for BuildCommandEvaluation {
 }
 
 impl BuildCommandError {
-    fn root_anchor(error: RootModuleLoadingAnchorError) -> Self {
-        Self {
-            kind: BuildCommandErrorKind::RootAnchor(error),
-        }
-    }
-
-    fn package(pattern: Arc<str>, error: RootPackageLoadError) -> Self {
-        Self {
-            kind: BuildCommandErrorKind::Package { pattern, error },
-        }
+    fn new(kind: BuildCommandErrorKind) -> Self {
+        Self { kind }
     }
 
     fn target_not_found(
@@ -1606,12 +1626,6 @@ impl BuildCommandError {
                 target,
                 build_file,
             },
-        }
-    }
-
-    fn analysis(pattern: Arc<str>, error: AnalysisError) -> Self {
-        Self {
-            kind: BuildCommandErrorKind::Analysis { pattern, error },
         }
     }
 
@@ -1632,13 +1646,34 @@ impl BuildCommandError {
             kind: BuildCommandErrorKind::Infrastructure(Arc::from(error.to_string())),
         }
     }
+
+    pub fn terminal_error(&self) -> (&'static str, i32) {
+        match &self.kind {
+            BuildCommandErrorKind::RepositoryPackage(error) if error.is_unsupported_feature() => {
+                ("unsupported_feature", 7)
+            }
+            _ => ("build_runtime_error", 2),
+        }
+    }
 }
 
 impl fmt::Display for BuildCommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.kind {
             BuildCommandErrorKind::RootAnchor(error) => error.fmt(f),
-            BuildCommandErrorKind::Package { error, .. } => error.fmt(f),
+            BuildCommandErrorKind::Package(error) => error.fmt(f),
+            BuildCommandErrorKind::RepositoryRoute(error) => error.fmt(f),
+            BuildCommandErrorKind::RepositoryPackage(error) => error.fmt(f),
+            BuildCommandErrorKind::RepositorySource(error) => write!(f, "{error:?}"),
+            BuildCommandErrorKind::SourceMissing(label) => {
+                write!(f, "{label}: missing input file '{label}'")
+            }
+            BuildCommandErrorKind::RootSource(result) => {
+                write!(f, "source observation failed: {result:?}")
+            }
+            BuildCommandErrorKind::ExternalTargetKind => {
+                f.write_str("external build target is not an exported source file")
+            }
             BuildCommandErrorKind::TargetNotFound {
                 pattern,
                 build_file,
@@ -1650,7 +1685,7 @@ impl fmt::Display for BuildCommandError {
                     build_file.display()
                 )
             }
-            BuildCommandErrorKind::Analysis { error, .. } => error.fmt(f),
+            BuildCommandErrorKind::Analysis(error) => error.fmt(f),
             BuildCommandErrorKind::ExternalRepository { pattern } => write!(
                 f,
                 "external repository target patterns are not supported before Stage 5 repository mapping: {pattern}"
@@ -1672,7 +1707,18 @@ impl fmt::Debug for BuildCommandError {
     }
 }
 
-impl std::error::Error for BuildCommandError {}
+impl std::error::Error for BuildCommandError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.kind {
+            BuildCommandErrorKind::RootAnchor(error) => Some(error),
+            BuildCommandErrorKind::Package(error) => Some(error),
+            BuildCommandErrorKind::RepositoryRoute(error) => Some(error),
+            BuildCommandErrorKind::RepositoryPackage(error) => Some(error),
+            BuildCommandErrorKind::Analysis(error) => Some(error),
+            _ => None,
+        }
+    }
+}
 
 impl fmt::Display for BuildCommandRootKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1689,14 +1735,12 @@ impl fmt::Display for BuildCommandRootKey {
     }
 }
 
-#[allow(dead_code)]
 fn build_complete(
     result: Result<BuildCommandEvaluation, BuildCommandError>,
 ) -> BuildCommandOutcome {
     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Arc::new(result))
 }
 
-#[allow(dead_code)]
 fn collect_build_branches(
     branches: Vec<BuildBranchResult>,
 ) -> Result<
@@ -1753,6 +1797,12 @@ async fn compute_build_branch(
 ) -> BuildBranchResult {
     let parsed = TargetPattern::parse(&pattern)
         .expect("BuildCommandRootKey stores validated canonical target patterns");
+    if let TargetPattern::Single(label) = &parsed {
+        if !label.repo().is_root() {
+            return compute_external_exported_source_build_branch(ctx, workspace, pattern, label)
+                .await;
+        }
+    }
     let package = match &parsed {
         TargetPattern::Single(label) => label.package().clone(),
         TargetPattern::PackageAll { package, .. } => package.clone(),
@@ -1775,14 +1825,14 @@ async fn compute_build_branch(
             Err(error) => {
                 return BuildBranchResult::Outcome(
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
-                        BuildCommandError::package(pattern, error.clone()),
+                        BuildCommandError::new(BuildCommandErrorKind::Package(error.clone())),
                     )),
                 );
             }
         },
     };
-    let analysis = match parsed {
-        TargetPattern::PackageAll { .. } => None,
+    let (analysis, completion) = match parsed {
+        TargetPattern::PackageAll { .. } => (None, BuildTargetCompletion::LoadedOnly),
         TargetPattern::Single(label) => {
             let Some(target) = package_value
                 .targets
@@ -1801,6 +1851,46 @@ async fn compute_build_branch(
                 );
             };
             if matches!(
+                target.kind,
+                slug_loading_v2::PackageTargetKind::ExportedFile
+            ) {
+                let path = workspace
+                    .as_path()
+                    .join(label.package().as_str())
+                    .join(label.target().as_str());
+                let demand = PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(path)
+                        .expect("root package target stays within the workspace"),
+                    PathObservationOperation::FileBytes,
+                );
+                match ctx.compute(&PathObservationKey::new(demand)).await {
+                    Err(error) => {
+                        return BuildBranchResult::Infrastructure(Arc::from(error.to_string()));
+                    }
+                    Ok(PathOutcome::Need(need)) => {
+                        return BuildBranchResult::Outcome(
+                            slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                                slug_bzlmod_v2::SourcePreparationNeeds::path(need),
+                            ),
+                        );
+                    }
+                    Ok(PathOutcome::Complete(result)) => match result.as_ref() {
+                        PathObservationResult::FileBytes(PathOperationResult::Present(_)) => {
+                            (None, BuildTargetCompletion::ObservedExportedSource)
+                        }
+                        _ => {
+                            return BuildBranchResult::Outcome(
+                                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                                    BuildCommandError::new(BuildCommandErrorKind::RootSource(
+                                        (*result).clone(),
+                                    )),
+                                )),
+                            );
+                        }
+                    },
+                }
+            } else if matches!(
                 target.kind,
                 slug_loading_v2::PackageTargetKind::StarlarkRule(_)
             ) {
@@ -1825,11 +1915,15 @@ async fn compute_build_branch(
                     }
                     Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => {
                         match value.as_ref() {
-                            Ok(analysis) => Some(analysis.clone()),
+                            Ok(analysis) => {
+                                (Some(analysis.clone()), BuildTargetCompletion::Analyzed)
+                            }
                             Err(error) => {
                                 return BuildBranchResult::Outcome(
                                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
-                                        BuildCommandError::analysis(pattern, error.clone()),
+                                        BuildCommandError::new(BuildCommandErrorKind::Analysis(
+                                            error.clone(),
+                                        )),
                                     )),
                                 );
                             }
@@ -1837,7 +1931,7 @@ async fn compute_build_branch(
                     }
                 }
             } else {
-                None
+                (None, BuildTargetCompletion::LoadedOnly)
             }
         }
         TargetPattern::Recursive { .. } => unreachable!(),
@@ -1847,8 +1941,132 @@ async fn compute_build_branch(
             pattern,
             package: package_value,
             analysis,
+            completion,
         },
     )))
+}
+
+async fn compute_external_exported_source_build_branch(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    pattern: Arc<str>,
+    label: &slug_identity_v2::ApparentLabel,
+) -> BuildBranchResult {
+    let route = match RootRepositoryRouteKey::new(workspace, label.repo().clone())
+        .expect("external single target has a nonroot repository route")
+    {
+        key => match ctx.compute(&key).await {
+            Err(error) => return BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
+            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+                return BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                    need,
+                ));
+            }
+            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(route) => route.clone(),
+                Err(error) => {
+                    return BuildBranchResult::Outcome(
+                        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                            BuildCommandError::new(BuildCommandErrorKind::RepositoryRoute(
+                                error.clone(),
+                            )),
+                        )),
+                    );
+                }
+            },
+        },
+    };
+    let package = match ctx
+        .compute(&RepositoryPackageLoadKey::new(
+            route.clone(),
+            label.package().clone(),
+        ))
+        .await
+    {
+        Err(error) => return BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+            return BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(
+                need,
+            ));
+        }
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(package) => package.clone(),
+            Err(error) => {
+                return BuildBranchResult::Outcome(
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                        BuildCommandError::new(BuildCommandErrorKind::RepositoryPackage(
+                            error.clone(),
+                        )),
+                    )),
+                );
+            }
+        },
+    };
+    let Some(target) = package
+        .targets
+        .iter()
+        .find(|candidate| candidate.name == label.target().as_str())
+    else {
+        return BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+            Err(BuildCommandError::target_not_found(
+                pattern,
+                label.package().clone(),
+                label.target().clone(),
+                package.build_file.clone(),
+            )),
+        ));
+    };
+    if !matches!(
+        target.kind,
+        slug_loading_v2::PackageTargetKind::ExportedFile
+    ) {
+        return BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+            Err(BuildCommandError::new(
+                BuildCommandErrorKind::ExternalTargetKind,
+            )),
+        ));
+    }
+    let source_label = CanonicalLabel::parse(&format!(
+        "{}//{}:{}",
+        route.canonical_repo(),
+        label.package(),
+        label.target()
+    ))
+    .expect("validated routed external label has a canonical projection");
+    let source = PathBuf::from(label.package().as_str()).join(label.target().as_str());
+    match ctx
+        .compute(&HostRepositorySourceFileKey::new(route, source))
+        .await
+    {
+        Err(error) => BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
+            BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(need))
+        }
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(HostRepositorySourceFileValue::Present { .. })
+            | Err(RepositorySourceFileError::WrongKind {
+                actual: PathNodeKind::Directory,
+                ..
+            }) => BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                Ok(BuildRequestedTarget {
+                    pattern,
+                    package,
+                    analysis: None,
+                    completion: BuildTargetCompletion::ObservedExportedSource,
+                }),
+            )),
+            Ok(HostRepositorySourceFileValue::Absent) => {
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                    BuildCommandError::new(BuildCommandErrorKind::SourceMissing(source_label)),
+                )))
+            }
+            Err(error) => {
+                BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                    BuildCommandError::new(BuildCommandErrorKind::RepositorySource(error.clone())),
+                )))
+            }
+        },
+    }
 }
 
 #[async_trait]
@@ -1871,7 +2089,9 @@ impl Key for BuildCommandRootKey {
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
                 Ok(anchor) => anchor.clone(),
                 Err(error) => {
-                    return build_complete(Err(BuildCommandError::root_anchor(error.clone())));
+                    return build_complete(Err(BuildCommandError::new(
+                        BuildCommandErrorKind::RootAnchor(error.clone()),
+                    )));
                 }
             },
         };
@@ -6740,15 +6960,31 @@ mod tests {
             )
             .unwrap()
         );
-        assert!(matches!(
+        assert!(
             BuildCommandRootKey::new(
                 workspace.clone(),
                 &[TargetPattern::parse("@repo//pkg:t").unwrap()],
                 configuration.clone(),
-            ),
-            Err(BuildCommandRequestError::ExternalRepository { pattern })
-                if pattern.as_ref() == "@repo//pkg:t"
-        ));
+            )
+            .is_ok()
+        );
+        for targets in [
+            vec![TargetPattern::parse("@repo//pkg:all").unwrap()],
+            vec![TargetPattern::parse("@repo//pkg/...").unwrap()],
+            vec![
+                TargetPattern::parse("//pkg:t").unwrap(),
+                TargetPattern::parse("@repo//pkg:t").unwrap(),
+            ],
+            vec![
+                TargetPattern::parse("@repo//pkg:one").unwrap(),
+                TargetPattern::parse("@repo//pkg:two").unwrap(),
+            ],
+        ] {
+            assert!(matches!(
+                BuildCommandRootKey::new(workspace.clone(), &targets, configuration.clone()),
+                Err(BuildCommandRequestError::ExternalRepository { .. })
+            ));
+        }
         assert!(matches!(
             BuildCommandRootKey::new(
                 workspace,
@@ -7063,7 +7299,7 @@ probe = rule(implementation = _impl)
                 if matches!(
                     value.as_ref(),
                     Err(BuildCommandError {
-                        kind: BuildCommandErrorKind::Package { .. },
+                        kind: BuildCommandErrorKind::Package(_),
                     })
                 )
         ));
@@ -7247,7 +7483,7 @@ probe = rule(implementation = _impl)
                 if matches!(
                     value.as_ref(),
                     Err(BuildCommandError {
-                        kind: BuildCommandErrorKind::Package { .. },
+                        kind: BuildCommandErrorKind::Package(_),
                     })
                 )
         ));
@@ -7267,7 +7503,7 @@ probe = rule(implementation = _impl)
                 if matches!(
                     value.as_ref(),
                     Err(BuildCommandError {
-                        kind: BuildCommandErrorKind::Package { .. },
+                        kind: BuildCommandErrorKind::Package(_),
                     })
                 )
         ));

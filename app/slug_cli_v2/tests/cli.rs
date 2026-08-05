@@ -2835,7 +2835,7 @@ fn output_base_query_reuses_one_daemon_across_build_edits() {
 }
 
 #[test]
-fn direct_external_module_cycle_is_public_only_for_query() {
+fn direct_external_module_cycle_is_typed_for_query_and_build() {
     let workspace = scratch("external-module-cycle");
     write(
         workspace.join("MODULE.bazel"),
@@ -2893,11 +2893,15 @@ fn direct_external_module_cycle_is_public_only_for_query() {
         .args(["build", "@dep//:target.txt"])
         .output()
         .unwrap();
+    assert_eq!(build.status.code(), Some(7), "{build:?}");
+    assert!(build.stdout.is_empty(), "{build:?}");
     let build_stderr = String::from_utf8(build.stderr).unwrap();
-    assert!(
-        !build_stderr.contains("unsupported_feature"),
-        "{build_stderr}"
+    let build_terminal = format!(
+        "{{\"error\":\"unsupported_feature\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}\n",
+        slug_core_v2::error::json_escape(&message),
     );
+    assert!(build_stderr.contains("ROOT_EVENT"), "{build_stderr}");
+    assert!(build_stderr.ends_with(&build_terminal), "{build_stderr}");
     assert!(!build_stderr.contains("DEP_EVENT"), "{build_stderr}");
     assert!(!build_stderr.contains("BUILD_EVENT"), "{build_stderr}");
 
@@ -2915,6 +2919,61 @@ fn direct_external_module_cycle_is_public_only_for_query() {
     assert!(ordinary_stderr.contains("\"error\":\"query_error\""));
     assert!(!ordinary_stderr.contains("unsupported_feature"));
     assert!(ordinary_stderr.contains("Evaluation of query"));
+}
+
+#[test]
+fn direct_external_exported_source_build_has_exact_one_shot_and_daemon_terminals() {
+    let workspace = scratch("external-build-source");
+    let output_base = scratch("external-build-source-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    );
+    write(
+        workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    );
+    write(
+        workspace.join("dep/BUILD.bazel"),
+        "exports_files([\"target.txt\"])\n",
+    );
+    write(workspace.join("dep/target.txt"), "one\n");
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .args(["build", "@dep//:target.txt"])
+        .output()
+        .unwrap();
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert!(one_shot.stdout.is_empty(), "{one_shot:?}");
+    assert_eq!(
+        String::from_utf8(one_shot.stderr).unwrap(),
+        "{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"dice_exported_source_file\"}\n"
+    );
+
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let daemon = |source: &str| {
+        slug()
+            .current_dir(&workspace)
+            .args([output_base_arg.as_str(), "build", source])
+            .output()
+            .unwrap()
+    };
+    let cold = daemon("@dep//:target.txt");
+    assert!(cold.status.success(), "{cold:?}");
+    assert!(cold.stdout.is_empty(), "{cold:?}");
+    assert_eq!(
+        String::from_utf8(cold.stderr).unwrap(),
+        "{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"daemon\",\"invalidated_files\":0,\"completed_boundary\":\"dice_exported_source_file\"}\n"
+    );
+    write(workspace.join("dep/target.txt"), "two\n");
+    let edited = daemon("@dep//:target.txt");
+    assert!(edited.status.success(), "{edited:?}");
+    assert!(edited.stdout.is_empty(), "{edited:?}");
+    assert_eq!(
+        String::from_utf8(edited.stderr).unwrap(),
+        "{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"daemon\",\"invalidated_files\":1,\"completed_boundary\":\"dice_exported_source_file\"}\n"
+    );
 }
 
 #[test]

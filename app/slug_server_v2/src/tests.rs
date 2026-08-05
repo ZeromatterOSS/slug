@@ -934,6 +934,117 @@ fn retained_daemon_direct_external_query_replays_only_changed_external_build() {
 }
 
 #[test]
+fn retained_daemon_build_observes_direct_external_exported_sources() {
+    let workspace = scratch("external-build-source");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "print(\"ROOT_EVENT\")\nmodule(name = \"demo\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"dep\")\n",
+    );
+    write(
+        &workspace.join("BUILD.bazel"),
+        "exports_files([\"root.txt\"])\n",
+    );
+    write(&workspace.join("root.txt"), "root\n");
+    write(
+        &workspace.join("dep/MODULE.bazel"),
+        "module(name = \"dep\", version = \"1.0.0\")\n",
+    );
+    write(
+        &workspace.join("dep/BUILD.bazel"),
+        "print(\"DEP_BUILD_EVENT\")\nexports_files([\"target.txt\"])\nfilegroup(name = \"files\")\n",
+    );
+    write(
+        &workspace.join("dep/rulepkg/defs.bzl"),
+        "def _impl(ctx):\n    fail(\"ANALYSIS_MUST_NOT_RUN\")\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("dep/rulepkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"rule\", visibility = [\"//visibility:public\"])\n",
+    );
+    let source = workspace.join("dep/target.txt");
+    write(&source, "one\n");
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let terminal = |invalidated_files| {
+        format!(
+            "{{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files},\"completed_boundary\":\"dice_exported_source_file\"}}\n"
+        )
+    };
+
+    let cold = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(cold.exit_code, 0, "{cold:?}");
+    assert!(cold.stdout.is_empty(), "{cold:?}");
+    assert_eq!(cold.stderr.matches("ROOT_EVENT").count(), 1, "{cold:?}");
+    assert_eq!(
+        cold.stderr.matches("DEP_BUILD_EVENT").count(),
+        1,
+        "{cold:?}"
+    );
+    let root_event = cold.stderr.find("ROOT_EVENT").unwrap();
+    let build_event = cold.stderr.find("DEP_BUILD_EVENT").unwrap();
+    let terminal_start = cold.stderr.find("{\"success\":true").unwrap();
+    assert!(
+        root_event < build_event && build_event < terminal_start,
+        "{cold:?}"
+    );
+    assert!(cold.stderr.ends_with(&terminal(0)), "{cold:?}");
+    assert!(!cold.stderr.contains("reapi"), "{cold:?}");
+
+    let warm = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(warm.exit_code, 0, "{warm:?}");
+    assert!(warm.stdout.is_empty(), "{warm:?}");
+    assert_eq!(warm.stderr, terminal(0));
+
+    write(&source, "two\n");
+    let edited = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(edited.exit_code, 0, "{edited:?}");
+    assert!(edited.stdout.is_empty(), "{edited:?}");
+    assert_eq!(edited.stderr, terminal(1));
+
+    fs::remove_file(&source).unwrap();
+    let absent = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(absent.exit_code, 2, "{absent:?}");
+    assert!(absent.stdout.is_empty(), "{absent:?}");
+    assert_eq!(
+        absent.stderr,
+        "{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"@@dep+//:target.txt: missing input file '@@dep+//:target.txt'\",\"runtime_mode\":\"daemon\",\"invalidated_files\":1}\n"
+    );
+
+    fs::create_dir(&source).unwrap();
+    let directory = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(directory.exit_code, 0, "{directory:?}");
+    assert!(directory.stdout.is_empty(), "{directory:?}");
+    assert_eq!(directory.stderr, terminal(0));
+
+    fs::remove_dir(&source).unwrap();
+    write(&source, "three\n");
+    let recreated = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(recreated.exit_code, 0, "{recreated:?}");
+    assert!(recreated.stdout.is_empty(), "{recreated:?}");
+    assert_eq!(recreated.stderr, terminal(1));
+
+    let root = daemon.build(&[target("//:root.txt")], &remote_disabled(), &[]);
+    assert_eq!(root.exit_code, 0, "{root:?}");
+    assert!(root.stdout.is_empty(), "{root:?}");
+    assert_eq!(root.stderr, terminal(0));
+
+    let unchanged = daemon.build(&[target("@dep//:files")], &remote_disabled(), &[]);
+    assert_eq!(unchanged.exit_code, 2, "{unchanged:?}");
+    assert!(unchanged.stderr.contains("not an exported source file"));
+
+    let rule = daemon.build(&[target("@dep//rulepkg:rule")], &remote_disabled(), &[]);
+    assert_eq!(rule.exit_code, 2, "{rule:?}");
+    assert!(rule.stderr.contains("not an exported source file"));
+    assert!(!rule.stderr.contains("ANALYSIS_MUST_NOT_RUN"), "{rule:?}");
+
+    let mut remote_execute = remote_disabled();
+    remote_execute.executor = Some("grpc://must-not-run".to_owned());
+    let remote_source = daemon.build(&[target("@dep//:target.txt")], &remote_execute, &[]);
+    assert_eq!(remote_source.exit_code, 0, "{remote_source:?}");
+    assert_eq!(remote_source.stderr, terminal(0));
+    assert!(!remote_source.stderr.contains("reapi"), "{remote_source:?}");
+}
+
+#[test]
 fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     let workspace = scratch("external-module-cycle");
     write(
@@ -987,6 +1098,17 @@ fn retained_daemon_external_module_cycle_recovers_without_stale_events() {
     assert!(!cold.stderr.contains("BUILD_EVENT"), "{cold:?}");
     assert!(!cold.stderr.contains("Evaluation of query"), "{cold:?}");
     assert_eq!(cold.invalidated_files, 0);
+
+    let build = daemon.build(&[target("@dep//:target.txt")], &remote_disabled(), &[]);
+    assert_eq!(build.exit_code, 7, "{build:?}");
+    assert!(build.stdout.is_empty(), "{build:?}");
+    assert_eq!(
+        build.stderr,
+        format!(
+            "{{\"error\":\"unsupported_feature\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":0}}\n",
+            slug_core_v2::error::json_escape(&message),
+        )
+    );
 
     let warm = daemon.query("buildfiles(@dep//:target.txt)", QueryOrder::Auto);
     assert_eq!(warm.exit_code, 7, "{warm:?}");

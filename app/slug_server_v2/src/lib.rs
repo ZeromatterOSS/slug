@@ -126,12 +126,24 @@ impl Daemon {
         };
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
-                Err(error) => TerminalOutput::new(
-                    2,
-                    String::new(),
-                    build_error_json("build_runtime_error", &error.to_string(), invalidated),
-                ),
+                Err(error) => {
+                    let (kind, exit_code) = error.terminal_error();
+                    TerminalOutput::new(
+                        exit_code,
+                        String::new(),
+                        build_error_json(kind, &error.to_string(), invalidated),
+                    )
+                }
                 Ok(evaluation) => {
+                    if evaluation.is_observed_exported_source() {
+                        return TerminalOutput::new(
+                            0,
+                            String::new(),
+                            format!(
+                                "{{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated},\"completed_boundary\":\"dice_exported_source_file\"}}\n"
+                            ),
+                        );
+                    }
                     let analyzed_target_count = evaluation.analyzed_target_count();
                     let declared_action_count = evaluation.declared_action_count();
                     if remote.mode() == RemoteMode::Execute {

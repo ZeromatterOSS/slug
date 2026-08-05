@@ -67,16 +67,31 @@ pub fn run(argv: Vec<String>) -> i32 {
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
-            eprint!("{}", build_error_json(&error.to_string(), "one-shot"));
+            eprint!(
+                "{}",
+                build_error_json("build_runtime_error", &error.to_string(), "one-shot")
+            );
             return 2;
         }
     };
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
             Err(error) => {
-                TerminalOutput::new(2, String::new(), build_error_json(&error.to_string(), "one-shot"))
+                let (kind, exit_code) = error.terminal_error();
+                TerminalOutput::new(
+                    exit_code,
+                    String::new(),
+                    build_error_json(kind, &error.to_string(), "one-shot"),
+                )
             }
             Ok(evaluation) => {
+            if evaluation.is_observed_exported_source() {
+                return TerminalOutput::new(
+                    0,
+                    String::new(),
+                    "{\"success\":true,\"command\":\"build\",\"target_count\":1,\"loaded_package_count\":1,\"analyzed_target_count\":0,\"declared_action_count\":0,\"runtime_mode\":\"one-shot\",\"completed_boundary\":\"dice_exported_source_file\"}\n".to_owned(),
+                );
+            }
             let argv_json = argv
                 .iter()
                 .map(|arg| format!("\"{}\"", json_escape(arg)))
@@ -96,7 +111,7 @@ pub fn run(argv: Vec<String>) -> i32 {
                     return TerminalOutput::new(
                         2,
                         String::new(),
-                        build_error_json(&error.to_string(), "one-shot"),
+                        build_error_json("build_runtime_error", &error.to_string(), "one-shot"),
                     );
                 }
             };
@@ -136,9 +151,10 @@ pub fn run(argv: Vec<String>) -> i32 {
     exit_code
 }
 
-fn build_error_json(message: &str, runtime_mode: &str) -> String {
+fn build_error_json(kind: &str, message: &str, runtime_mode: &str) -> String {
     format!(
-        "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}\n",
+        "{{\"error\":\"{}\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"{}\"}}\n",
+        kind,
         json_escape(message),
         runtime_mode,
     )
@@ -160,7 +176,7 @@ fn run_reapi_build(
             return TerminalOutput::new(
                 2,
                 String::new(),
-                build_error_json(&error.to_string(), "one-shot"),
+                build_error_json("build_runtime_error", &error.to_string(), "one-shot"),
             );
         }
     };
@@ -276,7 +292,7 @@ fn run_reapi_build(
         Err(error) => TerminalOutput::new(
             2,
             String::new(),
-            build_error_json(&error, "one-shot"),
+            build_error_json("build_runtime_error", &error, "one-shot"),
         ),
     }
 }
