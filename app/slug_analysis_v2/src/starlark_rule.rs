@@ -25,7 +25,9 @@ use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::provider::FrozenUserProviderCallable;
 use slug_loading_v2::provider::StarlarkDefaultInfo;
 use slug_loading_v2::provider::StarlarkDepset;
+use slug_loading_v2::provider::StarlarkToolchainInfo;
 use slug_loading_v2::provider::StarlarkUserProvider;
+use slug_loading_v2::provider::ToolchainInfoAnalysisContext;
 use starlark::PrintHandler;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Methods;
@@ -53,6 +55,8 @@ struct AnalysisContext {
     package_path: String,
     dependencies: Arc<[PreparedDependency]>,
     build_setting_value: Option<CompactString>,
+    marker: Option<CompactString>,
+    toolchain: Option<PreparedToolchain>,
 }
 
 impl fmt::Display for AnalysisContext {
@@ -76,7 +80,12 @@ impl<'v> StarlarkValue<'v> for AnalysisContext {
             })),
             "attr" => Some(heap.alloc_simple(AnalysisAttributes {
                 dependencies: self.dependencies.clone(),
+                marker: self.marker.clone(),
             })),
+            "toolchains" => self
+                .toolchain
+                .clone()
+                .map(|toolchain| heap.alloc_simple(AnalysisToolchains(toolchain))),
             "build_setting_value" => self
                 .build_setting_value
                 .as_ref()
@@ -94,9 +103,16 @@ pub(crate) struct PreparedDependency {
     pub(crate) sequence: bool,
 }
 
+#[derive(Debug, Clone, Allocative)]
+pub(crate) struct PreparedToolchain {
+    pub(crate) required_type: CompactString,
+    pub(crate) marker: CompactString,
+}
+
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct AnalysisAttributes {
     dependencies: Arc<[PreparedDependency]>,
+    marker: Option<CompactString>,
 }
 
 impl fmt::Display for AnalysisAttributes {
@@ -110,6 +126,12 @@ starlark::starlark_simple_value!(AnalysisAttributes);
 #[starlark_value(type = "analysis_attrs")]
 impl<'v> StarlarkValue<'v> for AnalysisAttributes {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        if attribute == "marker" {
+            return self
+                .marker
+                .as_ref()
+                .map(|marker| heap.alloc_str(marker).to_value());
+        }
         let dependencies = self
             .dependencies
             .iter()
@@ -124,6 +146,48 @@ impl<'v> StarlarkValue<'v> for AnalysisAttributes {
                 heap.alloc(dependencies)
             }
         })
+    }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisToolchains(PreparedToolchain);
+
+impl fmt::Display for AnalysisToolchains {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("<ctx.toolchains>")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisToolchains);
+
+#[starlark_value(type = "toolchains")]
+impl<'v> StarlarkValue<'v> for AnalysisToolchains {
+    fn at(&self, index: Value<'v>, heap: Heap<'v>) -> starlark::Result<Value<'v>> {
+        if index.unpack_str() != Some(self.0.required_type.as_str()) {
+            return Err(starlark::Error::new_other(anyhow::anyhow!(
+                "ctx.toolchains only contains {}",
+                self.0.required_type
+            )));
+        }
+        Ok(heap.alloc_simple(AnalysisToolchainInfo(self.0.clone())))
+    }
+}
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+struct AnalysisToolchainInfo(PreparedToolchain);
+
+impl fmt::Display for AnalysisToolchainInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ToolchainInfo(...)")
+    }
+}
+
+starlark::starlark_simple_value!(AnalysisToolchainInfo);
+
+#[starlark_value(type = "ToolchainInfo")]
+impl<'v> StarlarkValue<'v> for AnalysisToolchainInfo {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "marker").then(|| heap.alloc_str(&self.0.marker).to_value())
     }
 }
 
@@ -316,6 +380,8 @@ pub(crate) fn evaluate_loaded_rule(
     key: ConfiguredTargetKey,
     package_path: &str,
     dependencies: Vec<PreparedDependency>,
+    marker: Option<CompactString>,
+    toolchain: Option<PreparedToolchain>,
     print_handler: Option<&dyn PrintHandler>,
 ) -> Result<AnalysisResult, String> {
     let target = package
@@ -345,13 +411,20 @@ pub(crate) fn evaluate_loaded_rule(
                 .as_str()
                 .into()
         }),
+        marker,
+        toolchain,
     });
     let returned = {
         let mut evaluator = Evaluator::new(&module);
+        let toolchain_info_context = ToolchainInfoAnalysisContext;
+        evaluator.extra = Some(&toolchain_info_context);
         if let Some(print_handler) = print_handler {
             evaluator.set_print_handler(print_handler);
         }
-        evaluator.eval_function(implementation.frozen_value().to_value(), &[context], &[])
+        let result =
+            evaluator.eval_function(implementation.frozen_value().to_value(), &[context], &[]);
+        drop(evaluator);
+        result
     }
     .map_err(|error| error.to_string())?;
 
@@ -391,6 +464,10 @@ pub(crate) fn evaluate_loaded_rule(
                         .map(|(name, value)| (name.clone(), value.clone())),
                 )
                 .map_err(|error| error.to_string())?,
+            ));
+        } else if let Some(info) = StarlarkToolchainInfo::from_value(value) {
+            provider_values.push(ProviderValue::ToolchainInfo(
+                slug_build_api_v2::providers::ToolchainInfo::new(info.marker()),
             ));
         } else {
             return Err(format!(

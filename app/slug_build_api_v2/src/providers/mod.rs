@@ -221,6 +221,23 @@ pub struct PlatformInfo {
     pub exec_properties: BTreeMap<String, String>,
 }
 
+/// The fixture-bounded builtin result of `platform_common.ToolchainInfo`.
+///
+/// This deliberately is not a user provider: ToolchainInfo has one native
+/// field in the first resolution vertical and must keep its builtin identity.
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct ToolchainInfo {
+    pub marker: CompactString,
+}
+
+impl ToolchainInfo {
+    pub fn new(marker: impl Into<CompactString>) -> Self {
+        Self {
+            marker: marker.into(),
+        }
+    }
+}
+
 impl PlatformInfo {
     pub fn new(label: impl Into<String>) -> Self {
         Self {
@@ -271,6 +288,7 @@ pub enum ProviderValue {
     RunEnvironmentInfo(RunEnvironmentInfo),
     FilesToRunProvider(FilesToRunProvider),
     PlatformInfo(PlatformInfo),
+    ToolchainInfo(ToolchainInfo),
     User(UserProvider),
 }
 
@@ -282,6 +300,7 @@ impl ProviderValue {
             Self::RunEnvironmentInfo(_) => ProviderName("RunEnvironmentInfo".into()),
             Self::FilesToRunProvider(_) => ProviderName("FilesToRunProvider".into()),
             Self::PlatformInfo(_) => ProviderName("PlatformInfo".into()),
+            Self::ToolchainInfo(_) => ProviderName("ToolchainInfo".into()),
             Self::User(provider) => ProviderName(provider.id.exported_name().into()),
         }
     }
@@ -321,6 +340,10 @@ impl Equivalent<ProviderKey> for ProviderId {
 }
 
 impl ProviderCollection {
+    pub fn len(&self) -> usize {
+        self.providers.len()
+    }
+
     pub fn new(values: Vec<ProviderValue>) -> Result<Self, ProviderError> {
         Self::from_values(values, true)
     }
@@ -366,8 +389,22 @@ impl ProviderCollection {
     }
 
     pub fn default_info(&self) -> Option<&DefaultInfo> {
-        match self.get(&ProviderName("DefaultInfo".into())) {
+        match self
+            .providers
+            .get(&ProviderKey::Builtin(ProviderName("DefaultInfo".into())))
+        {
             Some(ProviderValue::DefaultInfo(info)) => Some(info),
+            _ => None,
+        }
+    }
+
+    /// Builtin-only lookup: user providers named `ToolchainInfo` never match.
+    pub fn toolchain_info(&self) -> Option<&ToolchainInfo> {
+        match self
+            .providers
+            .get(&ProviderKey::Builtin(ProviderName("ToolchainInfo".into())))
+        {
+            Some(ProviderValue::ToolchainInfo(info)) => Some(info),
             _ => None,
         }
     }

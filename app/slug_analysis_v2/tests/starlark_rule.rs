@@ -19,6 +19,7 @@ use dice::ActivationKind;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DiceNodeId;
 use dice::DynKey;
 use dice::RichActivation;
 use dice::UserComputationData;
@@ -35,6 +36,7 @@ use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
@@ -42,6 +44,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
@@ -302,6 +305,25 @@ fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
                 ))),
             );
         }
+        let mut parent = path.parent();
+        while let Some(directory) = parent.filter(|directory| directory.starts_with(root)) {
+            entries.insert(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(directory.to_path_buf()).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::Directory,
+                    1,
+                    1,
+                    1,
+                    1,
+                    0o755,
+                ))),
+            );
+            parent = directory.parent();
+        }
     }
     let mut path = Some(root);
     while let Some(directory) = path {
@@ -338,14 +360,32 @@ fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
 #[derive(Default)]
 struct RootActivationTracker {
     activations: Mutex<Vec<(String, ActivationKind)>>,
+    batches: Mutex<Vec<(String, EventBatch)>>,
+    nodes: Mutex<Vec<(String, DiceNodeId, Vec<DiceNodeId>)>>,
     legacy: AtomicUsize,
+    all_loading: bool,
 }
 
 impl RootActivationTracker {
-    fn take(&self) -> (Vec<(String, ActivationKind)>, usize) {
+    fn with_loading() -> Self {
+        Self {
+            all_loading: true,
+            ..Default::default()
+        }
+    }
+    fn take(
+        &self,
+    ) -> (
+        Vec<(String, ActivationKind)>,
+        usize,
+        Vec<(String, EventBatch)>,
+        Vec<(String, DiceNodeId, Vec<DiceNodeId>)>,
+    ) {
         (
             std::mem::take(&mut *self.activations.lock().unwrap()),
             self.legacy.load(std::sync::atomic::Ordering::Relaxed),
+            std::mem::take(&mut *self.batches.lock().unwrap()),
+            std::mem::take(&mut *self.nodes.lock().unwrap()),
         )
     }
 }
@@ -358,8 +398,7 @@ fn root_activation_identity(key: &RootConfiguredTargetAnalysisKey) -> String {
             configured_target
                 .configuration()
                 .root_string_setting()
-                .unwrap()
-                .as_str()
+                .map_or("<default>", RootStringSettingValue::as_str)
         );
     }
     let (requested, explicit) = key.root_string_setting_request_parts().unwrap();
@@ -409,10 +448,41 @@ impl ActivationTracker for RootActivationTracker {
                 .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
         if let Some(root_key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() {
+            let identity = root_activation_identity(root_key);
             self.activations
                 .lock()
                 .unwrap()
-                .push((root_activation_identity(root_key), activation.kind()));
+                .push((identity.clone(), activation.kind()));
+            self.nodes.lock().unwrap().push((
+                identity.clone(),
+                activation.node(),
+                activation.dependencies().to_vec(),
+            ));
+            if let Some(batch) = activation
+                .evaluation_data()
+                .and_then(|data| data.downcast_ref::<EventBatch>())
+            {
+                self.batches.lock().unwrap().push((identity, batch.dupe()));
+            }
+        } else if self.all_loading {
+            let identity = if let Some(key) = key.downcast_ref::<RootPackageLoadKey>() {
+                Some(format!("package/{key}"))
+            } else if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
+                Some("anchor".to_owned())
+            } else {
+                None
+            };
+            if let Some(identity) = identity {
+                self.activations
+                    .lock()
+                    .unwrap()
+                    .push((identity.clone(), activation.kind()));
+                self.nodes.lock().unwrap().push((
+                    identity,
+                    activation.node(),
+                    activation.dependencies().to_vec(),
+                ));
+            }
         }
     }
 }
@@ -485,6 +555,63 @@ async fn root_string_request(
         .unwrap()
 }
 
+async fn root_target_request(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    tracker: Arc<RootActivationTracker>,
+) -> Result<AnalysisResult, String> {
+    let mut user_data = UserComputationData {
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    };
+    user_data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(user_data);
+    updater
+        .changed_to(vec![(PathObservationEpochKey, root_epoch(workspace))])
+        .unwrap();
+    let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            root.clone(),
+            [root],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    let mut transaction = updater.commit().await;
+    let value = transaction
+        .compute(&RootConfiguredTargetAnalysisKey::new(
+            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+            ConfiguredTargetKey::new(
+                CanonicalLabel::parse(target).unwrap(),
+                ConfigurationKey::target("toolchain-context").unwrap(),
+            ),
+        ))
+        .await
+        .map_err(|error| error.to_string())?;
+    let AnalysisPreparationOutcome::Complete(value) = value else {
+        return Err("root target returned Needs".to_owned());
+    };
+    value
+        .as_ref()
+        .as_ref()
+        .cloned()
+        .map_err(|error| error.to_string())
+}
+
 fn provider_value(result: &AnalysisResult, provider: &ProviderId) -> String {
     result
         .providers()
@@ -497,6 +624,479 @@ fn provider_value(result: &AnalysisResult, provider: &ProviderId) -> String {
 
 fn root_setting_value(key: &ConfiguredTargetKey) -> &str {
     key.configuration().root_string_setting().unwrap().as_str()
+}
+
+const TOOLCHAIN_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:second\", \"//:first\")\n";
+const TOOLCHAIN_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""})
+def _first(ctx):
+    print("FIRST_LOCAL")
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+def _second(ctx):
+    print("SECOND_LOCAL")
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+def _request(ctx):
+    print("REQUEST_LOCAL")
+    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker)]
+first_impl = rule(implementation = _first, attrs = {"marker": attr.string(mandatory = True)})
+second_impl = rule(implementation = _second, attrs = {"marker": attr.string(mandatory = True)})
+request = rule(implementation = _request, toolchains = ["//:type"])
+"#;
+const TOOLCHAIN_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\nconstraint_value(name = \"other\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":linux\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\ntoolchain(name = \"first\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":linux\"])\ntoolchain(name = \"second\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":linux\"])\nrequest(name = \"request\")\n";
+
+async fn toolchain_case(module: &str, defs: &str, build: &str) -> Result<AnalysisResult, String> {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), module).unwrap();
+    fs::write(workspace.join("defs.bzl"), defs).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), build).unwrap();
+    root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+}
+
+#[tokio::test]
+async fn root_toolchain_selection_prepares_builtin_marker_context_in_registration_order() {
+    let workspace = scratch();
+    let module = workspace.join("MODULE.bazel");
+    let defs = workspace.join("defs.bzl");
+    let build = workspace.join("BUILD.bazel");
+    fs::write(&module, TOOLCHAIN_MODULE).unwrap();
+    fs::write(&defs, TOOLCHAIN_DEFS).unwrap();
+    fs::write(&build, TOOLCHAIN_BUILD).unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+    let first = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&first, &consumer), "second");
+    assert!(first.actions().is_empty());
+    assert!(first.declared_outputs().is_empty());
+    assert!(first.diagnostics().is_empty());
+    assert!(first.direct_dependencies().is_empty());
+    let warm = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
+        .await
+        .unwrap();
+    assert_eq!(warm, first);
+
+    fs::write(
+        &module,
+        TOOLCHAIN_MODULE.replacen(
+            "\"//:second\", \"//:first\"",
+            "\"//:first\", \"//:second\"",
+            1,
+        ),
+    )
+    .unwrap();
+    let reordered = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&reordered, &consumer), "first");
+
+    fs::write(&module, TOOLCHAIN_MODULE).unwrap();
+    let restored = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
+        .await
+        .unwrap();
+    assert_eq!(provider_value(&restored, &consumer), "second");
+    assert_eq!(restored, first);
+    let (activations, legacy, batches, nodes) = tracker.take();
+    assert_eq!(legacy, 0, "legacy analysis activated: {activations:#?}");
+    let identities = activations
+        .iter()
+        .map(|(identity, _)| identity.as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        identities
+            .iter()
+            .any(|identity| identity.contains("@@//:request")),
+        "{identities:#?}"
+    );
+    let local = |label: &str| {
+        batches
+            .iter()
+            .find(|(identity, _)| identity.contains(label))
+            .map(|(_, batch)| event_texts(batch))
+    };
+    assert_eq!(local("@@//:request"), Some(vec!["REQUEST_LOCAL"]));
+    assert_eq!(local("@@//:second_impl"), Some(vec!["SECOND_LOCAL"]));
+    let request = nodes
+        .iter()
+        .find(|(identity, _, _)| identity.contains("@@//:request"))
+        .unwrap();
+    let selected = nodes
+        .iter()
+        .find(|(identity, _, _)| identity.contains("@@//:second_impl"))
+        .unwrap();
+    assert!(request.2.contains(&selected.1));
+    assert!(
+        identities
+            .iter()
+            .any(|identity| identity.contains("@@//:first_impl")),
+        "{identities:#?}"
+    );
+    assert!(
+        identities
+            .iter()
+            .any(|identity| identity.contains("@@//:second_impl")),
+        "{identities:#?}"
+    );
+    assert!(identities.contains(&"anchor"), "{identities:#?}");
+    assert!(
+        identities
+            .iter()
+            .any(|identity| identity.starts_with("package/")),
+        "{identities:#?}"
+    );
+
+    fs::write(
+        &build,
+        TOOLCHAIN_BUILD.replacen("marker = \"second\"", "marker = \"edited\"", 1),
+    )
+    .unwrap();
+    let edited = root_target_request(
+        &dice,
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(provider_value(&edited, &consumer), "edited");
+    fs::write(&build, TOOLCHAIN_BUILD).unwrap();
+    let marker_restored = root_target_request(
+        &dice,
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(marker_restored, first);
+
+    fs::remove_file(&build).unwrap();
+    assert!(
+        root_target_request(
+            &dice,
+            &workspace,
+            "@@//:request",
+            Arc::new(RootActivationTracker::default())
+        )
+        .await
+        .is_err()
+    );
+    fs::write(&build, TOOLCHAIN_BUILD).unwrap();
+    let recreated = root_target_request(
+        &dice,
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(recreated, first);
+}
+
+#[tokio::test]
+async fn root_toolchain_resolution_rejects_every_native_reference_and_selection_mismatch() {
+    let cases = vec![
+        (
+            "required kind",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.replace("[\"//:type\"]", "[\"//:setting\"]"),
+            TOOLCHAIN_BUILD.to_owned(),
+            "required toolchain type",
+        ),
+        (
+            "platform kind",
+            TOOLCHAIN_MODULE.replace("//:platform", "//:type"),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.to_owned(),
+            "not platform",
+        ),
+        (
+            "toolchain kind",
+            TOOLCHAIN_MODULE.replace("//:second", "//:type"),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.to_owned(),
+            "not toolchain",
+        ),
+        (
+            "setting reference",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replacen(
+                "constraint_setting = \":setting\"",
+                "constraint_setting = \":type\"",
+                1,
+            ),
+            "non-constraint setting",
+        ),
+        (
+            "type reference",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replacen(
+                "toolchain_type = \":type\"",
+                "toolchain_type = \":setting\"",
+                1,
+            ),
+            "non-toolchain type",
+        ),
+        (
+            "implementation reference",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replacen("toolchain = \":first_impl\"", "toolchain = \":type\"", 1),
+            "not a Starlark rule",
+        ),
+        (
+            "exec reference",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replacen(
+                "exec_compatible_with = [\":linux\"]",
+                "exec_compatible_with = [\":type\"]",
+                1,
+            ),
+            "expected constraint_value",
+        ),
+        (
+            "platform duplicate",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replace(
+                "constraint_values = [\":linux\"]",
+                "constraint_values = [\":linux\", \":other\"]",
+            ),
+            "duplicate constraint setting",
+        ),
+        (
+            "exec duplicate",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replacen(
+                "exec_compatible_with = [\":linux\"]",
+                "exec_compatible_with = [\":linux\", \":other\"]",
+                1,
+            ),
+            "duplicate execution constraint setting",
+        ),
+        (
+            "no pair",
+            TOOLCHAIN_MODULE.to_owned(),
+            TOOLCHAIN_DEFS.to_owned(),
+            TOOLCHAIN_BUILD.replace(
+                "exec_compatible_with = [\":linux\"]",
+                "exec_compatible_with = [\":other\"]",
+            ),
+            "no compatible toolchain",
+        ),
+    ];
+    for (name, module, defs, build, expected) in cases {
+        let error = toolchain_case(&module, &defs, &build).await.unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_escapes() {
+    let first_module =
+        TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");
+    let dependency_defs = TOOLCHAIN_DEFS.replace(
+        "attrs = {\"marker\": attr.string(mandatory = True)})",
+        "attrs = {\"marker\": attr.string(mandatory = True), \"dep\": attr.label()})",
+    );
+    let transition_defs = format!(
+        "def _cfg(settings, attr): return {{\"//:setting\": \"value\"}}\nleaf_cfg = transition(implementation = _cfg, inputs = [], outputs = [\"//:setting\"])\n{}",
+        TOOLCHAIN_DEFS.replacen(
+            "{\"marker\": attr.string(mandatory = True)}",
+            "{\"marker\": attr.string(mandatory = True), \"dep\": attr.label(cfg = leaf_cfg)}",
+            1,
+        )
+    );
+    let cases = vec![
+        ("dependency leaf", first_module.clone(), dependency_defs, TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", dep = \":type\")", 1), "marker leaf"),
+        ("required leaf", first_module.clone(), TOOLCHAIN_DEFS.replacen("first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)})", "first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)}, toolchains = [\":type\"])", 1), TOOLCHAIN_BUILD.to_owned(), "marker leaf"),
+        ("transition leaf", first_module.clone(), transition_defs, TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", dep = \":type\")", 1), "marker leaf"),
+        ("build-setting leaf", first_module.clone(), TOOLCHAIN_DEFS.replacen("attrs = {\"marker\": attr.string(mandatory = True)})", "attrs = {\"marker\": attr.string(mandatory = True)}, build_setting = config.string(flag = True))", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", build_setting_default = \"bad\")", 1), "marker leaf"),
+        ("explicit tags", first_module.clone(), TOOLCHAIN_DEFS.to_owned(), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", tags = [])", 1), "marker leaf"),
+        ("omitted optional marker", first_module.clone(), TOOLCHAIN_DEFS.replacen("attr.string(mandatory = True)", "attr.string()", 1), TOOLCHAIN_BUILD.replacen("first_impl(name = \"first_impl\", marker = \"first\")", "first_impl(name = \"first_impl\")", 1), "marker leaf"),
+        ("extra scalar", first_module.clone(), TOOLCHAIN_DEFS.replacen("{\"marker\": attr.string(mandatory = True)}", "{\"marker\": attr.string(mandatory = True), \"extra\": attr.string()}", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", extra = \"bad\")", 1), "marker leaf"),
+        ("executable capability", first_module.clone(), TOOLCHAIN_DEFS.replacen("first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)})", "first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)}, executable = True)", 1), TOOLCHAIN_BUILD.to_owned(), "marker leaf"),
+        ("test capability", first_module.clone(), TOOLCHAIN_DEFS.replace("first_impl", "first_impl_test").replacen("attrs = {\"marker\": attr.string(mandatory = True)})", "attrs = {\"marker\": attr.string(mandatory = True)}, test = True)", 1), TOOLCHAIN_BUILD.replace("first_impl", "first_impl_test"), "marker leaf"),
+        ("missing callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo()"), TOOLCHAIN_BUILD.to_owned(), "exactly one named"),
+        ("positional callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "positional"),
+        ("typed callable marker", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = 1)"), TOOLCHAIN_BUILD.to_owned(), "must be a string"),
+        ("wrong callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(value = ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "named argument `marker`"),
+        ("extra callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = ctx.attr.marker, extra = \"bad\")"), TOOLCHAIN_BUILD.to_owned(), "exactly one named"),
+        ("context index", TOOLCHAIN_MODULE.to_owned(), TOOLCHAIN_DEFS.replace("ctx.toolchains[\"//:type\"]", "ctx.toolchains[\"//:missing\"]"), TOOLCHAIN_BUILD.to_owned(), "only contains //:type"),
+        ("action postguard", first_module.clone(), TOOLCHAIN_DEFS.replacen("    print(\"FIRST_LOCAL\")", "    out = ctx.actions.declare_file(\"bad\")\n    ctx.actions.write(out, \"bad\")", 1), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+        ("nonempty DefaultInfo", first_module.clone(), TOOLCHAIN_DEFS.replacen("    print(\"FIRST_LOCAL\")\n    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "    out = ctx.actions.declare_file(\"bad\")\n    return [DefaultInfo(files = depset([out])), platform_common.ToolchainInfo(marker = ctx.attr.marker)]", 1), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+        ("user ToolchainInfo", first_module.clone(), format!("ToolchainInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), ToolchainInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+        ("user DefaultInfo", first_module.clone(), format!("DefaultInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), DefaultInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+        ("provider cardinality", first_module, format!("Extra = provider(fields = {{\"value\": \"\"}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), Extra(value = \"bad\")]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+    ];
+    for (name, module, defs, build, expected) in cases {
+        let error = toolchain_case(&module, &defs, &build).await.unwrap_err();
+        assert!(error.contains(expected), "{name}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn zero_toolchain_requirement_bypasses_registration_resolution() {
+    let workspace = scratch();
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"root\")\nregister_toolchains(\"@external//:invalid\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("defs.bzl"), "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx): return [ConsumerInfo(value = \"zero\")]\nrequest = rule(implementation = _request)\n").unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"request\")\nrequest(name = \"request\")\n",
+    )
+    .unwrap();
+    let tracker = Arc::new(RootActivationTracker::with_loading());
+    let result = root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:request",
+        tracker.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap()
+        ),
+        "zero"
+    );
+    assert!(result.direct_dependencies().is_empty());
+    let (activations, legacy, _, nodes) = tracker.take();
+    assert_eq!(legacy, 0);
+    assert!(
+        activations
+            .iter()
+            .any(|(identity, _)| identity.starts_with("package/"))
+    );
+    let request = nodes
+        .iter()
+        .find(|(identity, _, _)| identity.contains("@@//:request"))
+        .unwrap();
+    let anchor = nodes
+        .iter()
+        .find(|(identity, _, _)| identity == "anchor")
+        .unwrap();
+    assert!(!request.2.contains(&anchor.1));
+}
+
+#[tokio::test]
+async fn root_toolchain_resolution_loads_reachable_cross_package_references() {
+    let workspace = scratch();
+    for package in ["platforms", "tools", "constraints", "impl", "rules"] {
+        fs::create_dir_all(workspace.join(package)).unwrap();
+    }
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\nregister_execution_platforms(\"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n").unwrap();
+    fs::write(workspace.join("defs.bzl"), "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx): return [ConsumerInfo(value = ctx.toolchains[\"//tools:type\"].marker)]\nrequest = rule(implementation = _request, toolchains = [\"//tools:type\"])\n").unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"request\")\nrequest(name = \"request\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("constraints/BUILD.bazel"), "constraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\n").unwrap();
+    fs::write(
+        workspace.join("platforms/BUILD.bazel"),
+        "platform(name = \"p\", constraint_values = [\"//constraints:linux\"])\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("rules/defs.bzl"), "def _impl(ctx): return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]\nimpl = rule(implementation = _impl, attrs = {\"marker\": attr.string(mandatory = True)})\n").unwrap();
+    fs::write(workspace.join("rules/BUILD.bazel"), "").unwrap();
+    fs::write(
+        workspace.join("impl/BUILD.bazel"),
+        "load(\"//rules:defs.bzl\", \"impl\")\nimpl(name = \"chosen\", marker = \"cross\")\n",
+    )
+    .unwrap();
+    fs::write(workspace.join("tools/BUILD.bazel"), "toolchain_type(name = \"type\")\ntoolchain(name = \"tc\", toolchain_type = \":type\", toolchain = \"//impl:chosen\", exec_compatible_with = [\"//constraints:linux\"])\n").unwrap();
+    let result = root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        provider_value(
+            &result,
+            &ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap()
+        ),
+        "cross"
+    );
+}
+
+#[tokio::test]
+async fn external_registration_error_yields_to_root_package_needs() {
+    let missing_module = "module(name = \"root\")\nregister_execution_platforms(\"@external//:p\", \"//platforms:p\")\nregister_toolchains(\"//tools:tc\")\n";
+    let required_defs = TOOLCHAIN_DEFS.replace("[\"//:type\"]", "[\"//:type\"]");
+    let need = toolchain_case(missing_module, &required_defs, TOOLCHAIN_BUILD)
+        .await
+        .unwrap_err();
+    assert!(need.contains("Needs"), "{need}");
+
+    let external = toolchain_case(
+        &TOOLCHAIN_MODULE.replacen(
+            "register_execution_platforms(",
+            "register_execution_platforms(\"@external//:p\", ",
+            1,
+        ),
+        TOOLCHAIN_DEFS,
+        TOOLCHAIN_BUILD,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        external.contains("external toolchain registration"),
+        "{external}"
+    );
+}
+
+#[tokio::test]
+async fn later_reference_round_need_yields_to_root_semantic_error() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        TOOLCHAIN_BUILD.replace(
+            "constraint_values = [\":linux\"]",
+            "constraint_values = [\"//missing:value\", \":type\"]",
+        ),
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let request = || {
+        root_target_request(
+            &dice,
+            &workspace,
+            "@@//:request",
+            Arc::new(RootActivationTracker::default()),
+        )
+    };
+    let need = request().await.unwrap_err();
+    assert!(need.contains("Needs"), "{need}");
+
+    fs::create_dir(workspace.join("missing")).unwrap();
+    fs::write(workspace.join("missing/BUILD.bazel"), "constraint_setting(name = \"setting\")\nconstraint_value(name = \"value\", constraint_setting = \":setting\")\n").unwrap();
+    let semantic = request().await.unwrap_err();
+    assert!(
+        semantic.contains("expected constraint_value at @@//:type"),
+        "{semantic}"
+    );
 }
 
 #[tokio::test]
@@ -603,7 +1203,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     assert_eq!(provider_value(&restored_default, &consumer), "default");
     assert_eq!(default_key, *restored_default.key());
 
-    let (activations, legacy) = tracker.take();
+    let (activations, legacy, _, _) = tracker.take();
     assert_eq!(legacy, 0, "legacy analysis key activated: {activations:#?}");
     assert_eq!(
         activation_codes(&activations),

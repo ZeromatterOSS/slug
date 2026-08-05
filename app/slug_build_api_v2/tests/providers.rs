@@ -22,6 +22,7 @@ use slug_build_api_v2::ProviderName;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::RunEnvironmentInfo;
 use slug_build_api_v2::UserProvider;
+use slug_build_api_v2::providers::ToolchainInfo;
 
 fn files(items: &[&str]) -> Depset<String> {
     Depset::from_direct(
@@ -109,6 +110,7 @@ fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
     ])
     .unwrap();
 
+    assert_eq!(collection.len(), 2);
     assert_eq!(
         collection
             .user(&independently_reconstructed_id)
@@ -120,6 +122,34 @@ fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
         collection
             .user(&ProviderId::new("//other:defs.bzl", "MyInfo").unwrap())
             .is_none()
+    );
+}
+
+#[test]
+fn toolchain_info_uses_builtin_identity_not_a_user_provider_name() {
+    let collection = ProviderCollection::new(vec![
+        ProviderValue::DefaultInfo(DefaultInfo::empty()),
+        ProviderValue::User(UserProvider::new("DefaultInfo", BTreeMap::new()).unwrap()),
+        ProviderValue::User(UserProvider::new("ToolchainInfo", BTreeMap::new()).unwrap()),
+        ProviderValue::ToolchainInfo(ToolchainInfo::new("selected")),
+    ])
+    .unwrap();
+
+    assert_eq!(collection.len(), 4);
+    assert_eq!(collection.default_info(), Some(&DefaultInfo::empty()));
+    assert_eq!(
+        collection.toolchain_info().unwrap().marker.as_str(),
+        "selected"
+    );
+    assert!(
+        collection
+            .user(&ProviderId::unqualified("ToolchainInfo").unwrap())
+            .is_some()
+    );
+    assert!(
+        collection
+            .user(&ProviderId::unqualified("DefaultInfo").unwrap())
+            .is_some()
     );
 }
 

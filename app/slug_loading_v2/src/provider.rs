@@ -344,6 +344,38 @@ pub(crate) struct AnalysisBuiltinCallable {
     name: &'static str,
 }
 
+/// Analysis-only capability supplied by the existing root analysis evaluator.
+/// Loading evaluators intentionally do not install it, so the same frozen
+/// callable remains unavailable while a `.bzl` file is evaluated.
+#[derive(Debug, ProvidesStaticType)]
+pub struct ToolchainInfoAnalysisContext;
+
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+pub struct StarlarkToolchainInfo {
+    marker: CompactString,
+}
+
+starlark::starlark_simple_value!(StarlarkToolchainInfo);
+
+impl StarlarkToolchainInfo {
+    pub fn marker(&self) -> &str {
+        &self.marker
+    }
+}
+
+impl fmt::Display for StarlarkToolchainInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("ToolchainInfo(...)")
+    }
+}
+
+#[starlark_value(type = "ToolchainInfo")]
+impl<'v> StarlarkValue<'v> for StarlarkToolchainInfo {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "marker").then(|| heap.alloc_str(&self.marker).to_value())
+    }
+}
+
 impl AnalysisBuiltinCallable {
     pub(crate) const fn new(name: &'static str) -> Self {
         Self { name }
@@ -392,6 +424,37 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
                     )));
                 }
                 Ok(eval.heap().alloc(StarlarkDefaultInfo { files }))
+            }
+            "ToolchainInfo" => {
+                if eval
+                    .extra
+                    .and_then(|extra| extra.downcast_ref::<ToolchainInfoAnalysisContext>())
+                    .is_none()
+                {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "unsupported analysis builtin ToolchainInfo"
+                    )));
+                }
+                args.no_positional_args(eval.heap())?;
+                let names = args.names_map()?;
+                if names.len() != 1 {
+                    return Err(starlark::Error::new_other(anyhow::anyhow!(
+                        "ToolchainInfo requires exactly one named string `marker`"
+                    )));
+                }
+                let marker = names.get("marker").ok_or_else(|| {
+                    starlark::Error::new_other(anyhow::anyhow!(
+                        "ToolchainInfo requires named argument `marker`"
+                    ))
+                })?;
+                let marker = marker.unpack_str().ok_or_else(|| {
+                    starlark::Error::new_other(anyhow::anyhow!(
+                        "ToolchainInfo marker must be a string"
+                    ))
+                })?;
+                Ok(eval.heap().alloc_simple(StarlarkToolchainInfo {
+                    marker: marker.into(),
+                }))
             }
             _ => Err(starlark::Error::new_other(anyhow::anyhow!(
                 "unsupported analysis builtin {}",
