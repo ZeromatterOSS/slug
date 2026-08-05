@@ -2736,6 +2736,34 @@ deferred command/parser behavior. Preserve 287/8/5/41 and defer contextual,
 regex, Host/repository, normalization, checksum/wire implementation, DICE
 changes, and configured-target-cycle work.
 
+### Corrected pure native family byte-contract retry REPLAN (2026-08-04)
+
+The corrected `WP-6-m2-pure-native-family-byte-contract-ledger-retry` retained
+the accepted renderer and forced-identity boundaries and fixed list grammar,
+repeatable assignment defaults, timeout split discriminators, and reverse
+UTF-16 ordering. Terminal source review still found the table non-mechanical:
+Android and Java grouped distinct enum converter/value families; `F-Text`
+omitted scalar `N=None`; Bool/Int/Tri/list/set/Dotted/Env/generic-enum and
+CompilationMode citations used inaccurate or broad ranges; and the default-only
+runs branch omitted that positive `Integer.parseInt` accepts `+2` while keeping
+the original `"+2"` option text. The entire unaccepted Stage 6 table was
+discarded; no Rust, JVM probe, or artifact existed.
+
+Run next only
+`WP-6-m2-pure-native-family-source-anchor-and-enum-route-evidence`. At no more
+than 190 Stage 6/260 total documentation lines, record exact full paths,
+class/method owners, inclusive pinned ranges, and returned-value owners for
+every future family; add one stable row per concrete finite enum with complete
+members and `D/E/X` route template; bind scalar String special-null; and record
+runs `D("1")` plus deferred `U("+2")` original-text behavior. Do not recreate
+the family contract, descriptor rows, renderer/UTF-16/list/Entry/timeout/forced
+evidence, Java, or Rust. An unverifiable range/member/alias, grouped enum,
+descriptor-specific judgment need, or cap breach is `REPLAN`. On acceptance,
+run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-2`. Preserve
+287/8/5/41 and defer contextual/regex/Host/repository conversion,
+normalization, checksum/wire implementation, DICE changes, and
+configured-target cycles.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
