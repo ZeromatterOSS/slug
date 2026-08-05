@@ -1,63 +1,58 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-implicit-default-info-provider-oracle`
+Packet: `WP-6-m2-implicit-default-info-decoder-implementation`
 Milestone: M2 configured Starlark provider normalization
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: isolated Bazel 9.2 positive oracle
-Predecessor: clean `REPLAN` of the string build-setting transition
-implementation at `7d39c759`; accepted transition fixture `b12774b9`.
+Role: bounded analysis-decoder correction
+Evidence: accepted Bazel 9.2 oracle `d4e7e47e`; strict existing provider
+collection; independently accepted synthesis design.
 
-Create one isolated fixture proving Bazel 9.2's successful configured-target
-semantics when a Starlark rule omits `DefaultInfo`. Add exactly six regular
-files and zero links under
-`tests/v2_oracle/fixtures/implicit-default-info-provider/`: `fixture.toml`,
-generated `expected/oracle.json`, and workspace `MODULE.bazel`, `BUILD.bazel`,
-`defs.bzl`, and `cquery_format.bzl`. Do not edit any existing fixture, harness,
-Rust, Cargo, command, or plan file in the evidence worker.
+Implement Bazel's implicit empty `DefaultInfo` normalization in exactly one
+production function. In
+`app/slug_analysis_v2/src/starlark_rule.rs::evaluate_loaded_rule`, decode the
+returned provider list exactly as today. After successful decoding and before
+strict collection construction, append exactly
+`ProviderValue::DefaultInfo(slug_build_api_v2::DefaultInfo::empty())` only when
+the decoded list contains no `DefaultInfo`. If an explicit default is present,
+append nothing. Always call the unchanged strict `ProviderCollection::new`.
 
-The workspace contains:
+This preserves the collection's always-default invariant and makes a
+custom-only Starlark rule expose an empty default exactly as the oracle proves.
+Do not use permissive `ProviderCollection::from_values(..., false)`, change the
+build API, or represent implicit absence. Existing explicit `DefaultInfo`,
+declared files, actions, duplicate rejection, direct dependencies, events, and
+evaluator ownership remain unchanged.
 
-1. one rule returning only `CustomInfo(value = "implicit")`;
-2. one rule returning `CustomInfo(value = "explicit")` and `DefaultInfo()`;
-3. one consumer that indexes both dependencies by the exported `CustomInfo`
-   and `DefaultInfo` constructors and returns a custom summary provider only;
-   and
-4. a formatter that reads only the exact known `providers(target)` keys and
-   emits stable canonical label, named custom value, `DefaultInfo` presence,
-   and `DefaultInfo.files` length. It must not enumerate provider keys.
+Exact production allowlist:
 
-Record exactly four successful commands against one retained Bazel 9.2 server:
+- `app/slug_analysis_v2/src/starlark_rule.rs`
 
-1. the implicit target exposes custom value `implicit`, a present
-   `DefaultInfo`, and zero files;
-2. the explicit-empty target exposes custom value `explicit`, a present
-   `DefaultInfo`, and zero files;
-3. the consumer proves both custom values and successful `DefaultInfo`
-   indexing with zero files on both dependencies; and
-4. an unchanged warm consumer replay is byte-identical.
+Exact test allowlist:
 
-Pin Bazel 9.2 source anchors for `StarlarkRuleConfiguredTargetUtil` return
-decoding and implicit empty default creation, `DefaultInfo`,
-`AbstractConfiguredTarget` indexing/membership/query dictionary synthesis,
-`StarlarkProvider.Key`, `StarlarkOutputFormatterCallback#providers`, and the
-configured-query provider integration test. Generate and replay without
-updates using `/usr/bin/bazel` 9.2. Run fixture list, JSON, inventory/cap,
-provenance, credential-pattern, archive, and diff checks and obtain independent
-fixture review.
+- `app/slug_analysis_v2/tests/starlark_rule.rs`
 
-Caps are six regular files, zero links, 220 authored non-generated lines, 420
-generated total lines, and four commands. This is one demonstrated provider-
-normalization prerequisite, not new fixture breadth requiring a growth
-checkpoint.
+Caps are 20 formatted production net lines, 120 test lines, and 140 total.
+Tests must prove a custom-only rule succeeds, its exported custom provider is
+retrievable, `default_info()` is present and empty, and declared outputs and
+actions are empty. Preserve and run the existing explicit-default/write-action
+regression. Run the existing strict build-API provider test unchanged to prove
+generic `ProviderCollection::new` still rejects custom-only input. No new
+duplicate-provider failure claim is required because the constructor and its
+existing tests remain unchanged.
 
-Stop if output exposes a configuration ID or configured path, platform,
-action key, mnemonic, or other unstable identity; if named semantic fields
-cannot prove implicit and explicit-empty `DefaultInfo`; or if the fixture needs
-provider-key enumeration, outputs/runfiles/executable behavior, builtin-only
-or non-Starlark-convertible providers, aliases, aspects, output groups,
-missing/duplicate/unnamed/wrong returns, any failure diagnostic, Rust, public
-cquery support, execution, or harness changes.
+Run serially: formatting; `slug_build_api_v2 --test providers`; focused and
+full `slug_analysis_v2 --test starlark_rule`; configured-target tests; full
+analysis; GNU-Windows analysis no-run; archive/diff/scope/cap checks. No daemon
+or binary smoke is required.
 
-After accepted evidence, design the exact analysis decoder normalization owner
-before resuming the transition implementation. Do not choose permissive
-configured-target absence or synthesize a provider in Rust in this packet.
+There is no retained utility change: reuse the existing empty default and
+`SmallMap`-backed strict collection. Stop for any build-API/provider-
+representation edit, permissive configured-target absence, synthetic nonempty
+files/runfiles/executable state, output inference, broader rule-return syntax,
+builtin/output-group/aspect/alias/query-provider breadth, failure-diagnostic
+claim, outside file, or cap breach.
+
+After acceptance, restore
+`WP-6-m2-positive-string-build-setting-transition-implementation` as the
+current packet under its previously accepted graph, allowlists, caps, and
+public-surface stops.

@@ -1034,3 +1034,42 @@ explicit-empty, dependency indexing, and warm replay through named semantic
 fields. Do not enumerate providers or add failures, Rust, public cquery, or
 execution behavior. After acceptance, design the exact decoder normalization
 owner before resuming string-setting transitions.
+
+### Implicit DefaultInfo provider oracle acceptance (2026-08-04)
+
+**Status: ACCEPTED at `d4e7e47e`.** The isolated Bazel 9.2 fixture has six
+regular files, zero links, four successful retained-server commands, 123
+authored lines, and 255 total generated-plus-authored lines. A custom-only
+target and an explicit-empty target both expose named `DefaultInfo` with zero
+files. A consumer successfully indexes both dependencies through the exported
+custom and `DefaultInfo` constructors, retains both custom values, and observes
+zero default files. Its unchanged warm replay is byte-identical.
+
+Generation and no-update replay pass with `/usr/bin/bazel` 9.2.0. Fixture
+list, JSON, inventory/caps, provenance, credential-pattern, whitespace,
+archive, and diff checks pass; focused pytest is unavailable. Independent
+latest-diff review returned `ACCEPT`. The formatter reads only exact named
+provider keys and exposes no configuration ID, path, platform, action key, or
+mnemonic. The evidence does not authorize provider enumeration,
+outputs/runfiles/executable semantics, failures, or general cquery support.
+
+### Implicit DefaultInfo decoder design (2026-08-04)
+
+**Status: ACCEPTED; synthesize only at successful Starlark return decoding.**
+Keep strict `ProviderCollection::new` and its always-default invariant. After
+`evaluate_loaded_rule` successfully decodes the returned provider list, append
+one existing empty `DefaultInfo` only when the list has no explicit default,
+then call the unchanged strict constructor. Explicit defaults, declared files,
+actions, duplicate rejection, dependencies, events, and evaluator ownership
+remain unchanged. Do not use the permissive collection constructor or edit the
+build API.
+
+Independent review accepted one production and one test owner at caps of 20
+production, 120 test, and 140 total formatted net lines. Required evidence is
+custom-provider retrieval plus present empty default and empty outputs/actions,
+the unchanged explicit-default/write-action regression, and the unchanged
+strict generic collection rejection. No retained utility changes.
+
+Implement next only `WP-6-m2-implicit-default-info-decoder-implementation`.
+After acceptance, resume the already accepted positive string build-setting
+transition implementation from a clean baseline.

@@ -25,8 +25,8 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active, replan** | recursive configured analysis, bounded root Starlark-label cquery in `135b0567`, positive string build-setting/transition evidence in `b12774b9`, and an accepted single-root-key-family semantic design | custom-only Starlark returns require evidence for Bazel's implicit empty `DefaultInfo`, then decoder normalization before semantic configuration implementation can resume | run `WP-6-m2-implicit-default-info-provider-oracle` |
-| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the M2 provider-normalization prerequisite is current |
+| M2: analysis graph | **active** | recursive configured analysis, bounded root Starlark-label cquery in `135b0567`, positive string transition evidence in `b12774b9`, and implicit-empty `DefaultInfo` evidence in `d4e7e47e` | implement the accepted decoder normalization, then resume bounded semantic configuration ownership before general identity/toolchain/action gates | implement `WP-6-m2-implicit-default-info-decoder-implementation` |
+| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the M2 decoder prerequisite is current |
 | M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-6-m2-implicit-default-info-provider-oracle`.
+`WP-6-m2-implicit-default-info-decoder-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -68,7 +68,9 @@ all public command observation unchanged. Its implementation stopped cleanly
 at a pre-existing provider decoder invariant: Slug requires an explicitly
 returned `DefaultInfo`, while Bazel accepts custom-only returns and observes an
 implicit empty default. The active positive oracle now pins that normalization
-before a decoder design and the internal transition retry; invalid transition
+as `d4e7e47e`; the accepted one-function decoder design now restores Bazel's
+implicit empty default while preserving Slug's strict collection invariant.
+The internal transition retry follows that prerequisite; invalid transition
 diagnostics remain deferred.
 
 The retained Bazel 9.2 evidence pins default and explicit `label` output to the
