@@ -1,70 +1,110 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-windows-option-path-short-name-resolution-design`
+Packet: `WP-6-m2-windows-option-path-long-name-observation-primitive`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: docs-only design for Bazel 9.2's filesystem-dependent Windows 8.3
-short-name normalization during Host-context option conversion.
+Result: a producer-free Host/DICE observation primitive that preserves the
+pre-lexical Windows option-path long-name success/fallback branch.
 
-Predecessors are authoritative: the accepted five-Host-route context, option
-label seam in `b035dfbb`, the stopped Host observation contract, pinned Bazel
-tag `9.2.0`, and the live Slug lossless Windows-long-path observation support.
-Add no Rust, probe, fixture, IO, or runtime behavior.
+Predecessors are authoritative: pinned Bazel tag `9.2.0`, the accepted Windows
+option-path short-name resolution design, and the existing lossless
+`WindowsLongPath` Host observation. Read
+`.codex/skills/slug-buck2-utility-reuse/SKILL.md` before editing retained
+representation. Reuse the existing Arc slices, sorted epoch, exact injected
+key, transient `Need`, outside-DICE observer, and retry model. Add no option
+producer, converter, command activation, or Host read beyond the demanded
+native operation.
 
-Pin exact source contracts for:
+Add one option-specific operation and exact outcome equivalent to:
 
-- the Windows short-path segment predicate, normalization-level promotion,
-  full-input `GetLongPath` call, successful replacement, `IOException` fallback,
-  UTF-16 behavior, and subsequent separator/dot/drive normalization;
-- `shell_executable`'s exact `~/`-then-replace-all-`~` order before path
-  creation, including a home expansion that introduces a short-name segment;
-- `platform_mappings` empty input returning its default without observation,
-  while nonempty path conversion and possible long-path observation precede
-  absolute rejection or explicit workspace-relative classification; and
-- Unix/nonmatching Windows inputs that remain purely lexical and must not
-  request an observation.
+```text
+WindowsOptionPathLongNameOutcome =
+    Resolved(Arc<[u16]>)
+  | IOExceptionFallback
+```
 
-Read `docs/developers/dice.md`, then audit the live
-`PathObservationOperation::WindowsLongPath`, its lossless UTF-16 demand/result,
-Host namespace, retained demand ownership, epoch invalidation, command retry,
-one-shot/daemon lifecycle, and current normalization consumers. Determine
-whether it is source-equivalent to Bazel's option-path call or requires a new
-fact/edge. Never hold a lock across a DICE computation.
+The outcome is public, immutable, structurally `Eq`/`Ord`/`Hash`,
+`Allocative`, and cheaply cloned only through its Arc payload. `Resolved`
+retains the exact UTF-16 returned by the existing Bazel-equivalent native
+resolver after extended-prefix removal and backslash-to-slash conversion but
+before separator/dot/drive lexical normalization. Every resolver failure is
+the distinct payload-free `IOExceptionFallback`; do not retain an OS error or
+turn it into a configuration error. `Resolved(raw-equivalent)` and fallback
+remain unequal.
 
-Select one smallest design that lets configuration conversion consume only
-supplied immutable facts while retaining every observation that can change the
-converted path/configuration identity. It may propose a pre-conversion scan and
-an ordered input/result projection, but must not hide IO in
-`slug_configuration_v2`, read the filesystem from a converter, use a global or
-best-effort cache, or collapse success/fallback. Freeze exact producer,
-consumer, equality/hash/order, invalidation, retry, and error ownership.
+Add a dedicated `PathObservationOperation`/`PathObservationResult` route and
+dedicated demand constructor. The demand is always in the Host namespace and
+structurally retains the caller-supplied normalized-absolute observation
+identity plus the exact complete, expanded, non-normalized raw UTF-16 input.
+Generic construction must reject both UTF-16 operations. The operation kind,
+identity path, and raw code units all participate in demand `Eq`/`Ord`/`Hash`;
+the new operation cannot collide with existing `WindowsLongPath` for the same
+path/input. Share the raw Arc field if clean; add no second copy, map, cache,
+interner, global, serializer, or wire form.
 
-Return one bounded implementation sequence or an explicit unsupported
-boundary/`REPLAN`. Keep the general Host snapshot schema, OS/CPU/RAM/home
-producer, contextual converters, checksum/wire, and activation later.
+The core observer must call the existing raw long-path resolution helper once.
+On success it returns the pre-lexical transformed UTF-16 under `Resolved`; on
+any ineligible/native sizing/fill failure it returns `IOExceptionFallback`.
+The Unix adapter returns fallback without filesystem access only as defensive
+primitive behavior; normal option conversion must never create this demand
+outside Windows host policy. Keep the existing `WindowsLongPath` operation's
+final lexical-normalization behavior and all of its consumers unchanged.
+Exhaustive-match edits outside workspace/core may only reject the new result
+as impossible on their existing routes.
+
+Tests must discriminate:
+
+- Host-only demand identity, exact raw UTF-16 including unpaired surrogates,
+  raw slash/backslash spelling, identity path, and operation-kind differences;
+- result/operation mismatch and duplicate-demand rejection;
+- `Resolved` versus fallback inequality even when later lexical normalization
+  would agree, plus exact pre-lexical returned spelling;
+- one native sizing/fill success and the existing ineligible, zero-size,
+  oversized, zero/overflow/unterminated-fill fallback families without a Host
+  probe;
+- transient missing `Need`, exact complete result, and A -> B -> A DICE replay
+  for resolved/fallback/payload changes; and
+- unchanged existing `WindowsLongPath` normalization and repository consumers.
 
 Allowlist:
 
-- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
+- `app/slug_workspace_v2/src/lib.rs`
+- `app/slug_workspace_v2/src/path_observation.rs`
+- `app/slug_workspace_v2/src/path_resolution.rs` only if its exhaustive result
+  rejection requires the new variant
+- `app/slug_core_v2/src/runtime/path_observation.rs`
+- `app/slug_core_v2/src/runtime/repository_io.rs` only for validation and test
+  exhaustive matches
+- `app/slug_bzlmod_v2/src/host_file.rs` only for an impossible result arm
+- `app/slug_bzlmod_v2/src/repository_ignore.rs` only for an impossible result
+  arm
+- `app/slug_bzlmod_v2/src/source_preparation.rs` only for impossible result
+  arms
+- terminal scheduling updates in
+  `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
+  `thoughts/shared/plans/slug-v2-subplans/current-packet.md`, and
+  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- routing only on `REPLAN`:
+  `.codex/skills/slug-agent-orchestration/references/routing-log.md` and
+  `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Caps: 500 net documentation lines and 600 total changed lines. No Rust, test,
-Cargo/lockfile, dependency, fixture, oracle/probe, generated source, filesystem
-or environment read, DICE key/compute/invalidation edit, Host snapshot, path
-converter, request/wire, daemon, configuration, target, loading/materialization,
-command-tokenization, or downstream activation edit.
+Caps: 340 production lines, 420 test lines, and 760 total net lines. No Cargo
+or lockfile edit, dependency, new crate, fixture, oracle/probe, option scan,
+home/OS/CPU/RAM capture, configuration schema/converter, request/wire, CLI,
+server, daemon lifecycle, checksum, target, loading/materialization behavior,
+or configured-target edge.
 
-Acceptance requires pinned source closure; a live DICE/path-observation and
-dependency-direction audit; exact observed-fact representation, ownership,
-invalidation, retry, and one-shot/daemon discriminators; bounded implementation
-allowlists/caps/validation/stops; and independent latest-text review.
+Validation: focused new workspace/core unit and DICE tests; full
+`cargo test -p slug_workspace_v2` and `cargo test -p slug_core_v2`; direct
+`cargo check -p slug_bzlmod_v2`; GNU-Windows no-run for workspace/core/bzlmod;
+formatting, diff, exact allowlist/cap, no-Cargo, archive, and existing
+`WindowsLongPath` semantic guards. Independent retained-representation/DICE
+and source-equivalence latest-diff reviews are mandatory.
 
-Stop and `REPLAN` on unresolved UTF-16/GetLongPath/fallback behavior, a need to
-run a Host probe, an observation that cannot be represented as immutable
-configuration input, filesystem access from configuration, a new global/cache,
-unowned invalidation, a lock across DICE compute, a new crate/dependency cycle,
-or any configured-target edge. Configured-target dependency cycles remain
+Stop and `REPLAN` on any change to existing `WindowsLongPath` observable
+semantics, collapsed success/fallback, lossy UTF-16, lexical normalization in
+the new producer, direct IO inside DICE, a lock across compute/await, unowned
+epoch invalidation, a new global/cache/interner/map, dependency/Cargo change,
+Host snapshot or option/configuration/request activation, new crate/cycle, or
+any configured-target edge. Configured-target dependency cycles remain
 explicitly deferred by user approval.

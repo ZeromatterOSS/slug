@@ -3876,6 +3876,118 @@ one-way ownership/dependency handoff before adding any Host observation or
 contextual converter. Configured-target dependency cycles remain explicitly
 deferred by user approval.
 
+### Windows option-path short-name resolution design (2026-08-05)
+
+`WP-6-m2-windows-option-path-short-name-resolution-design` closes the
+filesystem-dependent part of Bazel 9.2 option-path conversion at pinned tag
+`9.2.0` (`8220c6198837d5c13d53fea211cf3282aa12408a`).
+
+`WindowsPathOperations.isShortPath` matches a complete UTF-16 path segment
+against `^(.{1,6})~([0-9]{1,6})(\\..{0,3}){0,1}`, requires at most twelve
+code units, and requires the two captured groups to total fewer than eight;
+Java's default regex dot excludes line terminators. Backslashes, repeated
+separators, and dot segments can request ordinary lexical normalization, but
+`WindowsOsPathPolicy.needsToNormalize` promotes the level to
+`NEEDS_SHORT_PATH_NORMALIZATION` only when a segment passes the short-path
+predicate. At that level `normalize` first calls the default resolver on the
+complete pre-normalization string, replaces the string on success, retains the
+original on `IOException`, and only then normalizes separators, dot segments,
+and drive-letter case. The Java/native chain is
+`WindowsPathOperations.getLongPath` -> `nativeGetLongPath` -> `GetLongPath` ->
+`GetLongPathNameW`; its boundary is lossless UTF-16, adds/removes the extended
+prefix, and changes returned backslashes to slashes.
+
+Pinned anchors are
+`src/main/java/com/google/devtools/build/lib/windows/WindowsPathOperations.java:42-91`,
+`src/main/java/com/google/devtools/build/lib/vfs/WindowsOsPathPolicy.java:43-56,77-163`,
+`src/main/java/com/google/devtools/build/lib/vfs/PathFragment.java:124-143`,
+`src/main/java/com/google/devtools/build/lib/vfs/OsPathPolicy.java:66-85`,
+`src/main/native/windows/file-jni.cc:163-183`, and
+`src/main/native/windows/file.cc:73-87,182-197`.
+
+`OptionsUtils.convertOptionsPathFragment` expands only a literal leading
+`~/`, uses Java `String.replace` to replace every `~` with `user.home`, and
+then creates the `PathFragment`, so scanning happens after expansion and can
+see a short-looking segment introduced by home. `platform_mappings` empty
+input returns `PlatformMappingKey.DEFAULT` without conversion. Every nonempty
+input converts before absolute rejection or construction of the explicit
+workspace-relative key. Unix host policy never performs the Windows candidate
+scan, even for a short-looking segment; Windows inputs without a matching
+segment remain purely lexical. A Windows-host matching input that fails
+Bazel's native absolute-normalized precondition after `asLongPath(input)` has
+a deterministic caught-`IOException` fallback and needs no filesystem
+observation; the candidate predicate and the native-eligibility predicate
+remain distinct.
+
+Those option anchors are
+`src/main/java/com/google/devtools/build/lib/util/OptionsUtils.java:98-104,169-174`,
+`src/main/java/com/google/devtools/build/lib/analysis/PlatformOptions.java:233-247`,
+and `src/main/java/com/google/devtools/build/lib/vfs/UnixOsPathPolicy.java:20-108`.
+
+The live `PathObservationDemand::windows_long_path` already provides a Host
+namespace, raw `Arc<[u16]>` identity, an exact injected epoch, transient
+self-unequal `Need`, outside-DICE observation, command retry, and A -> B -> A
+replay. It is not the option-conversion fact: its result is only the final
+lexically normalized `Arc<[u16]>`, so it collapses native success and fallback
+and moves post-resolver normalization into the producer. Keep that accepted
+repository-path operation and every existing consumer byte-for-byte semantic.
+The live anchors are
+`app/slug_workspace_v2/src/path_observation.rs:244-320,617-790,1329-1380`,
+`app/slug_core_v2/src/runtime/path_observation.rs:135-223,862-1082,1688-1834`,
+and `app/slug_core_v2/src/runtime/dice.rs:3613-3762,4088-4200`.
+
+The option-specific operational fact is instead:
+
+```text
+WindowsOptionPathLongNameOutcome =
+    Resolved(Arc<[u16]>)
+  | IOExceptionFallback
+```
+
+Its dedicated Host demand retains the complete expanded, non-normalized raw
+UTF-16 input plus a producer-derived normalized-absolute identity. `Resolved`
+contains the exact long spelling after extended-prefix removal and
+backslash-to-slash conversion but before Windows lexical normalization.
+`IOExceptionFallback` is a distinct value and carries no diagnostic because
+Bazel catches the exception; the consumer recovers the raw input from the
+demand. The two variants remain unequal even if later lexical normalization
+would yield identical paths. Demand identity is structural namespace + path +
+operation + raw code units with exact `Eq`/`Ord`/`Hash`; the outcome is
+structural `Eq`/`Ord`/`Hash` and `Allocative`, and only its Arc payload may use
+`Dupe`.
+
+`slug_workspace_v2` owns this producer-free DICE demand/outcome primitive and
+`slug_core_v2` owns the direct native observation adapter. A later command
+owner scans home-expanded raw occurrences only under Windows host policy,
+requests only facts whose result can depend on filesystem state, retries
+outside DICE, and projects a complete
+raw-input-sorted/deduplicated `Arc<[WindowsOptionPathFact]>` into the pure
+configuration converter. That future configuration schema owns no PathBuf,
+OsString, DICE, IO, or workspace type; core is the sole future
+workspace/configuration bridge. A missing fact in a supposedly complete
+projection is a core assembly invariant failure. Duplicate demands or
+operation/result mismatch remain epoch construction errors. Native failure is
+the ordinary fallback value, never a configuration error.
+
+Each one-shot command and each daemon request must begin with a fresh command
+observation owner and exact epoch; a retained daemon DICE graph may not reuse
+prior option facts merely because its process survives. Epoch equality and
+the option outcome distinguish success/fallback and raw/payload changes.
+Downstream configuration equality includes only the eventual converted path,
+so equal normalized values may prune after the operational edge invalidates.
+No lock is held across DICE compute or retry.
+
+The design is `ACCEPT`. Implement next only the producer-free
+`WP-6-m2-windows-option-path-long-name-observation-primitive` in the existing
+workspace/core observation layers. The general Host snapshot, `user.home`
+capture, option pre-scan, ordered configuration projection, contextual
+conversion, core -> configuration dependency, command/request/wire ownership,
+daemon activation, checksum, and configured targets remain later. That later
+integration must `REPLAN` on a reverse dependency/new crate/cycle, stale
+cross-request facts, hidden configuration IO, missing raw UTF-16 identity, or
+an owner that holds a lock across DICE computation. Configured-target cycles
+remain explicitly deferred.
+
 ### Host input observation contract design REPLAN (2026-08-05)
 
 `WP-6-m2-host-input-observation-contract-design` stopped at its pinned-source
