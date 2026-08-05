@@ -330,6 +330,61 @@ impl Daemon {
         }
     }
 
+    pub fn cquery_starlark_label_with_bzlmod_inputs(
+        &mut self,
+        target: &TargetPattern,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+    ) -> QueryResult {
+        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
+            Ok(observations) => observations,
+            Err(error) => return cquery_error_result(&error.to_string(), 0),
+        };
+        #[cfg(test)]
+        self.forwarded_bzlmod_inputs.push(
+            crate::server::BzlmodRequestInputs::from_normalized_with_registry_urls(
+                &command_policy,
+                &environment_policy,
+                &lockfile_mode,
+                &registry_urls,
+            ),
+        );
+        let accepted = match self
+            .runtime
+            .cquery_starlark_label_command_with_bzlmod_inputs(
+                target,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                &registry_urls,
+            ) {
+            Ok(accepted) => accepted,
+            Err(error) => return cquery_error_result_for_terminal(&error, invalidated),
+        };
+        let published = accepted
+            .project(|terminal| match terminal.as_ref() {
+                Ok(evaluation) => {
+                    TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+                }
+                Err(error) => match error.missing_stderr() {
+                    Some(stderr) => TerminalOutput::new(1, String::new(), stderr),
+                    None => {
+                        TerminalOutput::new(2, String::new(), cquery_error_json(error, invalidated))
+                    }
+                },
+            })
+            .publish();
+        let (_terminal, exit_code, stdout, stderr) = published.into_parts();
+        QueryResult {
+            exit_code,
+            stdout,
+            stderr,
+            invalidated_files: invalidated,
+        }
+    }
+
     #[cfg(test)]
     fn take_forwarded_bzlmod_inputs_for_test(&mut self) -> Vec<crate::server::BzlmodRequestInputs> {
         std::mem::take(&mut self.forwarded_bzlmod_inputs)
@@ -349,6 +404,16 @@ fn query_error_json(error: &slug_query_v2::QueryError, invalidated_files: usize)
         "{{\"error\":\"{}\",\"command\":\"query\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
         error.error_kind(),
         json_escape(&query_error_message(error)),
+    )
+}
+
+fn cquery_error_json(
+    error: &slug_core_v2::runtime::CqueryCommandError,
+    invalidated_files: usize,
+) -> String {
+    format!(
+        "{{\"error\":\"cquery_runtime_error\",\"command\":\"cquery\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+        json_escape(&error.to_string()),
     )
 }
 
@@ -391,6 +456,33 @@ pub struct QueryResult {
     pub stdout: String,
     pub stderr: String,
     pub invalidated_files: usize,
+}
+
+fn cquery_error_result(message: &str, invalidated_files: usize) -> QueryResult {
+    QueryResult {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr: format!(
+            "{{\"error\":\"cquery_runtime_error\",\"command\":\"cquery\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+            json_escape(message),
+        ),
+        invalidated_files,
+    }
+}
+
+fn cquery_error_result_for_terminal(
+    error: &slug_core_v2::runtime::CqueryCommandError,
+    invalidated_files: usize,
+) -> QueryResult {
+    match error.missing_stderr() {
+        Some(stderr) => QueryResult {
+            exit_code: 1,
+            stdout: String::new(),
+            stderr,
+            invalidated_files,
+        },
+        None => cquery_error_result(&error.to_string(), invalidated_files),
+    }
 }
 
 impl QueryResult {
@@ -450,11 +542,13 @@ mod server;
 pub use server::BuildRequest;
 pub use server::BuildResponse;
 pub use server::BzlmodRequestInputs;
+pub use server::CqueryRequest;
 pub use server::DaemonRequest;
 pub use server::DaemonResponse;
 pub use server::QueryRequest;
 pub use server::pid_path;
 pub use server::send_build_request;
+pub use server::send_cquery_request;
 pub use server::send_query_request;
 pub use server::send_shutdown;
 pub use server::serve;

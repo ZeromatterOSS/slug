@@ -19,6 +19,7 @@ pub use configured_target::ConfiguredDependency;
 pub use configured_target::TransitionEdge;
 pub use configured_target::TransitionKind;
 pub use dice::AnalysisError;
+pub use dice::AnalysisErrorKind;
 pub use dice::ConfiguredTargetAnalysisKey;
 pub use dice::RootConfiguredTargetAnalysisKey;
 pub use key::ConfigurationChecksum;

@@ -24,6 +24,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
+use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
@@ -43,21 +44,49 @@ use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::evaluate_loaded_rule;
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum AnalysisErrorKind {
+    TargetNotFound {
+        label: CanonicalLabel,
+        build_file: PathBuf,
+    },
+    Message(String),
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct AnalysisError {
-    message: String,
+    kind: AnalysisErrorKind,
 }
 
 impl AnalysisError {
     fn new(message: impl Into<String>) -> Self {
         Self {
-            message: message.into(),
+            kind: AnalysisErrorKind::Message(message.into()),
         }
+    }
+
+    fn target_not_found(label: CanonicalLabel, build_file: PathBuf) -> Self {
+        Self {
+            kind: AnalysisErrorKind::TargetNotFound { label, build_file },
+        }
+    }
+
+    pub fn kind(&self) -> &AnalysisErrorKind {
+        &self.kind
     }
 }
 
 impl fmt::Display for AnalysisError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.message)
+        match &self.kind {
+            AnalysisErrorKind::TargetNotFound { label, build_file } => {
+                write!(
+                    f,
+                    "target `{label}` was not found in {}",
+                    build_file.display()
+                )
+            }
+            AnalysisErrorKind::Message(message) => f.write_str(message),
+        }
     }
 }
 
@@ -148,10 +177,7 @@ fn starlark_rule_implementation<'a>(
         .iter()
         .find(|target| target.name == label.target().as_str())
         .ok_or_else(|| {
-            AnalysisError::new(format!(
-                "target `{label}` was not found in {}",
-                package.build_file.display()
-            ))
+            AnalysisError::target_not_found(label.clone(), package.build_file.clone())
         })?;
     let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
         return Err(AnalysisError::new(format!(

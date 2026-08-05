@@ -13,6 +13,7 @@ use dice::Key;
 use dice::RichActivation;
 use dice::UserComputationData;
 use dupe::Dupe;
+use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetKey;
@@ -291,6 +292,30 @@ fn marker_value(
 }
 
 #[tokio::test]
+async fn root_analysis_preserves_typed_direct_target_missing() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let key = RootConfiguredTargetAnalysisKey::new(workspace(), configured("@@//parent:missing"));
+    let mut transaction =
+        transaction(&dice, EpochBuilder::base("v1-", &[], 1).build(), tracker).await;
+    let outcome = transaction.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(result) = outcome else {
+        panic!("complete package lookup returned Need");
+    };
+    let error = result.as_ref().as_ref().unwrap_err();
+    assert!(matches!(
+        error.kind(),
+        AnalysisErrorKind::TargetNotFound { label, build_file }
+            if label.to_string() == "@@//parent:missing"
+                && build_file == &std::path::PathBuf::from("/workspace/parent/BUILD.bazel")
+    ));
+    assert_eq!(
+        error.to_string(),
+        "target `@@//parent:missing` was not found in /workspace/parent/BUILD.bazel"
+    );
+}
+
+#[tokio::test]
 async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
@@ -380,7 +405,8 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
     let AnalysisPreparationOutcome::Complete(deleted) = deleted else {
         panic!("deleted dependency package returned Need");
     };
-    assert!(deleted.as_ref().is_err());
+    let error = deleted.as_ref().as_ref().unwrap_err();
+    assert!(matches!(error.kind(), AnalysisErrorKind::Message(_)));
     let deleted_events = tracker.take();
     assert_eq!(
         analysis_batch(&deleted_events, "@@//parent:parent").map(event_texts),

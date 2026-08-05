@@ -91,6 +91,8 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
 fn command_requests_extract_bzlmod_policy_flags() {
     let query = QueryRequest::parse(&["--output=label", "deps(//pkg:bin)"]).unwrap();
     let cquery = CqueryRequest::parse(&[
+        "--output=starlark",
+        "--starlark:expr=str(target.label)",
         "--ignore_dev_dependency=false",
         "--lockfile_mode=error",
         "--allow_yanked_versions=all",
@@ -105,10 +107,10 @@ fn command_requests_extract_bzlmod_policy_flags() {
     assert!(!query.bzlmod_policy.ignore_dev_dependency());
     assert_eq!(query.lockfile_mode, LockfileMode::Update);
     assert_eq!(
-        cquery.query.bzlmod_policy.stable_serialize(),
+        cquery.bzlmod_policy.stable_serialize(),
         "allow_yanked=all;ignore_dev_dependency=false"
     );
-    assert_eq!(cquery.query.lockfile_mode, LockfileMode::Error);
+    assert_eq!(cquery.lockfile_mode, LockfileMode::Error);
     assert!(aquery.query.bzlmod_policy.ignore_dev_dependency());
     assert!(run.bzlmod_policy.ignore_dev_dependency());
     assert!(!test.bzlmod_policy.ignore_dev_dependency());
@@ -120,9 +122,14 @@ fn bzlmod_policy_flags_report_structured_parse_errors() {
     let allow_error = BuildRequest::parse(&["--allow_yanked_versions=not-a-module", "//pkg:bin"])
         .unwrap_err()
         .to_string();
-    let bool_error = CqueryRequest::parse(&["--ignore_dev_dependency=maybe", "//pkg:bin"])
-        .unwrap_err()
-        .to_string();
+    let bool_error = CqueryRequest::parse(&[
+        "--output=starlark",
+        "--starlark:expr=str(target.label)",
+        "--ignore_dev_dependency=maybe",
+        "//pkg:bin",
+    ])
+    .unwrap_err()
+    .to_string();
     let lockfile_error = BuildRequest::parse(&["--lockfile_mode=bad", "//pkg:bin"])
         .unwrap_err()
         .to_string();
@@ -411,11 +418,93 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
 }
 
 #[test]
-fn cquery_and_aquery_retain_placeholder_flag_parsing_without_query_restrictions() {
-    let cquery =
-        CqueryRequest::parse(&["--output=label_kind", "--order_output=deps", "//pkg:bin"]).unwrap();
-    assert_eq!(cquery.query.output, QueryOutputFormat::LabelKind);
-    assert_eq!(cquery.query.order, slug_query_v2::QueryOrder::Auto);
+fn cquery_accepts_only_the_starlark_label_boundary() {
+    let cquery = CqueryRequest::parse(&[
+        "--output=starlark",
+        "--starlark:expr=str(target.label)",
+        "--output_base=/tmp/slug-cquery",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    assert_eq!(cquery.target.to_string(), "//pkg:bin");
+    assert_eq!(cquery.output_base.as_deref(), Some("/tmp/slug-cquery"));
+
+    for args in [
+        vec!["//pkg:bin"],
+        vec![
+            "--output=label",
+            "--starlark:expr=str(target.label)",
+            "//pkg:bin",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=target.label",
+            "//pkg:bin",
+        ],
+        vec!["--output", "--starlark:expr=str(target.label)", "//pkg:bin"],
+        vec!["--output=starlark", "--starlark:expr", "//pkg:bin"],
+        vec![
+            "--output=",
+            "--starlark:expr=str(target.label)",
+            "//pkg:bin",
+        ],
+        vec!["--output=starlark", "--starlark:expr=", "//pkg:bin"],
+        vec!["--output=starlark", "--starlark:file=fmt.bzl", "//pkg:bin"],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "--",
+            "//pkg:bin",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "//pkg:bin",
+            "//pkg:other",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "//pkg:all",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "//pkg/...",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "@dep//pkg:bin",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "--order_output=full",
+            "//pkg:bin",
+        ],
+    ] {
+        assert!(CqueryRequest::parse(&args).is_err(), "{args:?}");
+    }
+
+    assert!(
+        CqueryRequest::parse(&[
+            "--output=starlark",
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "//pkg:bin",
+        ])
+        .is_err()
+    );
+    assert!(
+        CqueryRequest::parse(&[
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "--starlark:expr=str(target.label)",
+            "//pkg:bin",
+        ])
+        .is_err()
+    );
 
     let aquery = AqueryRequest::parse(&[
         "--output=streamed_jsonproto",
@@ -426,9 +515,7 @@ fn cquery_and_aquery_retain_placeholder_flag_parsing_without_query_restrictions(
     assert_eq!(aquery.query.output, QueryOutputFormat::StreamedJsonProto);
     assert_eq!(aquery.query.order, slug_query_v2::QueryOrder::Auto);
 
-    let cquery = CqueryRequest::parse(&["--strict_test_suite", "//pkg:bin"]).unwrap();
     let aquery = AqueryRequest::parse(&["--nostrict_test_suite=false", "//pkg:bin"]).unwrap();
-    assert_eq!(cquery.query.policy, QueryPolicy::default());
     assert_eq!(aquery.query.policy, QueryPolicy::default());
 }
 
@@ -447,21 +534,14 @@ fn run_request_preserves_program_args_after_target() {
 }
 
 #[test]
-fn test_cquery_and_aquery_have_stage_owned_placeholders() {
+fn test_and_aquery_have_stage_owned_placeholders() {
     let test = TestRequest::parse(&["//pkg:probe_test"]).unwrap();
-    let cquery = CqueryRequest::parse(&["//pkg:probe"]).unwrap();
     let aquery = AqueryRequest::parse(&["deps(//pkg:probe)"]).unwrap();
 
     assert!(
         test.placeholder_error()
             .to_json_line()
             .contains("Stage 7/8")
-    );
-    assert!(
-        cquery
-            .placeholder_error()
-            .to_json_line()
-            .contains("Stage 6/8")
     );
     assert!(
         aquery

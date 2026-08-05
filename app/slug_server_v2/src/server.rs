@@ -55,6 +55,13 @@ pub struct QueryRequest {
     pub bzlmod: BzlmodRequestInputs,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CqueryRequest {
+    pub target: String,
+    #[serde(default)]
+    pub bzlmod: BzlmodRequestInputs,
+}
+
 /// Stable primitive wire representation for one bzlmod request.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BzlmodRequestInputs {
@@ -170,6 +177,7 @@ const fn default_graph_factored() -> bool {
 pub enum DaemonRequest {
     Build(BuildRequest),
     Query(QueryRequest),
+    Cquery(CqueryRequest),
 }
 
 /// Common response envelope for all daemon commands.
@@ -302,6 +310,48 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 invalidated_files: result.invalidated_files,
             }
         }
+        DaemonRequest::Cquery(request) => {
+            let (command_policy, environment_policy, lockfile_mode, registry_urls) =
+                match request.bzlmod.normalize() {
+                    Ok(inputs) => inputs,
+                    Err(error) => return malformed_bzlmod_response(error),
+                };
+            let target = match TargetPattern::parse(&request.target) {
+                Ok(target) => target,
+                Err(error) => {
+                    return DaemonResponse {
+                        exit_code: 2,
+                        stdout: String::new(),
+                        stderr: format!(
+                            "{{\"error\":\"cquery_request_error\",\"message\":\"{}\"}}",
+                            slug_core_v2::error::json_escape(&error)
+                        ),
+                        invalidated_files: 0,
+                    };
+                }
+            };
+            if !matches!(&target, TargetPattern::Single(label) if label.repo().is_root()) {
+                return DaemonResponse {
+                    exit_code: 2,
+                    stdout: String::new(),
+                    stderr: "{\"error\":\"cquery_request_error\",\"message\":\"cquery accepts exactly one root literal target\"}".to_owned(),
+                    invalidated_files: 0,
+                };
+            }
+            let result = daemon.cquery_starlark_label_with_bzlmod_inputs(
+                &target,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                registry_urls,
+            );
+            DaemonResponse {
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                invalidated_files: result.invalidated_files,
+            }
+        }
     }
 }
 
@@ -387,6 +437,22 @@ pub fn send_query_request(
     write!(stream, "{json}\n").context("sending query request to daemon")?;
     let line = read_line(&mut stream)?;
     serde_json::from_str(&line).context("deserializing daemon query response")
+}
+
+pub fn send_cquery_request(
+    socket_path: &Path,
+    request: &CqueryRequest,
+) -> anyhow::Result<DaemonResponse> {
+    let mut stream = UnixStream::connect(socket_path)
+        .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
+    let json = serde_json::to_string(&DaemonRequest::Cquery(CqueryRequest {
+        target: request.target.clone(),
+        bzlmod: request.bzlmod.clone(),
+    }))
+    .context("serializing cquery request for daemon")?;
+    write!(stream, "{json}\n").context("sending cquery request to daemon")?;
+    let line = read_line(&mut stream)?;
+    serde_json::from_str(&line).context("deserializing daemon cquery response")
 }
 
 /// Send a shutdown command to a running daemon.

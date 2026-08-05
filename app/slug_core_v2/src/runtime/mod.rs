@@ -20,6 +20,8 @@ pub mod starlark;
 
 pub use dice::BuildCommandError;
 pub use dice::BuildCommandEvaluation;
+pub use dice::CqueryCommandError;
+pub use dice::CqueryCommandEvaluation;
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceDirectoryObservation;
 pub use dice::WorkspaceEvaluation;
@@ -57,6 +59,28 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
         .map_err(BuildCommandError::infrastructure)?;
     runtime.build_command_with_bzlmod_inputs(
         targets,
+        command_policy,
+        environment_policy,
+        lockfile_mode,
+        registry_urls,
+    )
+}
+
+pub fn evaluate_workspace_cquery_starlark_label_command_with_bzlmod_inputs(
+    workspace: &std::path::Path,
+    target: &slug_identity_v2::TargetPattern,
+    command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
+    environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
+    lockfile_mode: slug_bzlmod_v2::LockfileMode,
+    registry_urls: &[String],
+) -> Result<
+    AcceptedCommand<std::sync::Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+    CqueryCommandError,
+> {
+    let runtime = WorkspaceRuntime::new(workspace.to_path_buf())
+        .map_err(CqueryCommandError::infrastructure)?;
+    runtime.cquery_starlark_label_command_with_bzlmod_inputs(
+        target,
         command_policy,
         environment_policy,
         lockfile_mode,

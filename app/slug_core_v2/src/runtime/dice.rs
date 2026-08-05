@@ -46,6 +46,7 @@ use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_analysis_v2::AnalysisError;
+use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredTargetAnalysisKey;
@@ -405,6 +406,7 @@ pub struct WorkspaceRuntime {
 struct ExternalQueryActivationAudit {
     forbidden: Mutex<Vec<String>>,
     typed_roots: AtomicUsize,
+    configured_roots: Mutex<Vec<ConfiguredTargetKey>>,
 }
 
 #[cfg(test)]
@@ -470,6 +472,16 @@ impl ExternalQueryActivationAudit {
         if key.downcast_ref::<RootQueryCommandKey>().is_some() {
             self.typed_roots.fetch_add(1, Ordering::Relaxed);
         }
+        if let Some(key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() {
+            self.configured_roots
+                .lock()
+                .unwrap()
+                .push(key.configured_target().clone());
+        }
+    }
+
+    fn take_configured_roots(&self) -> Vec<ConfiguredTargetKey> {
+        std::mem::take(&mut *self.configured_roots.lock().unwrap())
     }
 }
 
@@ -1203,6 +1215,53 @@ impl NativeCommandRoot for BuildCommandRootKey {
     }
 }
 
+#[async_trait]
+impl NativeCommandRoot for CqueryCommandRoot {
+    type Terminal = Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>;
+
+    async fn compute(
+        &self,
+        transaction: &mut dice::DiceTransaction,
+    ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>
+    {
+        let outcome = transaction
+            .compute(&self.analysis_key)
+            .await
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))?;
+        Ok(match outcome {
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(needs)
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(result) => {
+                let terminal = match result.as_ref() {
+                    Ok(analysis) => Ok(CqueryCommandEvaluation {
+                        analysis: analysis.clone(),
+                    }),
+                    Err(error) => Err(self.map_analysis_error(error)),
+                };
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Arc::new(terminal))
+            }
+        })
+    }
+}
+
+impl CqueryCommandRoot {
+    fn map_analysis_error(&self, error: &AnalysisError) -> CqueryCommandError {
+        match error.kind() {
+            AnalysisErrorKind::TargetNotFound { label, build_file }
+                if label == self.analysis_key.configured_target().label() =>
+            {
+                CqueryCommandError::MissingTarget {
+                    requested: self.requested.clone(),
+                    label: label.clone(),
+                    build_file: build_file.clone(),
+                }
+            }
+            _ => CqueryCommandError::Analysis(error.clone()),
+        }
+    }
+}
+
 async fn poll_then_cancel_synthetic_compute<K>(
     transaction: &mut dice::DiceTransaction,
     key: &K,
@@ -1459,6 +1518,29 @@ struct BuildCommandRootKey {
     configuration: ConfigurationKey,
 }
 
+#[derive(Clone)]
+struct CqueryCommandRoot {
+    requested: Arc<str>,
+    analysis_key: RootConfiguredTargetAnalysisKey,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct CqueryCommandEvaluation {
+    analysis: AnalysisResult,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum CqueryCommandError {
+    MissingTarget {
+        requested: Arc<str>,
+        label: CanonicalLabel,
+        build_file: PathBuf,
+    },
+    Analysis(AnalysisError),
+    Request(Arc<str>),
+    Infrastructure(Arc<str>),
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 enum BuildCommandRequestError {
     ExternalRepository { pattern: Arc<str> },
@@ -1595,6 +1677,60 @@ impl BuildCommandEvaluation {
                 ..
             }]
         )
+    }
+}
+
+impl CqueryCommandEvaluation {
+    pub fn starlark_label_stdout(&self) -> String {
+        format!("{}\n", self.analysis.key().label())
+    }
+}
+
+impl CqueryCommandError {
+    fn request(message: impl Into<String>) -> Self {
+        Self::Request(Arc::from(message.into()))
+    }
+
+    pub(super) fn infrastructure(error: impl fmt::Display) -> Self {
+        Self::Infrastructure(Arc::from(error.to_string()))
+    }
+
+    pub fn missing_stderr(&self) -> Option<String> {
+        let Self::MissingTarget {
+            requested,
+            label,
+            build_file,
+        } = self
+        else {
+            return None;
+        };
+        let message = format!(
+            "no such target '{requested}': target '{}' not declared in package '{}' defined by {}",
+            label.target().as_str(),
+            label.package().package(),
+            build_file.display(),
+        );
+        Some(format!(
+            "ERROR: Skipping '{requested}': {message}\nERROR: {message}\nERROR: Build did NOT complete successfully\n"
+        ))
+    }
+}
+
+impl fmt::Display for CqueryCommandError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::MissingTarget {
+                label, build_file, ..
+            } => {
+                write!(
+                    f,
+                    "target `{label}` was not found in {}",
+                    build_file.display()
+                )
+            }
+            Self::Analysis(error) => error.fmt(f),
+            Self::Request(message) | Self::Infrastructure(message) => f.write_str(message),
+        }
     }
 }
 
@@ -2592,6 +2728,55 @@ impl WorkspaceRuntime {
             .map(|result| result.accepted)
             .map_err(|error| {
                 BuildCommandError::infrastructure(format!("typed build command failed: {error}"))
+            })
+    }
+
+    pub fn cquery_starlark_label_command_with_bzlmod_inputs(
+        &self,
+        target: &TargetPattern,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: &[String],
+    ) -> Result<
+        AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
+        CqueryCommandError,
+    > {
+        let TargetPattern::Single(label) = target else {
+            return Err(CqueryCommandError::request(
+                "cquery accepts exactly one literal target label",
+            ));
+        };
+        if !label.repo().is_root() {
+            return Err(CqueryCommandError::request(
+                "external repository cquery targets are not supported",
+            ));
+        }
+        let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
+            .map_err(CqueryCommandError::infrastructure)?;
+        let configuration =
+            ConfigurationKey::target("first-build").map_err(CqueryCommandError::infrastructure)?;
+        let canonical =
+            CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
+                .map_err(CqueryCommandError::infrastructure)?;
+        let root = CqueryCommandRoot {
+            requested: Arc::from(target.to_string()),
+            analysis_key: RootConfiguredTargetAnalysisKey::new(
+                NormalizedAbsolutePath::new(self.workspace.clone())
+                    .map_err(CqueryCommandError::infrastructure)?,
+                ConfiguredTargetKey::new(canonical, configuration),
+            ),
+        };
+        let request = NativeDemandRequestInputBundle {
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+        };
+        self.drive_command(request, root)
+            .map(|result| result.accepted)
+            .map_err(|error| {
+                CqueryCommandError::infrastructure(format!("typed cquery command failed: {error}"))
             })
     }
 
@@ -5018,6 +5203,110 @@ mod tests {
             accepted_output_text(&missing),
             ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
         );
+    }
+
+    #[test]
+    fn cquery_starlark_label_drives_the_existing_root_analysis_once() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"driver\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+        )
+        .unwrap();
+        let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = WorkspaceRuntime::new(workspace.path())
+            .unwrap()
+            .with_activation_audit(activation_audit.clone());
+        let run = |target: &TargetPattern| {
+            runtime.cquery_starlark_label_command_with_bzlmod_inputs(
+                target,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+            )
+        };
+        let assert_roots = |label: &str, expected_count| {
+            let roots = activation_audit.take_configured_roots();
+            assert_eq!(
+                roots.len(),
+                expected_count,
+                "cquery analysis root activation count"
+            );
+            for root in roots {
+                assert_eq!(
+                    root.stable_serialize(),
+                    format!("{label} [target:first-build]")
+                );
+            }
+        };
+        let target = TargetPattern::parse("//pkg:probe").unwrap();
+        let cold = run(&target).unwrap();
+        let cold_evaluation = cold.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(cold_evaluation.starlark_label_stdout(), "@@//pkg:probe\n");
+        assert!(cold_evaluation.analysis.actions().is_empty());
+        assert!(accepted_output_text(&cold).is_empty());
+        assert_roots("@@//pkg:probe", 13);
+
+        let warm = run(&target).unwrap();
+        assert!(warm.terminal_for_test().as_ref().is_ok());
+        assert!(accepted_output_text(&warm).is_empty());
+        assert_roots("@@//pkg:probe", 1);
+
+        let missing = TargetPattern::parse("//pkg:missing").unwrap();
+        let missing_result = run(&missing).unwrap();
+        let error = missing_result
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap_err();
+        assert_eq!(error.missing_stderr().unwrap().lines().count(), 3);
+        assert!(accepted_output_text(&missing_result).is_empty());
+        assert_roots("@@//pkg:missing", 1);
+
+        let recovered = run(&target).unwrap();
+        assert_eq!(
+            recovered
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .starlark_label_stdout(),
+            "@@//pkg:probe\n"
+        );
+        assert!(accepted_output_text(&recovered).is_empty());
+        assert_roots("@@//pkg:probe", 1);
+
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n# cquery edit\n",
+        )
+        .unwrap();
+        let build_edit = run(&target).unwrap();
+        assert!(build_edit.terminal_for_test().as_ref().is_ok());
+        assert!(accepted_output_text(&build_edit).is_empty());
+        assert_roots("@@//pkg:probe", 1);
+
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n# cquery edit\n",
+        )
+        .unwrap();
+        let bzl_edit = run(&target).unwrap();
+        assert!(bzl_edit.terminal_for_test().as_ref().is_ok());
+        assert!(accepted_output_text(&bzl_edit).is_empty());
+        assert_roots("@@//pkg:probe", 1);
     }
 
     fn accepted_native_snapshot(runtime: &WorkspaceRuntime) -> AcceptedNativeDemandSnapshot {

@@ -865,15 +865,92 @@ fn missing_build_target_is_structured_parse_error() {
 }
 
 #[test]
-fn planned_configured_and_action_queries_are_structured() {
-    for command in ["cquery", "aquery"] {
-        let output = slug().args([command, "//:x"]).output().unwrap();
-        assert_eq!(output.status.code(), Some(2));
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        assert!(stderr.contains("\"error\":\"planned_placeholder\""));
-        assert!(stderr.contains(&format!("\"command\":\"{command}\"")));
-        assert!(stderr.contains("//:x"));
-    }
+fn cquery_starlark_label_matches_success_missing_and_recovery() {
+    let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
+    let args = [
+        "cquery",
+        "//parent:parent",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)",
+    ];
+    let success = slug().current_dir(&workspace).args(args).output().unwrap();
+    assert!(success.status.success(), "{success:?}");
+    assert_eq!(success.stdout, b"@@//parent:parent\n");
+    assert!(success.stderr.is_empty());
+
+    let missing = slug()
+        .current_dir(&workspace)
+        .args([
+            "cquery",
+            "//parent:missing",
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(missing.status.code(), Some(1));
+    assert!(missing.stdout.is_empty());
+    let stderr = String::from_utf8(missing.stderr).unwrap();
+    let message = format!(
+        "no such target '//parent:missing': target 'missing' not declared in package 'parent' defined by {}",
+        workspace
+            .canonicalize()
+            .unwrap()
+            .join("parent/BUILD.bazel")
+            .display()
+    );
+    assert_eq!(
+        stderr,
+        format!(
+            "ERROR: Skipping '//parent:missing': {message}\nERROR: {message}\nERROR: Build did NOT complete successfully\n"
+        )
+    );
+}
+
+#[test]
+fn cquery_starlark_label_daemon_recovers_after_missing() {
+    let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
+    let output_base = scratch("cquery-starlark-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let invoke = |target: &str| {
+        slug()
+            .current_dir(&workspace)
+            .args([
+                output_base_arg.as_str(),
+                "cquery",
+                target,
+                "--output=starlark",
+                "--starlark:expr=str(target.label)",
+            ])
+            .output()
+            .unwrap()
+    };
+    let first = invoke("//parent:parent");
+    assert!(first.status.success(), "{first:?}");
+    assert_eq!(first.stdout, b"@@//parent:parent\n");
+    assert!(first.stderr.is_empty());
+    let missing = invoke("//parent:missing");
+    assert_eq!(missing.status.code(), Some(1));
+    assert!(missing.stdout.is_empty());
+    let message = format!(
+        "no such target '//parent:missing': target 'missing' not declared in package 'parent' defined by {}",
+        workspace
+            .canonicalize()
+            .unwrap()
+            .join("parent/BUILD.bazel")
+            .display()
+    );
+    assert_eq!(
+        String::from_utf8(missing.stderr).unwrap(),
+        format!(
+            "ERROR: Skipping '//parent:missing': {message}\nERROR: {message}\nERROR: Build did NOT complete successfully\n"
+        )
+    );
+    let recovered = invoke("//parent:parent");
+    assert!(recovered.status.success(), "{recovered:?}");
+    assert_eq!(recovered.stdout, b"@@//parent:parent\n");
+    assert!(recovered.stderr.is_empty());
 }
 
 #[test]

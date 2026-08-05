@@ -23,6 +23,7 @@ use slug_reapi_v2::RemoteConfig;
 
 use crate::BuildRequest;
 use crate::BzlmodRequestInputs;
+use crate::CqueryRequest;
 use crate::Daemon;
 use crate::DaemonRequest;
 use crate::DaemonResponse;
@@ -685,6 +686,59 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     assert!(response.stdout.is_empty());
     assert_eq!(response.stderr, "{\"error\":\"analysis_not_implemented\"}");
     assert_eq!(response.invalidated_files, 3);
+}
+
+#[test]
+fn tagged_cquery_protocol_is_narrow_and_round_trips() {
+    let request = DaemonRequest::Cquery(CqueryRequest {
+        target: "//pkg:probe".to_owned(),
+        bzlmod: BzlmodRequestInputs::default(),
+    });
+    let json = serde_json::to_string(&request).unwrap();
+    assert!(!json.contains("order_output"));
+    assert!(!json.contains("expression"));
+    let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
+    let DaemonRequest::Cquery(request) = round_trip else {
+        panic!("expected tagged cquery request");
+    };
+    assert_eq!(request.target, "//pkg:probe");
+    assert_eq!(request.bzlmod, BzlmodRequestInputs::default());
+}
+
+#[test]
+fn retained_cquery_missing_recovers_without_new_invalidations() {
+    let workspace = scratch("cquery-recovery");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, value: &str| {
+        daemon.cquery_starlark_label_with_bzlmod_inputs(
+            &target(value),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+        )
+    };
+    let success = run(&mut daemon, "//pkg:probe");
+    assert_eq!(success.exit_code, 0, "{success:?}");
+    assert_eq!(success.stdout, "@@//pkg:probe\n");
+    let missing = run(&mut daemon, "//pkg:missing");
+    assert_eq!(missing.exit_code, 1, "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    assert_eq!(missing.invalidated_files, 0);
+    assert!(missing.stderr.contains("ERROR: Skipping '//pkg:missing'"));
+    let recovery = run(&mut daemon, "//pkg:probe");
+    assert_eq!(recovery.exit_code, 0, "{recovery:?}");
+    assert_eq!(recovery.stdout, "@@//pkg:probe\n");
+    assert_eq!(recovery.invalidated_files, 0);
 }
 
 #[test]
