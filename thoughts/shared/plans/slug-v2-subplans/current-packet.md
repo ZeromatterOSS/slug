@@ -1,84 +1,77 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry`
+Packet: `WP-6-m2-pure-native-converter-source-closure-ledger`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: retry the discarded pure native value/default/rendering kernel against
-the now-closed pinned-source discriminator set; every contextual or Java-regex
-path must refuse explicitly.
-Predecessor: `WP-6-m2-pure-native-value-default-and-rendering-kernel` reached
-`REPLAN` after its permitted correction and a later DottedVersion source miss;
-all unaccepted Rust was discarded cleanly.
+Role: close the pinned-source semantic, equality, and Java-rendering contract for
+all 287 pure native descriptors before any third Rust implementation attempt.
+Predecessor: the clean retry stopped before validation when ordinary enum-name
+rendering disproved its generic lowercase enum value; all unaccepted Rust was
+discarded and HEAD remains the accepted metadata plus REPLAN documentation.
 
-Within `slug_configuration_v2`, add:
+Using pinned Bazel commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
+extend the Stage 6 owner plan with:
 
-- a closed structurally equal `NativeValue` algebra for primitive/text/enum/
-  dotted-version/list/entry/ordered-map/environment/fission values and a
-  positive-only internally constructible `RunsPerTestSeed`;
-- source-default materialization with exact annotation `"null"` semantics,
-  repeatable empty behavior, all literal categories, and a private pinned table
-  for the six symbolic label expressions, without resolving labels;
-- descriptor-directed one-occurrence conversion for exactly the 287 pure
-  descriptor paths and explicit typed refusal for eight Java-regex, five Host,
-  and 41 repository/package/loading descriptors; and
-- exact source-backed Java `value.toString()` projection into the accepted
-  outer cache grammar.
+- one compact row for each of the 287 pure descriptors, reusing the existing
+  inventory ordinal/FQCN/name/type/converter rather than duplicating metadata;
+- shared source-backed family rules for the six built-in field-type families
+  and every explicit pure converter identifier; and
+- a complete mapping from admitted input to retained semantic value/equality
+  and exact Java `value.toString()` text before the accepted outer cache-field
+  grammar.
 
-Freeze the retry corrections in source-pinned tests:
+Each descriptor row must record its family-rule ID, default route (special
+`"null"`, literal conversion, repeat wrapping, or isolated positive runs seed),
+explicit input grammar/rejection boundary, case rule, converter aliases (never
+command option aliases), retained Java/Rust semantic kind, structural equality,
+exact rendering rule, pinned source owner/line, and discriminator IDs. Family
+rules must enumerate every finite input/member/output spelling and all aliases.
 
-- `TestTimeoutConverter` uses decimal `Integer.parseInt`, Guava six-token-limit
-  empty-token behavior, uppercase enum-map keys, and canonical Java duration
-  text (`PT1M`, `PT5M`, `PT15M`, `PT1H`, and mixed H/M/S);
-- `StripMode` renders lowercase; an empty fission list routes to outer `EMPTY`;
-  the numeric runs seed cannot represent zero/negative or be constructed by a
-  public caller; and Void expansion rows remain absent/default-only rather than
-  rendering a scalar `"null"`;
-- DottedVersion implements case-insensitive component grammar
-  `(\\d+)([a-z0-9]*?)?(\\d+)?` and descriptive terminator grammar
-  `([a-z]\\w*)`; both numeric captures use decimal Java `Integer.parseInt`
-  signed-32-bit bounds with no sign/radix spelling, the ASCII descriptive
-  component `[A-Za-z][A-Za-z0-9_]*` is accepted only after a numeric component
-  and stops later validation, and the complete original input governs both
-  structural equality and rendering; and
-- discriminate `2147483647`/`2147483648`,
-  `1alpha2147483647`/`1alpha2147483648`, `1.internal_build`,
-  `1.2.internal_build.!`, and exact retained `1.0.0` text.
+The ledger must preserve `287 pure / 8 Java-regex / 5 Host / 41 repository =
+341`, plus the orthogonal 45 repeat/13 old-name/6 expansion/2 implicit command
+metadata. It must prescribe typed enum identity (enum kind plus member or
+parameterized value), never cache text as structural identity, and similarly
+identify every non-enum structural value.
 
-Apply `.codex/skills/slug-buck2-utility-reuse/SKILL.md`. Use `CompactString`
-for retained dynamic scalar text, immutable `Arc<[T]>`/`Arc<[(T,T)]>` slices,
-and `Allocative`. Use `Dupe` only for a demonstrably pointer-cheap aggregate;
-never mark owned leaves cheap. Preserve structural equality and null-versus-
-empty identity. No runtime descriptor map, interner, cache, global, hash,
-generic unordered map, or derived Rust `Debug`/`Display` cache text.
+At minimum freeze later-test discriminators for:
+
+- ordinary EnumConverter mixed-case input to uppercase enum-name text, custom
+  lowercase `CompilationMode`/`StripMode`, typed cross-kind inequality,
+  BoolOrEnum aliases, and nominal versus `forced=N` sharding;
+- Boolean/TriState synonyms, Integer.decode sign/radix/bounds, raw text,
+  comma-list empty/interior-empty, Java UTF-16 ordered-set sort/dedup,
+  assignment/env, fission, timeout/Duration, and DottedVersion;
+- special-null/repeat/default wrapping, positive/private runs seed, absent-only
+  Void, `NULL`/`EMPTY`, escaping, every descriptor default cache text, one
+  admitted nondefault per family, and every finite enum member/alias/output.
+
+Pinned cross-cutting owners: `common/options/{Converters,EnumConverter,
+BoolOrEnumConverter,Option,OptionDefinition,FieldOptionDefinition,OptionsBase}
+.java`. Pure owners include `analysis/config/{CompilationMode,CoreOptions,
+CoreOptionConverters}.java`, `analysis/test/{TestConfiguration,
+TestShardingStrategy,TestShardingStrategyNotForced,TestShardingStrategyForced}
+.java`, `packages/TestTimeout.java`, `rules/android/AndroidConfiguration.java`,
+`rules/apple/{AppleCommandLineOptions,AppleConfiguration,DottedVersion,
+DottedVersionConverter}.java`, `rules/cpp/{CppOptions,CppConfiguration}.java`,
+and `rules/java/{JavaConfiguration,JavaOptions}.java`. Every row must name its
+exact declaring/converter/value owner file and line; no grouped “relevant file”
+citation is acceptable when another exact owner is discovered.
 
 Allowlist:
 
-- `app/slug_configuration_v2/Cargo.toml`
-- `app/slug_configuration_v2/src/native/mod.rs`
-- `app/slug_configuration_v2/src/native/cache_grammar.rs`
-- `app/slug_configuration_v2/src/native/tests.rs`
-- `app/slug_configuration_v2/src/native/value.rs`
-- `app/slug_configuration_v2/src/native/defaults.rs`
-- `app/slug_configuration_v2/src/native/convert.rs`
+- `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`
+- `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
-Caps: 1,550 production, 1,250 test, and 2,800 total formatted net lines across
-the seven files. Add only demonstrated retained workspace dependencies; no
-external dependency/version, registry, root workspace, ignored lockfile,
-generated source/data, fixture, oracle, scheduling, or downstream change.
+Cap: 1,050 formatted net documentation lines total, at most 900 in the Stage 6
+ledger. No Rust, tests, fixtures, source generation, Cargo/dependency, oracle,
+command, DICE, registry, or downstream change.
 
-Acceptance also requires all 341 routing results and exact 287/8/5/41 counts;
-all default families and six symbolic values; special-null versus explicit
-`null`; repeatable empty versus scalar/list empty; every pure converter and
-enum spelling; exact runs seed; list/entry/map/env/fission/duration/dotted text;
-`NULL`/`EMPTY`/escaping; structural equality; valid-Unicode Java UTF-16 order;
-and typed refusal of every deferred family. Reuse the independent 341-row
-metadata table.
-
-Stop and `REPLAN` on any new material source/rendering correction; Java pattern
-generation or a general `PerLabelOptions`/`runs_per_test` regex branch;
-lone-surrogate/lossy UTF-8 behavior; Host or repository/package/
-loading/Starlark access; argv/RC/repeat/expansion/implicit/alias behavior; any
-P/C/T normalization; generic map/record rendering; checksum, command, wire,
-DICE, analysis, path, platform, ActionKey, aquery, or execution work; retained-
-state ambiguity; cap breach; or any change outside the allowlist. Configured-
-target dependency cycles remain deferred with user approval.
+Stop and `REPLAN` if any pure row lacks a complete pinned converter/value/
+`toString()` chain; descriptors sharing a proposed family differ semantically;
+a row requires a new representation, dependency, contextual converter, Java
+regex, Host/repository/loading access, or live oracle; counts change; command,
+normalization, checksum, wire, or DICE behavior becomes necessary; or the cap
+is exceeded. Configured-target dependency cycles remain deferred by approval.

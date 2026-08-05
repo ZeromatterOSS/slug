@@ -2523,3 +2523,43 @@ material source/rendering correction is another `REPLAN`; do not broaden into
 an oracle, general `PerLabelOptions`/`runs_per_test` regex branch, contextual
 converter, normalizer, checksum, command, wire, or DICE packet.
 Configured-target dependency cycles remain user-deferred.
+
+### Pure native kernel retry REPLAN (2026-08-04)
+
+The clean `WP-6-m2-pure-native-value-default-and-rendering-kernel-retry`
+stopped before validation and discarded its entire unaccepted seven-file diff.
+Pinned source proved that generic lowercase enum retention/rendering is false:
+`EnumConverter` matches case-insensitively against `value.toString()` and
+returns the typed enum, so ordinary Java enums retain identity and render names
+such as `MAIN`, `OFF`, `EXPLICIT`, and `DISABLED`; only specific enums such as
+`CompilationMode` and `StripMode` override `toString()` to lowercase. Cache
+text cannot serve as enum structural identity because distinct enum types can
+render the same name. `BoolOrEnumConverter`, parameterized forced sharding,
+and custom `PlatformType` further disprove one generic enum/string rule.
+
+This is a new material rendering correction under the retry's zero-tolerance
+stop. HEAD returned cleanly to `368f8fa1`; no Rust, registry, dependency,
+fixture, oracle, or lockfile change remains. Two independent route audits
+rejected an enum-only patch: the repeated misses show that all admitted pure
+converter input, retained-value, equality, and `toString()` chains need one
+complete pinned-source authority before more implementation.
+
+Run next only `WP-6-m2-pure-native-converter-source-closure-ledger`. Add one
+compact Stage 6 row for every existing pure descriptor and shared family rules
+covering the 227 built-in plus 60 explicit rows. Each row must link its existing
+ordinal/FQCN/name/type/converter to default route, explicit grammar/rejection,
+case and converter-alias rules, typed returned value and equality, exact Java
+rendering, pinned owner/line, and discriminator IDs. Enumerate every finite
+member/alias/output; specify typed enum kind plus member/parameter rather than
+rendered-string identity; preserve 287/8/5/41 and all command metadata.
+
+At no more than 1,050 total/900 Stage 6 documentation lines, freeze later tests
+for ordinary-uppercase versus override-lowercase enums, cross-kind inequality,
+boolean/TriState/Integer synonyms and bounds, raw/list/set/entry/env/fission,
+timeout/Duration, DottedVersion, defaults/runs/Void, `NULL`/`EMPTY`/escaping,
+all descriptor defaults, one nondefault per family, and every finite enum
+member. No Rust is authorized. Missing source chains, semantic family splits,
+new representation/context/oracle needs, count changes, or cap breach are
+`REPLAN`. Host, repository/loading, Java-regex/`PerLabelOptions`, command,
+normalization, checksum, wire, DICE, and configured-cycle semantics remain
+deferred.
