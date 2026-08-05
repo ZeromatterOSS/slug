@@ -2202,10 +2202,10 @@ schemas. The bounded packet creates `slug_configuration_v2`, retains the exact
 341-row descriptor registry, and implements only FQCN/option ordering plus the
 native `NULL`/`EMPTY`/quoted-escape cache-field grammar.
 
-Allow only root `Cargo.toml`, the mechanical new-workspace-package entry in
-`Cargo.lock`, and the new crate's `Cargo.toml`, `src/lib.rs`,
-`src/native/{mod,registry,cache_grammar,tests}.rs`: eight files, 2,400
-production, 1,400 test, and 3,800 total formatted net lines. Use a static
+Allow only root `Cargo.toml` and the new crate's `Cargo.toml`, `src/lib.rs`,
+`src/native/{mod,registry,cache_grammar,tests}.rs`: seven files, 2,400
+production, 1,400 test, and 3,800 total formatted net lines. The workspace
+intentionally ignores `Cargo.lock`; do not track or modify it. Use a static
 descriptor slice—no generated source, map, interner, cache, global, weak hash,
 wire, DICE, Host access, converter execution, normalized values, mixed checksum,
 or existing-crate edit. The implementation must apply the Buck2 utility-reuse

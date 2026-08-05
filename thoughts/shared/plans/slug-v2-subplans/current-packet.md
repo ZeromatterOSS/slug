@@ -27,7 +27,6 @@ global, or invented hash. Preserve descriptor identity structurally.
 Allowlist:
 
 - `Cargo.toml`
-- `Cargo.lock` (only the new local workspace-package record)
 - `app/slug_configuration_v2/Cargo.toml`
 - `app/slug_configuration_v2/src/lib.rs`
 - `app/slug_configuration_v2/src/native/mod.rs`
@@ -36,8 +35,9 @@ Allowlist:
 - `app/slug_configuration_v2/src/native/tests.rs`
 
 Caps: 2,400 production, 1,400 test, 3,800 total formatted net lines across
-eight files. Existing crates, generated source/data, fixtures, oracle records,
-and external dependency versions must not change.
+seven files. The intentionally ignored workspace `Cargo.lock`, existing crates,
+generated source/data, fixtures, oracle records, and external dependency
+versions must not change.
 
 Acceptance requires source-backed tests for exactly 17 ordered classes and 341
 unique ordered options. Tests must carry an independent compact pinned expected
