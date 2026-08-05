@@ -2041,3 +2041,216 @@ fn glob_reports_context_and_allow_empty_type_errors() {
         .to_string();
     assert!(error.contains("glob() may only be called while evaluating a BUILD package"));
 }
+
+#[test]
+fn rule_toolchain_requirements_are_definition_relative_and_not_dependencies() {
+    let workspace = scratch("toolchain-resolution-first-platform-loading");
+    let defs = workspace.join("defs.bzl");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        &defs,
+        r#"ProbeInfo = provider(fields = {"marker": "selected toolchain marker"})
+
+def _demo_toolchain_impl(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+
+demo_toolchain_impl = rule(
+    implementation = _demo_toolchain_impl,
+    attrs = {
+        "marker": attr.string(mandatory = True),
+    },
+)
+
+def _probe_impl(ctx):
+    return [ProbeInfo(marker = ctx.toolchains["//:demo_type"].marker)]
+
+probe_rule = rule(
+    implementation = _probe_impl,
+    toolchains = ["//:demo_type"],
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join(BUILD_FILE_PRIMARY),
+        r#"load(":defs.bzl", "demo_toolchain_impl", "probe_rule")
+
+constraint_setting(name = "selection")
+
+constraint_value(
+    name = "first",
+    constraint_setting = ":selection",
+)
+
+constraint_value(
+    name = "second",
+    constraint_setting = ":selection",
+)
+
+platform(
+    name = "first_platform",
+    constraint_values = [":first"],
+)
+
+platform(
+    name = "second_platform",
+    constraint_values = [":second"],
+)
+
+toolchain_type(name = "demo_type")
+
+demo_toolchain_impl(
+    name = "first_impl",
+    marker = "first",
+)
+
+demo_toolchain_impl(
+    name = "second_impl",
+    marker = "second",
+)
+
+toolchain(
+    name = "first_toolchain",
+    exec_compatible_with = [":first"],
+    toolchain = ":first_impl",
+    toolchain_type = ":demo_type",
+)
+
+toolchain(
+    name = "second_toolchain",
+    exec_compatible_with = [":second"],
+    toolchain = ":second_impl",
+    toolchain_type = ":demo_type",
+)
+
+probe_rule(name = "probe")
+"#,
+    )
+    .unwrap();
+
+    let loaded = try_load_package(&workspace, &workspace).unwrap();
+    let requirements = |loaded: &slug_loading_v2::LoadedPackage, name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find_map(|target| match &target.kind {
+                PackageTargetKind::StarlarkRule(rule) if target.name == name => {
+                    Some(rule.required_toolchains().to_vec())
+                }
+                _ => None,
+            })
+            .unwrap()
+    };
+    let dependencies = |loaded: &slug_loading_v2::LoadedPackage, name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find_map(|target| match &target.kind {
+                PackageTargetKind::StarlarkRule(rule) if target.name == name => {
+                    Some(rule.dependencies().to_vec())
+                }
+                _ => None,
+            })
+            .unwrap()
+    };
+    assert_eq!(
+        requirements(&loaded, "probe"),
+        [CanonicalLabel::parse("@@//:demo_type").unwrap()]
+    );
+    assert!(dependencies(&loaded, "probe").is_empty());
+    assert!(requirements(&loaded, "first_impl").is_empty());
+    assert!(requirements(&loaded, "second_impl").is_empty());
+
+    let consumer = workspace.join("consumer");
+    let empty_defs = workspace.join("empty.bzl");
+    fs::write(
+        &empty_defs,
+        "def _empty(ctx):\n    return [DefaultInfo(files = depset([]))]\nempty_rule = rule(implementation = _empty, toolchains = [])\n",
+    )
+    .unwrap();
+    fs::create_dir_all(&consumer).unwrap();
+    fs::write(
+        consumer.join(BUILD_FILE_PRIMARY),
+        "load(\"//:defs.bzl\", \"probe_rule\")\nload(\"//:empty.bzl\", \"empty_rule\")\nprobe_rule(name = \"consumer_probe\")\nempty_rule(name = \"empty\")\n",
+    )
+    .unwrap();
+    let consumer =
+        try_load_package_with_extra_bzl(&workspace, &consumer, &[defs, empty_defs]).unwrap();
+    assert_eq!(
+        requirements(&consumer, "consumer_probe"),
+        [CanonicalLabel::parse("@@//:demo_type").unwrap()]
+    );
+    assert!(dependencies(&consumer, "consumer_probe").is_empty());
+    assert!(requirements(&consumer, "empty").is_empty());
+}
+
+#[test]
+fn rule_toolchains_and_toolchain_info_fail_closed_outside_the_fixture_subset() {
+    let cases = [
+        ("toolchains = \":demo_type\"", "list"),
+        ("toolchains = (\":demo_type\",)", "list"),
+        ("toolchains = [1]", "expected `list[str]`"),
+        ("toolchains = [\"@external//:type\"]", "external repository"),
+        ("toolchains = [\":one\", \":two\"]", "at most one"),
+        (
+            "toolchains = [\":demo_type\", \":demo_type\"]",
+            "at most one",
+        ),
+        ("toolchains = [\"...\"]", "direct target label"),
+        ("toolchains = [\":all\"]", "direct target label"),
+    ];
+    for (index, (options, expected)) in cases.into_iter().enumerate() {
+        let workspace = scratch(&format!("bad-rule-toolchains-{index}"));
+        let package = workspace.join("pkg");
+        fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+        fs::create_dir_all(&package).unwrap();
+        fs::write(
+            package.join("defs.bzl"),
+            format!("def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nbad = rule(implementation = _impl, {options})\n"),
+        )
+        .unwrap();
+        fs::write(
+            package.join(BUILD_FILE_PRIMARY),
+            "load(\":defs.bzl\", \"bad\")\nbad(name = \"subject\")\n",
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(expected), "{error}");
+    }
+
+    let workspace = scratch("toolchain-info-loading");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    return [platform_common.ToolchainInfo()]\nprobe = rule(implementation = _impl)\nempty = rule(implementation = _impl, toolchains = [])\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\", \"empty\")\nprobe(name = \"frozen\")\nempty(name = \"empty\")\n",
+    )
+    .unwrap();
+    let loaded = try_load_package(&workspace, &package).unwrap();
+    assert!(loaded.targets.iter().any(|target| matches!(
+        &target.kind,
+        PackageTargetKind::StarlarkRule(rule)
+            if target.name == "empty" && rule.required_toolchains().is_empty()
+    )));
+
+    fs::write(
+        package.join("defs.bzl"),
+        "TOOLCHAIN_INFO = platform_common.ToolchainInfo()\n",
+    )
+    .unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("unsupported analysis builtin ToolchainInfo"),
+        "{error}"
+    );
+}

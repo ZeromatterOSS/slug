@@ -28,6 +28,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_loading_v2::BzlModuleEvaluator;
+use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::BzlModuleEvalKey;
 use slug_loading_v2::keys::PackageLoadKey;
@@ -1623,6 +1624,61 @@ fn package_context_labels_have_same_dice_equality_and_definition_lifecycle() {
     write(&definitions, &schema("two.txt"));
     let recreated = load_package(&dice, &runtime, &workspace, &package, &[definitions]).unwrap();
     assert_eq!(default_changed, recreated);
+}
+
+#[test]
+fn toolchain_requirements_have_definition_lifecycle_and_semantic_equality() {
+    let workspace = scratch("toolchain-requirement-lifecycle");
+    let package = workspace.join("consumer");
+    let defs = workspace.join("definitions/defs.bzl");
+    let build = package.join("BUILD.bazel");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading\")\n",
+    );
+    let definitions = |requirement: &str, marker: &str| {
+        format!(
+            "def _impl(ctx):\n    return [platform_common.ToolchainInfo(marker = \"{marker}\")]\nprobe = rule(implementation = _impl, toolchains = [\"{requirement}\"])\n"
+        )
+    };
+    write(&defs, &definitions(":type_a", "initial"));
+    write(
+        &build,
+        "load(\"//definitions:defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    );
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let runtime = tokio::runtime::Runtime::new().unwrap();
+    let load = || load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
+
+    let initial = load();
+    let requirement = initial
+        .targets
+        .iter()
+        .find_map(|target| match &target.kind {
+            PackageTargetKind::StarlarkRule(rule) if target.name == "subject" => {
+                Some(rule.required_toolchains())
+            }
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(requirement.len(), 1);
+    assert_eq!(requirement[0].to_string(), "@@//definitions:type_a");
+
+    let warm = load();
+    assert_eq!(initial, warm);
+    write(&defs, &definitions(":type_b", "initial"));
+    let changed = load();
+    assert_ne!(warm, changed);
+    write(&defs, &definitions(":type_a", "initial"));
+    let restored = load();
+    assert_eq!(initial, restored);
+
+    write(&defs, &definitions(":type_a", "marker edit"));
+    let marker = load();
+    assert_ne!(restored, marker);
+    write(&defs, &definitions(":type_a", "initial"));
+    let marker_restored = load();
+    assert_eq!(restored, marker_restored);
 }
 
 #[test]

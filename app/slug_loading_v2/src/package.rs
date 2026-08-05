@@ -413,6 +413,7 @@ pub struct StarlarkRuleImplementation {
     #[allocative(skip)]
     implementation: FrozenValue,
     dependencies: Arc<[CanonicalLabel]>,
+    required_toolchains: Arc<[CanonicalLabel]>,
     schema: Arc<[AttributeSchema]>,
     values: Arc<[AttributeValue]>,
     capability: Arc<RuleCapability>,
@@ -424,6 +425,7 @@ impl PartialEq for StarlarkRuleImplementation {
         // The frozen function is retained for Stage 6 lifetime only. Its heap
         // address is not package semantics and must not defeat DICE equality.
         self.dependencies == other.dependencies
+            && self.required_toolchains == other.required_toolchains
             && self.schema == other.schema
             && self.values == other.values
             && self.capability == other.capability
@@ -440,6 +442,12 @@ impl StarlarkRuleImplementation {
 
     pub fn dependencies(&self) -> &[CanonicalLabel] {
         &self.dependencies
+    }
+
+    /// Toolchain-type requirements declared by the defining `rule()` call.
+    /// These are loading-only retained metadata, not ordinary dependencies.
+    pub fn required_toolchains(&self) -> &[CanonicalLabel] {
+        &self.required_toolchains
     }
 
     pub fn schema(&self) -> &[AttributeSchema] {
@@ -761,6 +769,7 @@ impl PackageRecorder {
         &self,
         name: String,
         implementation: FrozenValue,
+        required_toolchains: Arc<[CanonicalLabel]>,
         capability: Arc<RuleCapability>,
         schema: Arc<[AttributeSchema]>,
         values: Arc<[AttributeValue]>,
@@ -790,6 +799,7 @@ impl PackageRecorder {
             PackageTargetKind::StarlarkRule(StarlarkRuleImplementation {
                 implementation,
                 dependencies: dependencies.into(),
+                required_toolchains,
                 schema,
                 values,
                 capability,
@@ -1116,6 +1126,34 @@ fn package_output_label(base_package: &str, raw: &str) -> anyhow::Result<Canonic
         anyhow::bail!("output label must name a valid target in this package: {raw}");
     }
     Ok(label)
+}
+
+fn rule_toolchain_requirement(
+    values: Option<UnpackList<&str>>,
+    eval: &Evaluator<'_, '_, '_>,
+) -> anyhow::Result<Arc<[CanonicalLabel]>> {
+    let values = values.map_or_else(Vec::new, |values| values.items);
+    if values.len() > 1 {
+        anyhow::bail!("rule(toolchains = ...) supports at most one requirement");
+    }
+    if values.is_empty() {
+        return Ok(Arc::from([]));
+    }
+    let context = BzlEvaluationContext::from_evaluator(eval)?;
+    let source = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
+        .map_err(anyhow::Error::msg)?;
+    values
+        .iter()
+        .map(|value| {
+            let target = value.rsplit_once(':').map(|(_, target)| target);
+            let recursive = target.is_none() && (*value == "..." || value.ends_with("/..."));
+            if recursive || matches!(target, Some("all" | "all-targets" | "*")) {
+                anyhow::bail!("rule(toolchains = ...) requires a direct target label: {value}");
+            }
+            package_context_label(source.package().package().as_str(), value)
+        })
+        .collect::<anyhow::Result<Vec<_>>>()
+        .map(Into::into)
 }
 
 fn package_global(
@@ -1494,6 +1532,8 @@ fn coerce_starlark_value(
 struct RuleDefinitionGen<V> {
     implementation: V,
     #[trace(unsafe_ignore)]
+    required_toolchains: Arc<[CanonicalLabel]>,
+    #[trace(unsafe_ignore)]
     schema: Arc<[RuleAttributeSchemaGen<V>]>,
     executable: bool,
     test: bool,
@@ -1507,6 +1547,7 @@ struct RuleDefinitionGen<V> {
 #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
 struct FrozenRuleDefinition {
     implementation: FrozenValue,
+    required_toolchains: Arc<[CanonicalLabel]>,
     schema: Arc<[FrozenRuleAttributeSchema]>,
     capability: Arc<RuleCapability>,
     root_string_build_setting: bool,
@@ -1539,6 +1580,7 @@ impl<'v> Freeze for RuleDefinition<'v> {
         };
         Ok(FrozenRuleDefinition {
             implementation: self.implementation.freeze(freezer)?,
+            required_toolchains: self.required_toolchains,
             schema: self
                 .schema
                 .iter()
@@ -2063,6 +2105,25 @@ impl<'v> StarlarkValue<'v> for ConfigModule {
     }
 }
 
+#[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+struct PlatformCommonModule;
+
+impl fmt::Display for PlatformCommonModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("platform_common")
+    }
+}
+
+starlark::starlark_simple_value!(PlatformCommonModule);
+
+#[starlark_value(type = "platform_common")]
+impl<'v> StarlarkValue<'v> for PlatformCommonModule {
+    fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
+        (attribute == "ToolchainInfo")
+            .then(|| heap.alloc_simple(AnalysisBuiltinCallable::new("ToolchainInfo")))
+    }
+}
+
 #[starlark_value(type = "rule")]
 impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
     type Canonical = Self;
@@ -2120,6 +2181,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
             None
         };
         let implementation = self.implementation;
+        let required_toolchains = self.required_toolchains.clone();
         let capability = self.capability.clone();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
@@ -2197,6 +2259,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                 recorder.starlark_rule(
                     name.to_owned(),
                     implementation,
+                    required_toolchains,
                     capability,
                     schema,
                     values,
@@ -2366,8 +2429,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         implementation: Value<'v>,
         attrs: Option<SmallMap<String, Value<'v>>>,
         build_setting: Option<Value<'v>>,
+        toolchains: Option<UnpackList<&str>>,
         #[starlark(default = false)] executable: bool,
         #[starlark(default = false)] test: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<RuleDefinition<'v>> {
         let root_string_build_setting = build_setting
             .map(|value| RootStringBuildSetting::from_value(value).is_some())
@@ -2429,6 +2494,7 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         }
         Ok(RuleDefinition {
             implementation,
+            required_toolchains: rule_toolchain_requirement(toolchains, eval)?,
             schema: schema.into(),
             executable,
             test,
@@ -2594,6 +2660,7 @@ pub(crate) fn loading_globals() -> Globals {
     globals.set("native", NativeModule);
     globals.set("attr", AttrModule);
     globals.set("config", ConfigModule);
+    globals.set("platform_common", PlatformCommonModule);
     globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));
     globals.build()
