@@ -4010,6 +4010,31 @@ request pre-scan/fresh projection, then configuration converters. A mandatory
 REPLAN precedes configured-target or command activation; configured-target
 cycle deferral remains unchanged.
 
+### Host conversion inputs schema implementation ACCEPT (2026-08-05)
+
+`WP-6-m2-host-conversion-inputs-schema-implementation` adds the public,
+producer-free `HostConversionInputs` schema in `slug_configuration_v2`. Its
+optional AutoCPU, path-flavor, and capacity fields preserve not-demanded
+without forcing a Host read. Strict occurrence-ordered home facts and
+raw-UTF-16-ordered Windows facts reject duplicates and reversals; the Windows
+outcome retains resolved payload versus `IOExceptionFallback` structurally.
+
+The Arc-backed aggregate and every leaf have structural equality, order, hash,
+and `Allocative`; only the aggregate is `Dupe`. Tests freeze all 15 AutoCPU
+spellings, full-range capacity values, valid and invalid fact order, unpaired
+UTF-16, Arc sharing, and one-field-at-a-time aggregate identity changes. The
+change is 233 production, 272 test, and 505 total net Rust lines. Seventeen
+crate tests, crate check, GNU-Windows no-run, formatting, archive, scope, cap,
+no-Cargo, and diff gates pass; independent source and representation reviews
+return `ACCEPT`.
+
+Run next only `WP-6-m2-process-host-owner-capture-design`, docs-only. Freeze
+the exact native source, error, retry/latching, synchronization, process
+construction, and test-injection contract before core owns any Host read. Add
+no Rust, Host access, dependency, DICE, request scan, converter, command, or
+configured-target behavior. Configured-target cycle deferral remains
+unchanged.
+
 ### Windows option-path short-name resolution design (2026-08-05)
 
 `WP-6-m2-windows-option-path-short-name-resolution-design` closes the
