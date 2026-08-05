@@ -2564,6 +2564,108 @@ new representation/context/oracle needs, count changes, or cap breach are
 normalization, checksum, wire, DICE, and configured-cycle semantics remain
 deferred.
 
+### Java/Guava renderer authority evidence retry (2026-08-04)
+
+This is evidence only: it adds no JVM, Java source, fixture, or runtime
+dependency to Slug. Authority is Bazel 9.2 pinned source
+`8220c6198837d5c13d53fea211cf3282aa12408a`, not the sibling worktree HEAD.
+`bazel info java-home java-runtime` in `../bazel` reported:
+
+```
+INFO: Invocation ID: a58d770b-bc2f-46e6-be8b-4c024fde0be0
+java-home: /run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/install/3e6f3b7d6fdac67aed908160850e082b/embedded_tools/jdk
+java-runtime: OpenJDK Runtime Environment (build 25.0.2+10-LTS) by Azul Systems, Inc.
+```
+
+The exact `java-home/bin/java -version` is `openjdk version "25.0.2" 2026-01-20
+LTS`, `Zulu25.32+17-CA (build 25.0.2+10-LTS)`, and Zulu 64-bit Server VM. The
+embedded JRE has no compiler, so the nonpersistent probe used cached Zulu
+`javac 25.0.1` at
+`.../cache/repos/v1/contents/d9a6fe8fadec0ff7dc65b029aed97a8d9fe270e492ba26b4ac8fa49c55c6d31d/37f719ba-fef0-4b1e-a3e7-8870ce12dbe5/bin/javac`.
+That compiler is evidence plumbing only: the probe's generated record
+`ObjectMethods` and every `toString()` execute on Bazel's exact 25.0.2 JRE.
+
+The isolated directory `/tmp/slug-renderer-authority-retry` contained only a
+standard-Java `RendererProbe` (same-shaped EnvVar records, collections,
+`EnumMap`, duration, and owner-equivalent enum overrides). Its UTF-16 input is
+actual U+E000 then actual U+10000, and its exact discriminator is
+`Stream.of("\uE000", "\uD800\uDC00").distinct().sorted().toList()`; it neither
+joins strings nor skips the distinct-then-natural-sort path. Commands and
+stdout were:
+
+```
+$ JAVAC=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/cache/repos/v1/contents/d9a6fe8fadec0ff7dc65b029aed97a8d9fe270e492ba26b4ac8fa49c55c6d31d/37f719ba-fef0-4b1e-a3e7-8870ce12dbe5/bin/javac
+$ JRE=/run/media/system/Colossus/dev-home/.cache/bazel/_bazel_wgray/install/3e6f3b7d6fdac67aed908160850e082b/embedded_tools/jdk/bin/java
+$ "$JAVAC" -version
+javac 25.0.1
+$ "$JAVAC" /tmp/slug-renderer-authority-retry/RendererProbe.java
+$ "$JRE" -version
+openjdk version "25.0.2" 2026-01-20 LTS
+OpenJDK Runtime Environment Zulu25.32+17-CA (build 25.0.2+10-LTS)
+OpenJDK 64-Bit Server VM Zulu25.32+17-CA (build 25.0.2+10-LTS, mixed mode)
+$ "$JRE" -cp /tmp/slug-renderer-authority-retry RendererProbe
+EMPTY=x=EMPTY,<SP><LF>
+SINGLETON_EMPTY=x="[]",<SP><LF>
+MULTI=x="[a, ]",<SP><LF>
+ENTRY=x="a=b=c",<SP><LF>
+SET=x="Set[name=N, value=V]",<SP><LF>
+INHERIT=x="Inherit[name=N]",<SP><LF>
+UNSET=x="Unset[name=N]",<SP><LF>
+BOOL=x="true",<SP><LF>
+INT=x="-16",<SP><LF>
+STRING=x="a\\b\"c",<SP><LF>
+ENUM=x="OFF",<SP><LF>
+COMPILATION_MODE=x="dbg",<SP><LF>
+STRIP_MODE=x="sometimes",<SP><LF>
+PLATFORM_TYPE=x="mÄcos",<SP><LF>
+DURATION=x="PT1H1M1S",<SP><LF>
+TIMEOUT_DEFAULT=x="{short=PT1M, moderate=PT5M, long=PT15M, eternal=PT1H}",<SP><LF>
+TIMEOUT_MIXED=x="{short=PT1H1M1S, moderate=PT1M1S, long=PT15M, eternal=PT1H}",<SP><LF>
+UTF16_LIST=x="[𐀀, ]",<SP><LF>
+UTF16_INPUT_UNITS=E000,D800 DC00
+UTF16_OUTPUT_UNITS=D800 DC00,E000
+```
+
+`<SP><LF>` denotes output byte `0x20` followed by LF, not literal output text.
+The input/output unit rows and bracketed list prove the required reversal.
+
+| Retained value / concrete renderer authority | Exact `toString()` | Exact outer field bytes |
+| --- | --- | --- |
+| empty list / Bazel `OptionsBase.java:96-116` | not used | `x=EMPTY, ` |
+| singleton-empty, multi-element, `ImmutableList` / Java SE 21 [`AbstractCollection#toString`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/AbstractCollection.html#toString()); Guava `ImmutableList extends ImmutableCollection extends AbstractCollection` | `[]`; `[a, ]` | `x="[]", `; `x="[a, ]", ` |
+| reverse U+E000/U+10000 input through `distinct().sorted().toList()` / Java SE 21 [`String#compareTo`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html#compareTo(java.lang.String)) UTF-16 order and `AbstractCollection#toString`; exact runtime probe | `[𐀀, ]` | `x="[𐀀, ]", ` |
+| Guava `Maps.immutableEntry("a","b=c")` / `Maps.java:1470-1473` returns `AbstractMap.SimpleImmutableEntry`; Java SE 21 [`SimpleImmutableEntry#toString`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/AbstractMap.SimpleImmutableEntry.html#toString()) | `a=b=c` | `x="a=b=c", ` |
+| `EnvVar.Set`, `Inherit`, `Unset` / Bazel `Converters.java:599-617`; Java SE 21 [`Record#toString`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html#toString()) | `Set[name=N, value=V]`; `Inherit[name=N]`; `Unset[name=N]` | corresponding quoted rows above |
+| Boolean, Integer, String / Java SE 21 [`Boolean`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Boolean.html#toString()), [`Integer`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Integer.html#toString(int)), [`String`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html#toString()) | `true`; `-16`; `a\b"c` | `x="true", `; `x="-16", `; `x="a\\b\"c", ` |
+| ordinary enum / Java SE 21 [`Enum#toString`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Enum.html#toString()); Bazel `EnumConverter.java:50-60` returns the typed member | `OFF` | `x="OFF", ` |
+| `CompilationMode.DBG` / Bazel `CompilationMode.java:24-42` | `dbg` | `x="dbg", ` |
+| `CppConfiguration.StripMode.SOMETIMES` / Bazel `CppConfiguration.java:119-133` | `sometimes` | `x="sometimes", ` |
+| `PlatformTypeConverter.convert("MÄCOS")` / Bazel `AppleCommandLineOptions.java:393-406`, ASCII lowercase `String` result | `mÄcos` | `x="mÄcos", ` |
+| `TestTimeout` / Bazel `TestTimeout.java:159-162` | lowercase `short`, `moderate`, `long`, `eternal` | timeout rows above |
+| `Duration`; `EnumMap<TestTimeout,Duration>` / Java SE 21 [`Duration#toString`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/time/Duration.html#toString()) and [`AbstractMap#toString`](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/AbstractMap.html#toString()) | `PT1H1M1S`; lowercase-key ordered maps | exact duration/default/mixed rows above |
+| all nonempty/non-null values / Bazel `OptionsBase.java:51-52,96-116` | value bytes before outer escaping | `\\` becomes `\\\\`, `"` becomes `\"`, then surrounding `"..."`; only null is `NULL` |
+
+Guava is bound by artifact and source, never an interface inference: pinned
+`MODULE.bazel:175` names `com.google.guava:guava:33.5.0-jre`; pinned
+`maven_install.json:217-221` locks JAR SHA-256
+`1e301f0c52ac248b0b14fdc3d12283c77252d4d6f48521d572e7d8c4c2cc4ac7`.
+The earlier temporary Maven JAR hashed exactly to that value. Official Guava
+tag `v33.5.0` is `8868c096cfdabbe38170b6e395369c315cfb72a1`; its inspected
+source provides the stated immutable-list chain and concrete entry return.
+The retry probe and all earlier temporary Java/JAR/source material are deleted.
+
+This closes only renderer authority. Preserve 287/8/5/41; descriptor/family
+grammar, Rust, contextual and regex conversion, normalization, checksums,
+wire, DICE, and configured-target cycles remain deferred. Any disagreement,
+retained fixture, or production JVM implication is `REPLAN`.
+
+Independent terminal review accepted the reverse-order UTF-16 discriminator,
+exact renderer owners/bytes, runtime/compiler separation, Guava artifact/source
+binding, cleanup, scope, and cap. Run next only
+`WP-6-m2-pure-native-family-byte-contract-ledger-retry`: reuse this accepted
+renderer authority and freeze one compact row per pure conversion/value/default
+family, without repeating the 287 descriptor rows or adding Rust.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
