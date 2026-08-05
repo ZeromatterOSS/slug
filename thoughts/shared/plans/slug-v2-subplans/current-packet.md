@@ -1,13 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-4`
+Packet: `WP-6-m2-pure-native-family-byte-contract-ledger-retry-5`
 Milestone: M2 authoritative target configuration
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Role: freeze terminal nonrepeat/attachment, default, discriminator, and cache
-facts before mechanical descriptor attachment.
+Role: freeze actual enum defaults and remaining pure-family default-route facts
+before mechanical descriptor attachment.
 Predecessors: exact Java/Guava renderer authority, forced-sharding structural
 semantic identity, and the full family-source/16-enum route anchor table are
-accepted. Retry 3 was discarded at terminal review; this packet performs no
+accepted. Retry 4 was discarded at terminal review; this packet performs no
 new source discovery.
 
 Write one compact `F-*` contract row for every distinct pure semantic family,
@@ -65,6 +65,20 @@ Mandatory facts are immutable:
   `D("1")` is retained/cache `[(?:(?>.*)) Options: [1]]→x="[(?:(?>.*)) Options: [1]]", `
   while `U("+2")` remains deferred with no general `E/A`; and
 - Platform has `D(s)=E(s)=ASCII-lower(s)`.
+- Every enum `D(s)` case-folds through its normal route. Actual defaults are:
+  StrictDeps `{default,error,off}`; Exec `{off}`;
+  OutputDirectoryNaming `{diff_against_dynamic_baseline}`; OutputPaths `{off}`;
+  Include `{off}`; AndroidConfig `{MAIN}`; Apk `{v1_v2}`;
+  AndroidManifest `{android}`; ManifestOrder `{alphabetical}`;
+  AppleConfig `{UNKNOWN}`; DynamicMode `{off,default}`; JavaClasspath `{bazel}`;
+  OneVersion `{OFF}`; Cancel `{never}`; Compilation `{fastbuild,opt}`; and
+  Strip `{sometimes}`. Keep concrete nondefault `E` and exact bytes, with
+  lowercase overrides only for Compilation and Strip;
+- F-AllowCommaList additionally has generic nonrepeat `D(s)=split(s)` and
+  `D("-O0,-DDEBUG=1")=[-O0,-DDEBUG=1]→x="[-O0, -DDEBUG=1]", ` alongside
+  empty/default and repeat routes; F-Dotted has only `N=None` defaults and
+  distinct `E("1.0")`/`E("1")`, never `D("1.0")`; and
+- runs `U("+2")` is accepted but deferred while retaining original text.
 
 Preserve the disjoint `287 + 8 + 5 + 41 = 341` routing and independent
 repeat/old-name/expansion/implicit metadata. The table must let a later packet

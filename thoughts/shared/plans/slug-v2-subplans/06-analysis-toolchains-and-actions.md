@@ -2895,6 +2895,22 @@ Platform `D/E` ASCII lower. Preserve `287 + 8 + 5 + 41` and cycle deferral.
 Stop again on undefined grammar, default, byte, identity, scope, or cap fact;
 after acceptance run only mechanical 287-descriptor attachment.
 
+### Pure native family byte-contract ledger retry 4 REPLAN (2026-08-04)
+
+The unaccepted 59-line retry-4 ledger was discarded because actual enum default
+inventories and generic case-folded `D(s)` routes were not frozen, AllowComma
+did not distinguish generic nonempty default from repeat flattening, Dotted
+claimed a default for `1.0`, and runs did not state accepted-but-deferred `+2`.
+No source lookup, probe, descriptor, Rust, or runtime change occurred.
+
+Run only `WP-6-m2-pure-native-family-byte-contract-ledger-retry-5`, docs-only
+synthesis from the same accepted evidence. Preserve every retry-4 fact; add the
+actual enum `D` inventory/generic case-folding; AllowComma `D(s)` and
+`D("-O0,-DDEBUG=1")`; Dotted only `N=None` with distinct `E("1.0")`/`E("1")`;
+and accepted-but-deferred runs `U("+2")`. Preserve `287 + 8 + 5 + 41`, caps,
+hard stops, and all deferrals including user-approved later configured-target
+dependency cycles. After acceptance run only mechanical 287 attachment.
+
 ### Java/Guava renderer authority evidence REPLAN (2026-08-04)
 
 `WP-6-m2-java-guava-renderer-authority-evidence` bound Bazel 9.2's exact Zulu
