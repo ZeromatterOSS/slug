@@ -732,3 +732,32 @@ packet, while the accepted recursive Bazel 9.2 fixture uses a Starlark file and
 does not pin the exact expression/lifecycle contract. Run only
 `WP-6-m2-root-cquery-starlark-label-evidence` next. Default/explicit `label`
 output remains unsupported until the full configuration substrate exists.
+
+### Root cquery Starlark-label evidence (2026-08-04)
+
+`WP-6-m2-root-cquery-starlark-label-evidence` is accepted from an isolated copy
+of `recursive-custom-rule-providers-actions` under `/usr/bin/bazel` 9.2.0 and
+one retained output base. The exact serial sequence was:
+
+1. `cquery //parent:parent --output=starlark
+   --starlark:expr=str(target.label)` exited 0 and wrote exactly the 18 bytes
+   `@@//parent:parent\n` (`40402f2f706172656e743a706172656e740a`).
+2. The same formatter for `//parent:missing` exited 1 with empty stdout and the
+   stable skipping/no-such-target pair naming
+   `<workspace>/parent/BUILD.bazel`, followed by
+   `ERROR: Build did NOT complete successfully`.
+3. Repeating the successful command in the same server exited 0 and returned
+   byte-identical stdout. Bazel reported warm analysis progress through four
+   packages/six configured targets and then five packages/nine configured
+   targets before successful completion.
+
+The output exposes neither a configuration checksum nor a mnemonic and agrees
+with the canonical-label component of the frozen Bazel 9.2 Starlark-file row.
+The retained server shut down successfully, the temporary workspace/output
+base was removed, and no fixture or generated record changed.
+
+Design next only `WP-6-m2-root-cquery-starlark-label-boundary-design`. Preserve
+the exact single-root-literal, explicit formatter/expression boundary and the
+existing `RootConfiguredTargetAnalysisKey`; default/explicit `label`, arbitrary
+Starlark, files, patterns, external labels, and configuration identity remain
+outside the packet.

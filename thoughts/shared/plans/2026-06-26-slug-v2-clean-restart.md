@@ -25,9 +25,9 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions, and exact Bazel 9.2 root cquery label evidence | general Bazel target-option/configuration identity plus transition, toolchain/platform, repository-mapping, and broader action ownership gates | run `WP-6-m2-root-cquery-starlark-label-evidence` |
+| M2: analysis graph | **active** | recursive custom-rule configured analysis, returned providers, target-local actions, and exact Bazel 9.2 root cquery label/Starlark-label evidence | general Bazel target-option/configuration identity plus transition, toolchain/platform, repository-mapping, and broader action ownership gates | design `WP-6-m2-root-cquery-starlark-label-boundary-design` |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | pause while the bounded M1 Host package key is current |
-| M4: `cquery` | **evidence active** | command/parser placeholder, accepted Stage 6 recursive configured-target evidence, and exact default/label/missing/recovery output | default/label needs the unmodeled configuration checksum; a configuration-opaque Starlark-label slice needs exact 9.2 lifecycle evidence | run the shared M2 Starlark-label evidence packet |
+| M4: `cquery` | **design active** | command/parser placeholder, accepted Stage 6 recursive configured-target evidence, exact default/label evidence, and configuration-opaque Starlark-label success/missing/recovery | default/label needs the unmodeled configuration checksum; the first narrow Starlark-label consumer needs a reviewed command/wire/error lifecycle | share the active M2 boundary design |
 | M5: `aquery` | not started | retained narrow action fixtures only | M4 and exact Stage 6 action graph/formatters | none |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
@@ -35,7 +35,7 @@ and must name the same packet.
 
 ### Current packet
 
-`WP-6-m2-root-cquery-starlark-label-evidence`.
+`WP-6-m2-root-cquery-starlark-label-boundary-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
@@ -52,8 +52,10 @@ the default checksum depends on fourteen native option fragments, host and
 platform inputs, plus Starlark options/scopes; Slug's opaque `first-build`
 cannot reproduce it in a bounded packet. That public output remains
 unsupported. Reserved review selected a smaller first consumer whose Starlark
-expression emits only the canonical configured label, so the active packet
-obtains exact Bazel 9.2 success/failure/recovery evidence for that boundary.
+expression emits only the canonical configured label. Retained Bazel 9.2 now
+pins its exact `@@//parent:parent\n` bytes, missing-target failure, and
+same-server recovery; the active packet designs the narrow command, typed
+error, daemon-wire, and lifecycle boundary before Rust.
 
 The direct-local external exported-source build lifecycle evidence is accepted.
 Pinned Bazel 9.2 proves present/edit/recreate success with no output, deletion
