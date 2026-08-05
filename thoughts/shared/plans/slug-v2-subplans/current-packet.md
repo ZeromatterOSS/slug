@@ -25,7 +25,8 @@ execution-platform outer/toolchain inner MODULE order.
 Analyze the selected NODEP implementation with the existing root configured
 analysis key and unchanged configuration. It must be a non-executable,
 non-test leaf Starlark rule whose exact supported user schema/value is one
-string `marker` plus only the loader-invariant empty `tags` entry, with no
+string `marker` plus only the loader-invariant defaulted empty `tags` entry,
+with no
 ordinary dependencies, requirements,
 transition/build-setting role, actions, outputs, diagnostics, or providers
 beyond exactly builtin ToolchainInfo plus implicit empty DefaultInfo. Verify

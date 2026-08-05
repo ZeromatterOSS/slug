@@ -1415,9 +1415,9 @@ errors. An external registration records an error without loading/projecting
 the external label, while discoverable root registrations and the required
 type still participate in that round's Need union. Toolchain execution
 constraints reject duplicate settings. Selected leaves require exactly one
-user string `marker` schema/value plus only the loader-invariant empty `tags`
-entry, no executable/test capability, and the existing dependency/requirement/
-transition/build-setting/action/output/diagnostic guards. Post-analysis
+user string `marker` schema/value plus only the loader-invariant defaulted
+empty `tags` entry, no executable/test capability, and the existing dependency/
+requirement/transition/build-setting/action/output/diagnostic guards. Post-analysis
 provider validation uses exact builtin keys and exact two-entry cardinality
 for empty DefaultInfo plus ToolchainInfo, never names.
 Zero-requirement requesters bypass anchor/resolution and retain the existing
