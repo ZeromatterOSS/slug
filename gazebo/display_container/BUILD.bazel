@@ -1,14 +1,13 @@
-load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
-oncall("build_infra")
+package(default_visibility = ["//visibility:public"])
 
 rust_library(
     name = "display_container",
-    srcs = glob(
-        ["src/**/*.rs"],
-    ),
-    deps = [
-        "fbsource//third-party/rust:either",
-        "fbsource//third-party/rust:indenter",
-    ],
+    srcs = glob(["src/**/*.rs"]),
+    aliases = aliases(),
+    edition = crate_edition(),
+    deps = all_crate_deps(normal = True),
+    proc_macro_deps = all_crate_deps(proc_macro = True),
 )

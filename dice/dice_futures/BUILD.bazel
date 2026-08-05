@@ -1,23 +1,13 @@
-load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
-oncall("build_infra")
+package(default_visibility = ["//visibility:public"])
 
 rust_library(
     name = "dice_futures",
-    srcs = glob(
-        ["src/**/*.rs"],
-    ),
-    test_deps = [
-        "fbsource//third-party/rust:assert_matches",
-    ],
-    deps = [
-        "fbsource//third-party/rust:futures",
-        "fbsource//third-party/rust:once_cell",
-        "fbsource//third-party/rust:parking_lot",
-        "fbsource//third-party/rust:pin-project",
-        "fbsource//third-party/rust:slab",
-        "fbsource//third-party/rust:thiserror",
-        "fbsource//third-party/rust:tokio",
-        "//buck2/gazebo/dupe:dupe",
-    ],
+    srcs = glob(["src/**/*.rs"]),
+    aliases = aliases(),
+    edition = crate_edition(),
+    deps = all_crate_deps(normal = True) + ["//gazebo/dupe"],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
 )

@@ -87,7 +87,7 @@ fi
 
 root_v1_paths=$(git ls-files -- \
   .bazelignore .claude .github .vscode .watchmanconfig .envrc \
-  BUILD.bazel MODULE.bazel CHANGELOG.md Cross.toml HACKING.md \
+  CHANGELOG.md Cross.toml HACKING.md \
   buck_rust_binary.bzl ci.bzl defs.bzl lint_levels.bzl proto_defs.bzl \
   action_error_handler agent app_dep_graph_rules assets bazel_tools benchmarks \
   bootstrap buck2 build cfg examples explorer flake.lock flake.nix host_sharing \
@@ -98,6 +98,25 @@ if [ -n "$root_v1_paths" ]; then
   printf '%s\n' "$root_v1_paths"
 else
   ok "no tracked V1-only root paths"
+fi
+
+if [ -n "$(git_value ls-files --error-unmatch MODULE.bazel)" ]; then
+  if grep -F 'name = "slug"' MODULE.bazel >/dev/null 2>&1 &&
+     grep -F 'name = "rules_rust"' MODULE.bazel >/dev/null 2>&1 &&
+     grep -F 'version = "0.73.0"' MODULE.bazel >/dev/null 2>&1; then
+    ok "root MODULE.bazel is fresh Slug V2 metadata"
+  else
+    fail "root MODULE.bazel is not recognized Slug V2 metadata"
+  fi
+fi
+
+if [ -n "$(git_value ls-files --error-unmatch BUILD.bazel)" ]; then
+  if grep -F 'Cargo.Bazel.lock' BUILD.bazel >/dev/null 2>&1 &&
+     grep -F 'Cargo.lock' BUILD.bazel >/dev/null 2>&1; then
+    ok "root BUILD.bazel owns Slug V2 dependency inputs"
+  else
+    fail "root BUILD.bazel is not recognized Slug V2 metadata"
+  fi
 fi
 
 codex_v1_paths=$(git ls-files -- .codex \

@@ -1,30 +1,28 @@
-load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+load("@rules_rust//cargo:defs.bzl", "cargo_build_script")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
-oncall("build_infra")
+package(default_visibility = ["//visibility:public"])
+
+cargo_build_script(
+    name = "build_script",
+    srcs = ["build.rs"],
+    aliases = aliases(build = True, build_proc_macro = True),
+    edition = crate_edition(),
+    deps = all_crate_deps(build = True),
+    proc_macro_deps = all_crate_deps(build_proc_macro = True),
+)
 
 rust_library(
     name = "starlark_map",
     srcs = glob(["src/**/*.rs"]),
-    features = ["pagable"],
-    metadata = {
-        "buck.cfg_modifiers": [
-            # @oss-disable[end= ]: "ovr_config//rust:panic_unwind",
-        ],
-    },
-    rustc_flags = [
-        "--cfg=rust_nightly",
+    aliases = aliases(),
+    edition = crate_edition(),
+    deps = all_crate_deps(normal = True) + [
+        ":build_script",
+        "//allocative/allocative",
+        "//gazebo/dupe",
+        "//gazebo/strong_hash",
     ],
-    test_deps = [
-        "fbsource//third-party/rust:serde_json",
-    ],
-    deps = [
-        "fbsource//third-party/rust:equivalent",
-        "fbsource//third-party/rust:fxhash",
-        "fbsource//third-party/rust:hashbrown",
-        "fbsource//third-party/rust:serde",
-        "//buck2/allocative/allocative:allocative",
-        "//buck2/gazebo/dupe:dupe",
-        "//buck2/gazebo/strong_hash:strong_hash",
-        "//buck2/pagable:pagable",
-    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
 )

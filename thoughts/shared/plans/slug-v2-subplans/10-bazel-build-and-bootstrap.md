@@ -101,10 +101,12 @@ that lock, and gives crate_universe the root manifest and lock with
 `Cargo.Bazel.lock` owns reproducible rendering, and `MODULE.bazel.lock` owns
 bzlmod resolution. Manifest/toolchain changes update and review Cargo inputs
 first; only an explicit `CARGO_BAZEL_REPIN=1 bazel sync --only=slug_crates`
-may then update the rendering lock, and all affected lock diffs are reviewed
-together. The generated external repository may cover more than the CLI
-closure because the root manifest names the full workspace; only the owned
-first-party Bazel target graph is claimed to be closure-limited.
+may then update the rendering lock on rules_rust versions that support `sync`.
+Bazel 9.2 has removed that command, so this repository evaluates the named
+module extension with `CARGO_BAZEL_REPIN=1 bazel mod deps` instead. All affected
+lock diffs are reviewed together. The generated external repository may cover
+more than the CLI closure because the root manifest names the full workspace;
+only the owned first-party Bazel target graph is claimed to be closure-limited.
 
 Generated-source ownership is explicit and remains within the same closure:
 
@@ -137,6 +139,18 @@ rc is inspected or consumed, and no BuildBuddy/cache/RBE claim is made. A later
 credential-reviewed cache-only packet may add a non-secret opt-in repository
 configuration; RBE remains a distinct evidence packet. Query, cquery, aquery,
 self-hosting, and M2/M5/M6 semantics remain outside this developer-graph work.
+
+Gate A is accepted. Bazel 9.2.0/rules_rust 0.73.0 now owns all 19 retained
+packages, five local proc macros, three compiler-channel build scripts, and the
+LALRPOP build script. The fresh bzlmod graph pins `nightly/2025-09-14`; Cargo,
+crate-universe rendering, and bzlmod locks are checked in and a no-repin
+`bazel mod deps` left all three hashes stable. The first build exposed the
+grammar as compile-only data; declaring it as build-script runtime data fixed
+the exact sandbox failure. The final credential-free retained-root Bazel build
+and serial Cargo `dice`/`starlark` check passed with only existing unused-import
+and gold-linker warnings. The archive checker positively recognizes the fresh
+V2 root metadata. Independent Terra review returned `ACCEPT`; no rc, remote,
+app target, Rust source, or generated source entered the gate.
 
 ### 10.2 Bazel/BuildBuddy Developer Gate
 

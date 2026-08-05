@@ -1,12 +1,11 @@
-load("@fbsource//tools/build_defs:rust_library.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@slug_crates//:defs.bzl", "crate_edition")
 
-oncall("build_infra")
+package(default_visibility = ["//visibility:public"])
 
 rust_library(
     name = "lock_free_vec",
     srcs = glob(["src/**/*.rs"]),
-    crate_root = "src/lib.rs",
-    deps = [
-        "//buck2/allocative/allocative:allocative",
-    ],
+    edition = crate_edition(),
+    deps = ["//allocative/allocative"],
 )

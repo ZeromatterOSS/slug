@@ -1,8 +1,6 @@
 /target/
 target/
 /.codex-cargo-target/
-/Cargo.lock
-
 # Bazel/Slug generated workspace output links and trees.
 buck-out
 bazel-external
