@@ -838,6 +838,24 @@ accepted CLI/oracle row remains unchanged and supplies the public regression.
 Caps are 20 production/12 test/92 total net lines; external, BUILD, missing,
 cycle, evaluation, freeze, query, CLI, fixture, and DICE behavior remain frozen.
 
+The implementation adds only a validated `package/target` path formatter and
+the missing Parse display suffix, plus root and non-root assertions. Both
+focused cases, all 58 loading tests, all 53 loading-query tests, all 34 server
+tests, and the loading/query GNU-Windows check pass. A direct CLI replay now
+matches the accepted broken-Bzl exit and summary. The unchanged 57-row test
+continues past that repaired row and then reproduces its clean pre-existing
+`bzl_cycle_failure` unavailable-root-DICE-node terminal; the full CLI suite is
+therefore 38/39. The user explicitly deferred cyclic dependencies, and no cycle
+branch or assertion changed.
+
+Because the implementation packet falsely required that whole CLI target to
+be green, independent review required a second material contract correction;
+its terminal scheduling outcome is `REPLAN`, while the exact two-file Host-Bzl
+repair remains an accepted prerequisite. Next design only
+`WP-10-m8-bazel-canonical-fixture-payload-cycle-baseline-design`: preserve the
+cycle row and oracle unchanged, and freeze an honest before/after negative gate
+for the atomic migration before any payload, consumer, target, or deletion work.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

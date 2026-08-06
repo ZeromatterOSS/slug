@@ -425,6 +425,16 @@ fn root_load_resolution_is_mapping_free_and_rejects_path_escape() {
             "{invalid:?} entered Host key identity"
         );
     }
+
+    let root = resolve_host_load_label(&PackagePath::parse("").unwrap(), ":a.bzl").unwrap();
+    let error = super::HostBzlModuleError::Parse {
+        label: root,
+        message: Arc::from("broken"),
+    };
+    assert_eq!(
+        error.to_string(),
+        "parsing //:a.bzl: broken\ncompilation of module 'a.bzl' failed"
+    );
 }
 
 #[tokio::test]
@@ -749,7 +759,9 @@ async fn host_package_retained_graph_replays_all_input_lifecycles() {
         package_policy(),
     )
     .await;
-    assert!(terminal_error(&invalid_bzl).contains("parsing //pkg:a.bzl"));
+    let invalid_error = terminal_error(&invalid_bzl);
+    assert!(invalid_error.contains("loading `:a.bzl`: parsing //pkg:a.bzl"));
+    assert!(invalid_error.contains("compilation of module 'pkg/a.bzl' failed"));
 
     let nested_build = "load(\":sub/n.bzl\", \"value\")\nfilegroup(name = value)\n";
     let mut nested_epoch = package_epoch(

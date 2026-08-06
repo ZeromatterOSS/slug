@@ -773,6 +773,14 @@ impl HostRootBzlLabel {
         Self { package, target }
     }
 
+    fn path_fragment(&self) -> String {
+        if self.package.as_str().is_empty() {
+            self.target.to_string()
+        } else {
+            format!("{}/{}", self.package, self.target)
+        }
+    }
+
     fn canonical_label(&self) -> CanonicalLabel {
         CanonicalLabel::parse(&format!("@@//{}:{}", self.package, self.target))
             .expect("validated root .bzl identity is a canonical label")
@@ -1126,7 +1134,11 @@ impl fmt::Display for HostBzlModuleError {
         match self {
             Self::Source(error) => error.fmt(f),
             Self::Input(error) => error.fmt(f),
-            Self::Parse { label, message } => write!(f, "parsing {label}: {message}"),
+            Self::Parse { label, message } => write!(
+                f,
+                "parsing {label}: {message}\ncompilation of module '{}' failed",
+                label.path_fragment()
+            ),
             Self::LoadLabel { source, error } => {
                 write!(f, "resolving a load in {source}: {error}")
             }
