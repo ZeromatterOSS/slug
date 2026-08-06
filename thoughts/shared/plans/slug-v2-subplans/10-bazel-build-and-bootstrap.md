@@ -638,6 +638,25 @@ split, and exact caps. If no bounded drift enforcement exists without Cargo
 execution from Bazel, ambient tools, or CI assumptions, it must return terminal
 `REPLAN` rather than weaken the fixture semantics.
 
+The snapshot design is also terminal `REPLAN`. A checked-in payload is a
+declared Bazel input, but Bazel cannot mandatorily prove its no-follow source
+provenance under the frozen fixture graph. Recursive checking has the same
+repository-watch hole; individual file labels miss additions and empty
+directories; package-local globs/exports change the queried graphs; and a
+manual Rust/Cargo check, `bazel sync`, Git-index check, or future CI rule is
+skippable or ambient. The payload can therefore diverge silently in an ordinary
+supported Bazel developer invocation.
+
+Making the payload the sole canonical fixture representation would remove the
+duplicate, but it is a different ownership migration: the Python oracle
+harness currently `copytree`s each `fixture/workspace`, Cargo consumers use
+those paths directly, and deleting 14 source trees changes the fixture corpus.
+That possibility is neither accepted nor implemented here. The next packet is
+`WP-10-m8-bazel-canonical-fixture-payload-migration-design`; it must audit every
+Python/Rust/plan consumer, define the reversible provenance transition and
+byte-exact fresh Bazel 9 replay, and either freeze one bounded canonical format
+used by oracle, Cargo, and Bazel together or return terminal `REPLAN`.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
