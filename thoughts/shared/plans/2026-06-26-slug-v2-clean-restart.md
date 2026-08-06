@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 39 accepted Bazel targets covering 777 source cases and passing all 773 default-active Linux Cargo cases with stable locks; all Bzlmod and fixture-free query cases now have green Bazel targets; isolated Cargo/Bazel evidence accepts helper-relative compile-time payload embedding with no runtime runfiles | The sole-payload, every Python/Rust/Bazel consumer switch, four blocked targets, and all 163 source deletions must land in one reversible commit. The core unit target still lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-canonical-fixture-payload-migration-implementation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 has 39 accepted Bazel targets covering 777 source cases; isolated Cargo/Bazel evidence accepts helper-relative compile-time payload embedding with no runtime runfiles | The atomic payload migration stopped cleanly because its mandatory preflight reproduced three documented clean-HEAD failures: one broken-Bzl diagnostic and two server scratch fixtures without BUILD package markers. Correct only the server fixtures first; the payload/consumers/163 deletions remain absent. The core unit target still lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-server-loadfiles-package-fixture-correction` |
 
 ### Current packet
 
-`WP-10-m8-bazel-canonical-fixture-payload-migration-implementation`.
+`WP-10-m8-bazel-server-loadfiles-package-fixture-correction`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

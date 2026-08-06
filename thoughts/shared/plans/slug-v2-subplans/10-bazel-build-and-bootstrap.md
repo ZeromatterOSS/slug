@@ -797,6 +797,22 @@ handwritten additions, 38 non-generated touched files, 3,900 total changed
 lines, and 1,650 final net lines. Any different compile path or ownership,
 partial commit, weakened replay/platform contract, or cap overflow is REPLAN.
 
+The first atomic implementation attempt stopped before deletion and left no
+diff. Its preflight passed the migrated graph-output 5/5 and loading-query
+55/55 suites, but reproduced three clean `9344ea0d` baselines: the CLI
+broken-Bzl row still lacks Bazel's pinned `compilation of module ... failed`
+fragment, while two server-only `loadfiles` scratch tests name absolute `.bzl`
+labels in directories without BUILD package markers. Clean focused reruns
+failed identically after the complete migration draft was removed.
+
+The server failures are invalid test setup, not query behavior: add empty
+`BUILD.bazel` files for `shared`, `root`, `leaf`, and `alternate` in one
+four-line test-only packet, preserving all query/lifecycle assertions. Run
+`WP-10-m8-bazel-server-loadfiles-package-fixture-correction` first. Then design
+the separate Host-Bzl diagnostic parity repair around the pinned fixture and
+`HostBzlModuleEvalKey`; only after both prerequisites are green may the atomic
+payload migration restart unchanged.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
