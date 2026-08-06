@@ -23,6 +23,15 @@ rust_library(
 )
 
 rust_test(
+    name = "slug_bzlmod_v2_test",
+    crate = ":slug_bzlmod_v2",
+    aliases = aliases(normal_dev = True),
+    deps = all_crate_deps(normal_dev = True),
+    size = "small",
+    visibility = ["//visibility:private"],
+)
+
+rust_test(
     name = "dice_inputs_test",
     srcs = ["tests/dice_inputs.rs"],
     edition = crate_edition(),

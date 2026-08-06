@@ -540,6 +540,19 @@ cap, credential-pattern, stable-lock, diff, process-cleanup, and independent
 review gates pass. Next map only the private crate-mode Bzlmod target with its
 declared Tokio dev edge; do not combine any other target or source repair.
 
+The Bzlmod crate-mode target is accepted. One private target reuses the
+production crate and adds only generated `normal_dev` aliases/deps for the
+declared Tokio dev edge. Credential-free nightly Bazel and serial Cargo both
+pass all 278 library cases, including the source-owned `current_exe()` child;
+the GNU-Windows test binary compiles. No-repin module evaluation leaves all
+three lock hashes stable, and archive, scope, +9-net/100-line cap,
+credential-pattern, diff, process-cleanup, and independent review gates pass.
+Together with the ten fixture-free integrations and lockfile target, all 464
+Bzlmod cases now have green Bazel owners. Gate C1 has 38 accepted targets
+covering 749 source cases and 745 default-active Linux Cargo cases. Next design
+only the query library's clean-baseline `PreparationRestart` failure before
+mapping its 28-case crate-mode target.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
