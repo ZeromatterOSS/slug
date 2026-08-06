@@ -1032,6 +1032,30 @@ service, add evidence/CI/code/BUILD/MODULE/lock changes, or weaken credential,
 target, cycle, core, and platform boundaries. Live cache evidence and live RBE
 evidence remain separate successor packets in that order.
 
+The repository-config implementation is accepted. Root `.bazelrc` contains
+exactly the five user-approved BuildBuddy Cloud options plus the eight accepted
+mode options: ordinary builds use remote cache with local
+`worker,sandboxed,local` execution, `buildbuddy-cache` explicitly clears the
+executor and waits for uploads, and `buildbuddy-rbe` forces remote-only managed
+Linux/amd64 execution with no fallback. There is no header, import, instance,
+custom image, credential, or unrelated option.
+
+Bazel 9.2 loaded only this explicit root RC with system, workspace, and home RC
+discovery disabled. Both named profiles parsed and analyzed
+`//app/slug_cli_v2:slug` with `--nobuild`, zero actions, and final empty
+cache/executor/BES endpoints; the reported expansion contained only the root
+file and showed the cache executor clearing plus the exact RBE strategy and
+three scheduler properties. No remote service or home authentication was
+accessed. Archive, exact-line, credential-pattern, scope, cap, and diff checks
+pass.
+
+Next design only `WP-10-m8-bazel-buildbuddy-cache-evidence-design`. It must
+freeze the smallest secret-safe prime/replay driver, exact 43-green target
+manifest, disposable raw BEP/execution-log lifecycle, allowlisted sanitized
+record, cache-only discriminators, failure classes, review split, and caps
+before any authenticated invocation. RBE configuration remains present but no
+RBE claim or command enters that packet.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

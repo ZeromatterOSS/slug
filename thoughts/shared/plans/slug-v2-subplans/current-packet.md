@@ -1,29 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-repository-config-implementation`
+Packet: `WP-10-m8-bazel-buildbuddy-cache-evidence-design`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a repository-safe root `.bazelrc` with cache-default and RBE-opt-in
-BuildBuddy Cloud profiles.
+Result: a docs-only implementation contract for secret-safe authenticated
+BuildBuddy cache prime/replay evidence.
 
 ## Goal and required design
 
-Add exactly the 13 accepted non-secret options to root `.bazelrc`: the five
-user-approved BuildBuddy Cloud service lines; local `worker,sandboxed,local`
-ordinary spawn strategy; `buildbuddy-cache` executor clearing plus synchronous
-uploads; and `buildbuddy-rbe` remote-only/no-fallback execution on managed
-`linux`/`amd64` rather than self-hosted executors. Authentication remains solely in
-`~/.bazelrc`; never inspect, print, copy, or infer it. Validate both profiles with
-Bazel 9.2 using only the explicit root RC, no home/system/workspace RC discovery,
-and command-line endpoint clearing that prevents remote contact. Preserve the
-43-green/one-expected-red boundary, blocked core unit, and deferred cycle.
+Freeze the smallest local driver and sanitizer that prove a BuildBuddy remote-cache
+prime/replay for the exact 43-green target set without exposing authentication.
+Specify the checked-in target manifest, two distinct fresh output bases, cache-read
+disable/synchronous prime, cache-enabled replay, cache-only execution strategy,
+disposable mode-0700 raw BEP/execution logs outside the checkout, closed sanitized
+field schema, digest/runner/cache-hit predicates, failure classes, cleanup, platform
+coverage, implementation split, tests, and exact caps. Authentication may be consumed
+by ordinary Bazel RC discovery but must never be inspected, expanded, echoed, or
+persisted. Preserve the expected-red cycle target as its separate accepted negative
+gate and the blocked core unit outside the remote claim.
 
 ## Stops and budget
 
-Only `.bazelrc`, this owner plan, and the canonical/current scheduling documents
-may change: at most 13 configuration lines, 80 authored documentation lines, four
-files, and 150 total changed lines. Do not contact a remote service; inspect effective
-home options; add a header/import/secret, CI, evidence, code, BUILD/MODULE, lock, or
-custom platform/container; or enter core host tools, self-hosting, JVM, Bazel 8,
-WORKSPACE, and cycle semantics. Cache and RBE live evidence remain separate later
-packets.
+Return `REPLAN` rather than retain raw sensitive artifacts, infer cache behavior from
+elapsed text or aggregate process totals, accept a partial/mixed/local replay, invent
+an endpoint or credential path, combine RBE, add CI, run an authenticated invocation,
+or change configuration/code/locks/evidence/targets/cycle/core/platform behavior.
+Zero non-documentation changes; at most 420 authored documentation lines.
