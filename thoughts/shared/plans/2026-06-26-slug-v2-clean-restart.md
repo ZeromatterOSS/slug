@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 37 accepted Bazel targets covering 471 source cases and passing all 467 default-active Linux Cargo cases with stable locks; the Bzlmod lockfile and core runtime integrations are accepted | query unit and Bzlmod unit are whole-target **REPLAN** at clean-baseline failures; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; the core unit target lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-bzlmod-proxy-span-repair-design` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 37 accepted Bazel targets covering 471 source cases and passing all 467 default-active Linux Cargo cases with stable locks; the Bzlmod lockfile and core runtime integrations are accepted; pinned Bazel 9.2 proves the Bzlmod unit failure is four stale point-location expectations | query unit and Bzlmod unit are whole-target **REPLAN** at clean-baseline failures; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; the core unit target lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-bzlmod-caller-location-expectation-correction` |
 
 ### Current packet
 
-`WP-10-m8-bazel-bzlmod-proxy-span-repair-design`.
+`WP-10-m8-bazel-bzlmod-caller-location-expectation-correction`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

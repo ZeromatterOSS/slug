@@ -1,53 +1,50 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-bzlmod-proxy-span-repair-design`
+Packet: `WP-10-m8-bazel-bzlmod-caller-location-expectation-correction`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an accepted, evidence-backed bounded repair contract for the sole
-clean-baseline failure blocking the 278-case Bzlmod crate-mode target.
+Result: the Bzlmod library is clean at 278/278 with its existing Bazel-exact
+caller-location producer unchanged.
 
 ## Goal
 
-Freeze Bazel 9.2 authority, the live source owner, exact span semantics, and a
-bounded implementation/evidence successor for
-`records_exact_proxy_tag_and_innate_call_spans` without editing Rust.
+Correct only the four stale expected spans in
+`records_exact_proxy_tag_and_innate_call_spans` to the pinned Bazel 9.2
+opening-parenthesis points.
 
 ## Required design
 
-Reconcile the existing expected `use_extension` proxy span (line 2, columns
-9–39) with the clean actual starlark-rust call-stack span (line 2, columns
-22–22). Use accepted Bazel 9.2 oracle output or pinned Bazel source plus the
-live starlark-rust AST/evaluator source to establish whether the location owns
-the complete call expression, callee token, or another exact range. Inventory
-all consumers of the retained proxy/tag/innate locations and all assignment,
-include-file, reuse/merge, and error paths affected by the selected owner.
-Choose the smallest source-exact mechanism and freeze focused tests,
-downstream validation, platform checks, allowed files, caps, and stop
-conditions. Do not weaken/change the expected bytes merely to make Cargo green.
+Keep the existing `LogicalSpan` helper and logical file assertion. Replace the
+expected locations with line 2 columns `22–22` for `use_extension`, line 3
+columns `10–10` for `proxy.tag`, and line 5 columns `5–5` for both the innate
+proxy and its tag. These are zero-width half-open encodings of Bazel's 1-based
+caller `Location` points. Do not alter production code or add a new test.
 
 ## Allowed paths
 
+- `app/slug_bzlmod_v2/src/module_eval.rs` (test module only)
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Reuse or reproduce the clean 277/278 Cargo and Bazel failure only as needed.
-Record exact Bazel 9.2 or pinned-source authority, live source/consumer anchors,
-the proposed evidence matrix, line arithmetic, and an independent design
-review. Run structure, scope, cap, credential-pattern, and `git diff --check`
-gates; no implementation suite is authorized in this packet.
+Run the focused exact-location Cargo test, then serial full
+`cargo test -p slug_bzlmod_v2 --lib`; all 278 cases must pass. Run formatting,
+archive, exact test-only scope, cap, credential-pattern, stable-lock, and
+`git diff --check` gates and obtain independent latest-diff review. The absent
+crate-mode Bazel target is mapped only in the next packet; no Bazel test or
+Windows compile is required for four platform-independent expected literals.
 
 ## Stop conditions
 
-Stop with REPLAN if Bazel's exact range cannot be established, if the repair
-would alter unrelated directive/tag/innate spans or logical file identity, if
-it needs retained source text/AST beyond a bounded compact representation, or
-if it couples loading semantics, DICE ownership, query/cquery/aquery,
-execution/cache, fixtures, host tools, self-hosting, Java/JVM delegation, or
-Bazel 8/WORKSPACE compatibility. Do not inspect rc or credential contents.
+Stop with REPLAN on any change to `nonroot_span`, `LogicalSpan`, retained
+values/equality/finalization, AST/source retention, include identity,
+DICE/source preparation, BUILD/Cargo/lock/fixture/generated source, or any
+expectation other than the four pinned point locations. Do not couple query,
+cquery, aquery, execution/cache, host tools, fixtures, self-hosting, Java/JVM
+delegation, Bazel 8, WORKSPACE, rc, or credentials.
 
 ## Diff budget
 
-- At most 180 net documentation lines. No Rust, BUILD, Cargo, lock, fixture,
-  generated-source, CI, or unrelated change.
+- Zero production lines, at most eight changed test lines, at most 80 net
+  documentation lines, and at most 90 net total lines.

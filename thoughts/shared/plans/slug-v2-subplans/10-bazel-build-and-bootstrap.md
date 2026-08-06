@@ -513,6 +513,24 @@ Bazel targets covering 471 source cases and 467 default-active Linux Cargo
 cases. Next design only the clean-baseline Bzlmod proxy-span semantic repair
 that blocks its 278-case crate-mode target; do not change Rust in the design.
 
+The Bzlmod proxy-span design proves no production repair is valid. At pinned
+Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`, `Eval` sets the
+caller location to `CallExpression.getLparenLocation()`, `Location` is a
+1-based UTF-16 point rather than a range, and `ModuleFileGlobals` stores that
+point for extension proxies, tags, and both values created by an innate repo
+rule call. starlark-rust already carries the parsed `(` as a zero-width call
+site, and `nonroot_span` already combines it with the current logical include
+file. The correct Slug half-open spans are therefore `2:22–22` for
+`use_extension`, `3:10–10` for `proxy.tag`, and `5:5–5` for both the innate
+proxy and tag. The existing full-call expectations are stale.
+
+`WP-10-m8-bazel-bzlmod-caller-location-expectation-correction` changes only
+those four assertions in the existing exact-location unit test. It must not
+change `nonroot_span`, any retained carrier/equality/finalization path, AST or
+source retention, include identity, DICE/source preparation, or BUILD
+metadata. Focused and full Cargo library tests must pass 278/278 before a later
+packet maps the independently blocked crate-mode Bazel target.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
