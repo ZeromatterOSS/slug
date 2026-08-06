@@ -1232,6 +1232,22 @@ remote call, driver/schema/classifier/config/manifest, or documentation change
 is authorized. After offline review, a new evidence packet—not this failed
 packet—may make one fresh live attempt.
 
+The preflight repair is accepted in its exact two-file/30-line scope. The
+driver now runs the RC-disabled `version` command and accepts exactly one
+`Build label: 9.2.0` line from Bazelisk's multiline output. Wrong, missing,
+duplicate, undecodable, and failed version output remain `CONFIG_DRIFT`.
+Twenty-two offline tests, Python compilation, exact live RC-disabled version
+output, caps, diff, and independent review pass; no other driver behavior and
+no remote or home-RC boundary changed.
+
+Next evidence only `WP-10-m8-bazel-buildbuddy-cache-live-evidence-retry`. From
+the clean repair commit it makes one new driver invocation under the previously
+frozen live-evidence contract. This is not a continuation or rerun of the
+preflight-stopped packet: it is a fresh reviewed packet after the committed
+repair. Accept only `PROVED_CACHE_ONLY`; otherwise return `REPLAN` without a
+second attempt or code/config repair. Only a successful sanitized record may
+update owner and scheduling documentation, at most 100 lines in three files.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
