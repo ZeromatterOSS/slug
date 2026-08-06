@@ -571,6 +571,15 @@ retry owner, route/materialization state, or any other fixture input. Focused
 and full Cargo library tests must pass 28/28 before a later packet maps the
 crate-mode Bazel target.
 
+The query observation-fixture correction is accepted. One test-only path now
+declares the routed dependency's absent `.bazelignore`; production Need/restart
+ownership, DICE identity, one-route materialization, fake callers, and
+visibility expectations remain unchanged. The focused case passes and the full
+query library is clean at 28/28. Formatting, archive, exact one-line scope,
+cap, credential-pattern, stable-lock, diff, process-cleanup, and independent
+review gates pass. Next map only the private query crate-mode target with its
+declared Tokio dev edge; keep the 53-case loading-query fixture target absent.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

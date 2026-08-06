@@ -1231,6 +1231,7 @@ mod tests {
             "/workspace/REPO.bazel",
             "/workspace/.bazelignore",
             "/workspace/dep/REPO.bazel",
+            "/workspace/dep/.bazelignore",
         ] {
             epoch.insert(
                 demand(path, Operation::Lstat),

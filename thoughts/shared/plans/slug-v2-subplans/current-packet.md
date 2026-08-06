@@ -1,50 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-query-unit-ignore-observation-correction`
+Packet: `WP-10-m8-bazel-query-unit-test-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: the query library is clean at 28/28 with its production Need/restart
-and one-route canonical fake-caller semantics unchanged.
+Result: one private crate-mode Bazel target passing all 28 query library cases.
 
 ## Goal
 
-Correct only the stale observation epoch in
-`external_restricted_visible_uses_canonical_fake_caller_without_a_second_route`
-by declaring the routed dependency's absent `.bazelignore` file.
+Map only the now-green `slug_query_v2` library test crate as one private Bazel
+target with its declared Tokio dev dependency.
 
 ## Required design
 
-Add `"/workspace/dep/.bazelignore"` to the existing list whose Host Lstat
-observations are `Missing`. Preserve every other observation, the one real
-`@dep -> dep+` materialization, both request-local fake callers, visibility
-expectations, and direct environment path. Do not add a retry loop: the missing
-input, not production Need propagation, is the defect.
+Add exactly one private, small `rust_test` with
+`crate = ":slug_query_v2"`. Use generated `normal_dev` aliases and deps so the
+sole Cargo dev dependency, Tokio, is available without restating production
+dependencies. The target owns all 28 library cases. Do not alter the existing
+six-case `query_test`, add the 53-case `loading_query.rs` fixture target, or
+change Rust source.
 
 ## Allowed paths
 
-- `app/slug_query_v2/src/loading_environment.rs` (test module only)
+- `app/slug_query_v2/BUILD.bazel`
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Run the focused exact query test, then serial full
-`cargo test -p slug_query_v2 --lib`; all 28 cases must pass. Run formatting,
-archive, exact test-only scope, cap, credential-pattern, stable-lock, and
-`git diff --check` gates and obtain independent latest-diff review. The absent
-crate-mode Bazel target is mapped only in the next packet; no Bazel test or
-Windows compile is required for one platform-independent missing-path literal.
+Run the private target with credential-free nightly Bazel; all 28 cases must
+pass. Run serial Cargo `-p slug_query_v2 --lib`; the same 28 must pass. Run a
+GNU-Windows no-run library-test compile. Run no-repin `bazel mod deps` and
+prove all three lock hashes stable. Run archive, exact scope, cap,
+credential-pattern, and `git diff --check` gates; clean stale `slugd` before
+and after tests and obtain independent latest-diff review.
 
 ## Stop conditions
 
-Stop with REPLAN on any production change, expectation change, additional
-observation, second route/materialization, retry loop, caller/filesystem/
-fresh-graph bypass, DICE key/equality/Need change, lock across a DICE compute,
-test filter, BUILD/Cargo/lock/fixture/generated-source change, or coupling to
-query/cquery/aquery formatting, execution/cache, host tools, nested fixtures,
-self-hosting, Java/JVM delegation, Bazel 8, WORKSPACE, rc, or credentials.
+Stop with REPLAN on any Rust, Cargo/lock/fixture/generated-source change, any
+other target, test filter, target env/rustc_env/data/tool/runner, process or
+binary adapter, source/runfile write, ambient repository/home/PATH dependency,
+platform exclusion, Cargo execution from Bazel, rc or credential inspection,
+or M2/M5/M6/self-hosting coupling. Do not add a WORKSPACE, `.bazelrc`, CI,
+BuildBuddy/cache/RBE, query/cquery/aquery surface, or loading-query fixture
+owner.
 
 ## Diff budget
 
-- Zero production lines, at most two changed test lines, at most 80 net
-  documentation lines, and at most 90 net total lines.
+- At most 100 net metadata/documentation lines including at most 20 BUILD
+  lines. No Rust beyond the accepted predecessor's one test-fixture line,
+  Cargo, lock, fixture, generated-source, CI, or unrelated change.
