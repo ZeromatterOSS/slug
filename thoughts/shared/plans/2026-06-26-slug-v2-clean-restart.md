@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 39 accepted Bazel targets covering 777 source cases and passing all 773 default-active Linux Cargo cases with stable locks; all Bzlmod and fixture-free query cases now have green Bazel targets | Bazel 9.2 repository watching cannot retain no-follow directory identity, and a duplicate snapshot has no mandatory drift owner, so the shared nested-fixture boundary remains **REPLAN** pending an explicit sole-canonical-payload migration design; the core unit target lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-canonical-fixture-payload-migration-design` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 39 accepted Bazel targets covering 777 source cases and passing all 773 default-active Linux Cargo cases with stable locks; all Bzlmod and fixture-free query cases now have green Bazel targets | The sole-payload design remains **REPLAN** because its corrected `include_bytes!` argument is execroot-relative but Rust resolves it relative to the helper source; exact compile-input evidence is required before the one-commit 14-workspace migration can be rescheduled. The core unit target still lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-fixture-payload-compile-input-evidence` |
 
 ### Current packet
 
-`WP-10-m8-bazel-canonical-fixture-payload-migration-design`.
+`WP-10-m8-bazel-fixture-payload-compile-input-evidence`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

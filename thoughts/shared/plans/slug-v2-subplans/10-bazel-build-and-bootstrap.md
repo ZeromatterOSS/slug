@@ -657,6 +657,135 @@ Python/Rust/plan consumer, define the reversible provenance transition and
 byte-exact fresh Bazel 9 replay, and either freeze one bounded canonical format
 used by oracle, Cargo, and Bazel together or return terminal `REPLAN`.
 
+#### Gate C1 canonical fixture payload migration (2026-08-05)
+
+`WP-10-m8-bazel-canonical-fixture-payload-migration-design` establishes a sole
+canonical payload candidate, but returns `REPLAN` before implementation. The fixed set
+is the 14 workspaces already listed by Gate C0: 112 directories including the
+roots, 163 regular files, 24,939 bytes, and 992 logical lines. Direct consumers
+are exactly `app/slug_cli_v2/tests/{cli,graph_output}.rs`,
+`app/slug_query_v2/tests/loading_query.rs`, and
+`app/slug_server_v2/src/tests.rs`; they cover 42 CLI, 53 loading-query, and 34
+inseparable server cases. The Python loader currently assigns
+`fixture/workspace`, and the runner's `shutil.copytree` is the only live Python
+read of those trees. The 14 TOMLs contain 403 commands matching 403 expected
+rows, zero mutations, zero workspace-URI templates, and zero HTTP registries.
+Twelve TOMLs retain 153 Bazel 9.2 provenance anchors; the two without a
+provenance table must not receive fabricated upstream provenance.
+
+The only canonical byte source after migration is
+`tests/v2_fixture_payload/fixtures.payload`. Its frozen grammar is:
+
+```text
+slug-fixture-payload-v1\n
+D\t0755\tPATH\n
+F\t0644\tLEN\tSHA256\tPATH\n<exactly LEN raw bytes>\n
+E\t112\t163\t24939\n
+```
+
+`PATH` is its literal 7-bit ASCII byte sequence and must match
+`(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+`; there is no escaping. Each component
+must be nonempty, neither `.` nor `..`, must not end in dot, and must not be a
+case-insensitive Windows device basename. Thus tab, CR, LF, NUL, space, colon,
+backslash, non-ASCII, and every other byte outside that alphabet are rejected.
+All 275 directory/file records are globally sorted by these path bytes, with
+the fixture name retained as the first component; the fixture root itself is
+its directory record. The parser also rejects noncanonical order, duplicates
+and ASCII-case-fold collisions, absolute paths, unknown type/mode,
+count/length/hash mismatch, and trailing bytes. File bodies are length-framed
+raw bytes, so their UTF-8 validity is irrelevant. Directory records retain
+empty directories; links and other file types have no encoding. Repeated bytes
+at distinct paths are not deduplicated because paths are observable inputs.
+
+Python and Rust use the same named conformance matrix. Canonical vectors cover
+an empty directory, empty file, no-final-newline file, and a binary body with
+`00 09 0a ff`; malformed vectors cover every header/footer/type/mode/count/
+length/hash/trailing-data failure plus out-of-order, duplicate, case-collision,
+absolute, dot, dot-dot, trailing-dot, device, backslash, tab, newline, NUL, and
+non-ASCII paths. Each parser must accept/reject the exact same byte vectors.
+
+The initial encoded payload is exactly 50,103 bytes/1,424 lines with SHA-256
+`d4a5a0f05866908934725209649897fc7b3cf1dfc3f91aad2f5a9d7725bb5566`.
+For a per-workspace projection, start with the same header, copy in full-payload
+order only records whose path is exactly `NAME` or starts `NAME/` without
+stripping that prefix, then append `E\tD_NAME\tF_NAME\tBYTES_NAME\n` using that
+workspace's counts. SHA-256 covers that complete byte sequence. Implementations
+must derive and verify all 14 projections from the full payload. Their hashes
+are:
+
+| Workspace | SHA-256 |
+|-----------|---------|
+| `simple-rule-action` | `3b8a1425ef7ea5b92de2f363465e5d52d92ce25c2b1818450bffc9098277f5fb` |
+| `recursive-custom-rule-providers-actions` | `56584525959da70efe9fa64ef5acd862cb70fdf19ed5466d4c2d8f7a8d900c0f` |
+| `build-file-loading` | `a54763ef1ff899547f4620bc2c3ec912d9c1cdca1d30714a2e43fcfc851f9cbf` |
+| `query-parser-and-sets` | `0be99e30892443f9262e9618dd38c4a89522e107e0176f122a7a8cf4162542d6` |
+| `tests-query-expansion` | `8b9ee022d4736bc58d3adc1adb67b6a1e6de5569950a475b6cc6c03cb70ffdee` |
+| `query-visible-visibility` | `5bed82ad5b929c8d5f64dcfb2bb800ffdfa3fa13126ba22d02438bd5fe12cb9a` |
+| `query-build-load-files-provenance` | `85a2e8fdedbe19e46f4b11a9e6e008d44b290d56c672775e018938eacaec9f7a` |
+| `query-siblings-build-file-node` | `c2c102d891f2095f07878eae45fa0d3ad75bff269b32a213b7f4b2826d63b2b9` |
+| `query-loading-thin-vertical` | `74e8d13fceff7c8868431a3e57653f70d7dea73bc3d203c7000090d66fceb330` |
+| `query-labels-attribute-metadata` | `6ee33fce813b0ea9f286fea78dfde2a8e98389afdb01647c1e6d4892fed6ff5d` |
+| `query-executables-rule-capability` | `7d320eb69086edf9ca85ca512d65b7259baabc7ac35fa7077c011536a57af227` |
+| `query-rdeps-and-subtree-patterns` | `c4f5d3970fd6a3c8e04ebe277e12072311ef87dfccd372303d86dc1515260110` |
+| `query-path-topology` | `50e86ad2c6528567aa9b106cd487e024f562b34020b84174a96e1012d24b52be` |
+| `query-some-selection` | `9c0422b184f725508bd598d6b554f635a0f6ceeb507ac79c2bc59d2a3b1bc121` |
+
+A repository-owned standard-library Python tool is the sole packer and the
+Python parser/extractor. The one-time migration pack is POSIX-only: it walks
+only the fixed roots, never descends a link, compares entry identity around
+reads, uses directory-relative opens plus `O_NOFOLLOW`, and writes atomically.
+Extraction validates the complete payload before writing, accepts only a
+freshly create-new root, creates parents and files without reusing an existing
+component, and applies exact 0755/0644 modes on POSIX plus ordinary directory/
+regular-file semantics on Windows. The immutable payload cannot encode a link.
+Hostile concurrent replacement of a newly created extraction component is not
+claimed; native Windows adversarial reparse-race safety is explicitly outside
+this developer-test helper. Before source deletion the POSIX migration lane
+must reproduce every ordered path/type/mode/byte manifest and frozen hash.
+
+Each selected TOML gains an explicit payload workspace selector and initial
+tree hash; existing provenance tables remain byte-for-byte unchanged. Other
+fixtures keep the directory-backed loader path. The runner extracts the
+selected workspace, then applies the existing generic template expansion and
+mutation lifecycle so this representation does not fork oracle semantics.
+The README and validator describe and accept both representations.
+
+The candidate Rust boundary uses one shared standard-library test-only source
+module, not a production crate: the helper label belongs in each `rust_test`'s
+`srcs`, the payload only in `compile_data`, and the payload must be embedded at
+compile time under both Cargo and Bazel. The first correction proposed passing
+`$(execpath ...fixtures.payload)` through `rustc_env` to `include_bytes!`, but
+that path is execroot-relative while the macro resolves a relative argument
+from the helper source file. It therefore does not locate the declared input
+from the proposed layout. This is the second material contract correction, so
+no Rust embedding mechanism, implementation cap, payload creation, consumer
+switch, target activation, or source deletion is accepted by this design.
+
+If compile-input evidence later permits replanning, the retained candidate
+requires one exceptional atomic commit: any duplicate may exist only in the
+uncommitted checkout while packing and extraction are proved; the same future
+commit would add every owner/consumer/target, delete all 163 source files last,
+and remain reversible with one `git revert`. These are unaccepted future
+requirements, not current implementation authority.
+
+The retained future validation candidate is the Python parser/extractor/oracle
+and packet-validator suites; 42+53+34 Cargo cases; four Bazel targets;
+GNU-Windows branch compilation; per-target compile/runfiles checks; and all
+14/403 Bazel 9.2 commands in fresh and distinct replay roots against unchanged
+expected JSON. It would also require exact archive/deletion/payload accounting,
+stable locks, and independent destructive/platform latest-diff review. No part
+of that validation currently authorizes payload, consumer, target, or deletion
+work.
+
+The next packet is `WP-10-m8-bazel-fixture-payload-compile-input-evidence`. It
+may create and remove only an isolated temporary probe with the proposed source
+layout, and must prove one helper-source-relative Cargo/Bazel `include_bytes!`
+mechanism, exact `srcs`/`compile_data` ownership, compile-action input, and
+runtime-runfiles absence. Only accepted evidence plus independent review may
+reschedule the all-consumer atomic migration and its measured caps. No payload,
+helper, consumer, fixture, BUILD, Cargo, lock, or deletion change may persist in
+the evidence packet.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
