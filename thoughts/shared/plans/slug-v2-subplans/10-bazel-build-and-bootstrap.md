@@ -1056,6 +1056,129 @@ record, cache-only discriminators, failure classes, review split, and caps
 before any authenticated invocation. RBE configuration remains present but no
 RBE claim or command enters that packet.
 
+#### BuildBuddy cache-evidence design (2026-08-06)
+
+The design is accepted without an authenticated invocation. The canonical
+manifest is `tests/v2_oracle/buildbuddy_cache_targets.txt`. Its first line is
+the literal `slug-buildbuddy-targets-v1`; every remaining line is
+`kind<TAB>canonical-label`, with exactly
+`build<TAB>//app/slug_cli_v2:slug` followed by the 43 green `rust_test` labels
+sorted bytewise and prefixed by `test<TAB>`. Its exact 45-line, final-newline SHA-256 is
+`3a717cb4b0a1f5cab06d336e69d2382861a9c21af9a1502ea20c54b990adf6d5`.
+It includes the accepted 13-case `//app/slug_core_v2:runtime_test`; the absent,
+blocked 141-case core crate-mode unit is not that target. The only live target
+excluded is the separately accepted expected-red
+`//app/slug_cli_v2:cli_fixture_test` cycle gate.
+
+One stdlib-only Python driver runs one `bazel test` command per phase over the
+build label and all 43 test labels. Prime and replay use distinct never-before-
+existing output bases beneath one mode-0700 temporary directory outside the
+checkout, the same unprinted random action/test-environment nonce, Bazel 9.2.0,
+a clean Linux x86_64 checkout, the exact manifest hash, and root `.bazelrc`
+SHA-256 `e72f4223b6cfffbc96de018849e306ff9cbfdf4ca50248d8fee229a80dc4c805`.
+The command tail disables BES and RBE, clears disk cache, forces local
+strategies, fixes one unsharded run per test, emits local BEP JSON plus an
+execution-log JSON sequence, and publishes all action events. Prime disables
+remote reads, enables local-result upload, and waits synchronously; replay
+enables reads and disables upload. Both disable local fallback. No elapsed-time
+or terminal-text inference is evidence.
+
+After ordinary RC discovery and `--config=buildbuddy-cache`, both invocations
+append these exact command options before the manifest labels:
+
+```text
+--remote_executor=
+--bes_backend=
+--bes_results_url=
+--disk_cache=
+--spawn_strategy=worker,sandboxed,local
+--test_strategy=local
+--cache_test_results=yes
+--runs_per_test=1
+--test_sharding_strategy=disabled
+--noremote_local_fallback
+--build_event_publish_all_actions
+--build_event_json_file=<private-phase-path>
+--execution_log_json_file=<private-phase-path>
+--action_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE=<shared-nonce>
+--test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE=<shared-nonce>
+```
+
+Prime then appends `--noremote_accept_cached`,
+`--remote_upload_local_results`, and `--noremote_cache_async`; replay appends
+`--remote_accept_cached`, `--noremote_upload_local_results`, and
+`--noremote_cache_async`. The only accepted prime runner spellings are
+`local`, `worker`, and `linux-sandbox`; every other spelling is unknown and
+fail-closed. Command construction and error handling must never render the
+shared nonce or the full argv.
+
+The driver sets umask 077 before creating raw BEP, execution-log, and captured
+stdout/stderr files. Raw data can contain RC-expanded headers, command lines,
+environment, paths, host/user data, URIs, invocation IDs, and action inputs, so
+it never reaches stdout, an exception, a repository path, or the sanitized
+record. A streaming JSON decoder accepts pretty-printed JSON sequences. A
+`finally` path shuts down both private Bazel servers with all RC files ignored
+and recursively removes the private directory; failure to parse, sanitize,
+shutdown, or clean is fail-closed. Abrupt process death remains the documented
+mode-0700 temporary-file residual, not accepted evidence.
+
+The driver emits one compact JSON object built from a new allowlisted value,
+never by redacting raw objects. Its closed top-level fields are
+`schema_version`, `classification`, `mode`, `bazel_version`, `host_platform`,
+`git_head`, `git_clean`, `manifest_sha256`, `bazelrc_sha256`, `target_counts`,
+`prime`, and `replay`. Each phase contains only the Bazel process exit code;
+BuildFinished exit-code name/code; selected build-success, passed-test,
+test-run, and remotely-cached-test counts; local persistent-action-cache hit
+count; and an eligible-spawn summary. That summary contains count, a canonical
+digest-multiset SHA-256, cache-hit/status/exit failure counts, and counts for
+`local`, `remote_cache_hit`, `disk_cache_hit`, `remote_execution`, and
+`unknown`. Labels are represented only by manifest index while parsing and are
+not emitted. Arguments, environment, mnemonic, raw runner spelling, individual
+digests, paths, timing, host/user names, UUIDs, endpoints, headers, options,
+commands, and free-form status/error text are forbidden output fields.
+Stdout contains only that compact object plus one newline, stderr is empty,
+and every exception is converted to an allowlisted failure object without a
+traceback or raw exception text; a caller may redirect only stdout to a
+review-controlled sanitized-record path.
+
+`PROVED_CACHE_ONLY` requires both phases and every selected target to complete
+successfully; all 43 tests pass exactly once; prime has zero persistent local
+action-cache hits and zero remotely cached tests; and replay reports all 43
+tests remotely cached. Every prime spawn that is both cacheable and remotely
+cacheable has a digest, runner exactly `local`, `worker`, or `linux-sandbox`,
+no cache hit, empty status, and exit zero; every other prime runner maps to
+`unknown`. Replay has the identical eligible digest multiset and every
+eligible entry is exactly `runner="remote cache hit"`, `cache_hit=true`, empty
+status, and exit zero. No eligible replay entry may be local, disk-cache,
+remote-execution, or unknown. Non-cacheable or non-remotely-cacheable spawns may
+run locally but are counted outside the claim. Fresh output bases close Bazel
+9.2's omission of persistent action-cache hits from SpawnExec; BEP target/test
+events corroborate completion, while SpawnExec is authoritative for cache
+reuse.
+
+Failures classify without raw detail as `CONFIG_DRIFT`, `REMOTE_UNAVAILABLE`,
+`TARGET_FAILURE`, `CACHE_MISS_OR_MIXED_REPLAY`, `EVIDENCE_INCOMPLETE`, or
+`SANITIZER_REJECTED`. Unknown runners, malformed or missing terminal data,
+mixed/local eligible replay, digest mismatch, any persistent-action-cache hit,
+or incomplete cleanup can never prove the gate. The evidence covers only
+Linux x86_64 cache reuse; RBE, other platforms, CI, and the cycle/core
+boundaries remain separate.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-cache-evidence-implementation`. It may add
+`tools/v2_oracle_lib/buildbuddy_cache.py` (at most 480 lines),
+`tools/v2_oracle/buildbuddy_cache_gate.py` (40), the 45-line manifest, and
+`tests/v2_oracle/test_buildbuddy_cache_gate.py` (520), plus at most 120 owner
+and scheduling lines: seven files and 1,300 changed lines total. Tests use only
+synthetic raw bytes and mocked subprocesses and cover manifest/config/platform
+drift, JSON-sequence parsing, every admitted prime runner plus near-miss unknown
+runners, every failure class, target/test coverage,
+digest multiset mismatch, output allowlisting, command hardening, distinct
+output bases with one shared nonce, and raw cleanup on every exit. The packet
+may run offline tests but must not invoke BuildBuddy or consume authentication.
+A later evidence-only packet runs the frozen driver once; any live contract
+defect returns `REPLAN` rather than changing code beside authenticated evidence.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
