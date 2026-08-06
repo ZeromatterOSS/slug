@@ -444,6 +444,28 @@ adapter enters the BUILD graph. All three lock hashes remain stable; archive,
 scope, 141-net/380-line, diff, and independent review gates pass. Next design
 only the exact writable scratch owner for the remaining 11 lockfile cases.
 
+The metadata-only lockfile scratch design stops at `REPLAN`. Only
+`lockfile_atomic_apply_writes_only_write_plans_and_errors_never_write` calls the
+shared scratch helper, but all 11 cases compile into one integration target.
+rules_rust 0.73 sets rustc's `CARGO_MANIFEST_DIR` after target `rustc_env` to
+`${pwd}/app/slug_bzlmod_v2`; `env!` therefore embeds the compile-action sandbox,
+which is stale in the later TestRunner sandbox. Runtime env cannot change that
+literal. `rustc_env_files` can embed only static or compile-action values;
+relative values write beneath the runfiles CWD, while `${pwd}` remains stale.
+Data/runfile writes and platform-specific wrappers are rejected, and
+`rust_test` has no per-target working-directory attribute. Windows
+manifest-only runfiles make those workarounds weaker, not stronger.
+
+The smallest successor deliberately changes only the test helper's scratch
+selection. At runtime it prefers `TEST_TMPDIR`, then appends the existing
+`.codex-cargo-target/slug_bzlmod_v2_tests/<name>-<pid>` suffix; when Bazel's
+standard test variable is absent, Cargo retains the current
+`CARGO_MANIFEST_DIR/../..` root byte-for-byte. Pre-cleanup with ignored removal
+errors, `create_dir_all`, PID/name isolation, lockfile writes, and no
+post-cleanup remain unchanged. One private `lockfile_test` target needs only
+the production Bzlmod library. No target env, data, tool, runner, fixture,
+Cargo input, or production source changes.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

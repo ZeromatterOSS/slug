@@ -1,52 +1,55 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-bzlmod-lockfile-scratch-design`
+Packet: `WP-10-m8-bazel-bzlmod-lockfile-test-semantic-adapter-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an exact design for the writable scratch owner needed by the 11 cases
-in `slug_bzlmod_v2/tests/lockfile.rs`.
+Result: one private Bazel target passing all 11 lockfile integration cases with
+a hermetic runtime scratch root and unchanged Cargo fallback.
 
 ## Goal
 
-Freeze one hermetic Bazel adapter that preserves the lockfile integration's
-compile-time manifest-relative path and writable runtime semantics. Do not map
-the target or edit source/BUILD/Cargo in this design packet.
+Change only the test helper to prefer Bazel's runtime `TEST_TMPDIR`, preserve
+the existing Cargo manifest-relative fallback, and map `lockfile.rs` as one
+standalone integration target.
 
 ## Required design
 
-Reconcile all 11 cases, their exact
-`env!("CARGO_MANIFEST_DIR")/../../.codex-cargo-target/slug_bzlmod_v2_tests`
-construction, rules_rust compile-time env behavior, Bazel runfiles/sandbox
-writability, `TEST_TMPDIR`, and Windows path semantics. Preserve source-defined
-PID/name isolation and cleanup. Reject a compile-sandbox absolute path,
-source/runfile writes, ambient repository paths, Cargo execution, copied
-fixtures, or a platform-only solution. Name the smallest implementation packet
-with exact allowed files, adapter attributes, validation, and cap; use
-`REPLAN` if no bounded hermetic representation preserves the test semantics.
+In `scratch_dir`, choose the root from runtime `TEST_TMPDIR` when present;
+otherwise retain `env!("CARGO_MANIFEST_DIR")/../..`. From that root append
+`.codex-cargo-target/slug_bzlmod_v2_tests/<name>-<pid>`. Preserve ignored
+pre-removal errors, `create_dir_all`, the existing filename, writes, and lack of
+post-cleanup. Add exactly one private, small standalone `rust_test` owning
+`tests/lockfile.rs`, Cargo edition, and dependency only on
+`:slug_bzlmod_v2`. Do not set target env or rustc_env, add a wrapper/runner,
+write runfiles, or change production/Cargo/lock/fixture/generated source.
 
 ## Allowed paths
 
+- `app/slug_bzlmod_v2/tests/lockfile.rs`
+- `app/slug_bzlmod_v2/BUILD.bazel`
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Inspect the live test source and pinned rules_rust 0.73 behavior; use an
-isolated Bazel 9.2 scratch probe only if static ownership/writability evidence
-cannot discriminate the design. Mechanically reconcile all 11 cases. Run
-documentation, scope, cap, archive, credential-pattern, and `git diff --check`
-gates. No Cargo or repository test target is needed.
+Run the private target with credential-free nightly Bazel; all 11 cases must
+pass through `TEST_TMPDIR`. Run serial Cargo `--test lockfile`; all 11 must pass
+through the unchanged fallback. Run the GNU-Windows no-run target for this
+integration. Run no-repin `bazel mod deps` and prove all three lock hashes
+stable. Run Rust formatting, archive, scope, cap, credential-pattern, and
+`git diff --check` gates; clean stale `slugd` before and after tests.
 
 ## Stop conditions
 
-Stop with REPLAN on any Rust/BUILD/Cargo/lock/fixture/generated-source change,
-source/runfile write, ambient repository or home path, stale compile-sandbox
-path, copied/archive input, platform exclusion, Cargo execution from Bazel, rc
-or credential inspection, or M2/M5/M6/self-hosting coupling. Do not add a
+Stop with REPLAN on any production Rust, Cargo/lock/fixture/generated-source
+change, target env/rustc_env/data/tool/runner, source/runfile write, ambient
+repository or home path, platform exclusion, Cargo execution from Bazel, rc or
+credential inspection, or M2/M5/M6/self-hosting coupling. Do not add a
 WORKSPACE, `.bazelrc`, CI, BuildBuddy/cache/RBE, query, cquery, or aquery
 surface.
 
 ## Diff budget
 
-- Documentation only: at most 180 net lines. No Rust, BUILD, Cargo, lock,
-  fixture, generated-source, CI, or unrelated change.
+- At most 100 net lines including at most 45 handwritten test/BUILD lines. No
+  production Rust, Cargo, lock, fixture, generated-source, CI, or unrelated
+  change.
