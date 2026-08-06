@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = ROOT / "tests/v2_oracle/buildbuddy_cache_targets.txt"
 DIGEST = "d" * 64
 OTHER_DIGEST = "e" * 64
+VERSION_OUTPUT = b"Bazelisk version: v1.29.0\nBuild label: 9.2.0\nBuild target: bazel\n"
 
 
 def sequence(values: list[dict[str, object]]) -> bytes:
@@ -151,8 +152,8 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
             calls.append(argv)
             self.assertEqual(ROOT, _.get("cwd"))
-            if argv[-1] == "--version":
-                return subprocess.CompletedProcess(argv, 0, b"bazel 9.2.0\n")
+            if argv[-1] == "version":
+                return subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
             if len(argv) > 2 and argv[2] == "test":
                 phase = "prime" if "--noremote_accept_cached" in argv else "replay"
                 bep = Path(next(value.split("=", 1)[1] for value in argv if value.startswith("--build_event_json_file=")))
@@ -169,6 +170,7 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         with mock.patch.object(gate, "_git", side_effect=("a" * 40, "")):
             result = gate.run_gate(MANIFEST, runner=runner)
         self.assertEqual("PROVED_CACHE_ONLY", result["classification"])
+        self.assertEqual(["bazel", "--ignore_all_rc_files", "version"], calls[0])
         tests = [argv for argv in calls if len(argv) > 2 and argv[2] == "test"]
         self.assertEqual(2, len(tests))
         nonces = [{item for item in argv if "CACHE_GATE_NONCE=" in item} for argv in tests]
@@ -193,14 +195,18 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
 
     def test_preflight_rejects_wrong_version_before_gate(self) -> None:
         def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
-            return subprocess.CompletedProcess(argv, 0, b"bazel 9.1.0\n")
+            return subprocess.CompletedProcess(argv, 0, b"Build label: 9.1.0\n")
 
         with self.assertRaises(gate.GateError) as error:
             gate.run_gate(MANIFEST, runner=runner)
         self.assertEqual("CONFIG_DRIFT", error.exception.classification)
 
+        for output in (b"", VERSION_OUTPUT + b"Build label: 9.2.0\n"):
+            with self.assertRaises(gate.GateError):
+                gate._preflight("bazel", lambda argv, **_: subprocess.CompletedProcess(argv, 0, output))
+
     def test_preflight_rejects_platform_and_git_drift(self) -> None:
-        runner = lambda argv, **_: subprocess.CompletedProcess(argv, 0, b"bazel 9.2.0\n")
+        runner = lambda argv, **_: subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
         with mock.patch.object(gate.platform, "system", return_value="Darwin"), self.assertRaises(gate.GateError):
             gate._preflight("bazel", runner)
         with mock.patch.object(gate, "_git", side_effect=("not-a-sha", "")), self.assertRaises(gate.GateError):
@@ -223,8 +229,8 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
             if argv[-1] == "shutdown":
                 raise OSError("no raw detail")
-            if argv[-1] == "--version":
-                return subprocess.CompletedProcess(argv, 0, b"bazel 9.2.0\n")
+            if argv[-1] == "version":
+                return subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
             if len(argv) > 2 and argv[2] == "test":
                 roots.append(Path(argv[1].split("=", 1)[1]).parents[1])
             return subprocess.CompletedProcess(argv, 1)
@@ -237,8 +243,8 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
     def test_nonzero_shutdown_is_fail_closed_and_still_removes_root(self) -> None:
         roots: list[Path] = []
         def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
-            if argv[-1] == "--version":
-                return subprocess.CompletedProcess(argv, 0, b"bazel 9.2.0\n")
+            if argv[-1] == "version":
+                return subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
             if len(argv) > 2 and argv[2] == "test":
                 roots.append(Path(argv[1].split("=", 1)[1]).parents[1])
                 return subprocess.CompletedProcess(argv, 1)

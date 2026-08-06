@@ -207,8 +207,12 @@ def command(phase: str, bazel: str, output_base: Path, bep: Path, execution: Pat
 
 
 def _preflight(bazel: str, runner: Callable[..., subprocess.CompletedProcess[bytes]]) -> tuple[str, bool]:
-    version = runner([bazel, "--ignore_all_rc_files", "--version"], cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
-    if version.returncode != 0 or version.stdout != b"bazel 9.2.0\n" or platform.system() != "Linux" or platform.machine() not in {"x86_64", "AMD64"}:
+    version = runner([bazel, "--ignore_all_rc_files", "version"], cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+    try:
+        labels = [line for line in version.stdout.decode("utf-8").splitlines() if line.startswith("Build label:")]
+    except (AttributeError, UnicodeDecodeError):
+        raise GateError("CONFIG_DRIFT") from None
+    if version.returncode != 0 or labels != ["Build label: 9.2.0"] or platform.system() != "Linux" or platform.machine() not in {"x86_64", "AMD64"}:
         raise GateError("CONFIG_DRIFT")
     head, clean = _git("rev-parse", "HEAD"), _git("status", "--porcelain") == ""
     if not re.fullmatch(r"[0-9a-f]{40}", head) or not clean:
