@@ -1211,6 +1211,27 @@ It must not inspect home configuration, retain raw artifacts, rerun to chase a
 failure, add code/config/CI, invoke RBE, or change targets, cycle/core, or
 platform boundaries.
 
+The first live-evidence packet returns `REPLAN` before temporary-root creation
+or any remote/authenticated phase. Its sole sanitized result was
+`CONFIG_DRIFT`. Offline reproduction proved the local defect: with Bazelisk,
+`bazel --ignore_all_rc_files --version` treats `--version` as an unknown startup
+option and exits 2, while `bazel --ignore_all_rc_files version` succeeds without
+RC discovery and reports one `Build label: 9.2.0` line. Manifest/root-RC hashes,
+Git cleanliness, and Linux x86_64 remained exact. No BuildBuddy request or raw
+artifact occurred, and the packet is not rerun.
+
+Next repair only
+`WP-10-m8-bazel-buildbuddy-cache-evidence-preflight-version-repair`. It changes
+only `tools/v2_oracle_lib/buildbuddy_cache.py` and
+`tests/v2_oracle/test_buildbuddy_cache_gate.py`, at most 35 changed lines. The
+preflight argv becomes exactly `bazel --ignore_all_rc_files version`; parsing
+accepts exactly one `Build label: 9.2.0` line within Bazelisk's multiline output
+and rejects a missing, duplicate, or different build label. Tests pin the argv
+and all four outputs. No Bazel test/build, ordinary RC discovery, authentication,
+remote call, driver/schema/classifier/config/manifest, or documentation change
+is authorized. After offline review, a new evidence packet—not this failed
+packet—may make one fresh live attempt.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
