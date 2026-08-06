@@ -1,56 +1,50 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-query-unit-preparation-restart-repair-design`
+Packet: `WP-10-m8-bazel-query-unit-ignore-observation-correction`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an accepted, evidence-backed bounded repair or terminal REPLAN for the
-sole clean-baseline failure blocking the 28-case query crate-mode target.
+Result: the query library is clean at 28/28 with its production Need/restart
+and one-route canonical fake-caller semantics unchanged.
 
 ## Goal
 
-Determine why
+Correct only the stale observation epoch in
 `external_restricted_visible_uses_canonical_fake_caller_without_a_second_route`
-returns `QueryErrorKind::PreparationRestart`, freeze Bazel 9.2 authority and
-the exact live owner, and select the smallest valid successor without editing
-Rust.
+by declaring the routed dependency's absent `.bazelignore` file.
 
 ## Required design
 
-Read `docs/developers/dice.md` before auditing the Need/restart path. Reuse or
-reproduce the clean Cargo/Bazel 27/28 result, then trace the external
-Restricted-visibility fake-caller request through query loading, source
-preparation, repository mapping, DICE keys, Need propagation, and retry
-ownership. Establish the accepted Bazel 9.2 semantic result and distinguish a
-stale expectation from a missing route, incorrect canonical caller identity,
-or invalid restart lifecycle. Inventory equality/invalidation/event/error and
-cold/warm/edit/delete/recreate consumers affected by any proposed owner.
-Freeze exact files, tests, downstream/platform validation, line caps, and stop
-conditions for one implementation packet, or record terminal REPLAN if no
-bounded exact Rust correction exists.
+Add `"/workspace/dep/.bazelignore"` to the existing list whose Host Lstat
+observations are `Missing`. Preserve every other observation, the one real
+`@dep -> dep+` materialization, both request-local fake callers, visibility
+expectations, and direct environment path. Do not add a retry loop: the missing
+input, not production Need propagation, is the defect.
 
 ## Allowed paths
 
+- `app/slug_query_v2/src/loading_environment.rs` (test module only)
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Record the exact clean failure and accepted Bazel 9.2 oracle/pinned-source
-authority, live key/request/caller/Need source anchors, the complete proposed
-evidence matrix and line arithmetic, and independent DICE/identity design
-review. Run structure, scope, cap, credential-pattern, and `git diff --check`
-gates; no implementation suite is authorized in this packet.
+Run the focused exact query test, then serial full
+`cargo test -p slug_query_v2 --lib`; all 28 cases must pass. Run formatting,
+archive, exact test-only scope, cap, credential-pattern, stable-lock, and
+`git diff --check` gates and obtain independent latest-diff review. The absent
+crate-mode Bazel target is mapped only in the next packet; no Bazel test or
+Windows compile is required for one platform-independent missing-path literal.
 
 ## Stop conditions
 
-Stop with REPLAN on a second route that duplicates source preparation, a
-callerless/direct-filesystem/fresh-graph bypass, lock held across DICE compute,
-changed global query identity, erased Need/restart semantics, filtered or
-expected-failure tests, fixture/host-tool coupling, unbounded redesign, or any
-query/cquery/aquery formatter expansion, execution/cache, self-hosting,
-Java/JVM delegation, Bazel 8, WORKSPACE, rc, or credential dependency.
+Stop with REPLAN on any production change, expectation change, additional
+observation, second route/materialization, retry loop, caller/filesystem/
+fresh-graph bypass, DICE key/equality/Need change, lock across a DICE compute,
+test filter, BUILD/Cargo/lock/fixture/generated-source change, or coupling to
+query/cquery/aquery formatting, execution/cache, host tools, nested fixtures,
+self-hosting, Java/JVM delegation, Bazel 8, WORKSPACE, rc, or credentials.
 
 ## Diff budget
 
-- At most 240 net documentation lines. No Rust, BUILD, Cargo, lock, fixture,
-  generated-source, CI, or unrelated change.
+- Zero production lines, at most two changed test lines, at most 80 net
+  documentation lines, and at most 90 net total lines.

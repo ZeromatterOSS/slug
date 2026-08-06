@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 38 accepted Bazel targets covering 749 source cases and passing all 745 default-active Linux Cargo cases with stable locks; all 464 Bzlmod cases now have green Bazel targets | the query unit target remains **REPLAN** at its clean-baseline failure; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; the core unit target lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-query-unit-preparation-restart-repair-design` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 38 accepted Bazel targets covering 749 source cases and passing all 745 default-active Linux Cargo cases with stable locks; all 464 Bzlmod cases now have green Bazel targets; the query unit failure is one stale missing-observation fixture input | the query unit target awaits its bounded fixture correction and mapping; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; the core unit target lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-query-unit-ignore-observation-correction` |
 
 ### Current packet
 
-`WP-10-m8-bazel-query-unit-preparation-restart-repair-design`.
+`WP-10-m8-bazel-query-unit-ignore-observation-correction`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

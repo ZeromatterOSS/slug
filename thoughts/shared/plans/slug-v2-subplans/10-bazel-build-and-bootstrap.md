@@ -553,6 +553,24 @@ covering 749 source cases and 745 default-active Linux Cargo cases. Next design
 only the query library's clean-baseline `PreparationRestart` failure before
 mapping its 28-case crate-mode target.
 
+The query restart design proves production and the accepted one-route caller
+contract are already exact. The private test epoch omits only Host
+`Lstat(/workspace/dep/.bazelignore) = Missing`. External package lookup
+correctly resolves the routed ignore file before loading the package, so that
+absent observation becomes a typed Need; the direct environment correctly
+turns it into its private restart sentinel, but this unit test has no outer
+root-query retry owner. Normal integration epochs already supply the missing
+observation. The fake same-`dep+` and synthetic `other+` callers still share
+one real route and preserve the accepted Bazel 9.2 canonical-package
+visibility discriminator.
+
+`WP-10-m8-bazel-query-unit-ignore-observation-correction` adds only the missing
+external `.bazelignore` path to the test's existing missing-Lstat list. It must
+not change an expectation, production query/loading/Bzlmod code, a DICE key or
+retry owner, route/materialization state, or any other fixture input. Focused
+and full Cargo library tests must pass 28/28 before a later packet maps the
+crate-mode Bazel target.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
