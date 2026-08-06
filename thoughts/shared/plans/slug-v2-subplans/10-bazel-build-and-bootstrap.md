@@ -983,6 +983,55 @@ RBE configuration and evidence with an independently reviewed platform map.
 Only those implementation designs may set file allowlists and line caps; CI and
 self-hosting remain later work.
 
+#### Repository-safe BuildBuddy Cloud decision (2026-08-06)
+
+`WP-10-m8-bazel-buildbuddy-repository-config-decision` is accepted by explicit
+user approval. The repository targets hosted BuildBuddy Cloud. Authentication
+remains only in the user's `~/.bazelrc`; the root configuration must contain no
+header, token, certificate, credential helper, import of a home path, or derived
+credential value.
+
+The five approved service options are exact:
+
+```text
+build --bes_results_url=https://app.buildbuddy.io/invocation/
+build --bes_backend=grpcs://remote.buildbuddy.io
+common --remote_cache=grpcs://remote.buildbuddy.io
+common --remote_timeout=10m
+common --remote_executor=grpcs://remote.buildbuddy.io
+```
+
+Remote cache is the ordinary developer default, but remote execution is
+opt-in. The root file therefore also sets
+`common --spawn_strategy=worker,sandboxed,local`; without that line Bazel 9.2's
+default `remote,worker,sandboxed,local` order would make the common executor
+remote-capable on ordinary builds. Named `build:` profiles are
+`buildbuddy-cache` and `buildbuddy-rbe`; `test` inherits them through the build
+command hierarchy. The cache profile clears the common executor with
+`--remote_executor=` and waits for cache uploads with
+`--remote_cache_async=false`. The RBE profile forces
+`--spawn_strategy=remote`, disables local fallback, and selects the managed
+BuildBuddy pool with `OSFamily=linux`, `Arch=amd64`, and
+`use-self-hosted-executors=false` remote default execution properties.
+
+No remote instance name or custom container image is selected. Linux/amd64 is
+the initial RBE platform; other developer hosts use cache-only mode until an
+independently reviewed compatible executor exists. The 43-green/one-expected-
+red command boundary, blocked core unit, deferred cycle, private raw-log rules,
+and fail-closed evidence classifier remain unchanged.
+
+The next packet is
+`WP-10-m8-bazel-buildbuddy-repository-config-implementation`. It may add only
+the 13 non-comment option lines above to root `.bazelrc` and update the owner
+plan plus scheduling documents: at most 13 configuration lines, 80 authored
+documentation lines, four files, and 150 total changed lines. It validates the
+two profiles with Bazel 9.2 while explicitly disabling system, workspace, and
+home RC discovery and overriding every remote/BES endpoint to empty after the
+selected profile. It must not inspect effective home options, contact a remote
+service, add evidence/CI/code/BUILD/MODULE/lock changes, or weaken credential,
+target, cycle, core, and platform boundaries. Live cache evidence and live RBE
+evidence remain separate successor packets in that order.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
