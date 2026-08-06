@@ -813,6 +813,14 @@ the separate Host-Bzl diagnostic parity repair around the pinned fixture and
 `HostBzlModuleEvalKey`; only after both prerequisites are green may the atomic
 payload migration restart unchanged.
 
+The server fixture correction is accepted. Exactly four empty `BUILD.bazel`
+markers make `shared`, `root`, `leaf`, and `alternate` real scratch packages;
+the two focused tests and all 34 server library cases pass with every `.bzl`
+byte, query, output, invalidation count, lifecycle, and assertion unchanged.
+Independent review accepted the four-line test-only diff. Next run only
+`WP-10-m8-host-bzl-parse-diagnostic-parity-design`; no payload migration work
+resumes until that separate Bazel-authoritative diagnostic is green.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

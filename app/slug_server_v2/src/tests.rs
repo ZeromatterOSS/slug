@@ -451,6 +451,7 @@ fn retained_daemon_strict_test_suite_toggle_is_request_local_and_invalidates_no_
 fn retained_daemon_formats_graph_from_the_same_query_result_path() {
     let workspace = scratch("query-graph-output");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&workspace.join("shared/BUILD.bazel"), "");
     write(&workspace.join("shared/defs.bzl"), "VALUE = 1\n");
     write(
         &workspace.join("pkg/BUILD.bazel"),
@@ -1461,6 +1462,9 @@ fn retained_daemon_loadfiles_observes_leaf_and_load_edge_transitions() {
     let app_build = workspace.join("app/BUILD.bazel");
     let root_bzl = workspace.join("root/root.bzl");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&workspace.join("root/BUILD.bazel"), "");
+    write(&workspace.join("leaf/BUILD.bazel"), "");
+    write(&workspace.join("alternate/BUILD.bazel"), "");
     write(
         &app_build,
         "load(\"//root:root.bzl\", \"ROOT\")\nfilegroup(name = \"app\")\n",
