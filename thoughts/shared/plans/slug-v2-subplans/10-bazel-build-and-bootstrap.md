@@ -593,6 +593,51 @@ shared nested-fixture owner for the 42 CLI integration, 53 query-loading, and
 34 server-unit cases while the 141-case core unit target remains independently
 blocked on pinned cross-platform Git/tar owners.
 
+#### Gate C1 nested-fixture ownership redesign (2026-08-05)
+
+`WP-10-m8-bazel-nested-fixture-ownership-redesign` reconciles the complete
+shared boundary. The two CLI integration crates own 42 cases and reference all
+14 workspaces/163 files; loading-query owns 53 cases but only seven functions
+reference five workspaces/53 files; the server unit crate owns 34 inseparable
+cases but only three functions reference four workspaces/37 files. The union
+has 112 directories, 105 package directories, 107 `BUILD`/`BUILD.bazel` files,
+and only regular non-executable files: every directory is mode 0755, every
+file is mode 0644, every path is ASCII and Windows-safe, every content is valid
+UTF-8, and there are no symlinks or case-folded path collisions. Consumers do
+not mutate these sources; their writes are confined to separate temporary
+workspaces. Extra package files or targets remain forbidden because recursive,
+siblings, buildfiles/loadfiles, generated-file, and exact label-kind outputs
+observe the complete workspace graph.
+
+No Bazel 9.2 repository-rule owner satisfies the frozen no-follow incremental
+contract. `watch_tree` computes a recursive directory digest by following a
+symlink to a directory before Starlark can reject it. Replacing it with watched
+`readdir` plus watched file reads also fails: the recorded directory marker
+hashes sorted names but not entry types, and the file marker reduces both a
+directory and a symlink-to-directory to `DIR`. Replacing an existing directory
+with a same-shaped directory symlink can therefore leave every marker stable,
+skip repository reevaluation, and bypass a `realpath` check. Adding `watch` on
+each child does not close that discriminator.
+
+The repository-rule proposal is terminal `REPLAN`, including its otherwise
+valid length-framed byte transport and compile-time embedding consumer. Direct
+source directories, package-local exports, runtime runfiles, ambient traversal
+tools, and Windows exclusion remain rejected. The only unexhausted bounded
+mechanism is the immutable checked-in snapshot explicitly reserved by Gate C0:
+a deterministic cross-platform no-follow generator, ordered directory/file
+manifest and hashes, mandatory source-to-snapshot drift check, create-new
+scratch extraction, and compile-time declared-input consumer. That duplicate
+is not accepted by this packet; it needs its own design and independent review
+before any payload, helper, BUILD, Cargo, lock, or application change.
+
+The next packet is `WP-10-m8-bazel-nested-fixture-snapshot-design`. It may only
+freeze the generator/manifest/hash format, how drift enforcement cannot be
+silently skipped, the 14/112/163 source inventory and no-follow lifecycle, the
+compile-time embedding/extraction API, Windows and remote contracts, packet
+split, and exact caps. If no bounded drift enforcement exists without Cargo
+execution from Bazel, ambient tools, or CI assumptions, it must return terminal
+`REPLAN` rather than weaken the fixture semantics.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

@@ -1,31 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-nested-fixture-ownership-redesign`
+Packet: `WP-10-m8-bazel-nested-fixture-snapshot-design`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an accepted hermetic, incrementally tracked, cross-platform ownership
-design—or terminal REPLAN—for the remaining nested-fixture test boundary.
+Result: an accepted deterministic immutable-snapshot ownership design—or
+terminal REPLAN—for the remaining nested-fixture test boundary.
 
 ## Goal
 
-Select the smallest source-exact Bazel fixture owner that can serve the 42 CLI
+Determine whether one checked-in source-exact payload can serve the 42 CLI
 integration cases, 53 loading-query cases, and inseparable 34-case server unit
-target without altering the workspaces those tests query.
+target after Bazel 9.2's repository watching proved unable to retain no-follow
+directory identity.
 
 ## Required design
 
-Reconcile every live fixture consumer, mutation, compile-time manifest/binary
-path, and expected workspace byte with the 14-workspace/163-file/105-nested-
-package Gate C0 inventory and the query/server subsets. Re-evaluate only
-mechanisms that can declare all bytes for local sandbox, remote execution, and
-incremental invalidation while preserving Windows manifest-only runfiles and
-Cargo behavior. If a checked-in immutable snapshot/archive is the sole bounded
-mechanism, freeze a deterministic source-exact generator, manifest/hash and
-drift check, extraction/scratch lifecycle, platform path contract, and prove
-why the duplicate cannot diverge silently or change queried BUILD semantics.
-Otherwise freeze the exact supported Bazel owner and consumer API. Partition
-CLI binary env, fixture ownership, query loading, and server crate-mode
-activation; do not bundle unrelated semantic repairs.
+Freeze the smallest cross-platform no-follow generator for exactly 14
+workspaces, 112 directories, and 163 regular files. Specify a versioned ordered
+directory/file format, normalized modes/metadata, per-entry and whole-payload
+hashes, atomic generation, and a source-to-payload drift check that cannot be
+silently skipped in the supported Cargo and Bazel developer gates. Preserve
+empty directories, arbitrary bytes, the non-ASCII discriminator, ASCII
+Windows-safe paths, and exact BUILD/BUILD.bazel workspace graphs. Freeze a
+create-new `TEST_TMPDIR` extraction API and compile-time rules_rust
+`compile_data` embedding so runtime runfiles remain unnecessary. Partition the
+owner, loading-query, server, and CLI binary/test activations and size every
+packet. Do not implement the snapshot or helper.
 
 ## Allowed paths
 
@@ -34,26 +34,25 @@ activation; do not bundle unrelated semantic repairs.
 
 ## Required validation
 
-Record exact consumer/file/workspace/mutation inventories, the Bazel 9.2 and
-rules_rust ownership/runfiles authority, remote/invalidation and native-Windows
-analysis, deterministic byte/path lifecycle, proposed packet split and line
-arithmetic, and independent fixture/remote/platform design review. Run
-structure, scope, cap, credential-pattern, and `git diff --check` gates; no
-fixture, archive, generator, Rust, BUILD, or Cargo implementation is authorized
-in this packet.
+Record the exact generator authority and source enumeration, no-follow and
+path-collision behavior, deterministic byte/hash lifecycle, drift-enforcement
+entry points, local sandbox and remote declared-input semantics, native-Windows
+analysis, Cargo fallback, packet split, and line arithmetic. Obtain independent
+fixture/generator/drift/remote/platform review. Run structure, scope, cap,
+credential-pattern, archive, and `git diff --check` gates.
 
 ## Stop conditions
 
-Stop with REPLAN on undeclared recursive source-directory reads, package-local
-exports or targets that change queried fixture graphs, ambient repository/home
-paths, untracked directory symlinks, source/runfile writes, a snapshot without
-deterministic source-to-byte drift enforcement, Cargo execution from Bazel,
-Windows exclusion or assumed runfiles tree, nondeterministic metadata, remote
-or incremental invalidation gaps, fixture query-output changes, or coupling to
-core host tools, query/cquery/aquery expansion, execution/cache semantics,
-self-hosting, Java/JVM delegation, Bazel 8, WORKSPACE, rc, or credentials.
+Stop with REPLAN on a drift check that is optional or Bazel-invisible in the
+supported developer gate, ambient interpreters/tools/repository paths, followed
+links, untracked directory reads, nondeterministic timestamps/owners/modes,
+source/runfile writes, path or byte loss, Windows exclusion, runtime runfiles,
+Cargo execution from Bazel, package-local fixture exports, queried graph
+changes, application activation, CI assumptions, or coupling to core host
+tools, query/cquery/aquery expansion, execution/cache semantics, self-hosting,
+Java/JVM delegation, Bazel 8, WORKSPACE, rc, or credentials.
 
 ## Diff budget
 
-- At most 420 net documentation lines. No Rust, BUILD, Cargo, lock, fixture,
-  archive, generated source, generator/tool, CI, or unrelated change.
+- At most 360 net documentation lines. No Rust, BUILD, Cargo, lock, fixture,
+  payload/archive, generated source, generator/tool, CI, or unrelated change.
