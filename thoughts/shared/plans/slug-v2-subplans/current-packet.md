@@ -1,54 +1,53 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-core-runtime-test-implementation`
+Packet: `WP-10-m8-bazel-bzlmod-proxy-span-repair-design`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one private standalone Bazel target passing all 13 source-owned core
-runtime integration cases without activating the blocked core unit host tools.
+Result: an accepted, evidence-backed bounded repair contract for the sole
+clean-baseline failure blocking the 278-case Bzlmod crate-mode target.
 
 ## Goal
 
-Map only `app/slug_core_v2/tests/runtime.rs` as one standalone integration
-target with its exact direct dependencies.
+Freeze Bazel 9.2 authority, the live source owner, exact span semantics, and a
+bounded implementation/evidence successor for
+`records_exact_proxy_tag_and_innate_call_spans` without editing Rust.
 
 ## Required design
 
-Add exactly one private, small standalone `rust_test` owning
-`tests/runtime.rs`, using the Cargo edition. Its direct dependencies are
-`:slug_core_v2`, `//app/slug_bzlmod_v2`, `//app/slug_identity_v2`,
-`//app/slug_loading_v2`, `//app/slug_query_v2`, and the generated `tempfile`
-crate label. Preserve the source-owned Unix cfgs: all 13 cases execute on Unix
-and the symlink-alias case remains cfg-excluded elsewhere. Do not add the
-141-case crate-mode unit target or any env, data, tool, runner, fixture,
-platform constraint, process, service, source adapter, Cargo input, or lock.
+Reconcile the existing expected `use_extension` proxy span (line 2, columns
+9–39) with the clean actual starlark-rust call-stack span (line 2, columns
+22–22). Use accepted Bazel 9.2 oracle output or pinned Bazel source plus the
+live starlark-rust AST/evaluator source to establish whether the location owns
+the complete call expression, callee token, or another exact range. Inventory
+all consumers of the retained proxy/tag/innate locations and all assignment,
+include-file, reuse/merge, and error paths affected by the selected owner.
+Choose the smallest source-exact mechanism and freeze focused tests,
+downstream validation, platform checks, allowed files, caps, and stop
+conditions. Do not weaken/change the expected bytes merely to make Cargo green.
 
 ## Allowed paths
 
-- `app/slug_core_v2/BUILD.bazel`
 - the canonical plan, Stage 10 owner, and this manifest
 - `.codex/skills/slug-agent-orchestration/references/routing-history-2026-08.md`
 
 ## Required validation
 
-Run the private target with credential-free nightly Bazel; all 13 Unix-active
-cases must pass from unique temporary workspaces. Run serial Cargo
-`--test runtime`; the same 13 must pass. Compile the integration with the
-GNU-Windows no-run target, preserving the source-owned non-Unix cfg reduction.
-Run no-repin `bazel mod deps` and prove all three lock hashes stable. Run
-archive, scope, cap, credential-pattern, and `git diff --check` gates; clean
-stale `slugd` before and after tests.
+Reuse or reproduce the clean 277/278 Cargo and Bazel failure only as needed.
+Record exact Bazel 9.2 or pinned-source authority, live source/consumer anchors,
+the proposed evidence matrix, line arithmetic, and an independent design
+review. Run structure, scope, cap, credential-pattern, and `git diff --check`
+gates; no implementation suite is authorized in this packet.
 
 ## Stop conditions
 
-Stop with REPLAN on any Rust source, Cargo/lock/fixture/generated-source change,
-unit target, target env/rustc_env/data/tool/runner, host process, source/runfile
-write, ambient repository/home/PATH dependency, platform exclusion, Cargo
-execution from Bazel, rc or credential inspection, or M2/M5/M6/self-hosting
-coupling. Do not add a WORKSPACE, `.bazelrc`, CI, BuildBuddy/cache/RBE, query,
-cquery, or aquery surface.
+Stop with REPLAN if Bazel's exact range cannot be established, if the repair
+would alter unrelated directive/tag/innate spans or logical file identity, if
+it needs retained source text/AST beyond a bounded compact representation, or
+if it couples loading semantics, DICE ownership, query/cquery/aquery,
+execution/cache, fixtures, host tools, self-hosting, Java/JVM delegation, or
+Bazel 8/WORKSPACE compatibility. Do not inspect rc or credential contents.
 
 ## Diff budget
 
-- At most 100 net metadata/documentation lines including at most 40 BUILD
-  lines. No Rust, Cargo, lock, fixture, generated-source, CI, or unrelated
-  change.
+- At most 180 net documentation lines. No Rust, BUILD, Cargo, lock, fixture,
+  generated-source, CI, or unrelated change.

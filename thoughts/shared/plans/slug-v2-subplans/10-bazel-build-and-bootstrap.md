@@ -501,6 +501,18 @@ standalone target with direct core, Bzlmod, identity, loading, query, and
 source behavior and add no unit target, env, data, tool, runner, fixture,
 platform exclusion, source adapter, Cargo input, or lock change.
 
+The core runtime successor is accepted. Its one private standalone target has
+the exact five first-party and `tempfile` dependencies, while the 141-case
+crate-mode target remains absent at the host-tool `REPLAN` boundary.
+Credential-free nightly Bazel and serial Cargo each pass all 13 Unix-active
+runtime cases; the GNU-Windows test binary compiles with the source-owned
+non-Unix cfg reduction. No-repin module evaluation leaves all three lock hashes
+stable, and archive, scope, 15-net/100-line cap, credential-pattern, diff,
+process-cleanup, and independent review gates pass. Gate C1 now has 37 accepted
+Bazel targets covering 471 source cases and 467 default-active Linux Cargo
+cases. Next design only the clean-baseline Bzlmod proxy-span semantic repair
+that blocks its 278-case crate-mode target; do not change Rust in the design.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
