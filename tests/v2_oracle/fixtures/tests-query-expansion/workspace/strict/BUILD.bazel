@@ -1,2 +1,0 @@
-test_suite(name = "non_test_member", tests = [":plain"])
-filegroup(name = "plain")

@@ -20,6 +20,8 @@ from .fixture import Fixture, FixtureCommand, Mutation
 from .manifest import collect_manifest_roots
 from .nativelink import NativeLinkService, discover_nativelink_binary, start_nativelink, stop_nativelink
 from .normalize import normalize_text, path_replacements
+from .payload import extract as extract_payload_workspace
+from .payload import projection
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 HTTP_REGISTRY_STARTUP_TIMEOUT_SECONDS = 5.0
@@ -87,7 +89,19 @@ def _copy_workspace(fixture: Fixture, run_dir: Path) -> Path:
     workspace = run_dir / "workspace"
     if workspace.exists():
         raise FileExistsError(f"refusing to reuse run workspace: {workspace}")
-    shutil.copytree(fixture.workspace, workspace, symlinks=True)
+    if fixture.payload_workspace is None:
+        shutil.copytree(fixture.workspace, workspace, symlinks=True)
+    else:
+        payload = REPO_ROOT / "tests" / "v2_fixture_payload" / "fixtures.payload"
+        payload_bytes = payload.read_bytes()
+        actual_hash = hashlib.sha256(
+            projection(payload_bytes, fixture.payload_workspace)
+        ).hexdigest()
+        if actual_hash != fixture.initial_tree_hash:
+            raise ValueError(
+                f"fixture payload projection hash mismatch for {fixture.name}: {actual_hash}"
+            )
+        extract_payload_workspace(payload_bytes, fixture.payload_workspace, workspace)
     _expand_workspace_uri_templates(workspace)
     return workspace
 

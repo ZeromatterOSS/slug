@@ -1,5 +1,7 @@
 [fixture]
 name = "query-some-selection"
+payload_workspace = "query-some-selection"
+initial_tree_hash = "9c0422b184f725508bd598d6b554f635a0f6ceeb507ac79c2bc59d2a3b1bc121"
 description = "Bazel 9.2 ordinary-query oracle for some() arbitrary selection, signed Java-int counts, and complete operand demand."
 comparison = "message_shape"
 oracle_notes = "Root-only ordinary-query slice. The fixture contains no generated/output nodes, external repositories, configured state, or Sky Query flags. some() alternatives are bounded only to complete valid members/subsets and never claim a winning label."

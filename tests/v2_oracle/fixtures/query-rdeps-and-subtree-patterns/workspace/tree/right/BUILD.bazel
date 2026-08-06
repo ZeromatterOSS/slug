@@ -1,5 +1,0 @@
-exports_files(["right_source.txt"])
-
-filegroup(name = "right_parent", srcs = [":right_source.txt"])
-filegroup(name = "right_cross_only", srcs = ["//tree/left:source.txt"])
-filegroup(name = "right_both", srcs = ["//tree/left:source.txt", ":right_source.txt"])

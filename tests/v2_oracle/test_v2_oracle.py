@@ -30,6 +30,12 @@ from tools.v2_oracle_lib.fixture import (
 )
 from tools.v2_oracle_lib.manifest import collect_manifest
 from tools.v2_oracle_lib.normalize import normalize_text, path_replacements
+from tools.v2_oracle_lib.payload import Entry as PayloadEntry
+from tools.v2_oracle_lib.payload import encode as encode_payload
+from tools.v2_oracle_lib.payload import extract as extract_payload
+from tools.v2_oracle_lib.payload import pack as pack_payload
+from tools.v2_oracle_lib.payload import parse as parse_payload
+from tools.v2_oracle_lib.payload import projection as payload_projection
 from tools.v2_oracle_lib.runner import (
     BazelServerIdentity,
     RunOptions,
@@ -68,6 +74,151 @@ def test_fixture_listing_includes_initial_stage1_set() -> None:
         "negative-no-workspace",
         "glob-directory-invalidation",
     } <= names
+
+
+PROJECTION_HASHES = {
+    "simple-rule-action": "3b8a1425ef7ea5b92de2f363465e5d52d92ce25c2b1818450bffc9098277f5fb",
+    "recursive-custom-rule-providers-actions": "56584525959da70efe9fa64ef5acd862cb70fdf19ed5466d4c2d8f7a8d900c0f",
+    "build-file-loading": "a54763ef1ff899547f4620bc2c3ec912d9c1cdca1d30714a2e43fcfc851f9cbf",
+    "query-parser-and-sets": "0be99e30892443f9262e9618dd38c4a89522e107e0176f122a7a8cf4162542d6",
+    "tests-query-expansion": "8b9ee022d4736bc58d3adc1adb67b6a1e6de5569950a475b6cc6c03cb70ffdee",
+    "query-visible-visibility": "5bed82ad5b929c8d5f64dcfb2bb800ffdfa3fa13126ba22d02438bd5fe12cb9a",
+    "query-build-load-files-provenance": "85a2e8fdedbe19e46f4b11a9e6e008d44b290d56c672775e018938eacaec9f7a",
+    "query-siblings-build-file-node": "c2c102d891f2095f07878eae45fa0d3ad75bff269b32a213b7f4b2826d63b2b9",
+    "query-loading-thin-vertical": "74e8d13fceff7c8868431a3e57653f70d7dea73bc3d203c7000090d66fceb330",
+    "query-labels-attribute-metadata": "6ee33fce813b0ea9f286fea78dfde2a8e98389afdb01647c1e6d4892fed6ff5d",
+    "query-executables-rule-capability": "7d320eb69086edf9ca85ca512d65b7259baabc7ac35fa7077c011536a57af227",
+    "query-rdeps-and-subtree-patterns": "c4f5d3970fd6a3c8e04ebe277e12072311ef87dfccd372303d86dc1515260110",
+    "query-path-topology": "50e86ad2c6528567aa9b106cd487e024f562b34020b84174a96e1012d24b52be",
+    "query-some-selection": "9c0422b184f725508bd598d6b554f635a0f6ceeb507ac79c2bc59d2a3b1bc121",
+}
+
+
+def test_canonical_fixture_payload_has_frozen_inventory_and_projections() -> None:
+    payload = (ROOT / "tests" / "v2_fixture_payload" / "fixtures.payload").read_bytes()
+    entries = parse_payload(payload)
+    assert (len(entries), sum(entry.directory for entry in entries)) == (275, 112)
+    assert sum(len(entry.body) for entry in entries) == 24_939
+    assert hashlib.sha256(payload).hexdigest() == (
+        "d4a5a0f05866908934725209649897fc7b3cf1dfc3f91aad2f5a9d7725bb5566"
+    )
+    assert {
+        name: hashlib.sha256(payload_projection(payload, name)).hexdigest()
+        for name in PROJECTION_HASHES
+    } == PROJECTION_HASHES
+
+
+def _payload_document(*records: bytes, footer: bytes) -> bytes:
+    return b"slug-fixture-payload-v1\n" + b"".join(records) + footer
+
+
+def _directory_record(path: bytes, mode: bytes = b"0755") -> bytes:
+    return b"D\t" + mode + b"\t" + path + b"\n"
+
+
+def _file_record(
+    path: bytes,
+    body: bytes = b"",
+    *,
+    length: bytes | None = None,
+    digest: bytes | None = None,
+    mode: bytes = b"0644",
+    terminator: bytes = b"\n",
+) -> bytes:
+    return b"F\t" + mode + b"\t" + (length or str(len(body)).encode()) + b"\t" + (
+        digest or hashlib.sha256(body).hexdigest().encode()
+    ) + b"\t" + path + b"\n" + body + terminator
+
+
+def _path_payload(path: bytes) -> bytes:
+    records = [_directory_record(b"root")] if path.startswith(b"root/") else []
+    records.append(_directory_record(path))
+    return _payload_document(*records, footer=f"E\t{len(records)}\t0\t0\n".encode())
+
+
+def test_fixture_payload_named_conformance_matrix() -> None:
+    canonical = {
+        "canonical_empty_directory": encode_payload([PayloadEntry("root", True)]),
+        "canonical_empty_file": encode_payload(
+            [PayloadEntry("root", True), PayloadEntry("root/empty", False)]
+        ),
+        "canonical_no_final_newline": encode_payload(
+            [PayloadEntry("root", True), PayloadEntry("root/text", False, b"line")]
+        ),
+        "canonical_binary_body": encode_payload(
+            [PayloadEntry("root", True), PayloadEntry("root/data", False, b"\x00\x09\x0a\xff")]
+        ),
+    }
+    for name, value in canonical.items():
+        assert parse_payload(value), name
+
+    empty_hash = hashlib.sha256(b"").hexdigest().encode()
+    malformed = {
+        "invalid_header": b"not-the-header\nE\t0\t0\t0\n",
+        "invalid_footer_shape": _payload_document(footer=b"E\t0\t0\n"),
+        "invalid_footer_count": _payload_document(_directory_record(b"root"), footer=b"E\t0\t0\t0\n"),
+        "unknown_type": _payload_document(b"X\t0755\troot\n", footer=b"E\t0\t0\t0\n"),
+        "directory_mode": _payload_document(_directory_record(b"root", b"0700"), footer=b"E\t1\t0\t0\n"),
+        "file_mode": _payload_document(_file_record(b"root/a", mode=b"0600"), footer=b"E\t0\t1\t0\n"),
+        "file_length": _payload_document(_file_record(b"root/a", length=b"1"), footer=b"E\t0\t1\t0\n"),
+        "oversized_length": _payload_document(_file_record(b"root/a", length=b"18446744073709551615"), footer=b"E\t0\t1\t0\n"),
+        "file_hash": _payload_document(_file_record(b"root/a", digest=b"0" * 64), footer=b"E\t0\t1\t0\n"),
+        "uppercase_hash": _payload_document(_file_record(b"root/a", digest=empty_hash.upper()), footer=b"E\t0\t1\t0\n"),
+        "missing_body_terminator": _payload_document(_file_record(b"root/a", b"x", terminator=b""), footer=b"E\t0\t1\t1\n"),
+        "trailing_data": _payload_document(footer=b"E\t0\t0\t0\nextra"),
+        "out_of_order": _payload_document(_directory_record(b"b"), _directory_record(b"a"), footer=b"E\t2\t0\t0\n"),
+        "duplicate_path": _payload_document(_directory_record(b"root"), _directory_record(b"root"), footer=b"E\t2\t0\t0\n"),
+        "case_collision": _payload_document(_directory_record(b"A"), _directory_record(b"a"), footer=b"E\t2\t0\t0\n"),
+        "absolute_path": _path_payload(b"/root"),
+        "dot_component": _path_payload(b"root/."),
+        "dot_dot_component": _path_payload(b"root/.."),
+        "trailing_dot": _path_payload(b"root/name."),
+        "device_name": _path_payload(b"root/con.txt"),
+        "backslash_path": _path_payload(b"root\\name"),
+        "tab_path": _path_payload(b"root\tname"),
+        "newline_path": _path_payload(b"root\nname"),
+        "carriage_return_path": _path_payload(b"root\rname"),
+        "nul_path": _path_payload(b"root\x00name"),
+        "space_path": _path_payload(b"root name"),
+        "colon_path": _path_payload(b"root:name"),
+        "non_ascii_path": _path_payload(b"root/\xff"),
+        "missing_parent": _payload_document(_directory_record(b"root"), _file_record(b"root/a/b"), footer=b"E\t1\t1\t0\n"),
+        "file_parent": _payload_document(_directory_record(b"root"), _file_record(b"root/a"), _directory_record(b"root/a/b"), footer=b"E\t2\t1\t0\n"),
+    }
+    for name, value in malformed.items():
+        with pytest.raises((ValueError, OverflowError), match="."):
+            parse_payload(value)
+
+
+@pytest.mark.skipif(os.name != "posix", reason="packing is deliberately POSIX-only")
+def test_fixture_payload_pack_and_extract_are_no_follow_mode_exact_and_fresh() -> None:
+    source = scratch_dir("payload-pack-source")
+    source.chmod(0o755)
+    (source / "empty").mkdir(mode=0o755)
+    file = source / "file"
+    file.write_bytes(b"body")
+    file.chmod(0o644)
+    payload = pack_payload([("sample", source)])
+    assert [(entry.path, entry.directory) for entry in parse_payload(payload)] == [
+        ("sample", True),
+        ("sample/empty", True),
+        ("sample/file", False),
+    ]
+
+    destination = source.parent / f"payload-extract-{uuid.uuid4().hex}"
+    extract_payload(payload, "sample", destination)
+    assert stat.S_IMODE(destination.stat().st_mode) == 0o755
+    assert stat.S_IMODE((destination / "file").stat().st_mode) == 0o644
+    with pytest.raises(FileExistsError):
+        extract_payload(payload, "sample", destination)
+
+    file.chmod(0o600)
+    with pytest.raises(ValueError, match="0644"):
+        pack_payload([("sample", source)])
+    file.chmod(0o644)
+    (source / "link").symlink_to(file)
+    with pytest.raises((OSError, ValueError)):
+        pack_payload([("sample", source)])
 
 
 def test_fixture_parser_reads_commands_and_mutations() -> None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 from typing import Any
 
 try:
@@ -68,6 +69,8 @@ class Fixture:
     root: Path
     workspace: Path
     expected: Path
+    payload_workspace: str | None = None
+    initial_tree_hash: str | None = None
     description: str = ""
     compare: str = "semantic"
     commands: tuple[FixtureCommand, ...] = field(default_factory=tuple)
@@ -261,6 +264,13 @@ def _optional_string(value: Any, field_name: str) -> str | None:
     return value
 
 
+def _optional_sha256(value: Any, field_name: str) -> str | None:
+    value = _optional_string(value, field_name)
+    if value is not None and not re.fullmatch(r"[0-9a-f]{64}", value):
+        raise ValueError(f"{field_name} must be a lowercase SHA-256 digest")
+    return value
+
+
 def _parse_provenance(value: Any) -> FixtureProvenance:
     if value is None:
         return FixtureProvenance()
@@ -291,6 +301,16 @@ def load_fixture(path: Path) -> Fixture:
         raise ValueError("fixture.name must be a non-empty string")
     compare = _compare_mode(fixture_data.get("comparison"), "semantic")
     manifest_roots = _as_str_list(fixture_data.get("manifest_roots"), "fixture.manifest_roots")
+    payload_workspace = _optional_string(
+        fixture_data.get("payload_workspace"), "fixture.payload_workspace"
+    )
+    initial_tree_hash = _optional_sha256(
+        fixture_data.get("initial_tree_hash"), "fixture.initial_tree_hash"
+    )
+    if (payload_workspace is None) != (initial_tree_hash is None):
+        raise ValueError(
+            "fixture.payload_workspace and fixture.initial_tree_hash must appear together"
+        )
 
     commands_raw = raw.get("commands", [])
     if not isinstance(commands_raw, list):
@@ -361,6 +381,8 @@ def load_fixture(path: Path) -> Fixture:
         name=name,
         root=path,
         workspace=path / "workspace",
+        payload_workspace=payload_workspace,
+        initial_tree_hash=initial_tree_hash,
         expected=path / "expected",
         description=str(fixture_data.get("description", "")),
         compare=compare,

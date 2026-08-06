@@ -1,0 +1,1424 @@
+slug-fixture-payload-v1
+D	0755	build-file-loading
+F	0644	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	build-file-loading/BUILD.bazel
+
+F	0644	54	e6d6e816911fce60c96561893a9b640006c572a510442515b6bbd14f1069243f	build-file-loading/MODULE.bazel
+module(name = "build_file_loading", version = "0.0.0")
+D	0755	build-file-loading/pkg
+F	0644	280	b0a96d75de0673157cdb442637d7c21e658d9fce9399488eab71e0a81c76ebef	build-file-loading/pkg/BUILD.bazel
+load(":macros.bzl", "make_export")
+
+package(default_visibility = ["//visibility:public"])
+
+exports_files(["data.txt"])
+
+filegroup(
+    name = "fg",
+    srcs = ["data.txt"],
+)
+
+alias(
+    name = "alias_fg",
+    actual = ":fg",
+)
+
+make_export(name = "macro_file", src = "macro.txt")
+F	0644	4	3a6eb0790f39ac87c94f3856b2dd2c5d110e6811602261a9a923d3bb23adc8b7	build-file-loading/pkg/data.txt
+data
+F	0644	5	27d66c0dcef19a926429158d80111b954a5c23d076833347da3e27b91e4b423d	build-file-loading/pkg/macro.txt
+macro
+F	0644	107	cfebc9c50e69be811094a91d4df9decf2361c1d659834fba6ec7785ac302993c	build-file-loading/pkg/macros.bzl
+def make_export(name, src):
+    native.exports_files([src])
+    native.filegroup(name = name, srcs = [src])
+D	0755	query-build-load-files-provenance
+F	0644	56	a5bd0699be014cc41ced8258be379c851fa58c4b956e6c868562bf64395d14cb	query-build-load-files-provenance/BUILD.bazel
+exports_files(["BUILD.bazel"])
+filegroup(name = "root")
+
+F	0644	51	b3ac4a57374d344a731c77b7ebfb09887a4cc81b3aa918d2e098b48c8797d27d	query-build-load-files-provenance/MODULE.bazel
+module(name = "query_build_load_files_provenance")
+
+D	0755	query-build-load-files-provenance/a
+F	0644	91	b8a5dcbbaf2c0cf8f9349a70553950817856e2aaf866fca8dc53dbe7cd5a39d6	query-build-load-files-provenance/a/BUILD.bazel
+load("//shared:one.bzl", "marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "one")
+
+D	0755	query-build-load-files-provenance/b
+F	0644	91	3ddeaac790b3d09fcc003566757705f3206a00b723554c27214e71c184ef645e	query-build-load-files-provenance/b/BUILD.bazel
+load("//shared:one.bzl", "marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "two")
+
+D	0755	query-build-load-files-provenance/broken_bzl
+F	0644	50	e8915779d3205006aec02bf8da0550b980fbec9388845df935088340f5d92ce2	query-build-load-files-provenance/broken_bzl/BUILD.bazel
+load(":bad.bzl", "bad")
+filegroup(name = "probe")
+
+F	0644	28	0e1d101e1defe202eb1be512bf057050a15d7bd48e1ac7fc72507e78466a61cd	query-build-load-files-provenance/broken_bzl/bad.bzl
+this is not valid Starlark(
+
+D	0755	query-build-load-files-provenance/broken_load
+F	0644	32	1238a6eabd5807e3730c89ff49cd717969372b1dacc4b8f826080b0525ee73bd	query-build-load-files-provenance/broken_load/BUILD.bazel
+load(":missing.bzl", "missing")
+
+F	0644	21	f88082e52c273c7d69b090380bdf1d438fcaca7c596bb1739bc3f4697740c9ff	query-build-load-files-provenance/broken_load/good.bzl
+load_marker = "good"
+
+D	0755	query-build-load-files-provenance/broken_syntax
+F	0644	28	0e1d101e1defe202eb1be512bf057050a15d7bd48e1ac7fc72507e78466a61cd	query-build-load-files-provenance/broken_syntax/BUILD.bazel
+this is not valid Starlark(
+
+F	0644	23	5f6bcb671e74321d574be0d7f5d7826e9ad78d26435948dd1c8c2b6378ba3fc4	query-build-load-files-provenance/broken_syntax/good.bzl
+syntax_marker = "good"
+
+D	0755	query-build-load-files-provenance/bzl_cycle
+F	0644	50	9848635e3123bfd5a31a1bbcbe6e2fb8df9c92a5a1a795d58003a1788612fea7	query-build-load-files-provenance/bzl_cycle/BUILD.bazel
+load(":one.bzl", "one")
+filegroup(name = "probe")
+
+F	0644	34	a3453ebcc1b5554c7fba8c16eee528473473b67413575d76c77af1c8953d6b7c	query-build-load-files-provenance/bzl_cycle/one.bzl
+load(":two.bzl", "two")
+one = two
+
+F	0644	34	e3d10b2c53f80e6c9f959d4df4dd903f5af78527eebb03931b9cb1145107d047	query-build-load-files-provenance/bzl_cycle/two.bzl
+load(":one.bzl", "one")
+two = one
+
+D	0755	query-build-load-files-provenance/consumer_bad
+F	0644	154	4d075b817941e7e5d6df99dfe4c54239c7a5bad81f9061ff7d54f3a4d136c2d0	query-build-load-files-provenance/consumer_bad/BUILD.bazel
+load("//broken_syntax:good.bzl", "syntax_marker")
+load("//broken_load:good.bzl", "load_marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "probe")
+
+D	0755	query-build-load-files-provenance/diamond
+F	0644	149	e0dec5cef634bf336d07b8a0030aa4de6606a81afd72a9c9e447646a5ca431c1	query-build-load-files-provenance/diamond/BUILD.bazel
+load(":left.bzl", "left")
+load(":right.bzl", "right")
+
+exports_files(["BUILD.bazel", "left.bzl", "right.bzl", "leaf.bzl"])
+filegroup(name = "probe")
+
+F	0644	14	fc3233150e76e3e26ed3b8392f5969a5c6adbd5b37ea1b94bb7f9f948e0346e2	query-build-load-files-provenance/diamond/leaf.bzl
+leaf = "leaf"
+
+F	0644	39	6bb9ec5be1247182111fd01a8dcd76e62f0d3d51dbf4e4c26879140c97549d5f	query-build-load-files-provenance/diamond/left.bzl
+load(":leaf.bzl", "leaf")
+
+left = leaf
+
+F	0644	40	aa2714051f8cbb988ec16e56d63903555e6372f4777c6ce3220463782aaf7aca	query-build-load-files-provenance/diamond/right.bzl
+load(":leaf.bzl", "leaf")
+
+right = leaf
+
+D	0755	query-build-load-files-provenance/dual
+F	0644	28	161054a615b37b8d8e6dbb9b582eb009f19eb457b9b6d6e3923689775e5c670c	query-build-load-files-provenance/dual/BUILD
+filegroup(name = "ignored")
+
+F	0644	97	e3262a76c71801644b867b8690393eb07574631dcc05b6900a548ab086044d2c	query-build-load-files-provenance/dual/BUILD.bazel
+load("//shared:one.bzl", "marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "preferred")
+
+D	0755	query-build-load-files-provenance/fallback
+F	0644	86	4d6f28d0c7cd9a7de429badb8e64d5617e3264e5b1de75ad6fade7c0b54bf7cc	query-build-load-files-provenance/fallback/BUILD
+load("//shared:one.bzl", "marker")
+
+exports_files(["BUILD"])
+filegroup(name = "only")
+
+D	0755	query-build-load-files-provenance/missing_load
+F	0644	58	958129984b5d4d622641b023c72877f2963fde20d3a1bc70461840deaeffae66	query-build-load-files-provenance/missing_load/BUILD.bazel
+load(":missing.bzl", "missing")
+filegroup(name = "probe")
+
+D	0755	query-build-load-files-provenance/shared
+F	0644	85	d95cd2c80bf1de37c52ac8cdca348cdf4669fd3a7b4aae3d8ff1f272e3983932	query-build-load-files-provenance/shared/BUILD.bazel
+exports_files(["BUILD.bazel", "one.bzl", "two.bzl"])
+filegroup(name = "shared_rule")
+
+F	0644	54	fb1639bf4957574c16d6aaa2889d2c971f606cf925e8bdce7782d2945176cd64	query-build-load-files-provenance/shared/one.bzl
+load(":two.bzl", "transitive_marker")
+
+marker = "one"
+
+F	0644	26	af40692ffd7020f5b0eb4667a557076aeb5d95212d199c138b74e2dc67fdf5b3	query-build-load-files-provenance/shared/two.bzl
+transitive_marker = "two"
+
+D	0755	query-build-load-files-provenance/single
+F	0644	103	9adc5172ee8ef9b9b94932e6f0639c93c4a0b2d67dd0e8f8869825f18e7fbd37	query-build-load-files-provenance/single/BUILD.bazel
+load("//shared:two.bzl", "transitive_marker")
+
+exports_files(["BUILD.bazel"])
+filegroup(name = "only")
+
+D	0755	query-executables-rule-capability
+F	0644	31	35af6638bf8666468715909ccc76cba9c4502241182256adc45e44745f7ad6e1	query-executables-rule-capability/BUILD.bazel
+exports_files(["BUILD.bazel"])
+
+F	0644	51	3556390f93f989015d65a39f6ce4065ad21abe14d306706642be71666ee25131	query-executables-rule-capability/MODULE.bazel
+module(name = "query_executables_rule_capability")
+
+D	0755	query-executables-rule-capability/invalid_not_test
+F	0644	70	0905ff7eb72f62c0ff595d21fb77b33c71b16a621cdc068e21beb9707f51b0d4	query-executables-rule-capability/invalid_not_test/BUILD.bazel
+load(":defs.bzl", "not_test_suffix")
+
+not_test_suffix(name = "probe")
+
+F	0644	115	14dc544507ba7fcf79e0cc833585f1349a4557107366b1f51ae8eac7573cbd01	query-executables-rule-capability/invalid_not_test/defs.bzl
+def _impl(ctx):
+    return [DefaultInfo()]
+
+not_test_suffix = rule(
+    implementation = _impl,
+    test = True,
+)
+
+D	0755	query-executables-rule-capability/invalid_suffix_test
+F	0644	62	80ba2133259645114dc6e9a8f695656ac4807f7a3d3053e9c7aecf27fbd67b09	query-executables-rule-capability/invalid_suffix_test/BUILD.bazel
+load(":defs.bzl", "suffix_test")
+
+suffix_test(name = "probe")
+
+F	0644	94	1a7670291f03ea6420fcf5b5beae92c59c6ea5f6a2c7ef7dbc15a9085c9cb53f	query-executables-rule-capability/invalid_suffix_test/defs.bzl
+def _impl(ctx):
+    return [DefaultInfo()]
+
+suffix_test = rule(
+    implementation = _impl,
+)
+
+D	0755	query-executables-rule-capability/pkg
+F	0644	670	fd936894e7a40885ea3f11006471820df3d85d82f894c6ad294fc5ccb61cc43f	query-executables-rule-capability/pkg/BUILD.bazel
+load(":defs.bzl", "exec_arbitrary", "explicit_test_test", "implicit_test_test", "output_rule", "plain_rule")
+
+exports_files(["BUILD.bazel", "data.txt"])
+
+exec_arbitrary(name = "arbitrary_target")
+exec_arbitrary(name = "target_test")
+exec_arbitrary(name = "edge_exec", deps = [":edge_dep"])
+plain_rule(name = "plain")
+plain_rule(name = "edge_dep")
+implicit_test_test(name = "ordinary_target")
+explicit_test_test(name = "explicit_test_target")
+
+filegroup(name = "files", srcs = [":data.txt"])
+alias(name = "alias_exec", actual = ":arbitrary_target")
+config_setting(name = "setting", values = {"cpu": "k8"})
+
+output_rule(name = "generated_owner", outs = ["generated.txt"])
+
+F	0644	518	1f52549e669c244e4fe9a57a658c87e1919f4d10e4aeb30ca978db8c83c77653	query-executables-rule-capability/pkg/defs.bzl
+def _impl(ctx):
+    return [DefaultInfo()]
+
+exec_arbitrary = rule(
+    implementation = _impl,
+    executable = True,
+    attrs = {"deps": attr.label_list()},
+)
+
+plain_rule = rule(
+    implementation = _impl,
+    attrs = {"deps": attr.label_list()},
+)
+
+output_rule = rule(
+    implementation = _impl,
+    attrs = {"outs": attr.output_list()},
+)
+
+implicit_test_test = rule(
+    implementation = _impl,
+    test = True,
+)
+
+explicit_test_test = rule(
+    implementation = _impl,
+    test = True,
+    executable = True,
+)
+
+D	0755	query-executables-rule-capability/test_false
+F	0644	70	9a2df6939188d8c207494d505b4d2b4a2e5c29d256f33e862c1c2fb555120841	query-executables-rule-capability/test_false/BUILD.bazel
+load(":defs.bzl", "test_false_test")
+
+test_false_test(name = "probe")
+
+F	0644	139	052ddbcf2346d55ed822360734b32e183909e897fcc4d1155c84394599344289	query-executables-rule-capability/test_false/defs.bzl
+def _impl(ctx):
+    return [DefaultInfo()]
+
+test_false_test = rule(
+    implementation = _impl,
+    test = True,
+    executable = False,
+)
+
+D	0755	query-labels-attribute-metadata
+F	0644	31	35af6638bf8666468715909ccc76cba9c4502241182256adc45e44745f7ad6e1	query-labels-attribute-metadata/BUILD.bazel
+exports_files(["BUILD.bazel"])
+
+F	0644	49	bd9baddb99d844a3ea57a9e35c26c388a07f87ef7709e92cf8110bf2b413fb87	query-labels-attribute-metadata/MODULE.bazel
+module(name = "query_labels_attribute_metadata")
+
+D	0755	query-labels-attribute-metadata/broken
+F	0644	62	5c3e02cccd7c365578377bbcb5e8cb8da2a568ce058cd077f9d7439999fcb320	query-labels-attribute-metadata/broken/BUILD.bazel
+load("//pkg:defs.bzl", "must_rule")
+
+must_rule(name = "must")
+
+D	0755	query-labels-attribute-metadata/consumer
+F	0644	76	4ff426021fe9023bd1193e0f7c6ecc2fbbed05b95ccae4d053bd2ad9603e1822	query-labels-attribute-metadata/consumer/BUILD.bazel
+load("//pkg:defs.bzl", "probe_rule")
+
+probe_rule(name = "default_consumer")
+
+D	0755	query-labels-attribute-metadata/duplicate_filegroup
+F	0644	71	0bf97079d2c05d4f38ca68393cf27beade67c3827ea3bae2e787cbc27660bfe6	query-labels-attribute-metadata/duplicate_filegroup/BUILD.bazel
+filegroup(
+    name = "duplicate",
+    srcs = ["member", ":member"],
+)
+
+D	0755	query-labels-attribute-metadata/duplicate_starlark
+F	0644	113	ec782ab6a0e13b702d427b97bbc642422727a4c4d63c1966cb618987bb468abd	query-labels-attribute-metadata/duplicate_starlark/BUILD.bazel
+load(":defs.bzl", "duplicate_rule")
+
+duplicate_rule(
+    name = "duplicate",
+    many = ["member", ":member"],
+)
+
+F	0644	159	51423ddc80ec4bc77cc384d429a0db681d0671b8f9103f578e82d1641ce7228f	query-labels-attribute-metadata/duplicate_starlark/defs.bzl
+duplicate_rule = rule(
+    implementation = lambda ctx: [],
+    attrs = {
+        "many": attr.label_list(
+            allow_files = True,
+        ),
+    },
+)
+
+D	0755	query-labels-attribute-metadata/invalid_relative
+F	0644	83	8480d7a249e0625ad5d8ab4ae21d80f1ec4f1fbead5975e5eafdd20be07c7f20	query-labels-attribute-metadata/invalid_relative/BUILD.bazel
+load("//pkg:defs.bzl", "probe_rule")
+
+probe_rule(name = "bad", one = "pkg:target")
+
+D	0755	query-labels-attribute-metadata/other
+F	0644	140	4e986acfcbe4309d9a4c8ac6de5e38a8a2ab57fc87525e12a8b5ec4113f06f8f	query-labels-attribute-metadata/other/BUILD.bazel
+load("//pkg:defs.bzl", "probe_rule")
+
+exports_files(["cross.txt"])
+probe_rule(name = "consumer", many = [":cross.txt", "//pkg:source.txt"])
+
+D	0755	query-labels-attribute-metadata/pkg
+F	0644	1795	d5048d2b9149f53b60855619ed49e85372bbd2ff73b3122af2e5c88756da8784	query-labels-attribute-metadata/pkg/BUILD.bazel
+load(":defs.bzl", "context_rule", "must_rule", "output_rule", "probe_rule")
+
+config_setting(name = "linux", values = {"cpu": "k8"})
+config_setting(name = "arm", values = {"cpu": "arm"})
+
+exports_files([
+    "BUILD.bazel",
+    "source.txt",
+    "default.txt",
+    "implicit.txt",
+    "branch_linux.txt",
+    "branch_arm.txt",
+    "branch_default.txt",
+    "shared.txt",
+])
+
+probe_rule(
+    name = "explicit",
+    one = ":source.txt",
+    many = [":source.txt", "//other:cross.txt"],
+)
+
+probe_rule(name = "omitted")
+probe_rule(name = "empty", many = [])
+probe_rule(name = "implicit")
+context_rule(
+    name = "package_context",
+    one = "bare.txt",
+    many = ["dir/bare.txt", ":colon.txt", "//other:cross.txt"],
+)
+filegroup(name = "filegroup_srcs_omitted")
+filegroup(name = "filegroup_srcs_explicit_empty", srcs = [])
+probe_rule(
+    name = "selecting",
+    chosen = select({
+        ":linux": [":branch_linux.txt"],
+        ":arm": [":branch_arm.txt"],
+        "//conditions:default": [":branch_default.txt"],
+    }),
+    combined = [":shared.txt"] + select({
+        ":linux": [":branch_linux.txt", ":shared.txt"],
+        ":arm": [":branch_arm.txt"],
+        "//conditions:default": [":branch_default.txt", ":shared.txt"],
+    }),
+)
+output_rule(name = "outputs", out = "one.out", outs = ["two.out", "three.out"])
+output_rule(name = "outputs_two", out = "four.out", outs = ["five.out", "six.out"])
+probe_rule(
+    name = "dicts",
+    string_labels = {"first": ":source.txt", "cross": "//other:cross.txt"},
+    label_strings = {":default.txt": "default", "//other:cross.txt": "cross"},
+    label_lists = {"local": [":implicit.txt", ":source.txt"], "cross": ["//other:cross.txt"]},
+)
+alias(name = "alias", actual = ":explicit")
+probe_rule(name = "missing_ref", many = ["//does_not_exist:nope"])
+
+F	0644	1041	9921cf3f34e97433a47786f83044a8cebd10e5d7d2e0315137f44fddd60cd739	query-labels-attribute-metadata/pkg/defs.bzl
+def _impl(ctx):
+    return [DefaultInfo()]
+
+probe_rule = rule(
+    implementation = _impl,
+    attrs = {
+        "one": attr.label(),
+        "many": attr.label_list(),
+        "with_default": attr.label_list(default = [":default.txt"]),
+        "note": attr.string(default = "plain-text"),
+        "_implicit": attr.label(default = ":implicit.txt"),
+        "chosen": attr.label_list(),
+        "combined": attr.label_list(),
+        "string_labels": attr.string_keyed_label_dict(),
+        "label_strings": attr.label_keyed_string_dict(),
+        "label_lists": attr.label_list_dict(),
+    },
+)
+
+context_rule = rule(
+    implementation = _impl,
+    attrs = {
+        "one": attr.label(mandatory = True),
+        "many": attr.label_list(mandatory = True),
+    },
+)
+
+output_rule = rule(
+    implementation = _impl,
+    attrs = {
+        "out": attr.output(mandatory = True),
+        "outs": attr.output_list(mandatory = True),
+    },
+)
+
+must_rule = rule(
+    implementation = _impl,
+    attrs = {"required": attr.label(mandatory = True)},
+)
+
+D	0755	query-loading-thin-vertical
+F	0644	36	5f4ca9a4eccce79c6c9c2b193e870ab76e55315c87b31fee12cc223a286d7f83	query-loading-thin-vertical/BUILD.bazel
+filegroup(name = "root", srcs = [])
+
+F	0644	64	2214cb6989cfe0b88a23026816d705f02f850a418a12cc92bd3d0b3c6859e0b7	query-loading-thin-vertical/MODULE.bazel
+module(name = "query_loading_thin_vertical", version = "0.1.0")
+
+D	0755	query-loading-thin-vertical/app
+F	0644	181	19c932f3edeecaef83a914ab4426a95a1817cb0e30346cc60b6806abca2206b5	query-loading-thin-vertical/app/BUILD.bazel
+load("//rules:defs.bzl", "passthrough")
+
+alias(
+    name = "via_alias",
+    actual = "//lib:leaf",
+)
+
+passthrough(
+    name = "app",
+    deps = [":via_alias", "//nested:branch"],
+)
+
+D	0755	query-loading-thin-vertical/cycle
+F	0644	74	73fce5e2cc2c74de946eb7f65490d723efb8bbde171b18011f58d1b80a22c8c1	query-loading-thin-vertical/cycle/BUILD.bazel
+filegroup(name = "a", srcs = [":b"])
+filegroup(name = "b", srcs = [":a"])
+
+D	0755	query-loading-thin-vertical/lib
+F	0644	132	4b84abf55db692043353fd8287a238aba9176f4415778dc0b98d79ba3665213f	query-loading-thin-vertical/lib/BUILD.bazel
+exports_files(["explicit.txt"])
+
+filegroup(
+    name = "leaf",
+    srcs = ["implicit.txt", ":explicit.txt", "missing_input.txt"],
+)
+
+F	0644	21	720fbac1b198b2a50918a4213ca1411f07f9e7c82345b165e489812e736e63ce	query-loading-thin-vertical/lib/explicit.txt
+exported source file
+
+F	0644	21	02286ce058e53868d9faf98bfdd12388d5d106a3e80fb031bbe222416097e041	query-loading-thin-vertical/lib/implicit.txt
+implicit source file
+
+D	0755	query-loading-thin-vertical/nested
+F	0644	64	9fe6fda1dd63af999bd51cc58622286bc75c80b909282d3857392be4ac3ef0cc	query-loading-thin-vertical/nested/BUILD.bazel
+filegroup(name = "branch", srcs = ["//nested/child:child.txt"])
+
+D	0755	query-loading-thin-vertical/nested/child
+F	0644	48	5fd67e7db396fe5ea9e11fe64c76e1fe0334c0c0f4656674f841137bee53e172	query-loading-thin-vertical/nested/child/BUILD.bazel
+filegroup(name = "child", srcs = ["child.txt"])
+
+F	0644	25	8286dd7372d44c7811710cb4a854dc963173a80dc00403ff2849cfbe88388fac	query-loading-thin-vertical/nested/child/child.txt
+nested child source file
+
+D	0755	query-loading-thin-vertical/rules
+F	0644	28	d3db178d6c0d8b9fd537f38eea7d51a575ff4229a27a027e51df4753d2765897	query-loading-thin-vertical/rules/BUILD.bazel
+exports_files(["defs.bzl"])
+
+F	0644	159	c4a9c07a9526b86ea8d98efcf6caf39a21dd12f30d505d513be815378b5d5d95	query-loading-thin-vertical/rules/defs.bzl
+def _passthrough_impl(ctx):
+    return [DefaultInfo()]
+
+passthrough = rule(
+    implementation = _passthrough_impl,
+    attrs = {"deps": attr.label_list()},
+)
+
+D	0755	query-parser-and-sets
+F	0644	50	7b289ae09f5790ee627e6a407318ff95e033da2acf9b7fd215ad571d74233335	query-parser-and-sets/BUILD.bazel
+filegroup(name = "root", srcs = ["pkg/data.txt"])
+
+F	0644	58	13f02e741f462ae7f7dc6d11fc35bda58b996637c7489f406f29f7962b8490d8	query-parser-and-sets/MODULE.bazel
+module(name = "query_parser_and_sets", version = "0.1.0")
+
+D	0755	query-parser-and-sets/pkg
+F	0644	116	bdfcd8b76759d419bc1dae553b41f84dee9ddb55f60bef76b3b1c45e626715da	query-parser-and-sets/pkg/BUILD.bazel
+exports_files(["data.txt"])
+
+filegroup(name = "lib", srcs = [":data.txt"])
+filegroup(name = "bin", srcs = [":lib"])
+
+F	0644	26	7fdacd91a6547481fd3e165692460eba202b2619b42c7607fba35f5da96f645e	query-parser-and-sets/pkg/data.txt
+query parser fixture data
+
+D	0755	query-path-topology
+F	0644	2250	659dc2e21a6d64c68bffc411c91da932470e24e33f3a4dfeec8eb7c966c87a3f	query-path-topology/BUILD.bazel
+load(":defs.bzl", "edge")
+
+# A unique three-node/two-edge rule path.
+filegroup(name = "linear_start", srcs = [":linear_mid"])
+filegroup(name = "linear_mid", srcs = [":linear_end"])
+filegroup(name = "linear_end")
+
+# A diamond: somepath may legally choose either complete shortest branch.
+filegroup(name = "diamond_start", srcs = [":diamond_split"])
+filegroup(name = "diamond_split", srcs = [":diamond_left", ":diamond_right"])
+filegroup(name = "diamond_left", srcs = [":diamond_end"])
+filegroup(name = "diamond_right", srcs = [":diamond_end"])
+filegroup(name = "diamond_end")
+
+# A cycle with an escape edge to its destination.
+filegroup(name = "cycle_a", srcs = [":cycle_b"])
+filegroup(name = "cycle_b", srcs = [":cycle_a", ":cycle_end"])
+filegroup(name = "cycle_end")
+
+filegroup(name = "disconnected")
+
+# Multiple reachable origin/destination pairs.
+filegroup(name = "multi_a", srcs = [":multi_end_a"])
+filegroup(name = "multi_b", srcs = [":multi_end_b"])
+filegroup(name = "multi_end_a")
+filegroup(name = "multi_end_b")
+
+# Exactly one reachable pair among these operands.
+filegroup(name = "one_pair_origin", srcs = [":one_pair_destination"])
+filegroup(name = "one_pair_other_origin")
+filegroup(name = "one_pair_destination")
+filegroup(name = "one_pair_other_destination")
+
+# Two genuinely ambiguous origin/destination pairs, with no shared root.
+filegroup(name = "ambiguous_a", srcs = [":ambiguous_a_left", ":ambiguous_a_right"])
+filegroup(name = "ambiguous_a_left", srcs = [":ambiguous_a_end"])
+filegroup(name = "ambiguous_a_right", srcs = [":ambiguous_a_end"])
+filegroup(name = "ambiguous_a_end")
+filegroup(name = "ambiguous_b", srcs = [":ambiguous_b_left", ":ambiguous_b_right"])
+filegroup(name = "ambiguous_b_left", srcs = [":ambiguous_b_end"])
+filegroup(name = "ambiguous_b_right", srcs = [":ambiguous_b_end"])
+filegroup(name = "ambiguous_b_end")
+
+alias(name = "alias_start", actual = ":linear_start")
+
+# A Starlark-defined label-list edge, without analysis or generated outputs.
+edge(name = "custom_start", deps = [":custom_mid"])
+edge(name = "custom_mid", deps = [":custom_end"])
+edge(name = "custom_end")
+
+# Source-file endpoint direction is deliberately one-way in the loading graph.
+filegroup(name = "source_parent", srcs = ["source.txt"])
+
+F	0644	37	8327cb72ead7d6306e91b3922b305f6f825da5e72b0cbf500a1dd8231786df68	query-path-topology/MODULE.bazel
+module(name = "query_path_topology")
+
+F	0644	125	3d58b1de1a08d158e3795ff3c154a0cf8e689917776adf82de48b54b289b799d	query-path-topology/defs.bzl
+def _edge_impl(ctx):
+    return []
+
+edge = rule(
+    implementation = _edge_impl,
+    attrs = {"deps": attr.label_list()},
+)
+
+F	0644	16	fb04111432148527c50b1603ff8d9bb799b0cfe3a0c89fdc96b851a1477b5906	query-path-topology/source.txt
+source endpoint
+
+D	0755	query-rdeps-and-subtree-patterns
+F	0644	36	5f4ca9a4eccce79c6c9c2b193e870ab76e55315c87b31fee12cc223a286d7f83	query-rdeps-and-subtree-patterns/BUILD.bazel
+filegroup(name = "root", srcs = [])
+
+F	0644	69	7ee451ac8d5b6090561ec30ddd2efb5b585509206ca700fd32cf80c4ac938a07	query-rdeps-and-subtree-patterns/MODULE.bazel
+module(name = "query_rdeps_and_subtree_patterns", version = "0.1.0")
+
+D	0755	query-rdeps-and-subtree-patterns/empty
+F	0644	21	33ae016be0c4a22f15f727c92849d1a6377bfa59e0f758252d44c07b74304900	query-rdeps-and-subtree-patterns/empty/marker.txt
+empty subtree marker
+
+D	0755	query-rdeps-and-subtree-patterns/nonpackage
+D	0755	query-rdeps-and-subtree-patterns/nonpackage/desc
+F	0644	46	dc5d87071e0325df67e0ac5932a8d402c2b45e5343efef4a66c0b0966fca19dc	query-rdeps-and-subtree-patterns/nonpackage/desc/BUILD.bazel
+filegroup(name = "desc", srcs = ["desc.txt"])
+
+F	0644	18	95abc84ce9098715e2872b51f88ac521eb40ca5bf777a5c0bd08268f88c1a4d3	query-rdeps-and-subtree-patterns/nonpackage/desc/desc.txt
+descendant source
+
+D	0755	query-rdeps-and-subtree-patterns/rules
+F	0644	28	d3db178d6c0d8b9fd537f38eea7d51a575ff4229a27a027e51df4753d2765897	query-rdeps-and-subtree-patterns/rules/BUILD.bazel
+exports_files(["defs.bzl"])
+
+F	0644	153	dbc7f03b89bd3d47c30aded5312ac57308dd4a16312d56c13b19f1532877c589	query-rdeps-and-subtree-patterns/rules/defs.bzl
+def _edge_rule_impl(ctx):
+    return [DefaultInfo()]
+
+edge_rule = rule(
+    implementation = _edge_rule_impl,
+    attrs = {"deps": attr.label_list()},
+)
+
+D	0755	query-rdeps-and-subtree-patterns/tree
+D	0755	query-rdeps-and-subtree-patterns/tree/left
+F	0644	532	f3b219c6687321d9266840bfe63df350b6dbe741d465c4a3ae99e039c2d76f83	query-rdeps-and-subtree-patterns/tree/left/BUILD.bazel
+load("//rules:defs.bzl", "edge_rule")
+
+exports_files(["source.txt"])
+
+filegroup(name = "leaf", srcs = [":source.txt"])
+filegroup(name = "parent_one", srcs = [":source.txt"])
+filegroup(name = "parent_two", srcs = [":source.txt"])
+filegroup(name = "cross_only", srcs = ["//tree/right:right_source.txt"])
+
+alias(name = "via_alias", actual = ":leaf")
+edge_rule(name = "custom_parent", deps = [":via_alias", "//tree/right:right_parent"])
+
+filegroup(name = "cycle_a", srcs = [":cycle_b"])
+filegroup(name = "cycle_b", srcs = [":cycle_a"])
+
+D	0755	query-rdeps-and-subtree-patterns/tree/left/nested
+F	0644	50	0954710272d8e4b4fb68cce8dba86851413d344180a2a006821d169b04a2b8cc	query-rdeps-and-subtree-patterns/tree/left/nested/BUILD.bazel
+filegroup(name = "nested", srcs = ["nested.txt"])
+
+F	0644	14	840c2ff3c5325e1305b00fddf2885d4b70688ae357825045b3bb3900803a66c6	query-rdeps-and-subtree-patterns/tree/left/nested/nested.txt
+nested source
+
+F	0644	12	8e5ad7a168c3b1b768176c6ccfea443ceeaa56ec5f10ea50ef0b44dd69982aec	query-rdeps-and-subtree-patterns/tree/left/source.txt
+left source
+
+D	0755	query-rdeps-and-subtree-patterns/tree/right
+F	0644	259	142e03fc9da88b7713cec712b7e1ced653c9026e0b97235e30894055183da35a	query-rdeps-and-subtree-patterns/tree/right/BUILD.bazel
+exports_files(["right_source.txt"])
+
+filegroup(name = "right_parent", srcs = [":right_source.txt"])
+filegroup(name = "right_cross_only", srcs = ["//tree/left:source.txt"])
+filegroup(name = "right_both", srcs = ["//tree/left:source.txt", ":right_source.txt"])
+
+F	0644	13	dfd75f3714f47abdeb760c49596ecfaccad1c32f78e8cbd4dff72ff03ea2ccce	query-rdeps-and-subtree-patterns/tree/right/right_source.txt
+right source
+
+D	0755	query-siblings-build-file-node
+F	0644	61	c24e0c8f7ae5817669dff73a2c0a442644de86ee6611cf673008c1c254fcc519	query-siblings-build-file-node/BUILD.bazel
+exports_files(["BUILD.bazel"])
+filegroup(name = "root_rule")
+
+F	0644	48	f789535c6c439e47b9e32c0f5750c465534380a7bbadda3674f00bbc62dce669	query-siblings-build-file-node/MODULE.bazel
+module(name = "query_siblings_build_file_node")
+
+D	0755	query-siblings-build-file-node/defs
+F	0644	28	d3db178d6c0d8b9fd537f38eea7d51a575ff4229a27a027e51df4753d2765897	query-siblings-build-file-node/defs/BUILD.bazel
+exports_files(["defs.bzl"])
+
+F	0644	122	6798592d96a74346274a6e37ad73f80482ca7f8810c21491950292b496596fb1	query-siblings-build-file-node/defs/defs.bzl
+def _impl(ctx):
+    return []
+
+custom_rule = rule(
+    implementation = _impl,
+    attrs = {"deps": attr.label_list()},
+)
+
+D	0755	query-siblings-build-file-node/dual
+F	0644	28	161054a615b37b8d8e6dbb9b582eb009f19eb457b9b6d6e3923689775e5c670c	query-siblings-build-file-node/dual/BUILD
+filegroup(name = "ignored")
+
+F	0644	61	def7318f40c467ead68440ddf518f12522fa712de0640f8703059eb07d66d42a	query-siblings-build-file-node/dual/BUILD.bazel
+exports_files(["BUILD.bazel"])
+filegroup(name = "preferred")
+
+D	0755	query-siblings-build-file-node/fallback
+F	0644	50	d025123ccacba10fc00c3cce98546fd63fe57cd01322e70eef05187eecf6987a	query-siblings-build-file-node/fallback/BUILD
+exports_files(["BUILD"])
+filegroup(name = "only")
+
+D	0755	query-siblings-build-file-node/modern
+F	0644	375	89b31c43b6252b3cfd4a49b016aa832bf234bf7925c7bcb83770c66825c86dfc	query-siblings-build-file-node/modern/BUILD.bazel
+load("//defs:defs.bzl", "custom_rule")
+
+exports_files(["BUILD.bazel", "explicit.txt"])
+
+filegroup(name = "leaf")
+filegroup(name = "rule", srcs = [":leaf", ":explicit.txt", ":implicit.txt"])
+filegroup(name = "cycle_a", srcs = [":cycle_b"])
+filegroup(name = "cycle_b", srcs = [":cycle_a"])
+alias(name = "alias", actual = ":rule")
+custom_rule(name = "custom", deps = [":leaf"])
+
+D	0755	query-siblings-build-file-node/namedall
+F	0644	81	526dc653234831758ec2ab2837d935d8a5e867c00a7ad3a1e3b05d92c44c11ea	query-siblings-build-file-node/namedall/BUILD.bazel
+exports_files(["BUILD.bazel"])
+filegroup(name = "all")
+filegroup(name = "other")
+
+D	0755	query-siblings-build-file-node/provenance
+F	0644	177	35a1060179b10b39984888b39d4dea6ddcb5014c0b2ab1c11bf904a1d36b97a3	query-siblings-build-file-node/provenance/BUILD.bazel
+exports_files(["BUILD.bazel"])
+
+filegroup(
+    name = "a",
+    srcs = [":zz"],
+)
+
+filegroup(name = "y")
+
+filegroup(
+    name = "z",
+    srcs = [":a"],
+)
+
+filegroup(name = "zz")
+
+D	0755	query-some-selection
+F	0644	390	a05a7f0a2a01b6991def90b71940e513fd657c9a32e76a51d055af226f04c100	query-some-selection/BUILD.bazel
+filegroup(name = "early")
+
+# Deliberately non-lexical input order for arbitrary some() selection.
+filegroup(name = "zeta")
+filegroup(name = "alpha")
+filegroup(name = "middle")
+filegroup(name = "single")
+
+filegroup(name = "depth_root", srcs = [":depth_child"])
+filegroup(name = "depth_child")
+filegroup(name = "cycle_a", srcs = [":cycle_b"])
+filegroup(name = "cycle_b", srcs = [":cycle_a"])
+
+F	0644	38	4b5c602fc01939e21179e3ded79c7e9176fd5d1a335a9f003ddb9f6c3158f51b	query-some-selection/MODULE.bazel
+module(name = "query_some_selection")
+
+D	0755	query-some-selection/other
+F	0644	26	ebbd17147a3822d9e36684b3881733e24097ccd7e61dd330d4209aa4455452c2	query-some-selection/other/BUILD.bazel
+filegroup(name = "later")
+
+D	0755	query-some-selection/recursive
+F	0644	29	2b7d276041d403194b7ea17eb29b01888f828862d2f12f7f49963c3c95d5e3ac	query-some-selection/recursive/BUILD.bazel
+filegroup(name = "rec_zeta")
+
+D	0755	query-some-selection/recursive/nested
+F	0644	30	cf1b9537aae2b9c25f768d835b895ccf0ff69ecb80c26f91d549926235bd797b	query-some-selection/recursive/nested/BUILD.bazel
+filegroup(name = "rec_alpha")
+
+D	0755	query-visible-visibility
+F	0644	59	25965fa6172e5d94a8b13a4cb936f5f7e29a28109cf851450bafce6687335fc5	query-visible-visibility/MODULE.bazel
+module(name = "query_visible_visibility", version = "1.0")
+
+D	0755	query-visible-visibility/artifacts
+F	0644	507	653b2a9ceec2d63511be9dd0d315211764a56b971076ef814bfa63cb131c1252	query-visible-visibility/artifacts/BUILD.bazel
+load(":defs.bzl", "emit")
+
+package(default_visibility = ["//visibility:private"])
+
+exports_files(
+    ["exported.txt"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "uses_implicit",
+    srcs = ["implicit.txt"],
+)
+
+emit(
+    name = "public_gen",
+    out = "public.out",
+    visibility = ["//visibility:public"],
+)
+
+emit(
+    name = "private_gen",
+    out = "private.out",
+    visibility = ["//visibility:private"],
+)
+
+package_group(
+    name = "friends",
+    packages = ["//viewer"],
+)
+
+F	0644	151	dc70c69e123672aa281181ad71aa50e0bf98c9847b5733b13f3d092746fd700b	query-visible-visibility/artifacts/defs.bzl
+def _emit_impl(ctx):
+    return []
+
+emit = rule(
+    implementation = _emit_impl,
+    attrs = {
+        "out": attr.output(mandatory = True),
+    },
+)
+
+F	0644	9	b43f735cc10823a2d75e01c8e447336afd134daf861c7527cd95d319d3a5a1fd	query-visible-visibility/artifacts/exported.txt
+exported
+
+F	0644	9	79fe8025e1ed7ffd99e8f168042e36395b1fd022886ddd1910ca4c2d2bf3a089	query-visible-visibility/artifacts/implicit.txt
+implicit
+
+D	0755	query-visible-visibility/build_public
+F	0644	136	8cea29ed6331624f615c6a21da33f167052125eaffabd21edca0283dc831fb6b	query-visible-visibility/build_public/BUILD.bazel
+package(default_visibility = ["//visibility:private"])
+
+exports_files(
+    ["BUILD.bazel"],
+    visibility = ["//visibility:public"],
+)
+
+D	0755	query-visible-visibility/consumer_a
+F	0644	158	c7409511850cc8e22f2024aa81f9cfa2f5495504b6474f3d1529c4ac285b9c28	query-visible-visibility/consumer_a/BUILD.bazel
+load("//loads:defs.bzl", "make_consumer")
+
+make_consumer(name = "consumer")
+
+filegroup(
+    name = "restricted",
+    visibility = ["//consumer_a:__pkg__"],
+)
+
+D	0755	query-visible-visibility/consumer_b
+F	0644	76	32604079768b2d7d3a94f43d84d0917ea7a876b62de08120c18f6aec1a5fe0a8	query-visible-visibility/consumer_b/BUILD.bazel
+load("//loads:defs.bzl", "make_consumer")
+
+make_consumer(name = "consumer")
+
+D	0755	query-visible-visibility/cross_leaf
+F	0644	68	718aff7dda604794bf7041be956a3e6f5420095c98d6dab31965585e7f06ac77	query-visible-visibility/cross_leaf/BUILD.bazel
+package_group(
+    name = "friends",
+    packages = ["//viewer"],
+)
+
+D	0755	query-visible-visibility/cross_target
+F	0644	73	226bb2dd384f4890608ba2675393b8d57cd4ac0917d17009e7fb8cfd455d0e4f	query-visible-visibility/cross_target/BUILD.bazel
+filegroup(
+    name = "visible",
+    visibility = ["//cross_top:top"],
+)
+
+D	0755	query-visible-visibility/cross_top
+F	0644	76	a1b0283beba1d386b89410c401719ff4c0f7d9ca438b053a2a645c1921a22bd9	query-visible-visibility/cross_top/BUILD.bazel
+package_group(
+    name = "top",
+    includes = ["//cross_leaf:friends"],
+)
+
+D	0755	query-visible-visibility/default_direct
+F	0644	119	6f41c214db0325af3b70f202f05465420287e8d3e261c919fc51c0df767ffcba	query-visible-visibility/default_direct/BUILD.bazel
+package(default_visibility = [
+    "//viewer:__pkg__",
+    "//viewer:__subpackages__",
+])
+
+filegroup(name = "omitted")
+
+D	0755	query-visible-visibility/default_group
+F	0644	143	993c6ac8465110082be713d02857823ae9a45d98f530272296e7c209b764b1af	query-visible-visibility/default_group/BUILD.bazel
+package(default_visibility = ["//owner:exact"])
+
+filegroup(name = "omitted")
+
+filegroup(
+    name = "source_owner",
+    srcs = ["data.txt"],
+)
+
+F	0644	18	8028c2c6aacd49e9cb6f4cfd50ac72a226f092d2c351932cd13710bcf3192386	query-visible-visibility/default_group/data.txt
+visibility source
+
+D	0755	query-visible-visibility/defaults_public
+F	0644	90	dd1fab31e855b079f0db102aca2ed44aa4ce966baf40237f2cff200ae87b2276	query-visible-visibility/defaults_public/BUILD.bazel
+package(default_visibility = ["//visibility:public"])
+
+filegroup(name = "default_public")
+
+D	0755	query-visible-visibility/errors
+D	0755	query-visible-visibility/errors/malformed_spec
+F	0644	100	02cdda44d900f1a61ca8c2261d890e3b9329942deabe8afe478ad7967e045b50	query-visible-visibility/errors/malformed_spec/BUILD.bazel
+package_group(
+    name = "broken",
+    packages = ["not-a-package"],
+)
+
+filegroup(name = "target")
+
+D	0755	query-visible-visibility/errors/missing_include
+F	0644	162	44e060838127d1d9e8c2dd069d350067055b7ffc16540242a0dcf6a627ee0d5f	query-visible-visibility/errors/missing_include/BUILD.bazel
+package_group(
+    name = "top",
+    packages = ["//viewer"],
+    includes = [":does_not_exist"],
+)
+
+filegroup(
+    name = "target",
+    visibility = [":top"],
+)
+
+D	0755	query-visible-visibility/errors/missing_top
+F	0644	72	b8d12c21eec7a42275222cb039f809c2f161d5bdaecd702dbf086e8cb0933ef0	query-visible-visibility/errors/missing_top/BUILD.bazel
+filegroup(
+    name = "target",
+    visibility = [":does_not_exist"],
+)
+
+D	0755	query-visible-visibility/errors/misspelled
+F	0644	76	11abe48c6557e8bc64a708f980cc644663f3134b0b73bd26d62b08aa5f53ee55	query-visible-visibility/errors/misspelled/BUILD.bazel
+filegroup(
+    name = "target",
+    visibility = ["//visibility:plubic"],
+)
+
+D	0755	query-visible-visibility/java
+D	0755	query-visible-visibility/java/acme
+F	0644	156	0d7faec07d71455315a1a06dbba606eb59049ebc96cb2c48d604424dbd7d672b	query-visible-visibility/java/acme/BUILD.bazel
+filegroup(
+    name = "caller",
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "private",
+    visibility = ["//visibility:private"],
+)
+
+D	0755	query-visible-visibility/javatests
+D	0755	query-visible-visibility/javatests/acme
+F	0644	156	0d7faec07d71455315a1a06dbba606eb59049ebc96cb2c48d604424dbd7d672b	query-visible-visibility/javatests/acme/BUILD.bazel
+filegroup(
+    name = "caller",
+    visibility = ["//visibility:private"],
+)
+
+filegroup(
+    name = "private",
+    visibility = ["//visibility:private"],
+)
+
+D	0755	query-visible-visibility/javatests/other
+F	0644	27	26c9f38a3d91e602138716ca63bcb6cabf66206e36fa871027df9e3cc6957484	query-visible-visibility/javatests/other/BUILD.bazel
+filegroup(name = "caller")
+
+D	0755	query-visible-visibility/loads
+F	0644	125	545275360e5515f432e326f73280db9228561419e8d08858da896c14867c50f2	query-visible-visibility/loads/BUILD.bazel
+load(":defs.bzl", "make_consumer")
+
+package(default_visibility = ["//visibility:private"])
+
+make_consumer(name = "consumer")
+
+F	0644	103	f7632d47fbcb69534e0b2c2fb9c70c369a4e45e1852c44f961bc4bdbeb569731	query-visible-visibility/loads/defs.bzl
+def make_consumer(name):
+    native.filegroup(
+        name = name,
+        srcs = ["defs.bzl"],
+    )
+
+D	0755	query-visible-visibility/other
+F	0644	27	26c9f38a3d91e602138716ca63bcb6cabf66206e36fa871027df9e3cc6957484	query-visible-visibility/other/BUILD.bazel
+filegroup(name = "caller")
+
+D	0755	query-visible-visibility/owner
+F	0644	2394	f83d73606f569d3a1c5e692df1badf6c53116a98b1965e285cb3a4232cf31b1c	query-visible-visibility/owner/BUILD.bazel
+package(default_visibility = ["//visibility:private"])
+
+package_group(
+    name = "exact",
+    packages = ["//viewer"],
+)
+
+package_group(
+    name = "subtree",
+    packages = ["//viewer/..."],
+)
+
+package_group(
+    name = "base",
+    packages = [
+        "//viewer/...",
+        "-//viewer/blocked/...",
+    ],
+)
+
+package_group(
+    name = "reallow",
+    packages = ["//viewer/blocked/reallowed"],
+)
+
+package_group(
+    name = "middle",
+    includes = [
+        ":base",
+        ":reallow",
+    ],
+)
+
+package_group(
+    name = "top",
+    includes = [":middle"],
+)
+
+package_group(
+    name = "cycle_a",
+    packages = ["//viewer"],
+    includes = [":cycle_b"],
+)
+
+package_group(
+    name = "cycle_b",
+    includes = [":cycle_a"],
+)
+
+config_setting(
+    name = "config_omitted",
+    values = {"define": "visibility_probe=1"},
+)
+
+config_setting(
+    name = "config_exact",
+    values = {"define": "visibility_probe=1"},
+    visibility = [":exact"],
+)
+
+filegroup(
+    name = "explicit_public",
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "explicit_private",
+    visibility = ["//visibility:private"],
+)
+
+filegroup(name = "default_private")
+
+filegroup(
+    name = "viewer_pkg",
+    visibility = ["//viewer:__pkg__"],
+)
+
+filegroup(
+    name = "viewer_subpackages",
+    visibility = ["//viewer:__subpackages__"],
+)
+
+filegroup(
+    name = "other_subpackages",
+    visibility = ["//other:__subpackages__"],
+)
+
+filegroup(
+    name = "direct_specs",
+    visibility = [
+        "//viewer:__pkg__",
+        "//viewer:__subpackages__",
+    ],
+)
+
+filegroup(
+    name = "direct_subpackages_only",
+    visibility = ["//viewer:__subpackages__"],
+)
+
+filegroup(
+    name = "exact_only",
+    visibility = [":exact"],
+)
+
+filegroup(
+    name = "subtree_only",
+    visibility = [":subtree"],
+)
+
+filegroup(
+    name = "base_only",
+    visibility = [":base"],
+)
+
+filegroup(
+    name = "top_reallow",
+    visibility = [":top"],
+)
+
+filegroup(
+    name = "direct_reallow",
+    visibility = [
+        ":base",
+        "//viewer/blocked:__subpackages__",
+    ],
+)
+
+filegroup(
+    name = "cycle_visible",
+    visibility = [":cycle_a"],
+)
+
+filegroup(name = "ordinary")
+
+filegroup(
+    name = "wrong_direct",
+    visibility = [":ordinary"],
+)
+
+package_group(
+    name = "wrong_include",
+    includes = [":ordinary"],
+)
+
+filegroup(
+    name = "wrong_include_target",
+    visibility = [":wrong_include"],
+)
+
+D	0755	query-visible-visibility/viewer
+F	0644	27	26c9f38a3d91e602138716ca63bcb6cabf66206e36fa871027df9e3cc6957484	query-visible-visibility/viewer/BUILD.bazel
+filegroup(name = "caller")
+
+D	0755	query-visible-visibility/viewer/blocked
+F	0644	27	26c9f38a3d91e602138716ca63bcb6cabf66206e36fa871027df9e3cc6957484	query-visible-visibility/viewer/blocked/BUILD.bazel
+filegroup(name = "caller")
+
+D	0755	query-visible-visibility/viewer/blocked/reallowed
+F	0644	27	26c9f38a3d91e602138716ca63bcb6cabf66206e36fa871027df9e3cc6957484	query-visible-visibility/viewer/blocked/reallowed/BUILD.bazel
+filegroup(name = "caller")
+
+D	0755	query-visible-visibility/viewer/sub
+F	0644	27	26c9f38a3d91e602138716ca63bcb6cabf66206e36fa871027df9e3cc6957484	query-visible-visibility/viewer/sub/BUILD.bazel
+filegroup(name = "caller")
+
+D	0755	recursive-custom-rule-providers-actions
+F	0644	45	5b24ab1cd8340cdfe7087e18c22b0196e27e765944c2aaefd929f73eacf3b022	recursive-custom-rule-providers-actions/BUILD.bazel
+# Root package intentionally has no targets.
+
+F	0644	57	f690d5ddbe01d71bb27ff09e7a52694ceafdf31f3891213058e850494cc21fde	recursive-custom-rule-providers-actions/MODULE.bazel
+module(name = "recursive_custom_rule_providers_actions")
+
+F	0644	514	d3c26a888be33bb69beb5ca82eca27df72ce70b6a9e64bbd736e14f2893d2cbc	recursive-custom-rule-providers-actions/cquery_format.bzl
+def format(target):
+    available = providers(target)
+    default_files = sorted([
+        file.short_path
+        for file in available["DefaultInfo"].files.to_list()
+    ])
+    parent_key = "//rules:defs.bzl%ParentInfo"
+    leaf_key = "//rules:defs.bzl%LeafInfo"
+    provider_key = parent_key if parent_key in available else leaf_key
+    return "label=%s files=%s provider=%s value=%s" % (
+        target.label,
+        ",".join(default_files),
+        provider_key,
+        available[provider_key].value,
+    )
+
+D	0755	recursive-custom-rule-providers-actions/leaf
+F	0644	191	aec7121cb5717d5a57a0d3b7b0880c4a63cf2230118be07bf8d91ed55168b847	recursive-custom-rule-providers-actions/leaf/BUILD.bazel
+load("//rules:defs.bzl", "leaf_rule")
+
+leaf_rule(
+    name = "first",
+    visibility = ["//visibility:public"],
+)
+
+leaf_rule(
+    name = "second",
+    visibility = ["//visibility:public"],
+)
+
+D	0755	recursive-custom-rule-providers-actions/parent
+F	0644	146	c52e53a0da80729f36297e500acb12d290400720907f3e93f9448b4d81073487	recursive-custom-rule-providers-actions/parent/BUILD.bazel
+load("//rules:defs.bzl", "parent_rule")
+
+parent_rule(
+    name = "parent",
+    deps = [
+        "//leaf:second",
+        "//leaf:first",
+    ],
+)
+
+D	0755	recursive-custom-rule-providers-actions/rules
+F	0644	28	d3db178d6c0d8b9fd537f38eea7d51a575ff4229a27a027e51df4753d2765897	recursive-custom-rule-providers-actions/rules/BUILD.bazel
+exports_files(["defs.bzl"])
+
+F	0644	840	5706d0f2c8af56ecad9562db56fb153e2675995ead952d3ffe635763a20e0ec9	recursive-custom-rule-providers-actions/rules/defs.bzl
+LeafInfo = provider(fields = {"value": "leaf target name"})
+ParentInfo = provider(fields = {"value": "dependency leaf names in declaration order"})
+
+def _leaf_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, ctx.label.name + "\n")
+    return [
+        DefaultInfo(files = depset([out])),
+        LeafInfo(value = ctx.label.name),
+    ]
+
+leaf_rule = rule(implementation = _leaf_impl)
+
+def _parent_impl(ctx):
+    values = [dep[LeafInfo].value for dep in ctx.attr.deps]
+    out = ctx.actions.declare_file("parent.txt")
+    ctx.actions.write(out, ",".join(values) + "\n")
+    return [
+        DefaultInfo(files = depset([out])),
+        ParentInfo(value = ",".join(values)),
+    ]
+
+parent_rule = rule(
+    implementation = _parent_impl,
+    attrs = {
+        "deps": attr.label_list(),
+    },
+)
+
+D	0755	simple-rule-action
+F	0644	0	e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855	simple-rule-action/BUILD.bazel
+
+F	0644	54	402532e63193be313373e55e2e71e39278b40b1182d35eb7f3dca09db3d52dfc	simple-rule-action/MODULE.bazel
+module(name = "simple_rule_action", version = "0.0.0")
+D	0755	simple-rule-action/pkg
+F	0644	64	6660b66c0e6bd3f239a2f3becac1612d27b9965bbc8ff99d76afe947e02375e5	simple-rule-action/pkg/BUILD.bazel
+load(":defs.bzl", "write_file")
+
+write_file(name = "write_file")
+F	0644	241	01df77257ed43f6c6d79498180e6241f514324a697b48a9cf4e4dec8e4a3fd10	simple-rule-action/pkg/defs.bzl
+def _write_file_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "hello from an action\n")
+    return [DefaultInfo(files = depset([out]))]
+
+write_file = rule(implementation = _write_file_impl)
+D	0755	tests-query-expansion
+F	0644	28	d3db178d6c0d8b9fd537f38eea7d51a575ff4229a27a027e51df4753d2765897	tests-query-expansion/BUILD.bazel
+exports_files(["defs.bzl"])
+
+F	0644	39	9e13303ace34c031a6ef06b0a2fc1352d78d9be7cd34907b394544fc15a426fa	tests-query-expansion/MODULE.bazel
+module(name = "tests_query_expansion")
+
+D	0755	tests-query-expansion/bare_members
+F	0644	70	187c87b63690578a8fa6f5838df462800d99f74e12f43c234597743af2b6f8f0	tests-query-expansion/bare_members/BUILD.bazel
+test_suite(
+    name = "suite",
+    tests = ["a.txt", "dir/b.txt"],
+)
+
+D	0755	tests-query-expansion/cross
+F	0644	127	81d2ba15d4606ece51d828d91ff420e878cb84fe7f820620498c518822300762	tests-query-expansion/cross/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "cross_suite", tests = [":cross_test"])
+oracle_test(name = "cross_test")
+
+D	0755	tests-query-expansion/cycle_a
+F	0644	48	d602a08e207a25001a755859a8b05b272be033a23a2cce039207eb7837218549	tests-query-expansion/cycle_a/BUILD.bazel
+test_suite(name = "a", tests = ["//cycle_b:b"])
+
+D	0755	tests-query-expansion/cycle_b
+F	0644	48	5fea0bb7cedf73646284169b6157fb3341e4acd0177fad2ce7e3dbfaf37ca064	tests-query-expansion/cycle_b/BUILD.bazel
+test_suite(name = "b", tests = ["//cycle_a:a"])
+
+D	0755	tests-query-expansion/dedup
+F	0644	246	8a59c7caf305e2d2527551451288638d6006dc6bb59c4aad589b1a14af7ead8f	tests-query-expansion/dedup/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "root", tests = [":shared_test", ":left", ":right"])
+test_suite(name = "left", tests = [":shared_test"])
+test_suite(name = "right", tests = [":shared_test"])
+oracle_test(name = "shared_test")
+
+F	0644	121	3d2801e6ff47fca3a6cb42d0778f7d2146a8474fb52f8d02711f988c7a25306e	tests-query-expansion/defs.bzl
+def _test_impl(ctx):
+    return [DefaultInfo()]
+
+oracle_test = rule(
+    implementation = _test_impl,
+    test = True,
+)
+
+D	0755	tests-query-expansion/direct
+F	0644	97	16a978bb7d5aaa4e9e9a2346eb6ac7067c26e57a31d30d3997fa7dc5d265b683	tests-query-expansion/direct/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+oracle_test(name = "direct_test")
+
+filegroup(name = "plain")
+
+D	0755	tests-query-expansion/duplicate_labels
+F	0644	101	0b210698381f518727c443dc8aa68587609ae8c1a36cdf12560a4a3b816183a4	tests-query-expansion/duplicate_labels/BUILD.bazel
+filegroup(name = "member")
+
+test_suite(
+    name = "duplicate",
+    tests = ["member", ":member"],
+)
+
+D	0755	tests-query-expansion/explicit
+F	0644	370	d16510d47b3b3630bf1f6f6959b9133a4ad48f282da710247f7dbc6ecc8ad5fa	tests-query-expansion/explicit/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+test_suite(
+    name = "root_suite",
+    tests = [":direct_test", ":nested_suite", "//cross:cross_suite"],
+)
+
+test_suite(name = "nested_suite", tests = [":nested_test"])
+test_suite(name = "only_direct", tests = [":direct_test"])
+
+oracle_test(name = "direct_test")
+oracle_test(name = "nested_test")
+oracle_test(name = "unlisted_test")
+
+D	0755	tests-query-expansion/filters
+F	0644	653	db616cb6a9040352e18c7215aea59d2c857d35ef057fb33fe8e3043c62c54b03	tests-query-expansion/filters/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+oracle_test(name = "fast_test", tags = ["fast"])
+oracle_test(name = "slow_fast_test", tags = ["fast", "slow"])
+oracle_test(name = "plain_test")
+oracle_test(name = "large_test", size = "large")
+
+test_suite(name = "bare", tests = [":fast_test", ":plain_test"], tags = ["fast"])
+test_suite(name = "plus", tests = [":fast_test", ":plain_test"], tags = ["+fast"])
+test_suite(name = "exclude_slow", tests = [":fast_test", ":slow_fast_test"], tags = ["-slow"])
+test_suite(name = "manual_suite", tests = [":plain_test"], tags = ["manual"])
+test_suite(name = "large", tests = [":large_test", ":plain_test"], tags = ["large"])
+
+D	0755	tests-query-expansion/implicit
+F	0644	199	d9eedd9082babf61d6a7c741d0f20570eee897289b0575b9728f0797acef5556	tests-query-expansion/implicit/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "empty")
+
+oracle_test(name = "alpha_test")
+oracle_test(name = "large_test", size = "large")
+oracle_test(name = "manual_test", tags = ["manual"])
+
+D	0755	tests-query-expansion/missing
+F	0644	58	202c18728658be309ee467fb29be03ce82b25abc58e5cb1e57cf8804acb967d0	tests-query-expansion/missing/BUILD.bazel
+test_suite(name = "broken", tests = ["//missing_target"])
+
+D	0755	tests-query-expansion/missing_target
+F	0644	92	77857b41f55f0723da201e985f2ef9023918e70c57d494c662336b2915688b78	tests-query-expansion/missing_target/BUILD.bazel
+# Intentionally empty package: //missing_target resolves, but its implicit target does not.
+
+D	0755	tests-query-expansion/ordering
+F	0644	411	db8478ab4273e9e19c884e125517ea729dd34e493e75e875168375861d0b00ac	tests-query-expansion/ordering/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+oracle_test(
+    name = "tagged_test",
+    tags = ["𐀀", "", "𐀀", "ascii"],
+)
+oracle_test(name = "")
+oracle_test(name = "𐀀")
+
+test_suite(
+    name = "explicit_order",
+    tags = ["𐀀", "", "𐀀", "ascii"],
+    tests = [
+        "//ordering/a/b:a",
+        "//ordering/a:b/c",
+        ":𐀀",
+        ":",
+    ],
+)
+
+test_suite(name = "implicit_order")
+
+D	0755	tests-query-expansion/ordering/a
+F	0644	24	e6f62172153fac2a04171e99ca8a1277b768462d08be837d9cad6e2f96cb523f	tests-query-expansion/ordering/a/BUILD.bazel
+filegroup(name = "b/c")
+
+D	0755	tests-query-expansion/ordering/a/b
+F	0644	22	481a7feb2d7021c62d8166e926085b1f8ac55e33cb00d7dfd2705f9d200fbabe	tests-query-expansion/ordering/a/b/BUILD.bazel
+filegroup(name = "a")
+
+D	0755	tests-query-expansion/provenance
+F	0644	148	3523fdb4372b18f2ee04ef4839fac9094ad539f1244a8c0b0f7230cd4828cb5f	tests-query-expansion/provenance/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+test_suite(name = "omitted")
+test_suite(name = "explicit_empty", tests = [])
+
+oracle_test(name = "member_test")
+
+D	0755	tests-query-expansion/source_critical
+F	0644	838	eb0a65009dd6aa1f17185bd84305a9344841887d010c0bbf1c9082713a38a320	tests-query-expansion/source_critical/BUILD.bazel
+load("//:defs.bzl", "oracle_test")
+
+oracle_test(name = "nested_unfiltered_test")
+test_suite(
+    name = "nested_unfiltered",
+    tests = [":nested_unfiltered_test"],
+)
+test_suite(
+    name = "parent_requires_parent_tag",
+    tests = [":nested_unfiltered"],
+    tags = ["parent_only"],
+)
+
+oracle_test(name = "shared_blocked_test", tags = ["blocked"])
+test_suite(
+    name = "shared_unfiltered_nested",
+    tests = [":shared_blocked_test"],
+)
+test_suite(
+    name = "filtered_direct_then_nested",
+    tests = [":shared_blocked_test", ":shared_unfiltered_nested"],
+    tags = ["-blocked"],
+)
+
+oracle_test(name = "literal_plus_tag_test", tags = ["+tag"])
+oracle_test(name = "plain_tag_test", tags = ["tag"])
+test_suite(
+    name = "exclude_literal_plus_tag",
+    tests = [":literal_plus_tag_test", ":plain_tag_test"],
+    tags = ["-+tag"],
+)
+
+D	0755	tests-query-expansion/strict
+F	0644	83	29e64f143edcbccc01fe0b1f58818b4d81d1f24001cbf960e98041ad242b08ad	tests-query-expansion/strict/BUILD.bazel
+test_suite(name = "non_test_member", tests = [":plain"])
+filegroup(name = "plain")
+
+E	112	163	24939

@@ -1,5 +1,7 @@
 [fixture]
 name = "query-path-topology"
+payload_workspace = "query-path-topology"
+initial_tree_hash = "50e86ad2c6528567aa9b106cd487e024f562b34020b84174a96e1012d24b52be"
 description = "Bazel 9.2 root-repository loading-query oracle for allpaths, somepath, and explicit label output over source and rule topology."
 comparison = "message_shape"
 oracle_notes = "Root-only label loading-query slice. The workspace has no generated/output nodes, analysis, external repositories, or filesystem-sensitive query functions. somepath is arbitrary by Bazel contract: the bounded alternatives below admit only complete forward shortest paths. QueryCommand deliberately preserves a top-level somepath's forward path for default/auto rather than applying lexicographic AUTO sorting. Explicit label rows prove equivalence with default output under auto/full order and Bazel 9 rejection of prototype-only text output."

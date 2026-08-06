@@ -1,8 +1,0 @@
-load("//loads:defs.bzl", "make_consumer")
-
-make_consumer(name = "consumer")
-
-filegroup(
-    name = "restricted",
-    visibility = ["//consumer_a:__pkg__"],
-)

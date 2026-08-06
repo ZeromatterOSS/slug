@@ -1,1 +1,0 @@
-filegroup(name = "branch", srcs = ["//nested/child:child.txt"])

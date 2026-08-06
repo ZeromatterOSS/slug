@@ -1,5 +1,7 @@
 [fixture]
 name = "query-loading-thin-vertical"
+payload_workspace = "query-loading-thin-vertical"
+initial_tree_hash = "74e8d13fceff7c8868431a3e57653f70d7dea73bc3d203c7000090d66fceb330"
 description = "Bazel 9.2 root-repository unconfigured query oracle over filegroups, aliases, source files, custom-rule label deps, nested packages, a dependency cycle, and package output."
 comparison = "message_shape"
 oracle_notes = "Root-only loading-query slice. The cycle is queried structurally, not built or analyzed. lib/missing_input.txt is intentionally absent but is addressable because filegroup.srcs names it. The fixture establishes Bazel's literal, :all, recursive-pattern, alias, source-file, custom-rule-dependency, set-operation, missing-target/package, and package-output behavior. Package rows prove main-root empty spelling, sorted deduplication, dependency projection, and fake load-file package identity."

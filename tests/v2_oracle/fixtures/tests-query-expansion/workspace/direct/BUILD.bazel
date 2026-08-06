@@ -1,5 +1,0 @@
-load("//:defs.bzl", "oracle_test")
-
-oracle_test(name = "direct_test")
-
-filegroup(name = "plain")

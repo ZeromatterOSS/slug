@@ -16,8 +16,17 @@ use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
 
+#[path = "../../../tests/v2_fixture_support/src/lib.rs"]
+mod fixture_support;
+use fixture_support::FixtureWorkspace;
+
 fn slug() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_slug"))
+    let executable = std::path::PathBuf::from(env!("CARGO_BIN_EXE_slug"));
+    Command::new(if executable.is_absolute() {
+        executable
+    } else {
+        std::env::current_dir().unwrap().join(executable)
+    })
 }
 
 fn scratch(name: &str) -> std::path::PathBuf {
@@ -38,11 +47,8 @@ fn write(path: impl AsRef<std::path::Path>, content: &str) {
     std::fs::write(path, content).unwrap();
 }
 
-fn fixture_workspace(name: &str) -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures")
-        .join(name)
-        .join("workspace")
+fn fixture_workspace(name: &str) -> FixtureWorkspace {
+    FixtureWorkspace::new(name).unwrap()
 }
 
 #[derive(Clone, Copy)]
@@ -437,7 +443,7 @@ fn assert_visible_oracle_case(
     named: &NamedQueryOracleCase,
 ) {
     let mut command = slug();
-    command.current_dir(workspace);
+    command.current_dir(&workspace);
     if let Some(output_base_arg) = output_base_arg {
         command.arg(output_base_arg);
     }
@@ -642,7 +648,7 @@ fn assert_query_oracle_case(
     case: QueryOracleCase,
 ) {
     let mut command = slug();
-    command.current_dir(workspace);
+    command.current_dir(&workspace);
     if let Some(output_base_arg) = output_base_arg {
         command.arg(output_base_arg);
     }
@@ -705,11 +711,10 @@ fn help_is_bazel_v2_specific() {
 
 #[test]
 fn simple_rule_fixture_enters_the_dice_starlark_runtime_before_analysis() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/simple-rule-action/workspace");
+    let workspace = fixture_workspace("simple-rule-action");
 
     let output = slug()
-        .current_dir(workspace)
+        .current_dir(&workspace)
         .args(["build", "//pkg:write_file", "--unknown_flag"])
         .output()
         .unwrap();
@@ -763,7 +768,7 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
     );
 
     let output = slug()
-        .current_dir(workspace)
+        .current_dir(&workspace)
         .args(["build", "//parent:parent", "--unknown_flag"])
         .output()
         .unwrap();
@@ -778,11 +783,10 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
 
 #[test]
 fn build_file_loading_fixture_reaches_package_loading_before_analysis() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/build-file-loading/workspace");
+    let workspace = fixture_workspace("build-file-loading");
 
     let output = slug()
-        .current_dir(workspace)
+        .current_dir(&workspace)
         .args(["build", "//pkg:fg"])
         .output()
         .unwrap();
@@ -1010,8 +1014,7 @@ fn cquery_starlark_label_daemon_recovers_after_missing() {
 
 #[test]
 fn query_prints_text_labels_in_auto_and_full_order() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-parser-and-sets/workspace");
+    let workspace = fixture_workspace("query-parser-and-sets");
     let auto = slug()
         .current_dir(&workspace)
         .args(["query", "deps(//pkg:bin)"])
@@ -1121,8 +1124,7 @@ fn typed_query_activation_publishes_cold_events_without_warm_daemon_replay() {
 
 #[test]
 fn tests_query_expansion_fixture_matches_exact_twenty_seven_non_build_rows_one_shot() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace");
+    let workspace = fixture_workspace("tests-query-expansion");
     let function_cases = tests_function_oracle_cases();
     let non_function_cases = non_function_tests_oracle_cases();
     assert_eq!(function_cases.len() + non_function_cases.len(), 27);
@@ -1133,8 +1135,7 @@ fn tests_query_expansion_fixture_matches_exact_twenty_seven_non_build_rows_one_s
 
 #[test]
 fn visibility_stage4_fixture_matches_exact_twelve_non_visible_rows() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-visible-visibility/workspace");
+    let workspace = fixture_workspace("query-visible-visibility");
     let cases = visibility_stage4_oracle_cases();
     assert_eq!(cases.len(), 12);
     for named in cases {
@@ -1145,8 +1146,7 @@ fn visibility_stage4_fixture_matches_exact_twelve_non_visible_rows() {
 
 #[test]
 fn visible_fixture_matches_exact_twenty_five_rows_one_shot() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-visible-visibility/workspace");
+    let workspace = fixture_workspace("query-visible-visibility");
     let cases = visible_oracle_cases();
     assert_eq!(cases.len(), 25);
     for named in &cases {
@@ -1157,8 +1157,7 @@ fn visible_fixture_matches_exact_twenty_five_rows_one_shot() {
 
 #[test]
 fn visible_fixture_matches_exact_twenty_five_rows_through_one_daemon() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-visible-visibility/workspace");
+    let workspace = fixture_workspace("query-visible-visibility");
     let output_base = scratch("visible-query-output-base");
     let _cleanup = DaemonCleanup(output_base.clone());
     let output_base_arg = format!("--output_base={}", output_base.display());
@@ -1178,8 +1177,7 @@ fn visible_fixture_matches_exact_twenty_five_rows_through_one_daemon() {
 
 #[test]
 fn tests_query_expansion_fixture_matches_all_twenty_one_function_rows_through_daemon() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace");
+    let workspace = fixture_workspace("tests-query-expansion");
     let output_base = scratch("tests-query-output-base");
     let _cleanup = DaemonCleanup(output_base.clone());
     let output_base_arg = format!("--output_base={}", output_base.display());
@@ -1193,8 +1191,7 @@ fn tests_query_expansion_fixture_matches_all_twenty_one_function_rows_through_da
 
 #[test]
 fn build_load_files_provenance_fixture_matches_all_fifty_seven_text_bazel_rows_through_cli() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-build-load-files-provenance/workspace");
+    let workspace = fixture_workspace("query-build-load-files-provenance");
     let successes: &[(&str, &[&str], &str)] = &[
         (
             "buildfiles_direct_primary",
@@ -1572,8 +1569,7 @@ fn build_load_files_provenance_fixture_matches_all_fifty_seven_text_bazel_rows_t
 
 #[test]
 fn siblings_build_file_node_fixture_matches_all_oracle_rows() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-siblings-build-file-node/workspace");
+    let workspace = fixture_workspace("query-siblings-build-file-node");
     const MODERN: &str = "//modern:BUILD.bazel\n//modern:alias\n//modern:custom\n//modern:cycle_a\n//modern:cycle_b\n//modern:explicit.txt\n//modern:implicit.txt\n//modern:leaf\n//modern:rule\n";
     const MODERN_FULL: &str = "//modern:rule\n//modern:leaf\n//modern:implicit.txt\n//modern:explicit.txt\n//modern:cycle_b\n//modern:cycle_a\n//modern:custom\n//modern:alias\n//modern:BUILD.bazel\n";
     let successful = [
@@ -1766,8 +1762,7 @@ fn siblings_build_file_node_fixture_matches_all_oracle_rows() {
 
 #[test]
 fn loading_query_fixture_matches_full_bazel_semantic_slice() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-loading-thin-vertical/workspace");
+    let workspace = fixture_workspace("query-loading-thin-vertical");
     let successful = [
         ("//app:app", "//app:app\n"),
         ("//lib:implicit.txt", "//lib:implicit.txt\n"),
@@ -1831,8 +1826,7 @@ fn loading_query_fixture_matches_full_bazel_semantic_slice() {
 
 #[test]
 fn labels_metadata_fixture_matches_twenty_nine_non_label_kind_bazel_rows_through_cli() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-labels-attribute-metadata/workspace");
+    let workspace = fixture_workspace("query-labels-attribute-metadata");
     let successes: &[(&[&str], &str)] = &[
         (
             &["query", "labels(one, //pkg:explicit)"],
@@ -2033,8 +2027,7 @@ fn labels_metadata_fixture_matches_twenty_nine_non_label_kind_bazel_rows_through
 
 #[test]
 fn executables_rule_capability_fixture_matches_all_thirty_two_non_label_kind_bazel_rows() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-executables-rule-capability/workspace");
+    let workspace = fixture_workspace("query-executables-rule-capability");
     let successes: &[(&[&str], &str)] = &[
         (
             &["query", "executables(//pkg:all)"],
@@ -2296,8 +2289,7 @@ fn output_base_executables_reuses_one_daemon_across_capability_transitions() {
 
 #[test]
 fn reverse_query_fixture_matches_all_twenty_six_bazel_rows_through_cli() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-rdeps-and-subtree-patterns/workspace");
+    let workspace = fixture_workspace("query-rdeps-and-subtree-patterns");
     let successes: &[(&[&str], &str)] = &[
         (
             &["query", "//tree/left/..."],
@@ -2456,8 +2448,7 @@ fn reverse_query_fixture_matches_all_twenty_six_bazel_rows_through_cli() {
 
 #[test]
 fn path_topology_fixture_covers_all_forty_three_bazel_rows_through_cli() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-path-topology/workspace");
+    let workspace = fixture_workspace("query-path-topology");
     const LINEAR_ALL_AUTO: &str = "//:linear_end\n//:linear_mid\n//:linear_start\n";
     const LINEAR_FORWARD: &str = "//:linear_start\n//:linear_mid\n//:linear_end\n";
     const EMPTY: &str = "";
@@ -2724,8 +2715,7 @@ fn path_topology_fixture_covers_all_forty_three_bazel_rows_through_cli() {
 
 #[test]
 fn some_selection_fixture_covers_all_forty_two_bazel_rows_through_cli() {
-    let workspace = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-some-selection/workspace");
+    let workspace = fixture_workspace("query-some-selection");
     const ONE_OF_THREE: &[&str] = &["//:zeta\n", "//:alpha\n", "//:middle\n"];
     const TWO_AUTO: &[&str] = &[
         "//:alpha\n//:middle\n",
@@ -3882,8 +3872,9 @@ fn label_kind_matches_the_accepted_rule_capability_and_generated_file_rows() {
     ];
 
     for (fixture, expression, expected) in cases {
+        let workspace = fixture_workspace(fixture);
         let output = slug()
-            .current_dir(fixture_workspace(fixture))
+            .current_dir(&workspace)
             .args(["query", "--output=label_kind", expression])
             .output()
             .unwrap();

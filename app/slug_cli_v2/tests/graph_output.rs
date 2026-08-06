@@ -10,22 +10,30 @@
 
 use std::process::Command;
 
+#[path = "../../../tests/v2_fixture_support/src/lib.rs"]
+mod fixture_support;
+use fixture_support::FixtureWorkspace;
+
 fn slug() -> Command {
-    Command::new(env!("CARGO_BIN_EXE_slug"))
+    let executable = std::path::PathBuf::from(env!("CARGO_BIN_EXE_slug"));
+    Command::new(if executable.is_absolute() {
+        executable
+    } else {
+        std::env::current_dir().unwrap().join(executable)
+    })
 }
 
-fn workspace() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-build-load-files-provenance/workspace")
+fn workspace() -> FixtureWorkspace {
+    FixtureWorkspace::new("query-build-load-files-provenance").unwrap()
 }
 
-fn ordinary_graph_workspace() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-loading-thin-vertical/workspace")
+fn ordinary_graph_workspace() -> FixtureWorkspace {
+    FixtureWorkspace::new("query-loading-thin-vertical").unwrap()
 }
 
 #[test]
 fn graph_output_matches_each_bazel_provenance_oracle_row() {
+    let workspace = workspace();
     let cases = [
         (
             "loadfiles_direct",
@@ -62,7 +70,7 @@ fn graph_output_matches_each_bazel_provenance_oracle_row() {
 
     for (name, expression, nodes) in cases {
         let output = slug()
-            .current_dir(workspace())
+            .current_dir(&workspace)
             .args([
                 "query",
                 "--order_output=full",
@@ -88,8 +96,9 @@ fn graph_output_matches_each_bazel_provenance_oracle_row() {
 
 #[test]
 fn graph_output_honors_unfactored_mode() {
+    let workspace = workspace();
     let output = slug()
-        .current_dir(workspace())
+        .current_dir(&workspace)
         .args([
             "query",
             "--order_output=full",
@@ -115,6 +124,7 @@ fn graph_output_honors_unfactored_mode() {
 
 #[test]
 fn ordinary_graphs_keep_the_existing_lexical_selection_order() {
+    let workspace = ordinary_graph_workspace();
     let factored = concat!(
         "digraph mygraph {\n",
         "  node [shape=box];\n",
@@ -157,7 +167,7 @@ fn ordinary_graphs_keep_the_existing_lexical_selection_order() {
         ("--nograph:factored", unfactored),
     ] {
         let output = slug()
-            .current_dir(ordinary_graph_workspace())
+            .current_dir(&workspace)
             .args(["query", "--output=graph", factored_flag, "deps(//app:app)"])
             .output()
             .unwrap();

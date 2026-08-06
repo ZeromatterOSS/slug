@@ -1,8 +1,0 @@
-package(default_visibility = ["//owner:exact"])
-
-filegroup(name = "omitted")
-
-filegroup(
-    name = "source_owner",
-    srcs = ["data.txt"],
-)

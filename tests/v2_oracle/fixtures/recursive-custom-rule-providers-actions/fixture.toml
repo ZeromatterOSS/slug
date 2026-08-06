@@ -1,5 +1,7 @@
 [fixture]
 name = "recursive-custom-rule-providers-actions"
+payload_workspace = "recursive-custom-rule-providers-actions"
+initial_tree_hash = "56584525959da70efe9fa64ef5acd862cb70fdf19ed5466d4c2d8f7a8d900c0f"
 description = "Recursive custom-rule analysis exposes ordered dependency providers and target-owned write actions."
 comparison = "message_shape"
 oracle_notes = "Oracle-only M2 fixture: cquery proves configured providers and aquery proves action declaration ownership without build execution or materialization."

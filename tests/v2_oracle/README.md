@@ -6,7 +6,10 @@ diagnostics, and selected output manifests.
 
 Fixture directories live under `tests/v2_oracle/fixtures/<name>/` and contain:
 
-- `workspace/`: isolated input workspace copied before each run.
+- either `workspace/`, an isolated input tree copied before each run, or a
+  `payload_workspace` plus `initial_tree_hash` in `fixture.toml`. The latter is
+  extracted into a fresh run directory from the sole canonical
+  `tests/v2_fixture_payload/fixtures.payload` byte source.
 - `fixture.toml`: command list, comparison mode, expected diagnostics, and
   manifest roots.
 - `expected/oracle.json`: generated upstream Bazel result when available, or a
@@ -21,6 +24,9 @@ SLUG_V2_BIN=target/debug/slug python3 tools/v2_oracle run --fixture version-baze
 ```
 
 Runs write compact artifacts under `${SLUG_V2_ORACLE_ROOT:-target/v2o}`.
+A payload-backed fixture verifies its complete per-workspace projection hash
+before creating any output. Directory-backed fixtures retain the existing copy,
+template-expansion, and mutation lifecycle.
 A failed comparison writes `comparison/failures.txt`, `actual.json`, and, when
 available, `expected_vs_actual.diff` inside that fixture run directory.
 

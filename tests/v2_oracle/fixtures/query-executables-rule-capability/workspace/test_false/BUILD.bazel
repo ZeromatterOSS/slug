@@ -1,3 +1,0 @@
-load(":defs.bzl", "test_false_test")
-
-test_false_test(name = "probe")

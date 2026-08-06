@@ -1,5 +1,7 @@
 [fixture]
 name = "simple-rule-action"
+payload_workspace = "simple-rule-action"
+initial_tree_hash = "3b8a1425ef7ea5b92de2f363465e5d52d92ce25c2b1818450bffc9098277f5fb"
 description = "A custom Starlark rule declares and writes one output file."
 comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]

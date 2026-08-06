@@ -152,12 +152,15 @@ else
   ok "only V2 app crates are tracked under app/"
 fi
 
-test_v1_paths=$(git ls-files -- tests ':!tests/v2_oracle/**' 2>/dev/null || true)
+test_v1_paths=$(git ls-files -- tests \
+  ':!tests/v2_oracle/**' \
+  ':!tests/v2_fixture_payload/**' \
+  ':!tests/v2_fixture_support/**' 2>/dev/null || true)
 if [ -n "$test_v1_paths" ]; then
   fail "tracked non-oracle test paths remain:"
   printf '%s\n' "$test_v1_paths"
 else
-  ok "only V2 oracle tests are tracked under tests/"
+  ok "only V2 test infrastructure is tracked under tests/"
 fi
 
 tool_v1_paths=$(git ls-files -- tools \

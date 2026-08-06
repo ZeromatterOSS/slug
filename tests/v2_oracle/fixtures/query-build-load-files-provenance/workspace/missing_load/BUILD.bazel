@@ -1,2 +1,0 @@
-load(":missing.bzl", "missing")
-filegroup(name = "probe")

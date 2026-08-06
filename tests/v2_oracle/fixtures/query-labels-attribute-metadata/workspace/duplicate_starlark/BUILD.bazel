@@ -1,6 +1,0 @@
-load(":defs.bzl", "duplicate_rule")
-
-duplicate_rule(
-    name = "duplicate",
-    many = ["member", ":member"],
-)

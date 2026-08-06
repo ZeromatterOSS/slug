@@ -38,3 +38,26 @@ rust_test(
     visibility = ["//visibility:private"],
     deps = [":slug_query_v2"],
 )
+
+rust_test(
+    name = "loading_query_fixture_test",
+    srcs = [
+        "tests/loading_query.rs",
+        "//tests/v2_fixture_support:src/lib.rs",
+    ],
+    compile_data = ["//tests/v2_fixture_payload:fixtures.payload"],
+    crate_root = "tests/loading_query.rs",
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        ":slug_query_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_loading_v2",
+        "//app/slug_workspace_v2",
+        "//dice/dice",
+        "//gazebo/dupe",
+        "//starlark-rust/starlark_map",
+    ] + all_crate_deps(normal_dev = True),
+)

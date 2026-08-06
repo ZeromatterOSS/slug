@@ -1,3 +1,0 @@
-load("//pkg:defs.bzl", "must_rule")
-
-must_rule(name = "must")

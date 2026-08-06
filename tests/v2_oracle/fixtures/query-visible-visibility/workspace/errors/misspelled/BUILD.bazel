@@ -1,4 +1,0 @@
-filegroup(
-    name = "target",
-    visibility = ["//visibility:plubic"],
-)

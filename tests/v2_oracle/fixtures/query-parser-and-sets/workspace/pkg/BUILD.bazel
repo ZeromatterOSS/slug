@@ -1,4 +1,0 @@
-exports_files(["data.txt"])
-
-filegroup(name = "lib", srcs = [":data.txt"])
-filegroup(name = "bin", srcs = [":lib"])

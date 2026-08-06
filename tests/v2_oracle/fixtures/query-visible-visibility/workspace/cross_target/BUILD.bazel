@@ -1,4 +1,0 @@
-filegroup(
-    name = "visible",
-    visibility = ["//cross_top:top"],
-)

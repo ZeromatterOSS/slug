@@ -1,5 +1,7 @@
 [fixture]
 name = "query-rdeps-and-subtree-patterns"
+payload_workspace = "query-rdeps-and-subtree-patterns"
+initial_tree_hash = "c4f5d3970fd6a3c8e04ebe277e12072311ef87dfccd372303d86dc1515260110"
 description = "Bazel 9.2 root-repository loading-query oracle for subtree patterns, reverse dependencies, and same-package direct reverse dependencies."
 comparison = "message_shape"
 oracle_notes = "Root repository only. The graph deliberately includes nested packages, a non-package prefix, an empty prefix, aliases, custom label-list edges, source labels, multiple parents, a cycle, duplicate inputs, and cross-package criss-cross edges."

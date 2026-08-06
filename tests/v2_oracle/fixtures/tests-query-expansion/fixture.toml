@@ -1,5 +1,7 @@
 [fixture]
 name = "tests-query-expansion"
+payload_workspace = "tests-query-expansion"
+initial_tree_hash = "8b9ee022d4736bc58d3adc1adb67b6a1e6de5569950a475b6cc6c03cb70ffdee"
 description = "Bazel 9.2.0 ordinary-query oracle for tests(EXPR) suite expansion, filtering, strictness, and output order."
 comparison = "message_shape"
 oracle_notes = "Root-repository, bzlmod-only fixture. Multi-result tests() rows assert exactly the expected label set but deliberately permit every callback order Bazel's asynchronous suite traversal can produce."

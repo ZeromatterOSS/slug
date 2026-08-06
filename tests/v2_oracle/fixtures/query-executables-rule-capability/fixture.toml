@@ -1,5 +1,7 @@
 [fixture]
 name = "query-executables-rule-capability"
+payload_workspace = "query-executables-rule-capability"
+initial_tree_hash = "7d320eb69086edf9ca85ca512d65b7259baabc7ac35fa7077c011536a57af227"
 description = "Bazel 9.2 ordinary-query oracle for the exact executables() rule-capability predicate."
 comparison = "message_shape"
 oracle_notes = "Root-repository current-loadable-graph gate only. It distinguishes per-target executable capability from exported Starlark rule-class identity, not BUILD target spelling or implementation identity. In Bazel rule() creation, test=True forces executable capability even when executable=False is supplied; that probe establishes accepted syntax plus exported *_test exclusion only, never a false capability. The executables() predicate remains Rule.isExecutable() plus non-test-class exclusion, not test || executable. The representation-only --output=label_kind rows pin upstream class names and are excluded from Stage 8 Slug formatter acceptance. Native genrule and test_suite are deliberately absent and remain separate substrate gates."

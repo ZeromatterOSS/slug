@@ -13,6 +13,9 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
+#[path = "../../../tests/v2_fixture_support/src/lib.rs"]
+mod fixture_support;
+use fixture_support::FixtureWorkspace;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -480,8 +483,7 @@ fn retained_daemon_formats_graph_from_the_same_query_result_path() {
 
 #[test]
 fn retained_daemon_matches_the_three_accepted_package_rows() {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-loading-thin-vertical/workspace");
+    let workspace = FixtureWorkspace::new("query-loading-thin-vertical").unwrap();
     let mut daemon = Daemon::new(&workspace).unwrap();
     for (expression, expected) in [
         (
@@ -505,8 +507,7 @@ fn retained_daemon_matches_the_three_accepted_package_rows() {
 
 #[test]
 fn retained_daemon_accepts_explicit_label_output() {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/query-path-topology/workspace");
+    let workspace = FixtureWorkspace::new("query-path-topology").unwrap();
     let mut daemon = Daemon::new(&workspace).unwrap();
     let expression = "allpaths(//:linear_start, //:linear_end)";
     for (order, expected) in [
@@ -528,8 +529,7 @@ fn retained_daemon_accepts_explicit_label_output() {
 
 #[test]
 fn retained_daemon_matches_the_ten_accepted_label_kind_rows() {
-    let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests/v2_oracle/fixtures");
-    let rule_workspace = fixtures.join("query-executables-rule-capability/workspace");
+    let rule_workspace = FixtureWorkspace::new("query-executables-rule-capability").unwrap();
     let mut rules = Daemon::new(&rule_workspace).unwrap();
     for (expression, expected) in [
         (
@@ -559,7 +559,7 @@ fn retained_daemon_matches_the_ten_accepted_label_kind_rows() {
         assert_eq!(result.stdout, expected, "{expression}");
     }
 
-    let generated_workspace = fixtures.join("query-labels-attribute-metadata/workspace");
+    let generated_workspace = FixtureWorkspace::new("query-labels-attribute-metadata").unwrap();
     let mut generated = Daemon::new(&generated_workspace).unwrap();
     for (expression, expected) in [
         (

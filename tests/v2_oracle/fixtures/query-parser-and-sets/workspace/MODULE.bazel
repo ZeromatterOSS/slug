@@ -1,1 +1,0 @@
-module(name = "query_parser_and_sets", version = "0.1.0")

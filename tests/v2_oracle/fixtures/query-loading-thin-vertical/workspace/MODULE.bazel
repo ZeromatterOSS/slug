@@ -1,1 +1,0 @@
-module(name = "query_loading_thin_vertical", version = "0.1.0")

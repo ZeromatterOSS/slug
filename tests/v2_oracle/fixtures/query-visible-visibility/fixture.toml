@@ -1,5 +1,7 @@
 [fixture]
 name = "query-visible-visibility"
+payload_workspace = "query-visible-visibility"
+initial_tree_hash = "5bed82ad5b929c8d5f64dcfb2bb800ffdfa3fa13126ba22d02438bd5fe12cb9a"
 description = "Bazel 9.2.0 ordinary-query oracle for target visibility representation, package groups, visible(), and visibility query edges."
 comparison = "message_shape"
 oracle_notes = "Root-repository, bzlmod-only fixture. The first 37 rows are future Slug representation/visible gates: 25 visible() rows and 12 Stage 4 representation rows. The final two bazel_only_structure_* rows are Bazel-only evidence for flag-sensitive graph structure and do not authorize Slug command support or enter a future Slug acceptance count."

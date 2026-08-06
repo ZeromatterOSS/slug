@@ -1,6 +1,0 @@
-load("//:defs.bzl", "oracle_test")
-
-test_suite(name = "root", tests = [":shared_test", ":left", ":right"])
-test_suite(name = "left", tests = [":shared_test"])
-test_suite(name = "right", tests = [":shared_test"])
-oracle_test(name = "shared_test")

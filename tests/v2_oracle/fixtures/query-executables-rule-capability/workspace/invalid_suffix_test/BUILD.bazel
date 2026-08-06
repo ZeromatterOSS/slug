@@ -1,3 +1,0 @@
-load(":defs.bzl", "suffix_test")
-
-suffix_test(name = "probe")

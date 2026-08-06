@@ -1,5 +1,7 @@
 [fixture]
 name = "build-file-loading"
+payload_workspace = "build-file-loading"
+initial_tree_hash = "a54763ef1ff899547f4620bc2c3ec912d9c1cdca1d30714a2e43fcfc851f9cbf"
 description = "BUILD.bazel loading smoke with exports_files, filegroup, alias, visibility, and a loaded macro."
 comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]

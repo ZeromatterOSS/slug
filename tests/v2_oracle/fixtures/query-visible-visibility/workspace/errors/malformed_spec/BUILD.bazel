@@ -1,6 +1,0 @@
-package_group(
-    name = "broken",
-    packages = ["not-a-package"],
-)
-
-filegroup(name = "target")

@@ -1,5 +1,7 @@
 [fixture]
 name = "query-labels-attribute-metadata"
+payload_workspace = "query-labels-attribute-metadata"
+initial_tree_hash = "6ee33fce813b0ea9f286fea78dfde2a8e98389afdb01647c1e6d4892fed6ff5d"
 description = "Bazel 9.2 ordinary-query oracle for labels() attribute metadata, selector reachability, and output targets."
 comparison = "message_shape"
 oracle_notes = "Root-repository ordinary-query metadata gate only. This fixture establishes loading-owned attribute schema/coercion/provenance and the later labels() projection; it accepts neither regex, configured-query, visibility, executable, nor test semantics."

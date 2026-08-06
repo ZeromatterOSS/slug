@@ -1,4 +1,0 @@
-package_group(
-    name = "friends",
-    packages = ["//viewer"],
-)

@@ -12,6 +12,8 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::time::SystemTime;
 
+#[path = "../../../tests/v2_fixture_support/src/lib.rs"]
+mod fixture_support;
 use dice::ActivationData;
 use dice::ActivationKind as DiceActivationKind;
 use dice::ActivationTracker;
@@ -23,6 +25,7 @@ use dice::Key;
 use dice::RichActivation;
 use dice::RootActivation;
 use dice::UserComputationData;
+use fixture_support::FixtureWorkspace;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
@@ -377,10 +380,8 @@ fn subtree(prefix: &str, kind: ActivationKind) -> (QueryKeyIdentity, ActivationK
 
 #[tokio::test]
 async fn tests_function_source_critical_discriminators_and_strict_policy_are_request_local() {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace")
-        .canonicalize()
-        .unwrap();
+    let fixture = FixtureWorkspace::new("tests-query-expansion").unwrap();
+    let workspace = fixture.path().canonicalize().unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
 
@@ -438,10 +439,8 @@ async fn tests_function_source_critical_discriminators_and_strict_policy_are_req
 
 #[tokio::test]
 async fn tests_function_matches_all_twenty_one_non_build_oracle_rows() {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace")
-        .canonicalize()
-        .unwrap();
+    let fixture = FixtureWorkspace::new("tests-query-expansion").unwrap();
+    let workspace = fixture.path().canonicalize().unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
     let successes: &[(&str, QueryOrder, &[&str])] = &[
@@ -627,10 +626,8 @@ async fn tests_function_keeps_fake_and_top_level_other_targets_outside_strict_lo
 
 #[tokio::test]
 async fn tests_named_attribute_resolution_records_suite_evaluation_edges() {
-    let workspace = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../tests/v2_oracle/fixtures/tests-query-expansion/workspace")
-        .canonicalize()
-        .unwrap();
+    let fixture = FixtureWorkspace::new("tests-query-expansion").unwrap();
+    let workspace = fixture.path().canonicalize().unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
     let output = evaluate_loading_query(
@@ -2263,11 +2260,8 @@ async fn labels_metadata_changes_invalidate_and_semantic_formatting_reuses_the_p
 
 #[tokio::test]
 async fn build_file_zero_edges_and_full_siblings_order_match_bazel_oracle() {
-    let workspace = fs::canonicalize(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/v2_oracle/fixtures/query-siblings-build-file-node/workspace"),
-    )
-    .unwrap();
+    let fixture = FixtureWorkspace::new("query-siblings-build-file-node").unwrap();
+    let workspace = fs::canonicalize(fixture.path()).unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
 
@@ -2500,11 +2494,8 @@ async fn siblings_has_exact_dice_build_basename_priority_and_package_lifecycle()
 
 #[tokio::test]
 async fn some_selects_once_in_set_order_and_signed_depths_are_empty() {
-    let workspace = fs::canonicalize(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/v2_oracle/fixtures/query-some-selection/workspace"),
-    )
-    .unwrap();
+    let fixture = FixtureWorkspace::new("query-some-selection").unwrap();
+    let workspace = fs::canonicalize(fixture.path()).unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
 
@@ -3022,11 +3013,8 @@ async fn exact_query_key_activation_multisets_cover_retained_transitions() {
 
 #[tokio::test]
 async fn subtree_rdeps_and_same_package_reverse_queries_match_bazel_oracle() {
-    let workspace = fs::canonicalize(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/v2_oracle/fixtures/query-rdeps-and-subtree-patterns/workspace"),
-    )
-    .unwrap();
+    let fixture = FixtureWorkspace::new("query-rdeps-and-subtree-patterns").unwrap();
+    let workspace = fs::canonicalize(fixture.path()).unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
 
@@ -3129,11 +3117,8 @@ async fn subtree_rdeps_and_same_package_reverse_queries_match_bazel_oracle() {
 
 #[tokio::test]
 async fn path_queries_share_topology_and_apply_only_root_somepath_auto_exception() {
-    let workspace = fs::canonicalize(
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tests/v2_oracle/fixtures/query-path-topology/workspace"),
-    )
-    .unwrap();
+    let fixture = FixtureWorkspace::new("query-path-topology").unwrap();
+    let workspace = fs::canonicalize(fixture.path()).unwrap();
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let mut transaction = transaction(&dice, &workspace).await;
 

@@ -1,5 +1,7 @@
 [fixture]
 name = "query-parser-and-sets"
+payload_workspace = "query-parser-and-sets"
+initial_tree_hash = "0be99e30892443f9262e9618dd38c4a89522e107e0176f122a7a8cf4162542d6"
 description = "Bazel 9.2 query CLI oracle for parser-visible expression grammar, operators, errors, duplicate elimination, and text ordering."
 comparison = "message_shape"
 oracle_notes = "CLI evidence only: it records evaluation, diagnostics, duplicate elimination, and text ordering. AST shape and source spans remain Rust unit-test obligations because Bazel CLI does not expose them."

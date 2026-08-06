@@ -1,4 +1,4 @@
-load("@rules_rust//rust:defs.bzl", "rust_library")
+load("@rules_rust//rust:defs.bzl", "rust_library", "rust_test")
 load("@slug_crates//:defs.bzl", "aliases", "all_crate_deps", "crate_edition")
 
 package(default_visibility = ["//visibility:public"])
@@ -9,6 +9,28 @@ rust_library(
     aliases = aliases(),
     edition = crate_edition(),
     deps = all_crate_deps(normal = True) + [
+        "//app/slug_analysis_v2",
+        "//app/slug_build_api_v2",
+        "//app/slug_bzlmod_v2",
+        "//app/slug_core_v2",
+        "//app/slug_identity_v2",
+        "//app/slug_loading_v2",
+        "//app/slug_query_v2",
+        "//app/slug_reapi_v2",
+    ],
+    proc_macro_deps = all_crate_deps(proc_macro = True),
+)
+
+rust_test(
+    name = "server_fixture_test",
+    srcs = glob(["src/**/*.rs"]) + ["//tests/v2_fixture_support:src/lib.rs"],
+    compile_data = ["//tests/v2_fixture_payload:fixtures.payload"],
+    aliases = aliases(),
+    crate_root = "src/lib.rs",
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = all_crate_deps(normal = True) + all_crate_deps(normal_dev = True) + [
         "//app/slug_analysis_v2",
         "//app/slug_build_api_v2",
         "//app/slug_bzlmod_v2",

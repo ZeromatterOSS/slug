@@ -1,3 +1,0 @@
-load(":defs.bzl", "not_test_suffix")
-
-not_test_suffix(name = "probe")

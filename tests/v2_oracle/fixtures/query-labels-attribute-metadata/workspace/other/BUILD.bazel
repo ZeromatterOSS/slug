@@ -1,4 +1,0 @@
-load("//pkg:defs.bzl", "probe_rule")
-
-exports_files(["cross.txt"])
-probe_rule(name = "consumer", many = [":cross.txt", "//pkg:source.txt"])

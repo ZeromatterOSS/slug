@@ -1,5 +1,7 @@
 [fixture]
 name = "query-build-load-files-provenance"
+payload_workspace = "query-build-load-files-provenance"
+initial_tree_hash = "85a2e8fdedbe19e46f4b11a9e6e008d44b290d56c672775e018938eacaec9f7a"
 description = "Bazel 9.2 ordinary-query oracle for buildfiles/loadfiles transitive provenance and fake .bzl targets."
 comparison = "message_shape"
 oracle_notes = "Root-repository ordinary-query slice. A single fake/real label probe proves intersection keeps the left representative, equal-label except is empty in both directions, and union reaches both provenances; the fixture never claims a request-global owner. No .scl, external repository, generated/output, configured, or action semantics are accepted."

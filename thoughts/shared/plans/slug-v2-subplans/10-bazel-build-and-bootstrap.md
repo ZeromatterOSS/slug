@@ -876,6 +876,17 @@ with the exact 64-command single-mismatch gate; Bazel exit 3 alone is never
 accepted. No wrapper, fifth target, skip, ignore, filter, split, manual tag,
 cycle/oracle/assertion change, new path, or cap increase is authorized.
 
+The atomic migration is accepted. One 50,103-byte canonical payload owns all
+14 workspaces, its Python/Rust consumers verify the frozen hashes before fresh
+extraction, and the old 163 files are deleted in the same reversible commit.
+Cargo/Bazel graph, loading-query, and server targets pass; CLI is exactly 40/41
+at only the unchanged cycle row. Two absolute Bazel 9.2 roots each pass 14
+fixtures/403 commands against unchanged evidence. Windows compile, declared
+inputs, runfiles, reconstruction, locks, archive, caps, cleanup, and independent
+review pass. Gate C1 has 43 targets/906 cases; core unit remains blocked on
+declared cross-platform Git/tar owners. Next design only
+`WP-10-m8-bazel-buildbuddy-developer-gate-design` before cache/RBE work.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

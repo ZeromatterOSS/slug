@@ -1,5 +1,7 @@
 [fixture]
 name = "query-siblings-build-file-node"
+payload_workspace = "query-siblings-build-file-node"
+initial_tree_hash = "c2c102d891f2095f07878eae45fa0d3ad75bff269b32a213b7f4b2826d63b2b9"
 description = "Bazel 9.2 ordinary-query oracle for siblings() and actual package BUILD-file target basenames."
 comparison = "message_shape"
 oracle_notes = "Root-repository loading-query slice only. BUILD-file labels follow the active loaded basename (BUILD.bazel preferred over BUILD); exports_files of that active file is observed exactly once. No buildfiles/loadfiles/fake .bzl, kind/regex, generated/output, external, configured, or action semantics are claimed."

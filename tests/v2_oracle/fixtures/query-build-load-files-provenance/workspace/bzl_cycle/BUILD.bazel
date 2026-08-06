@@ -1,2 +1,0 @@
-load(":one.bzl", "one")
-filegroup(name = "probe")

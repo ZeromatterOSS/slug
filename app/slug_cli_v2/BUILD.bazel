@@ -34,3 +34,36 @@ rust_binary(
     srcs = ["src/main.rs"],
     deps = [":slug_cli_v2"],
 )
+
+rust_test(
+    name = "cli_fixture_test",
+    srcs = [
+        "tests/cli.rs",
+        "//tests/v2_fixture_support:src/lib.rs",
+    ],
+    compile_data = ["//tests/v2_fixture_payload:fixtures.payload"],
+    crate_root = "tests/cli.rs",
+    data = [":slug"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [
+        "//app/slug_commands_v2",
+        "//app/slug_core_v2",
+        "//app/slug_server_v2",
+    ],
+)
+
+rust_test(
+    name = "graph_output_fixture_test",
+    srcs = [
+        "tests/graph_output.rs",
+        "//tests/v2_fixture_support:src/lib.rs",
+    ],
+    compile_data = ["//tests/v2_fixture_payload:fixtures.payload"],
+    crate_root = "tests/graph_output.rs",
+    data = [":slug"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+)

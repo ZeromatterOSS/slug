@@ -1,5 +1,0 @@
-load("//broken_syntax:good.bzl", "syntax_marker")
-load("//broken_load:good.bzl", "load_marker")
-
-exports_files(["BUILD.bazel"])
-filegroup(name = "probe")
