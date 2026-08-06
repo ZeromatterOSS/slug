@@ -821,6 +821,23 @@ Independent review accepted the four-line test-only diff. Next run only
 `WP-10-m8-host-bzl-parse-diagnostic-parity-design`; no payload migration work
 resumes until that separate Bazel-authoritative diagnostic is green.
 
+The Host-Bzl diagnostic design accepts one private presentation repair.
+`HostBzlModuleEvalKey` already produces a typed `HostBzlModuleError::Parse`;
+root-package loading preserves it under the raw load context, and query/CLI/
+daemon layers serialize that error unchanged. Only its display arm omits the
+legacy loader's pinned `compilation of module 'pkg/file.bzl' failed` summary.
+The label already retains validated package and direct-file target fields, so
+the logical slash path needs no parsing, filesystem access, new carrier, key,
+event, equality, or wrapper.
+
+`WP-10-m8-host-bzl-parse-diagnostic-parity-implementation` may add the logical
+path formatter and exact summary in `bzl_module.rs`, then tighten the existing
+malformed-`a.bzl` Host lifecycle assertion. A direct private display assertion
+must also prove that root-package `:a.bzl` renders `a.bzl`, not `/a.bzl`. The
+accepted CLI/oracle row remains unchanged and supplies the public regression.
+Caps are 20 production/12 test/92 total net lines; external, BUILD, missing,
+cycle, evaluation, freeze, query, CLI, fixture, and DICE behavior remain frozen.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

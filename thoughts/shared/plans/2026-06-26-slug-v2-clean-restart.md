@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 has 39 accepted Bazel targets covering 777 source cases; helper-relative compile embedding is proved; four missing scratch BUILD markers restore all 34 server tests | Design and repair the one remaining Host-Bzl parse diagnostic baseline before retrying the unchanged atomic payload/consumer/163-deletion migration. The core unit target still lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-host-bzl-parse-diagnostic-parity-design` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 has 39 accepted Bazel targets covering 777 source cases; helper-relative compile embedding is proved; four missing scratch BUILD markers restore all 34 server tests; the Host-Bzl diagnostic design isolates one private display arm | Implement the exact malformed-module summary and restore the final red CLI row before retrying the unchanged atomic payload/consumer/163-deletion migration. The core unit target still lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-host-bzl-parse-diagnostic-parity-implementation` |
 
 ### Current packet
 
-`WP-10-m8-host-bzl-parse-diagnostic-parity-design`.
+`WP-10-m8-host-bzl-parse-diagnostic-parity-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
