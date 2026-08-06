@@ -1087,6 +1087,8 @@ After ordinary RC discovery and `--config=buildbuddy-cache`, both invocations
 append these exact command options before the manifest labels:
 
 ```text
+--remote_cache=grpcs://remote.buildbuddy.io
+--remote_instance_name=
 --remote_executor=
 --bes_backend=
 --bes_results_url=
@@ -1178,6 +1180,36 @@ output bases with one shared nonce, and raw cleanup on every exit. The packet
 may run offline tests but must not invoke BuildBuddy or consume authentication.
 A later evidence-only packet runs the frozen driver once; any live contract
 defect returns `REPLAN` rather than changing code beside authenticated evidence.
+
+The cache-evidence implementation is accepted. The exact 45-line manifest
+selects `slug` plus all 43 green tests, including the 13-case core runtime test,
+and has the frozen `3a717c…f6d5` SHA-256. The stdlib driver binds the approved
+BuildBuddy cache endpoint and empty instance after RC expansion, clears BES,
+executor, and disk cache, uses one private fresh output base per phase, and
+records only the closed sanitized schema. Bazel/version, root RC hash, clean
+Git head, Linux x86_64, manifest, per-target completion/run/cache counts,
+persistent action-cache hits, eligible action digests, exact runners, and
+cleanup all fail closed.
+
+Twenty-two synthetic/mocked tests cover both command phases, every admitted
+prime runner and near miss, JSON sequences and scalar types, per-label 0/2
+run/cache masking, digest multiplicity/mismatch, target/BEP failures, remote
+abort, configuration/platform drift, private file modes, outside-checkout
+roots, raw-output suppression, both shutdown failures, recursive cleanup, and
+the sanitized key allowlist. Unit tests, Python compilation, the exact manifest
+hash, archive, caps, diff, a dirty-tree no-network `CONFIG_DRIFT` CLI smoke, and
+independent review pass. No authenticated command or home RC read occurred.
+
+Next evidence only `WP-10-m8-bazel-buildbuddy-cache-live-evidence`. From the
+clean implementation commit it runs the frozen driver once with ordinary RC
+discovery, permitting Bazel alone to consume home-owned authentication. Review
+only the compact stdout object. Success requires `PROVED_CACHE_ONLY`; any other
+classification, unexpected stderr, retained private path, or required code/
+configuration repair returns `REPLAN`. The packet may update only owner and
+scheduling documentation with the sanitized result: three files and 100 lines.
+It must not inspect home configuration, retain raw artifacts, rerun to chase a
+failure, add code/config/CI, invoke RBE, or change targets, cycle/core, or
+platform boundaries.
 
 ### 10.3 Slug-as-Bazel Analysis Gate
 
