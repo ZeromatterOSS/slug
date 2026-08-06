@@ -41,6 +41,15 @@ rust_test(
 )
 
 rust_test(
+    name = "lockfile_test",
+    srcs = ["tests/lockfile.rs"],
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = [":slug_bzlmod_v2"],
+)
+
+rust_test(
     name = "nonroot_module_eval_test",
     srcs = ["tests/nonroot_module_eval.rs"],
     edition = crate_edition(),

@@ -555,9 +555,14 @@ fn lockfile_version_constant_matches_the_sole_owner() {
 }
 
 fn scratch_dir(name: &str) -> std::path::PathBuf {
-    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
+    let root = std::env::var_os("TEST_TMPDIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join("..")
+        });
+    let dir = root
         .join(".codex-cargo-target")
         .join("slug_bzlmod_v2_tests")
         .join(format!("{name}-{}", std::process::id()));

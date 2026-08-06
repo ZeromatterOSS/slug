@@ -466,6 +466,41 @@ post-cleanup remain unchanged. One private `lockfile_test` target needs only
 the production Bzlmod library. No target env, data, tool, runner, fixture,
 Cargo input, or production source changes.
 
+The lockfile semantic-adapter successor is accepted. The helper now chooses
+Bazel's runtime `TEST_TMPDIR` while preserving the exact prior
+`CARGO_MANIFEST_DIR/../..` Cargo fallback and the existing suffix, pre-clean,
+creation, write, and no-post-cleanup lifecycle. One private target passes all
+11 cases under credential-free nightly Bazel, and serial Cargo passes the same
+11 cases through the fallback; the GNU-Windows test binary also compiles.
+Formatting, no-repin module evaluation, archive, scope, 14-net/100-line cap,
+credential-pattern, diff, and independent review gates pass, and all three
+lock hashes remain stable. Gate C1 now has 36 accepted Bazel targets covering
+458 source cases and 454 default-active Linux Cargo cases. Next design only the
+hermetic host-tool owner for the core unit/runtime test split; do not map either
+target until that design is accepted.
+
+The core host-tool owner design stops at `REPLAN` for the 141-case crate-mode
+unit target. Four `repository_io.rs` cases execute bare `git` and/or `tar`, and
+the production paths also resolve those names through ambient command lookup.
+The current module graph has no pinned, immutable, platform-selected Git or tar
+executable supplier. rules_rust test `data` plus `env` can pass a declared
+`$(rootpath)` file, but cannot turn that file path into the directory required
+by `PATH`; Windows manifest-only runfiles make a directory shim invalid. Do not
+inherit host `PATH`, discover home/system tools, add wrappers, write runfiles,
+exclude Windows, or publish the core unit target. A future successor requires a
+separately reviewed Linux/macOS/Windows supplier and a consuming API that takes
+declared executable paths directly.
+
+The audit also proves the standalone `tests/runtime.rs` crate is independent of
+that boundary. Its 13 source cases use only unique temporary workspaces and
+source-owned platform cfgs; it has no checked-in fixture, external process,
+service env, daemon, or host tool. Therefore
+`WP-10-m8-bazel-core-runtime-test-implementation` may add only that private
+standalone target with direct core, Bzlmod, identity, loading, query, and
+`tempfile` dependencies. It must preserve 13 Unix-active/12 non-Unix-active
+source behavior and add no unit target, env, data, tool, runner, fixture,
+platform exclusion, source adapter, Cargo input, or lock change.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named

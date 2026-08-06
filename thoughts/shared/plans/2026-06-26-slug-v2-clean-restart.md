@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 35 accepted Bazel targets covering 447 source cases and passing all 443 default-active Linux Cargo cases with stable locks; the Bzlmod lockfile scratch successor is source-exact | query unit and Bzlmod unit are whole-target **REPLAN** at clean-baseline failures; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; core host-tool ownership needs a separate design; cache/RBE and self-hosting remain | `WP-10-m8-bazel-bzlmod-lockfile-test-semantic-adapter-implementation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C0 freezes the CLI runfiles boundary and passes the CLI library unit test; Gate C1 inventories all 1,005 transitive V2 cases, with 36 accepted Bazel targets covering 458 source cases and passing all 454 default-active Linux Cargo cases with stable locks; the Bzlmod lockfile scratch adapter is accepted; the core host-tool audit isolates its runtime integration | query unit and Bzlmod unit are whole-target **REPLAN** at clean-baseline failures; the CLI integrations, query loading integration, and server unit target share the nested-fixture **REPLAN**; the core unit target lacks pinned cross-platform `git`/`tar` owners; cache/RBE and self-hosting remain | `WP-10-m8-bazel-core-runtime-test-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-bzlmod-lockfile-test-semantic-adapter-implementation`.
+`WP-10-m8-bazel-core-runtime-test-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
