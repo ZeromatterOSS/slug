@@ -856,6 +856,26 @@ repair remains an accepted prerequisite. Next design only
 cycle row and oracle unchanged, and freeze an honest before/after negative gate
 for the atomic migration before any payload, consumer, target, or deletion work.
 
+That design is accepted without a wrapper or test change. The 57-row Rust test
+runs all 49 successes, then missing and repaired broken-Bzl failures, and stops
+at the user-deferred cycle mismatch before five later failure rows. The existing
+oracle runner supplies the complementary payload-sensitive gate because it runs
+all 64 fixture commands independently. Two distinct directory-backed Slug
+replays each produced exactly one comparison failure, `bzl_cycle_failure`, and
+all other commands passed. Only numeric engine/node fields varied; after
+canonicalizing the complete `DiceNodeId` fragment to
+`DiceNodeId { engine: <id>, node: <id> }`, the ordered name/argv/exit/normalized
+stdout/stderr/manifest/mutations records serialized by compact sorted-key
+Python JSON with no trailing newline have SHA-256
+`eb217429572083716f41e133cb68c67e8ee3237d2524c65c21d7a5f472709cb4`.
+
+The atomic migration is rescheduled unchanged except for truthful target
+acceptance. Three Bazel targets must pass. The CLI target must build, then fail
+only as 38/39 source cases (40/41 including helper conformance tests), paired
+with the exact 64-command single-mismatch gate; Bazel exit 3 alone is never
+accepted. No wrapper, fifth target, skip, ignore, filter, split, manual tag,
+cycle/oracle/assertion change, new path, or cap increase is authorized.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
