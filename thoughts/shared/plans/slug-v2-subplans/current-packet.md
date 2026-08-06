@@ -1,24 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-developer-gate-design`
+Packet: `WP-10-m8-bazel-buildbuddy-repository-config-decision`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a docs-only design for authenticated cache/RBE evidence after Gate C1.
+Result: a user-reviewed, docs-only choice of the repository-safe BuildBuddy
+connection and executor platform before any remote configuration.
 
 ## Goal and required design
 
-Freeze the smallest Bazel 9.2 developer gate that distinguishes remote unavailable,
-cache-only, and execution-enabled BuildBuddy modes through structured, secret-free
-evidence before implementation or CI changes. Audit only live repository
-configuration, the accepted 43-target Gate C1 graph, and Bazel/BEP surfaces. Never
-inspect or reproduce `~/.bazelrc`; credentials remain environment-owned. Define local
-fresh/replay commands, cache/RBE discriminators, redaction, failure classification,
-platform coverage, review gates, implementation split, and exact caps. Preserve the
-blocked core unit target and the user-deferred cyclic-Bzl baseline.
+Obtain the user's explicit choice between hosted BuildBuddy and an
+organization/self-hosted service. Freeze only non-secret, repository-safe facts:
+opt-in cache-only and execution-enabled profile names; whether either may be a
+default; exact BES/cache/executor endpoints and optional instance name; exact RBE
+OS/CPU and platform/container properties, including an immutable image identifier
+when required; and the 43-green/one-expected-red target command matrix. Accept
+official service documentation or a user-supplied sanitized organization connection
+snippet as evidence. Never inspect, print, copy, or infer `~/.bazelrc`; authentication
+remains environment-owned. Preserve the blocked core unit and user-deferred cyclic-Bzl
+baseline.
 
 ## Stops and budget
 
-Return `REPLAN` rather than infer remote behavior from elapsed text, expose
-secrets, add CI, accept silent fallback, change code/locks/evidence, or enter core host
-tools, self-hosting, JVM, Bazel 8, WORKSPACE, or cycle semantics. Zero
-non-documentation changes; at most 500 authored documentation lines.
+Stop for explicit user input rather than choose a deployment, endpoint, tenant,
+instance, executor pool, platform, or container by assumption. Do not add or edit
+`.bazelrc`, run Bazel remotely, inspect effective RC expansion, add CI/evidence/code/
+locks, expose secrets, or enter core host tools, self-hosting, JVM, Bazel 8,
+WORKSPACE, or cycle semantics. Zero non-documentation changes; at most 220 authored
+documentation lines.

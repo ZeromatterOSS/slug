@@ -899,6 +899,90 @@ declared cross-platform Git/tar owners. Next design only
 - Keep focused Cargo checks as a cross-build-system regression until the Bazel
   graph covers every active crate/test.
 
+#### Developer-gate design stop (2026-08-05)
+
+`WP-10-m8-bazel-buildbuddy-developer-gate-design` returns `REPLAN` before any
+configuration or remote invocation. The live root has no tracked or untracked
+`.bazelrc`, named BuildBuddy profile, remote cache/executor/BES endpoint,
+instance name, or remote execution platform. The sixteen tracked `.bazelrc`
+files are isolated oracle-fixture inputs and define no reusable developer
+profile. Home authentication is intentionally unavailable to the audit.
+Consequently the repository does not establish whether the intended service is
+BuildBuddy Cloud or an organization/self-hosted deployment, whether cache and
+executor endpoints coincide, or which executor OS/CPU/container is compatible
+with the pinned toolchain. Inventing any of those values would violate the
+fail-closed packet contract.
+
+The target boundary itself is closed and is not the blocker. The checkout has
+44 live `rust_test` targets. Gate C1 contributes 43 targets and 906 source
+cases: 42 green targets plus the expected-red CLI fixture target. The previously
+accepted Gate C0 CLI unit target is the forty-third green target, so the full
+remote boundary is exactly 43 green targets plus one separate expected-red
+`//app/slug_cli_v2:cli_fixture_test`. That target must stay 40/41 at only
+`bzl_cycle_failure`, paired with the independent 14-fixture/403-command
+single-mismatch oracle. The blocked 141-case core unit target is absent from
+both sets.
+
+Pinned Bazel 9.2 source does close the later evidence vocabulary:
+
+- The pinned
+  [`SpawnExec`](https://github.com/bazelbuild/bazel/blob/8220c6198837d5c13d53fea211cf3282aa12408a/src/main/protobuf/spawn.proto#L100-L192)
+  `runner` distinguishes `remote` from `remote cache hit`, while
+  `cache_hit`, `status`, `exit_code`, `remotable`, `remote_cacheable`,
+  `target_label`, `mnemonic`, and the action digest supply the per-spawn
+  discriminator. Persistent local action-cache hits are not logged, so prime
+  and replay must use distinct fresh output bases.
+- The pinned
+  [BEP schema](https://github.com/bazelbuild/bazel/blob/8220c6198837d5c13d53fea211cf3282aa12408a/src/main/java/com/google/devtools/build/lib/buildeventstream/proto/build_event_stream.proto#L819-L900)
+  supplies `BuildFinished`, target/test completion events, and
+  `BuildMetrics.ActionSummary.runner_count` corroborate exit, target coverage,
+  and aggregate runner counts. They do not replace per-spawn evidence.
+- A cache-only candidate would prime locally with cache reads disabled and
+  synchronous uploads, then replay from a second output base with remote reads
+  enabled. An RBE candidate would use a third output base, remote reads
+  disabled, remote strategy forced, and local fallback disabled. The exact
+  commands remain unaccepted until the repository profiles and platform are
+  selected.
+- Raw BEP and execution logs are sensitive intermediates: BEP carries parsed
+  command lines, options, workspace/host/user data, and file URIs, while the
+  execution log carries action arguments and environments. A later driver must
+  create them under a mode-0700 temporary directory outside the checkout,
+  never echo or upload them as review evidence, extract only a closed
+  allowlisted record, and delete them on every exit. Profiles, elapsed text,
+  invocation URLs, effective RC expansion, BuildBuddy UI exports, and terminal
+  process totals are not acceptance evidence.
+
+The eventual classifier must fail closed. `PROVED_CACHE_ONLY` requires a
+successful fresh/replay pair with matching selected action digests, remote
+cache hits on replay, and no remote executor runner. `PROVED_RBE` requires
+successful selected spawns with runner `remote`, empty status, zero exit, no
+cache hit on the forced-fresh run, and no local fallback. Bazel remote exit
+codes may classify `REMOTE_UNAVAILABLE`; ordinary analysis/build/test failures
+remain `TARGET_FAILURE`. Missing terminal events, unknown runners, mixed
+fallback, absent selected actions, or incomplete raw logs are
+`EVIDENCE_INCOMPLETE`, never success.
+
+The smallest successor is
+`WP-10-m8-bazel-buildbuddy-repository-config-decision`. It is a docs-only,
+explicitly user-reviewed choice of:
+
+1. opt-in cache-only and execution-enabled profile names and whether either may
+   become a default;
+2. exact non-secret BES/cache/executor endpoints and optional instance name;
+3. the exact supported RBE OS/CPU and required platform/container properties,
+   including an immutable image identifier when applicable; and
+4. the 43-green/one-expected-red command matrix plus private raw-artifact and
+   sanitized-record locations.
+
+The user must either approve the hosted BuildBuddy connection/platform values
+from official service documentation or supply a sanitized organization/on-prem
+connection snippet. The successor adds no `.bazelrc`, CI, remote invocation,
+evidence, code, lock, or credential. After that decision, implementation splits
+serially into cache-only repository configuration and live evidence first, then
+RBE configuration and evidence with an independently reviewed platform map.
+Only those implementation designs may set file allowlists and line caps; CI and
+self-hosting remain later work.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
