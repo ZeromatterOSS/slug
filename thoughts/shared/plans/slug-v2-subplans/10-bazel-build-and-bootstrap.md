@@ -777,14 +777,25 @@ stable locks, and independent destructive/platform latest-diff review. No part
 of that validation currently authorizes payload, consumer, target, or deletion
 work.
 
-The next packet is `WP-10-m8-bazel-fixture-payload-compile-input-evidence`. It
-may create and remove only an isolated temporary probe with the proposed source
-layout, and must prove one helper-source-relative Cargo/Bazel `include_bytes!`
-mechanism, exact `srcs`/`compile_data` ownership, compile-action input, and
-runtime-runfiles absence. Only accepted evidence plus independent review may
-reschedule the all-consumer atomic migration and its measured caps. No payload,
-helper, consumer, fixture, BUILD, Cargo, lock, or deletion change may persist in
-the evidence packet.
+`WP-10-m8-bazel-fixture-payload-compile-input-evidence` resolves that REPLAN.
+An isolated probe used the final sibling layout and the helper literal
+`include_bytes!("../../v2_fixture_payload/fixtures.payload")`. Standalone Cargo
+and credential-free Bazel 9.2/rules_rust 0.73 each ran the same one-case test.
+The Bazel target put the helper label in `srcs` and payload in `compile_data`;
+`aquery` listed consumer, helper, and payload on the Rust compile action, while
+the runfiles tree and manifest contained neither helper nor payload. The
+literal is resolved from the helper source under both build systems, needs no
+cfg/env/absolute sandbox path, and has no platform branch. All temporary Rust,
+BUILD, Cargo, lock, payload, and target files were removed; archive and Git
+state returned clean.
+
+The atomic implementation may now use that exact mechanism and the retained
+format/migration requirements. `WP-10-m8-bazel-canonical-fixture-payload-
+migration-implementation` owns the sole commit under the measured 300 Python,
+380 Rust, 330 test, and 190 metadata/consumer/docs allocations: at most 1,200
+handwritten additions, 38 non-generated touched files, 3,900 total changed
+lines, and 1,650 final net lines. Any different compile path or ownership,
+partial commit, weakened replay/platform contract, or cap overflow is REPLAN.
 
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
