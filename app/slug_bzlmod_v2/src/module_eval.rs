@@ -3772,19 +3772,19 @@ repo_rule(name = "ignored_innate", dev_dependency = True, value = len)
         };
         assert_eq!(
             evaluated.extension_usages[0].proxies[0].location,
-            expected(2, 9, 39)
+            expected(2, 22, 22)
         );
         assert_eq!(
             evaluated.extension_usages[0].tags[0].location,
-            expected(3, 1, 21)
+            expected(3, 10, 10)
         );
         assert_eq!(
             evaluated.extension_usages[1].proxies[0].location,
-            expected(5, 1, 25)
+            expected(5, 5, 5)
         );
         assert_eq!(
             evaluated.extension_usages[1].tags[0].location,
-            expected(5, 1, 25)
+            expected(5, 5, 5)
         );
     }
 

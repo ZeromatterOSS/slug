@@ -531,6 +531,15 @@ source retention, include identity, DICE/source preparation, or BUILD
 metadata. Focused and full Cargo library tests must pass 278/278 before a later
 packet maps the independently blocked crate-mode Bazel target.
 
+The caller-location expectation correction is accepted. Exactly four test
+literals now encode Bazel's opening-parenthesis points; no producer, retained
+value, equality, logical file, AST, DICE, BUILD, Cargo, or lock input changed.
+The focused case passes and the full Bzlmod library is clean at 278/278 for the
+first time in this Gate C sequence. Formatting, archive, exact four-line scope,
+cap, credential-pattern, stable-lock, diff, process-cleanup, and independent
+review gates pass. Next map only the private crate-mode Bzlmod target with its
+declared Tokio dev edge; do not combine any other target or source repair.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
