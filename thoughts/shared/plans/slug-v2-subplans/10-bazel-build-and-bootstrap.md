@@ -1248,6 +1248,34 @@ repair. Accept only `PROVED_CACHE_ONLY`; otherwise return `REPLAN` without a
 second attempt or code/config repair. Only a successful sanitized record may
 update owner and scheduling documentation, at most 100 lines in three files.
 
+The fresh live-evidence retry returns `REPLAN`. Its sanitized record binds clean
+head `bfa95056…`, Bazel 9.2.0, Linux x86_64, and the exact manifest/root-RC
+hashes, but both phases finish with process/BuildFinished exit 2, no completed
+target or test, no action-cache hit, and zero eligible spawns; classification is
+`TARGET_FAILURE`. Stderr remained empty and current private-root cleanup passed.
+Three older mode-0700 directories left by synthetic development runs before the
+cleanup tests were finalized were resolved by exact path and permanently
+deleted without reading their contents; no matching directory remains.
+
+An RC-disabled Bazel 9.2 help audit recognizes every frozen flag. Two
+credential-free `canonicalize-flags --for_command=test` probes also accept the
+final option tail and the explicit root-only `buildbuddy-cache` profile when
+labels are omitted. They perform no build/test or remote request. Thus no
+checked-in argv defect is demonstrated. Exit 2 with zero events points to the
+effective normal-RC environment, but the sanitizer intentionally maps unknown
+exit names to `OTHER`, and inspecting or expanding home RC would violate the
+credential boundary. No third live attempt is authorized.
+
+Next decision only `WP-10-m8-bazel-buildbuddy-cache-home-auth-rc-decision`.
+The user must privately reduce or confirm `~/.bazelrc` to the authentication
+option needed by the checked-in configuration, preferably
+`common --remote_header=x-buildbuddy-api-key=<secret>` (a `build` scope also
+reaches `test`), with no stale endpoint, profile, instance, executor, strategy,
+or unsupported option. The secret line/value must not be pasted, inspected,
+logged, or committed; only a token-free confirmation is recorded. No agent
+command, repository change, or live retry occurs before that confirmation.
+After it, a separately reviewed packet may authorize one fresh attempt.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
