@@ -22,6 +22,15 @@ rust_library(
 )
 
 rust_test(
+    name = "slug_query_v2_test",
+    crate = ":slug_query_v2",
+    aliases = aliases(normal_dev = True),
+    deps = all_crate_deps(normal_dev = True),
+    size = "small",
+    visibility = ["//visibility:private"],
+)
+
+rust_test(
     name = "query_test",
     srcs = ["tests/query.rs"],
     edition = crate_edition(),

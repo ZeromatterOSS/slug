@@ -580,6 +580,19 @@ cap, credential-pattern, stable-lock, diff, process-cleanup, and independent
 review gates pass. Next map only the private query crate-mode target with its
 declared Tokio dev edge; keep the 53-case loading-query fixture target absent.
 
+The query crate-mode target is accepted. One private target reuses the
+production crate and adds only generated `normal_dev` aliases/deps for the
+declared Tokio dev edge. Credential-free nightly Bazel and serial Cargo both
+pass all 28 library cases; the GNU-Windows test binary compiles. No-repin
+module evaluation leaves all three lock hashes stable, and archive, scope,
++9-net/100-line cap, credential-pattern, diff, process-cleanup, and independent
+review gates pass. Gate C1 now has 39 accepted targets covering 777 source
+cases and 773 default-active Linux Cargo cases. All low-risk targets and the
+two bounded clean-baseline corrections are exhausted. Next redesign only the
+shared nested-fixture owner for the 42 CLI integration, 53 query-loading, and
+34 server-unit cases while the 141-case core unit target remains independently
+blocked on pinned cross-platform Git/tar owners.
+
 ### 10.2 Bazel/BuildBuddy Developer Gate
 
 - Build and test `slug_cli_v2` with Bazel 9 using the repository's named
