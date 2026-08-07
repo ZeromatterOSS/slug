@@ -1908,6 +1908,30 @@ Offline tests/compilation/caps/diff and independent review only; do not invoke
 Bazel/home RC/remote service or edit accepted files. One later packet owns one
 live probe; structured cache/RBE and 43-test expansion remain mandatory.
 
+The execution-artifact replacement contract is accepted in commit
+`520b45f6…`: 272 lines in the exact three-file scope. Eight mocked offline
+tests, Python compilation, caps/diff checks, and independent privacy/lifecycle
+review pass. It accepts Bazel's pinned regular-file replacement only under
+retained root/phase/output identities and mode-0600/single-link constraints,
+distinguishes empty/nonempty by metadata, never opens content, deep-normalizes
+exact built-in schema types, anchors shutdown, and deletes original plus
+replacement reserved roots. Prime/shutdown output/root swaps, link/mode/
+directory attacks, subclass smuggling, cleanup failure, and no-leak lifecycle
+are pinned. No Bazel/home RC/remote service ran.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-prime-execution-artifact-contract-live-evidence`.
+From its clean scheduling commit, invoke
+`python3 tools/v2_oracle/buildbuddy_build_cache_execution_artifact_probe.py`
+exactly once with inherited environment. Only Bazel consumes ordinary/home RC;
+review only CLI status, empty stderr, and the fixed record. Accept only exit
+zero and `PROBE_RECORDED`; never retry or inspect private contents. Route
+`ZERO+ANCHORED_PRIVATE_NONEMPTY` to a separate strict parser-discriminator
+design; `ZERO+ANCHORED_PRIVATE_EMPTY` to a source-consistent no-record stop;
+`ZERO+NOT_ANCHORED_PRIVATE` to `REPLAN`; anchored `NONZERO` to a failure-detail
+sanitizer design; and other `NONZERO` to a user-owned token-free environment
+decision. This makes no cache/RBE claim; those and 43-test expansion remain.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

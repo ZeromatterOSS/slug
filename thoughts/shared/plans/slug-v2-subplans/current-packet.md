@@ -1,39 +1,37 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-prime-execution-artifact-contract-implementation`
+Packet: `WP-10-m8-bazel-buildbuddy-prime-execution-artifact-contract-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a pinned-source execution-artifact replacement contract.
+Result: one sanitized execution-artifact replacement result.
 
-## Goal and required design
+## Goal and required evidence
 
-Add only `buildbuddy_build_cache_execution_artifact_probe.py` as library (190 lines), CLI (35), and tests (270) under the matching existing directories: 495 lines maximum.
+From the clean scheduling commit, invoke exactly once:
 
-Bazel 9.2 `ExpandedSpawnLogContext` lines 106-130 and 291-316 at pinned commit `8220c619…` require JSON conversion, delete a preexisting output, and create the
-final output while closing the converter. `ExecutionOptions` lines 420-436 define it as executed-spawn records, so an empty final file is possible. Reuse the
-exact frozen prime command but accept this source-required execution-file inode replacement only inside the retained private root/phase.
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_execution_artifact_probe.py
+```
 
-Precreate mode-0600 execution evidence, then inspect only its final direct-child
-metadata through the retained phase descriptor. Symlink, hardlink, directory,
-bad mode, or lost root/phase identity is `NOT_ANCHORED_PRIVATE`; a single-link
-regular mode-0600 file is `ANCHORED_PRIVATE_NONEMPTY` or
-`ANCHORED_PRIVATE_EMPTY`. Never open/read/hash content or expose exact metadata.
+Inherit the environment unchanged so only Bazel consumes ordinary/home RC.
+Never inspect, print, copy, or persist the RC/token, `HOME`, private contents,
+invocation URLs, or BuildBuddy UI data. Review only CLI status, empty stderr,
+and its compact normalized record. Accept the probe only for exit zero, fixed
+mode/schema, and `PROBE_RECORDED`.
 
-The closed deep-normalized record has exactly schema version one, fixed mode
-`buildbuddy-build-cache-prime-execution-artifact-probe`, classification
-`PROBE_RECORDED|SANITIZER_REJECTED`, process `ZERO|NONZERO`, and the execution
-enum above. Rejection uses fixed conservative values. Reuse descriptor-safe
-shutdown/original-inode cleanup and clean-Git/no-`slugd` guards.
+The only result values are process `ZERO|NONZERO` and execution
+`ANCHORED_PRIVATE_NONEMPTY|ANCHORED_PRIVATE_EMPTY|NOT_ANCHORED_PRIVATE`.
+The probe never reads the artifact and owns anchored shutdown, cleanup of both
+original/replacement private roots, Git cleanliness, and no-`slugd`.
 
 ## Stops and budget
 
-Offline mocked tests cover exact command reuse; retained/replaced empty/nonempty
-regular files; missing/symlink/hardlink/bad-mode/directory; phase/root swaps;
-no-open/read enforcement; hostile schema; cleanup/shutdown/Git/daemon failures;
-and secret suppression. Run focused tests, compilation, caps/diff, and
-independent review only. Do not invoke Bazel, normal/home RC, remote services,
-or edit the accepted gate/probes/config/targets/docs.
+Do not retry, read artifacts, modify code/config, or claim cache/RBE. Any CLI,
+schema, stderr, or lifecycle failure is `REPLAN`. Route only the fixed record:
+`ZERO+NONEMPTY` to a separate strict parser-discriminator design; `ZERO+EMPTY`
+to a source-consistent no-record stop; `ZERO+NOT_ANCHORED` to `REPLAN`;
+`NONZERO` plus an anchored file to a failure-detail sanitizer design; and other
+`NONZERO` to a user-owned token-free environment decision.
 
-Stop on any need to accept links, relax mode/single-link constraints, read
-bytes, expose metadata, or make a cache/RBE claim. A separate packet owns one
-live probe. Structured cache/RBE, 43-test expansion, and Stage 10 remain open.
+Afterward only owner/canonical/current docs may record the result, at most 100
+changed lines. Structured cache/RBE, 43-test expansion, and Stage 10 remain.
