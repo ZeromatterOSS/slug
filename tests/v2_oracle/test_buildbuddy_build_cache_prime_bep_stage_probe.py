@@ -14,7 +14,7 @@ from tools.v2_oracle_lib import buildbuddy_build_cache as cache
 from tools.v2_oracle_lib import buildbuddy_build_cache_prime_bep_stage_probe as probe
 
 BEP = (b'{"id":{"targetCompleted":{"label":"//app/slug_cli_v2:slug"}},"completed":{"success":true}}\n'
-       b'{"id":{"buildFinished":{}},"finished":{"exitCode":{"name":"SUCCESS","code":0}}}\n')
+       b'{"id":{"buildFinished":{}},"finished":{"exitCode":{"name":"SUCCESS"}}}\n')
 
 
 def _payload(change: str) -> bytes:
@@ -26,10 +26,13 @@ def _payload(change: str) -> bytes:
     if change == "hits_bad": return BEP + b'{"id":{},"buildMetrics":{"actionSummary":{"actionCacheStatistics":{"hits":1}}}}\n'
     if change == "hits_invalid": return BEP + b'{"id":{},"buildMetrics":{"actionSummary":{"actionCacheStatistics":{"hits":"bad"}}}}\n'
     if change == "statistics_nondict": return BEP + b'{"id":{},"buildMetrics":{"actionSummary":{"actionCacheStatistics":[]}}}\n'
-    if change == "exit_invalid": return BEP.replace(b'"code":0', b'"code":"bad"')
+    if change == "exit_invalid": return BEP.replace(b'"name":"SUCCESS"', b'"name":"SUCCESS","code":"bad"')
+    if change in ("exit_null", "exit_false", "exit_true", "exit_string", "exit_negative"):
+        value = {"exit_null": b"null", "exit_false": b"false", "exit_true": b"true", "exit_string": b'"0"', "exit_negative": b"-1"}[change]
+        return BEP.replace(b'"name":"SUCCESS"', b'"name":"SUCCESS","code":' + value)
     if change == "target_nondict": return BEP.replace(b'{"label":"//app/slug_cli_v2:slug"}', b'[]')
     if change == "completed_nondict": return BEP.replace(b'{"success":true}', b'[]')
-    if change == "finished_invalid": return BEP.replace(b'{"exitCode":{"name":"SUCCESS","code":0}}', b'[]')
+    if change == "finished_invalid": return BEP.replace(b'{"exitCode":{"name":"SUCCESS"}}', b'[]')
     if change == "event_then_stream": return b'{"id":[]}\n{'
     if change == "finished_then_stream": return b'{"id":{"buildFinished":{}},"finished":[]}\n{'
     if change == "hits_then_stream": return b'{"id":{},"buildMetrics":{"actionSummary":{"actionCacheStatistics":{"hits":"bad"}}}}\n{'
@@ -74,15 +77,15 @@ class PrimeBepStageProbeTest(unittest.TestCase):
         bep = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--build_event_json_file="))); execution = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--execution_log_json_file=")))
         self.assertEqual(cache.command("bazel", Path(prime[1].split("=", 1)[1]), bep, execution, nonce), prime)
         self.assertEqual(["bazel", "--ignore_all_rc_files", f"--output_base={prime[1].split('=', 1)[1]}", "shutdown"], calls[1])
-        self.assertEqual("ff4ef162688c72e6606c09b23c9886a1d23d5fc3174dd012dc390c60e79f34a3", hashlib.sha256(Path(cache.__file__).read_bytes()).hexdigest())
+        self.assertEqual("a52c29d027050f07a5c51142e18554ec73443cfaa23b717b332d8d9e8ebdf4ba", hashlib.sha256(Path(cache.__file__).read_bytes()).hexdigest())
 
     def test_process_descriptor_stream_event_terminal_and_counter_stages(self) -> None:
-        cases = (("ready", 9, "PROCESS_NONZERO"), ("bep_missing", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_symlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_replace", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_hardlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_mode", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_directory", 0, "BEP_DESCRIPTOR_REJECTED"), ("stream_bad", 0, "BEP_STREAM_REJECTED"), ("event_bad", 0, "BEP_EVENT_REJECTED"), ("event_then_stream", 0, "BEP_EVENT_REJECTED"), ("nested_bad", 0, "BEP_EVENT_REJECTED"), ("completed_nondict", 0, "BEP_EVENT_REJECTED"), ("finished_invalid", 0, "BEP_TERMINAL_REJECTED"), ("finished_then_stream", 0, "BEP_STREAM_REJECTED"), ("hits_then_stream", 0, "BEP_COUNTER_REJECTED"), ("exit_invalid", 0, "BEP_COUNTER_REJECTED"))
+        cases = (("ready", 9, "PROCESS_NONZERO"), ("bep_missing", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_symlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_replace", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_hardlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_mode", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_directory", 0, "BEP_DESCRIPTOR_REJECTED"), ("stream_bad", 0, "BEP_STREAM_REJECTED"), ("event_bad", 0, "BEP_EVENT_REJECTED"), ("event_then_stream", 0, "BEP_EVENT_REJECTED"), ("nested_bad", 0, "BEP_EVENT_REJECTED"), ("completed_nondict", 0, "BEP_EVENT_REJECTED"), ("finished_invalid", 0, "BEP_TERMINAL_REJECTED"), ("finished_then_stream", 0, "BEP_STREAM_REJECTED"), ("hits_then_stream", 0, "BEP_COUNTER_REJECTED"), ("exit_invalid", 0, "BEP_COUNTER_REJECTED"), ("exit_null", 0, "BEP_COUNTER_REJECTED"), ("exit_false", 0, "BEP_COUNTER_REJECTED"), ("exit_true", 0, "BEP_COUNTER_REJECTED"), ("exit_string", 0, "BEP_COUNTER_REJECTED"), ("exit_negative", 0, "BEP_COUNTER_REJECTED"))
         for change, code, stage in cases:
             with self.subTest(stage=stage): self.assertEqual(stage, self._run(change, code)[0]["stage"])
 
     def test_phase_record_parser_parity(self) -> None:
-        cases = (("ready", "BEP_READY"), ("terminal_bad", "BEP_READY"), ("counter_bad", "BEP_READY"), ("hits_bad", "BEP_READY"), ("statistics_nondict", "BEP_READY"), ("target_nondict", "BEP_READY"), ("event_bad", "BEP_EVENT_REJECTED"), ("nested_bad", "BEP_EVENT_REJECTED"), ("completed_nondict", "BEP_EVENT_REJECTED"), ("finished_invalid", "BEP_TERMINAL_REJECTED"), ("finished_then_stream", "BEP_STREAM_REJECTED"), ("hits_then_stream", "BEP_COUNTER_REJECTED"), ("exit_invalid", "BEP_COUNTER_REJECTED"))
+        cases = (("ready", "BEP_READY"), ("terminal_bad", "BEP_READY"), ("counter_bad", "BEP_READY"), ("hits_bad", "BEP_READY"), ("statistics_nondict", "BEP_READY"), ("target_nondict", "BEP_READY"), ("event_bad", "BEP_EVENT_REJECTED"), ("nested_bad", "BEP_EVENT_REJECTED"), ("completed_nondict", "BEP_EVENT_REJECTED"), ("finished_invalid", "BEP_TERMINAL_REJECTED"), ("finished_then_stream", "BEP_STREAM_REJECTED"), ("hits_then_stream", "BEP_COUNTER_REJECTED"), ("exit_invalid", "BEP_COUNTER_REJECTED"), ("exit_null", "BEP_COUNTER_REJECTED"), ("exit_false", "BEP_COUNTER_REJECTED"), ("exit_true", "BEP_COUNTER_REJECTED"), ("exit_string", "BEP_COUNTER_REJECTED"), ("exit_negative", "BEP_COUNTER_REJECTED"))
         for change, stage in cases:
             with self.subTest(change=change):
                 try: cache.phase_record(_payload(change), b"", 0, "prime"); gate_raises = False

@@ -68,7 +68,7 @@ def _bep(data: bytes) -> None:
         except Exception: raise ProbeError("BEP_EVENT_REJECTED") from None
     if len(finished) != 1 or not isinstance(finished[0], dict) or not isinstance(finished[0].get("exitCode"), dict): raise ProbeError("BEP_TERMINAL_REJECTED")
     exit_data = finished[0]["exitCode"]
-    try: cache._count(exit_data.get("code"))
+    try: cache._count(exit_data.get("code", 0))
     except Exception: raise ProbeError("BEP_COUNTER_REJECTED") from None
 
 

@@ -84,7 +84,7 @@ def phase_record(bep: bytes, execution: bytes, process_exit: int, phase: str) ->
     if not isinstance(finished.get("exitCode"), dict):
         raise GateError("EVIDENCE_INCOMPLETE")
     exit_data = finished["exitCode"]
-    name, code = exit_data.get("name"), _count(exit_data.get("code"))
+    name, code = exit_data.get("name"), _count(exit_data.get("code", 0))
     success = name == "SUCCESS" and code == 0
     outcome = "remote" if remote_failure or name in {"REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR"} else "command" if name == "COMMAND_LINE_ERROR" and code == 2 else "success" if success else "target"
     return {"process_success_count": int(process_exit == 0), "build_finished_success_count": int(success), "target_success_count": target_successes, "output_count": 0, "persistent_action_cache_hit_count": persistent_hits, "eligible_spawns": spawns(parsed.json_sequence(execution), phase), "_outcome": outcome}

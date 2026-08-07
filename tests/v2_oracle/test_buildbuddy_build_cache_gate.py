@@ -53,6 +53,12 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
         self.assertEqual(1, record["target_success_count"]); self.assertEqual("success", record["_outcome"])
         bad = seq([{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "REMOTE_ERROR", "code": 1}, "failureDetail": {"message": "token=/private"}}}])
         self.assertEqual("remote", gate.phase_record(bad, b"", 1, "prime")["_outcome"])
+        for value in (None, False, True, "0", -1):
+            with self.subTest(value=value):
+                invalid = seq([{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS", "code": value}}}])
+                with self.assertRaises(gate.GateError): gate.phase_record(invalid, b"", 0, "prime")
+        class IntSubclass(int): pass
+        with self.assertRaises(gate.GateError): gate._count(IntSubclass(0))
         self.assertNotIn("private", json.dumps(record))
         with self.assertRaises(gate.GateError): gate.phase_record(self._bep() + self._bep(), self._execution("prime"), 0, "prime")
 
@@ -230,7 +236,7 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
         return seq([{"runner": "remote cache hit" if phase == "replay" else "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": phase == "replay", "status": "", "exitCode": 0}])
     @staticmethod
     def _bep() -> bytes:
-        return seq([{"id": {"targetCompleted": {"label": gate.LABEL}}, "completed": {"success": True}}, {"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS", "code": 0}}}])
+        return seq([{"id": {"targetCompleted": {"label": gate.LABEL}}, "completed": {"success": True}}, {"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS"}}}])
     @staticmethod
     def _records() -> tuple[dict[str, object], dict[str, object]]:
         def record(remote: bool) -> dict[str, object]:

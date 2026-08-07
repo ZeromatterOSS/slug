@@ -70,7 +70,7 @@ class PrimeStageProbeTest(unittest.TestCase):
         self.assertEqual(cache.command("bazel", Path(prime[1].split("=", 1)[1]), bep, execution, nonce), prime)
         self.assertEqual(["bazel", "--ignore_all_rc_files", f"--output_base={prime[1].split('=', 1)[1]}", "shutdown"], calls[1])
         gate_source = Path(cache.__file__).read_bytes()
-        self.assertEqual("ff4ef162688c72e6606c09b23c9886a1d23d5fc3174dd012dc390c60e79f34a3", hashlib.sha256(gate_source).hexdigest())
+        self.assertEqual("a52c29d027050f07a5c51142e18554ec73443cfaa23b717b332d8d9e8ebdf4ba", hashlib.sha256(gate_source).hexdigest())
 
     def test_process_descriptor_phase_and_spawn_stages(self) -> None:
         cases = (("ready", 7, "PROCESS_NONZERO"), ("bep_missing", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_symlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_replace", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_hardlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_mode", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_directory", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_bad", 0, "BEP_PHASE_REJECTED"), ("execution_missing", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_symlink", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_hardlink", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_mode", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_directory", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_bad", 0, "EXECUTION_SPAWN_REJECTED"))
