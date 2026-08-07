@@ -2050,6 +2050,18 @@ only fixed stream/event/terminal/counter/BEP-ready stages, with exact schema and
 process pairing. Offline tests and independent review only; no Bazel, home RC,
 network, gate/stage-probe/config edit, or live artifact.
 
+The BEP-only fixed-stage probe is accepted in `6b176661…` at 127 library, 17
+CLI, 117 test, and 261 total lines. Its five focused and 40 related tests pass;
+independent review accepts exact `phase_record` evaluation/first-failure order,
+semantic-value acceptance, terminal/counter separation, privacy, and lifecycle.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-bep-stage-probe-transported-live-evidence`.
+Use the accepted anonymous bounded transport and retained-session polling to
+invoke the frozen BEP CLI exactly once with inherited environment. Review only
+the fixed envelope, empty child stderr, and normalized fixed-stage record. No
+retry, raw/home/artifact/service access, code/config edit, or cache/RBE claim.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
