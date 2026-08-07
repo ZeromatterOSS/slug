@@ -1,29 +1,25 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-command-failure-diagnostic-implementation`
+Packet: `WP-10-m8-bazel-buildbuddy-command-failure-diagnostic-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a reviewed secret-safe structured command-failure diagnostic.
+Result: one reviewed compact cache proof or structured failure diagnosis.
 
 ## Goal and required design
 
-Extend the cache gate from structured Bazel 9.2
-`BuildFinished.failureDetail` only. Admit fixed `COMMAND_LINE_ERROR`, add a
-closed per-phase `command_failure_class`, and classify matching exit-2 phases
-as `COMMAND_LINE_FAILURE` before target failure. Explicitly allowlist the
-accepted command/options, remote configuration, execution configuration, and
-build-configuration enum pairs. Unknown, missing, multiple, or malformed
-structured data must become `UNKNOWN_COMMAND_LINE_ERROR`; never expose the
-free-form message, enum, key, stderr, credential, nonce, or path.
+From clean implementation commit `b66c0bc3…`, run
+`python3 tools/v2_oracle/buildbuddy_cache_gate.py` exactly once. Permit only
+Bazel to consume ordinary workspace/home RC discovery. Review only its compact
+stdout object, process status, and empty stderr. Accept `PROVED_CACHE_ONLY` as
+the cache proof. Accept `COMMAND_LINE_FAILURE` only as a diagnosis when each
+phase contains a fixed allowlisted `command_failure_class`; it returns
+`REPLAN`, not a cache claim.
 
 ## Stops and budget
 
-Change only `tools/v2_oracle_lib/buildbuddy_cache.py` (90 changed lines) and
-`tests/v2_oracle/test_buildbuddy_cache_gate.py` (180 changed lines), at most
-270 changed lines total. Offline tests must cover every allowlisted pair and
-unknown/malformed cases, prove raw/private fields cannot escape, prove stderr
-is not read for diagnosis, and preserve all prior classifications. Do not run
-Bazel build/test, discover ordinary/home RCs, inspect home configuration,
-contact BuildBuddy, change configuration/manifests/CLI/CI/BUILD/MODULE/locks,
-or make a live attempt. A separate reviewed evidence packet owns one later
-diagnostic invocation.
+Return `REPLAN` on any other classification, stderr, retained raw path, schema
+surprise, unavailable service, target/cache miss, or required repair. Do not
+make a second attempt, inspect home configuration, retain or read raw logs,
+invoke RBE, or change code/config/CI/BUILD/MODULE/locks/targets/cycle/core/
+platform behavior. Only the owner plan, canonical plan, and this manifest may
+record the sanitized result: at most 100 changed lines in three files.

@@ -1331,6 +1331,29 @@ discovery, home inspection, remote call, configuration/manifest change, or
 live retry. After offline review, a separate evidence packet may make exactly
 one fresh diagnostic invocation.
 
+The structured diagnostic implementation is accepted in its exact two-file,
+74-changed-line scope. It allowlists all 33 pinned Bazel 9.2 exit-2 pairs,
+admits only fixed `COMMAND_LINE_ERROR`, emits only the closed per-phase class,
+and gives `COMMAND_LINE_FAILURE` precedence over ordinary target failure while
+preserving remote precedence. Unknown or malformed detail fails closed without
+retaining any raw key or value. Twenty-four offline tests, Python compilation,
+caps, diff, and independent review pass; no Bazel, home-RC, or remote command
+ran.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-command-failure-diagnostic-evidence`. From clean
+implementation commit `b66c0bc3…`, run the frozen driver exactly once with
+ordinary RC discovery and let only Bazel consume home-owned authentication.
+Review only the compact stdout object, process status, and empty stderr.
+`PROVED_CACHE_ONLY` closes the cache proof. `COMMAND_LINE_FAILURE` is accepted
+only as a secret-safe diagnosis and must report the fixed class for each phase;
+it does not prove cache behavior and returns `REPLAN` for a later bounded
+repair/decision. Any other classification, schema surprise, retained private
+path, or required repair also returns `REPLAN`. Do not make a second attempt,
+inspect home configuration or raw artifacts, change code/config/CI/targets, or
+invoke RBE. Only owner and scheduling documentation may record the sanitized
+result, at most 100 changed lines in three files.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
