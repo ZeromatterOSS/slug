@@ -1624,6 +1624,39 @@ value, RC content, URL, or log may be pasted. No agent runs Bazel, reads stderr
 or home configuration, contacts BuildBuddy, changes the repository, or makes a
 cache/RBE claim before the response. RBE remains behind cache evidence.
 
+The user decision is accepted: the exact minimal build succeeds with ordinary
+RC discovery and the nightly selector. The user explicitly authorizes agents
+to invoke Bazel in the normal environment so Bazel can consume the auth-only
+`~/.bazelrc`; its contents and token remain unread, unprinted, uncopied, and
+uncommitted. This closes the authentication/RC and single-target analysis/build
+boundary, but it is not structured cache or RBE evidence. The known prime-
+runner classifier drift remains a separate required repair before another
+formal cache-gate attempt.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-rbe-developer-build-after-user-minimal-success`.
+From the clean
+decision commit, create one private mode-0700 root and run exactly one fresh-
+output-base Bazel build of `//app/slug_cli_v2:slug` with ordinary RC discovery,
+`--config=buildbuddy-rbe`, explicit nightly, no accepted cached result or local-
+result upload, top-level output download, and private BEP/execution/terminal
+files. The checked-in repository RC configuration supplies the hosted
+endpoints; the `buildbuddy-rbe` profile supplies remote-only strategy/no-
+fallback and managed Linux/amd64 properties. Inherit the process environment
+unchanged; do not set, print, expand, copy, inspect, or otherwise touch `HOME`
+or home RC. Only Bazel consumes the user-owned authentication.
+
+Accept only process exit zero and exactly one executable materialized beneath
+the private output base. Never display or inspect the terminal/BEP/execution
+files. Any build, output, retained-root, Git, daemon, or cleanup failure is
+`REPLAN` without retry. Always shut down the private Bazel server, delete raw/
+private state, and recheck Git and `slugd`. This proves only that one fresh,
+remote-only BuildBuddy-profile Stage 10 developer build completed; without
+parsing structured logs it does not prove per-spawn RBE, cache reuse, the
+43-test gate, CI, Stage 7 backend acceptance, or self-hosting. Afterward only
+owner/canonical/current docs may record the fixed result, at most 120 lines in
+three files.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
