@@ -72,6 +72,40 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         prime["passed_test_count"] = 0
         self.assertEqual("TARGET_FAILURE", gate.classify(prime, replay, ("a",)))
 
+    def test_command_failure_diagnostics_are_allowlisted_and_precede_target_failure(self) -> None:
+        expected = {
+            "command": {"OPTIONS_PARSE_FAILURE": "COMMAND_OPTIONS_PARSE", "STARLARK_OPTIONS_PARSE_FAILURE": "COMMAND_STARLARK_OPTIONS_PARSE", "ARGUMENTS_NOT_RECOGNIZED": "COMMAND_ARGUMENTS_NOT_RECOGNIZED", "INVOCATION_POLICY_PARSE_FAILURE": "COMMAND_INVOCATION_POLICY", "INVOCATION_POLICY_INVALID": "COMMAND_INVOCATION_POLICY"},
+            "remoteOptions": {"REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR": "REMOTE_OPTIONS_CONFIGURATION", "DOWNLOADER_WITHOUT_GRPC_CACHE": "REMOTE_OPTIONS_CONFIGURATION", "EXECUTION_WITH_INVALID_CACHE": "REMOTE_OPTIONS_CONFIGURATION"},
+            "remoteExecution": {"CREDENTIALS_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "RPC_LOG_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "EXEC_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "DOWNLOADER_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS": "REMOTE_EXECUTION_CONFIGURATION"},
+            "executionOptions": {"INVALID_STRATEGY": "EXECUTION_OPTIONS_CONFIGURATION", "RESTRICTION_UNMATCHED_TO_ACTION_CONTEXT": "EXECUTION_OPTIONS_CONFIGURATION", "REMOTE_FALLBACK_STRATEGY_NOT_ABSTRACT_SPAWN": "EXECUTION_OPTIONS_CONFIGURATION", "STRATEGY_NOT_FOUND": "EXECUTION_OPTIONS_CONFIGURATION", "DYNAMIC_STRATEGY_NOT_SANDBOXED": "EXECUTION_OPTIONS_CONFIGURATION", "MULTIPLE_EXECUTION_LOG_FORMATS": "EXECUTION_OPTIONS_CONFIGURATION"},
+            "execution": {"EXECUTION_LOG_INITIALIZATION_FAILURE": "EXECUTION_LOG_CONFIGURATION"},
+            "buildConfiguration": {"PLATFORM_MAPPING_EVALUATION_FAILURE": "BUILD_CONFIGURATION", "INVALID_CONFIGURATION": "BUILD_CONFIGURATION", "INVALID_BUILD_OPTIONS": "BUILD_CONFIGURATION", "MULTI_CPU_PREREQ_UNMET": "BUILD_CONFIGURATION", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID": "BUILD_CONFIGURATION", "CYCLE": "BUILD_CONFIGURATION", "CONFLICTING_CONFIGURATIONS": "BUILD_CONFIGURATION", "INVALID_OUTPUT_DIRECTORY_MNEMONIC": "BUILD_CONFIGURATION", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE": "BUILD_CONFIGURATION", "INVALID_PROJECT": "BUILD_CONFIGURATION"},
+        }
+        self.assertEqual(expected, gate.COMMAND_FAILURE_CLASSES)
+        for category, codes in expected.items():
+            for code, failure_class in codes.items():
+                record = gate.phase_record(self._command_bep({"message": "credential=secret nonce=/private/path", category: {"code": code}}), b"", "prime", (), 2)
+                self.assertEqual(failure_class, record["command_failure_class"])
+                self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
+                self.assertNotIn("credential=secret", json.dumps(record))
+                self.assertNotIn("nonce=/private/path", json.dumps(record))
+                self.assertNotIn("/private/path", json.dumps(record))
+                self.assertNotIn(f'"code": "{code}"', json.dumps(record))
+
+    def test_command_failure_diagnostic_is_closed_and_uses_no_stderr(self) -> None:
+        malformed = (None, 1, {}, {"message": 1, "command": {"code": "OPTIONS_PARSE_FAILURE"}}, {"message": "secret"}, {"command": {"code": "UNKNOWN_ENUM"}}, {"command": {"code": "OPTIONS_PARSE_FAILURE", "path": "/private"}}, {"command": {"code": "OPTIONS_PARSE_FAILURE"}, "remoteOptions": {"code": "EXECUTION_WITH_INVALID_CACHE"}}, {"arbitrary": {"code": "credential=secret"}})
+        for detail in malformed:
+            record = gate.phase_record(self._command_bep(detail), b"", "prime", (), 2)
+            self.assertEqual("UNKNOWN_COMMAND_LINE_ERROR", record["command_failure_class"])
+            self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
+            self.assertNotIn("secret", json.dumps(record))
+            self.assertNotIn("UNKNOWN_ENUM", json.dumps(record))
+            self.assertNotIn("arbitrary", json.dumps(record))
+        non_command = sequence([{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "ARBITRARY_ENUM", "code": 2}, "failureDetail": {"message": "stderr credential=secret", "command": {"code": "OPTIONS_PARSE_FAILURE"}}}}])
+        record = gate.phase_record(non_command, b"", "prime", (), 2)
+        self.assertEqual("NONE", record["command_failure_class"])
+        self.assertNotIn("ARBITRARY_ENUM", json.dumps(record))
+
     def test_digest_mismatch_is_cache_failure_but_zero_is_incomplete(self) -> None:
         prime, replay = self._records(1)
         replay["eligible_spawns"]["digest_multiset_sha256"] = "different"
@@ -170,6 +204,7 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         with mock.patch.object(gate, "_git", side_effect=("a" * 40, "")):
             result = gate.run_gate(MANIFEST, runner=runner)
         self.assertEqual("PROVED_CACHE_ONLY", result["classification"])
+        self.assertNotIn("raw token", json.dumps(result))
         self.assertEqual(["bazel", "--ignore_all_rc_files", "version"], calls[0])
         tests = [argv for argv in calls if len(argv) > 2 and argv[2] == "test"]
         self.assertEqual(2, len(tests))
@@ -257,7 +292,7 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
 
     def _records(self, count: int) -> tuple[dict[str, object], dict[str, object]]:
         def record(remote: bool) -> dict[str, object]:
-            return {"process_exit_code": 0, "build_finished": {"name": "SUCCESS", "code": 0}, "build_success_count": 1, "passed_test_count": count, "test_run_count": count, "remotely_cached_test_count": count if remote else 0, "persistent_action_cache_hit_count": 0, "eligible_spawns": {"count": 1, "digest_multiset_sha256": "same", "cache_hit_failures": 0, "status_failures": 0, "exit_failures": 0, "local": 0 if remote else 1, "remote_cache_hit": 1 if remote else 0, "disk_cache_hit": 0, "remote_execution": 0, "unknown": 0}}
+            return {"process_exit_code": 0, "build_finished": {"name": "SUCCESS", "code": 0}, "command_failure_class": "NONE", "build_success_count": 1, "passed_test_count": count, "test_run_count": count, "remotely_cached_test_count": count if remote else 0, "persistent_action_cache_hit_count": 0, "eligible_spawns": {"count": 1, "digest_multiset_sha256": "same", "cache_hit_failures": 0, "status_failures": 0, "exit_failures": 0, "local": 0 if remote else 1, "remote_cache_hit": 1 if remote else 0, "disk_cache_hit": 0, "remote_execution": 0, "unknown": 0}}
         return record(False), record(True)
 
     @staticmethod
@@ -267,6 +302,13 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         events.extend({"id": {"testSummary": {"label": test}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "totalNumCached": 1 if phase == "replay" else 0}} for test in tests)
         events.append({"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS", "code": 0}}})
         return sequence(events)
+
+    @staticmethod
+    def _command_bep(detail: object) -> bytes:
+        finished: dict[str, object] = {"exitCode": {"name": "COMMAND_LINE_ERROR", "code": 2}}
+        if detail is not None:
+            finished["failureDetail"] = detail
+        return sequence([{"id": {"buildFinished": {}}, "finished": finished}])
 
     def _temp(self, name: str, data: bytes) -> Path:
         path = ROOT / "target" / name

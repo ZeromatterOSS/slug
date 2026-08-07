@@ -18,7 +18,15 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_SHA256 = "3a717cb4b0a1f5cab06d336e69d2382861a9c21af9a1502ea20c54b990adf6d5"
 BAZELRC_SHA256 = "e72f4223b6cfffbc96de018849e306ff9cbfdf4ca50248d8fee229a80dc4c805"
 VERSION = "slug-buildbuddy-targets-v1"
-FAILURES = {"CONFIG_DRIFT", "REMOTE_UNAVAILABLE", "TARGET_FAILURE", "CACHE_MISS_OR_MIXED_REPLAY", "EVIDENCE_INCOMPLETE", "SANITIZER_REJECTED"}
+FAILURES = {"CONFIG_DRIFT", "REMOTE_UNAVAILABLE", "COMMAND_LINE_FAILURE", "TARGET_FAILURE", "CACHE_MISS_OR_MIXED_REPLAY", "EVIDENCE_INCOMPLETE", "SANITIZER_REJECTED"}
+COMMAND_FAILURE_CLASSES = {
+    "command": {"OPTIONS_PARSE_FAILURE": "COMMAND_OPTIONS_PARSE", "STARLARK_OPTIONS_PARSE_FAILURE": "COMMAND_STARLARK_OPTIONS_PARSE", "ARGUMENTS_NOT_RECOGNIZED": "COMMAND_ARGUMENTS_NOT_RECOGNIZED", "INVOCATION_POLICY_PARSE_FAILURE": "COMMAND_INVOCATION_POLICY", "INVOCATION_POLICY_INVALID": "COMMAND_INVOCATION_POLICY"},
+    "remoteOptions": {"REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR": "REMOTE_OPTIONS_CONFIGURATION", "DOWNLOADER_WITHOUT_GRPC_CACHE": "REMOTE_OPTIONS_CONFIGURATION", "EXECUTION_WITH_INVALID_CACHE": "REMOTE_OPTIONS_CONFIGURATION"},
+    "remoteExecution": {"CREDENTIALS_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "RPC_LOG_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "EXEC_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "DOWNLOADER_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS": "REMOTE_EXECUTION_CONFIGURATION"},
+    "executionOptions": {"INVALID_STRATEGY": "EXECUTION_OPTIONS_CONFIGURATION", "RESTRICTION_UNMATCHED_TO_ACTION_CONTEXT": "EXECUTION_OPTIONS_CONFIGURATION", "REMOTE_FALLBACK_STRATEGY_NOT_ABSTRACT_SPAWN": "EXECUTION_OPTIONS_CONFIGURATION", "STRATEGY_NOT_FOUND": "EXECUTION_OPTIONS_CONFIGURATION", "DYNAMIC_STRATEGY_NOT_SANDBOXED": "EXECUTION_OPTIONS_CONFIGURATION", "MULTIPLE_EXECUTION_LOG_FORMATS": "EXECUTION_OPTIONS_CONFIGURATION"},
+    "execution": {"EXECUTION_LOG_INITIALIZATION_FAILURE": "EXECUTION_LOG_CONFIGURATION"},
+    "buildConfiguration": {"PLATFORM_MAPPING_EVALUATION_FAILURE": "BUILD_CONFIGURATION", "INVALID_CONFIGURATION": "BUILD_CONFIGURATION", "INVALID_BUILD_OPTIONS": "BUILD_CONFIGURATION", "MULTI_CPU_PREREQ_UNMET": "BUILD_CONFIGURATION", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID": "BUILD_CONFIGURATION", "CYCLE": "BUILD_CONFIGURATION", "CONFLICTING_CONFIGURATIONS": "BUILD_CONFIGURATION", "INVALID_OUTPUT_DIRECTORY_MNEMONIC": "BUILD_CONFIGURATION", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE": "BUILD_CONFIGURATION", "INVALID_PROJECT": "BUILD_CONFIGURATION"},
+}
 
 
 class GateError(Exception):
@@ -102,6 +110,19 @@ def _digest(value: Any) -> str:
     return json.dumps({"hash": value["hash"], "sizeBytes": size}, sort_keys=True, separators=(",", ":"))
 
 
+def _command_failure_class(value: Any) -> str:
+    if not isinstance(value, dict) or set(value) - {"message"} == set() or not isinstance(value.get("message", ""), str):
+        return "UNKNOWN_COMMAND_LINE_ERROR"
+    categories = set(value) - {"message"}
+    if len(categories) != 1:
+        return "UNKNOWN_COMMAND_LINE_ERROR"
+    category = categories.pop()
+    detail = value.get(category)
+    if not isinstance(detail, dict) or set(detail) != {"code"} or not isinstance(detail.get("code"), str):
+        return "UNKNOWN_COMMAND_LINE_ERROR"
+    return COMMAND_FAILURE_CLASSES.get(category, {}).get(detail["code"], "UNKNOWN_COMMAND_LINE_ERROR")
+
+
 def spawn_summary(entries: Iterable[dict[str, Any]], phase: str) -> dict[str, Any]:
     buckets = {name: 0 for name in ("local", "remote_cache_hit", "disk_cache_hit", "remote_execution", "unknown")}
     digests: list[str] = []
@@ -168,7 +189,7 @@ def phase_record(bep: bytes, execution: bytes, phase: str, tests: tuple[str, ...
         raise GateError("EVIDENCE_INCOMPLETE")
     summary = spawn_summary(json_sequence(execution), phase)
     name = exit_data.get("name")
-    safe_name = name if name in {"SUCCESS", "REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR"} else "OTHER"
+    safe_name = name if name in {"SUCCESS", "REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR", "COMMAND_LINE_ERROR"} else "OTHER"
     if aborted_remote:
         safe_name = "REMOTE_ERROR"
     code = exit_data.get("code")
@@ -177,13 +198,16 @@ def phase_record(bep: bytes, execution: bytes, phase: str, tests: tuple[str, ...
     if any(cached.get(test, 0) > runs.get(test, 0) for test in tests):
         raise GateError("EVIDENCE_INCOMPLETE")
     passed_once = {test for test in passed & completed_tests if runs.get(test, 0) == 1}
-    return {"process_exit_code": process_exit, "build_finished": {"name": safe_name, "code": code}, "build_success_count": int("//app/slug_cli_v2:slug" in completed), "passed_test_count": len(passed_once), "test_run_count": sum(runs.get(test, 0) == 1 for test in tests), "remotely_cached_test_count": sum(cached.get(test, 0) == 1 for test in tests), "persistent_action_cache_hit_count": persistent_hits, "eligible_spawns": summary}
+    command_failure_class = _command_failure_class(build_finished.get("failureDetail")) if safe_name == "COMMAND_LINE_ERROR" else "NONE"
+    return {"process_exit_code": process_exit, "build_finished": {"name": safe_name, "code": code}, "command_failure_class": command_failure_class, "build_success_count": int("//app/slug_cli_v2:slug" in completed), "passed_test_count": len(passed_once), "test_run_count": sum(runs.get(test, 0) == 1 for test in tests), "remotely_cached_test_count": sum(cached.get(test, 0) == 1 for test in tests), "persistent_action_cache_hit_count": persistent_hits, "eligible_spawns": summary}
 
 
 def classify(prime: dict[str, Any], replay: dict[str, Any], tests: tuple[str, ...]) -> str:
     required = len(tests)
     if any(record["build_finished"]["name"] in {"REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR"} for record in (prime, replay)):
         return "REMOTE_UNAVAILABLE"
+    if any(record["process_exit_code"] == 2 and record["build_finished"] == {"name": "COMMAND_LINE_ERROR", "code": 2} and record["command_failure_class"] != "NONE" for record in (prime, replay)):
+        return "COMMAND_LINE_FAILURE"
     if any(record["process_exit_code"] != 0 or record["build_finished"] != {"name": "SUCCESS", "code": 0} or record["build_success_count"] != 1 or record["passed_test_count"] != required or record["test_run_count"] != required for record in (prime, replay)):
         return "TARGET_FAILURE"
     if any(record["persistent_action_cache_hit_count"] for record in (prime, replay)) or prime["remotely_cached_test_count"]:
