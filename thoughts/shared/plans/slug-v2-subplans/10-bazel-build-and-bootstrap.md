@@ -2456,6 +2456,25 @@ outer/child zero, empty stderr, `DELIVERED`, exact `PROVED_RBE`, and clean full-
 RBE root/process/daemon/Git lifecycle. No retry, raw/home/artifact/UI/service
 access, code/config edit, or weakening of the all-SpawnExec/43-test proof.
 
+The single full-RBE invocation from clean `3e4d9586…` delivers outer/child zero,
+empty stderr, and fixed `PROVED_RBE`. Process, BuildFinished, production, and
+output counts are one; all 43 tests complete, pass, and run exactly once, with
+zero remotely cached tests or persistent action-cache hits. All 1,006 SpawnExec
+records have valid digests and runner `remote`; cache-hit, remotable, status,
+exit, remote-cache, local, worker, sandbox, and other error/counts are zero.
+Afterward there are zero full-RBE roots, output-base processes, or `slugd`, and
+Git is clean. No raw/home/artifact/UI/service data was inspected. Together with
+the accepted full-cache record, this closes only the 43-test BuildBuddy developer
+gate; Stage 10.3/self-hosting remains parked behind M5/M6.
+
+Next design only `WP-10-m8-bazel-buildbuddy-ci-admission-design`. Record the two
+full-gate proofs, then obtain explicit user approval for CI provider/workflow,
+trusted triggers, Linux x86_64 runner, permissions, secret injection, concurrency,
+cost, and timeout policy. Freeze separate serialized no-argument cache then RBE
+jobs and their public classification/status mapping before any workflow edit. No
+workflow/code/config/driver/manifest/target/fixture/lock/credential access/change
+or remote invocation in the design.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware

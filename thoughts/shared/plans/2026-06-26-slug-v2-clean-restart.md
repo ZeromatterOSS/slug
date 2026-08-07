@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 green tests; full-manifest cache is `PROVED_CACHE_ONLY` and the full-RBE driver is offline-accepted | Run the manifest-aware managed-RBE gate once | `WP-10-m8-bazel-buildbuddy-full-rbe-transported-live-evidence` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle | Decide CI admission without claiming self-hosting completion before M5/M6 | `WP-10-m8-bazel-buildbuddy-ci-admission-design` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-full-rbe-transported-live-evidence`.
+`WP-10-m8-bazel-buildbuddy-ci-admission-design`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
