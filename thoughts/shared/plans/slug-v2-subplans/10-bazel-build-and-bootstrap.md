@@ -2035,6 +2035,21 @@ and emits only a fixed `DELIVERED|REJECTED` envelope. The terminal caller must
 retain and poll any returned session ID. Session loss, invalid envelope, raw
 output, cleanup/Git/daemon drift, or `REJECTED` stops at `REPLAN` without reissue.
 
+The transported invocation from clean `e017d16d…` is accepted as delivery:
+outer zero, `DELIVERED`, child zero, empty child stderr, and fixed
+`BEP_PHASE_REJECTED`. Its private root is absent afterward, Git is clean, and no
+`slugd` exists. No raw/home/artifact/service data was inspected. This localizes
+only the prime BEP parser boundary and proves no cache or RBE behavior.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-bep-stage-probe-implementation`.
+Add separate stdlib library/CLI/tests at 230/35/300 and 565 total lines. Reuse
+the exact one-prime command, strict BEP descriptor, anchors, shutdown, cleanup,
+Git, and daemon guards; never read execution content or traverse outputs. Emit
+only fixed stream/event/terminal/counter/BEP-ready stages, with exact schema and
+process pairing. Offline tests and independent review only; no Bazel, home RC,
+network, gate/stage-probe/config edit, or live artifact.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
