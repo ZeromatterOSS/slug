@@ -1292,6 +1292,45 @@ record a successful sanitized result, at most 100 lines in three files; code,
 configuration, raw artifacts, RBE, CI, and target/platform boundaries remain
 unchanged.
 
+The post-confirmation evidence packet returns `REPLAN`. Its compact record
+binds clean head `2c3370dc…`, Bazel 9.2.0, Linux x86_64, and the frozen manifest
+and root-RC hashes. Both prime and replay terminate with process and
+BuildFinished exit 2/name `OTHER`, zero completed builds/tests, zero eligible
+spawns, and zero cache hits; classification remains `TARGET_FAILURE`. Stderr is
+empty, private-root cleanup passes, and no second attempt occurred. Repeating
+the same opaque live invocation cannot distinguish a command-line failure from
+a target failure.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-command-failure-diagnostic-implementation`. Bazel
+9.2 source commit `8220c619…` establishes `BuildFinished.failureDetail` as the
+structured failure owner and marks the relevant command/options, remote
+configuration, execution configuration, and build-configuration enum codes as
+exit 2. Extend the sanitizer from that structured object only: admit the fixed
+BuildFinished name `COMMAND_LINE_ERROR`, emit a fixed per-phase
+`command_failure_class`, and classify matching exit-2 phases as
+`COMMAND_LINE_FAILURE` ahead of ordinary target failure. The closed classes
+are `NONE`, `COMMAND_OPTIONS_PARSE`, `COMMAND_STARLARK_OPTIONS_PARSE`,
+`COMMAND_ARGUMENTS_NOT_RECOGNIZED`, `COMMAND_INVOCATION_POLICY`,
+`REMOTE_OPTIONS_CONFIGURATION`, `REMOTE_EXECUTION_CONFIGURATION`,
+`EXECUTION_OPTIONS_CONFIGURATION`, `EXECUTION_LOG_CONFIGURATION`,
+`BUILD_CONFIGURATION`, and `UNKNOWN_COMMAND_LINE_ERROR`. Each non-unknown
+class requires one exact category/code pair from an explicit allowlist;
+missing, multiple, malformed, or unrecognized data fails closed to the unknown
+class.
+
+The implementation may change only
+`tools/v2_oracle_lib/buildbuddy_cache.py` (at most 90 changed lines) and
+`tests/v2_oracle/test_buildbuddy_cache_gate.py` (at most 180 changed lines).
+Tests must cover every admitted pair and malformed/unknown input, prove that
+free-form `failureDetail.message`, stderr, credentials, nonces, paths, and
+arbitrary enums cannot enter the compact record, and preserve all existing
+success/remote/target/cache behavior. No raw output may be parsed or read for
+diagnosis. The packet is offline only: no Bazel build/test, ordinary RC
+discovery, home inspection, remote call, configuration/manifest change, or
+live retry. After offline review, a separate evidence packet may make exactly
+one fresh diagnostic invocation.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

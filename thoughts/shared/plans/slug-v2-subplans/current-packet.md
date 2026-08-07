@@ -1,26 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-cache-live-evidence-after-home-auth`
+Packet: `WP-10-m8-bazel-buildbuddy-command-failure-diagnostic-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one reviewed sanitized proof of BuildBuddy cache-only prime/replay.
+Result: a reviewed secret-safe structured command-failure diagnostic.
 
 ## Goal and required design
 
-From the clean decision commit, run
-`python3 tools/v2_oracle/buildbuddy_cache_gate.py` exactly once. Permit only
-Bazel to consume ordinary workspace/home RC discovery. Review only the compact
-stdout object and process status. Accept only `PROVED_CACHE_ONLY`, exact
-43-test/build completion, per-test exact-once execution and replay caching,
-zero persistent local action-cache hits, identical eligible digest multisets,
-local-only eligible prime runners, remote-cache-hit-only eligible replay
-runners, empty stderr, and implicit successful private-root cleanup.
+Extend the cache gate from structured Bazel 9.2
+`BuildFinished.failureDetail` only. Admit fixed `COMMAND_LINE_ERROR`, add a
+closed per-phase `command_failure_class`, and classify matching exit-2 phases
+as `COMMAND_LINE_FAILURE` before target failure. Explicitly allowlist the
+accepted command/options, remote configuration, execution configuration, and
+build-configuration enum pairs. Unknown, missing, multiple, or malformed
+structured data must become `UNKNOWN_COMMAND_LINE_ERROR`; never expose the
+free-form message, enum, key, stderr, credential, nonce, or path.
 
 ## Stops and budget
 
-Return `REPLAN` on any other classification, stderr, retained raw path, schema
-surprise, unavailable service, target/cache miss, or required code/config
-change. Do not make a second attempt, inspect home configuration, retain raw
-logs, invoke RBE, or change code/config/CI/BUILD/MODULE/locks/targets/cycle/core/
-platform behavior. After success, only the owner plan, canonical plan, and this
-manifest may record the sanitized result: at most 100 lines in three files.
+Change only `tools/v2_oracle_lib/buildbuddy_cache.py` (90 changed lines) and
+`tests/v2_oracle/test_buildbuddy_cache_gate.py` (180 changed lines), at most
+270 changed lines total. Offline tests must cover every allowlisted pair and
+unknown/malformed cases, prove raw/private fields cannot escape, prove stderr
+is not read for diagnosis, and preserve all prior classifications. Do not run
+Bazel build/test, discover ordinary/home RCs, inspect home configuration,
+contact BuildBuddy, change configuration/manifests/CLI/CI/BUILD/MODULE/locks,
+or make a live attempt. A separate reviewed evidence packet owns one later
+diagnostic invocation.
