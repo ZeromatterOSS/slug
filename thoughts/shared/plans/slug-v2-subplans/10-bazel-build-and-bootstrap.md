@@ -1979,6 +1979,30 @@ status, empty stderr, and the fixed compact record. Accept only exit zero and
 at most one build-label cache vertical; structured build-only RBE, 43-test
 expansion, and the rest of Stage 10 remain required.
 
+The one repaired live gate from clean head `9c537944…` returns `REPLAN`: exit
+one, empty stderr, fixed `EVIDENCE_INCOMPLETE`, and conservative empty phase
+summaries. The private root is absent afterward, Git is clean, and no `slugd`
+exists. No private/home-RC content was read and no retry or cause inference is
+allowed. Prior probes already prove prime process zero plus retained nonempty
+BEP and replacement-aware nonempty execution, so a parser-stage discriminator
+is the next bounded boundary.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-implementation`. Add a
+separate stdlib library/CLI/tests (260/35/320 lines; 615 total) that reuse the
+exact one-prime command, descriptor readers/anchors/output checks, parsers,
+shutdown, cleanup, Git, and daemon guards. Emit only schema version, fixed mode,
+`STAGE_RECORDED|SANITIZER_REJECTED`, process `ZERO|NONZERO`, and one fixed stage:
+`NOT_RECORDED`, `PRECHECK_REJECTED`, `SETUP_REJECTED`, `PROCESS_NONZERO`,
+`POST_RUN_ANCHOR_REJECTED`, `BEP_DESCRIPTOR_REJECTED`, `BEP_PHASE_REJECTED`,
+`EXECUTION_DESCRIPTOR_REJECTED`, `EXECUTION_SPAWN_REJECTED`, `OUTPUT_REJECTED`,
+`POST_PARSE_ANCHOR_REJECTED`, `PRIME_SEMANTICS_REJECTED`, or `PRIME_READY`.
+Never emit counts, values, paths, sizes, hashes, labels, runners, or exceptions.
+Mock every stage, ownership/swap/lifecycle attack, schema subclass, suppression,
+empty CLI stderr, exact argv, and unchanged gate. Offline tests/compile/caps/
+diff and independent review only; no Bazel/home RC/network or gate edit. One
+later packet owns one probe; cache/RBE and 43-test expansion remain required.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
