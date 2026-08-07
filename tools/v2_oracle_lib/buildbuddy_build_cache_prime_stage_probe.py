@@ -40,7 +40,27 @@ def normalize(value: object) -> dict[str, object]:
 
 
 def _ready(phase: dict[str, Any], spawns: dict[str, Any]) -> bool:
-    return (phase.get("_outcome") == "success" and all(phase[key] == 1 for key in ("process_success_count", "build_finished_success_count", "target_success_count", "output_count")) and not phase["persistent_action_cache_hit_count"] and spawns["count"] > 0 and not any(spawns[key] for key in ("cache_error_count", "status_error_count", "exit_error_count", "remote_cache_hit", "other")) and spawns["local"] + spawns["worker"] + spawns["linux_sandbox"] == spawns["count"])
+    return _semantic_stage(phase, spawns) == "PRIME_READY"
+
+
+def _semantic_stage(phase: dict[str, Any], spawns: dict[str, Any]) -> str:
+    if phase.get("_outcome") != "success": return "PRIME_OUTCOME_REJECTED"
+    if phase.get("process_success_count") != 1: return "PRIME_PROCESS_COUNTER_REJECTED"
+    if phase.get("build_finished_success_count") != 1: return "PRIME_BUILD_FINISHED_COUNTER_REJECTED"
+    if phase.get("target_success_count") != 1: return "PRIME_TARGET_COUNTER_REJECTED"
+    if phase.get("output_count") != 1: return "PRIME_OUTPUT_COUNTER_REJECTED"
+    if phase.get("persistent_action_cache_hit_count") != 0: return "PRIME_PERSISTENT_CACHE_REJECTED"
+    try:
+        if not spawns.get("count") > 0: return "PRIME_ELIGIBLE_SET_REJECTED"
+    except TypeError: return "PRIME_ELIGIBLE_SET_REJECTED"
+    if spawns.get("cache_error_count") != 0: return "PRIME_CACHE_EXPECTATION_REJECTED"
+    if spawns.get("status_error_count") != 0: return "PRIME_STATUS_EXPECTATION_REJECTED"
+    if spawns.get("exit_error_count") != 0: return "PRIME_EXIT_EXPECTATION_REJECTED"
+    if spawns.get("remote_cache_hit") != 0: return "PRIME_REMOTE_HIT_CLASS_REJECTED"
+    if spawns.get("other") != 0: return "PRIME_OTHER_RUNNER_CLASS_REJECTED"
+    try: partitioned = spawns.get("local") + spawns.get("worker") + spawns.get("linux_sandbox") == spawns.get("count")
+    except TypeError: partitioned = False
+    return "PRIME_READY" if partitioned else "PRIME_RUNNER_PARTITION_REJECTED"
 
 
 def _private(path: Path) -> tuple[int, int]:

@@ -20,7 +20,7 @@ SPAWN = b'{"spawn":{"cacheable":true,"remote_cacheable":true,"runner":"local","a
 
 
 class OutputSemanticsProbeTest(unittest.TestCase):
-    def _run(self, change: str = "ready", code: int = 0) -> tuple[dict[str, object], list[list[str]], list[Path]]:
+    def _run(self, change: str = "ready", code: int = 0, bep_bytes: bytes = BEP) -> tuple[dict[str, object], list[list[str]], list[Path]]:
         calls, roots = [], []
         def executable(output: Path, name: str = "slug", mode: int = 0o700) -> Path:
             path = output / "execroot/bin/app/slug_cli_v2" / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_bytes(b"x"); path.chmod(mode); return path
@@ -37,7 +37,7 @@ class OutputSemanticsProbeTest(unittest.TestCase):
                 item = artifact.lstat(); self.assertTrue(stat.S_ISREG(item.st_mode)); self.assertEqual(0o600, stat.S_IMODE(item.st_mode)); self.assertEqual(1, item.st_nlink)
             if change == "bep_missing": bep.unlink()
             elif change == "bep_bad": bep.write_bytes(b"{")
-            else: bep.write_bytes(BEP)
+            else: bep.write_bytes(bep_bytes)
             if change == "execution_missing": execution.unlink()
             elif change == "execution_bad": execution.write_bytes(b"{")
             elif change == "execution_replace": execution.unlink(); execution.write_bytes(SPAWN)
@@ -66,7 +66,7 @@ class OutputSemanticsProbeTest(unittest.TestCase):
         with mock.patch.object(probe.cache, "_anchored", side_effect=(True, False, True, True)): self.assertEqual("POST_OUTPUT_ANCHOR_REJECTED", self._run()[0]["stage"])
 
     def test_process_and_reader_parse_stages(self) -> None:
-        cases = (("ready", 7, "PROCESS_NONZERO"), ("bep_missing", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_bad", 0, "BEP_PHASE_REJECTED"), ("execution_missing", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_bad", 0, "EXECUTION_SPAWN_REJECTED"), ("execution_empty", 0, "PRIME_SEMANTICS_REJECTED"))
+        cases = (("ready", 7, "PROCESS_NONZERO"), ("bep_missing", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_bad", 0, "BEP_PHASE_REJECTED"), ("execution_missing", 0, "EXECUTION_DESCRIPTOR_REJECTED"), ("execution_bad", 0, "EXECUTION_SPAWN_REJECTED"), ("execution_empty", 0, "PRIME_ELIGIBLE_SET_REJECTED"))
         for change, code, stage in cases:
             with self.subTest(stage=stage): self.assertEqual(stage, self._run(change, code)[0]["stage"])
         self.assertEqual("PRIME_READY", self._run("execution_replace")[0]["stage"])
@@ -74,23 +74,80 @@ class OutputSemanticsProbeTest(unittest.TestCase):
         with mock.patch.object(probe.cache, "_anchored", side_effect=(True, True, False, True, True)): self.assertEqual("POST_PARSE_ANCHOR_REJECTED", self._run()[0]["stage"])
 
     def test_every_aggregate_prime_predicate_input_runs_through_imported_predicate(self) -> None:
-        phase = {"_outcome": "success", "process_success_count": 1, "build_finished_success_count": 1, "target_success_count": 1, "output_count": 0, "persistent_action_cache_hit_count": 0}
+        phase = {"_outcome": "success", "process_success_count": 1, "build_finished_success_count": 1, "target_success_count": 1, "output_count": 1, "persistent_action_cache_hit_count": 0}
         spawns = {"count": 1, "cache_error_count": 0, "status_error_count": 0, "exit_error_count": 0, "local": 1, "worker": 0, "linux_sandbox": 0, "remote_cache_hit": 0, "other": 0}
-        cases: list[tuple[dict[str, object], dict[str, int], str]] = []
-        for outcome in ("remote", "command", "target"): cases.append(({"_outcome": outcome}, {}, "PRIME_SEMANTICS_REJECTED"))
-        for key in ("process_success_count", "build_finished_success_count", "target_success_count"): cases.append(({key: 0}, {}, "PRIME_SEMANTICS_REJECTED"))
-        cases.append(({"persistent_action_cache_hit_count": 1}, {}, "PRIME_SEMANTICS_REJECTED"))
-        cases.append(({}, {"count": 0, "local": 0}, "PRIME_SEMANTICS_REJECTED"))
-        for key in ("cache_error_count", "status_error_count", "exit_error_count"): cases.append(({}, {key: 1}, "PRIME_SEMANTICS_REJECTED"))
-        for runner in ("local", "worker", "linux_sandbox"):
-            values = {key: 0 for key in ("local", "worker", "linux_sandbox")}; values[runner] = 1; cases.append(({}, values, "PRIME_READY"))
-        for runner in ("remote_cache_hit", "other"): cases.append(({}, {"local": 0, runner: 1}, "PRIME_SEMANTICS_REJECTED"))
+        cases = (
+            ({"_outcome": "target"}, {}, "PRIME_OUTCOME_REJECTED"),
+            ({"process_success_count": 0}, {}, "PRIME_PROCESS_COUNTER_REJECTED"),
+            ({"build_finished_success_count": 0}, {}, "PRIME_BUILD_FINISHED_COUNTER_REJECTED"),
+            ({"target_success_count": 0}, {}, "PRIME_TARGET_COUNTER_REJECTED"),
+            ({"output_count": 0}, {}, "PRIME_OUTPUT_COUNTER_REJECTED"),
+            ({"persistent_action_cache_hit_count": 1}, {}, "PRIME_PERSISTENT_CACHE_REJECTED"),
+            ({}, {"count": 0, "local": 0}, "PRIME_ELIGIBLE_SET_REJECTED"),
+            ({}, {"cache_error_count": 1}, "PRIME_CACHE_EXPECTATION_REJECTED"),
+            ({}, {"status_error_count": 1}, "PRIME_STATUS_EXPECTATION_REJECTED"),
+            ({}, {"exit_error_count": 1}, "PRIME_EXIT_EXPECTATION_REJECTED"),
+            ({}, {"local": 0, "remote_cache_hit": 1}, "PRIME_REMOTE_HIT_CLASS_REJECTED"),
+            ({}, {"local": 0, "other": 1}, "PRIME_OTHER_RUNNER_CLASS_REJECTED"),
+            ({}, {"local": 0}, "PRIME_RUNNER_PARTITION_REJECTED"),
+            ({}, {}, "PRIME_READY"),
+        )
         for phase_change, spawn_change, expected in cases:
             current_phase, current_spawns = {**phase, **phase_change}, {**spawns, **spawn_change}
-            current_phase["output_count"] = 1
-            self.assertEqual(expected == "PRIME_READY", probe.prime_stage._ready(current_phase, current_spawns))
-            current_phase["output_count"] = 0
-            with self.subTest(phase=phase_change, spawn=spawn_change), mock.patch.object(probe.cache, "phase_record", return_value=current_phase), mock.patch.object(probe.cache, "spawns", return_value=current_spawns): self.assertEqual(expected, self._run()[0]["stage"])
+            with self.subTest(stage=expected):
+                self.assertEqual(expected, probe.prime_stage._semantic_stage(current_phase, current_spawns))
+                self.assertEqual(expected == "PRIME_READY", probe.prime_stage._ready(current_phase, current_spawns))
+                if expected == "PRIME_OUTPUT_COUNTER_REJECTED":
+                    with mock.patch.object(probe.prime_stage, "_semantic_stage", return_value=expected): self.assertEqual(expected, self._run()[0]["stage"])
+                else:
+                    with mock.patch.object(probe.cache, "phase_record", return_value=current_phase), mock.patch.object(probe.cache, "spawns", return_value=current_spawns): self.assertEqual(expected, self._run()[0]["stage"])
+
+    def test_semantic_first_failure_and_defensive_missing_inputs(self) -> None:
+        phase = {"_outcome": "success", "process_success_count": 1, "build_finished_success_count": 1, "target_success_count": 1, "output_count": 1, "persistent_action_cache_hit_count": 0}
+        spawns = {"count": 1, "cache_error_count": 0, "status_error_count": 0, "exit_error_count": 0, "local": 1, "worker": 0, "linux_sandbox": 0, "remote_cache_hit": 0, "other": 0}
+        failures = (("_outcome", "target", "PRIME_OUTCOME_REJECTED"), ("process_success_count", 0, "PRIME_PROCESS_COUNTER_REJECTED"), ("build_finished_success_count", 0, "PRIME_BUILD_FINISHED_COUNTER_REJECTED"), ("target_success_count", 0, "PRIME_TARGET_COUNTER_REJECTED"), ("output_count", 0, "PRIME_OUTPUT_COUNTER_REJECTED"), ("persistent_action_cache_hit_count", 1, "PRIME_PERSISTENT_CACHE_REJECTED"))
+        for index, (key, value, stage) in enumerate(failures):
+            current = {**phase, **{later_key: later for later_key, later, _ in failures[index:]}, key: value}
+            with self.subTest(stage=stage): self.assertEqual(stage, probe.prime_stage._semantic_stage(current, {**spawns, "cache_error_count": 1, "other": 1}))
+        spawn_failures = (
+            ({"count": 0}, "PRIME_ELIGIBLE_SET_REJECTED"),
+            ({"cache_error_count": 1}, "PRIME_CACHE_EXPECTATION_REJECTED"),
+            ({"status_error_count": 1}, "PRIME_STATUS_EXPECTATION_REJECTED"),
+            ({"exit_error_count": 1}, "PRIME_EXIT_EXPECTATION_REJECTED"),
+            ({"local": 0, "remote_cache_hit": 1}, "PRIME_REMOTE_HIT_CLASS_REJECTED"),
+            ({"local": 0, "other": 1}, "PRIME_OTHER_RUNNER_CLASS_REJECTED"),
+            ({"local": 0, "count": 3}, "PRIME_RUNNER_PARTITION_REJECTED"),
+        )
+        for index, (_, stage) in enumerate(spawn_failures):
+            current = dict(spawns)
+            for changes, _ in reversed(spawn_failures[index:]): current.update(changes)
+            with self.subTest(spawn_stage=stage): self.assertEqual(stage, probe.prime_stage._semantic_stage(phase, current))
+        for key, stage in (("_outcome", "PRIME_OUTCOME_REJECTED"), ("process_success_count", "PRIME_PROCESS_COUNTER_REJECTED"), ("build_finished_success_count", "PRIME_BUILD_FINISHED_COUNTER_REJECTED"), ("target_success_count", "PRIME_TARGET_COUNTER_REJECTED"), ("output_count", "PRIME_OUTPUT_COUNTER_REJECTED"), ("persistent_action_cache_hit_count", "PRIME_PERSISTENT_CACHE_REJECTED")):
+            current = dict(phase); current.pop(key)
+            self.assertEqual(stage, probe.prime_stage._semantic_stage(current, spawns))
+        for key, stage in (("count", "PRIME_ELIGIBLE_SET_REJECTED"), ("cache_error_count", "PRIME_CACHE_EXPECTATION_REJECTED"), ("status_error_count", "PRIME_STATUS_EXPECTATION_REJECTED"), ("exit_error_count", "PRIME_EXIT_EXPECTATION_REJECTED"), ("remote_cache_hit", "PRIME_REMOTE_HIT_CLASS_REJECTED"), ("other", "PRIME_OTHER_RUNNER_CLASS_REJECTED"), ("local", "PRIME_RUNNER_PARTITION_REJECTED")):
+            current = dict(spawns); current.pop(key)
+            self.assertEqual(stage, probe.prime_stage._semantic_stage(phase, current))
+        self.assertEqual("PRIME_ELIGIBLE_SET_REJECTED", probe.prime_stage._semantic_stage(phase, {**spawns, "count": "secret"}))
+
+    def test_parser_driven_non_success_outcome_precedes_later_semantics(self) -> None:
+        target = b'{"id":{"targetCompleted":{"label":"//app/slug_cli_v2:slug"}},"completed":{"success":true}}\n'
+        for name, code in (("REMOTE_ERROR", 34), ("COMMAND_LINE_ERROR", 2)):
+            finished = ('{"id":{"buildFinished":{}},"finished":{"exitCode":{"name":"%s","code":%d}}}\n' % (name, code)).encode()
+            with self.subTest(name=name): self.assertEqual("PRIME_OUTCOME_REJECTED", self._run(bep_bytes=target + finished)[0]["stage"])
+
+    def test_parser_driven_semantic_branches(self) -> None:
+        finished = b'{"id":{"buildFinished":{}},"finished":{"exitCode":{"name":"SUCCESS","code":0}}}\n'
+        metric = b'{"id":{},"buildMetrics":{"actionSummary":{"actionCacheStatistics":{"hits":1}}}}\n'
+        def stage(bep: bytes = BEP, execution: bytes = SPAWN) -> str:
+            phase = cache.phase_record(bep, b"", 0, "prime"); phase["output_count"] = 1
+            return probe.prime_stage._semantic_stage(phase, cache.spawns(cache.parsed.json_sequence(execution), "prime"))
+        self.assertEqual("PRIME_TARGET_COUNTER_REJECTED", stage(finished))
+        self.assertEqual("PRIME_PERSISTENT_CACHE_REJECTED", stage(BEP + metric))
+        self.assertEqual("PRIME_ELIGIBLE_SET_REJECTED", stage(execution=b""))
+        for field, value, expected in (("cache_hit", "true", "PRIME_CACHE_EXPECTATION_REJECTED"), ("status", '"error"', "PRIME_STATUS_EXPECTATION_REJECTED"), ("exit_code", "1", "PRIME_EXIT_EXPECTATION_REJECTED"), ("runner", '"remote cache hit"', "PRIME_REMOTE_HIT_CLASS_REJECTED"), ("runner", '"mystery"', "PRIME_OTHER_RUNNER_CLASS_REJECTED")):
+            text = SPAWN.decode().replace(f'"{field}":' + ('"local"' if field == "runner" else "false" if field == "cache_hit" else '""' if field == "status" else "0"), f'"{field}":{value}')
+            with self.subTest(stage=expected): self.assertEqual(expected, stage(execution=text.encode()))
 
     def test_root_phase_output_read_and_shutdown_swaps_fail_closed(self) -> None:
         for change in ("phase_swap", "root_swap", "output_swap", "shutdown_output_swap", "shutdown_root_swap"):

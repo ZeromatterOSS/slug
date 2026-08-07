@@ -17,7 +17,7 @@ from tools.v2_oracle_lib import buildbuddy_prime_diagnostic as cleanup
 REPO_ROOT = cache.REPO_ROOT
 MODE = "buildbuddy-build-cache-prime-output-semantics-probe"
 CLASSES = frozenset(("STAGE_RECORDED", "SANITIZER_REJECTED"))
-STAGES = frozenset(("NOT_RECORDED", "PRECHECK_REJECTED", "SETUP_REJECTED", "PROCESS_NONZERO", "POST_RUN_ANCHOR_REJECTED", "OUTPUT_SCAN_REJECTED", "OUTPUT_MATERIALIZATION_REJECTED", "POST_OUTPUT_ANCHOR_REJECTED", "BEP_DESCRIPTOR_REJECTED", "BEP_PHASE_REJECTED", "EXECUTION_DESCRIPTOR_REJECTED", "EXECUTION_SPAWN_REJECTED", "POST_PARSE_ANCHOR_REJECTED", "PRIME_SEMANTICS_REJECTED", "PRIME_READY"))
+STAGES = frozenset(("NOT_RECORDED", "PRECHECK_REJECTED", "SETUP_REJECTED", "PROCESS_NONZERO", "POST_RUN_ANCHOR_REJECTED", "OUTPUT_SCAN_REJECTED", "OUTPUT_MATERIALIZATION_REJECTED", "POST_OUTPUT_ANCHOR_REJECTED", "BEP_DESCRIPTOR_REJECTED", "BEP_PHASE_REJECTED", "EXECUTION_DESCRIPTOR_REJECTED", "EXECUTION_SPAWN_REJECTED", "POST_PARSE_ANCHOR_REJECTED", "PRIME_OUTCOME_REJECTED", "PRIME_PROCESS_COUNTER_REJECTED", "PRIME_BUILD_FINISHED_COUNTER_REJECTED", "PRIME_TARGET_COUNTER_REJECTED", "PRIME_OUTPUT_COUNTER_REJECTED", "PRIME_PERSISTENT_CACHE_REJECTED", "PRIME_ELIGIBLE_SET_REJECTED", "PRIME_CACHE_EXPECTATION_REJECTED", "PRIME_STATUS_EXPECTATION_REJECTED", "PRIME_EXIT_EXPECTATION_REJECTED", "PRIME_REMOTE_HIT_CLASS_REJECTED", "PRIME_OTHER_RUNNER_CLASS_REJECTED", "PRIME_RUNNER_PARTITION_REJECTED", "PRIME_READY"))
 NONZERO_STAGES = frozenset(("PRECHECK_REJECTED", "SETUP_REJECTED", "PROCESS_NONZERO"))
 ZERO_STAGES = STAGES - NONZERO_STAGES - {"NOT_RECORDED"}
 
@@ -91,7 +91,7 @@ def run_probe(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedPr
                                 else:
                                     phase_record["output_count"] = output_count
                                     if not cache._anchored(root, root_id, root_fd, "prime", phase_id, output_fd, output_id): result = record("STAGE_RECORDED", process, "POST_PARSE_ANCHOR_REJECTED")
-                                    else: result = record("STAGE_RECORDED", process, "PRIME_READY" if prime_stage._ready(phase_record, spawns) else "PRIME_SEMANTICS_REJECTED")
+                                    else: result = record("STAGE_RECORDED", process, prime_stage._semantic_stage(phase_record, spawns))
     except ProbeError as error: result = record("STAGE_RECORDED", "NONZERO", error.stage)
     except Exception: result = record()
     finally:
