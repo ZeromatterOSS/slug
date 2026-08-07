@@ -1276,6 +1276,22 @@ logged, or committed; only a token-free confirmation is recorded. No agent
 command, repository change, or live retry occurs before that confirmation.
 After it, a separately reviewed packet may authorize one fresh attempt.
 
+The home-auth decision is accepted by the user's explicit token-free
+confirmation. No home path, line, token, derived value, or effective option was
+inspected or recorded. The confirmation closes only the prior normal-RC drift
+boundary; it does not itself prove connectivity or cache behavior.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-cache-live-evidence-after-home-auth`. From the clean
+decision commit it runs the frozen driver exactly once. This is a fresh packet
+after the user-owned external-state change, not a retry inside either failed
+packet. Accept only the compact `PROVED_CACHE_ONLY` record with exit 0 and empty
+stderr. Any other classification, retained private path, or required repair is
+`REPLAN` with no second attempt. Only owner and scheduling documentation may
+record a successful sanitized result, at most 100 lines in three files; code,
+configuration, raw artifacts, RBE, CI, and target/platform boundaries remain
+unchanged.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
