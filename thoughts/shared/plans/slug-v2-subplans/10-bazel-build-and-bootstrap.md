@@ -1478,6 +1478,52 @@ targets, run Bazel, inspect home RC, contact BuildBuddy, or make a live retry.
 Afterward, prefer the user's authentication-free sibling `../actiond` lane to
 validate the Bazel build through REAPI before returning to hosted cache proof.
 
+The nightly-channel repair is accepted in commit `7f58f3bc…`. The driver now
+passes the exact selector once after its cache profile. Twenty-four focused
+offline tests, Python compilation, six changed lines, diff checks, and
+independent REPLAN review pass; MODULE, RC, locks, manifest, and targets are
+unchanged, and no Bazel or remote command ran.
+
+The user chooses sibling `../actiond` for the first authentication-free REAPI
+build proof. The live sibling is clean at `8a42c3d4…`; Linux x86_64 has writable
+KVM and vhost-vsock devices, but no built worker binary. This newer candidate
+does not replace Stage 7's formal `ca39423b…` pin or count as backend
+acceptance. It is only the Stage 10 developer-build smoke.
+
+Next evidence only `WP-10-m8-actiond-local-reapi-build-evidence`. Create one
+private mode-0700 top root and require loopback port 8980 to be unbound. In the
+clean sibling, use private output base/symlink state and workspace RC with
+system/home RC disabled to build `-c opt`
+`//cmd/linux-actiond:linux-actiond_linux_x86_64`, explicitly clearing BES,
+remote executor/cache, and disk cache and using no remote config. Allow ordinary
+Bzlmod downloads, but no release download, commit switch, or fallback if this
+source build fails. Resolve exactly one canonical executable through same-base
+`cquery` plus `info execution_root`, bounded beneath the private output base.
+
+Start that binary in its own process group on `127.0.0.1:8980` with private
+state, 8192 MiB CAS image, 4096 MiB memory, four CPUs, and 180-second startup
+timeout. Require a live PID and the exact VM gRPC-bridge listening event. Then,
+from a clean Slug scheduling commit that retains `7f58f3bc…` as its accepted
+code ancestor, and a separate fresh output base, run exactly one
+`//app/slug_cli_v2:slug` build with system/home RC disabled; explicit nightly;
+actiond as loopback executor/cache; empty instance/BES/results/disk/downloader;
+remote-only spawn/genrule, no local fallback, no accepted cached actions, no
+local-result upload or cache compression, top-level output download, 900-second
+remote timeout, four jobs, and exact `libc=glibc2.39` plus `requires-bash=`
+properties. Keep BEP and execution JSON private.
+
+Accept only process/BEP/target success, one materialized executable, a nonempty
+SpawnExec sequence, and every spawn exactly runner `remote`, cache miss, empty
+status, and exit zero. Mixed/local/worker/sandbox/cache-hit/unknown execution
+fails closed. On every exit, shut down both private Bazel servers, terminate and
+reap the worker process group with bounded TERM/KILL, verify the port closes,
+delete all private roots/logs, and recheck both repositories clean. Record only
+the fixed summary, exact Slug run HEAD, and candidate actiond commit. Do not use
+home RC, BuildBuddy,
+RBE profiles, persistent state, or raw artifacts; this is local REAPI build
+evidence, not BuildBuddy cache proof. After the run only owner/canonical/current
+docs may record the result, at most 120 changed lines.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
