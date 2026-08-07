@@ -2262,6 +2262,26 @@ the fixed transport envelope, empty CLI stderr, and normalized compact gate
 record. No retry, raw/home/artifact/service access, code/config edit, broad gate,
 or RBE claim.
 
+The single paired invocation from clean `d9f14877…` delivers outer/child zero,
+empty child stderr, and fixed `PROVED_BUILD_CACHE`. Both phases have process,
+BuildFinished, target, and output counts one, zero persistent action-cache and
+spawn errors, and the same 877-action digest multiset. Prime records 877
+`linux-sandbox` cache misses; replay records 877 remote-cache hits and no local,
+worker, sandbox, or other eligible runners. Afterward there are zero matching
+output-base processes, reserved roots, or `slugd`, and Git is clean. No raw,
+home, artifact, invocation, or service data was inspected. This proves only the
+one build-label cache vertical.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-rbe-vertical-implementation`. Add a separate
+stdlib RBE library/CLI/tests at 260/20/300 and 580 total lines. Use the exact-
+hash checked-in managed Linux/amd64 profile, one fresh output base, disabled
+cache reads/local-result uploads, top-level output materialization, private BEP/
+execution logs, and all-SpawnExec structured classification. Reuse hardened
+parsing/filesystem primitives without changing the accepted cache gate. Offline
+tests and independent schema/privacy/lifecycle review only; no Bazel, network,
+home RC, artifact, service, config, target, or fixture access/change.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
