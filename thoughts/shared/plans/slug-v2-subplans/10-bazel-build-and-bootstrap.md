@@ -2105,6 +2105,18 @@ fixed descriptor/stream/spawn/execution-ready stages. Never read BEP or traverse
 output. Offline tests and independent review only; no Bazel/home RC/network/
 live artifact or existing-file edit.
 
+The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
+17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
+pass; independent review accepts private dual-artifact setup, replacement-aware
+execution reads, lazy first-failure order, no BEP/output access, and lifecycle.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-execution-stage-probe-transported-live-evidence`.
+Invoke the frozen CLI exactly once through the accepted anonymous transport and
+retained-session polling with inherited environment. Review only the fixed
+envelope, empty child stderr, and normalized stage. No retry, raw/home/artifact/
+service access, code/config edit, or cache/RBE claim.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
