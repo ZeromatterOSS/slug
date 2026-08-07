@@ -1595,6 +1595,35 @@ configuration or raw artifacts, invoke RBE, or change code/config/CI/targets.
 Only owner/canonical/current documentation may record the result, at most 100
 lines in three files.
 
+That packet returns `REPLAN` after its single frozen driver invocation from
+clean head `df7fe87d…`. The compact record binds Bazel 9.2.0, Linux x86_64,
+the exact manifest/root-RC hashes, and the clean head. Prime and replay both
+report process and BuildFinished exit 2/name `COMMAND_LINE_ERROR`, fixed class
+`MISSING_FAILURE_DETAIL`, zero completed targets/tests, zero eligible spawns,
+and zero cache hits. Classification is `COMMAND_LINE_FAILURE`, stderr is empty,
+all private roots are absent, Git and daemon checks pass, and no retry occurred.
+This proves only a second pre-target command-line boundary; it proves neither
+analysis/execution nor BuildBuddy connectivity/cache reuse.
+
+The repaired driver contains the nightly selector exactly once in its pinned
+location, while Bazel's failed BuildFinished again omits the only structured
+failure detail. No checked-in command repair follows from the sanitized record,
+and another identical driver invocation cannot add evidence. A static review
+also found that the implementation currently requires prime eligible runners
+to be exactly `local`, while its accepted design admits `local`, `worker`, and
+`linux-sandbox`; this latent classifier drift was not exercised and did not
+cause the pre-spawn failure, but must be separately resolved before a later
+live cache retry.
+
+Next decision only
+`WP-10-m8-bazel-buildbuddy-command-stderr-user-decision-after-nightly-repair`.
+The user may privately run the frozen token-free minimal reproduction with the
+nightly selector and report only `minimal succeeds` or a token-free paraphrase
+naming the offending option/failure kind. No raw output, header/token, path,
+value, RC content, URL, or log may be pasted. No agent runs Bazel, reads stderr
+or home configuration, contacts BuildBuddy, changes the repository, or makes a
+cache/RBE claim before the response. RBE remains behind cache evidence.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
