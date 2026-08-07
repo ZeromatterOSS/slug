@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload owns all 14 shared fixture workspaces; normal-RC minimal and remote-only-profile builds succeed; the fail-closed build-only cache driver is accepted | Run its single sanitized live cache pair, prove structured build-only RBE, then expand to the full 43-test gate before core host-tool owners and self-hosting | `WP-10-m8-bazel-buildbuddy-build-cache-vertical-live-evidence` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload owns all 14 shared fixture workspaces; normal-RC minimal and remote-only-profile builds succeed; the build-only cache gate failed closed with clean lifecycle | Add a metadata-only prime artifact probe for the opaque incomplete-evidence boundary, then resume structured cache/RBE proof and the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-cache-prime-artifact-probe-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-build-cache-vertical-live-evidence`.
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-artifact-probe-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

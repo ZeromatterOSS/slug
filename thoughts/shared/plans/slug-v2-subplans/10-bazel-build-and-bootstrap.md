@@ -1829,6 +1829,32 @@ BuildBuddy UI data, or invocation URLs. This proves at most one build-label
 cache vertical; structured build-only RBE proof and then expansion to all 43
 accepted test targets remain mandatory successors.
 
+The single live cache pair from clean head `1a4ca52c…` returns `REPLAN`. The
+frozen CLI exits one with empty stderr and the sole fixed classification
+`EVIDENCE_INCOMPLETE`; its closed prime/replay summaries remain conservative
+and empty. The exact temporary root is absent afterward, Git remains clean,
+and no `slugd` exists. No terminal/BEP/execution or home-RC content was read,
+and no retry, cause inference, cache claim, or RBE claim is allowed.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-artifact-probe-implementation`.
+Add a separate stdlib library/CLI and tests that reuse the accepted cache
+command exactly for one mocked prime but never read any output or evidence
+contents. After process return it may expose only fixed `ZERO|NONZERO` process
+and `PRIVATE_REGULAR|NOT_PRIVATE_REGULAR` BEP/execution metadata classes, using
+precreated identities and no-follow checks. Its deep-normalized closed schema
+also contains only schema version one, fixed
+`buildbuddy-build-cache-prime-artifact-probe` mode, and
+`PROBE_RECORDED|SANITIZER_REJECTED`; rejection uses conservative fixed values.
+Reuse clean-Git/no-`slugd`, RC-disabled shutdown, retained-root identity, and
+exact cleanup. Add only the library (220 lines), CLI (35), and test (260): 515
+lines maximum. Mocked tests cover all eight combinations, malicious schema,
+symlink/hardlink/replacement, no-read enforcement, command reuse, cleanup and
+secret suppression. Offline tests/compilation/caps/diff and independent review
+only; do not invoke Bazel/home RC/remote service or edit the accepted gate.
+A separate packet owns one live probe; structured cache/RBE and the 43-test
+expansion remain required.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

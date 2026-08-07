@@ -1,29 +1,43 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-vertical-live-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-artifact-probe-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one sanitized BuildBuddy build-cache prime/replay result.
+Result: a fail-closed metadata-only prime artifact probe.
 
-## Goal and required evidence
+## Goal and required design
 
-From the clean scheduling commit, invoke exactly once:
+Add only:
 
-```sh
-python3 tools/v2_oracle/buildbuddy_build_cache_gate.py
-```
+- `tools/v2_oracle_lib/buildbuddy_build_cache_artifact_probe.py` (220 lines),
+- `tools/v2_oracle/buildbuddy_build_cache_artifact_probe.py` (35), and
+- `tests/v2_oracle/test_buildbuddy_build_cache_artifact_probe.py` (260).
 
-Inherit the process environment unchanged. The driver invokes Bazel twice with ordinary RC discovery so only Bazel consumes the user's authentication-only home RC.
-Never inspect, print, copy, expand, or persist that RC, its token, or any derived authentication value; do not set or inspect `HOME`.
+The probe reuses `buildbuddy_build_cache.command(...)` exactly for one mocked
+prime invocation and its existing label/vector. It precreates private BEP and
+execution files, never opens or reads any terminal or evidence contents, and
+after the process returns checks only retained-identity no-follow metadata:
+`PRIVATE_REGULAR` or `NOT_PRIVATE_REGULAR`. Reuse existing clean-Git/no-`slugd`,
+RC-disabled shutdown, retained-root identity, and exact-root cleanup patterns.
 
-Review only the CLI exit status, empty CLI stderr, and its single compact closed JSON record. Accept only exit zero and `PROVED_BUILD_CACHE` with schema version 1,
-fixed `buildbuddy-build-cache-only` mode, and the frozen fixed-key phase summaries. The driver itself requires fresh bases, successful builds/materialization,
-a nonempty matching eligible digest multiset, prime local misses, replay remote-cache hits, zero persistent action-cache hits, clean Git/no-`slugd`, RC-disabled shutdown, and exact private-root cleanup.
+The closed record has exactly `schema_version=1`, fixed mode
+`buildbuddy-build-cache-prime-artifact-probe`, classification
+`PROBE_RECORDED|SANITIZER_REJECTED`, process `ZERO|NONZERO`, and BEP/execution
+`PRIVATE_REGULAR|NOT_PRIVATE_REGULAR`. A rejected record uses fixed conservative
+values. Never emit an exit code, path, size, time, raw byte, command, nonce,
+hostname, RC/auth value, exception, or artifact-derived value. The CLI deeply
+normalizes the schema, writes one compact JSON line, and keeps stderr empty.
 
 ## Stops and budget
 
-Do not read private terminal/BEP/execution artifacts, invocation URLs, home RC, or BuildBuddy UI data. Do not retry, bisect, modify code/configuration, or reinterpret any non-accepting class.
-A nonzero CLI status, nonempty stderr, schema surprise, any class other than `PROVED_BUILD_CACHE`, retained state, Git drift, or daemon/cleanup failure is `REPLAN`.
+Mocked offline tests cover all eight recorded combinations, wrong/hostile
+schema, symlink/hardlink/replacement, proof that artifacts are never read,
+exact command reuse, cleanup/shutdown/Git/daemon failures, and secret
+suppression. Run only focused tests, Python compilation, caps/diff checks, and
+independent review. Do not invoke Bazel, ordinary/home RC, or a remote service;
+do not edit the accepted gate, `.bazelrc`, targets, manifest, or other files.
 
-Afterward only owner/canonical/current scheduling docs may record the fixed result, at most 100 changed lines across three files. This packet can prove only one build-label cache vertical.
-Structured build-only RBE proof, expansion of the validated driver to the complete 43-test manifest/invariants, and the rest of Stage 10 remain required successors.
+Stop at `REPLAN` if any raw read, exact exit/metadata exposure, cache-gate schema
+change, cap breach, or second material correction is required. A separate
+packet owns one probe invocation. Structured build-only cache/RBE evidence,
+the full 43-test expansion, and the rest of Stage 10 remain required.
