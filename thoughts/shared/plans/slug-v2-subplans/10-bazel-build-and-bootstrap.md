@@ -2003,6 +2003,21 @@ empty CLI stderr, exact argv, and unchanged gate. Offline tests/compile/caps/
 diff and independent review only; no Bazel/home RC/network or gate edit. One
 later packet owns one probe; cache/RBE and 43-test expansion remain required.
 
+The fixed-enum one-prime stage probe is accepted in `a5eb73d7…` at 114 library,
+17 CLI, 126 test, and 257 total lines. Its six focused tests and the 35-test
+related regression set pass; independent review accepts its outcome check,
+canonical stage/process matrix, strict BEP/replacement-aware execution readers,
+frozen-gate assertion, and fail-closed lifecycle.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-live-evidence`. From a
+clean scheduling commit, invoke the frozen CLI exactly once with the inherited
+environment and ordinary Bazel RC discovery. Bazel alone may consume the
+private home RC. Review only CLI status, empty stderr, and its fixed compact
+JSON; never inspect or retain home-RC, terminal, BEP, execution, invocation, or
+remote-service data. Do not retry or modify code/config. Record the fixed stage
+and follow its predeclared route; cache/RBE and 43-test expansion remain open.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
