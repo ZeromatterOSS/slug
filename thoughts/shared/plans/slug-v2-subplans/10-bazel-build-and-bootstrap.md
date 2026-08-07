@@ -2186,6 +2186,30 @@ environment. Review only the fixed transport envelope, empty guard stderr,
 `LIFECYCLE_CLEAN`, and its normalized nested semantic stage. No retry, raw/
 home/artifact/service access, code/config edit, or cache/RBE claim.
 
+The single guarded invocation from clean `7ab0b0a7…` delivers outer/guard zero,
+empty guard stderr, `LIFECYCLE_CLEAN`, and nested fixed
+`PRIME_CACHE_EXPECTATION_REJECTED`. Afterward there are zero matching
+output-base processes, reserved roots, or `slugd`, and Git is clean. No raw,
+home, artifact, invocation, or service data was inspected. This proves only
+that the prime execution log records at least one cache-state mismatch.
+
+Pinned Bazel 9.2 source closes the repair direction. `SpawnExec.cache_hit` is a
+proto3 boolean; `ExpandedSpawnLogContext` always sets it, and the execution-log
+JSON printer uses `alwaysPrintFieldsWithNoPresence`, so false remains explicit.
+`RemoteOptions` defaults cache reads on and `RemoteExecutionService` uses that
+option in its read policy. The one-label command omitted the already-designed
+prime override, so parser defaulting would weaken exact evidence rather than
+repair the command.
+
+Next repair only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-disable-cache-reads-repair`. Add
+exactly `--noremote_accept_cached` to the one-prime command and pin its position,
+strict cache-field matrix, and source-faithful prime readiness. Update only four
+shared-source digest assertions. Six files, at most four production and 50 test
+changed lines. Do not change parsers, schema, stages, lifecycle, RC/config,
+fixtures, or any other option. Offline tests and independent source review only;
+no Bazel, network, home RC, live artifact, or service access.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware

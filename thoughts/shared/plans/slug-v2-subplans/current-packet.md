@@ -1,35 +1,39 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-semantic-branch-discriminator-transported-live-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-disable-cache-reads-repair`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one lifecycle-clean fixed prime semantic branch.
+Result: one source-reviewed cache-read-disabled prime command.
 
 ## Goal and required evidence
 
-From the clean scheduling commit, confirm only fixed counts: zero direct
-`slug-buildbuddy-prime-*` temporary entries, clean Git, and no `slugd`. Use the
-accepted in-memory wrapper to invoke exactly one child with repository cwd,
-`env` omitted, `shell=False`, and anonymous `TemporaryFile` stdout/stderr:
+Edit only:
 
-```sh
-python3 tools/v2_oracle/buildbuddy_build_cache_prime_lifecycle_guard.py
-```
+- `tools/v2_oracle_lib/buildbuddy_build_cache.py`
+- `tests/v2_oracle/test_buildbuddy_build_cache_gate.py`
+- `tests/v2_oracle/test_buildbuddy_build_cache_prime_stage_probe.py`
+- `tests/v2_oracle/test_buildbuddy_build_cache_prime_bep_stage_probe.py`
+- `tests/v2_oracle/test_buildbuddy_build_cache_prime_execution_stage_probe.py`
+- `tests/v2_oracle/test_buildbuddy_build_cache_prime_output_semantics_probe.py`
 
-The wrapper bounds stdout at 2 KiB, requires empty stderr, validates exact
-normalized/canonical guard JSON, and emits only the fixed transport envelope.
-Retain and poll one session ID; never start another command. The outer wrapper,
-guard, output-semantics child, and Bazel inherit the environment unchanged, so
-only Bazel may consume private ordinary/home RC. Never inspect raw child,
-RC/token, BEP/execution, temporary contents, invocation, or service data.
+Add exactly one `--noremote_accept_cached` argument immediately after
+`--config=buildbuddy-cache` in the one-prime command. Do not add upload, async,
+replay, executor, BES, disk-cache, strategy, or other overrides. Pin the exact
+argument once and preserve every existing command argument and order otherwise.
+
+Keep `cache_hit` strict. Bazel 9.2 `ExpandedSpawnLogContext` sets the proto3
+boolean on every logged spawn, and its `JsonOutputStreamWrapper` selects
+`JsonFormat.printer().alwaysPrintFieldsWithNoPresence()`. Therefore prime false
+is source-faithfully explicit. Test prime false accepted; prime true, absent,
+null, string, zero, and one rejected; replay true accepted and replay false
+rejected. A source-faithful false prime reaches `PRIME_READY`. Update only the
+four frozen shared-source digest assertions made stale by the command change.
 
 ## Stops and budget
 
-Do not reissue, inspect artifacts, or modify code/config. Session loss, invalid
-envelope, nonempty guard stderr, sanitizer result, cleanup/Git/daemon drift, or
-raw exposure is `REPLAN`. `DELIVERED` accepts transport only. Only
-`LIFECYCLE_CLEAN` permits routing by the nested stage. `PRIME_READY` advances to
-replay-only cache evidence. Process/build-finished/output/runner-partition
-rejections are contract contradictions and `REPLAN`; each other fixed rejection
-gets one corresponding narrow source/design route without retry or cache/RBE
-claim. Recheck only fixed root/process/daemon/Git counts afterward.
+Stay within four production and 50 test changed lines. Run all
+`test_buildbuddy_build_cache*.py` modules, focused cache-field/command tests,
+`py_compile`, exact scope/line caps, and `git diff --check`, then independent
+pinned-source review. No parser, schema, stage, lifecycle guard, CLI, RC/config,
+fixture, docs, unrelated option, Bazel, network, home RC, live artifact, or
+service access. A later guarded live packet is scheduled only after acceptance.
