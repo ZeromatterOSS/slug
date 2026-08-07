@@ -1879,6 +1879,35 @@ plus any unusable artifact to `REPLAN`; and `ZERO` plus both usable artifacts
 to a strictly allowlisted parser-discriminator design. Any lifecycle/schema
 failure is `REPLAN`. Structured RBE and the 43-test expansion remain required.
 
+The one-shot metadata probe from clean head `bb1f169d…` is accepted with exit
+zero, empty stderr, and fixed record `ZERO` / `PRIVATE_REGULAR` BEP /
+`NOT_PRIVATE_REGULAR` execution. The private root is absent afterward, Git is
+clean, and no `slugd` exists. No artifact/home-RC content was read and no retry
+or cache/RBE claim occurred. This isolates the prior failure to the requested
+execution-artifact ownership contract after a successful prime process.
+
+Pinned Bazel 9.2 source at `8220c619…` resolves that contract:
+`ExpandedSpawnLogContext.java` lines 106-130 makes JSON require conversion,
+deletes a preexisting output, and writes through a temporary path; lines
+291-316 create the converted final output and may emit zero records.
+`ExecutionOptions.java` lines 420-436 defines JSON entries as executed spawns.
+Therefore retained inode identity is invalid for this artifact, while an empty
+final regular file remains source-permitted.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-prime-execution-artifact-contract-implementation`.
+Add separate stdlib library/CLI/tests (190/35/270 lines; 495 total) that reuse
+the frozen prime command and classify only process `ZERO|NONZERO` plus final
+execution metadata `ANCHORED_PRIVATE_NONEMPTY|ANCHORED_PRIVATE_EMPTY|
+NOT_ANCHORED_PRIVATE`. Through the retained private phase descriptor, accept a
+replaced or retained direct-child file only when regular, mode 0600, and single-
+link; never open/read/hash content or expose size/inode/path. Deep-normalize the
+fixed schema and reuse exact cleanup/shutdown/Git/daemon guards. Mock all
+replacement/retention/empty/link/mode/directory/swap and hostile-output cases.
+Offline tests/compilation/caps/diff and independent review only; do not invoke
+Bazel/home RC/remote service or edit accepted files. One later packet owns one
+live probe; structured cache/RBE and 43-test expansion remain mandatory.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

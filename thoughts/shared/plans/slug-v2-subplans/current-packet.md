@@ -1,39 +1,39 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-artifact-probe-live-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-prime-execution-artifact-contract-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one sanitized metadata-only prime artifact result.
+Result: a pinned-source execution-artifact replacement contract.
 
-## Goal and required evidence
+## Goal and required design
 
-From the clean scheduling commit, invoke exactly once:
+Add only `buildbuddy_build_cache_execution_artifact_probe.py` as library (190 lines), CLI (35), and tests (270) under the matching existing directories: 495 lines maximum.
 
-```sh
-python3 tools/v2_oracle/buildbuddy_build_cache_artifact_probe.py
-```
+Bazel 9.2 `ExpandedSpawnLogContext` lines 106-130 and 291-316 at pinned commit `8220c619…` require JSON conversion, delete a preexisting output, and create the
+final output while closing the converter. `ExecutionOptions` lines 420-436 define it as executed-spawn records, so an empty final file is possible. Reuse the
+exact frozen prime command but accept this source-required execution-file inode replacement only inside the retained private root/phase.
 
-Inherit the environment unchanged so only Bazel consumes ordinary/home RC.
-Never inspect, print, copy, or persist that RC/token, `HOME`, terminal or
-artifact contents, invocation URLs, or BuildBuddy UI data. Review only CLI
-status, empty stderr, and one compact normalized JSON record. Accept the probe
-only for exit zero, fixed mode/schema, and `PROBE_RECORDED`.
+Precreate mode-0600 execution evidence, then inspect only its final direct-child
+metadata through the retained phase descriptor. Symlink, hardlink, directory,
+bad mode, or lost root/phase identity is `NOT_ANCHORED_PRIVATE`; a single-link
+regular mode-0600 file is `ANCHORED_PRIVATE_NONEMPTY` or
+`ANCHORED_PRIVATE_EMPTY`. Never open/read/hash content or expose exact metadata.
 
-The only payload values are process `ZERO|NONZERO` and BEP/execution
-`PRIVATE_REGULAR|NOT_PRIVATE_REGULAR`. The latter requires a nonempty retained
-private identity but exposes no exact metadata. The probe owns RC-disabled
-shutdown, original-inode cleanup, Git cleanliness, and no-`slugd`.
+The closed deep-normalized record has exactly schema version one, fixed mode
+`buildbuddy-build-cache-prime-execution-artifact-probe`, classification
+`PROBE_RECORDED|SANITIZER_REJECTED`, process `ZERO|NONZERO`, and the execution
+enum above. Rejection uses fixed conservative values. Reuse descriptor-safe
+shutdown/original-inode cleanup and clean-Git/no-`slugd` guards.
 
 ## Stops and budget
 
-Do not retry, inspect artifacts, diagnose a flag, modify code/config, or claim
-cache/RBE. Any CLI/schema/stderr/lifecycle failure is `REPLAN`. Route a recorded
-result only by its four fixed values: `NONZERO` plus any unusable artifact goes
-to a user-owned token-free environment decision; `NONZERO` plus two usable
-artifacts to a separately designed failure-detail sanitizer; `ZERO` plus any
-unusable artifact to `REPLAN`; and `ZERO` plus two usable artifacts to a
-separate strictly allowlisted parser-discriminator design.
+Offline mocked tests cover exact command reuse; retained/replaced empty/nonempty
+regular files; missing/symlink/hardlink/bad-mode/directory; phase/root swaps;
+no-open/read enforcement; hostile schema; cleanup/shutdown/Git/daemon failures;
+and secret suppression. Run focused tests, compilation, caps/diff, and
+independent review only. Do not invoke Bazel, normal/home RC, remote services,
+or edit the accepted gate/probes/config/targets/docs.
 
-Afterward only owner/canonical/current docs may record the fixed result, at most
-100 changed lines. Structured build-only cache/RBE evidence, the full 43-test
-expansion, and the rest of Stage 10 remain required.
+Stop on any need to accept links, relax mode/single-link constraints, read
+bytes, expose metadata, or make a cache/RBE claim. A separate packet owns one
+live probe. Structured cache/RBE, 43-test expansion, and Stage 10 remain open.
