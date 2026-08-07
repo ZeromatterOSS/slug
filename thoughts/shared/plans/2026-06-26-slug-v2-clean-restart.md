@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload now owns all 14 shared fixture workspaces with exact Cargo/Bazel compile embedding, two 403-command Bazel 9.2 sweeps, and the sole user-deferred cycle negative gate; the user-approved BuildBuddy Cloud profiles and independently accepted secret-safe cache driver freeze cache prime/replay collection; checked-in flags parse offline, auth-only home RC is confirmed without exposure, and complete structured diagnosis proves Bazel omitted failure detail for the pre-target command error | Live cache/RBE evidence, core host-tool owners, and self-hosting remain | `WP-10-m8-bazel-buildbuddy-command-stderr-user-decision` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload now owns all 14 shared fixture workspaces with exact Cargo/Bazel compile embedding, two 403-command Bazel 9.2 sweeps, and the sole user-deferred cycle negative gate; the user-approved BuildBuddy Cloud profiles and independently accepted secret-safe cache driver freeze cache prime/replay collection; the token-free minimal reproduction reaches analysis and exposes the cache driver's omitted nightly channel selector | Live cache/RBE evidence, core host-tool owners, and self-hosting remain | `WP-10-m8-bazel-buildbuddy-nightly-channel-repair` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-command-stderr-user-decision`.
+`WP-10-m8-bazel-buildbuddy-nightly-channel-repair`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

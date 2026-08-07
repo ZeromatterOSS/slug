@@ -1453,6 +1453,31 @@ cache claim is made. The response determines whether the next bounded packet
 repairs a checked-in command option or records an external home/service
 boundary.
 
+The user decision is accepted from a token-free terminal diagnostic. The
+minimal cache-profile invocation parses ordinary/home RC state and reaches
+analysis, where `//app/slug_cli_v2:slug` fails because no registered
+`@@rules_rust+//rust:toolchain_type` matches. No header, token, invocation URL,
+or home-RC content was provided or recorded, and this result makes no cache or
+connectivity claim.
+
+The repository already registers `@rust_toolchains//:all` from the sole
+`nightly/2025-09-14` extension tag. The accepted Stage 10 boundary requires
+local commands to pass `--@rules_rust//rust/toolchain/channel=nightly` because
+rules_rust defaults the channel selector to stable. The frozen cache driver
+omitted that selector.
+
+Next repair only `WP-10-m8-bazel-buildbuddy-nightly-channel-repair`. Add the
+exact channel flag once to `command()` immediately after
+`--config=buildbuddy-cache`, and pin its spelling, uniqueness, and order in the
+existing command test. Change only
+`tools/v2_oracle_lib/buildbuddy_cache.py` (at most 5 changed lines) and
+`tests/v2_oracle/test_buildbuddy_cache_gate.py` (at most 15), at most 20 total.
+Run only the focused offline unit test, Python compilation, cap/diff checks,
+and independent REPLAN review. Do not change MODULE/lock/config/manifest/
+targets, run Bazel, inspect home RC, contact BuildBuddy, or make a live retry.
+Afterward, prefer the user's authentication-free sibling `../actiond` lane to
+validate the Bazel build through REAPI before returning to hosted cache proof.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
