@@ -2062,6 +2062,22 @@ invoke the frozen BEP CLI exactly once with inherited environment. Review only
 the fixed envelope, empty child stderr, and normalized fixed-stage record. No
 retry, raw/home/artifact/service access, code/config edit, or cache/RBE claim.
 
+The transported BEP invocation from clean `b4ffdf58…` delivers outer/child zero,
+empty child stderr, and fixed `BEP_COUNTER_REJECTED`; cleanup, Git, and no-`slugd`
+are green. Pinned Bazel 9.2 `JsonFormatFileTransport` uses protobuf 33.4 JSON
+without default-value inclusion. Both touched fields are `int32`: nonzero values
+are JSON numbers, while successful `BuildFinished.ExitCode.code == 0` is omitted.
+`ActionCacheStatistics.hits` already defaults an absent field correctly; no live
+artifact was needed or inspected.
+
+Next repair only `WP-10-m8-bazel-buildbuddy-bep-zero-default-repair`. In the
+gate and BEP probe only, default absent exit `code` to integer zero before the
+unchanged strict counter validator. Update only their focused tests with
+source-faithful omitted-zero fixtures and explicit null/bool/string/negative
+rejections. Four files, at most 12 production/65 test/77 total net lines;
+offline validation and independent review only. No Bazel/home RC/network/live
+artifact/config/schema/command/lifecycle change.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
