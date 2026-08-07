@@ -49,6 +49,9 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
     def test_command_hardens_cache_only_and_shares_nonce(self) -> None:
         argv = gate.command("prime", "bazel", Path("/private/output"), Path("/private/bep"), Path("/private/log"), "secret", ("//a:b",))
         self.assertIn("--config=buildbuddy-cache", argv)
+        nightly = "--@rules_rust//rust/toolchain/channel=nightly"
+        self.assertEqual(1, argv.count(nightly))
+        self.assertEqual(["test", "--config=buildbuddy-cache", nightly], argv[2:5])
         self.assertIn("--remote_cache=grpcs://remote.buildbuddy.io", argv)
         self.assertIn("--remote_instance_name=", argv)
         self.assertIn("--remote_executor=", argv)
@@ -243,6 +246,7 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         self.assertEqual(["bazel", "--ignore_all_rc_files", "version"], calls[0])
         tests = [argv for argv in calls if len(argv) > 2 and argv[2] == "test"]
         self.assertEqual(2, len(tests))
+        self.assertTrue(all(argv[4] == "--@rules_rust//rust/toolchain/channel=nightly" and argv.count(argv[4]) == 1 for argv in tests))
         nonces = [{item for item in argv if "CACHE_GATE_NONCE=" in item} for argv in tests]
         self.assertEqual(nonces[0], nonces[1])
         self.assertEqual(2, len([argv for argv in calls if argv[-1] == "shutdown"]))
