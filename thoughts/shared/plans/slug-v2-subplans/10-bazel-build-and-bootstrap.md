@@ -2091,6 +2091,20 @@ transport with retained-session polling and inherited environment. Review only
 the fixed envelope, empty child stderr, and normalized stage. No retry,
 raw/home/artifact/service access, code/config edit, or cache/RBE claim.
 
+The repaired transported BEP invocation from clean `91a0b8fb…` delivers
+outer/child zero, empty child stderr, and fixed `BEP_READY`; its private root is
+absent afterward, Git is clean, and no `slugd` exists. No raw/home/artifact/
+service data was inspected. This proves only the BEP portion of prime parsing.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-execution-stage-probe-implementation`.
+Add separate stdlib library/CLI/tests at 180/30/220 and 430 total lines. Reuse
+the exact command, replacement-aware execution reader, anchors, shutdown,
+cleanup, Git, and daemon guards. Preserve lazy first-failure order and emit only
+fixed descriptor/stream/spawn/execution-ready stages. Never read BEP or traverse
+output. Offline tests and independent review only; no Bazel/home RC/network/
+live artifact or existing-file edit.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
