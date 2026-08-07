@@ -2420,6 +2420,23 @@ without changing full-cache or one-label code. Offline tests and independent
 schema/privacy/lifecycle review only; no Bazel, network, home RC, artifact,
 service, config, manifest, target, or fixture access/change.
 
+The full-RBE driver is accepted in `d7faa2f7…` at 140 library, 20 CLI, 184 test,
+and 344 total lines. Eight focused and 100 complete offline BuildBuddy tests pass
+with compile, scope, cap, and diff gates. Independent review accepts exact command
+composition, immutable manifest and singleton/default BEP reuse, strict all-
+SpawnExec accounting, closed head/platform/schema bindings, distinct full-RBE
+namespace, replacement-safe private artifacts/output, cleanup suppression, and
+canonical CLI. No existing file changed.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-full-cache-transported-live-evidence`. Invoke the
+frozen full-cache CLI exactly once through anonymous bounded transport with an
+8 KiB stdout cap, retained-session polling, and inherited environment. Accept
+only outer/child zero, empty stderr, `DELIVERED`, exact `PROVED_CACHE_ONLY`, and
+clean cache-root/process/daemon/Git lifecycle. This one CLI owns two serialized
+Bazel children. No retry, raw/home/artifact/UI/service access, code/config edit,
+or RBE invocation; any non-proof stops before the full-RBE live packet.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
