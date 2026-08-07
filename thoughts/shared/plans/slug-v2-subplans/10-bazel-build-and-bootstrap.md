@@ -1746,6 +1746,30 @@ and the closed JSON schema. Run only focused offline tests, Python compilation,
 caps/diff checks, and independent review; no Bazel, ordinary/home RC, remote
 call, or live evidence. A later packet owns one sanitized normal-RC invocation.
 
+The sanitizer implementation is accepted in commit `ec8ec2d7…`: 423 lines in
+the exact three-file scope. It reuses the frozen one-label prime argv, generates
+one private nonce, reads only regular no-follow bounded stderr on exit two,
+recognizes only the five whole-payload pinned-source shapes, normalizes every
+record/CLI return through the closed schema, and owns RC-disabled shutdown plus
+descriptor-anchored exact-root cleanup. Eight focused synthetic/mocked tests,
+Python compilation, caps, diff checks, and independent privacy/lifecycle review
+pass, including malicious return, FIFO/symlink stderr, read-only cleanup, and
+root/nested-directory swap regressions. No Bazel, normal/home RC, or remote
+command ran.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-prime-normal-rc-sanitized-stderr-evidence`. From the
+clean implementation commit, run
+`python3 tools/v2_oracle/buildbuddy_prime_diagnostic.py` exactly once with the
+inherited environment. Only Bazel may consume ordinary/home RC. Review only the
+single compact JSON object, CLI status, and empty CLI stderr; never inspect home
+RC or private/raw artifacts. Accept a diagnosis only for exit-zero CLI result,
+classification `NORMAL_RC_PRIME_DIAGNOSED`, and one of the five frozen fixed
+IDs, then schedule one bounded checked-in option repair. Any other class/status,
+schema surprise, retained root, Git/daemon drift, or cleanup failure is
+`REPLAN` without retry, bisection, code/config change, or cache/RBE claim. Only
+owner/canonical/current docs may record the fixed result, at most 100 lines.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
