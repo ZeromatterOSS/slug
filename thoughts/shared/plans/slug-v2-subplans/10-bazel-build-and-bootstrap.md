@@ -1770,6 +1770,39 @@ schema surprise, retained root, Git/daemon drift, or cleanup failure is
 `REPLAN` without retry, bisection, code/config change, or cache/RBE claim. Only
 owner/canonical/current docs may record the fixed result, at most 100 lines.
 
+The single sanitized invocation from clean head `d0f4d572…` returns `REPLAN`.
+Its CLI exits one with empty stderr and the sole closed record
+`SANITIZER_REJECTED`/`NONE`; all diagnostic/wrapper roots are absent, Git is
+clean, and no `slugd` remains. No raw/home data was read and no retry occurred.
+Because no public option identifier was emitted, no checked-in repair is
+justified. The old 43-test driver remains unchanged as a later expansion target.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-vertical-implementation`. Add a separate
+stdlib build-only cache driver/CLI/tests. Each phase uses a fresh output base and
+the user-confirmed minimal `bazel build --config=buildbuddy-cache` command with
+nightly, empty executor/BES/results/disk cache, no local fallback, one shared
+fresh 64-hex action-env nonce, private BEP/execution logs, and only
+`//app/slug_cli_v2:slug`. Deliberately omit the failed vector's explicit cache/
+instance, spawn/test strategy, all test flags, publish-all-actions, cache-read/
+upload/async overrides, and test nonce; repository RC/profile/defaults own
+those already-proven settings.
+
+Accept `PROVED_BUILD_CACHE` only when both process/BEP/target results succeed;
+each fresh base contains exactly one executable regular target output matching
+`*/bin/app/slug_cli_v2/slug`; eligible prime runners are exactly `local`,
+`worker`, or `linux-sandbox` and all are cache misses; replay spawns are remote-
+cache hits; nonempty digest multisets
+match; status/exit and persistent-action-cache failures are zero; and private
+cleanup/Git/no-`slugd` pass. Add only
+`tools/v2_oracle_lib/buildbuddy_build_cache.py` (250 lines),
+`tools/v2_oracle/buildbuddy_build_cache_gate.py` (40), and
+`tests/v2_oracle/test_buildbuddy_build_cache_gate.py` (360): 650 lines maximum.
+Offline mocked tests, compilation, caps/diff, and independent privacy/lifecycle
+review only; no Bazel/home/remote invocation. A separate packet owns one live
+pair. The claim remains one build label; structured RBE and then the full
+43-test expansion follow without redefining the final Stage 10 gate.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

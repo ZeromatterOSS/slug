@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload owns all 14 shared fixture workspaces; normal-RC minimal and remote-only-profile builds succeed; the one-label prime exit-two sanitizer is accepted with closed privacy/lifecycle coverage | Run the sanitizer once, repair any fixed option diagnosis, then close live cache/per-spawn RBE evidence, core host-tool owners, and self-hosting | `WP-10-m8-bazel-buildbuddy-prime-normal-rc-sanitized-stderr-evidence` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload owns all 14 shared fixture workspaces; normal-RC minimal and remote-only-profile builds succeed; the strict old-vector sanitizer safely returned no diagnosis | Build a separate successful-command-based Slug build cache vertical, prove build-only cache/RBE, then expand to the full 43-test gate before core host-tool owners and self-hosting | `WP-10-m8-bazel-buildbuddy-build-cache-vertical-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-prime-normal-rc-sanitized-stderr-evidence`.
+`WP-10-m8-bazel-buildbuddy-build-cache-vertical-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
