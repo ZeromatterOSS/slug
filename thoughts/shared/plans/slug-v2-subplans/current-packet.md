@@ -1,56 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-semantic-branch-discriminator-implementation`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-semantic-branch-discriminator-transported-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one offline-reviewed fixed semantic branch discriminator.
+Result: one lifecycle-clean fixed prime semantic branch.
 
 ## Goal and required evidence
 
-Edit only these existing files:
+From the clean scheduling commit, confirm only fixed counts: zero direct
+`slug-buildbuddy-prime-*` temporary entries, clean Git, and no `slugd`. Use the
+accepted in-memory wrapper to invoke exactly one child with repository cwd,
+`env` omitted, `shell=False`, and anonymous `TemporaryFile` stdout/stderr:
 
-- `tools/v2_oracle_lib/buildbuddy_build_cache_prime_stage_probe.py` (145 final)
-- `tools/v2_oracle_lib/buildbuddy_build_cache_prime_output_semantics_probe.py`
-  (140 final)
-- `tests/v2_oracle/test_buildbuddy_build_cache_prime_output_semantics_probe.py`
-  (250 final)
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_prime_lifecycle_guard.py
+```
 
-Stay within 535 final and +125 net lines. Add one ordered `_semantic_stage()`
-helper to the shared prime-stage module, make `_ready()` delegate to it, and
-have the output-semantics probe call the same helper. Preserve every earlier
-process, anchor, output, descriptor, parser, shutdown, cleanup, and privacy
-stage in its existing order.
-
-Expand the current predicate in this exact first-failure order:
-
-1. `PRIME_OUTCOME_REJECTED`
-2. `PRIME_PROCESS_COUNTER_REJECTED`
-3. `PRIME_BUILD_FINISHED_COUNTER_REJECTED`
-4. `PRIME_TARGET_COUNTER_REJECTED`
-5. `PRIME_OUTPUT_COUNTER_REJECTED`
-6. `PRIME_PERSISTENT_CACHE_REJECTED`
-7. `PRIME_ELIGIBLE_SET_REJECTED`
-8. `PRIME_CACHE_EXPECTATION_REJECTED`
-9. `PRIME_STATUS_EXPECTATION_REJECTED`
-10. `PRIME_EXIT_EXPECTATION_REJECTED`
-11. `PRIME_REMOTE_HIT_CLASS_REJECTED`
-12. `PRIME_OTHER_RUNNER_CLASS_REJECTED`
-13. `PRIME_RUNNER_PARTITION_REJECTED`
-14. `PRIME_READY`
-
-Emit only the fixed stage. Do not expose values, counts, paths, hashes, labels,
-raw records, or runner spellings.
+The wrapper bounds stdout at 2 KiB, requires empty stderr, validates exact
+normalized/canonical guard JSON, and emits only the fixed transport envelope.
+Retain and poll one session ID; never start another command. The outer wrapper,
+guard, output-semantics child, and Bazel inherit the environment unchanged, so
+only Bazel may consume private ordinary/home RC. Never inspect raw child,
+RC/token, BEP/execution, temporary contents, invocation, or service data.
 
 ## Stops and budget
 
-Test every semantic branch and ready result through the shared helper, exact
-`_ready()` equivalence, earliest simultaneous failure, parser-driven reachable
-branches, and mocked defensive branches. Preserve output-first short-circuit,
-exact-one executable, private read attacks, anchors, shutdown/cleanup, schema,
-privacy, exact argv, and fingerprint coverage. Remove the coarse semantic stage
-from this probe and pass unchanged prime-stage/BEP/execution/lifecycle-guard/gate
-regressions, `py_compile`, final/net caps, scope, and `git diff --check`.
-Independent review is mandatory because this changes a fixed public stage enum.
-No Bazel, network, home RC, live artifact, service, CLI, guard, parser, gate,
-config, fixture, or unrelated edit. A later guarded live packet is separately
-scheduled only after acceptance.
+Do not reissue, inspect artifacts, or modify code/config. Session loss, invalid
+envelope, nonempty guard stderr, sanitizer result, cleanup/Git/daemon drift, or
+raw exposure is `REPLAN`. `DELIVERED` accepts transport only. Only
+`LIFECYCLE_CLEAN` permits routing by the nested stage. `PRIME_READY` advances to
+replay-only cache evidence. Process/build-finished/output/runner-partition
+rejections are contract contradictions and `REPLAN`; each other fixed rejection
+gets one corresponding narrow source/design route without retry or cache/RBE
+claim. Recheck only fixed root/process/daemon/Git counts afterward.

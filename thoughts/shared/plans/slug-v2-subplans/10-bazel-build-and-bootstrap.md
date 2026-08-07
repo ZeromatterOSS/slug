@@ -2171,6 +2171,21 @@ runner spellings. At most three existing files, 535 final lines, and +125 net
 lines. Offline tests and independent public-enum review only; no Bazel, network,
 home RC, live artifact, service, CLI, guard, parser, gate, config, or fixture edit.
 
+The semantic branch discriminator is accepted in `70b3c84a…` at 134 shared
+predicate, 114 output probe, 187 test, 435 final, and +77 net lines. Nine
+focused and 67 related tests pass with compile, scope, cap, and diff gates.
+Independent correction review accepts exact first-failure coverage, parsed
+non-success BEP routes, shared `_ready` equivalence, ZERO-only fixed stages, and
+unchanged pre-semantic and lifecycle behavior.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-semantic-branch-discriminator-transported-live-evidence`.
+Invoke the unchanged lifecycle-guard CLI exactly once through the accepted
+anonymous bounded outer transport with retained-session polling and inherited
+environment. Review only the fixed transport envelope, empty guard stderr,
+`LIFECYCLE_CLEAN`, and its normalized nested semantic stage. No retry, raw/
+home/artifact/service access, code/config edit, or cache/RBE claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
