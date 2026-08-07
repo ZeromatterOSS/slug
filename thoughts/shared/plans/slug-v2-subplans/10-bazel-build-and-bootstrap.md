@@ -1855,6 +1855,30 @@ only; do not invoke Bazel/home RC/remote service or edit the accepted gate.
 A separate packet owns one live probe; structured cache/RBE and the 43-test
 expansion remain required.
 
+The metadata-only artifact probe is accepted in commit `83262a2c…`: 261 lines
+in the exact three-file scope. Seven offline mocked tests, Python compilation,
+caps/diff checks, and independent privacy/lifecycle review pass. The probe
+reuses the exact build-only prime command, never reads terminal or artifact
+contents, and emits only fixed process and nonempty retained-private-identity
+classes. Deep CLI normalization, all eight combinations, malicious schema,
+evidence symlink/hardlink/replacement, phase/root swaps, no-read enforcement,
+RC-disabled shutdown, original-inode cleanup, and secret suppression are pinned.
+No Bazel, normal/home RC, or remote service was invoked by that packet.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-artifact-probe-live-evidence`.
+From its clean scheduling commit, run
+`python3 tools/v2_oracle/buildbuddy_build_cache_artifact_probe.py` exactly once
+with the inherited environment; only Bazel consumes ordinary/home RC. Review
+only CLI status, empty stderr, and the normalized fixed-schema record. Accept
+only exit zero and `PROBE_RECORDED`; do not retry, read any private contents,
+modify code/config, or claim cache/RBE. Route `NONZERO` plus any unusable
+artifact to a user-owned token-free environment decision; `NONZERO` plus two
+usable artifacts to a separate strict failure-detail sanitizer design; `ZERO`
+plus any unusable artifact to `REPLAN`; and `ZERO` plus both usable artifacts
+to a strictly allowlisted parser-discriminator design. Any lifecycle/schema
+failure is `REPLAN`. Structured RBE and the 43-test expansion remain required.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
