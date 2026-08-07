@@ -7,8 +7,9 @@ Result: exact Bazel 9 ProtoJSON absent-zero compatibility.
 
 ## Goal and required implementation
 
-Edit only the gate/BEP-probe libraries and their focused tests. Change only the
-two exit-code reads to default an absent field before strict validation:
+Edit only the gate/BEP-probe libraries, their focused tests, and the prime-stage
+test's frozen gate-source digest. Change only the two exit-code reads to default
+an absent field before strict validation:
 
 ```python
 _count(exit_data.get("code", 0))
@@ -19,7 +20,7 @@ Pinned Bazel 9.2 uses protobuf 33.4 JSON without default-value inclusion;
 Do not change `_count`, the already-correct omitted `hits` handling, commands,
 schemas, stages, descriptor/lifecycle logic, or any execution/output behavior.
 
-Production is capped at 12 net lines, tests at 65, total 77. Make successful
+Production is capped at 12 net lines, tests at 68, total 80. Make successful
 BEP fixtures omit code zero. Prove gate success and `BEP_READY`; reject supplied
 null, false, true, string `"0"`, negative, subclasses, and malformed values;
 retain valid explicit nonzero remote-error behavior and privacy/schema pins.

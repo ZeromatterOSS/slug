@@ -2072,9 +2072,10 @@ artifact was needed or inspected.
 
 Next repair only `WP-10-m8-bazel-buildbuddy-bep-zero-default-repair`. In the
 gate and BEP probe only, default absent exit `code` to integer zero before the
-unchanged strict counter validator. Update only their focused tests with
-source-faithful omitted-zero fixtures and explicit null/bool/string/negative
-rejections. Four files, at most 12 production/65 test/77 total net lines;
+unchanged strict counter validator. Update their focused tests plus only the
+prime-stage test's frozen gate digest, with source-faithful omitted-zero fixtures
+and explicit null/bool/string/negative rejections. Five files, at most 12
+production/68 test/80 total net lines;
 offline validation and independent review only. No Bazel/home RC/network/live
 artifact/config/schema/command/lifecycle change.
 
