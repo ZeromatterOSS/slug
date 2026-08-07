@@ -1,4 +1,4 @@
-"""Fail-closed, secret-safe BuildBuddy cache evidence collection."""
+"""Closed, manifest-aware BuildBuddy cache prime/replay evidence."""
 from __future__ import annotations
 
 import hashlib
@@ -7,7 +7,6 @@ import os
 import platform
 import re
 import secrets
-import shutil
 import stat
 import subprocess
 import tempfile
@@ -18,91 +17,64 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 MANIFEST_SHA256 = "3a717cb4b0a1f5cab06d336e69d2382861a9c21af9a1502ea20c54b990adf6d5"
 BAZELRC_SHA256 = "e72f4223b6cfffbc96de018849e306ff9cbfdf4ca50248d8fee229a80dc4c805"
 VERSION = "slug-buildbuddy-targets-v1"
-FAILURES = {"CONFIG_DRIFT", "REMOTE_UNAVAILABLE", "COMMAND_LINE_FAILURE", "TARGET_FAILURE", "CACHE_MISS_OR_MIXED_REPLAY", "EVIDENCE_INCOMPLETE", "SANITIZER_REJECTED"}
-COMMAND_FAILURE_CLASSES = {
-    "command": {"OPTIONS_PARSE_FAILURE": "COMMAND_OPTIONS_PARSE", "STARLARK_OPTIONS_PARSE_FAILURE": "COMMAND_STARLARK_OPTIONS_PARSE", "ARGUMENTS_NOT_RECOGNIZED": "COMMAND_ARGUMENTS_NOT_RECOGNIZED", "INVOCATION_POLICY_PARSE_FAILURE": "COMMAND_INVOCATION_POLICY", "INVOCATION_POLICY_INVALID": "COMMAND_INVOCATION_POLICY"},
-    "remoteOptions": {"REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR": "REMOTE_OPTIONS_CONFIGURATION", "DOWNLOADER_WITHOUT_GRPC_CACHE": "REMOTE_OPTIONS_CONFIGURATION", "EXECUTION_WITH_INVALID_CACHE": "REMOTE_OPTIONS_CONFIGURATION"},
-    "remoteExecution": {"CREDENTIALS_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "RPC_LOG_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "EXEC_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "DOWNLOADER_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS": "REMOTE_EXECUTION_CONFIGURATION"},
-    "executionOptions": {"INVALID_STRATEGY": "EXECUTION_OPTIONS_CONFIGURATION", "RESTRICTION_UNMATCHED_TO_ACTION_CONTEXT": "EXECUTION_OPTIONS_CONFIGURATION", "REMOTE_FALLBACK_STRATEGY_NOT_ABSTRACT_SPAWN": "EXECUTION_OPTIONS_CONFIGURATION", "STRATEGY_NOT_FOUND": "EXECUTION_OPTIONS_CONFIGURATION", "DYNAMIC_STRATEGY_NOT_SANDBOXED": "EXECUTION_OPTIONS_CONFIGURATION", "MULTIPLE_EXECUTION_LOG_FORMATS": "EXECUTION_OPTIONS_CONFIGURATION"},
-    "execution": {"EXECUTION_LOG_INITIALIZATION_FAILURE": "EXECUTION_LOG_CONFIGURATION"},
-    "buildConfiguration": {"PLATFORM_MAPPING_EVALUATION_FAILURE": "BUILD_CONFIGURATION", "INVALID_CONFIGURATION": "BUILD_CONFIGURATION", "INVALID_BUILD_OPTIONS": "BUILD_CONFIGURATION", "MULTI_CPU_PREREQ_UNMET": "BUILD_CONFIGURATION", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID": "BUILD_CONFIGURATION", "CYCLE": "BUILD_CONFIGURATION", "CONFLICTING_CONFIGURATIONS": "BUILD_CONFIGURATION", "INVALID_OUTPUT_DIRECTORY_MNEMONIC": "BUILD_CONFIGURATION", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE": "BUILD_CONFIGURATION", "INVALID_PROJECT": "BUILD_CONFIGURATION"},
-}
-B92_FAILURE_DETAIL_CATEGORY_KEYS = frozenset((
-    "interrupted", "externalRepository", "buildProgress", "remoteOptions",
-    "clientEnvironment", "crash", "symlinkForest", "packageOptions",
-    "remoteExecution", "execution", "workspaces", "crashOptions",
-    "filesystem", "executionOptions", "command", "spawn",
-    "grpcServer", "canonicalizeFlags", "buildConfiguration", "infoCommand",
-    "memoryOptions", "query", "localExecution", "actionCache",
-    "fetchCommand", "syncCommand", "sandbox", "includeScanning",
-    "testCommand", "actionQuery", "targetPatterns", "cleanCommand",
-    "configCommand", "configurableQuery", "dumpCommand", "helpCommand",
-    "mobileInstall", "profileCommand", "runCommand", "versionCommand",
-    "printActionCommand", "workspaceStatus", "javaCompile", "actionRewinding",
-    "cppCompile", "starlarkAction", "ninjaAction", "dynamicExecution",
-    "failAction", "symlinkAction", "cppLink", "ltoAction",
-    "testAction", "worker", "analysis", "packageLoading",
-    "toolchain", "starlarkLoading", "externalDeps", "diffAwareness",
-    "modCommand", "buildReport", "skyfocus", "remoteAnalysisCaching",
-))
-B92_EXIT2_SOURCE_PAIRS = (
-    ("externalRepository", "OVERRIDE_DISALLOWED_MANAGED_DIRECTORIES"), ("externalRepository", "BAD_DOWNLOADER_CONFIG"), ("externalRepository", "CREDENTIALS_INIT_FAILURE"), ("externalRepository", "BAD_REPO_CONTENTS_CACHE"), ("externalRepository", "UNKNOWN_REGISTRY"), ("externalRepository", "SYMLINKING_FAILED"),
-    ("buildProgress", "BES_RUNS_PER_TEST_LIMIT_UNSUPPORTED"),
-    ("remoteOptions", "REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR"), ("remoteOptions", "DOWNLOADER_WITHOUT_GRPC_CACHE"), ("remoteOptions", "EXECUTION_WITH_INVALID_CACHE"),
-    ("clientEnvironment", "CLIENT_CWD_MALFORMED"),
-    ("symlinkForest", "TOPLEVEL_OUTDIR_PACKAGE_PATH_CONFLICT"), ("symlinkForest", "TOPLEVEL_OUTDIR_USED_AS_SOURCE"), ("symlinkForest", "CREATION_FAILED"),
-    ("packageOptions", "PACKAGE_PATH_INVALID"), ("packageOptions", "NONSINGLETON_PACKAGE_PATH"),
-    ("remoteExecution", "CREDENTIALS_INIT_FAILURE"), ("remoteExecution", "CACHE_INIT_FAILURE"), ("remoteExecution", "RPC_LOG_FAILURE"), ("remoteExecution", "EXEC_CHANNEL_INIT_FAILURE"), ("remoteExecution", "CACHE_CHANNEL_INIT_FAILURE"), ("remoteExecution", "DOWNLOADER_CHANNEL_INIT_FAILURE"), ("remoteExecution", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD"), ("remoteExecution", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS"),
-    ("execution", "EXECUTION_LOG_INITIALIZATION_FAILURE"),
-    ("workspaces", "WORKSPACES_LOG_INITIALIZATION_FAILURE"),
-    ("filesystem", "DEFAULT_DIGEST_HASH_FUNCTION_INVALID_VALUE"),
-    ("executionOptions", "INVALID_STRATEGY"), ("executionOptions", "RESTRICTION_UNMATCHED_TO_ACTION_CONTEXT"), ("executionOptions", "REMOTE_FALLBACK_STRATEGY_NOT_ABSTRACT_SPAWN"), ("executionOptions", "STRATEGY_NOT_FOUND"), ("executionOptions", "DYNAMIC_STRATEGY_NOT_SANDBOXED"), ("executionOptions", "MULTIPLE_EXECUTION_LOG_FORMATS"),
-    ("command", "COMMAND_NOT_FOUND"), ("command", "INVOCATION_POLICY_PARSE_FAILURE"), ("command", "INVOCATION_POLICY_INVALID"), ("command", "OPTIONS_PARSE_FAILURE"), ("command", "STARLARK_OPTIONS_PARSE_FAILURE"), ("command", "ARGUMENTS_NOT_RECOGNIZED"), ("command", "NOT_IN_WORKSPACE"), ("command", "IN_OUTPUT_DIRECTORY"),
-    ("canonicalizeFlags", "FOR_COMMAND_INVALID"),
-    ("buildConfiguration", "PLATFORM_MAPPING_EVALUATION_FAILURE"), ("buildConfiguration", "INVALID_CONFIGURATION"), ("buildConfiguration", "INVALID_BUILD_OPTIONS"), ("buildConfiguration", "MULTI_CPU_PREREQ_UNMET"), ("buildConfiguration", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID"), ("buildConfiguration", "CYCLE"), ("buildConfiguration", "CONFLICTING_CONFIGURATIONS"), ("buildConfiguration", "INVALID_OUTPUT_DIRECTORY_MNEMONIC"), ("buildConfiguration", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE"), ("buildConfiguration", "INVALID_PROJECT"),
-    ("infoCommand", "TOO_MANY_KEYS"), ("infoCommand", "KEY_NOT_RECOGNIZED"),
-    ("memoryOptions", "DEPRECATED_EXPERIMENTAL_OOM_MORE_EAGERLY_THRESHOLD_INVALID_VALUE"), ("memoryOptions", "DEPRECATED_EXPERIMENTAL_OOM_MORE_EAGERLY_NO_TENURED_COLLECTORS_FOUND"),
-    ("query", "QUERY_FILE_WITH_COMMAND_LINE_EXPRESSION"), ("query", "QUERY_FILE_READ_FAILURE"), ("query", "COMMAND_LINE_EXPRESSION_MISSING"), ("query", "OUTPUT_FORMAT_INVALID"), ("query", "GRAPHLESS_PREREQ_UNMET"), ("query", "ANALYSIS_QUERY_PREREQ_UNMET"), ("query", "DEPRECATED_UNCLOSED_QUOTATION_EXPRESSION_ERROR"), ("query", "BUILDFILES_AND_LOADFILES_CANNOT_USE_OUTPUT_LOCATION_ERROR"), ("query", "TARGET_NOT_IN_UNIVERSE_SCOPE"), ("query", "OUTPUT_FORMAT_PREREQ_UNMET"), ("query", "DEPRECATED_UNEXPECTED_TOKEN_ERROR"), ("query", "DEPRECATED_INTEGER_LITERAL_MISSING"), ("query", "DEPRECATED_INVALID_STARTING_CHARACTER_ERROR"), ("query", "DEPRECATED_PREMATURE_END_OF_INPUT_ERROR"), ("query", "SYNTAX_ERROR"), ("query", "ILLEGAL_FLAG_COMBINATION"),
-    ("localExecution", "LOCKFREE_OUTPUT_PREREQ_UNMET"),
-    ("fetchCommand", "EXPRESSION_MISSING"), ("fetchCommand", "OPTIONS_INVALID"), ("fetchCommand", "QUERY_PARSE_ERROR"), ("fetchCommand", "QUERY_EVALUATION_ERROR"),
-    ("actionQuery", "COMMAND_LINE_EXPANSION_FAILURE"), ("actionQuery", "COMMAND_LINE_EXPRESSION_MISSING"), ("actionQuery", "EXPRESSION_PARSE_FAILURE"), ("actionQuery", "SKYFRAME_STATE_WITH_COMMAND_LINE_EXPRESSION"), ("actionQuery", "SKYFRAME_STATE_PREREQ_UNMET"), ("actionQuery", "ILLEGAL_PATTERN_SYNTAX"), ("actionQuery", "INCORRECT_ARGUMENTS"), ("actionQuery", "TOP_LEVEL_TARGETS_WITH_SKYFRAME_STATE_NOT_SUPPORTED"), ("actionQuery", "LABELS_FUNCTION_NOT_SUPPORTED"), ("actionQuery", "TEMPLATE_EXPANSION_FAILURE"),
-    ("targetPatterns", "TARGET_PATTERN_FILE_WITH_COMMAND_LINE_PATTERN"), ("targetPatterns", "TARGET_PATTERN_FILE_READ_FAILURE"),
-    ("cleanCommand", "ARGUMENTS_NOT_RECOGNIZED"),
-    ("configCommand", "TOO_MANY_CONFIG_IDS"), ("configCommand", "CONFIGURATION_NOT_FOUND"),
-    ("configurableQuery", "COMMAND_LINE_EXPRESSION_MISSING"), ("configurableQuery", "EXPRESSION_PARSE_FAILURE"), ("configurableQuery", "FILTERS_NOT_SUPPORTED"), ("configurableQuery", "BUILDFILES_FUNCTION_NOT_SUPPORTED"), ("configurableQuery", "SIBLINGS_FUNCTION_NOT_SUPPORTED"), ("configurableQuery", "VISIBLE_FUNCTION_NOT_SUPPORTED"), ("configurableQuery", "ATTRIBUTE_MISSING"), ("configurableQuery", "INCORRECT_CONFIG_ARGUMENT_ERROR"), ("configurableQuery", "TARGET_MISSING"), ("configurableQuery", "STARLARK_SYNTAX_ERROR"), ("configurableQuery", "STARLARK_EVAL_ERROR"), ("configurableQuery", "FORMAT_FUNCTION_ERROR"),
-    ("helpCommand", "MISSING_ARGUMENT"), ("helpCommand", "COMMAND_NOT_FOUND"),
-    ("mobileInstall", "CLASSIC_UNSUPPORTED"), ("mobileInstall", "NO_TARGET_SPECIFIED"), ("mobileInstall", "MULTIPLE_TARGETS_SPECIFIED"),
-    ("runCommand", "NO_TARGET_SPECIFIED"), ("runCommand", "TOO_MANY_TARGETS_SPECIFIED"), ("runCommand", "TARGET_NOT_EXECUTABLE"), ("runCommand", "RUN_UNDER_TARGET_NOT_BUILT"), ("runCommand", "RUN_PREREQ_UNMET"), ("runCommand", "TOO_MANY_TEST_SHARDS_OR_RUNS"), ("runCommand", "NO_SHELL_SPECIFIED"),
-    ("versionCommand", "NOT_AVAILABLE"),
-    ("actionRewinding", "REWIND_LOST_INPUTS_PREREQ_UNMET"),
-    ("dynamicExecution", "NO_USABLE_STRATEGY_FOUND"),
-    ("modCommand", "MISSING_ARGUMENTS"), ("modCommand", "TOO_MANY_ARGUMENTS"), ("modCommand", "INVALID_ARGUMENTS"), ("modCommand", "BUILDOZER_FAILED"), ("modCommand", "ERROR_DURING_GRAPH_INSPECTION"),
-    ("skyfocus", "INVALID_ACTIVE_DIRECTORIES"), ("skyfocus", "NON_ACTIVE_DIRECTORIES_CHANGE"), ("skyfocus", "CONFIGURATION_CHANGE"), ("skyfocus", "DISALLOWED_OPERATION_ON_FOCUSED_GRAPH"),
-    ("remoteAnalysisCaching", "PROJECT_FILE_NOT_FOUND"), ("remoteAnalysisCaching", "INCOMPATIBLE_OPTIONS"), ("remoteAnalysisCaching", "INVALID_SERVER_ADDRESS"),
-)
-B92_EXIT2_CANONICAL_BYTES = b"slug-bazel-9.2-failure-detail-exit2-v1\n" + b"".join(f"{category}\t{code}\n".encode("ascii") for category, code in B92_EXIT2_SOURCE_PAIRS)
-B92_EXIT2_CLASSES = {(category, code): COMMAND_FAILURE_CLASSES.get(category, {}).get(code, f"B92_EXIT2_CLASS_{ordinal:03d}") for ordinal, (category, code) in enumerate(B92_EXIT2_SOURCE_PAIRS, 1)}
+MODE = "buildbuddy-cache-only"
+BAZEL_VERSION = "9.2.0"
+HOST_PLATFORM = "linux-x86_64"
+BUILD_LABEL = "//app/slug_cli_v2:slug"
+CLASSES = frozenset(("PROVED_CACHE_ONLY", "CONFIG_DRIFT", "REMOTE_UNAVAILABLE", "COMMAND_LINE_FAILURE", "TARGET_FAILURE", "CACHE_MISS_OR_MIXED_REPLAY", "EVIDENCE_INCOMPLETE", "SANITIZER_REJECTED"))
+FAILURES = CLASSES - {"PROVED_CACHE_ONLY"}
+SPAWN_KEYS = frozenset(("count", "digest_multiset_sha256", "cache_error_count", "status_error_count", "exit_error_count", "local", "worker", "linux_sandbox", "remote_cache_hit", "other"))
+PHASE_KEYS = frozenset(("process_success_count", "build_finished_success_count", "build_success_count", "output_count", "test_completion_count", "passed_test_count", "test_run_count", "remotely_cached_test_count", "persistent_action_cache_hit_count", "eligible_spawns"))
+MAX_BEP_BYTES = 128 << 20
+MAX_EXECUTION_BYTES = 512 << 20
 
 
 class GateError(Exception):
-    def __init__(self, classification: str):
-        self.classification = classification if classification in FAILURES else "SANITIZER_REJECTED"
+    def __init__(self, classification: str = "SANITIZER_REJECTED"):
+        self.classification = classification if classification in CLASSES else "SANITIZER_REJECTED"
 
 
-def load_manifest(path: Path) -> tuple[str, tuple[str, ...]]:
-    data = path.read_bytes()
-    if hashlib.sha256(data).hexdigest() != MANIFEST_SHA256:
-        raise GateError("CONFIG_DRIFT")
-    lines = data.decode("ascii").splitlines()
-    if not data.endswith(b"\n") or len(lines) != 45 or lines[0] != VERSION:
-        raise GateError("CONFIG_DRIFT")
+def _manifest_bytes() -> bytes:
+    parent_fd = root_fd = tests_fd = oracle_fd = file_fd = None
+    try:
+        parent_fd = os.open(REPO_ROOT.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        root_fd = os.open(REPO_ROOT.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+        tests_fd = os.open("tests", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
+        oracle_fd = os.open("v2_oracle", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=tests_fd)
+        file_fd = os.open("buildbuddy_cache_targets.txt", os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=oracle_fd)
+        parent = os.fstat(parent_fd); parent_id = parent.st_dev, parent.st_ino
+        opened = (os.fstat(root_fd), os.fstat(tests_fd), os.fstat(oracle_fd), os.fstat(file_fd))
+        identities = tuple((item.st_dev, item.st_ino) for item in opened)
+        current = (os.stat(REPO_ROOT.name, dir_fd=parent_fd, follow_symlinks=False), os.stat("tests", dir_fd=root_fd, follow_symlinks=False), os.stat("v2_oracle", dir_fd=tests_fd, follow_symlinks=False), os.stat("buildbuddy_cache_targets.txt", dir_fd=oracle_fd, follow_symlinks=False))
+        current_parent = os.stat(REPO_ROOT.parent, follow_symlinks=False)
+        if not stat.S_ISDIR(parent.st_mode) or (current_parent.st_dev, current_parent.st_ino) != parent_id or any(not stat.S_ISDIR(item.st_mode) for item in opened[:3]) or not stat.S_ISREG(opened[3].st_mode) or opened[3].st_nlink != 1 or opened[3].st_size > 16 << 10 or tuple((item.st_dev, item.st_ino) for item in current) != identities: raise OSError
+        chunks: list[bytes] = []; size = 0
+        while chunk := os.read(file_fd, min(4096, (16 << 10) + 1 - size)):
+            chunks.append(chunk); size += len(chunk)
+            if size > 16 << 10: raise OSError
+        after = os.fstat(file_fd)
+        current = (os.stat(REPO_ROOT.name, dir_fd=parent_fd, follow_symlinks=False), os.stat("tests", dir_fd=root_fd, follow_symlinks=False), os.stat("v2_oracle", dir_fd=tests_fd, follow_symlinks=False), os.stat("buildbuddy_cache_targets.txt", dir_fd=oracle_fd, follow_symlinks=False))
+        current_parent = os.stat(REPO_ROOT.parent, follow_symlinks=False)
+        if (current_parent.st_dev, current_parent.st_ino) != parent_id or (after.st_dev, after.st_ino) != identities[3] or after.st_size != size or tuple((item.st_dev, item.st_ino) for item in current) != identities: raise OSError
+        return b"".join(chunks)
+    except OSError:
+        raise GateError("CONFIG_DRIFT") from None
+    finally:
+        for fd in (file_fd, oracle_fd, tests_fd, root_fd, parent_fd):
+            if fd is not None: os.close(fd)
+
+
+def load_manifest() -> tuple[str, tuple[str, ...]]:
+    data = _manifest_bytes()
+    if hashlib.sha256(data).hexdigest() != MANIFEST_SHA256: raise GateError("CONFIG_DRIFT")
+    try: lines = data.decode("ascii").splitlines()
+    except UnicodeDecodeError: raise GateError("CONFIG_DRIFT") from None
+    if not data.endswith(b"\n") or len(lines) != 45 or lines[0] != VERSION: raise GateError("CONFIG_DRIFT")
     kinds = [line.split("\t", 1) for line in lines[1:]]
-    if any(len(item) != 2 or not item[1].startswith("//") for item in kinds):
-        raise GateError("CONFIG_DRIFT")
+    if any(len(item) != 2 or not item[1].startswith("//") for item in kinds): raise GateError("CONFIG_DRIFT")
     builds = [label for kind, label in kinds if kind == "build"]
     tests = [label for kind, label in kinds if kind == "test"]
-    if builds != ["//app/slug_cli_v2:slug"] or len(tests) != 43 or tests != sorted(tests):
-        raise GateError("CONFIG_DRIFT")
+    if builds != [BUILD_LABEL] or len(tests) != 43 or tests != sorted(tests): raise GateError("CONFIG_DRIFT")
     return builds[0], tuple(tests)
 
 
@@ -129,10 +101,6 @@ def _field(item: dict[str, Any], *names: str, default: Any = None) -> Any:
         if name in item:
             return item[name]
     return default
-
-
-def _runner(value: Any) -> str:
-    return {"remote cache hit": "remote_cache_hit", "local": "local", "worker": "local", "linux-sandbox": "local", "disk cache hit": "disk_cache_hit", "remote": "remote_execution"}.get(value, "unknown")
 
 
 def _boolean(item: dict[str, Any], *names: str) -> bool:
@@ -165,197 +133,244 @@ def _digest(value: Any) -> str:
     return json.dumps({"hash": value["hash"], "sizeBytes": size}, sort_keys=True, separators=(",", ":"))
 
 
-def _command_failure_class(value: Any) -> str:
-    if value is None:
-        return "MISSING_FAILURE_DETAIL"
-    if not isinstance(value, dict) or not isinstance(value.get("message", ""), str):
-        return "MALFORMED_FAILURE_DETAIL"
-    keys = set(value)
-    if keys - B92_FAILURE_DETAIL_CATEGORY_KEYS - {"message"}:
-        return "UNSUPPORTED_GENERAL_FAILURE_DETAIL"
-    categories = keys & B92_FAILURE_DETAIL_CATEGORY_KEYS
-    if len(categories) != 1:
-        return "MALFORMED_FAILURE_DETAIL"
-    category = categories.pop()
-    detail = value.get(category)
-    if not isinstance(detail, dict) or set(detail) != {"code"} or not isinstance(detail.get("code"), str):
-        return "MALFORMED_FAILURE_DETAIL"
-    return B92_EXIT2_CLASSES.get((category, detail["code"]), "UNRECOGNIZED_B9_2_EXIT2_DETAIL")
-
-
-def spawn_summary(entries: Iterable[dict[str, Any]], phase: str) -> dict[str, Any]:
-    buckets = {name: 0 for name in ("local", "remote_cache_hit", "disk_cache_hit", "remote_execution", "unknown")}
-    digests: list[str] = []
-    failures = {"cache_hit": 0, "status": 0, "exit": 0}
-    eligible = 0
-    for item in entries:
-        event = item.get("spawn", item.get("SpawnExec", item))
-        if not isinstance(event, dict):
-            raise GateError("EVIDENCE_INCOMPLETE")
-        remotely_cacheable = _boolean(event, "remote_cacheable", "remoteCacheable")
-        cacheable = _boolean(event, "cacheable")
-        if not (cacheable and remotely_cacheable):
-            continue
-        kind = _runner(_field(event, "runner"))
-        buckets[kind] += 1
-        digest = _digest(_field(event, "action_digest", "actionDigest", "digest"))
-        hit = _field(event, "cache_hit", "cacheHit")
-        status = _field(event, "status", default="")
-        exit_code = _field(event, "exit_code", "exitCode", default=0)
-        eligible += 1
-        digests.append(digest)
-        failures["cache_hit"] += int(not isinstance(hit, bool) or hit != (phase == "replay"))
-        failures["status"] += int(status not in ("", None))
-        failures["exit"] += int(_count(exit_code) != 0)
-        if phase == "prime":
-            failures["status"] += int(kind != "local")
-        else:
-            failures["status"] += int(kind != "remote_cache_hit")
-    return {"count": eligible, "digest_multiset_sha256": hashlib.sha256("\n".join(sorted(digests)).encode()).hexdigest(), "cache_hit_failures": failures["cache_hit"], "status_failures": failures["status"], "exit_failures": failures["exit"], **buckets}
-
-
-def phase_record(bep: bytes, execution: bytes, phase: str, tests: tuple[str, ...], process_exit: int) -> dict[str, Any]:
-    build_finished: dict[str, Any] | None = None
-    completed: set[str] = set()
-    passed: set[str] = set()
-    runs: dict[str, int] = {}
-    cached: dict[str, int] = {}
-    persistent_hits = 0
-    aborted_remote = False
-    for event in json_sequence(bep):
-        ident = event.get("id", {})
-        if "buildFinished" in ident:
-            build_finished = event.get("finished")
-        label = next((v.get("label") for v in ident.values() if isinstance(v, dict) and isinstance(v.get("label"), str)), None)
-        if "targetCompleted" in ident and label:
-            if event.get("completed", {}).get("success") is True:
-                completed.add(label)
-        if "testSummary" in ident and label:
-            summary = event.get("testSummary", {})
-            if summary.get("overallStatus") == "PASSED":
-                passed.add(label)
-            runs[label] = _count(summary.get("totalRunCount", 0))
-            cached[label] = _count(summary.get("totalNumCached", 0))
-        metrics = event.get("buildMetrics", {}).get("actionSummary", {}).get("actionCacheStatistics", {})
-        if isinstance(metrics, dict):
-            persistent_hits += _count(metrics.get("hits", 0))
-        aborted = event.get("aborted")
-        if isinstance(aborted, dict):
-            aborted_remote |= aborted.get("reason") == "REMOTE_ENVIRONMENT_FAILURE"
-    if not isinstance(build_finished, dict):
-        raise GateError("EVIDENCE_INCOMPLETE")
-    exit_data = build_finished.get("exitCode", {})
-    if not isinstance(exit_data, dict):
-        raise GateError("EVIDENCE_INCOMPLETE")
-    summary = spawn_summary(json_sequence(execution), phase)
-    name = exit_data.get("name")
-    safe_name = name if name in {"SUCCESS", "REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR", "COMMAND_LINE_ERROR"} else "OTHER"
-    if aborted_remote:
-        safe_name = "REMOTE_ERROR"
-    code = exit_data.get("code")
-    code = _count(code)
-    completed_tests = completed & set(tests)
-    if any(cached.get(test, 0) > runs.get(test, 0) for test in tests):
-        raise GateError("EVIDENCE_INCOMPLETE")
-    passed_once = {test for test in passed & completed_tests if runs.get(test, 0) == 1}
-    command_failure_class = _command_failure_class(build_finished.get("failureDetail")) if safe_name == "COMMAND_LINE_ERROR" else "NONE"
-    return {"process_exit_code": process_exit, "build_finished": {"name": safe_name, "code": code}, "command_failure_class": command_failure_class, "build_success_count": int("//app/slug_cli_v2:slug" in completed), "passed_test_count": len(passed_once), "test_run_count": sum(runs.get(test, 0) == 1 for test in tests), "remotely_cached_test_count": sum(cached.get(test, 0) == 1 for test in tests), "persistent_action_cache_hit_count": persistent_hits, "eligible_spawns": summary}
-
-
-def classify(prime: dict[str, Any], replay: dict[str, Any], tests: tuple[str, ...]) -> str:
-    required = len(tests)
-    if any(record["build_finished"]["name"] in {"REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR"} for record in (prime, replay)):
-        return "REMOTE_UNAVAILABLE"
-    if any(record["process_exit_code"] == 2 and record["build_finished"] == {"name": "COMMAND_LINE_ERROR", "code": 2} and record["command_failure_class"] != "NONE" for record in (prime, replay)):
-        return "COMMAND_LINE_FAILURE"
-    if any(record["process_exit_code"] != 0 or record["build_finished"] != {"name": "SUCCESS", "code": 0} or record["build_success_count"] != 1 or record["passed_test_count"] != required or record["test_run_count"] != required for record in (prime, replay)):
-        return "TARGET_FAILURE"
-    if any(record["persistent_action_cache_hit_count"] for record in (prime, replay)) or prime["remotely_cached_test_count"]:
-        return "CACHE_MISS_OR_MIXED_REPLAY"
-    if replay["remotely_cached_test_count"] != required:
-        return "CACHE_MISS_OR_MIXED_REPLAY"
-    a, b = prime["eligible_spawns"], replay["eligible_spawns"]
-    if not a["count"] or not b["count"]:
-        return "EVIDENCE_INCOMPLETE"
-    if a["count"] != b["count"] or a["digest_multiset_sha256"] != b["digest_multiset_sha256"]:
-        return "CACHE_MISS_OR_MIXED_REPLAY"
-    if any(a[key] for key in ("cache_hit_failures", "status_failures", "exit_failures")) or any(b[key] for key in ("cache_hit_failures", "status_failures", "exit_failures", "local", "disk_cache_hit", "remote_execution", "unknown")):
-        return "CACHE_MISS_OR_MIXED_REPLAY"
-    return "PROVED_CACHE_ONLY"
-
-
 def command(phase: str, bazel: str, output_base: Path, bep: Path, execution: Path, nonce: str, labels: tuple[str, ...]) -> list[str]:
     common = [bazel, f"--output_base={output_base}", "test", "--config=buildbuddy-cache", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_cache=grpcs://remote.buildbuddy.io", "--remote_instance_name=", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--spawn_strategy=worker,sandboxed,local", "--test_strategy=local", "--cache_test_results=yes", "--runs_per_test=1", "--test_sharding_strategy=disabled", "--noremote_local_fallback", "--build_event_publish_all_actions", f"--build_event_json_file={bep}", f"--execution_log_json_file={execution}", f"--action_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", f"--test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}"]
     extra = ["--noremote_accept_cached", "--remote_upload_local_results", "--noremote_cache_async"] if phase == "prime" else ["--remote_accept_cached", "--noremote_upload_local_results", "--noremote_cache_async"]
     return common + extra + list(labels)
 
 
-def _preflight(bazel: str, runner: Callable[..., subprocess.CompletedProcess[bytes]]) -> tuple[str, bool]:
-    version = runner([bazel, "--ignore_all_rc_files", "version"], cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
-    try:
-        labels = [line for line in version.stdout.decode("utf-8").splitlines() if line.startswith("Build label:")]
-    except (AttributeError, UnicodeDecodeError):
-        raise GateError("CONFIG_DRIFT") from None
-    if version.returncode != 0 or labels != ["Build label: 9.2.0"] or platform.system() != "Linux" or platform.machine() not in {"x86_64", "AMD64"}:
-        raise GateError("CONFIG_DRIFT")
-    head, clean = _git("rev-parse", "HEAD"), _git("status", "--porcelain") == ""
-    if not re.fullmatch(r"[0-9a-f]{40}", head) or not clean:
-        raise GateError("CONFIG_DRIFT")
-    return head, clean
+def full_command(phase: str, bazel: str, output: Path, bep: Path, execution: Path, nonce: str, labels: tuple[str, ...]) -> list[str]:
+    if type(phase) is not str or phase not in ("prime", "replay") or not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{64}", nonce): raise GateError("SANITIZER_REJECTED")
+    if type(labels) is not tuple or len(labels) != 44 or labels[0] != BUILD_LABEL or tuple(sorted(labels[1:])) != labels[1:] or len(set(labels)) != 44: raise GateError("CONFIG_DRIFT")
+    return [bazel, f"--output_base={output}", "test", "--config=buildbuddy-cache", "--noremote_accept_cached" if phase == "prime" else "--remote_accept_cached", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--noremote_local_fallback", "--cache_test_results=yes", "--runs_per_test=1", "--test_sharding_strategy=disabled", f"--action_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", f"--test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", f"--build_event_json_file={bep}", f"--execution_log_json_file={execution}", *labels]
 
 
-def run_gate(manifest: Path, bazel: str = "bazel", runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> dict[str, Any]:
-    build, tests = load_manifest(manifest)
-    rc_hash = hashlib.sha256((REPO_ROOT / ".bazelrc").read_bytes()).hexdigest()
-    if rc_hash != BAZELRC_SHA256:
-        raise GateError("CONFIG_DRIFT")
-    old_umask = os.umask(0o077)
-    root: Path | None = None
+def spawn_summary(entries: Iterable[dict[str, Any]], phase: str) -> dict[str, Any]:
+    if type(phase) is not str or phase not in ("prime", "replay"): raise GateError()
+    runners = {key: 0 for key in ("local", "worker", "linux_sandbox", "remote_cache_hit", "other")}
+    digests: list[str] = []; errors = {key: 0 for key in ("cache", "status", "exit")}
+    for item in entries:
+        event = item.get("spawn", item.get("SpawnExec", item))
+        if not isinstance(event, dict): raise GateError("EVIDENCE_INCOMPLETE")
+        if not (_boolean(event, "cacheable") and _boolean(event, "remote_cacheable", "remoteCacheable")): continue
+        runners[{"local": "local", "worker": "worker", "linux-sandbox": "linux_sandbox", "remote cache hit": "remote_cache_hit"}.get(_field(event, "runner"), "other")] += 1
+        digests.append(_digest(_field(event, "action_digest", "actionDigest", "digest")))
+        hit = _field(event, "cache_hit", "cacheHit")
+        errors["cache"] += int(not isinstance(hit, bool) or hit != (phase == "replay"))
+        errors["status"] += int(_field(event, "status", default="") not in ("", None))
+        errors["exit"] += int(_count(_field(event, "exit_code", "exitCode", default=0)) != 0)
+    return {"count": len(digests), "digest_multiset_sha256": hashlib.sha256("\n".join(sorted(digests)).encode()).hexdigest(), "cache_error_count": errors["cache"], "status_error_count": errors["status"], "exit_error_count": errors["exit"], **runners}
+
+
+def phase_record(bep: bytes, execution: bytes, phase: str, tests: tuple[str, ...], process_exit: int) -> dict[str, Any]:
+    if type(tests) is not tuple or len(tests) != 43 or tests != tuple(sorted(tests)): raise GateError("CONFIG_DRIFT")
+    finished: list[Any] = []; completions: dict[str, list[bool]] = {BUILD_LABEL: []}; summaries: dict[str, list[dict[str, Any]]] = {test: [] for test in tests}
+    completions.update({test: [] for test in tests}); persistent_hits = 0; remote_failure = False
+    for event in json_sequence(bep):
+        ident = event.get("id")
+        if not isinstance(ident, dict): raise GateError("EVIDENCE_INCOMPLETE")
+        if "buildFinished" in ident: finished.append(event.get("finished"))
+        target = ident.get("targetCompleted")
+        if "targetCompleted" in ident:
+            if not isinstance(target, dict) or not isinstance(target.get("label"), str) or target["label"] not in completions: raise GateError("EVIDENCE_INCOMPLETE")
+            completions[target["label"]].append(event.get("completed", {}).get("success") is True)
+        summary_id = ident.get("testSummary")
+        if "testSummary" in ident:
+            if not isinstance(summary_id, dict) or not isinstance(summary_id.get("label"), str) or summary_id["label"] not in summaries or not isinstance(event.get("testSummary"), dict): raise GateError("EVIDENCE_INCOMPLETE")
+            summaries[summary_id["label"]].append(event["testSummary"])
+        metrics = event.get("buildMetrics", {}).get("actionSummary", {}).get("actionCacheStatistics", {})
+        if isinstance(metrics, dict): persistent_hits += _count(metrics.get("hits", 0))
+        remote_failure |= isinstance(event.get("aborted"), dict) and event["aborted"].get("reason") == "REMOTE_ENVIRONMENT_FAILURE"
+    if len(finished) != 1 or not isinstance(finished[0], dict) or any(len(items) != 1 for items in completions.values()) or any(len(items) != 1 for items in summaries.values()): raise GateError("EVIDENCE_INCOMPLETE")
+    exit_data = finished[0].get("exitCode")
+    if not isinstance(exit_data, dict): raise GateError("EVIDENCE_INCOMPLETE")
+    name, code = exit_data.get("name"), _count(exit_data.get("code", 0))
+    success = name == "SUCCESS" and code == 0
+    outcome = "remote" if remote_failure or name in {"REMOTE_ERROR", "REMOTE_ENVIRONMENTAL_ERROR"} else "command" if name == "COMMAND_LINE_ERROR" and code == 2 else "success" if success else "target"
+    runs, cached, passed = {}, {}, set()
+    for test, items in summaries.items():
+        item = items[0]; runs[test] = _count(item.get("totalRunCount")); cached[test] = _count(item.get("totalNumCached", 0 if phase == "prime" else None))
+        if cached[test] > runs[test]: raise GateError("EVIDENCE_INCOMPLETE")
+        if item.get("overallStatus") == "PASSED": passed.add(test)
+    return {"process_success_count": int(_count(process_exit) == 0), "build_finished_success_count": int(success), "build_success_count": int(completions[BUILD_LABEL] == [True]), "output_count": 0, "test_completion_count": sum(completions[test] == [True] for test in tests), "passed_test_count": len(passed), "test_run_count": sum(runs[test] == 1 for test in tests), "remotely_cached_test_count": sum(cached[test] == 1 for test in tests), "persistent_action_cache_hit_count": persistent_hits, "eligible_spawns": spawn_summary(json_sequence(execution), phase), "_outcome": outcome}
+
+
+def classify(prime: dict[str, Any], replay: dict[str, Any]) -> str:
+    records = (prime, replay)
+    if any(item.get("_outcome") == "remote" for item in records): return "REMOTE_UNAVAILABLE"
+    if any(item.get("_outcome") == "command" for item in records): return "COMMAND_LINE_FAILURE"
+    required = {"process_success_count": 1, "build_finished_success_count": 1, "build_success_count": 1, "output_count": 1, "test_completion_count": 43, "passed_test_count": 43, "test_run_count": 43}
+    if any(item.get("_outcome") != "success" or any(item[key] != value for key, value in required.items()) for item in records): return "TARGET_FAILURE"
+    if prime["remotely_cached_test_count"] != 0 or replay["remotely_cached_test_count"] != 43 or any(item["persistent_action_cache_hit_count"] for item in records): return "CACHE_MISS_OR_MIXED_REPLAY"
+    a, b = prime["eligible_spawns"], replay["eligible_spawns"]
+    if not a["count"] or not b["count"]: return "EVIDENCE_INCOMPLETE"
+    if a["count"] != b["count"] or a["digest_multiset_sha256"] != b["digest_multiset_sha256"]: return "CACHE_MISS_OR_MIXED_REPLAY"
+    if any(a[key] or b[key] for key in ("cache_error_count", "status_error_count", "exit_error_count")): return "CACHE_MISS_OR_MIXED_REPLAY"
+    if any(a[key] for key in ("remote_cache_hit", "other")) or a["local"] + a["worker"] + a["linux_sandbox"] != a["count"]: return "CACHE_MISS_OR_MIXED_REPLAY"
+    if b["remote_cache_hit"] != b["count"] or any(b[key] for key in ("local", "worker", "linux_sandbox", "other")): return "CACHE_MISS_OR_MIXED_REPLAY"
+    return "PROVED_CACHE_ONLY"
+
+
+def _empty_phase() -> dict[str, Any]:
+    spawns = {key: 0 for key in SPAWN_KEYS}; spawns["digest_multiset_sha256"] = hashlib.sha256(b"").hexdigest()
+    return {key: (spawns if key == "eligible_spawns" else 0) for key in PHASE_KEYS}
+
+
+def record(classification: str = "SANITIZER_REJECTED", prime: dict[str, Any] | None = None, replay: dict[str, Any] | None = None, git_head: str = "0" * 40, git_clean: bool = False) -> dict[str, Any]:
+    if type(classification) is not str or classification not in CLASSES: classification = "SANITIZER_REJECTED"
+    def public(item: dict[str, Any] | None) -> dict[str, Any]:
+        source = _empty_phase() if item is None else item
+        return {key: source[key] for key in PHASE_KEYS}
+    return {"schema_version": 1, "mode": MODE, "classification": classification, "bazel_version": BAZEL_VERSION, "host_platform": HOST_PLATFORM, "git_head": git_head, "git_clean": git_clean, "manifest_version": VERSION, "manifest_sha256": MANIFEST_SHA256, "bazelrc_sha256": BAZELRC_SHA256, "target_counts": {"build": 1, "test": 43}, "prime": public(prime), "replay": public(replay)}
+
+
+def normalize(value: object) -> dict[str, Any]:
     try:
-        head, clean = _preflight(bazel, runner)
-        root = Path(tempfile.mkdtemp(prefix="slug-buildbuddy-cache-"))
-        if stat.S_IMODE(root.stat().st_mode) != 0o700:
-            raise GateError("SANITIZER_REJECTED")
-        try:
-            root.resolve().relative_to(REPO_ROOT.resolve())
-        except ValueError:
-            pass
-        else:
-            raise GateError("SANITIZER_REJECTED")
-        nonce = secrets.token_hex(32)
-        records: dict[str, dict[str, Any]] = {}
-        for phase in ("prime", "replay"):
-            phase_root = root / phase
-            phase_root.mkdir()
-            bep, execution = phase_root / "bep.json", phase_root / "execution.json"
-            stdout, stderr = phase_root / "stdout", phase_root / "stderr"
-            with stdout.open("xb") as stdout_file, stderr.open("xb") as stderr_file:
-                result = runner(command(phase, bazel, phase_root / "output", bep, execution, nonce, (build,) + tests), cwd=REPO_ROOT, stdout=stdout_file, stderr=stderr_file, check=False)
-            records[phase] = phase_record(bep.read_bytes(), execution.read_bytes(), phase, tests, result.returncode)
-        classification = classify(records["prime"], records["replay"], tests)
-        return {"schema_version": 1, "classification": classification, "mode": "buildbuddy-cache-only", "bazel_version": "9.2.0", "host_platform": "linux-x86_64", "git_head": head, "git_clean": clean, "manifest_sha256": MANIFEST_SHA256, "bazelrc_sha256": BAZELRC_SHA256, "target_counts": {"build": 1, "test": len(tests)}, "prime": records["prime"], "replay": records["replay"]}
-    except GateError:
-        raise
+        if type(value) is not dict or set(value) != set(record()) or any(type(value[key]) is not str for key in ("mode", "classification", "bazel_version", "host_platform", "git_head", "manifest_version", "manifest_sha256", "bazelrc_sha256")): raise GateError()
+        if type(value["schema_version"]) is not int or value["schema_version"] != 1 or type(value["git_clean"]) is not bool or type(value["target_counts"]) is not dict: raise GateError()
+        fixed = (value["mode"], value["bazel_version"], value["host_platform"], value["manifest_version"], value["manifest_sha256"], value["bazelrc_sha256"], value["target_counts"])
+        if fixed != (MODE, BAZEL_VERSION, HOST_PLATFORM, VERSION, MANIFEST_SHA256, BAZELRC_SHA256, {"build": 1, "test": 43}) or value["classification"] not in CLASSES or not re.fullmatch(r"[0-9a-f]{40}", value["git_head"]): raise GateError()
+        def phase(source: object) -> dict[str, Any]:
+            if type(source) is not dict or set(source) != PHASE_KEYS or type(source["eligible_spawns"]) is not dict or set(source["eligible_spawns"]) != SPAWN_KEYS: raise GateError()
+            result = {key: _count(source[key]) for key in PHASE_KEYS - {"eligible_spawns"}}; raw = source["eligible_spawns"]
+            digest = raw["digest_multiset_sha256"]
+            if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest): raise GateError()
+            spawns = {key: _count(raw[key]) for key in SPAWN_KEYS - {"digest_multiset_sha256"}}
+            if sum(spawns[key] for key in ("local", "worker", "linux_sandbox", "remote_cache_hit", "other")) != spawns["count"] or any(spawns[key] > spawns["count"] for key in ("cache_error_count", "status_error_count", "exit_error_count")): raise GateError()
+            spawns["digest_multiset_sha256"] = digest; result["eligible_spawns"] = {key: spawns[key] for key in SPAWN_KEYS}
+            return {key: result[key] for key in PHASE_KEYS}
+        prime, replay = phase(value["prime"]), phase(value["replay"])
+        if value["classification"] == "PROVED_CACHE_ONLY":
+            if not value["git_clean"] or value["git_head"] == "0" * 40 or classify({**prime, "_outcome": "success"}, {**replay, "_outcome": "success"}) != "PROVED_CACHE_ONLY": raise GateError()
+        result = record(value["classification"], prime, replay, value["git_head"], value["git_clean"])
+        return result if result == value else record()
     except Exception:
-        raise GateError("EVIDENCE_INCOMPLETE") from None
+        return record()
+
+
+def _hardened() -> Any:
+    from tools.v2_oracle_lib import buildbuddy_build_cache
+    return buildbuddy_build_cache
+
+
+def _clean() -> bool: return _hardened()._clean()
+def _anchored(*args: Any) -> bool: return _hardened()._anchored(*args)
+def _outputs(path: Path) -> int: return _hardened()._outputs(path)
+def _shutdown(bazel: str, output: Path, runner: Callable[..., subprocess.CompletedProcess[bytes]]) -> bool: return _hardened()._shutdown(bazel, output, runner)
+def _remove_original(parent_fd: int, root_fd: int, identity: tuple[int, int]) -> bool: return _hardened()._remove_original(parent_fd, root_fd, identity)
+
+
+def _remove_reserved(root: Path, parent_fd: int) -> bool:
+    reserved_fd = None
+    try:
+        temp = Path(tempfile.gettempdir()).resolve()
+        parent = os.fstat(parent_fd); expected = os.stat(temp, follow_symlinks=False)
+        if not root.name.startswith("slug-buildbuddy-cache-") or root.parent.resolve() != temp or not stat.S_ISDIR(parent.st_mode) or (parent.st_dev, parent.st_ino) != (expected.st_dev, expected.st_ino): return False
+        try: item = os.stat(root.name, dir_fd=parent_fd, follow_symlinks=False)
+        except FileNotFoundError: return True
+        if not stat.S_ISDIR(item.st_mode):
+            os.unlink(root.name, dir_fd=parent_fd); return False
+        reserved_fd = os.open(root.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd); opened = os.fstat(reserved_fd); identity = opened.st_dev, opened.st_ino
+        if (item.st_dev, item.st_ino) != identity: return False
+        return _remove_original(parent_fd, reserved_fd, identity)
+    except Exception: return False
     finally:
-        os.umask(old_umask)
-        cleanup_failed = False
-        if root is not None:
-            for phase in ("prime", "replay"):
-                try:
-                    shutdown = runner([bazel, "--ignore_all_rc_files", f"--output_base={root / phase / 'output'}", "shutdown"], cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-                    cleanup_failed |= shutdown.returncode != 0
-                except Exception:
-                    cleanup_failed = True
-            try:
-                shutil.rmtree(root)
-            except Exception:
-                cleanup_failed = True
-        if cleanup_failed:
-            raise GateError("SANITIZER_REJECTED")
+        if reserved_fd is not None: os.close(reserved_fd)
 
 
-def _git(*args: str) -> str:
-    result = subprocess.run(["git", *args], cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
-    return result.stdout.decode("ascii", "replace").strip()
+def _root_bytes(name: str, limit: int) -> bytes:
+    parent_fd = root_fd = file_fd = None
+    try:
+        parent_fd = os.open(REPO_ROOT.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW); root_fd = os.open(REPO_ROOT.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+        root = os.fstat(root_fd); root_id = root.st_dev, root.st_ino; current_root = os.stat(REPO_ROOT.name, dir_fd=parent_fd, follow_symlinks=False)
+        if not stat.S_ISDIR(root.st_mode) or (current_root.st_dev, current_root.st_ino) != root_id: raise OSError
+        file_fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=root_fd); before = os.fstat(file_fd); identity = before.st_dev, before.st_ino
+        current = os.stat(name, dir_fd=root_fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_nlink != 1 or before.st_size > limit or (current.st_dev, current.st_ino) != identity: raise OSError
+        chunks: list[bytes] = []; size = 0
+        while chunk := os.read(file_fd, min(4096, limit + 1 - size)):
+            chunks.append(chunk); size += len(chunk)
+            if size > limit: raise OSError
+        after = os.fstat(file_fd); current = os.stat(name, dir_fd=root_fd, follow_symlinks=False); current_root = os.stat(REPO_ROOT.name, dir_fd=parent_fd, follow_symlinks=False)
+        if (after.st_dev, after.st_ino) != identity or after.st_size != size or (current.st_dev, current.st_ino) != identity or (current_root.st_dev, current_root.st_ino) != root_id: raise OSError
+        return b"".join(chunks)
+    finally:
+        if file_fd is not None: os.close(file_fd)
+        if root_fd is not None: os.close(root_fd)
+        if parent_fd is not None: os.close(parent_fd)
+
+
+def _preflight() -> str:
+    try:
+        okay = _clean() and platform.system() == "Linux" and platform.machine() in {"x86_64", "AMD64"}
+        okay &= _root_bytes(".bazelversion", 64) == b"9.2.0\n" and hashlib.sha256(_root_bytes(".bazelrc", 1 << 20)).hexdigest() == BAZELRC_SHA256
+        head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, check=False)
+        text = head.stdout.decode("ascii").strip(); okay &= head.returncode == 0 and bool(re.fullmatch(r"[0-9a-f]{40}", text))
+    except Exception: okay, text = False, ""
+    if not okay: raise GateError("CONFIG_DRIFT")
+    return text
+
+
+def _artifact_bytes(directory_fd: int, name: str, limit: int, identity: tuple[int, int] | None = None) -> bytes:
+    fd = None
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory_fd); before = os.fstat(fd); current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        actual = before.st_dev, before.st_ino
+        if not stat.S_ISREG(before.st_mode) or stat.S_IMODE(before.st_mode) != 0o600 or before.st_nlink != 1 or before.st_size > limit or (current.st_dev, current.st_ino) != actual or identity not in (None, actual): raise OSError
+        chunks: list[bytes] = []; size = 0
+        while chunk := os.read(fd, min(1 << 20, limit + 1 - size)):
+            chunks.append(chunk); size += len(chunk)
+            if size > limit: raise OSError
+        after = os.fstat(fd); current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if (after.st_dev, after.st_ino) != actual or after.st_size != size or (current.st_dev, current.st_ino) != actual: raise OSError
+        return b"".join(chunks)
+    except OSError: raise GateError("EVIDENCE_INCOMPLETE") from None
+    finally:
+        if fd is not None: os.close(fd)
+
+
+def run_gate(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> dict[str, Any]:
+    old, root, parent_fd, root_fd = os.umask(0o077), None, None, None
+    result, root_id, phases, started, head = record(), None, {}, set(), "0" * 40
+    try:
+        build, tests = load_manifest(); labels = (build,) + tests; head = _preflight()
+        root = Path(tempfile.mkdtemp(prefix="slug-buildbuddy-cache-"))
+        if stat.S_IMODE(root.stat().st_mode) != 0o700: raise GateError()
+        try: root.resolve().relative_to(REPO_ROOT.resolve()); raise GateError()
+        except ValueError: pass
+        parent_fd = os.open(root.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW); root_fd = os.open(root.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
+        item = os.fstat(root_fd); root_id = item.st_dev, item.st_ino; nonce = secrets.token_hex(32); records = {}
+        for phase in ("prime", "replay"):
+            phase_root = root / phase; phase_root.mkdir(); output = phase_root / "output"; output.mkdir()
+            phase_fd = os.open(phase, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd); phase_item = os.fstat(phase_fd); phase_id = phase_item.st_dev, phase_item.st_ino
+            output_fd = os.open("output", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=phase_fd); output_item = os.fstat(output_fd); output_id = output_item.st_dev, output_item.st_ino
+            phases[phase] = (phase_fd, phase_id, output_fd, output_id)
+            bep, execution, stdout, stderr = (phase_root / name for name in ("bep.json", "execution.json", "stdout", "stderr"))
+            for path in (bep, execution, stdout, stderr): _hardened().cleanup._private_file(path)
+            identities = {path.name: (path.lstat().st_dev, path.lstat().st_ino) for path in (bep, execution)}; started.add(phase)
+            with stdout.open("ab") as out, stderr.open("ab") as err: done = runner(full_command(phase, bazel, output, bep, execution, nonce, labels), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
+            if not _anchored(root, root_id, root_fd, phase, phase_id, output_fd, output_id): raise GateError("EVIDENCE_INCOMPLETE")
+            public = phase_record(_artifact_bytes(phase_fd, bep.name, MAX_BEP_BYTES, identities[bep.name]), _artifact_bytes(phase_fd, execution.name, MAX_EXECUTION_BYTES), phase, tests, _count(done.returncode))
+            public["output_count"] = _outputs(output)
+            if not _anchored(root, root_id, root_fd, phase, phase_id, output_fd, output_id): raise GateError("EVIDENCE_INCOMPLETE")
+            records[phase] = public
+        result = record(classify(records["prime"], records["replay"]), records["prime"], records["replay"], head, True)
+    except GateError as error: result = record(error.classification, git_head=head, git_clean=head != "0" * 40)
+    except Exception: result = record("EVIDENCE_INCOMPLETE", git_head=head, git_clean=head != "0" * 40)
+    finally:
+        os.umask(old); okay = True
+        if root is not None and root_fd is not None and root_id is not None:
+            for phase, (phase_fd, phase_id, output_fd, output_id) in phases.items():
+                if phase in started and _anchored(root, root_id, root_fd, phase, phase_id, output_fd, output_id): okay &= _shutdown(bazel, root / phase / "output", runner) and _anchored(root, root_id, root_fd, phase, phase_id, output_fd, output_id)
+                elif phase in started: okay = False
+            for phase_fd, _, output_fd, _ in phases.values(): os.close(output_fd); os.close(phase_fd)
+            if parent_fd is not None: okay &= _remove_original(parent_fd, root_fd, root_id)
+            else: okay = False
+            os.close(root_fd); root_fd = None
+        elif root_fd is not None: os.close(root_fd); root_fd = None; okay = False
+        if root is not None and parent_fd is not None: okay &= _remove_reserved(root, parent_fd)
+        elif root is not None: okay = False
+        if parent_fd is not None: os.close(parent_fd)
+        if root is not None and not _clean(): okay = False
+        if not okay: result = record()
+    return normalize(result)

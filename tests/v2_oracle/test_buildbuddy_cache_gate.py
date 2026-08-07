@@ -5,357 +5,256 @@ import json
 import os
 import stat
 import subprocess
+import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from unittest import mock
 
-from tools.v2_oracle_lib import buildbuddy_cache as gate
 from tools.v2_oracle import buildbuddy_cache_gate as cli
+from tools.v2_oracle_lib import buildbuddy_cache as gate
 
-
-ROOT = Path(__file__).resolve().parents[2]
-MANIFEST = ROOT / "tests/v2_oracle/buildbuddy_cache_targets.txt"
 DIGEST = "d" * 64
-OTHER_DIGEST = "e" * 64
-VERSION_OUTPUT = b"Bazelisk version: v1.29.0\nBuild label: 9.2.0\nBuild target: bazel\n"
-ABSENT = object()
+HEAD = "a" * 40
+TESTS = tuple(f"//tests:t{number:02d}" for number in range(43))
+LABELS = (gate.BUILD_LABEL,) + TESTS
 
 
-def sequence(values: list[dict[str, object]]) -> bytes:
-    return b"\n".join(json.dumps(value, indent=2).encode() for value in values)
+def sequence(events: list[dict[str, object]]) -> bytes:
+    return b"\n".join(json.dumps(event, separators=(",", ":")).encode() for event in events) + b"\n"
 
 
-class BuildBuddyCacheGateTest(unittest.TestCase):
-    def test_manifest_is_exact_and_includes_runtime(self) -> None:
-        build, tests = gate.load_manifest(MANIFEST)
-        self.assertEqual("//app/slug_cli_v2:slug", build)
-        self.assertEqual(43, len(tests))
-        self.assertIn("//app/slug_core_v2:runtime_test", tests)
-        self.assertNotIn("//app/slug_cli_v2:cli_fixture_test", tests)
+def bep(phase: str, change: str = "ready") -> bytes:
+    events: list[dict[str, object]] = [
+        {"id": {"targetCompleted": {"label": gate.BUILD_LABEL}}, "completed": {"success": True}},
+        *({"id": {"targetCompleted": {"label": test}}, "completed": {"success": True}} for test in TESTS),
+        *({"id": {"testSummary": {"label": test}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, **({"totalNumCached": 1} if phase == "replay" else {})}} for test in TESTS),
+        {"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS"}}},
+    ]
+    if change == "duplicate_finished": events.append(events[-1])
+    elif change == "missing_finished": events.pop()
+    elif change == "duplicate_completion": events.insert(1, events[0])
+    elif change == "missing_completion": events.pop(1)
+    elif change == "foreign_completion": events.insert(1, {"id": {"targetCompleted": {"label": "//foreign:target"}}, "completed": {"success": True}})
+    elif change == "failed_completion": events[1] = {**events[1], "completed": {"success": False}}
+    elif change == "duplicate_summary": events.insert(-1, events[-2])
+    elif change == "missing_summary": events.pop(-2)
+    elif change == "foreign_summary": events.insert(-1, {"id": {"testSummary": {"label": "//foreign:test"}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "totalNumCached": 0}})
+    elif change == "failed_summary": events[-2] = {**events[-2], "testSummary": {"overallStatus": "FAILED", "totalRunCount": 1, "totalNumCached": int(phase == "replay")}}
+    elif change == "bad_runs": events[-2] = {**events[-2], "testSummary": {"overallStatus": "PASSED", "totalRunCount": 2, "totalNumCached": int(phase == "replay")}}
+    elif change == "bad_cached": events[-2] = {**events[-2], "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "totalNumCached": int(phase != "replay")}}
+    elif change == "impossible_cached": events[-2] = {**events[-2], "testSummary": {"overallStatus": "PASSED", "totalRunCount": 0, "totalNumCached": 1}}
+    elif change == "missing_replay_cached": events[-2]["testSummary"].pop("totalNumCached")  # type: ignore[index,union-attr]
+    elif change.startswith("cached_"): events[-2]["testSummary"]["totalNumCached"] = {"cached_null": None, "cached_bool": False, "cached_string": "0"}[change]  # type: ignore[index,union-attr]
+    elif change.startswith("exit_"): events[-1]["finished"]["exitCode"]["code"] = {"exit_null": None, "exit_bool": False, "exit_string": "0"}[change]  # type: ignore[index,union-attr]
+    elif change == "remote": events.insert(-1, {"id": {"aborted": {}}, "aborted": {"reason": "REMOTE_ENVIRONMENT_FAILURE", "description": "/private/secret"}})
+    elif change == "command": events[-1] = {"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "COMMAND_LINE_ERROR", "code": 2}}}
+    elif change == "target": events[-1] = {"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "BUILD_FAILURE", "code": 1}}}
+    elif change == "persistent": events.insert(-1, {"id": {"buildMetrics": {}}, "buildMetrics": {"actionSummary": {"actionCacheStatistics": {"hits": 1}}}})
+    return sequence(events)
 
-    def test_manifest_drift_is_rejected(self) -> None:
-        path = self._temp("bad.txt", b"x\n")
-        with self.assertRaisesRegex(gate.GateError, "") as error:
-            gate.load_manifest(path)
-        self.assertEqual("CONFIG_DRIFT", error.exception.classification)
 
-    def test_json_sequence_accepts_pretty_sequence_and_rejects_nonobject(self) -> None:
-        self.assertEqual([{"one": 1}, {"two": 2}], list(gate.json_sequence(sequence([{"one": 1}, {"two": 2}]))))
-        with self.assertRaises(gate.GateError):
-            list(gate.json_sequence(b"[]"))
+def execution(phase: str, runner: str | None = None, **changes: object) -> bytes:
+    event: dict[str, object] = {"cacheable": True, "remoteCacheable": True, "runner": runner or ("linux-sandbox" if phase == "prime" else "remote cache hit"), "action_digest": {"hash": DIGEST, "sizeBytes": 4}, "cache_hit": phase == "replay", "status": "", "exit_code": 0}
+    event.update(changes)
+    return sequence([{"SpawnExec": event}])
 
-    def test_command_hardens_cache_only_and_shares_nonce(self) -> None:
-        argv = gate.command("prime", "bazel", Path("/private/output"), Path("/private/bep"), Path("/private/log"), "secret", ("//a:b",))
-        self.assertIn("--config=buildbuddy-cache", argv)
-        nightly = "--@rules_rust//rust/toolchain/channel=nightly"
-        self.assertEqual(1, argv.count(nightly))
-        self.assertEqual(["test", "--config=buildbuddy-cache", nightly], argv[2:5])
-        self.assertIn("--remote_cache=grpcs://remote.buildbuddy.io", argv)
-        self.assertIn("--remote_instance_name=", argv)
-        self.assertIn("--remote_executor=", argv)
-        self.assertIn("--bes_backend=", argv)
-        self.assertIn("--bes_results_url=", argv)
-        self.assertIn("--noremote_accept_cached", argv)
-        self.assertNotIn("--remote_executor=grpcs://", " ".join(argv))
-        self.assertEqual("//a:b", argv[-1])
-        self.assertEqual("--output_base=/private/output", argv[1])
-        self.assertEqual("test", argv[2])
 
-    def test_classify_accepts_only_full_cache_replay(self) -> None:
-        prime, replay = self._records(2)
-        self.assertEqual("PROVED_CACHE_ONLY", gate.classify(prime, replay, ("a", "b")))
-        replay["eligible_spawns"]["local"] = 1
-        self.assertEqual("CACHE_MISS_OR_MIXED_REPLAY", gate.classify(prime, replay, ("a", "b")))
+class FullCacheGateTest(unittest.TestCase):
+    def test_manifest_exact_shape_and_fixed_path_anchors(self) -> None:
+        data = (gate.VERSION + "\n" + "build\t" + gate.BUILD_LABEL + "\n" + "".join(f"test\t{test}\n" for test in TESTS)).encode()
+        with mock.patch.object(gate, "MANIFEST_SHA256", hashlib.sha256(data).hexdigest()), mock.patch.object(gate, "_manifest_bytes", return_value=data):
+            self.assertEqual((gate.BUILD_LABEL, TESTS), gate.load_manifest())
+        for bad in (data[:-1], data.replace(b"test\t//tests:t00", b"other\t//tests:t00"), data.replace(b"//tests:t00", b"//tests:t99")):
+            with mock.patch.object(gate, "MANIFEST_SHA256", hashlib.sha256(bad).hexdigest()), mock.patch.object(gate, "_manifest_bytes", return_value=bad), self.assertRaises(gate.GateError): gate.load_manifest()
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory) / "repo"; oracle = repo / "tests/v2_oracle"; oracle.mkdir(parents=True); target = oracle / "buildbuddy_cache_targets.txt"; target.write_bytes(data)
+            digest = hashlib.sha256(data).hexdigest()
+            with mock.patch.object(gate, "REPO_ROOT", repo), mock.patch.object(gate, "MANIFEST_SHA256", digest): self.assertEqual((gate.BUILD_LABEL, TESTS), gate.load_manifest())
+            exact_copy = Path(directory) / "exact-copy.txt"; exact_copy.write_bytes(data)
+            with mock.patch.object(gate, "MANIFEST_SHA256", digest), mock.patch.object(cli.gate, "run_gate") as run, redirect_stdout(StringIO()), redirect_stderr(StringIO()): self.assertEqual(1, cli.main([str(exact_copy)])); run.assert_not_called()
+            tests = repo / "tests"; saved = repo / "real-tests"; tests.rename(saved); tests.symlink_to(saved, target_is_directory=True)
+            with mock.patch.object(gate, "REPO_ROOT", repo), mock.patch.object(gate, "MANIFEST_SHA256", digest), self.assertRaises(gate.GateError): gate.load_manifest()
 
-    def test_classify_remote_and_target_failures(self) -> None:
-        prime, replay = self._records(1)
-        prime["build_finished"] = {"name": "REMOTE_ERROR", "code": 1}
-        self.assertEqual("REMOTE_UNAVAILABLE", gate.classify(prime, replay, ("a",)))
-        prime, replay = self._records(1)
-        prime["passed_test_count"] = 0
-        self.assertEqual("TARGET_FAILURE", gate.classify(prime, replay, ("a",)))
-        command = gate.phase_record(self._command_bep({"command": {"code": "COMMAND_NOT_FOUND"}}), b"", "replay", (), 2)
-        self.assertEqual("REMOTE_UNAVAILABLE", gate.classify(self._records(0)[0] | {"build_finished": {"name": "REMOTE_ERROR", "code": 1}}, command, ()))
+    def test_manifest_midread_name_and_directory_replacement(self) -> None:
+        data = (gate.VERSION + "\n" + "build\t" + gate.BUILD_LABEL + "\n" + "".join(f"test\t{test}\n" for test in TESTS)).encode(); digest = hashlib.sha256(data).hexdigest()
+        for change in ("name", "directory"):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
+                repo = Path(directory) / "repo"; oracle = repo / "tests/v2_oracle"; oracle.mkdir(parents=True); target = oracle / "buildbuddy_cache_targets.txt"; target.write_bytes(data)
+                original, changed = gate.os.read, []
+                def replace(fd: int, size: int) -> bytes:
+                    payload = original(fd, size)
+                    if not changed:
+                        changed.append(True)
+                        if change == "name": target.rename(target.with_name("saved-manifest")); target.write_bytes(data)
+                        else: oracle.rename(oracle.with_name("saved-v2_oracle")); oracle.mkdir(); (oracle / target.name).write_bytes(data)
+                    return payload
+                with mock.patch.object(gate, "REPO_ROOT", repo), mock.patch.object(gate, "MANIFEST_SHA256", digest), mock.patch.object(gate.os, "read", side_effect=replace), self.assertRaises(gate.GateError): gate.load_manifest()
 
-    def test_command_failure_diagnostics_are_allowlisted_and_precede_target_failure(self) -> None:
-        semantic = {
-            "command": {"OPTIONS_PARSE_FAILURE": "COMMAND_OPTIONS_PARSE", "STARLARK_OPTIONS_PARSE_FAILURE": "COMMAND_STARLARK_OPTIONS_PARSE", "ARGUMENTS_NOT_RECOGNIZED": "COMMAND_ARGUMENTS_NOT_RECOGNIZED", "INVOCATION_POLICY_PARSE_FAILURE": "COMMAND_INVOCATION_POLICY", "INVOCATION_POLICY_INVALID": "COMMAND_INVOCATION_POLICY"},
-            "remoteOptions": {"REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR": "REMOTE_OPTIONS_CONFIGURATION", "DOWNLOADER_WITHOUT_GRPC_CACHE": "REMOTE_OPTIONS_CONFIGURATION", "EXECUTION_WITH_INVALID_CACHE": "REMOTE_OPTIONS_CONFIGURATION"},
-            "remoteExecution": {"CREDENTIALS_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "RPC_LOG_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "EXEC_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "DOWNLOADER_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS": "REMOTE_EXECUTION_CONFIGURATION"},
-            "executionOptions": {"INVALID_STRATEGY": "EXECUTION_OPTIONS_CONFIGURATION", "RESTRICTION_UNMATCHED_TO_ACTION_CONTEXT": "EXECUTION_OPTIONS_CONFIGURATION", "REMOTE_FALLBACK_STRATEGY_NOT_ABSTRACT_SPAWN": "EXECUTION_OPTIONS_CONFIGURATION", "STRATEGY_NOT_FOUND": "EXECUTION_OPTIONS_CONFIGURATION", "DYNAMIC_STRATEGY_NOT_SANDBOXED": "EXECUTION_OPTIONS_CONFIGURATION", "MULTIPLE_EXECUTION_LOG_FORMATS": "EXECUTION_OPTIONS_CONFIGURATION"},
-            "execution": {"EXECUTION_LOG_INITIALIZATION_FAILURE": "EXECUTION_LOG_CONFIGURATION"},
-            "buildConfiguration": {"PLATFORM_MAPPING_EVALUATION_FAILURE": "BUILD_CONFIGURATION", "INVALID_CONFIGURATION": "BUILD_CONFIGURATION", "INVALID_BUILD_OPTIONS": "BUILD_CONFIGURATION", "MULTI_CPU_PREREQ_UNMET": "BUILD_CONFIGURATION", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID": "BUILD_CONFIGURATION", "CYCLE": "BUILD_CONFIGURATION", "CONFLICTING_CONFIGURATIONS": "BUILD_CONFIGURATION", "INVALID_OUTPUT_DIRECTORY_MNEMONIC": "BUILD_CONFIGURATION", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE": "BUILD_CONFIGURATION", "INVALID_PROJECT": "BUILD_CONFIGURATION"},
-        }
-        semantic_pairs = {(category, code): value for category, codes in semantic.items() for code, value in codes.items()}
-        self.assertEqual(semantic, gate.COMMAND_FAILURE_CLASSES)
-        self.assertEqual(33, len(semantic_pairs))
-        self.assertEqual(64, len(gate.B92_FAILURE_DETAIL_CATEGORY_KEYS))
-        self.assertEqual(131, len(gate.B92_EXIT2_SOURCE_PAIRS))
-        self.assertEqual("cbc5777ca02212ba3a5d20847c469eb221bd29b3c217162e6be39c5f5bf86d57", hashlib.sha256(gate.B92_EXIT2_CANONICAL_BYTES).hexdigest())
-        self.assertTrue(gate.B92_EXIT2_CANONICAL_BYTES.startswith(b"slug-bazel-9.2-failure-detail-exit2-v1\n"))
-        opaque: list[str] = []
-        for ordinal, pair in enumerate(gate.B92_EXIT2_SOURCE_PAIRS, 1):
-            category, code = pair
-            failure_class = semantic_pairs.get(pair, f"B92_EXIT2_CLASS_{ordinal:03d}")
-            self.assertEqual(failure_class, gate.B92_EXIT2_CLASSES[pair])
-            record = gate.phase_record(self._command_bep({category: {"code": code}}), b"", "prime", (), 2)
-            self.assertEqual(failure_class, record["command_failure_class"])
-            self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
-            self.assertNotIn(f'"{category}":', json.dumps(record))
-            self.assertNotIn(f'"{code}"', json.dumps(record))
-            if pair not in semantic_pairs:
-                opaque.append(failure_class)
-        self.assertEqual(98, len(opaque))
-        self.assertEqual(98, len(set(opaque)))
-        self.assertEqual("B92_EXIT2_CLASS_034", gate.B92_EXIT2_CLASSES[("command", "COMMAND_NOT_FOUND")])
-        self.assertEqual("B92_EXIT2_CLASS_040", gate.B92_EXIT2_CLASSES[("command", "NOT_IN_WORKSPACE")])
-        self.assertEqual("B92_EXIT2_CLASS_041", gate.B92_EXIT2_CLASSES[("command", "IN_OUTPUT_DIRECTORY")])
+    def test_exact_full_vector_nonce_and_legacy_command(self) -> None:
+        nonce = "f" * 64; output, event, log = Path("/private/output"), Path("/private/bep"), Path("/private/execution")
+        expected = ["bazel", f"--output_base={output}", "test", "--config=buildbuddy-cache", "--noremote_accept_cached", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--noremote_local_fallback", "--cache_test_results=yes", "--runs_per_test=1", "--test_sharding_strategy=disabled", f"--action_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", f"--test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", f"--build_event_json_file={event}", f"--execution_log_json_file={log}", *LABELS]
+        self.assertEqual(expected, gate.full_command("prime", "bazel", output, event, log, nonce, LABELS))
+        replay = gate.full_command("replay", "bazel", output, event, log, nonce, LABELS)
+        self.assertEqual("--remote_accept_cached", replay[4])
+        for forbidden in ("--remote_cache=", "--spawn_strategy=", "--test_strategy=", "--remote_upload_local_results", "--noremote_upload_local_results", "--remote_cache_async", "--noremote_cache_async"):
+            self.assertFalse(any(item.startswith(forbidden) for item in expected))
+        for bad_phase, bad_nonce, bad_labels in (("other", nonce, LABELS), ("prime", "secret", LABELS), ("prime", nonce, LABELS[:-1]), ("prime", nonce, LABELS[:-2] + (LABELS[-1], LABELS[-2]))):
+            with self.assertRaises(gate.GateError): gate.full_command(bad_phase, "bazel", output, event, log, bad_nonce, bad_labels)
+        legacy = ["bazel", f"--output_base={output}", "test", "--config=buildbuddy-cache", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_cache=grpcs://remote.buildbuddy.io", "--remote_instance_name=", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--spawn_strategy=worker,sandboxed,local", "--test_strategy=local", "--cache_test_results=yes", "--runs_per_test=1", "--test_sharding_strategy=disabled", "--noremote_local_fallback", "--build_event_publish_all_actions", f"--build_event_json_file={event}", f"--execution_log_json_file={log}", f"--action_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", f"--test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE={nonce}", "--noremote_accept_cached", "--remote_upload_local_results", "--noremote_cache_async", *LABELS]
+        self.assertEqual(legacy, gate.command("prime", "bazel", output, event, log, nonce, LABELS))
 
-    def test_command_failure_structural_results_and_private_suppression(self) -> None:
-        cases = (
-            (ABSENT, "MISSING_FAILURE_DETAIL"), (None, "MISSING_FAILURE_DETAIL"),
-            (1, "MALFORMED_FAILURE_DETAIL"), ([], "MALFORMED_FAILURE_DETAIL"), ({}, "MALFORMED_FAILURE_DETAIL"),
-            ({"message": "header=x-buildbuddy-api-key=secret nonce=private/path"}, "MALFORMED_FAILURE_DETAIL"),
-            ({"message": "header=x-buildbuddy-api-key=secret nonce=private/path", "command": {"code": "OPTIONS_PARSE_FAILURE"}}, "COMMAND_OPTIONS_PARSE"),
-            ({"message": 1, "command": {"code": "OPTIONS_PARSE_FAILURE"}}, "MALFORMED_FAILURE_DETAIL"),
-            ({"command": "bad"}, "MALFORMED_FAILURE_DETAIL"), ({"command": {}}, "MALFORMED_FAILURE_DETAIL"),
-            ({"command": {"code": 1}}, "MALFORMED_FAILURE_DETAIL"), ({"command": {"code": "OPTIONS_PARSE_FAILURE", "path": "private/path"}}, "MALFORMED_FAILURE_DETAIL"),
-            ({"command": {"code": "OPTIONS_PARSE_FAILURE"}, "remoteOptions": {"code": "EXECUTION_WITH_INVALID_CACHE"}}, "MALFORMED_FAILURE_DETAIL"),
-            ({"x-buildbuddy-api-key=secret": {"code": "nonce=private/path"}}, "UNSUPPORTED_GENERAL_FAILURE_DETAIL"),
-            ({"command": {"code": "HEADER_NONCE_PRIVATE_PATH_SECRET"}}, "UNRECOGNIZED_B9_2_EXIT2_DETAIL"),
-        )
-        for detail, expected in cases:
-            record = gate.phase_record(self._command_bep(detail), b"", "prime", (), 2)
-            self.assertEqual(expected, record["command_failure_class"])
-            self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
-            for private in ("secret", "header=", "x-buildbuddy-api-key", "nonce=", "private/path", "HEADER_NONCE"):
-                self.assertNotIn(private, json.dumps(record))
-        non_command = sequence([{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "ARBITRARY_ENUM", "code": 2}, "failureDetail": {"message": "stderr credential=secret", "command": {"code": "OPTIONS_PARSE_FAILURE"}}}}])
-        record = gate.phase_record(non_command, b"", "prime", (), 2)
-        self.assertEqual("NONE", record["command_failure_class"])
-        self.assertNotIn("ARBITRARY_ENUM", json.dumps(record))
+    def test_shared_parser_api_and_spawn_strictness(self) -> None:
+        self.assertEqual([{"a": 1}, {"b": 2}], list(gate.json_sequence(b'{"a":1}\n {"b":2}')))
+        for data in (b"[]", b"{", b"\xff"):
+            with self.assertRaises(gate.GateError): list(gate.json_sequence(data))
+        self.assertEqual(1, gate._field({"a": 1}, "a")); self.assertEqual("x", gate._field({}, "a", default="x"))
+        self.assertFalse(gate._boolean({}, "a")); self.assertTrue(gate._boolean({"a": True}, "a")); self.assertEqual(2, gate._count(2))
+        self.assertEqual('{"hash":"' + DIGEST + '","sizeBytes":4}', gate._digest({"hash": DIGEST, "sizeBytes": "4"}))
+        for call in (lambda: gate._boolean({"a": 1}, "a"), lambda: gate._count(True), lambda: gate._count(-1), lambda: gate._digest({"hash": "bad", "sizeBytes": 1}), lambda: gate._digest({"hash": DIGEST, "sizeBytes": True})):
+            with self.assertRaises(gate.GateError): call()
+        for runner, bucket in (("local", "local"), ("worker", "worker"), ("linux-sandbox", "linux_sandbox"), ("remote cache hit", "remote_cache_hit"), ("remote", "other")):
+            summary = gate.spawn_summary(gate.json_sequence(execution("prime", runner=runner)), "prime")
+            self.assertEqual(1, summary[bucket])
+        for field, value, error in (("cache_hit", "false", "cache_error_count"), ("status", "bad", "status_error_count"), ("exit_code", 1, "exit_error_count")):
+            self.assertEqual(1, gate.spawn_summary(gate.json_sequence(execution("prime", **{field: value})), "prime")[error])
+        with self.assertRaises(gate.GateError): gate.spawn_summary(gate.json_sequence(execution("prime", action_digest={"hash": "bad", "sizeBytes": 1})), "prime")
 
-    def test_digest_mismatch_is_cache_failure_but_zero_is_incomplete(self) -> None:
-        prime, replay = self._records(1)
-        replay["eligible_spawns"]["digest_multiset_sha256"] = "different"
-        self.assertEqual("CACHE_MISS_OR_MIXED_REPLAY", gate.classify(prime, replay, ("a",)))
-        replay["eligible_spawns"]["count"] = 0
-        self.assertEqual("EVIDENCE_INCOMPLETE", gate.classify(prime, replay, ("a",)))
-        prime, replay = self._records(1)
-        replay["persistent_action_cache_hit_count"] = 1
-        self.assertEqual("CACHE_MISS_OR_MIXED_REPLAY", gate.classify(prime, replay, ("a",)))
+    def test_singleton_bep_and_cache_predicates(self) -> None:
+        prime = gate.phase_record(bep("prime"), execution("prime"), "prime", TESTS, 0); prime["output_count"] = 1
+        replay = gate.phase_record(bep("replay"), execution("replay"), "replay", TESTS, 0); replay["output_count"] = 1
+        self.assertEqual("PROVED_CACHE_ONLY", gate.classify(prime, replay))
+        self.assertEqual((43, 43, 0), (prime["test_completion_count"], prime["passed_test_count"], prime["remotely_cached_test_count"]))
+        self.assertEqual(43, replay["remotely_cached_test_count"])
+        for change in ("duplicate_finished", "missing_finished", "duplicate_completion", "missing_completion", "foreign_completion", "duplicate_summary", "missing_summary", "foreign_summary", "impossible_cached", "cached_null", "cached_bool", "cached_string", "exit_null", "exit_bool", "exit_string"):
+            with self.subTest(change=change), self.assertRaises(gate.GateError): gate.phase_record(bep("prime", change), execution("prime"), "prime", TESTS, 0)
+        with self.assertRaises(gate.GateError): gate.phase_record(bep("replay", "missing_replay_cached"), execution("replay"), "replay", TESTS, 0)
+        for change, expected in (("failed_completion", "TARGET_FAILURE"), ("failed_summary", "TARGET_FAILURE"), ("bad_runs", "TARGET_FAILURE"), ("bad_cached", "CACHE_MISS_OR_MIXED_REPLAY"), ("remote", "REMOTE_UNAVAILABLE"), ("command", "COMMAND_LINE_FAILURE"), ("target", "TARGET_FAILURE"), ("persistent", "CACHE_MISS_OR_MIXED_REPLAY")):
+            current = gate.phase_record(bep("prime", change), execution("prime"), "prime", TESTS, 0); current["output_count"] = 1
+            self.assertEqual(expected, gate.classify(current, replay), change)
+        current = json.loads(json.dumps(prime)); current["eligible_spawns"]["digest_multiset_sha256"] = "e" * 64
+        self.assertEqual("CACHE_MISS_OR_MIXED_REPLAY", gate.classify(current, replay))
+        current = json.loads(json.dumps(replay)); current["eligible_spawns"].update(remote_cache_hit=0, local=1)
+        self.assertEqual("CACHE_MISS_OR_MIXED_REPLAY", gate.classify(prime, current))
 
-    def test_metrics_hits_and_unsuccessful_completion_are_strict(self) -> None:
-        tests = ("//a:t",)
-        bep = self._bep(tests, "prime") + sequence([{"id": {"buildMetrics": {}}, "buildMetrics": {"actionSummary": {"actionCacheStatistics": {"hits": 2}}}}])
-        execution = sequence([{"runner": "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}])
-        record = gate.phase_record(bep, execution, "prime", tests, 0)
-        self.assertEqual(2, record["persistent_action_cache_hit_count"])
-        bad = self._bep(tests, "prime").replace(b'"success": true', b'"success": false')
-        self.assertEqual(0, gate.phase_record(bad, execution, "prime", tests, 0)["build_success_count"])
-        missing_test_completion = sequence([{"id": {"targetCompleted": {"label": "//app/slug_cli_v2:slug"}}, "completed": {"success": True}}, {"id": {"testSummary": {"label": "//a:t"}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "totalNumCached": 0}}, {"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS", "code": 0}}}])
-        self.assertEqual(0, gate.phase_record(missing_test_completion, execution, "prime", tests, 0)["passed_test_count"])
+    def test_closed_schema_classes_counts_and_hostile_values(self) -> None:
+        prime = gate.phase_record(bep("prime"), execution("prime"), "prime", TESTS, 0); prime["output_count"] = 1
+        replay = gate.phase_record(bep("replay"), execution("replay"), "replay", TESTS, 0); replay["output_count"] = 1
+        proved = gate.record("PROVED_CACHE_ONLY", prime, replay, HEAD, True)
+        self.assertEqual(proved, gate.normalize(proved)); self.assertEqual(set(gate.record()), set(proved))
+        self.assertEqual({"build": 1, "test": 43}, proved["target_counts"]); self.assertEqual(gate.CLASSES, gate.FAILURES | {"PROVED_CACHE_ONLY"})
+        class DictSubclass(dict): pass
+        class StringSubclass(str): pass
+        hostile = [
+            {**proved, "secret": "/private/token"}, DictSubclass(proved), {**proved, "classification": StringSubclass("PROVED_CACHE_ONLY")},
+            {**proved, "schema_version": True}, {**proved, "git_clean": 1}, {**proved, "target_counts": {"build": 1, "test": 42}},
+        ]
+        for value in hostile: self.assertEqual(gate.record(), gate.normalize(value))
+        for mutate in (lambda value: value["prime"].pop("output_count"), lambda value: value["prime"].update(secret=1), lambda value: value["prime"].update(output_count=-1), lambda value: value["prime"]["eligible_spawns"].update(count=2), lambda value: value["prime"]["eligible_spawns"].update(digest_multiset_sha256="bad")):
+            value = json.loads(json.dumps(proved)); mutate(value); self.assertEqual(gate.record(), gate.normalize(value))
+        value = json.loads(json.dumps(proved)); value["prime"] = DictSubclass(value["prime"]); self.assertEqual(gate.record(), gate.normalize(value))
+        self.assertNotIn("private", json.dumps(gate.record()))
 
-    def test_each_test_must_run_and_cache_exactly_once(self) -> None:
-        tests = ("//a:first", "//a:second")
-        local_execution = sequence([{"runner": "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}])
-        uneven = self._bep(tests, "prime").replace(b'"totalRunCount": 1', b'"totalRunCount": 0', 1).replace(b'"totalRunCount": 1', b'"totalRunCount": 2', 1)
-        record = gate.phase_record(uneven, local_execution, "prime", tests, 0)
-        self.assertEqual(0, record["test_run_count"])
-        self.assertEqual(0, record["passed_test_count"])
-        impossible_cache = self._bep(tests, "replay").replace(b'"totalNumCached": 1', b'"totalNumCached": 0', 1).replace(b'"totalNumCached": 1', b'"totalNumCached": 2', 1)
-        remote_execution = sequence([{"runner": "remote cache hit", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": True, "status": "", "exitCode": 0}])
-        with self.assertRaises(gate.GateError):
-            gate.phase_record(impossible_cache, remote_execution, "replay", tests, 0)
-
-    def test_phase_record_rejects_unknown_prime_runner(self) -> None:
-        tests = ("//a:t",)
-        bep = self._bep(tests, "prime")
-        execution = sequence([{"runner": "mystery", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}])
-        record = gate.phase_record(bep, execution, "prime", tests, 0)
-        self.assertEqual(1, record["eligible_spawns"]["unknown"])
-        replay = self._records(1)[1]
-        replay["eligible_spawns"]["digest_multiset_sha256"] = record["eligible_spawns"]["digest_multiset_sha256"]
-        self.assertEqual("CACHE_MISS_OR_MIXED_REPLAY", gate.classify(record, replay, tests))
-
-    def test_spawn_summary_ignores_ineligible_local_and_rejects_nonboolean_hit(self) -> None:
-        entries = [{"runner": "local", "cacheable": False, "remoteCacheable": False}, {"runner": "remote cache hit", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": True, "status": "", "exitCode": 0}]
-        summary = gate.spawn_summary(entries, "replay")
-        self.assertEqual(0, summary["local"])
-        self.assertEqual(1, summary["remote_cache_hit"])
-        entries[1]["cacheHit"] = "true"
-        self.assertEqual(1, gate.spawn_summary(entries, "replay")["cache_hit_failures"])
-
-    def test_spawn_and_bep_scalar_types_fail_closed(self) -> None:
-        malformed = [{"runner": "local", "cacheable": "true", "remoteCacheable": True}]
-        with self.assertRaises(gate.GateError):
-            gate.spawn_summary(malformed, "prime")
-        tests = ("//a:t",)
-        execution = sequence([{"runner": "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": False}])
-        with self.assertRaises(gate.GateError):
-            gate.phase_record(self._bep(tests, "prime"), execution, "prime", tests, 0)
-        malformed_bep = self._bep(tests, "prime").replace(b'"totalRunCount": 1', b'"totalRunCount": true')
-        with self.assertRaises(gate.GateError):
-            gate.phase_record(malformed_bep, sequence([]), "prime", tests, 0)
-
-    def test_phase_record_rejects_missing_terminal_data(self) -> None:
-        with self.assertRaises(gate.GateError):
-            gate.phase_record(b"", b"", "prime", ("//a:t",), 1)
-
-    def test_digest_validation_is_strict_and_canonical(self) -> None:
-        self.assertEqual(json.dumps({"hash": DIGEST, "sizeBytes": 2}, sort_keys=True, separators=(",", ":")), gate._digest({"hash": DIGEST, "sizeBytes": "2", "ignored": "x"}))
-        for digest in ({"hash": "A" * 64, "sizeBytes": 1}, {"hash": DIGEST, "sizeBytes": "02"}, {"hash": DIGEST, "sizeBytes": -1}):
-            with self.assertRaises(gate.GateError):
-                gate._digest(digest)
-
-    def test_run_gate_is_mocked_and_cleans_private_paths(self) -> None:
-        calls: list[list[str]] = []
-        roots: list[Path] = []
-
-        def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+    def _run(self, change: str = "ready", post_clean: bool = True) -> tuple[dict[str, object], list[list[str]], list[Path]]:
+        calls: list[list[str]] = []; roots: list[Path] = []
+        def runner(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
             calls.append(argv)
-            self.assertEqual(ROOT, _.get("cwd"))
-            if argv[-1] == "version":
-                return subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
-            if len(argv) > 2 and argv[2] == "test":
-                phase = "prime" if "--noremote_accept_cached" in argv else "replay"
-                bep = Path(next(value.split("=", 1)[1] for value in argv if value.startswith("--build_event_json_file=")))
-                log = Path(next(value.split("=", 1)[1] for value in argv if value.startswith("--execution_log_json_file=")))
-                roots.append(Path(argv[1].split("=", 1)[1]).parents[1])
-                labels = tuple(value for value in argv if value.startswith("//"))
-                tests = labels[1:]
-                self.assertEqual(0o600, stat.S_IMODE(os.fstat(_.get("stdout").fileno()).st_mode))
-                self.assertEqual(0o600, stat.S_IMODE(os.fstat(_.get("stderr").fileno()).st_mode))
-                _.get("stderr").write(b"header=x-buildbuddy-api-key=secret nonce=private/path")
-                bep.write_bytes(self._bep(tests, phase))
-                log.write_bytes(sequence([{"runner": "local" if phase == "prime" else "remote cache hit", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 4}, "cacheHit": phase == "replay", "status": "", "exitCode": 0}]))
-            return subprocess.CompletedProcess(argv, 0, b"raw token", b"raw token")
-
-        original_read_bytes = Path.read_bytes
-        def checked_read_bytes(path: Path) -> bytes:
-            self.assertNotEqual("stderr", path.name)
-            return original_read_bytes(path)
-
-        with mock.patch.object(Path, "read_bytes", checked_read_bytes), mock.patch.object(gate, "_git", side_effect=("a" * 40, "")):
-            result = gate.run_gate(MANIFEST, runner=runner)
-        self.assertEqual("PROVED_CACHE_ONLY", result["classification"])
-        self.assertNotIn("raw token", json.dumps(result))
-        self.assertNotIn("x-buildbuddy-api-key", json.dumps(result))
-        self.assertEqual(["bazel", "--ignore_all_rc_files", "version"], calls[0])
-        tests = [argv for argv in calls if len(argv) > 2 and argv[2] == "test"]
-        self.assertEqual(2, len(tests))
-        self.assertTrue(all(argv[4] == "--@rules_rust//rust/toolchain/channel=nightly" and argv.count(argv[4]) == 1 for argv in tests))
-        nonces = [{item for item in argv if "CACHE_GATE_NONCE=" in item} for argv in tests]
-        self.assertEqual(nonces[0], nonces[1])
-        self.assertEqual(2, len([argv for argv in calls if argv[-1] == "shutdown"]))
-        self.assertEqual({"schema_version", "classification", "mode", "bazel_version", "host_platform", "git_head", "git_clean", "manifest_sha256", "bazelrc_sha256", "target_counts", "prime", "replay"}, set(result))
-        self.assertEqual("buildbuddy-cache-only", result["mode"])
-        self.assertEqual("linux-x86_64", result["host_platform"])
-        self.assertNotEqual(next(item for item in tests[0] if item.startswith("--output_base=")), next(item for item in tests[1] if item.startswith("--output_base=")))
-        self.assertIn("--noremote_accept_cached", tests[0])
-        self.assertIn("--remote_accept_cached", tests[1])
-        self.assertTrue(roots and all(not root.exists() for root in roots))
-
-    def test_remote_abort_payload_is_remote_unavailable(self) -> None:
-        tests = ("//a:t",)
-        bep = self._bep(tests, "prime") + sequence([{"id": {"targetCompleted": {"label": "//a:other"}}, "aborted": {"reason": "REMOTE_ENVIRONMENT_FAILURE", "description": "raw secret"}}])
-        execution = sequence([{"runner": "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}])
-        prime = gate.phase_record(bep, execution, "prime", tests, 0)
-        replay = self._records(1)[1]
-        self.assertEqual("REMOTE_UNAVAILABLE", gate.classify(prime, replay, tests))
-        self.assertNotIn("raw secret", json.dumps(prime))
-
-    def test_preflight_rejects_wrong_version_before_gate(self) -> None:
-        def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
-            return subprocess.CompletedProcess(argv, 0, b"Build label: 9.1.0\n")
-
-        with self.assertRaises(gate.GateError) as error:
-            gate.run_gate(MANIFEST, runner=runner)
-        self.assertEqual("CONFIG_DRIFT", error.exception.classification)
-
-        for output in (b"", VERSION_OUTPUT + b"Build label: 9.2.0\n"):
-            with self.assertRaises(gate.GateError):
-                gate._preflight("bazel", lambda argv, **_: subprocess.CompletedProcess(argv, 0, output))
-
-    def test_preflight_rejects_platform_and_git_drift(self) -> None:
-        runner = lambda argv, **_: subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
-        with mock.patch.object(gate.platform, "system", return_value="Darwin"), self.assertRaises(gate.GateError):
-            gate._preflight("bazel", runner)
-        with mock.patch.object(gate, "_git", side_effect=("not-a-sha", "")), self.assertRaises(gate.GateError):
-            gate._preflight("bazel", runner)
-
-    def test_all_prime_runners_and_near_miss(self) -> None:
-        for name in ("local", "worker", "linux-sandbox"):
-            self.assertEqual(1, gate.spawn_summary([{"runner": name, "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}], "prime")["local"])
-        self.assertEqual(1, gate.spawn_summary([{"runner": "local-ish", "cacheable": True, "remoteCacheable": True, "digest": {"hash": OTHER_DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}], "prime")["unknown"])
-
-    def test_cli_hides_exception_and_keeps_stderr_empty(self) -> None:
-        stdout, stderr = StringIO(), StringIO()
-        with mock.patch.object(cli, "run_gate", side_effect=RuntimeError("token=not-allowed")), redirect_stdout(stdout), redirect_stderr(stderr):
-            self.assertEqual(1, cli.main([]))
-        self.assertEqual("", stderr.getvalue())
-        self.assertEqual({"classification": "SANITIZER_REJECTED", "schema_version": 1}, json.loads(stdout.getvalue()))
-
-    def test_cleanup_failure_is_fail_closed(self) -> None:
-        roots: list[Path] = []
-        def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
             if argv[-1] == "shutdown":
-                raise OSError("no raw detail")
-            if argv[-1] == "version":
-                return subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
-            if len(argv) > 2 and argv[2] == "test":
-                roots.append(Path(argv[1].split("=", 1)[1]).parents[1])
-            return subprocess.CompletedProcess(argv, 1)
+                output = Path(argv[2].split("=", 1)[1])
+                if change == "shutdown_output_swap": output.rename(output.with_name("saved-output")); output.mkdir()
+                if change == "shutdown_exception": raise OSError("/private")
+                return subprocess.CompletedProcess(argv, 1 if change == "shutdown_nonzero" else 0)
+            output = Path(argv[1].split("=", 1)[1]); phase_root, root = output.parent, output.parents[1]; roots.append(root)
+            phase = "prime" if "--noremote_accept_cached" in argv else "replay"
+            event_path = Path(next(item.split("=", 1)[1] for item in argv if item.startswith("--build_event_json_file=")))
+            log_path = Path(next(item.split("=", 1)[1] for item in argv if item.startswith("--execution_log_json_file=")))
+            event_change = change if phase == "prime" and change in {"duplicate_finished", "missing_finished", "duplicate_completion", "missing_completion", "foreign_completion", "duplicate_summary", "missing_summary", "foreign_summary", "failed_completion", "failed_summary", "bad_runs", "bad_cached", "impossible_cached", "remote", "command", "target", "persistent"} else "ready"
+            event_path.write_bytes(bep(phase, event_change)); log_path.write_bytes(execution(phase))
+            target = output / "execroot/x/bin/app/slug_cli_v2/slug"
+            if change != "output_missing":
+                target.parent.mkdir(parents=True); target.write_bytes(b"x"); target.chmod(0o600 if change == "output_nonexec" else 0o700)
+                if change == "output_multiple":
+                    second = output / "execroot/y/bin/app/slug_cli_v2/slug"; second.parent.mkdir(parents=True); second.write_bytes(b"x"); second.chmod(0o700)
+            if phase == "prime":
+                if change == "bep_replace": event_path.rename(event_path.with_name("old-bep")); event_path.write_bytes(bep(phase))
+                elif change == "execution_replace": log_path.rename(log_path.with_name("old-execution")); log_path.write_bytes(execution(phase))
+                elif change == "bep_symlink": event_path.unlink(); event_path.symlink_to("/dev/null")
+                elif change == "execution_mode": log_path.chmod(0o640)
+                elif change == "execution_missing": log_path.unlink()
+                elif change == "execution_bad": log_path.write_bytes(b"{")
+                elif change == "root_swap": root.rename(root.with_name("saved-root")); root.mkdir()
+                elif change == "phase_swap": phase_root.rename(phase_root.with_name("saved-prime")); phase_root.mkdir()
+                elif change == "output_swap": output.rename(output.with_name("saved-output")); output.mkdir()
+            return subprocess.CompletedProcess(argv, 0)
+        clean = mock.Mock(side_effect=[True] if post_clean else [False])
+        with mock.patch.object(gate, "load_manifest", return_value=(gate.BUILD_LABEL, TESTS)), mock.patch.object(gate, "_preflight", return_value=HEAD), mock.patch.object(gate, "_clean", clean):
+            result = gate.run_gate(runner=runner)
+        return result, calls, roots
 
-        with mock.patch.object(gate, "_git", side_effect=("a" * 40, "")), self.assertRaises(gate.GateError) as error:
-            gate.run_gate(MANIFEST, runner=runner)
-        self.assertEqual("SANITIZER_REJECTED", error.exception.classification)
-        self.assertTrue(roots and not roots[0].exists())
+    def test_private_two_phase_run_output_and_cleanup(self) -> None:
+        result, calls, roots = self._run()
+        self.assertEqual("PROVED_CACHE_ONLY", result["classification"]); self.assertEqual(4, len(calls)); self.assertEqual(2, len(roots))
+        self.assertEqual(["prime", "replay"], ["prime" if "--noremote_accept_cached" in call else "replay" for call in calls[:2]])
+        self.assertEqual(roots[0], roots[1]); self.assertFalse(roots[0].exists())
+        for phase in ("prime", "replay"):
+            self.assertEqual(1, result[phase]["output_count"]); self.assertEqual(43, result[phase]["passed_test_count"])
 
-    def test_nonzero_shutdown_is_fail_closed_and_still_removes_root(self) -> None:
-        roots: list[Path] = []
-        def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
-            if argv[-1] == "version":
-                return subprocess.CompletedProcess(argv, 0, VERSION_OUTPUT)
-            if len(argv) > 2 and argv[2] == "test":
-                roots.append(Path(argv[1].split("=", 1)[1]).parents[1])
-                return subprocess.CompletedProcess(argv, 1)
-            return subprocess.CompletedProcess(argv, 9)
+    def test_artifact_output_anchor_and_evidence_failures(self) -> None:
+        self.assertEqual("PROVED_CACHE_ONLY", self._run("execution_replace")[0]["classification"])
+        for change, expected in (
+            ("bep_replace", "EVIDENCE_INCOMPLETE"), ("bep_symlink", "EVIDENCE_INCOMPLETE"), ("execution_mode", "EVIDENCE_INCOMPLETE"), ("execution_missing", "EVIDENCE_INCOMPLETE"), ("execution_bad", "EVIDENCE_INCOMPLETE"),
+            ("output_missing", "TARGET_FAILURE"), ("output_nonexec", "TARGET_FAILURE"), ("output_multiple", "TARGET_FAILURE"),
+            ("duplicate_finished", "EVIDENCE_INCOMPLETE"), ("duplicate_completion", "EVIDENCE_INCOMPLETE"), ("foreign_completion", "EVIDENCE_INCOMPLETE"), ("foreign_summary", "EVIDENCE_INCOMPLETE"), ("failed_summary", "TARGET_FAILURE"), ("bad_cached", "CACHE_MISS_OR_MIXED_REPLAY"),
+        ):
+            with self.subTest(change=change): self.assertEqual(expected, self._run(change)[0]["classification"])
+        for change in ("root_swap", "phase_swap", "output_swap", "shutdown_output_swap", "shutdown_nonzero", "shutdown_exception"):
+            with self.subTest(change=change):
+                result, _, roots = self._run(change); self.assertEqual(gate.record(), result); self.assertTrue(all(not root.exists() for root in roots))
 
-        with mock.patch.object(gate, "_git", side_effect=("a" * 40, "")), self.assertRaises(gate.GateError) as error:
-            gate.run_gate(MANIFEST, runner=runner)
-        self.assertEqual("SANITIZER_REJECTED", error.exception.classification)
-        self.assertTrue(roots and not roots[0].exists())
+    def test_replacement_during_read_cleanup_and_clean_suppression(self) -> None:
+        original, changed = gate.os.read, []
+        def replace(fd: int, size: int) -> bytes:
+            data = original(fd, size)
+            if not changed and size >= (1 << 20):
+                changed.append(True)
+                for root in Path(tempfile.gettempdir()).glob("slug-buildbuddy-cache-*/prime/bep.json"):
+                    saved = root.with_name("midread-bep"); root.rename(saved); root.write_bytes(bep("prime"))
+            return data
+        with mock.patch.object(gate.os, "read", side_effect=replace): self.assertEqual("EVIDENCE_INCOMPLETE", self._run()[0]["classification"])
+        actual = gate._remove_original
+        def fail_remove(*args: object) -> bool: actual(*args); return False
+        with mock.patch.object(gate, "_remove_original", side_effect=fail_remove): self.assertEqual(gate.record(), self._run()[0])
+        self.assertEqual(gate.record(), self._run(post_clean=False)[0])
+        with mock.patch.object(gate, "load_manifest", return_value=(gate.BUILD_LABEL, TESTS)), mock.patch.object(gate, "_preflight", side_effect=gate.GateError("CONFIG_DRIFT")):
+            self.assertEqual("CONFIG_DRIFT", gate.run_gate()["classification"])
 
-    def _records(self, count: int) -> tuple[dict[str, object], dict[str, object]]:
-        def record(remote: bool) -> dict[str, object]:
-            return {"process_exit_code": 0, "build_finished": {"name": "SUCCESS", "code": 0}, "command_failure_class": "NONE", "build_success_count": 1, "passed_test_count": count, "test_run_count": count, "remotely_cached_test_count": count if remote else 0, "persistent_action_cache_hit_count": 0, "eligible_spawns": {"count": 1, "digest_multiset_sha256": "same", "cache_hit_failures": 0, "status_failures": 0, "exit_failures": 0, "local": 0 if remote else 1, "remote_cache_hit": 1 if remote else 0, "disk_cache_hit": 0, "remote_execution": 0, "unknown": 0}}
-        return record(False), record(True)
+    def test_reserved_cache_namespace_refusal_and_removal(self) -> None:
+        parent = Path(tempfile.gettempdir()); parent_fd = os.open(parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        wrong = Path(tempfile.mkdtemp(prefix="slug-buildbuddy-prime-")); allowed = Path(tempfile.mkdtemp(prefix="slug-buildbuddy-cache-"))
+        try:
+            self.assertFalse(gate._remove_reserved(wrong, parent_fd)); self.assertTrue(wrong.exists())
+            self.assertTrue(gate._remove_reserved(allowed, parent_fd)); self.assertFalse(allowed.exists())
+        finally:
+            os.close(parent_fd)
+            if wrong.exists(): wrong.rmdir()
 
-    @staticmethod
-    def _bep(tests: tuple[str, ...], phase: str) -> bytes:
-        events: list[dict[str, object]] = [{"id": {"targetCompleted": {"label": "//app/slug_cli_v2:slug"}}, "completed": {"success": True}}]
-        events.extend({"id": {"targetCompleted": {"label": test}}, "completed": {"success": True}} for test in tests)
-        events.extend({"id": {"testSummary": {"label": test}}, "testSummary": {"overallStatus": "PASSED", "totalRunCount": 1, "totalNumCached": 1 if phase == "replay" else 0}} for test in tests)
-        events.append({"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "SUCCESS", "code": 0}}})
-        return sequence(events)
-
-    @staticmethod
-    def _command_bep(detail: object = ABSENT) -> bytes:
-        finished: dict[str, object] = {"exitCode": {"name": "COMMAND_LINE_ERROR", "code": 2}}
-        if detail is not ABSENT:
-            finished["failureDetail"] = detail
-        return sequence([{"id": {"buildFinished": {}}, "finished": finished}])
-
-    def _temp(self, name: str, data: bytes) -> Path:
-        path = ROOT / "target" / name
-        path.parent.mkdir(exist_ok=True)
-        path.write_bytes(data)
-        self.addCleanup(path.unlink)
-        return path
+    def test_cli_canonical_privacy_and_shared_one_label_imports(self) -> None:
+        prime = gate.phase_record(bep("prime"), execution("prime"), "prime", TESTS, 0); prime["output_count"] = 1
+        replay = gate.phase_record(bep("replay"), execution("replay"), "replay", TESTS, 0); replay["output_count"] = 1
+        proved = gate.record("PROVED_CACHE_ONLY", prime, replay, HEAD, True)
+        out, err = StringIO(), StringIO()
+        with mock.patch.object(cli.gate, "run_gate", return_value=proved), redirect_stdout(out), redirect_stderr(err): self.assertEqual(0, cli.main([]))
+        self.assertEqual("", err.getvalue()); self.assertEqual(json.dumps(proved, sort_keys=True, separators=(",", ":")) + "\n", out.getvalue())
+        for failure in (RuntimeError("/private/token"), gate.record("CONFIG_DRIFT")):
+            out, err = StringIO(), StringIO()
+            patcher = mock.patch.object(cli.gate, "run_gate", side_effect=failure) if isinstance(failure, Exception) else mock.patch.object(cli.gate, "run_gate", return_value=failure)
+            with patcher, redirect_stdout(out), redirect_stderr(err): self.assertEqual(1, cli.main([]))
+            self.assertEqual("", err.getvalue()); self.assertNotIn("private", out.getvalue()); self.assertEqual(set(gate.record()), set(json.loads(out.getvalue())))
+        exact_copy = Path("/private/exact-copy")
+        with mock.patch.object(cli.gate, "run_gate") as run, redirect_stdout(StringIO()), redirect_stderr(StringIO()): self.assertEqual(1, cli.main([str(exact_copy)])); run.assert_not_called()
+        from tools.v2_oracle_lib import buildbuddy_build_cache, buildbuddy_build_rbe
+        self.assertIs(buildbuddy_build_cache.parsed, gate); self.assertIs(buildbuddy_build_rbe.parsed, gate)
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
