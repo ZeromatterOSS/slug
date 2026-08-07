@@ -30,7 +30,7 @@ class GateError(Exception):
 def command(bazel: str, output: Path, bep: Path, execution: Path, nonce: str) -> list[str]:
     if not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{64}", nonce):
         raise GateError()
-    return [bazel, f"--output_base={output}", "build", "--config=buildbuddy-cache", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--noremote_local_fallback", f"--action_env=SLUG_BUILDBUDDY_BUILD_CACHE_NONCE={nonce}", f"--build_event_json_file={bep}", f"--execution_log_json_file={execution}", LABEL]
+    return [bazel, f"--output_base={output}", "build", "--config=buildbuddy-cache", "--noremote_accept_cached", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--noremote_local_fallback", f"--action_env=SLUG_BUILDBUDDY_BUILD_CACHE_NONCE={nonce}", f"--build_event_json_file={bep}", f"--execution_log_json_file={execution}", LABEL]
 
 
 def _count(value: Any) -> int:

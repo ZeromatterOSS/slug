@@ -23,9 +23,10 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
     def test_command_is_exact_minimal_build_and_nonce(self) -> None:
         argv = gate.command("bazel", Path("/p/out"), Path("/p/bep"), Path("/p/log"), "a" * 64)
         self.assertEqual(["bazel", "--output_base=/p/out", "build", "--config=buildbuddy-cache"], argv[:4])
+        self.assertEqual("--noremote_accept_cached", argv[4]); self.assertEqual(1, argv.count("--noremote_accept_cached"))
         self.assertEqual(gate.LABEL, argv[-1]); self.assertEqual(1, argv.count("--@rules_rust//rust/toolchain/channel=nightly"))
         self.assertEqual({"--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache="}, set(x for x in argv if x in {"--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache="}))
-        for forbidden in ("remote_cache", "remote_instance", "spawn_strategy", "test_", "publish_all", "remote_accept", "remote_upload", "cache_async", "test_env"):
+        for forbidden in ("remote_cache", "remote_instance", "spawn_strategy", "test_", "publish_all", "remote_upload", "cache_async", "test_env"):
             self.assertFalse(any(forbidden in x for x in argv))
         with self.assertRaises(gate.GateError): gate.command("bazel", Path("/p"), Path("/b"), Path("/e"), "secret")
 
@@ -33,6 +34,12 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
         event = {"runner": "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}
         summary = gate.spawns([event], "prime")
         self.assertEqual(1, summary["local"]); self.assertEqual(0, summary["cache_error_count"])
+        absent = object()
+        for phase, hit, errors in (("prime", False, 0), ("prime", True, 1), ("prime", absent, 1), ("prime", None, 1), ("prime", "false", 1), ("prime", 0, 1), ("prime", 1, 1), ("replay", True, 0), ("replay", False, 1)):
+            current = dict(event)
+            if hit is absent: current.pop("cacheHit")
+            else: current["cacheHit"] = hit
+            with self.subTest(phase=phase, hit=hit): self.assertEqual(errors, gate.spawns([current], phase)["cache_error_count"])
         event["runner"] = "worker"; self.assertEqual(1, gate.spawns([event], "prime")["worker"])
         event["runner"] = "linux-sandbox"; self.assertEqual(1, gate.spawns([event], "prime")["linux_sandbox"])
         event["runner"] = "private-runner"; self.assertEqual(1, gate.spawns([event], "prime")["other"])
