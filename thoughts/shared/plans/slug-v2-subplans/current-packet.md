@@ -1,44 +1,36 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-execution-replacement-repair`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-repaired-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a replacement-aware, descriptor-anchored cache gate.
+Result: one replacement-aware build-cache prime/replay result.
 
-## Goal and required design
+## Goal and required evidence
 
-Change only `tools/v2_oracle_lib/buildbuddy_build_cache.py` (150 net lines) and
-`tests/v2_oracle/test_buildbuddy_build_cache_gate.py` (220 net): 370 maximum.
-Do not change the CLI, closed schema, command vector, classification set, BEP
-identity rule, configuration, targets, manifests, or docs.
+From the clean scheduling commit, invoke exactly once:
 
-Keep BEP's precreated exact-inode read. For execution only, open the final
-direct child through the retained phase FD with no-follow/nonblocking read;
-accept retained or replaced inode only when regular, mode 0600, and single-
-link. Read through that descriptor, verify its dirent identity before/after,
-then feed the existing strict JSON-sequence/spawn parser. Never expose raw
-content or exact metadata.
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_gate.py
+```
 
-Precreate/open each phase output directory with retained no-follow identity.
-Require root/phase/output anchoring before and after parse, output inspection,
-and shutdown. Cleanup removes both the original root inode and anything the
-child placed at the reserved random root entry without following links.
+Inherit the environment unchanged so only Bazel consumes ordinary/home RC.
+Never inspect, print, copy, or persist that RC/token, `HOME`, terminal/BEP/
+execution contents, invocation URLs, or BuildBuddy UI data. Review only CLI
+status, empty stderr, and one compact normalized JSON record.
 
-Pinned Bazel 9.2 commit `8220c619…` requires this execution-only replacement:
-`ExpandedSpawnLogContext` lines 106-130/291-316 delete the preexisting JSON
-output then create the converted final file; `ExecutionOptions` lines 420-436
-define its executed-spawn records. Empty remains source-valid and must reach
-the existing parser's `EVIDENCE_INCOMPLETE`, not an ownership rejection.
+Accept only exit zero, schema version one, fixed
+`buildbuddy-build-cache-only` mode, and `PROVED_BUILD_CACHE`. The frozen gate
+requires both successful builds/materializations, nonempty matching eligible
+digest multisets, prime local misses, replay remote-cache hits, zero persistent
+hits/errors, anchored shutdown, dual-root cleanup, clean Git, and no `slugd`.
 
 ## Stops and budget
 
-Offline tests cover retained/replaced/empty execution, symlink/hardlink/mode/
-directory rejection, BEP replacement rejection, root/phase/output swaps before
-and during reads/shutdown, exact unchanged argv/schema/classes, cleanup, and
-raw suppression. Run focused unittest, compilation, scope/caps/diff checks,
-and independent privacy/lifecycle review only. No Bazel, home RC, network,
-remote service, or raw live artifact. One focused correction is allowed.
+Do not retry, inspect artifacts, modify code/config, or reinterpret any failure.
+Any nonzero CLI, nonempty stderr, schema surprise, class other than
+`PROVED_BUILD_CACHE`, retained state, Git/daemon drift, or cleanup failure is
+`REPLAN`. This can prove only one build-label cache vertical.
 
-Any need for a second material repair, schema/vector/class change, BEP
-relaxation, links/mode relaxation, path-following, or raw data is `REPLAN`.
-A separate packet owns one gate invocation. RBE/43-test/Stage 10 remain open.
+Afterward only owner/canonical/current docs may record the fixed result, at most
+100 changed lines. Structured build-only RBE, the full 43-test expansion, and
+the rest of Stage 10 remain required successors.

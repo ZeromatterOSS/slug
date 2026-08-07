@@ -1956,6 +1956,29 @@ independent review only; no Bazel/home RC/network/live data. A second material
 repair or public-contract relaxation is `REPLAN`. One later packet owns one
 unchanged gate invocation; RBE and 43-test expansion remain successors.
 
+The replacement-aware cache-gate repair is accepted in commit `72f45081…`:
+production +97/test +93 net lines in the exact two-file scope. Fourteen focused
+offline tests, Python compilation, caps/scope/diff checks, and independent
+privacy/lifecycle review pass. The public CLI/schema/argv/classes and BEP
+exact-inode rule remain unchanged. Execution alone admits Bazel's pinned final
+regular replacement through a no-follow phase-relative FD, revalidates exact
+0600/single-link/dirent state after reading, and uses the existing strict
+parser. Root/phase/output identities surround parsing, materialization, and
+shutdown; cleanup removes original/replacement reserved roots. Replacement,
+empty/link/mode/directory, mid-read mutation, setup-FD failure, swap, subclass,
+cleanup, suppression, and no-leak cases are pinned. No Bazel/home RC ran.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-repaired-live-evidence`. From its clean
+scheduling commit, invoke
+`python3 tools/v2_oracle/buildbuddy_build_cache_gate.py` exactly once with the
+inherited environment. Only Bazel consumes ordinary/home RC. Review only CLI
+status, empty stderr, and the fixed compact record. Accept only exit zero and
+`PROVED_BUILD_CACHE`; any other class/status/schema/lifecycle result is
+`REPLAN` without retry, artifact inspection, or code/config change. This proves
+at most one build-label cache vertical; structured build-only RBE, 43-test
+expansion, and the rest of Stage 10 remain required.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
