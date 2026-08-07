@@ -1,37 +1,44 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-prime-execution-artifact-contract-live-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-execution-replacement-repair`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one sanitized execution-artifact replacement result.
+Result: a replacement-aware, descriptor-anchored cache gate.
 
-## Goal and required evidence
+## Goal and required design
 
-From the clean scheduling commit, invoke exactly once:
+Change only `tools/v2_oracle_lib/buildbuddy_build_cache.py` (150 net lines) and
+`tests/v2_oracle/test_buildbuddy_build_cache_gate.py` (220 net): 370 maximum.
+Do not change the CLI, closed schema, command vector, classification set, BEP
+identity rule, configuration, targets, manifests, or docs.
 
-```sh
-python3 tools/v2_oracle/buildbuddy_build_cache_execution_artifact_probe.py
-```
+Keep BEP's precreated exact-inode read. For execution only, open the final
+direct child through the retained phase FD with no-follow/nonblocking read;
+accept retained or replaced inode only when regular, mode 0600, and single-
+link. Read through that descriptor, verify its dirent identity before/after,
+then feed the existing strict JSON-sequence/spawn parser. Never expose raw
+content or exact metadata.
 
-Inherit the environment unchanged so only Bazel consumes ordinary/home RC.
-Never inspect, print, copy, or persist the RC/token, `HOME`, private contents,
-invocation URLs, or BuildBuddy UI data. Review only CLI status, empty stderr,
-and its compact normalized record. Accept the probe only for exit zero, fixed
-mode/schema, and `PROBE_RECORDED`.
+Precreate/open each phase output directory with retained no-follow identity.
+Require root/phase/output anchoring before and after parse, output inspection,
+and shutdown. Cleanup removes both the original root inode and anything the
+child placed at the reserved random root entry without following links.
 
-The only result values are process `ZERO|NONZERO` and execution
-`ANCHORED_PRIVATE_NONEMPTY|ANCHORED_PRIVATE_EMPTY|NOT_ANCHORED_PRIVATE`.
-The probe never reads the artifact and owns anchored shutdown, cleanup of both
-original/replacement private roots, Git cleanliness, and no-`slugd`.
+Pinned Bazel 9.2 commit `8220c619…` requires this execution-only replacement:
+`ExpandedSpawnLogContext` lines 106-130/291-316 delete the preexisting JSON
+output then create the converted final file; `ExecutionOptions` lines 420-436
+define its executed-spawn records. Empty remains source-valid and must reach
+the existing parser's `EVIDENCE_INCOMPLETE`, not an ownership rejection.
 
 ## Stops and budget
 
-Do not retry, read artifacts, modify code/config, or claim cache/RBE. Any CLI,
-schema, stderr, or lifecycle failure is `REPLAN`. Route only the fixed record:
-`ZERO+NONEMPTY` to a separate strict parser-discriminator design; `ZERO+EMPTY`
-to a source-consistent no-record stop; `ZERO+NOT_ANCHORED` to `REPLAN`;
-`NONZERO` plus an anchored file to a failure-detail sanitizer design; and other
-`NONZERO` to a user-owned token-free environment decision.
+Offline tests cover retained/replaced/empty execution, symlink/hardlink/mode/
+directory rejection, BEP replacement rejection, root/phase/output swaps before
+and during reads/shutdown, exact unchanged argv/schema/classes, cleanup, and
+raw suppression. Run focused unittest, compilation, scope/caps/diff checks,
+and independent privacy/lifecycle review only. No Bazel, home RC, network,
+remote service, or raw live artifact. One focused correction is allowed.
 
-Afterward only owner/canonical/current docs may record the result, at most 100
-changed lines. Structured cache/RBE, 43-test expansion, and Stage 10 remain.
+Any need for a second material repair, schema/vector/class change, BEP
+relaxation, links/mode relaxation, path-following, or raw data is `REPLAN`.
+A separate packet owns one gate invocation. RBE/43-test/Stage 10 remain open.

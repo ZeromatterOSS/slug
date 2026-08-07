@@ -1932,6 +1932,30 @@ design; `ZERO+ANCHORED_PRIVATE_EMPTY` to a source-consistent no-record stop;
 sanitizer design; and other `NONZERO` to a user-owned token-free environment
 decision. This makes no cache/RBE claim; those and 43-test expansion remain.
 
+The one-shot replacement-aware probe from clean head `e25d02f2…` is accepted:
+exit zero, empty stderr, and fixed `ZERO+ANCHORED_PRIVATE_NONEMPTY`. Its exact
+private root is absent afterward, Git remains clean, and no `slugd` exists. No
+artifact/home-RC content was inspected and no retry occurred. This proves a
+usable private JSON execution log exists under Bazel's pinned replacement
+semantics, not cache behavior.
+
+Next repair only
+`WP-10-m8-bazel-buildbuddy-build-cache-execution-replacement-repair`. Change
+only `tools/v2_oracle_lib/buildbuddy_build_cache.py` and its focused test: at
+most 150 production/220 test/370 total net lines. Preserve the CLI, schema,
+argv, classifications, and exact-inode BEP rule. For execution only, open the
+final direct child relative to the retained phase FD with no-follow; accept a
+retained/replaced regular mode-0600 single-link file, read through that FD,
+recheck its dirent identity, and use the existing strict JSON/spawn parser.
+Precreate/retain each output-directory FD and require root/phase/output identity
+around parsing, output inspection, and shutdown. Cleanup both original and
+replacement reserved roots without following links. Offline tests pin retained/
+replaced/empty, links/mode/directory, BEP rejection, all path swaps, unchanged
+public contracts, cleanup, and suppression. Focused tests/compile/caps/diff and
+independent review only; no Bazel/home RC/network/live data. A second material
+repair or public-contract relaxation is `REPLAN`. One later packet owns one
+unchanged gate invocation; RBE and 43-test expansion remain successors.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
