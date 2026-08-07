@@ -2105,6 +2105,19 @@ fixed descriptor/stream/spawn/execution-ready stages. Never read BEP or traverse
 output. Offline tests and independent review only; no Bazel/home RC/network/
 live artifact or existing-file edit.
 
+The combined output/prime-semantics probe is accepted in `1eb2d324…` at 114
+library, 17 CLI, 130 test, and 261 total lines. Its six focused and 51 related
+tests pass; independent review accepts output-first short-circuiting, structural
+prime-predicate reuse, complete predicate branches, private descriptor/read
+attacks, shutdown/cleanup, schema, and lifecycle.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-output-semantics-probe-transported-live-evidence`.
+Invoke the frozen CLI exactly once through the accepted anonymous bounded
+transport with retained-session polling and inherited environment. Review only
+the fixed envelope, empty child stderr, and normalized stage. No retry, raw/
+home/artifact/service access, code/config edit, or cache/RBE claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
