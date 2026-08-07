@@ -2225,6 +2225,28 @@ environment. Review only the fixed transport envelope, empty guard stderr,
 `LIFECYCLE_CLEAN`, and its nested semantic stage. No retry, raw/home/artifact/
 service access, code/config edit, or cache/RBE claim.
 
+The single guarded invocation from clean `dae86d3d…` delivers outer/guard zero,
+empty guard stderr, `LIFECYCLE_CLEAN`, and nested fixed `PRIME_READY`. Afterward
+there are zero matching output-base processes, reserved roots, or `slugd`, and
+Git is clean. No raw, home, artifact, invocation, or service data was inspected.
+This proves the isolated prime build only; replay and cache reuse remain open.
+
+The paired gate cannot yet run: its phase loop calls one phase-agnostic command,
+so the newly correct prime-negative cache-read flag would also disable replay
+reads. Pinned Bazel 9.2 makes `remote_accept_cached` the read-policy selector;
+upload and async flags do not control reads and remain outside the minimal
+one-label vector.
+
+Next repair only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-replay-read-policy-repair`.
+Require an exact `prime|replay` phase in the shared command API, selecting only
+`--noremote_accept_cached|--remote_accept_cached` at the existing argument slot.
+Update every prime caller explicitly and make the paired gate pass its loop
+phase. Fourteen files, at most 30 production and 70 test changed lines. No
+compatibility wrapper, default phase, upload/async option, parser, schema,
+classifier, lifecycle, config, fixture, or CLI change. Offline tests and
+independent source review only; no Bazel, network, home RC, artifact, or service.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware

@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets; guarded live prime evidence localizes cache-read acceptance, and the pinned-source command repair is accepted offline | Confirm one cache-read-disabled prime before replay/cache/RBE proof and the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-cache-prime-disable-cache-reads-transported-live-evidence` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets; the guarded one-label prime is now `PRIME_READY` with a clean lifecycle | Make the paired replay read policy explicit before cache/RBE proof and the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-cache-prime-replay-read-policy-repair` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-build-cache-prime-disable-cache-reads-transported-live-evidence`.
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-replay-read-policy-repair`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).
