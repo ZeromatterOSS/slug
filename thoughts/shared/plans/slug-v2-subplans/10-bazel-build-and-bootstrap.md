@@ -2154,6 +2154,23 @@ empty guard stderr, normalized lifecycle, and normalized nested stage when the
 lifecycle is clean. No retry, raw/home/artifact/service access, code/config edit,
 or cache/RBE claim.
 
+The single guarded invocation from clean `13b0700f…` delivers outer/guard zero,
+empty guard stderr, `LIFECYCLE_CLEAN`, and nested fixed
+`PRIME_SEMANTICS_REJECTED`. Afterward there are zero matching output-base
+processes, reserved roots, or `slugd`, and Git is clean. No raw, home, artifact,
+invocation, or service data was inspected. This accepts lifecycle and the fixed
+semantic route only; it makes no cache or RBE claim.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-semantic-branch-discriminator-implementation`.
+Within the existing shared prime predicate, output-semantics probe, and its
+tests, replace the coarse semantic rejection with one fixed ordered branch per
+existing predicate input. Preserve all pre-semantic stages and lifecycle code,
+reuse one shared helper, and emit no values, counts, paths, labels, hashes, or
+runner spellings. At most three existing files, 535 final lines, and +125 net
+lines. Offline tests and independent public-enum review only; no Bazel, network,
+home RC, live artifact, service, CLI, guard, parser, gate, config, or fixture edit.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
