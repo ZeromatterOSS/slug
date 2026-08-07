@@ -1,57 +1,45 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-cache-prime-root-only-nobuild-diagnosis`
+Packet: `WP-10-m8-bazel-buildbuddy-prime-stderr-sanitizer-implementation`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one credential-free diagnosis of the frozen cache prime option vector.
+Result: a fail-closed token-safe normal-RC prime diagnostic.
 
 ## Goal and required design
 
-From the clean scheduling commit, require a clean Linux x86_64 checkout, no
-`slugd`, and one fresh private mode-0700 root. Generate one unprinted nonce and
-run exactly one root-RC-only `bazel test` invocation:
+Add only `tools/v2_oracle_lib/buildbuddy_prime_diagnostic.py` (240 lines),
+`tools/v2_oracle/buildbuddy_prime_diagnostic.py` (40), and
+`tests/v2_oracle/test_buildbuddy_prime_diagnostic.py` (320): 600 maximum.
 
-```text
-env -u BAZELRC bazel \
-  --nosystem_rc --nohome_rc --noworkspace_rc \
-  --bazelrc=<repo>/.bazelrc --output_base=<private>/output test \
-  --config=buildbuddy-cache \
-  --@rules_rust//rust/toolchain/channel=nightly \
-  --remote_cache=grpcs://remote.buildbuddy.io --remote_instance_name= \
-  --remote_executor= --bes_backend= --bes_results_url= --disk_cache= \
-  --spawn_strategy=worker,sandboxed,local --test_strategy=local \
-  --cache_test_results=yes --runs_per_test=1 \
-  --test_sharding_strategy=disabled --noremote_local_fallback \
-  --build_event_publish_all_actions \
-  --build_event_json_file=<private>/build-events.json \
-  --execution_log_json_file=<private>/execution.json \
-  --action_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE=<nonce> \
-  --test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE=<nonce> \
-  --noremote_accept_cached --remote_upload_local_results \
-  --noremote_cache_async \
-  --remote_cache= --remote_executor= --remote_instance_name= \
-  --bes_backend= --bes_results_url= --disk_cache= --nofetch --nobuild \
-  //app/slug_cli_v2:slug
-```
+The stdlib diagnostic reuses `buildbuddy_cache.command("prime", ...)` with only
+`//app/slug_cli_v2:slug`, ordinary RC discovery, one mode-0700 root, mode-0600
+terminal/BEP/execution files, RC-disabled shutdown, exact-root cleanup, and
+clean Git/no-`slugd`. It never inspects/expands home RC; stdout, BEP, and
+execution data remain unread.
 
-Redirect both terminal streams to private mode-0600 files. The startup options
-and unset `BAZELRC` forbid ambient authentication; the final empty service/cache
-overrides forbid configured BuildBuddy traffic; `--nofetch` forbids repository
-fetching; and `--nobuild` forbids action execution. Private stderr may be
-inspected transiently only to identify a public checked-in non-remote flag or
-flag combination. Never paste, retain, or commit the raw stream or any private
-path.
+Only on Bazel exit two may a pure sanitizer read at most 65,536 strict-UTF-8
+stderr bytes. Pinned Bazel 9.2 `8220c619…` renders invalid argument, ` :: `, and
+`Unrecognized option: <argument>`. The bare frozen-vector intersection is
+exactly `--noremote_local_fallback`, `--build_event_publish_all_actions`,
+`--noremote_accept_cached`, `--remote_upload_local_results`, and
+`--noremote_cache_async`.
 
-Emit only `ROOT_ONLY_NONREMOTE_DIAGNOSED` plus the public identifier when exit
-two is attributable, `ROOT_ONLY_NONREMOTE_ACCEPTED` for exit zero,
-`ROOT_ONLY_UNEXPLAINED` for unattributable exit two, or `REPLAN` otherwise.
+The entire payload, except fixed terminal whitespace, must equal
+`ERROR: <flag> :: Unrecognized option: <same-flag>`. Only those five map to a
+fixed `CHECKED_IN_OPTION_*` ID. Every other prime flag or any extra byte/line,
+zero/multiple/unknown flag, malformed/oversized input, path, URL, header,
+bearer/token/nonce text, value, or unexpected shape emits only
+`NORMAL_RC_PRIME_UNEXPLAINED` or `SANITIZER_REJECTED`. No source text/hash,
+exception, path, endpoint, option value, or raw enum enters closed JSON, CLI
+stdout/stderr, persistence, or Git. Exit two plus one ID is
+`NORMAL_RC_PRIME_DIAGNOSED`; all other outcomes are opaque; cleanup fails closed.
 
 ## Stops and budget
 
-Do not retry, bisect options, change code/config/profile/backend, contact a
-remote service intentionally, or infer cache/RBE/test behavior. Always invoke
-private-output-base shutdown with all RC files ignored, delete only the exact
-private root (making only it owner-writable if needed), and recheck Git
-cleanliness and no `slugd`. Cleanup failure is `REPLAN` regardless of process
-exit. Only owner/canonical/current docs may record the fixed result, at most
-120 changed lines.
+Synthetic/mocked tests cover all five mappings, every other prime flag as
+rejection, near misses/extra data, malicious secret/path/value inputs,
+oversize/non-UTF-8, frozen argv, modes/outcomes, shutdown/deletion, empty CLI
+stderr, and closed schema. Run only focused offline tests, Python compilation,
+caps/diff checks, and independent privacy review. Do not run Bazel, use normal/
+home RC, contact BuildBuddy, change existing cache code/config/targets, or make
+a live attempt; a later reviewed packet owns one invocation.

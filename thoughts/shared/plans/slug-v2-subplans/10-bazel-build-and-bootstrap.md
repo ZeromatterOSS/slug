@@ -1712,6 +1712,40 @@ retry, bisect, change code/config, or claim cache/RBE behavior. Always shut down
 the private server, delete the exact root, and recheck Git and `slugd`. Afterward
 only owner/canonical/current docs may record the fixed result, at most 120 lines.
 
+The root-only no-remote packet returns `REPLAN` from clean head `cc79bac0…`.
+Its one credential-free `--nofetch --nobuild` variant exits one in 0.8 seconds,
+outside the accepted zero/two outcomes. Raw terminal/BEP/execution content
+remained unread; shutdown, exact-root deletion, Git, and no-`slugd` checks pass.
+The fixed result `REPLAN_EXIT_1` proves neither a checked-in option cause nor a
+normal-RC/auth interaction, and no retry or interpretation is allowed.
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-prime-stderr-sanitizer-implementation`. Add a
+dedicated stdlib diagnostic library/CLI and focused tests without changing the
+existing cache gate. The runner must reuse the frozen one-label prime argv,
+ordinary RC discovery, private mode-0700/0600 lifecycle, unread stdout/BEP/
+execution data, RC-disabled shutdown, and exact-root cleanup. Only on process
+exit two may its pure sanitizer read bounded strict-UTF-8 stderr bytes. It may
+map only the five bare public spellings at the intersection of pinned Bazel
+9.2's unrecognized-option grammar and the frozen vector:
+`--noremote_local_fallback`, `--build_event_publish_all_actions`,
+`--noremote_accept_cached`, `--remote_upload_local_results`, and
+`--noremote_cache_async`. Require the entire payload to match the one-line
+`ERROR: <flag> :: Unrecognized option: <flag>` shape apart from fixed terminal
+whitespace. Malformed/oversized input, every other prime flag, extra bytes or
+lines, zero/multiple/unknown flags, paths, URLs, headers, tokens, nonces,
+arbitrary values, or unexpected shape yield only an opaque fixed class. No
+source substring, hash, exception, path, or raw value may enter stdout/stderr,
+persistence, or Git.
+Change only `tools/v2_oracle_lib/buildbuddy_prime_diagnostic.py` (240 lines),
+`tools/v2_oracle/buildbuddy_prime_diagnostic.py` (40), and
+`tests/v2_oracle/test_buildbuddy_prime_diagnostic.py` (320): at most 600 lines.
+Tests use mocks/synthetic bytes and cover all five mappings, every other prime
+flag as rejection, all rejection classes, malicious secret/path/value
+suppression, frozen argv reuse, mode and cleanup failures, empty CLI stderr,
+and the closed JSON schema. Run only focused offline tests, Python compilation,
+caps/diff checks, and independent review; no Bazel, ordinary/home RC, remote
+call, or live evidence. A later packet owns one sanitized normal-RC invocation.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
