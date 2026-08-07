@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets; one-label BuildBuddy cache prime/replay is `PROVED_BUILD_CACHE` with clean lifecycle | Implement structured one-label managed RBE evidence before the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-rbe-vertical-implementation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets; one-label BuildBuddy cache prime/replay is `PROVED_BUILD_CACHE` with clean lifecycle; the structured managed-RBE driver is offline-accepted | Run the one-label managed-RBE evidence once before the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-rbe-vertical-transported-live-evidence` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-build-rbe-vertical-implementation`.
+`WP-10-m8-bazel-buildbuddy-build-rbe-vertical-transported-live-evidence`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

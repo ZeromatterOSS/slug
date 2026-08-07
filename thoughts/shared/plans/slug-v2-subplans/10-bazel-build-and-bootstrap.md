@@ -2282,6 +2282,23 @@ parsing/filesystem primitives without changing the accepted cache gate. Offline
 tests and independent schema/privacy/lifecycle review only; no Bazel, network,
 home RC, artifact, service, config, target, or fixture access/change.
 
+The structured RBE driver is accepted in `e48213bb…` at 213 library, 17 CLI,
+190 test, and 420 total lines. Six focused and 91 related tests pass with compile,
+scope, cap, and diff gates. Independent review accepts the exact inherited-RC
+command, strict all-SpawnExec schema/classification, bounded no-follow pinned-
+file reads, private evidence/output anchoring, cleanup suppression, and canonical
+CLI behavior. Pinned Bazel 9.2 source confirms the expanded execution-log JSON
+printer includes no-presence scalar defaults, so successful SpawnExec status and
+exit fields are explicitly empty and zero.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-rbe-vertical-transported-live-evidence`.
+Invoke the frozen CLI exactly once through the accepted anonymous bounded outer
+transport with a 4 KiB stdout cap, retained-session polling, and inherited
+environment. Accept only outer/child zero, empty stderr, `DELIVERED`, exact
+normalized `PROVED_BUILD_RBE`, and clean root/process/daemon/Git lifecycle. No
+retry, raw/home/artifact/UI/service access, code/config edit, or 43-target claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
