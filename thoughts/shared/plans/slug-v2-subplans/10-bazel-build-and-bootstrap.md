@@ -2138,6 +2138,22 @@ new residue is removed through the existing no-follow helper but suppresses the
 stage; all other lifecycle failures fail closed. Offline tests and independent
 review only; no Bazel, network, home RC, live artifact, or service access.
 
+The lifecycle guard is accepted in `a0cdaa13…` at 183 library, 25 CLI, 213
+test, and 421 total lines. Thirteen focused and 64 related tests pass along with
+compile, scope, line, and diff gates. Independent correction review accepts
+exact schema coupling, canonical anonymous child transport, independent Git and
+daemon checks, nofollow root identity through cleanup, replacement preservation,
+and suppression of every non-clean child stage.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-lifecycle-guard-transported-live-evidence`.
+From a clean reserved-root namespace, invoke the frozen guard CLI exactly once
+through the accepted anonymous bounded outer transport with retained-session
+polling and inherited environment. Review only the fixed transport envelope,
+empty guard stderr, normalized lifecycle, and normalized nested stage when the
+lifecycle is clean. No retry, raw/home/artifact/service access, code/config edit,
+or cache/RBE claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware

@@ -1,44 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-lifecycle-guard-implementation`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-lifecycle-guard-transported-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: an offline-reviewed lifecycle guard for one frozen prime child.
+Result: one lifecycle-guarded prime stage result.
 
 ## Goal and required evidence
 
-Add only these files:
+From the clean scheduling commit, first confirm only fixed counts: zero direct
+`slug-buildbuddy-prime-*` temporary entries, clean Git, and no `slugd`. Use the
+accepted in-memory wrapper to invoke exactly one child with repository cwd,
+`env` omitted, `shell=False`, and anonymous `TemporaryFile` stdout/stderr:
 
-- `tools/v2_oracle_lib/buildbuddy_build_cache_prime_lifecycle_guard.py` (220)
-- `tools/v2_oracle/buildbuddy_build_cache_prime_lifecycle_guard.py` (30)
-- `tests/v2_oracle/test_buildbuddy_build_cache_prime_lifecycle_guard.py` (300)
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_prime_lifecycle_guard.py
+```
 
-The 550-line stdlib-only guard requires clean Git, no `slugd`, and zero direct
-`slug-buildbuddy-prime-*` temporary entries before starting. It invokes exactly
-one frozen output-semantics CLI child using literal `python3`, repository cwd,
-inherited environment, `shell=False`, and anonymous `TemporaryFile` stdout and
-stderr. Bound stdout at 2 KiB; require empty stderr, zero exit, canonical JSON,
-and accepted child normalization. Scan only direct temporary names/metadata,
-never contents.
-
-Emit only schema version, fixed mode, classification, lifecycle, and a nested
-normalized child record. Fixed lifecycle values are `NOT_RECORDED`,
-`PRECHECK_REJECTED`, `CHILD_REJECTED`, `ROOT_RESIDUE_REMOVED`,
-`ROOT_RESIDUE_REJECTED`, `POSTCHECK_REJECTED`, and `LIFECYCLE_CLEAN`. Only
-`LIFECYCLE_CLEAN` exposes a `STAGE_RECORDED` child and exits zero. A single new
-root is removed through the existing no-follow helper, followed by a zero-root
-recheck, but its stage stays suppressed. Multiple roots, hostile types/swaps,
-invalid child records, cleanup failure or false success fail closed. Recheck Git
-and `slugd` after every path.
+The wrapper bounds stdout at 2 KiB, requires empty stderr, validates exact
+normalized/canonical guard JSON, and emits only the fixed transport envelope.
+The terminal caller retains and polls one session ID and never starts another
+command. The outer wrapper, guard, frozen output-semantics child, and Bazel all
+inherit the environment unchanged, so only Bazel may consume private ordinary/
+home RC. Never inspect raw child, RC/token, BEP/execution, temporary contents,
+invocation, or service data.
 
 ## Stops and budget
 
-Test every lifecycle value, exact child invocation/environment behavior, every
-valid stage/process pairing, preexisting-root short-circuit, clean semantic and
-ready results, single/multiple residue, hostile type and replacement races,
-cleanup failure/false success, child exception/nonzero/stderr/oversize/malformed/
-noncanonical output, postcheck drift, schema subclasses, empty CLI stderr, and
-secret/path suppression. Run focused plus the 51 related tests, `py_compile`,
-line/scope/diff gates, and independent lifecycle review. No Bazel, network,
-home RC, live artifact, service, config, or existing-file edit. A later live
-packet is separately scheduled only after acceptance.
+Do not reissue, inspect artifacts, or modify code/config. Session loss, invalid
+envelope, nonempty guard stderr, sanitizer result, cleanup/Git/daemon drift, or
+raw exposure is `REPLAN`. `DELIVERED` accepts transport only. Only
+`LIFECYCLE_CLEAN` permits routing by the normalized nested stage;
+`ROOT_RESIDUE_REMOVED` requires a cleanup repair before another semantic attempt,
+and every other non-clean lifecycle is `REPLAN`. Recheck only fixed root/process/
+daemon/Git counts afterward. Cache/RBE and the 43-test gate remain open.
