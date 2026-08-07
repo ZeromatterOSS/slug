@@ -1431,6 +1431,28 @@ inspect home/raw data, change code/config/CI/targets, or invoke RBE. Only owner
 and scheduling docs may record the sanitized result, at most 100 changed lines
 in three files.
 
+The complete diagnostic evidence packet returns `REPLAN` after exactly one
+invocation. Its compact record binds clean head `7f573984…`, Bazel 9.2.0,
+Linux x86_64, and the frozen hashes. Both phases report process and
+BuildFinished exit 2/name `COMMAND_LINE_ERROR`, the same fixed
+`MISSING_FAILURE_DETAIL` class, zero completed targets/tests, zero eligible
+spawns, and zero cache hits. Exit is 1, stderr is empty, and private-root,
+daemon, and Git cleanup pass. No raw/home data was read and no retry occurred.
+Bazel's pinned BEP contract permits failed BuildFinished events to omit
+`failure_detail`; therefore neither more structured pairs nor another identical
+run can identify this error.
+
+Next decision only
+`WP-10-m8-bazel-buildbuddy-command-stderr-user-decision`. The user may run the
+token-free minimal reproduction from the current-packet manifest and privately
+inspect its terminal error. They must not paste the raw stream or any header,
+token, path, or value. Report only either `minimal succeeds` or a token-free
+paraphrase naming the offending option/failure kind. No agent reads stderr or
+home configuration, no repository change occurs before the response, and no
+cache claim is made. The response determines whether the next bounded packet
+repairs a checked-in command option or records an external home/service
+boundary.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

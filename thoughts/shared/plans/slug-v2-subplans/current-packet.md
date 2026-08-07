@@ -1,24 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-complete-command-diagnostic-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-command-stderr-user-decision`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one cache proof or exact fixed structured failure diagnosis.
+Result: one token-free user diagnosis of Bazel's omitted failure detail.
 
 ## Goal and required design
 
-From clean implementation commit `fcc754a2…`, run
-`python3 tools/v2_oracle/buildbuddy_cache_gate.py` exactly once. Permit only
-Bazel to consume ordinary workspace/home RC discovery. Review only compact
-stdout, process status, and empty stderr. Accept `PROVED_CACHE_ONLY` as cache
-proof. Accept `COMMAND_LINE_FAILURE` only as a diagnosis when prime and replay
-carry the same fixed non-`NONE` class; it returns `REPLAN`, not a cache claim.
+The user, not an agent, may run this minimal reproduction and inspect its
+terminal output privately:
+
+```text
+bazel test --config=buildbuddy-cache --remote_executor= --bes_backend= \
+  --bes_results_url= --disk_cache= --noremote_local_fallback \
+  //app/slug_cli_v2:slug
+```
+
+Reply only `minimal succeeds` or give a token-free paraphrase naming the
+offending option/failure kind. Never paste the raw output, authentication
+header/value, token, path, invocation URL, or other private data.
 
 ## Stops and budget
 
-Return `REPLAN` on any other classification, differing fixed classes, stderr,
-retained raw path, schema surprise, unavailable service, target/cache miss, or
-required repair. Do not make a second attempt, inspect home configuration,
-retain/read raw logs, invoke RBE, or change code/config/CI/BUILD/MODULE/locks/
-targets/cycle/core/platform behavior. Only owner/canonical/current docs may
-record the sanitized result, at most 100 changed lines total.
+No agent command or repository change is authorized before the user's
+token-free response. Agents must not read stderr, inspect/expand home RC,
+contact BuildBuddy, rerun the gate, or infer a cache claim. After the response,
+a separate reviewed packet may record the decision and freeze one bounded
+repair or external-state action.
