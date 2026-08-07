@@ -1376,6 +1376,38 @@ documentation, at most 120 lines in three files. It must not change code or
 configuration, inspect home/raw data, run Bazel, contact BuildBuddy, or
 authorize another live attempt.
 
+The unknown-command diagnostic design is accepted. Pinned Bazel 9.2 source
+contains 131 exit-2 category/code pairs across 33 of the 64
+`FailureDetail.oneof category` fields; the first sanitizer mapped only 33.
+Category-only output is insufficient because even the omitted `command` pairs
+distinguish command discovery, workspace context, and output-tree context.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-complete-command-diagnostic-implementation`. Add an
+internal ordered `B92_EXIT2_SOURCE_PAIRS` table for all 131 pinned pairs. Its
+canonical bytes start with
+`slug-bazel-9.2-failure-detail-exit2-v1\n`, followed by one
+`lowerCamelCategory\tENUM_IDENTIFIER\n` line per pair in oneof-field order and
+then enum source-declaration order. The exact SHA-256 is
+`cbc5777ca02212ba3a5d20847c469eb221bd29b3c217162e6be39c5f5bf86d57`.
+The existing 33 pairs retain semantic classes; each remaining pair emits only
+its unique fixed source ordinal `B92_EXIT2_CLASS_NNN`, never a copied key/code.
+
+Also distinguish fixed structural results `MISSING_FAILURE_DETAIL`,
+`MALFORMED_FAILURE_DETAIL`, `UNSUPPORTED_GENERAL_FAILURE_DETAIL`, and
+`UNRECOGNIZED_B9_2_EXIT2_DETAIL` using the exhaustive 64-key oneof set.
+Optional string `message` is ignored; require one known category and exactly a
+string `code`. Extra/multiple/unknown general or category data fails closed and
+no raw value is emitted. Tests pin the 131 count/hash, 98 unique opaque IDs,
+unchanged semantic classes, every pair, all structural cases, malicious
+message/key/value/path/header/nonce/stderr suppression, no stderr read, and all
+existing classification/lifecycle behavior. Change only
+`tools/v2_oracle_lib/buildbuddy_cache.py` (150 changed lines) and
+`tests/v2_oracle/test_buildbuddy_cache_gate.py` (180), at most 330 total.
+Offline tests, compilation, caps, diff, and independent privacy/schema review
+are required. Do not run Bazel, inspect home/raw data, contact BuildBuddy, or
+make a live attempt; a later separately frozen evidence packet owns one run.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
