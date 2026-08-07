@@ -1524,6 +1524,45 @@ RBE profiles, persistent state, or raw artifacts; this is local REAPI build
 evidence, not BuildBuddy cache proof. After the run only owner/canonical/current
 docs may record the result, at most 120 changed lines.
 
+The source-worker packet returns `REPLAN` before worker startup or any Slug
+build. Bazel 9.1.0 successfully analyzed the clean `8a42c3d4…` sibling target
+and began 5,886 local actions, but after 4,416 processes its Linux sandbox
+failed copying the generated kernel `arch` input because the destination
+already existed; process exit was 36. No home RC, BES, remote executor/cache,
+BuildBuddy, or release fallback was used. The private Bazel server shut down.
+Generated LLVM/musl outputs were read-only, so the first exact-root delete
+failed; making only that private root owner-writable then deleting it closed
+cleanup. Both repositories are clean, port 8980 is closed, no worker/slugd
+remains, and the packet is not retried.
+
+Actiond's own README recommends releases for users. GitHub's immutable latest
+full release is `v0.0.6`, which the clean sibling tag resolves to commit
+`4bdf3e8899ead4eafad54943a18063e6ff0a2637`. Its
+`linux-actiond_linux_x86_64` asset is exactly 15,905,480 bytes with SHA-256
+`006dc798d4363596fe8ab997606fc93766a0cc427c2d005cf4fc1765fa4c2052`.
+The 479-byte `SHA256.txt` asset has SHA-256
+`639b31e99c2d9236b43e18ab03f6368625c346cab364386f8487ab6dea3a649a`
+and must contain that exact binary digest/name pair.
+
+Next evidence only `WP-10-m8-actiond-release-local-reapi-build-evidence`.
+Create one private 0700 root, require clean checkouts and unbound port 8980,
+download only the two exact versioned `v0.0.6` assets from GitHub, and verify
+manifest size/digest/content plus binary size/digest before setting mode 0500.
+No latest redirect, source-build retry, alternate mirror, commit switch, or
+fallback is allowed. Start the verified binary with the already accepted
+private-state/process-group/resource/readiness contract. Run the same single
+fresh-output-base, no-system/home-RC, explicit-nightly, actiond remote-only
+Slug binary build and the same private BEP/execution-log classifier.
+
+Acceptance and claims are unchanged: process/BEP/target/output success,
+nonempty SpawnExec, every spawn remote/uncached/empty-status/exit-zero, and only
+Stage 10 local REAPI developer evidence. Always stop/reap the worker, shut down
+the private Bazel server, verify port closure, make only the exact private root
+owner-writable if needed, delete it, and recheck both repositories. Any
+download/verification/start/build/evidence/cleanup failure is `REPLAN` with no
+retry. Afterward only owner/canonical/current docs may record the fixed result,
+at most 120 changed lines.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
