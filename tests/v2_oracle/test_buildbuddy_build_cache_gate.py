@@ -94,12 +94,19 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
         stdout, stderr = StringIO(), StringIO()
         with mock.patch.object(cli, "run_gate", return_value=hostile), redirect_stdout(stdout), redirect_stderr(stderr): self.assertEqual(1, cli.main([]))
         self.assertEqual("", stderr.getvalue()); self.assertNotIn("private", stdout.getvalue()); self.assertEqual("SANITIZER_REJECTED", json.loads(stdout.getvalue())["classification"])
+        class StringSubclass(str):
+            def __hash__(self) -> int: return hash("PROVED_BUILD_CACHE")
+            def __eq__(self, other: object) -> bool: return other == "PROVED_BUILD_CACHE"
+        hostile = gate.record("PROVED_BUILD_CACHE"); hostile["classification"] = StringSubclass("/private/class")
+        stdout, stderr = StringIO(), StringIO()
+        with mock.patch.object(cli, "run_gate", return_value=hostile), redirect_stdout(stdout), redirect_stderr(stderr): self.assertEqual(1, cli.main([]))
+        self.assertEqual("", stderr.getvalue()); self.assertNotIn("private", stdout.getvalue()); self.assertEqual("SANITIZER_REJECTED", json.loads(stdout.getvalue())["classification"])
         with mock.patch.object(gate, "_clean", return_value=False): self.assertEqual("CONFIG_DRIFT", gate.run_gate(runner=lambda *a, **k: subprocess.CompletedProcess([], 0))["classification"])
 
     def test_evidence_symlink_and_swap_are_rejected_without_reads(self) -> None:
         descriptor, name = tempfile.mkstemp(); os.close(descriptor)
         outside = Path(name); self.addCleanup(outside.unlink); outside.write_text("token=/private")
-        for attacked, method in (("bep.json", "symlink"), ("execution.json", "swap")):
+        for attacked, method in (("bep.json", "symlink"), ("bep.json", "replace"), ("execution.json", "swap")):
             with self.subTest(attacked=attacked):
                 def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
                     if argv[-1] == "shutdown": return subprocess.CompletedProcess(argv, 0)
@@ -107,6 +114,7 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
                     paths["bep.json"].write_bytes(self._bep()); paths["execution.json"].write_bytes(self._execution("prime"))
                     target = paths[attacked]; target.unlink()
                     if method == "symlink": target.symlink_to(outside)
+                    elif method == "replace": target.write_bytes(self._bep()); target.chmod(0o600)
                     else: os.link(outside, target)
                     return subprocess.CompletedProcess(argv, 0)
                 with mock.patch.object(gate, "_clean", return_value=True): result = gate.run_gate(runner=runner)
@@ -126,11 +134,96 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
         self.assertNotEqual("PROVED_BUILD_CACHE", result["classification"]); self.assertEqual([], shutdowns)
 
     def test_cleanup_failure_is_fail_closed(self) -> None:
-        actual = gate.cleanup._remove_root
-        def removed_but_fails(root: Path) -> bool: actual(root); return False
-        with mock.patch.object(gate, "_clean", return_value=True), mock.patch.object(gate.cleanup, "_remove_root", side_effect=removed_but_fails):
+        with mock.patch.object(gate, "_clean", return_value=True), mock.patch.object(gate, "_remove_original", return_value=False):
             result = gate.run_gate(runner=lambda argv, **_: subprocess.CompletedProcess(argv, 0) if argv[-1] == "shutdown" else (_ for _ in ()).throw(OSError()))
         self.assertEqual("SANITIZER_REJECTED", result["classification"])
+
+    def test_retained_replaced_and_empty_execution_reach_the_existing_parser(self) -> None:
+        for kind in ("retained", "replaced", "empty"):
+            with self.subTest(kind=kind):
+                def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+                    if argv[-1] == "shutdown": return subprocess.CompletedProcess(argv, 0)
+                    phase = "replay" if "replay" in argv[1] else "prime"
+                    bep = Path(next(x.split("=", 1)[1] for x in argv if x.startswith("--build_event_json_file=")))
+                    execution = Path(next(x.split("=", 1)[1] for x in argv if x.startswith("--execution_log_json_file=")))
+                    target = Path(argv[1].split("=", 1)[1]) / "execroot/x/bin/app/slug_cli_v2/slug"; target.parent.mkdir(parents=True); target.write_bytes(b"x"); target.chmod(0o700)
+                    bep.write_bytes(self._bep())
+                    if kind == "replaced": execution.unlink()
+                    execution.write_bytes(self._execution(phase) if kind != "empty" else b""); execution.chmod(0o600)
+                    return subprocess.CompletedProcess(argv, 0)
+                with mock.patch.object(gate, "_clean", return_value=True): result = gate.run_gate(runner=runner)
+                self.assertEqual("EVIDENCE_INCOMPLETE" if kind == "empty" else "PROVED_BUILD_CACHE", result["classification"])
+                self.assertNotIn("private", json.dumps(result))
+
+    def test_execution_link_mode_and_directory_are_rejected(self) -> None:
+        descriptor, name = tempfile.mkstemp(); os.close(descriptor)
+        outside = Path(name); self.addCleanup(lambda: outside.unlink(missing_ok=True)); outside.write_bytes(b"token=/private")
+        for attack in ("symlink", "hardlink", "mode", "directory"):
+            with self.subTest(attack=attack):
+                def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+                    if argv[-1] == "shutdown": return subprocess.CompletedProcess(argv, 0)
+                    bep = Path(next(x.split("=", 1)[1] for x in argv if x.startswith("--build_event_json_file=")))
+                    execution = Path(next(x.split("=", 1)[1] for x in argv if x.startswith("--execution_log_json_file=")))
+                    bep.write_bytes(self._bep()); execution.unlink()
+                    if attack == "symlink": execution.symlink_to(outside)
+                    elif attack == "hardlink": os.link(outside, execution)
+                    elif attack == "mode": execution.write_bytes(self._execution("prime")); execution.chmod(0o640)
+                    else: execution.mkdir()
+                    return subprocess.CompletedProcess(argv, 0)
+                with mock.patch.object(gate, "_clean", return_value=True): result = gate.run_gate(runner=runner)
+                self.assertEqual("EVIDENCE_INCOMPLETE", result["classification"]); self.assertNotIn("private", json.dumps(result))
+
+    def test_root_phase_output_and_read_swaps_fail_closed(self) -> None:
+        for attack in ("root", "phase", "output", "read", "chmod_read", "hardlink_read", "shutdown"):
+            with self.subTest(attack=attack):
+                swapped = False
+                execution_path: Path | None = None
+                def runner(argv: list[str], **_: object) -> subprocess.CompletedProcess[bytes]:
+                    nonlocal swapped, execution_path
+                    if argv[-1] == "shutdown":
+                        if attack == "shutdown" and not swapped:
+                            output = Path(argv[2].split("=", 1)[1]); output.rename(output.with_name("output-old")); output.mkdir(); swapped = True
+                        return subprocess.CompletedProcess(argv, 0)
+                    output = Path(argv[1].split("=", 1)[1]); phase, root = output.parent, output.parents[1]
+                    bep = Path(next(x.split("=", 1)[1] for x in argv if x.startswith("--build_event_json_file="))); execution = Path(next(x.split("=", 1)[1] for x in argv if x.startswith("--execution_log_json_file="))); execution_path = execution
+                    target = output / "execroot/x/bin/app/slug_cli_v2/slug"; target.parent.mkdir(parents=True); target.write_bytes(b"x"); target.chmod(0o700)
+                    bep.write_bytes(self._bep()); execution.write_bytes(self._execution("replay" if "replay" in str(phase) else "prime"))
+                    if not swapped and attack in ("root", "phase", "output"):
+                        victim = {"root": root, "phase": phase, "output": output}[attack]; victim.rename(victim.with_name(victim.name + "-old")); victim.mkdir(); swapped = True
+                    return subprocess.CompletedProcess(argv, 0)
+                read = os.read
+                def replace_after_read(fd: int, size: int) -> bytes:
+                    nonlocal swapped
+                    value = read(fd, size)
+                    if attack in ("read", "chmod_read", "hardlink_read") and not swapped and execution_path is not None and os.fstat(fd).st_ino == execution_path.lstat().st_ino:
+                        # The parser must reject a dirent that changes after its FD was opened.
+                        if attack == "read": execution_path.rename(execution_path.with_name("execution-old.json")); execution_path.write_bytes(self._execution("prime"))
+                        elif attack == "chmod_read": execution_path.chmod(0o640)
+                        else: os.link(execution_path, execution_path.with_name("execution-link.json"))
+                        swapped = True
+                    return value
+                with mock.patch.object(gate, "_clean", return_value=True), mock.patch.object(gate.os, "read", side_effect=replace_after_read):
+                    result = gate.run_gate(runner=runner)
+                self.assertNotEqual("PROVED_BUILD_CACHE", result["classification"])
+
+    def test_setup_open_and_fstat_failures_close_temporary_descriptors(self) -> None:
+        for stage in ("open", "fstat"):
+            with self.subTest(stage=stage):
+                before = len(os.listdir("/proc/self/fd")); opened_output: int | None = None; injected = False
+                original_open, original_fstat = gate.os.open, gate.os.fstat
+                def fail_open(name: object, flags: int, *args: object, **kwargs: object) -> int:
+                    nonlocal opened_output, injected
+                    if name == "output" and stage == "open" and not injected: injected = True; raise OSError
+                    value = original_open(name, flags, *args, **kwargs)
+                    if name == "output": opened_output = value
+                    return value
+                def fail_fstat(fd: int) -> os.stat_result:
+                    nonlocal injected
+                    if stage == "fstat" and fd == opened_output and not injected: injected = True; raise OSError
+                    return original_fstat(fd)
+                with mock.patch.object(gate, "_clean", return_value=True), mock.patch.object(gate.os, "open", side_effect=fail_open), mock.patch.object(gate.os, "fstat", side_effect=fail_fstat):
+                    result = gate.run_gate(runner=lambda argv, **_: subprocess.CompletedProcess(argv, 0))
+                self.assertNotEqual("PROVED_BUILD_CACHE", result["classification"]); self.assertEqual(before, len(os.listdir("/proc/self/fd")))
 
     @staticmethod
     def _execution(phase: str) -> bytes:

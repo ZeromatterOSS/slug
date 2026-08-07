@@ -34,7 +34,7 @@ def command(bazel: str, output: Path, bep: Path, execution: Path, nonce: str) ->
 
 
 def _count(value: Any) -> int:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+    if type(value) is not int or value < 0:
         raise GateError("EVIDENCE_INCOMPLETE")
     return value
 
@@ -122,7 +122,7 @@ def classify(prime: dict[str, Any], replay: dict[str, Any]) -> str:
 
 def record(classification: str, prime: dict[str, Any] | None = None, replay: dict[str, Any] | None = None) -> dict[str, Any]:
     empty = {"process_success_count": 0, "build_finished_success_count": 0, "target_success_count": 0, "output_count": 0, "persistent_action_cache_hit_count": 0, "eligible_spawns": {"count": 0, "digest_multiset_sha256": hashlib.sha256(b"").hexdigest(), "cache_error_count": 0, "status_error_count": 0, "exit_error_count": 0, "local": 0, "worker": 0, "linux_sandbox": 0, "remote_cache_hit": 0, "other": 0}}
-    if classification not in CLASSES: classification = "SANITIZER_REJECTED"
+    if type(classification) is not str or classification not in CLASSES: classification = "SANITIZER_REJECTED"
     if prime is None or replay is None: prime = replay = empty
     def public(item: dict[str, Any]) -> dict[str, Any]: return {key: value for key, value in item.items() if key != "_outcome"}
     return {"schema_version": 1, "mode": "buildbuddy-build-cache-only", "classification": classification, "prime": public(prime), "replay": public(replay)}
@@ -131,19 +131,19 @@ def record(classification: str, prime: dict[str, Any] | None = None, replay: dic
 def normalize(value: object) -> dict[str, Any]:
     """Rebuild only the closed public schema; reject all other values."""
     try:
-        if not isinstance(value, dict) or set(value) != {"schema_version", "mode", "classification", "prime", "replay"}:
+        if type(value) is not dict or set(value) != {"schema_version", "mode", "classification", "prime", "replay"}:
             raise GateError()
         classification = value["classification"]
-        if type(value["schema_version"]) is not int or value["schema_version"] != 1 or value["mode"] != "buildbuddy-build-cache-only" or not isinstance(classification, str) or classification not in CLASSES:
+        if type(value["schema_version"]) is not int or value["schema_version"] != 1 or type(value["mode"]) is not str or value["mode"] != "buildbuddy-build-cache-only" or type(classification) is not str or classification not in CLASSES:
             raise GateError()
 
         def phase(item: object) -> dict[str, Any]:
-            if not isinstance(item, dict) or set(item) != PHASE_KEYS or not isinstance(item["eligible_spawns"], dict) or set(item["eligible_spawns"]) != SPAWN_KEYS:
+            if type(item) is not dict or set(item) != PHASE_KEYS or type(item["eligible_spawns"]) is not dict or set(item["eligible_spawns"]) != SPAWN_KEYS:
                 raise GateError()
             public = {key: _count(item[key]) for key in PHASE_KEYS - {"eligible_spawns"}}
             source = item["eligible_spawns"]
             digest = source["digest_multiset_sha256"]
-            if not isinstance(digest, str) or not re.fullmatch(r"[0-9a-f]{64}", digest):
+            if type(digest) is not str or not re.fullmatch(r"[0-9a-f]{64}", digest):
                 raise GateError()
             spawns = {key: _count(source[key]) for key in SPAWN_KEYS - {"digest_multiset_sha256"}}
             if sum(spawns[key] for key in ("local", "worker", "linux_sandbox", "remote_cache_hit", "other")) != spawns["count"] or any(spawns[key] > spawns["count"] for key in ("cache_error_count", "status_error_count", "exit_error_count")):
@@ -179,44 +179,142 @@ def _private_bytes(directory_fd: int, name: str, identity: tuple[int, int]) -> b
             os.close(fd)
 
 
-def _anchored(root: Path, root_identity: tuple[int, int], root_fd: int, phase: str, phase_identity: tuple[int, int]) -> bool:
+def _execution_bytes(directory_fd: int, name: str) -> bytes:
+    """Read a direct child only after binding its current no-follow descriptor."""
+    fd = None
     try:
-        current_root = root.lstat()
+        fd = os.open(name, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=directory_fd)
+        item = os.fstat(fd)
+        identity = item.st_dev, item.st_ino
+        current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if not stat.S_ISREG(item.st_mode) or stat.S_IMODE(item.st_mode) != 0o600 or item.st_nlink != 1 or (current.st_dev, current.st_ino) != identity:
+            raise GateError("EVIDENCE_INCOMPLETE")
+        chunks: list[bytes] = []
+        while chunk := os.read(fd, 1 << 20):
+            chunks.append(chunk)
+        after = os.fstat(fd); current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+        if not stat.S_ISREG(after.st_mode) or stat.S_IMODE(after.st_mode) != 0o600 or after.st_nlink != 1 or (after.st_dev, after.st_ino) != identity or (current.st_dev, current.st_ino) != identity:
+            raise GateError("EVIDENCE_INCOMPLETE")
+        return b"".join(chunks)
+    except OSError:
+        raise GateError("EVIDENCE_INCOMPLETE") from None
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
+def _anchored(root: Path, root_identity: tuple[int, int], root_fd: int, phase: str, phase_identity: tuple[int, int], output_fd: int | None = None, output_identity: tuple[int, int] | None = None) -> bool:
+    phase_fd = None
+    try:
+        current_root, opened_root = root.lstat(), os.fstat(root_fd)
         current_phase = os.stat(phase, dir_fd=root_fd, follow_symlinks=False)
-        return stat.S_ISDIR(current_root.st_mode) and stat.S_ISDIR(current_phase.st_mode) and (current_root.st_dev, current_root.st_ino) == root_identity and (current_phase.st_dev, current_phase.st_ino) == phase_identity
+        root_ok = stat.S_ISDIR(current_root.st_mode) and (current_root.st_dev, current_root.st_ino) == root_identity == (opened_root.st_dev, opened_root.st_ino)
+        phase_ok = stat.S_ISDIR(current_phase.st_mode) and (current_phase.st_dev, current_phase.st_ino) == phase_identity
+        if output_fd is None or output_identity is None:
+            return root_ok and phase_ok
+        phase_fd = os.open(phase, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
+        current_output, opened_output = os.stat("output", dir_fd=phase_fd, follow_symlinks=False), os.fstat(output_fd)
+        return root_ok and phase_ok and stat.S_ISDIR(current_output.st_mode) and (current_output.st_dev, current_output.st_ino) == output_identity == (opened_output.st_dev, opened_output.st_ino)
     except OSError:
         return False
+    finally:
+        if phase_fd is not None:
+            os.close(phase_fd)
 
 
 def _clean() -> bool: return cleanup._clean_git() and cleanup._no_slugd()
 
 
+def _remove_reserved(root: Path, parent_fd: int) -> bool:
+    try:
+        item = os.stat(root.name, dir_fd=parent_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    if stat.S_ISDIR(item.st_mode):
+        return cleanup._remove_root(root)
+    try:
+        os.unlink(root.name, dir_fd=parent_fd)
+        return False
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+
+
+def _remove_original(parent_fd: int, root_fd: int, identity: tuple[int, int]) -> bool:
+    def clear(directory_fd: int) -> None:
+        for name in os.listdir(directory_fd):
+            item = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+            if stat.S_ISDIR(item.st_mode):
+                child_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)
+                try:
+                    opened = os.fstat(child_fd); os.fchmod(child_fd, stat.S_IMODE(opened.st_mode) | stat.S_IRWXU); clear(child_fd)
+                finally:
+                    os.close(child_fd)
+                current = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                if (current.st_dev, current.st_ino) != (opened.st_dev, opened.st_ino): raise OSError
+                os.rmdir(name, dir_fd=directory_fd)
+            else:
+                os.unlink(name, dir_fd=directory_fd)
+    try:
+        opened = os.fstat(root_fd)
+        if not stat.S_ISDIR(opened.st_mode) or (opened.st_dev, opened.st_ino) != identity: return False
+        os.fchmod(root_fd, stat.S_IMODE(opened.st_mode) | stat.S_IRWXU); clear(root_fd)
+        names = [name for name in os.listdir(parent_fd) if (lambda item: stat.S_ISDIR(item.st_mode) and (item.st_dev, item.st_ino) == identity)(os.stat(name, dir_fd=parent_fd, follow_symlinks=False))]
+        if len(names) != 1: return False
+        os.rmdir(names[0], dir_fd=parent_fd)
+        return True
+    except Exception:
+        return False
+
+
+def _shutdown(bazel: str, output: Path, runner: Callable[..., subprocess.CompletedProcess[bytes]]) -> bool:
+    try:
+        return runner([bazel, "--ignore_all_rc_files", f"--output_base={output}", "shutdown"], cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+    except Exception:
+        return False
+
+
 def run_gate(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run) -> dict[str, Any]:
-    old_umask, root, root_fd, result = os.umask(0o077), None, None, record("SANITIZER_REJECTED")
+    old_umask, root, parent_fd, root_fd, result = os.umask(0o077), None, None, None, record("SANITIZER_REJECTED")
     root_identity: tuple[int, int] | None = None
-    phases: dict[str, tuple[int, tuple[int, int]]] = {}
+    phases: dict[str, tuple[int, tuple[int, int], int, tuple[int, int]]] = {}
     try:
         if not _clean(): raise GateError("CONFIG_DRIFT")
         root = Path(tempfile.mkdtemp(prefix="slug-buildbuddy-prime-"))
         if stat.S_IMODE(root.stat().st_mode) != 0o700: raise GateError()
         try: root.resolve().relative_to(REPO_ROOT.resolve()); raise GateError()
         except ValueError: pass
-        root_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        parent_fd = os.open(root.parent, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        root_fd = os.open(root.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent_fd)
         root_metadata = os.fstat(root_fd); root_identity = (root_metadata.st_dev, root_metadata.st_ino)
         nonce, records = secrets.token_hex(32), {}
         for phase in ("prime", "replay"):
             phase_root = root / phase; phase_root.mkdir()
+            (phase_root / "output").mkdir()
             bep, execution = phase_root / "bep.json", phase_root / "execution.json"
             for evidence in (bep, execution): cleanup._private_file(evidence)
             identities = {path.name: (path.lstat().st_dev, path.lstat().st_ino) for path in (bep, execution)}
-            phase_fd = os.open(phase, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
-            phase_metadata = os.fstat(phase_fd); phase_identity = (phase_metadata.st_dev, phase_metadata.st_ino); phases[phase] = (phase_fd, phase_identity)
+            phase_fd = output_fd = None
+            try:
+                phase_fd = os.open(phase, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=root_fd)
+                output_fd = os.open("output", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=phase_fd)
+                phase_metadata, output_metadata = os.fstat(phase_fd), os.fstat(output_fd)
+                phase_identity, output_identity = (phase_metadata.st_dev, phase_metadata.st_ino), (output_metadata.st_dev, output_metadata.st_ino)
+            except Exception:
+                if output_fd is not None: os.close(output_fd)
+                if phase_fd is not None: os.close(phase_fd)
+                raise
+            phases[phase] = (phase_fd, phase_identity, output_fd, output_identity)
             with (phase_root / "stdout").open("xb") as stdout, (phase_root / "stderr").open("xb") as stderr:
                 done = runner(command(bazel, phase_root / "output", bep, execution, nonce), cwd=REPO_ROOT, stdout=stdout, stderr=stderr, check=False)
-            item = phase_record(_private_bytes(phase_fd, bep.name, identities[bep.name]), _private_bytes(phase_fd, execution.name, identities[execution.name]), _count(done.returncode), phase)
-            if not _anchored(root, root_identity, root_fd, phase, phase_identity): raise GateError("EVIDENCE_INCOMPLETE")
+            if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity): raise GateError("EVIDENCE_INCOMPLETE")
+            item = phase_record(_private_bytes(phase_fd, bep.name, identities[bep.name]), _execution_bytes(phase_fd, execution.name), _count(done.returncode), phase)
+            if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity): raise GateError("EVIDENCE_INCOMPLETE")
             item["output_count"] = _outputs(phase_root / "output")
-            if not _anchored(root, root_identity, root_fd, phase, phase_identity): raise GateError("EVIDENCE_INCOMPLETE")
+            if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity): raise GateError("EVIDENCE_INCOMPLETE")
             records[phase] = item
         result = record(classify(records["prime"], records["replay"]), records["prime"], records["replay"])
     except GateError as error:
@@ -226,24 +324,23 @@ def run_gate(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedPro
     finally:
         os.umask(old_umask); okay = True
         if root is not None and root_fd is not None and root_identity is not None:
-            for phase, (_, phase_identity) in phases.items():
-                if not _anchored(root, root_identity, root_fd, phase, phase_identity):
+            for phase, (phase_fd, phase_identity, output_fd, output_identity) in phases.items():
+                if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity):
                     okay = False; continue
-                try: okay &= runner([bazel, "--ignore_all_rc_files", f"--output_base={root / phase / 'output'}", "shutdown"], cwd=REPO_ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
-                except Exception: okay = False
-                if not _anchored(root, root_identity, root_fd, phase, phase_identity): okay = False
-            for phase_fd, _ in phases.values(): os.close(phase_fd)
+                okay &= _shutdown(bazel, root / phase / "output", runner)
+                if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity): okay = False
+            for phase_fd, _, output_fd, _ in phases.values(): os.close(output_fd); os.close(phase_fd)
+            if parent_fd is not None: okay &= _remove_original(parent_fd, root_fd, root_identity)
+            else: okay = False
             os.close(root_fd); root_fd = None
         elif root_fd is not None:
             os.close(root_fd); root_fd = None
             okay = False
-        if root is not None:
-            try: current = root.lstat()
-            except OSError: current = None
-            if root_identity is None or current is None or (current.st_dev, current.st_ino) != root_identity:
-                okay = False
-            else:
-                okay &= cleanup._remove_root(root)
+        if root is not None and parent_fd is not None:
+            okay &= _remove_reserved(root, parent_fd)
+        elif root is not None:
+            okay = False
+        if parent_fd is not None: os.close(parent_fd)
         if root is not None and not _clean(): okay = False
         if not okay: result = record("SANITIZER_REJECTED")
     return result
