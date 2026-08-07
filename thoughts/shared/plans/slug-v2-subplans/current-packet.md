@@ -1,57 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-vertical-implementation`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-vertical-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: a fail-closed build-only BuildBuddy prime/replay cache driver.
+Result: one sanitized BuildBuddy build-cache prime/replay result.
 
-## Goal and required design
+## Goal and required evidence
 
-Add only `tools/v2_oracle_lib/buildbuddy_build_cache.py` (250 lines),
-`tools/v2_oracle/buildbuddy_build_cache_gate.py` (40), and
-`tests/v2_oracle/test_buildbuddy_build_cache_gate.py` (360): 650 maximum.
+From the clean scheduling commit, invoke exactly once:
 
-Each `prime`/`replay` phase uses a distinct fresh output base and this same
-ordinary-RC command shape, differing only in private paths:
-
-```text
-bazel --output_base=<private>/<phase>/output build \
-  --config=buildbuddy-cache \
-  --@rules_rust//rust/toolchain/channel=nightly \
-  --remote_executor= --bes_backend= --bes_results_url= --disk_cache= \
-  --noremote_local_fallback \
-  --action_env=SLUG_BUILDBUDDY_BUILD_CACHE_NONCE=<shared-fresh-64hex> \
-  --build_event_json_file=<private>/<phase>/bep.json \
-  --execution_log_json_file=<private>/<phase>/execution.json \
-  //app/slug_cli_v2:slug
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_gate.py
 ```
 
-Ordinary RC is consumed only by Bazel. Raw terminal/BEP/execution data remains
-private; the driver builds a closed summary from parsed BEP/execution values and
-always performs RC-disabled shutdown plus descriptor-safe exact-root cleanup.
+Inherit the process environment unchanged. The driver invokes Bazel twice with ordinary RC discovery so only Bazel consumes the user's authentication-only home RC.
+Never inspect, print, copy, expand, or persist that RC, its token, or any derived authentication value; do not set or inspect `HOME`.
 
-`PROVED_BUILD_CACHE` requires both process/BuildFinished/target successes,
-exactly one executable regular `*/bin/app/slug_cli_v2/slug` per output base,
-nonempty matching eligible digest multisets, prime local/worker/linux-sandbox
-misses, replay remote-cache hits, empty statuses, zero exits/cache-field errors,
-zero persistent action-cache hits, clean Git/no-`slugd`, and complete cleanup.
-The closed schema is only `schema_version=1`, fixed
-`mode=buildbuddy-build-cache-only`, `classification`, and fixed-key
-`prime`/`replay` summaries for process/BuildFinished/target/output counts,
-persistent hits, and eligible-spawn count/digest-multiset hash/error/runner
-counts. It never emits a path, label, nonce, individual digest, command,
-endpoint, terminal data, or raw value. Classifications are exactly
-`PROVED_BUILD_CACHE`, `CONFIG_DRIFT`, `REMOTE_UNAVAILABLE`,
-`COMMAND_LINE_FAILURE`, `TARGET_FAILURE`, `CACHE_MISS_OR_MIXED_REPLAY`,
-`EVIDENCE_INCOMPLETE`, and `SANITIZER_REJECTED`.
+Review only the CLI exit status, empty CLI stderr, and its single compact closed JSON record. Accept only exit zero and `PROVED_BUILD_CACHE` with schema version 1,
+fixed `buildbuddy-build-cache-only` mode, and the frozen fixed-key phase summaries. The driver itself requires fresh bases, successful builds/materialization,
+a nonempty matching eligible digest multiset, prime local misses, replay remote-cache hits, zero persistent action-cache hits, clean Git/no-`slugd`, RC-disabled shutdown, and exact private-root cleanup.
 
 ## Stops and budget
 
-Synthetic/mocked tests cover command minimality/shared nonce, JSON sequences,
-runner/cache/digest/target/materialization near misses, fixed failure classes,
-closed schema, raw suppression, modes, shutdown/read-only/swap-safe cleanup,
-Git/no-`slugd`, and CLI stderr. Run only focused offline tests, Python
-compilation, caps/diff checks, and independent review. Do not run Bazel, use
-normal/home RC, contact BuildBuddy, modify old cache/config/targets, or make a
-live attempt. One later packet owns the build pair; build-only RBE and full
-43-test expansion remain required successors.
+Do not read private terminal/BEP/execution artifacts, invocation URLs, home RC, or BuildBuddy UI data. Do not retry, bisect, modify code/configuration, or reinterpret any non-accepting class.
+A nonzero CLI status, nonempty stderr, schema surprise, any class other than `PROVED_BUILD_CACHE`, retained state, Git drift, or daemon/cleanup failure is `REPLAN`.
+
+Afterward only owner/canonical/current scheduling docs may record the fixed result, at most 100 changed lines across three files. This packet can prove only one build-label cache vertical.
+Structured build-only RBE proof, expansion of the validated driver to the complete 43-test manifest/invariants, and the rest of Stage 10 remain required successors.

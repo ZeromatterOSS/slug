@@ -1803,6 +1803,32 @@ review only; no Bazel/home/remote invocation. A separate packet owns one live
 pair. The claim remains one build label; structured RBE and then the full
 43-test expansion follow without redefining the final Stage 10 gate.
 
+The build-only cache vertical is accepted in commit `e902610c…`: 412 lines in
+the exact three-file scope. Ten focused synthetic/mocked tests, Python
+compilation, caps, diff checks, and independent privacy/lifecycle review pass.
+The frozen driver constructs the successful minimal ordinary-RC build shape,
+shares only a fresh unprinted nonce across distinct output bases, emits only a
+deep-normalized fixed schema, requires exactly one terminal BEP event and one
+regular executable per phase, reads precreated evidence through retained
+no-follow descriptors, and keeps root/phase identities through output checks,
+RC-disabled shutdown, and descriptor-safe cleanup. Hostile nested output,
+evidence symlink/hardlink replacement, and phase-directory swap regressions
+fail closed. No Bazel, home RC, or remote service was invoked by that packet.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-vertical-live-evidence`. From its clean
+scheduling commit, run
+`python3 tools/v2_oracle/buildbuddy_build_cache_gate.py` exactly once with the
+inherited environment. Only Bazel may consume ordinary/home RC. Review only the
+single compact JSON object, empty CLI stderr, and CLI status. Accept only exit
+zero, schema version one, fixed `buildbuddy-build-cache-only` mode, and
+`PROVED_BUILD_CACHE`. Any other class/status, schema surprise, retained root,
+Git/daemon drift, or cleanup failure is `REPLAN` without retry, bisection, or
+code/config change. Never inspect home RC, terminal/BEP/execution artifacts,
+BuildBuddy UI data, or invocation URLs. This proves at most one build-label
+cache vertical; structured build-only RBE proof and then expansion to all 43
+accepted test targets remain mandatory successors.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
