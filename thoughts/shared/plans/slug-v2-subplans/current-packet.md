@@ -1,43 +1,37 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-cache-prime-replay-read-policy-repair`
+Packet: `WP-10-m8-bazel-buildbuddy-build-cache-phase-explicit-transported-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one source-reviewed phase-explicit prime/replay command API.
+Result: one fixed paired one-label build-cache record.
 
 ## Goal and required evidence
 
-Change the shared `buildbuddy_build_cache.command` API to require `phase` first,
-then retain its existing arguments. Accept only exact strings `prime` and
-`replay`; reject unknown strings, non-strings, and subclasses. At the existing
-slot immediately after `--config=buildbuddy-cache`, select exactly:
+From the clean scheduling commit, confirm only fixed counts: zero direct
+`slug-buildbuddy-prime-*` temporary entries, zero matching private-output-base
+processes, clean Git, and no `slugd`. Use an in-memory wrapper to invoke exactly
+one child with repository cwd, `env` omitted, `shell=False`, and anonymous
+`TemporaryFile` stdout/stderr:
 
-- prime: `--noremote_accept_cached`
-- replay: `--remote_accept_cached`
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_gate.py
+```
 
-Every other argument and its order stays byte-for-byte unchanged. `run_gate`
-passes the loop phase. These six one-prime probes pass literal `prime`:
-
-- `buildbuddy_build_cache_artifact_probe.py`
-- `buildbuddy_build_cache_execution_artifact_probe.py`
-- `buildbuddy_build_cache_prime_stage_probe.py`
-- `buildbuddy_build_cache_prime_bep_stage_probe.py`
-- `buildbuddy_build_cache_prime_execution_stage_probe.py`
-- `buildbuddy_build_cache_prime_output_semantics_probe.py`
-
-Edit those seven production files and their seven corresponding test files only.
-Do not retain a compatibility wrapper or default phase.
+The wrapper bounds stdout at 4 KiB, requires empty stderr, validates exact
+normalized/canonical gate JSON, and emits only a fixed transport envelope plus
+the normalized compact record. Retain and poll one session ID; never start
+another command. The wrapper, gate, both Bazel phases, and shutdown inherit the
+environment unchanged where applicable, so only Bazel may consume private
+ordinary/home RC. Never inspect raw child output, RC/token, BEP/execution,
+temporary contents, invocation, or service data.
 
 ## Stops and budget
 
-Pin that identical prime/replay vectors differ only at the read-policy slot;
-each contains exactly its own flag and excludes the opposite. Test invalid
-phases, paired negative-then-positive order, one shared nonce, distinct output
-bases, every unchanged prime probe command, and all existing classification,
-lifecycle, cleanup, and schema behavior. Refresh only stale shared-source digest
-assertions. Stay within 14 files, 30 production and 70 test changed lines. Run
-the seven focused modules, all `test_buildbuddy_build_cache*.py`, `py_compile`,
-scope/cap/digest/diff gates, and independent pinned-source review. No CLI,
-lifecycle guard, parser, classifier, schema, RC/config, upload/async option,
-fixture, docs, unrelated edit, Bazel, network, home RC, artifact, or service.
-A later evidence-only packet owns exactly one paired gate invocation.
+Do not reissue, inspect artifacts, or modify code/config. Session loss, invalid
+envelope, nonempty child stderr, sanitizer result, retained root/process,
+Git/daemon drift, or raw exposure is `REPLAN`. `DELIVERED` accepts transport
+only. Accept the cache vertical only with outer and child zero, empty stderr,
+exact schema/mode, and `PROVED_BUILD_CACHE`; any other fixed classification is
+one bounded route without retry. Recheck only fixed root/process/daemon/Git
+counts afterward. This can prove only the one build label; structured RBE and
+the 43-target expansion remain separate successors.

@@ -2247,6 +2247,21 @@ compatibility wrapper, default phase, upload/async option, parser, schema,
 classifier, lifecycle, config, fixture, or CLI change. Offline tests and
 independent source review only; no Bazel, network, home RC, artifact, or service.
 
+The phase-explicit read-policy repair is accepted in `7bb65291…`: 20 production
+and 27 test changed lines across the exact 14 files. Fifty-four focused and 67
+related tests pass with compile, scope, cap, digest, and diff gates. Independent
+review accepts the required exact phase API, unchanged prime vectors, opposite
+single-slot read policies, paired order, shared nonce, distinct output bases,
+and no upload/async/parser/schema/lifecycle/config drift.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-phase-explicit-transported-live-evidence`.
+Invoke the paired build-cache CLI exactly once through an anonymous bounded outer
+transport with retained-session polling and inherited environment. Review only
+the fixed transport envelope, empty CLI stderr, and normalized compact gate
+record. No retry, raw/home/artifact/service access, code/config edit, broad gate,
+or RBE claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
