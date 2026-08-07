@@ -1687,6 +1687,31 @@ config, or make cache/RBE/test claims. Always shut down the private server,
 delete the exact root, and recheck Git and `slugd`. Afterward only owner/
 canonical/current docs may record the fixed result, at most 120 lines.
 
+The one-label prime-vector packet returns `REPLAN` from clean head
+`6b66faa8…`. The exact frozen prime option vector with only
+`//app/slug_cli_v2:slug` exits two in 1.3 seconds, so the 43-label target set is
+not causal and the checked-in vector remains the bounded failure surface. No
+raw terminal/BEP/execution or home-RC content was read, no retry or bisection
+occurred, and private-server shutdown, exact-root deletion, Git, and no-`slugd`
+checks pass. The sole retained result is `PRIME_VECTOR_EXIT_2`; it makes no
+cache, RBE, test, or option-cause claim.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-cache-prime-root-only-nobuild-diagnosis`. Run the
+one-label prime-vector no-remote variant exactly once with system/home/workspace
+RC disabled, ambient `BAZELRC` unset, the tracked root RC selected explicitly,
+and final empty service/cache overrides plus `--nofetch --nobuild`. This command
+cannot consume home authentication, contact a configured BuildBuddy service,
+fetch repositories, or execute actions, so its private stderr may be inspected
+transiently only to identify a public checked-in flag/combination; never paste,
+retain, or commit it. Exit two plus an attributable public non-remote identifier
+is `ROOT_ONLY_NONREMOTE_DIAGNOSED`; exit zero is
+`ROOT_ONLY_NONREMOTE_ACCEPTED`; an unattributable exit two is
+`ROOT_ONLY_UNEXPLAINED`; any other result or cleanup failure is `REPLAN`. Do not
+retry, bisect, change code/config, or claim cache/RBE behavior. Always shut down
+the private server, delete the exact root, and recheck Git and `slugd`. Afterward
+only owner/canonical/current docs may record the fixed result, at most 120 lines.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.

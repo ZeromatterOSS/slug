@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload owns all 14 shared fixture workspaces; the cache gate selects nightly; verified actiond reached one remote spawn; normal-RC BuildBuddy minimal and fresh remote-only-profile Slug builds succeed without exposing home auth | Isolate the cache prime vector from its full target set, then close live cache/per-spawn RBE evidence, core host-tool owners, and self-hosting | `WP-10-m8-bazel-buildbuddy-cache-prime-command-vector-isolation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets covering 906 source cases; one canonical payload owns all 14 shared fixture workspaces; the cache gate selects nightly; normal-RC minimal and remote-only-profile Slug builds succeed; the one-label cache prime vector alone reproduces exit two | Diagnose that vector once without ambient credentials or execution, then close live cache/per-spawn RBE evidence, core host-tool owners, and self-hosting | `WP-10-m8-bazel-buildbuddy-cache-prime-root-only-nobuild-diagnosis` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-cache-prime-command-vector-isolation`.
+`WP-10-m8-bazel-buildbuddy-cache-prime-root-only-nobuild-diagnosis`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

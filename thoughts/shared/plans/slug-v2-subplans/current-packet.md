@@ -1,20 +1,20 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-cache-prime-command-vector-isolation`
+Packet: `WP-10-m8-bazel-buildbuddy-cache-prime-root-only-nobuild-diagnosis`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one token-safe classification of the frozen cache prime option vector.
+Result: one credential-free diagnosis of the frozen cache prime option vector.
 
 ## Goal and required design
 
 From the clean scheduling commit, require a clean Linux x86_64 checkout, no
-`slugd`, and one fresh private mode-0700 root. Generate one unprinted nonce,
-inherit the process environment unchanged, and run exactly one `bazel test`
-invocation with ordinary RC discovery. Do not set, print, expand, copy,
-inspect, or otherwise touch `HOME` or home RC:
+`slugd`, and one fresh private mode-0700 root. Generate one unprinted nonce and
+run exactly one root-RC-only `bazel test` invocation:
 
 ```text
-bazel --output_base=<private>/output test \
+env -u BAZELRC bazel \
+  --nosystem_rc --nohome_rc --noworkspace_rc \
+  --bazelrc=<repo>/.bazelrc --output_base=<private>/output test \
   --config=buildbuddy-cache \
   --@rules_rust//rust/toolchain/channel=nightly \
   --remote_cache=grpcs://remote.buildbuddy.io --remote_instance_name= \
@@ -29,19 +29,29 @@ bazel --output_base=<private>/output test \
   --test_env=SLUG_BUILDBUDDY_CACHE_GATE_NONCE=<nonce> \
   --noremote_accept_cached --remote_upload_local_results \
   --noremote_cache_async \
+  --remote_cache= --remote_executor= --remote_instance_name= \
+  --bes_backend= --bes_results_url= --disk_cache= --nofetch --nobuild \
   //app/slug_cli_v2:slug
 ```
 
-Redirect both terminal streams to private mode-0600 files. Never display,
-inspect, parse, copy, or commit terminal/BEP/execution contents. Emit only one
-fixed result: exit zero is `PRIME_VECTOR_ACCEPTED`; exit two is
-`PRIME_VECTOR_EXIT_2`; any other process result is `REPLAN`.
+Redirect both terminal streams to private mode-0600 files. The startup options
+and unset `BAZELRC` forbid ambient authentication; the final empty service/cache
+overrides forbid configured BuildBuddy traffic; `--nofetch` forbids repository
+fetching; and `--nobuild` forbids action execution. Private stderr may be
+inspected transiently only to identify a public checked-in non-remote flag or
+flag combination. Never paste, retain, or commit the raw stream or any private
+path.
+
+Emit only `ROOT_ONLY_NONREMOTE_DIAGNOSED` plus the public identifier when exit
+two is attributable, `ROOT_ONLY_NONREMOTE_ACCEPTED` for exit zero,
+`ROOT_ONLY_UNEXPLAINED` for unattributable exit two, or `REPLAN` otherwise.
 
 ## Stops and budget
 
-Do not retry, bisect options, change code/config/profile/backend, or infer cache,
-RBE, test-suite, or classifier behavior. Always invoke private-output-base
-shutdown with all RC files ignored, delete only the exact private root (making
-only it owner-writable if needed), and recheck Git cleanliness and no `slugd`.
-Cleanup failure is `REPLAN` regardless of process exit. Only owner/canonical/
-current docs may record the fixed result, at most 120 changed lines.
+Do not retry, bisect options, change code/config/profile/backend, contact a
+remote service intentionally, or infer cache/RBE/test behavior. Always invoke
+private-output-base shutdown with all RC files ignored, delete only the exact
+private root (making only it owner-writable if needed), and recheck Git
+cleanliness and no `slugd`. Cleanup failure is `REPLAN` regardless of process
+exit. Only owner/canonical/current docs may record the fixed result, at most
+120 changed lines.
