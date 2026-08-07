@@ -1408,6 +1408,29 @@ Offline tests, compilation, caps, diff, and independent privacy/schema review
 are required. Do not run Bazel, inspect home/raw data, contact BuildBuddy, or
 make a live attempt; a later separately frozen evidence packet owns one run.
 
+The complete command diagnostic is accepted in its exact two-file,
+151-changed-line scope. Its internal table reproduces the frozen 131-pair
+canonical hash and exhaustive 64-key set; all 98 new opaque ordinals are
+unique, the original 33 semantic classes are unchanged, and fixed structural
+outcomes distinguish missing, malformed, unsupported-general, and unrecognized
+detail. Twenty-four offline tests, Python compilation, caps, diff, and an
+independent pinned-source privacy/schema reconstruction pass. The diagnostic
+never reads private stderr, and no Bazel, home-RC, or remote command ran.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-complete-command-diagnostic-evidence`. From clean
+implementation commit `fcc754a2…`, run the unchanged frozen driver exactly
+once with ordinary RC discovery and let only Bazel consume home-owned
+authentication. Review only compact stdout, process status, and empty stderr.
+`PROVED_CACHE_ONLY` closes the cache proof. A `COMMAND_LINE_FAILURE` is accepted
+only as a diagnosis when prime and replay report the same fixed non-`NONE`
+class; record that class and return `REPLAN` for the corresponding bounded
+repair/decision. Any other classification, differing class, schema surprise,
+retained private path, or required repair is also `REPLAN`. Do not retry,
+inspect home/raw data, change code/config/CI/targets, or invoke RBE. Only owner
+and scheduling docs may record the sanitized result, at most 100 changed lines
+in three files.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
