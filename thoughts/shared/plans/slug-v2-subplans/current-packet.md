@@ -1,25 +1,25 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-command-failure-diagnostic-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-unknown-command-diagnostic-design`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one reviewed compact cache proof or structured failure diagnosis.
+Result: a frozen secret-safe expansion for the unknown command failure.
 
 ## Goal and required design
 
-From clean implementation commit `b66c0bc3…`, run
-`python3 tools/v2_oracle/buildbuddy_cache_gate.py` exactly once. Permit only
-Bazel to consume ordinary workspace/home RC discovery. Review only its compact
-stdout object, process status, and empty stderr. Accept `PROVED_CACHE_ONLY` as
-the cache proof. Accept `COMMAND_LINE_FAILURE` only as a diagnosis when each
-phase contains a fixed allowlisted `command_failure_class`; it returns
-`REPLAN`, not a cache claim.
+Audit pinned Bazel 9.2 `FailureDetail` exit-2 category/code pairs and the
+current parser. Design the smallest closed classification expansion that can
+distinguish the live `UNKNOWN_COMMAND_LINE_ERROR` without exposing raw
+messages, category/code/enum names, options, paths, credentials, nonces, or
+stderr. Freeze exact allowlists, malformed/general-field behavior, tests,
+implementation files/caps, and the boundary for one separately reviewed live
+diagnostic packet.
 
 ## Stops and budget
 
-Return `REPLAN` on any other classification, stderr, retained raw path, schema
-surprise, unavailable service, target/cache miss, or required repair. Do not
-make a second attempt, inspect home configuration, retain or read raw logs,
-invoke RBE, or change code/config/CI/BUILD/MODULE/locks/targets/cycle/core/
-platform behavior. Only the owner plan, canonical plan, and this manifest may
-record the sanitized result: at most 100 changed lines in three files.
+Change only the owner plan, canonical plan, and this manifest, at most 120
+changed lines total. Do not edit code/config/CI/BUILD/MODULE/locks, run Bazel,
+discover or inspect home configuration, read raw artifacts, contact
+BuildBuddy, invoke RBE, or make another live attempt. Return `REPLAN` if no
+bounded fixed classification can add diagnostic information without widening
+the secret boundary.

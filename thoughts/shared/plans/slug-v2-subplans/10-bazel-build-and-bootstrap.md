@@ -1354,6 +1354,28 @@ inspect home configuration or raw artifacts, change code/config/CI/targets, or
 invoke RBE. Only owner and scheduling documentation may record the sanitized
 result, at most 100 changed lines in three files.
 
+The structured evidence packet returns `REPLAN` after its single authorized
+invocation. Its compact record binds clean head `0a8f9730…`, Bazel 9.2.0,
+Linux x86_64, and the frozen manifest/root-RC hashes. Prime and replay both
+report process and BuildFinished exit 2/name `COMMAND_LINE_ERROR`, fixed class
+`UNKNOWN_COMMAND_LINE_ERROR`, zero completed targets/tests, zero eligible
+spawns, and zero cache hits. The driver exits 1 with no stderr; private-root,
+stale-daemon, and Git cleanup checks pass. No raw artifact or home RC was read,
+and no second attempt occurred. This proves a pre-target command-line boundary
+but neither identifies its structured category nor proves cache behavior.
+
+Next design only
+`WP-10-m8-bazel-buildbuddy-unknown-command-diagnostic-design`. Audit pinned
+Bazel 9.2 `FailureDetail` exit-2 categories and the current fail-closed parser
+to choose the smallest fixed classification expansion that can distinguish the
+unknown result without exposing the human message, raw category/code/enum,
+paths, options, credentials, nonces, or stderr. Freeze exact allowlists,
+malformed-input behavior, tests, file/line caps, and a separately reviewed live
+evidence boundary. The packet may change only owner and scheduling
+documentation, at most 120 lines in three files. It must not change code or
+configuration, inspect home/raw data, run Bazel, contact BuildBuddy, or
+authorize another live attempt.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
