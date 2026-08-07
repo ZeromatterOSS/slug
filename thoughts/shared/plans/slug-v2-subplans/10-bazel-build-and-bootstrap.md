@@ -2318,6 +2318,89 @@ and serialized evidence packets without widening either one-label proof. Do not
 run the older driver unchanged. No code/config/manifest/test, Bazel, network,
 home RC, artifact, or service access in the design.
 
+#### Full-gate driver reconciliation design (2026-08-07)
+
+The design preserves `tests/v2_oracle/buildbuddy_cache_targets.txt` byte-for-byte:
+version `slug-buildbuddy-targets-v1`, SHA-256
+`3a717cb4b0a1f5cab06d336e69d2382861a9c21af9a1502ea20c54b990adf6d5`, and counts
+`{build: 1, test: 43}`. The build label is `//app/slug_cli_v2:slug`; the sorted
+green tests include `//app/slug_core_v2:runtime_test` and exclude expected-red
+`//app/slug_cli_v2:cli_fixture_test`. No query, regeneration, or label growth is
+allowed. “Gate C1” means those 43 green test targets plus the production build
+label, never 43 total command labels.
+
+Four proof meanings remain disjoint: one-label `PROVED_BUILD_CACHE`, one-label
+`PROVED_BUILD_RBE`, full-manifest `PROVED_CACHE_ONLY`, and full-manifest
+`PROVED_RBE`. A one-label record can never be promoted. Cache and RBE records bind
+the exact manifest/version/counts, Bazel 9.2, Linux x86_64, checked-in RC hash,
+clean Git head, and the managed Linux/amd64 platform where applicable. They share
+private-artifact and lifecycle invariants but do not require cross-profile action
+counts or digest equality.
+
+The full cache driver remains one CLI invocation with prime then replay in two
+fresh output bases and one nonce. New `full_command` preserves the accepted
+phase-explicit one-label cache order through `--noremote_local_fallback`, then
+appends exactly once, in order, `--cache_test_results=yes`, `--runs_per_test=1`,
+`--test_sharding_strategy=disabled`, action then test env keys both named
+`SLUG_BUILDBUDDY_CACHE_GATE_NONCE`, BEP then execution paths, and all 44 manifest
+labels. It substitutes `test` for `build` and keeps the phase read-policy flag in
+its accepted slot; the opposite read flag, duplicate keys/options, endpoint,
+strategy, upload, async, or effective-profile reconstruction is forbidden. Both
+phases require exactly one BuildFinished and one successful production-label
+completion, executable-output count one, plus exactly one successful completion
+and one PASSED TestSummary per manifest test with run count one and cached count
+zero/one for prime/replay. Missing/duplicate manifest events or any foreign test
+summary fails closed. They also require process success and zero persistent
+action-cache hits, prime/replay remotely-cached counts 0/43, and equal nonempty
+eligible action counts/digest multisets. Prime permits only accepted uncached
+local runners; replay permits only remote-cache hits; every field/policy error is
+zero. The success class stays `PROVED_CACHE_ONLY`.
+
+The later full RBE driver is a separate CLI and third fresh output base. Its
+command preserves the accepted one-label RBE order through
+`--build_event_publish_all_actions`, then appends exactly once the three test
+flags above, action then test env keys both named `SLUG_BUILDBUDDY_RBE_GATE_NONCE`,
+BEP then execution paths, and the 44 labels. It substitutes `test` for `build`;
+opposite cache-read/upload flags and duplicate keys/options are forbidden. It
+retains top-level downloads, managed RBE, bounds, and no fallback, and clears only
+instance/BES/disk values already owned by the accepted vector. Success `PROVED_RBE`
+requires the same singleton BuildFinished/production/test completion and summary
+rules, output one, cached count zero, and every SpawnExec
+with a valid digest, exact remotable true, cache-hit false, empty status, exit
+zero, and runner `remote`; all other runners and error counts are zero.
+
+The existing 361-line cache library, 29-line CLI, and 361-line tests predate the
+accepted lifecycle and must not run live unchanged. Reconciliation must retain
+the exact shared APIs `json_sequence(data)`, `_field(item, *names, default=None)`,
+`_boolean(item, *names)`, `_count(value)`, and `_digest(value)` with their current
+strict semantics for both one-label drivers. It must also preserve legacy
+`command(phase, bazel, output_base, bep, execution, nonce, labels)` byte-for-byte
+for `buildbuddy_prime_diagnostic.py`; only new `full_command` serves the rewritten
+gate. Reconciliation replaces
+direct path reads/removal and open records with bounded no-follow, anchored,
+replacement-aware artifacts; exact executable output; closed canonical
+normalization; pre/post clean Git and no-`slugd`; identity-safe shutdown/removal;
+and cleanup suppression. The accepted one-label files/classes remain unchanged.
+
+Implementation is serial. First, rewrite only the existing full-cache library
+(430 lines), CLI (20), and tests (500), at most 950 total lines; the manifest and
+all one-label files stay unchanged. Then independently design/review the separate
+full-RBE implementation at 300/20/360 and 680 total lines. Only after both are
+offline-accepted may live evidence run as two serialized CLI invocations: cache
+once (two Bazel children), then RBE once (one child), never a combined gate.
+
+Manifest/config/profile/credential change, a local-only test, relaxed parser or
+runner semantics, RBE fallback/cache hits, raw/home/UI/service access, cleanup
+residue, or a live retry is `REPLAN`. Cache prime/replay count/digest/test-cache
+mismatch is also `REPLAN`; cache/RBE cross-profile count/digest mismatch is not.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-full-cache-driver-reconciliation-implementation`.
+Preserve the shared parser API and immutable one-label/manifest boundaries while
+hardening the older full-cache driver to the frozen cache contract. Offline tests
+and independent schema/privacy/lifecycle review only; no Bazel, network, home RC,
+artifact, service, config, manifest, target, or fixture access/change.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
