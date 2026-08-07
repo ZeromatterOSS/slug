@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import stat
@@ -19,6 +20,7 @@ MANIFEST = ROOT / "tests/v2_oracle/buildbuddy_cache_targets.txt"
 DIGEST = "d" * 64
 OTHER_DIGEST = "e" * 64
 VERSION_OUTPUT = b"Bazelisk version: v1.29.0\nBuild label: 9.2.0\nBuild target: bazel\n"
+ABSENT = object()
 
 
 def sequence(values: list[dict[str, object]]) -> bytes:
@@ -71,9 +73,11 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         prime, replay = self._records(1)
         prime["passed_test_count"] = 0
         self.assertEqual("TARGET_FAILURE", gate.classify(prime, replay, ("a",)))
+        command = gate.phase_record(self._command_bep({"command": {"code": "COMMAND_NOT_FOUND"}}), b"", "replay", (), 2)
+        self.assertEqual("REMOTE_UNAVAILABLE", gate.classify(self._records(0)[0] | {"build_finished": {"name": "REMOTE_ERROR", "code": 1}}, command, ()))
 
     def test_command_failure_diagnostics_are_allowlisted_and_precede_target_failure(self) -> None:
-        expected = {
+        semantic = {
             "command": {"OPTIONS_PARSE_FAILURE": "COMMAND_OPTIONS_PARSE", "STARLARK_OPTIONS_PARSE_FAILURE": "COMMAND_STARLARK_OPTIONS_PARSE", "ARGUMENTS_NOT_RECOGNIZED": "COMMAND_ARGUMENTS_NOT_RECOGNIZED", "INVOCATION_POLICY_PARSE_FAILURE": "COMMAND_INVOCATION_POLICY", "INVOCATION_POLICY_INVALID": "COMMAND_INVOCATION_POLICY"},
             "remoteOptions": {"REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR": "REMOTE_OPTIONS_CONFIGURATION", "DOWNLOADER_WITHOUT_GRPC_CACHE": "REMOTE_OPTIONS_CONFIGURATION", "EXECUTION_WITH_INVALID_CACHE": "REMOTE_OPTIONS_CONFIGURATION"},
             "remoteExecution": {"CREDENTIALS_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "RPC_LOG_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "EXEC_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "CACHE_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "DOWNLOADER_CHANNEL_INIT_FAILURE": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD": "REMOTE_EXECUTION_CONFIGURATION", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS": "REMOTE_EXECUTION_CONFIGURATION"},
@@ -81,26 +85,50 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
             "execution": {"EXECUTION_LOG_INITIALIZATION_FAILURE": "EXECUTION_LOG_CONFIGURATION"},
             "buildConfiguration": {"PLATFORM_MAPPING_EVALUATION_FAILURE": "BUILD_CONFIGURATION", "INVALID_CONFIGURATION": "BUILD_CONFIGURATION", "INVALID_BUILD_OPTIONS": "BUILD_CONFIGURATION", "MULTI_CPU_PREREQ_UNMET": "BUILD_CONFIGURATION", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID": "BUILD_CONFIGURATION", "CYCLE": "BUILD_CONFIGURATION", "CONFLICTING_CONFIGURATIONS": "BUILD_CONFIGURATION", "INVALID_OUTPUT_DIRECTORY_MNEMONIC": "BUILD_CONFIGURATION", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE": "BUILD_CONFIGURATION", "INVALID_PROJECT": "BUILD_CONFIGURATION"},
         }
-        self.assertEqual(expected, gate.COMMAND_FAILURE_CLASSES)
-        for category, codes in expected.items():
-            for code, failure_class in codes.items():
-                record = gate.phase_record(self._command_bep({"message": "credential=secret nonce=/private/path", category: {"code": code}}), b"", "prime", (), 2)
-                self.assertEqual(failure_class, record["command_failure_class"])
-                self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
-                self.assertNotIn("credential=secret", json.dumps(record))
-                self.assertNotIn("nonce=/private/path", json.dumps(record))
-                self.assertNotIn("/private/path", json.dumps(record))
-                self.assertNotIn(f'"code": "{code}"', json.dumps(record))
-
-    def test_command_failure_diagnostic_is_closed_and_uses_no_stderr(self) -> None:
-        malformed = (None, 1, {}, {"message": 1, "command": {"code": "OPTIONS_PARSE_FAILURE"}}, {"message": "secret"}, {"command": {"code": "UNKNOWN_ENUM"}}, {"command": {"code": "OPTIONS_PARSE_FAILURE", "path": "/private"}}, {"command": {"code": "OPTIONS_PARSE_FAILURE"}, "remoteOptions": {"code": "EXECUTION_WITH_INVALID_CACHE"}}, {"arbitrary": {"code": "credential=secret"}})
-        for detail in malformed:
-            record = gate.phase_record(self._command_bep(detail), b"", "prime", (), 2)
-            self.assertEqual("UNKNOWN_COMMAND_LINE_ERROR", record["command_failure_class"])
+        semantic_pairs = {(category, code): value for category, codes in semantic.items() for code, value in codes.items()}
+        self.assertEqual(semantic, gate.COMMAND_FAILURE_CLASSES)
+        self.assertEqual(33, len(semantic_pairs))
+        self.assertEqual(64, len(gate.B92_FAILURE_DETAIL_CATEGORY_KEYS))
+        self.assertEqual(131, len(gate.B92_EXIT2_SOURCE_PAIRS))
+        self.assertEqual("cbc5777ca02212ba3a5d20847c469eb221bd29b3c217162e6be39c5f5bf86d57", hashlib.sha256(gate.B92_EXIT2_CANONICAL_BYTES).hexdigest())
+        self.assertTrue(gate.B92_EXIT2_CANONICAL_BYTES.startswith(b"slug-bazel-9.2-failure-detail-exit2-v1\n"))
+        opaque: list[str] = []
+        for ordinal, pair in enumerate(gate.B92_EXIT2_SOURCE_PAIRS, 1):
+            category, code = pair
+            failure_class = semantic_pairs.get(pair, f"B92_EXIT2_CLASS_{ordinal:03d}")
+            self.assertEqual(failure_class, gate.B92_EXIT2_CLASSES[pair])
+            record = gate.phase_record(self._command_bep({category: {"code": code}}), b"", "prime", (), 2)
+            self.assertEqual(failure_class, record["command_failure_class"])
             self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
-            self.assertNotIn("secret", json.dumps(record))
-            self.assertNotIn("UNKNOWN_ENUM", json.dumps(record))
-            self.assertNotIn("arbitrary", json.dumps(record))
+            self.assertNotIn(f'"{category}":', json.dumps(record))
+            self.assertNotIn(f'"{code}"', json.dumps(record))
+            if pair not in semantic_pairs:
+                opaque.append(failure_class)
+        self.assertEqual(98, len(opaque))
+        self.assertEqual(98, len(set(opaque)))
+        self.assertEqual("B92_EXIT2_CLASS_034", gate.B92_EXIT2_CLASSES[("command", "COMMAND_NOT_FOUND")])
+        self.assertEqual("B92_EXIT2_CLASS_040", gate.B92_EXIT2_CLASSES[("command", "NOT_IN_WORKSPACE")])
+        self.assertEqual("B92_EXIT2_CLASS_041", gate.B92_EXIT2_CLASSES[("command", "IN_OUTPUT_DIRECTORY")])
+
+    def test_command_failure_structural_results_and_private_suppression(self) -> None:
+        cases = (
+            (ABSENT, "MISSING_FAILURE_DETAIL"), (None, "MISSING_FAILURE_DETAIL"),
+            (1, "MALFORMED_FAILURE_DETAIL"), ([], "MALFORMED_FAILURE_DETAIL"), ({}, "MALFORMED_FAILURE_DETAIL"),
+            ({"message": "header=x-buildbuddy-api-key=secret nonce=private/path"}, "MALFORMED_FAILURE_DETAIL"),
+            ({"message": "header=x-buildbuddy-api-key=secret nonce=private/path", "command": {"code": "OPTIONS_PARSE_FAILURE"}}, "COMMAND_OPTIONS_PARSE"),
+            ({"message": 1, "command": {"code": "OPTIONS_PARSE_FAILURE"}}, "MALFORMED_FAILURE_DETAIL"),
+            ({"command": "bad"}, "MALFORMED_FAILURE_DETAIL"), ({"command": {}}, "MALFORMED_FAILURE_DETAIL"),
+            ({"command": {"code": 1}}, "MALFORMED_FAILURE_DETAIL"), ({"command": {"code": "OPTIONS_PARSE_FAILURE", "path": "private/path"}}, "MALFORMED_FAILURE_DETAIL"),
+            ({"command": {"code": "OPTIONS_PARSE_FAILURE"}, "remoteOptions": {"code": "EXECUTION_WITH_INVALID_CACHE"}}, "MALFORMED_FAILURE_DETAIL"),
+            ({"x-buildbuddy-api-key=secret": {"code": "nonce=private/path"}}, "UNSUPPORTED_GENERAL_FAILURE_DETAIL"),
+            ({"command": {"code": "HEADER_NONCE_PRIVATE_PATH_SECRET"}}, "UNRECOGNIZED_B9_2_EXIT2_DETAIL"),
+        )
+        for detail, expected in cases:
+            record = gate.phase_record(self._command_bep(detail), b"", "prime", (), 2)
+            self.assertEqual(expected, record["command_failure_class"])
+            self.assertEqual("COMMAND_LINE_FAILURE", gate.classify(record, self._records(0)[1], ()))
+            for private in ("secret", "header=", "x-buildbuddy-api-key", "nonce=", "private/path", "HEADER_NONCE"):
+                self.assertNotIn(private, json.dumps(record))
         non_command = sequence([{"id": {"buildFinished": {}}, "finished": {"exitCode": {"name": "ARBITRARY_ENUM", "code": 2}, "failureDetail": {"message": "stderr credential=secret", "command": {"code": "OPTIONS_PARSE_FAILURE"}}}}])
         record = gate.phase_record(non_command, b"", "prime", (), 2)
         self.assertEqual("NONE", record["command_failure_class"])
@@ -197,14 +225,21 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
                 tests = labels[1:]
                 self.assertEqual(0o600, stat.S_IMODE(os.fstat(_.get("stdout").fileno()).st_mode))
                 self.assertEqual(0o600, stat.S_IMODE(os.fstat(_.get("stderr").fileno()).st_mode))
+                _.get("stderr").write(b"header=x-buildbuddy-api-key=secret nonce=private/path")
                 bep.write_bytes(self._bep(tests, phase))
                 log.write_bytes(sequence([{"runner": "local" if phase == "prime" else "remote cache hit", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 4}, "cacheHit": phase == "replay", "status": "", "exitCode": 0}]))
             return subprocess.CompletedProcess(argv, 0, b"raw token", b"raw token")
 
-        with mock.patch.object(gate, "_git", side_effect=("a" * 40, "")):
+        original_read_bytes = Path.read_bytes
+        def checked_read_bytes(path: Path) -> bytes:
+            self.assertNotEqual("stderr", path.name)
+            return original_read_bytes(path)
+
+        with mock.patch.object(Path, "read_bytes", checked_read_bytes), mock.patch.object(gate, "_git", side_effect=("a" * 40, "")):
             result = gate.run_gate(MANIFEST, runner=runner)
         self.assertEqual("PROVED_CACHE_ONLY", result["classification"])
         self.assertNotIn("raw token", json.dumps(result))
+        self.assertNotIn("x-buildbuddy-api-key", json.dumps(result))
         self.assertEqual(["bazel", "--ignore_all_rc_files", "version"], calls[0])
         tests = [argv for argv in calls if len(argv) > 2 and argv[2] == "test"]
         self.assertEqual(2, len(tests))
@@ -304,9 +339,9 @@ class BuildBuddyCacheGateTest(unittest.TestCase):
         return sequence(events)
 
     @staticmethod
-    def _command_bep(detail: object) -> bytes:
+    def _command_bep(detail: object = ABSENT) -> bytes:
         finished: dict[str, object] = {"exitCode": {"name": "COMMAND_LINE_ERROR", "code": 2}}
-        if detail is not None:
+        if detail is not ABSENT:
             finished["failureDetail"] = detail
         return sequence([{"id": {"buildFinished": {}}, "finished": finished}])
 

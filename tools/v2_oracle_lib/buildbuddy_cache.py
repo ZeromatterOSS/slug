@@ -27,6 +27,61 @@ COMMAND_FAILURE_CLASSES = {
     "execution": {"EXECUTION_LOG_INITIALIZATION_FAILURE": "EXECUTION_LOG_CONFIGURATION"},
     "buildConfiguration": {"PLATFORM_MAPPING_EVALUATION_FAILURE": "BUILD_CONFIGURATION", "INVALID_CONFIGURATION": "BUILD_CONFIGURATION", "INVALID_BUILD_OPTIONS": "BUILD_CONFIGURATION", "MULTI_CPU_PREREQ_UNMET": "BUILD_CONFIGURATION", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID": "BUILD_CONFIGURATION", "CYCLE": "BUILD_CONFIGURATION", "CONFLICTING_CONFIGURATIONS": "BUILD_CONFIGURATION", "INVALID_OUTPUT_DIRECTORY_MNEMONIC": "BUILD_CONFIGURATION", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE": "BUILD_CONFIGURATION", "INVALID_PROJECT": "BUILD_CONFIGURATION"},
 }
+B92_FAILURE_DETAIL_CATEGORY_KEYS = frozenset((
+    "interrupted", "externalRepository", "buildProgress", "remoteOptions",
+    "clientEnvironment", "crash", "symlinkForest", "packageOptions",
+    "remoteExecution", "execution", "workspaces", "crashOptions",
+    "filesystem", "executionOptions", "command", "spawn",
+    "grpcServer", "canonicalizeFlags", "buildConfiguration", "infoCommand",
+    "memoryOptions", "query", "localExecution", "actionCache",
+    "fetchCommand", "syncCommand", "sandbox", "includeScanning",
+    "testCommand", "actionQuery", "targetPatterns", "cleanCommand",
+    "configCommand", "configurableQuery", "dumpCommand", "helpCommand",
+    "mobileInstall", "profileCommand", "runCommand", "versionCommand",
+    "printActionCommand", "workspaceStatus", "javaCompile", "actionRewinding",
+    "cppCompile", "starlarkAction", "ninjaAction", "dynamicExecution",
+    "failAction", "symlinkAction", "cppLink", "ltoAction",
+    "testAction", "worker", "analysis", "packageLoading",
+    "toolchain", "starlarkLoading", "externalDeps", "diffAwareness",
+    "modCommand", "buildReport", "skyfocus", "remoteAnalysisCaching",
+))
+B92_EXIT2_SOURCE_PAIRS = (
+    ("externalRepository", "OVERRIDE_DISALLOWED_MANAGED_DIRECTORIES"), ("externalRepository", "BAD_DOWNLOADER_CONFIG"), ("externalRepository", "CREDENTIALS_INIT_FAILURE"), ("externalRepository", "BAD_REPO_CONTENTS_CACHE"), ("externalRepository", "UNKNOWN_REGISTRY"), ("externalRepository", "SYMLINKING_FAILED"),
+    ("buildProgress", "BES_RUNS_PER_TEST_LIMIT_UNSUPPORTED"),
+    ("remoteOptions", "REMOTE_DEFAULT_EXEC_PROPERTIES_LOGIC_ERROR"), ("remoteOptions", "DOWNLOADER_WITHOUT_GRPC_CACHE"), ("remoteOptions", "EXECUTION_WITH_INVALID_CACHE"),
+    ("clientEnvironment", "CLIENT_CWD_MALFORMED"),
+    ("symlinkForest", "TOPLEVEL_OUTDIR_PACKAGE_PATH_CONFLICT"), ("symlinkForest", "TOPLEVEL_OUTDIR_USED_AS_SOURCE"), ("symlinkForest", "CREATION_FAILED"),
+    ("packageOptions", "PACKAGE_PATH_INVALID"), ("packageOptions", "NONSINGLETON_PACKAGE_PATH"),
+    ("remoteExecution", "CREDENTIALS_INIT_FAILURE"), ("remoteExecution", "CACHE_INIT_FAILURE"), ("remoteExecution", "RPC_LOG_FAILURE"), ("remoteExecution", "EXEC_CHANNEL_INIT_FAILURE"), ("remoteExecution", "CACHE_CHANNEL_INIT_FAILURE"), ("remoteExecution", "DOWNLOADER_CHANNEL_INIT_FAILURE"), ("remoteExecution", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_DOTD"), ("remoteExecution", "REMOTE_DOWNLOAD_OUTPUTS_MINIMAL_WITHOUT_INMEMORY_JDEPS"),
+    ("execution", "EXECUTION_LOG_INITIALIZATION_FAILURE"),
+    ("workspaces", "WORKSPACES_LOG_INITIALIZATION_FAILURE"),
+    ("filesystem", "DEFAULT_DIGEST_HASH_FUNCTION_INVALID_VALUE"),
+    ("executionOptions", "INVALID_STRATEGY"), ("executionOptions", "RESTRICTION_UNMATCHED_TO_ACTION_CONTEXT"), ("executionOptions", "REMOTE_FALLBACK_STRATEGY_NOT_ABSTRACT_SPAWN"), ("executionOptions", "STRATEGY_NOT_FOUND"), ("executionOptions", "DYNAMIC_STRATEGY_NOT_SANDBOXED"), ("executionOptions", "MULTIPLE_EXECUTION_LOG_FORMATS"),
+    ("command", "COMMAND_NOT_FOUND"), ("command", "INVOCATION_POLICY_PARSE_FAILURE"), ("command", "INVOCATION_POLICY_INVALID"), ("command", "OPTIONS_PARSE_FAILURE"), ("command", "STARLARK_OPTIONS_PARSE_FAILURE"), ("command", "ARGUMENTS_NOT_RECOGNIZED"), ("command", "NOT_IN_WORKSPACE"), ("command", "IN_OUTPUT_DIRECTORY"),
+    ("canonicalizeFlags", "FOR_COMMAND_INVALID"),
+    ("buildConfiguration", "PLATFORM_MAPPING_EVALUATION_FAILURE"), ("buildConfiguration", "INVALID_CONFIGURATION"), ("buildConfiguration", "INVALID_BUILD_OPTIONS"), ("buildConfiguration", "MULTI_CPU_PREREQ_UNMET"), ("buildConfiguration", "HEURISTIC_INSTRUMENTATION_FILTER_INVALID"), ("buildConfiguration", "CYCLE"), ("buildConfiguration", "CONFLICTING_CONFIGURATIONS"), ("buildConfiguration", "INVALID_OUTPUT_DIRECTORY_MNEMONIC"), ("buildConfiguration", "CONFIGURATION_DISCARDED_ANALYSIS_CACHE"), ("buildConfiguration", "INVALID_PROJECT"),
+    ("infoCommand", "TOO_MANY_KEYS"), ("infoCommand", "KEY_NOT_RECOGNIZED"),
+    ("memoryOptions", "DEPRECATED_EXPERIMENTAL_OOM_MORE_EAGERLY_THRESHOLD_INVALID_VALUE"), ("memoryOptions", "DEPRECATED_EXPERIMENTAL_OOM_MORE_EAGERLY_NO_TENURED_COLLECTORS_FOUND"),
+    ("query", "QUERY_FILE_WITH_COMMAND_LINE_EXPRESSION"), ("query", "QUERY_FILE_READ_FAILURE"), ("query", "COMMAND_LINE_EXPRESSION_MISSING"), ("query", "OUTPUT_FORMAT_INVALID"), ("query", "GRAPHLESS_PREREQ_UNMET"), ("query", "ANALYSIS_QUERY_PREREQ_UNMET"), ("query", "DEPRECATED_UNCLOSED_QUOTATION_EXPRESSION_ERROR"), ("query", "BUILDFILES_AND_LOADFILES_CANNOT_USE_OUTPUT_LOCATION_ERROR"), ("query", "TARGET_NOT_IN_UNIVERSE_SCOPE"), ("query", "OUTPUT_FORMAT_PREREQ_UNMET"), ("query", "DEPRECATED_UNEXPECTED_TOKEN_ERROR"), ("query", "DEPRECATED_INTEGER_LITERAL_MISSING"), ("query", "DEPRECATED_INVALID_STARTING_CHARACTER_ERROR"), ("query", "DEPRECATED_PREMATURE_END_OF_INPUT_ERROR"), ("query", "SYNTAX_ERROR"), ("query", "ILLEGAL_FLAG_COMBINATION"),
+    ("localExecution", "LOCKFREE_OUTPUT_PREREQ_UNMET"),
+    ("fetchCommand", "EXPRESSION_MISSING"), ("fetchCommand", "OPTIONS_INVALID"), ("fetchCommand", "QUERY_PARSE_ERROR"), ("fetchCommand", "QUERY_EVALUATION_ERROR"),
+    ("actionQuery", "COMMAND_LINE_EXPANSION_FAILURE"), ("actionQuery", "COMMAND_LINE_EXPRESSION_MISSING"), ("actionQuery", "EXPRESSION_PARSE_FAILURE"), ("actionQuery", "SKYFRAME_STATE_WITH_COMMAND_LINE_EXPRESSION"), ("actionQuery", "SKYFRAME_STATE_PREREQ_UNMET"), ("actionQuery", "ILLEGAL_PATTERN_SYNTAX"), ("actionQuery", "INCORRECT_ARGUMENTS"), ("actionQuery", "TOP_LEVEL_TARGETS_WITH_SKYFRAME_STATE_NOT_SUPPORTED"), ("actionQuery", "LABELS_FUNCTION_NOT_SUPPORTED"), ("actionQuery", "TEMPLATE_EXPANSION_FAILURE"),
+    ("targetPatterns", "TARGET_PATTERN_FILE_WITH_COMMAND_LINE_PATTERN"), ("targetPatterns", "TARGET_PATTERN_FILE_READ_FAILURE"),
+    ("cleanCommand", "ARGUMENTS_NOT_RECOGNIZED"),
+    ("configCommand", "TOO_MANY_CONFIG_IDS"), ("configCommand", "CONFIGURATION_NOT_FOUND"),
+    ("configurableQuery", "COMMAND_LINE_EXPRESSION_MISSING"), ("configurableQuery", "EXPRESSION_PARSE_FAILURE"), ("configurableQuery", "FILTERS_NOT_SUPPORTED"), ("configurableQuery", "BUILDFILES_FUNCTION_NOT_SUPPORTED"), ("configurableQuery", "SIBLINGS_FUNCTION_NOT_SUPPORTED"), ("configurableQuery", "VISIBLE_FUNCTION_NOT_SUPPORTED"), ("configurableQuery", "ATTRIBUTE_MISSING"), ("configurableQuery", "INCORRECT_CONFIG_ARGUMENT_ERROR"), ("configurableQuery", "TARGET_MISSING"), ("configurableQuery", "STARLARK_SYNTAX_ERROR"), ("configurableQuery", "STARLARK_EVAL_ERROR"), ("configurableQuery", "FORMAT_FUNCTION_ERROR"),
+    ("helpCommand", "MISSING_ARGUMENT"), ("helpCommand", "COMMAND_NOT_FOUND"),
+    ("mobileInstall", "CLASSIC_UNSUPPORTED"), ("mobileInstall", "NO_TARGET_SPECIFIED"), ("mobileInstall", "MULTIPLE_TARGETS_SPECIFIED"),
+    ("runCommand", "NO_TARGET_SPECIFIED"), ("runCommand", "TOO_MANY_TARGETS_SPECIFIED"), ("runCommand", "TARGET_NOT_EXECUTABLE"), ("runCommand", "RUN_UNDER_TARGET_NOT_BUILT"), ("runCommand", "RUN_PREREQ_UNMET"), ("runCommand", "TOO_MANY_TEST_SHARDS_OR_RUNS"), ("runCommand", "NO_SHELL_SPECIFIED"),
+    ("versionCommand", "NOT_AVAILABLE"),
+    ("actionRewinding", "REWIND_LOST_INPUTS_PREREQ_UNMET"),
+    ("dynamicExecution", "NO_USABLE_STRATEGY_FOUND"),
+    ("modCommand", "MISSING_ARGUMENTS"), ("modCommand", "TOO_MANY_ARGUMENTS"), ("modCommand", "INVALID_ARGUMENTS"), ("modCommand", "BUILDOZER_FAILED"), ("modCommand", "ERROR_DURING_GRAPH_INSPECTION"),
+    ("skyfocus", "INVALID_ACTIVE_DIRECTORIES"), ("skyfocus", "NON_ACTIVE_DIRECTORIES_CHANGE"), ("skyfocus", "CONFIGURATION_CHANGE"), ("skyfocus", "DISALLOWED_OPERATION_ON_FOCUSED_GRAPH"),
+    ("remoteAnalysisCaching", "PROJECT_FILE_NOT_FOUND"), ("remoteAnalysisCaching", "INCOMPATIBLE_OPTIONS"), ("remoteAnalysisCaching", "INVALID_SERVER_ADDRESS"),
+)
+B92_EXIT2_CANONICAL_BYTES = b"slug-bazel-9.2-failure-detail-exit2-v1\n" + b"".join(f"{category}\t{code}\n".encode("ascii") for category, code in B92_EXIT2_SOURCE_PAIRS)
+B92_EXIT2_CLASSES = {(category, code): COMMAND_FAILURE_CLASSES.get(category, {}).get(code, f"B92_EXIT2_CLASS_{ordinal:03d}") for ordinal, (category, code) in enumerate(B92_EXIT2_SOURCE_PAIRS, 1)}
 
 
 class GateError(Exception):
@@ -111,16 +166,21 @@ def _digest(value: Any) -> str:
 
 
 def _command_failure_class(value: Any) -> str:
-    if not isinstance(value, dict) or set(value) - {"message"} == set() or not isinstance(value.get("message", ""), str):
-        return "UNKNOWN_COMMAND_LINE_ERROR"
-    categories = set(value) - {"message"}
+    if value is None:
+        return "MISSING_FAILURE_DETAIL"
+    if not isinstance(value, dict) or not isinstance(value.get("message", ""), str):
+        return "MALFORMED_FAILURE_DETAIL"
+    keys = set(value)
+    if keys - B92_FAILURE_DETAIL_CATEGORY_KEYS - {"message"}:
+        return "UNSUPPORTED_GENERAL_FAILURE_DETAIL"
+    categories = keys & B92_FAILURE_DETAIL_CATEGORY_KEYS
     if len(categories) != 1:
-        return "UNKNOWN_COMMAND_LINE_ERROR"
+        return "MALFORMED_FAILURE_DETAIL"
     category = categories.pop()
     detail = value.get(category)
     if not isinstance(detail, dict) or set(detail) != {"code"} or not isinstance(detail.get("code"), str):
-        return "UNKNOWN_COMMAND_LINE_ERROR"
-    return COMMAND_FAILURE_CLASSES.get(category, {}).get(detail["code"], "UNKNOWN_COMMAND_LINE_ERROR")
+        return "MALFORMED_FAILURE_DETAIL"
+    return B92_EXIT2_CLASSES.get((category, detail["code"]), "UNRECOGNIZED_B9_2_EXIT2_DETAIL")
 
 
 def spawn_summary(entries: Iterable[dict[str, Any]], phase: str) -> dict[str, Any]:
