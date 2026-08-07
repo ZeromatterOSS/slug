@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets; normal-RC minimal/RBE-profile builds succeed; the reviewed fixed-enum prime-stage probe is accepted offline | Invoke that probe once with ordinary RC discovery, then route its fixed result into cache/RBE proof and the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-live-evidence` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 accepted Bazel targets; the fixed prime-stage probe is accepted offline, but its first live result was lost by tool-session transport | Deliver one fresh fixed result through a retained-session envelope, then resume cache/RBE proof and the full 43-test gate | `WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-transported-live-evidence` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-live-evidence`.
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-transported-live-evidence`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

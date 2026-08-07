@@ -2018,6 +2018,23 @@ JSON; never inspect or retain home-RC, terminal, BEP, execution, invocation, or
 remote-service data. Do not retry or modify code/config. Record the fixed stage
 and follow its predeclared route; cache/RBE and 43-test expansion remain open.
 
+The one CLI issue from clean `ba003ec3…` is control-plane `REPLAN`: after the
+terminal tool yielded, its caller discarded the live session identifier, so no
+exit, stderr, or fixed JSON is recoverable. No result is inferred. The private
+root existed only while the command ran and is absent afterward; Git is clean
+and no `slugd` exists. Home RC, terminal/BEP/execution, invocation, and service
+data were unavailable and uninspected. This says nothing about Bazel,
+credentials, BuildBuddy, cache state, or the frozen probe.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-stage-probe-transported-live-evidence`.
+One in-memory wrapper may start the frozen CLI exactly once with unchanged
+environment, no shell child, and anonymous private stdout/stderr files; it
+checks stderr by size, bounds stdout to 2 KiB, validates exact normalized JSON,
+and emits only a fixed `DELIVERED|REJECTED` envelope. The terminal caller must
+retain and poll any returned session ID. Session loss, invalid envelope, raw
+output, cleanup/Git/daemon drift, or `REJECTED` stops at `REPLAN` without reissue.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
