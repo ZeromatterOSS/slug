@@ -123,7 +123,7 @@ def run_probe(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedPr
         stdout, stderr, bep, execution = (phase / name for name in ("stdout", "stderr", "bep.json", "execution.json"))
         identities = {path.name: _private(path) for path in (stdout, stderr, bep, execution)}
         with stdout.open("ab") as out, stderr.open("ab") as err:
-            done = runner(cache.command(bazel, phase / "output", bep, execution, secrets.token_hex(32)), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
+            done = runner(cache.command("prime", bazel, phase / "output", bep, execution, secrets.token_hex(32)), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
         if not _anchored(root, root_fd, root_identity, phase_identity): raise ProbeError
         process = "ZERO" if isinstance(done.returncode, int) and not isinstance(done.returncode, bool) and done.returncode == 0 else "NONZERO"
         outcome = record("PROBE_RECORDED", process, _metadata(phase_fd, bep.name, identities[bep.name]), _metadata(phase_fd, execution.name, identities[execution.name]))

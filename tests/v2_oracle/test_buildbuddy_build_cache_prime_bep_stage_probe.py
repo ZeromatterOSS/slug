@@ -75,9 +75,9 @@ class PrimeBepStageProbeTest(unittest.TestCase):
         self.assertFalse(roots[0].exists()); self.assertEqual(2, len(calls))
         prime = calls[0]; nonce = next(x.rsplit("=", 1)[1] for x in prime if "NONCE=" in x)
         bep = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--build_event_json_file="))); execution = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--execution_log_json_file=")))
-        self.assertEqual(cache.command("bazel", Path(prime[1].split("=", 1)[1]), bep, execution, nonce), prime)
+        self.assertEqual(cache.command("prime", "bazel", Path(prime[1].split("=", 1)[1]), bep, execution, nonce), prime)
         self.assertEqual(["bazel", "--ignore_all_rc_files", f"--output_base={prime[1].split('=', 1)[1]}", "shutdown"], calls[1])
-        self.assertEqual("641f76f3a272bb3914c825e7e351a5131855aedb576a8377e56c85e2840f8229", hashlib.sha256(Path(cache.__file__).read_bytes()).hexdigest())
+        self.assertEqual("ab285a31113a85f5a687e585088e596c552f29622b65fb991be4d591ab3886bc", hashlib.sha256(Path(cache.__file__).read_bytes()).hexdigest())
 
     def test_process_descriptor_stream_event_terminal_and_counter_stages(self) -> None:
         cases = (("ready", 9, "PROCESS_NONZERO"), ("bep_missing", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_symlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_replace", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_hardlink", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_mode", 0, "BEP_DESCRIPTOR_REJECTED"), ("bep_directory", 0, "BEP_DESCRIPTOR_REJECTED"), ("stream_bad", 0, "BEP_STREAM_REJECTED"), ("event_bad", 0, "BEP_EVENT_REJECTED"), ("event_then_stream", 0, "BEP_EVENT_REJECTED"), ("nested_bad", 0, "BEP_EVENT_REJECTED"), ("completed_nondict", 0, "BEP_EVENT_REJECTED"), ("finished_invalid", 0, "BEP_TERMINAL_REJECTED"), ("finished_then_stream", 0, "BEP_STREAM_REJECTED"), ("hits_then_stream", 0, "BEP_COUNTER_REJECTED"), ("exit_invalid", 0, "BEP_COUNTER_REJECTED"), ("exit_null", 0, "BEP_COUNTER_REJECTED"), ("exit_false", 0, "BEP_COUNTER_REJECTED"), ("exit_true", 0, "BEP_COUNTER_REJECTED"), ("exit_string", 0, "BEP_COUNTER_REJECTED"), ("exit_negative", 0, "BEP_COUNTER_REJECTED"))

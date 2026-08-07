@@ -21,14 +21,20 @@ def seq(values: list[dict[str, object]]) -> bytes:
 
 class BuildBuddyBuildCacheGateTest(unittest.TestCase):
     def test_command_is_exact_minimal_build_and_nonce(self) -> None:
-        argv = gate.command("bazel", Path("/p/out"), Path("/p/bep"), Path("/p/log"), "a" * 64)
+        argv = gate.command("prime", "bazel", Path("/p/out"), Path("/p/bep"), Path("/p/log"), "a" * 64)
+        replay = gate.command("replay", "bazel", Path("/p/out"), Path("/p/bep"), Path("/p/log"), "a" * 64)
         self.assertEqual(["bazel", "--output_base=/p/out", "build", "--config=buildbuddy-cache"], argv[:4])
         self.assertEqual("--noremote_accept_cached", argv[4]); self.assertEqual(1, argv.count("--noremote_accept_cached"))
+        self.assertEqual("--remote_accept_cached", replay[4]); self.assertEqual(argv[:4] + argv[5:], replay[:4] + replay[5:])
+        self.assertNotIn("--remote_accept_cached", argv); self.assertNotIn("--noremote_accept_cached", replay)
         self.assertEqual(gate.LABEL, argv[-1]); self.assertEqual(1, argv.count("--@rules_rust//rust/toolchain/channel=nightly"))
         self.assertEqual({"--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache="}, set(x for x in argv if x in {"--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache="}))
         for forbidden in ("remote_cache", "remote_instance", "spawn_strategy", "test_", "publish_all", "remote_upload", "cache_async", "test_env"):
             self.assertFalse(any(forbidden in x for x in argv))
-        with self.assertRaises(gate.GateError): gate.command("bazel", Path("/p"), Path("/b"), Path("/e"), "secret")
+        class Phase(str): pass
+        for phase in ("", "unknown", None, 0, Phase("prime")):
+            with self.subTest(phase=phase), self.assertRaises(gate.GateError): gate.command(phase, "bazel", Path("/p"), Path("/b"), Path("/e"), "a" * 64)
+        with self.assertRaises(gate.GateError): gate.command("prime", "bazel", Path("/p"), Path("/b"), Path("/e"), "secret")
 
     def test_json_parser_and_spawns_are_strict(self) -> None:
         event = {"runner": "local", "cacheable": True, "remoteCacheable": True, "digest": {"hash": DIGEST, "sizeBytes": 1}, "cacheHit": False, "status": "", "exitCode": 0}
@@ -91,6 +97,7 @@ class BuildBuddyBuildCacheGateTest(unittest.TestCase):
         builds = [x for x in calls if len(x) > 2 and x[2] == "build"]
         nonces = [next(x for x in argv if "NONCE=" in x) for argv in builds]
         self.assertEqual(2, len(builds)); self.assertEqual(nonces[0], nonces[1]); self.assertRegex(nonces[0], r"[0-9a-f]{64}$")
+        self.assertEqual(["--noremote_accept_cached", "--remote_accept_cached"], [argv[4] for argv in builds]); self.assertEqual(2, len({argv[1] for argv in builds}))
         self.assertEqual("PROVED_BUILD_CACHE", result["classification"]); self.assertTrue(all(not path.exists() for path in roots)); self.assertNotIn("private", json.dumps(result))
         self.assertEqual({"schema_version", "mode", "classification", "prime", "replay"}, set(result))
         self.assertEqual({"process_success_count", "build_finished_success_count", "target_success_count", "output_count", "persistent_action_cache_hit_count", "eligible_spawns"}, set(result["prime"]))

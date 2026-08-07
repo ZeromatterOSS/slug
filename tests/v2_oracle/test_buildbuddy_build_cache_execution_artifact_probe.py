@@ -59,7 +59,7 @@ class ExecutionArtifactProbeTest(unittest.TestCase):
                 prime = calls[0]; nonce = next(x.rsplit("=", 1)[1] for x in prime if "NONCE=" in x)
                 execution = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--execution_log_json_file=")))
                 bep = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--build_event_json_file=")))
-                self.assertEqual(cache.command("bazel", Path(prime[1].split("=", 1)[1]), bep, execution, nonce), prime)
+                self.assertEqual(cache.command("prime", "bazel", Path(prime[1].split("=", 1)[1]), bep, execution, nonce), prime)
 
     def test_invalid_artifacts_and_nonzero_are_recorded_conservatively(self) -> None:
         for change in ("missing", "symlink", "hardlink", "mode", "directory"):

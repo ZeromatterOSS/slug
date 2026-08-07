@@ -109,7 +109,7 @@ def run_probe(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedPr
         execution, bep = phase / "execution.json", phase / "bep.json"
         _private(execution)
         with (phase / "stdout").open("xb") as out, (phase / "stderr").open("xb") as err:
-            done = runner(cache.command(bazel, output, bep, execution, secrets.token_hex(32)), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
+            done = runner(cache.command("prime", bazel, output, bep, execution, secrets.token_hex(32)), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
         if not _anchored(root, root_fd, root_id, phase_id) or not _same_output(phase_fd, output_fd, output_id): raise OSError
         process = "ZERO" if type(done.returncode) is int and done.returncode == 0 else "NONZERO"
         execution_class = _execution(phase_fd, execution.name)

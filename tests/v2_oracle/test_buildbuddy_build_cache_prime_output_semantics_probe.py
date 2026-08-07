@@ -58,7 +58,7 @@ class OutputSemanticsProbeTest(unittest.TestCase):
         self.assertIn(b'"cache_hit":false', SPAWN)
         self.assertEqual(("STAGE_RECORDED", "ZERO", "PRIME_READY"), (result["classification"], result["process"], result["stage"])); self.assertFalse(roots[0].exists()); self.assertEqual(2, len(calls))
         prime = calls[0]; nonce = next(x.rsplit("=", 1)[1] for x in prime if "NONCE=" in x); output = Path(prime[1].split("=", 1)[1]); bep = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--build_event_json_file="))); execution = Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--execution_log_json_file=")))
-        self.assertEqual(cache.command("bazel", output, bep, execution, nonce), prime); self.assertEqual(["bazel", "--ignore_all_rc_files", f"--output_base={output}", "shutdown"], calls[1]); self.assertEqual("641f76f3a272bb3914c825e7e351a5131855aedb576a8377e56c85e2840f8229", hashlib.sha256(Path(cache.__file__).read_bytes()).hexdigest())
+        self.assertEqual(cache.command("prime", "bazel", output, bep, execution, nonce), prime); self.assertEqual(["bazel", "--ignore_all_rc_files", f"--output_base={output}", "shutdown"], calls[1]); self.assertEqual("ab285a31113a85f5a687e585088e596c552f29622b65fb991be4d591ab3886bc", hashlib.sha256(Path(cache.__file__).read_bytes()).hexdigest())
 
     def test_output_stages_precede_all_private_readers(self) -> None:
         for change in ("output_missing", "output_nonexecutable", "output_link", "output_multiple"):

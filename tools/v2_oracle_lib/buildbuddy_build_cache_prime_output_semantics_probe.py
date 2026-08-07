@@ -66,7 +66,7 @@ def run_probe(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedPr
         except Exception: raise ProbeError("SETUP_REJECTED") from None
         started = True
         with (phase / "stdout").open("xb") as out, (phase / "stderr").open("xb") as err:
-            done = runner(cache.command(bazel, output, bep, execution, secrets.token_hex(32)), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
+            done = runner(cache.command("prime", bazel, output, bep, execution, secrets.token_hex(32)), cwd=REPO_ROOT, stdout=out, stderr=err, check=False)
         process = "ZERO" if type(done.returncode) is int and done.returncode == 0 else "NONZERO"
         if process != "ZERO": result = record("STAGE_RECORDED", process, "PROCESS_NONZERO")
         elif not cache._anchored(root, root_id, root_fd, "prime", phase_id, output_fd, output_id): result = record("STAGE_RECORDED", process, "POST_RUN_ANCHOR_REJECTED")

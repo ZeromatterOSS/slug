@@ -27,10 +27,12 @@ class GateError(Exception):
         self.classification = classification if classification in CLASSES else "SANITIZER_REJECTED"
 
 
-def command(bazel: str, output: Path, bep: Path, execution: Path, nonce: str) -> list[str]:
+def command(phase: str, bazel: str, output: Path, bep: Path, execution: Path, nonce: str) -> list[str]:
+    if type(phase) is not str or phase not in ("prime", "replay"):
+        raise GateError()
     if not isinstance(nonce, str) or not re.fullmatch(r"[0-9a-f]{64}", nonce):
         raise GateError()
-    return [bazel, f"--output_base={output}", "build", "--config=buildbuddy-cache", "--noremote_accept_cached", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--noremote_local_fallback", f"--action_env=SLUG_BUILDBUDDY_BUILD_CACHE_NONCE={nonce}", f"--build_event_json_file={bep}", f"--execution_log_json_file={execution}", LABEL]
+    return [bazel, f"--output_base={output}", "build", "--config=buildbuddy-cache", "--noremote_accept_cached" if phase == "prime" else "--remote_accept_cached", "--@rules_rust//rust/toolchain/channel=nightly", "--remote_executor=", "--bes_backend=", "--bes_results_url=", "--disk_cache=", "--noremote_local_fallback", f"--action_env=SLUG_BUILDBUDDY_BUILD_CACHE_NONCE={nonce}", f"--build_event_json_file={bep}", f"--execution_log_json_file={execution}", LABEL]
 
 
 def _count(value: Any) -> int:
@@ -309,7 +311,7 @@ def run_gate(bazel: str = "bazel", runner: Callable[..., subprocess.CompletedPro
                 raise
             phases[phase] = (phase_fd, phase_identity, output_fd, output_identity)
             with (phase_root / "stdout").open("xb") as stdout, (phase_root / "stderr").open("xb") as stderr:
-                done = runner(command(bazel, phase_root / "output", bep, execution, nonce), cwd=REPO_ROOT, stdout=stdout, stderr=stderr, check=False)
+                done = runner(command(phase, bazel, phase_root / "output", bep, execution, nonce), cwd=REPO_ROOT, stdout=stdout, stderr=stderr, check=False)
             if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity): raise GateError("EVIDENCE_INCOMPLETE")
             item = phase_record(_private_bytes(phase_fd, bep.name, identities[bep.name]), _execution_bytes(phase_fd, execution.name), _count(done.returncode), phase)
             if not _anchored(root, root_identity, root_fd, phase, phase_identity, output_fd, output_identity): raise GateError("EVIDENCE_INCOMPLETE")

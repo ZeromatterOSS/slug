@@ -32,7 +32,7 @@ class ArtifactProbeTest(unittest.TestCase):
                         with mock.patch.object(probe, "_clean", return_value=True): result = probe.run_probe(runner=runner)
                         prime = calls[0]
                         nonce = next(item.rsplit("=", 1)[1] for item in prime if "NONCE=" in item)
-                        self.assertEqual(cache.command("bazel", Path(prime[1].split("=", 1)[1]), Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--build_event_json_file="))), Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--execution_log_json_file="))), nonce), prime)
+                        self.assertEqual(cache.command("prime", "bazel", Path(prime[1].split("=", 1)[1]), Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--build_event_json_file="))), Path(next(x.split("=", 1)[1] for x in prime if x.startswith("--execution_log_json_file="))), nonce), prime)
                         self.assertEqual("PROBE_RECORDED", result["classification"])
                         self.assertEqual("ZERO" if exit_code == 0 else "NONZERO", result["process"])
                         self.assertEqual("PRIVATE_REGULAR" if bep_good else "NOT_PRIVATE_REGULAR", result["bep"])
