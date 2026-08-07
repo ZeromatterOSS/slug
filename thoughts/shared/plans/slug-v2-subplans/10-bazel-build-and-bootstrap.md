@@ -1657,6 +1657,36 @@ parsing structured logs it does not prove per-spawn RBE, cache reuse, the
 owner/canonical/current docs may record the fixed result, at most 120 lines in
 three files.
 
+The direct BuildBuddy-profile packet is accepted from clean head `1d931816…`.
+Its one ordinary-RC invocation inherited the environment unchanged, exited
+zero, and materialized exactly one executable regular Slug binary beneath the
+fresh private output base. The private Bazel server shut down with exit zero;
+the exact private root was deleted; Git remained clean and no `slugd` existed.
+No terminal, BEP, execution-log, home-RC, header, or token content was read.
+This proves one fresh remote-only BuildBuddy-profile Stage 10 developer build,
+not structured per-spawn RBE, cache reuse, the 43-test gate, CI, Stage 7
+acceptance, or self-hosting.
+
+The earlier recorded prime-runner classifier drift is withdrawn. `_runner()`
+normalizes exact `local`, `worker`, and `linux-sandbox` spellings to the same
+`local` class, which prime `spawn_summary()` accepts. The focused test already
+pins that normalization; a later test-only strengthening may assert its zero
+status-failure consequence, but there is no production repair or live-gate
+blocker at this boundary.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-cache-prime-command-vector-isolation`. Run exactly
+one private ordinary-RC `bazel test` with the frozen cache driver's prime option
+vector unchanged but only `//app/slug_cli_v2:slug` as its label. Inherit the
+environment; only Bazel may consume home auth. Keep mode-0600 terminal/BEP/
+execution files unread and private, then delete them. Exit zero proves the
+option vector parses and isolates the prior opaque failure to the full target
+set/combined test boundary. Exit two records only `PRIME_VECTOR_EXIT_2` and
+stops; any other result is `REPLAN`. Do not retry, bisect options, change code/
+config, or make cache/RBE/test claims. Always shut down the private server,
+delete the exact root, and recheck Git and `slugd`. Afterward only owner/
+canonical/current docs may record the fixed result, at most 120 lines.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
