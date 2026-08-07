@@ -1563,6 +1563,38 @@ download/verification/start/build/evidence/cleanup failure is `REPLAN` with no
 retry. Afterward only owner/canonical/current docs may record the fixed result,
 at most 120 changed lines.
 
+The verified-release packet returns `REPLAN` after its single permitted Slug
+build. Clean Slug run HEAD `827c6fcc…` used clean sibling `8a42c3d4…`; the
+`v0.0.6` tag remained `4bdf3e88…`. Both immutable release assets passed their
+frozen size, SHA-256, and manifest-row checks before the binary became
+executable. The KVM VM reached the exact loopback bridge-ready event and Bazel
+9.2.0 analyzed `//app/slug_cli_v2:slug` with the registered nightly toolchain.
+
+The sole SpawnExec was an uncached `remote` spawn, proving loopback REAPI
+transport and remote scheduling, but its process setup returned exit 127 with
+fixed actiond diagnostic `child setup failed: execve SUCCESS`. BEP ended
+`BUILD_FAILURE`/`NON_ZERO_EXIT`, the target did not complete, and no executable
+materialized. Pinned source places that diagnostic after sandbox setup when
+`execve` returns; this identifies an actiond execution-launch boundary, but the
+discarded private action data and no-retry rule leave its exact cause unproven.
+It is not successful Slug compilation, cache reuse, Stage 7 backend acceptance,
+or a BuildBuddy claim. The private Bazel server and VM stopped, port 8980
+closed, the exact private root was made owner-writable and deleted, and both
+repositories plus the no-`slugd` check remained clean.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-cache-live-evidence-after-nightly-repair`. Run the
+frozen sanitized cache driver exactly once from the clean scheduling commit.
+Only Bazel may consume ordinary workspace/home RC discovery; agents may review
+only compact stdout, process status, and empty stderr. Accept only
+`PROVED_CACHE_ONLY` with the already frozen 43-test/build, fresh prime/replay,
+digest, runner, cache, and cleanup invariants. Any other classification,
+stderr, retained private path, schema surprise, service/target/cache failure,
+or required repair is `REPLAN` without a second attempt. Do not inspect home
+configuration or raw artifacts, invoke RBE, or change code/config/CI/targets.
+Only owner/canonical/current documentation may record the result, at most 100
+lines in three files.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
