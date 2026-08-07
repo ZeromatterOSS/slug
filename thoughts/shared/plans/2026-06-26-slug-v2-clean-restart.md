@@ -31,11 +31,11 @@ and must name the same packet.
 | M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 green test targets; one-label BuildBuddy cache is `PROVED_BUILD_CACHE` and managed RBE is `PROVED_BUILD_RBE`, both with clean lifecycle; full-gate reconciliation is designed | Harden the older manifest-aware cache driver without changing the manifest or one-label proofs | `WP-10-m8-bazel-buildbuddy-full-cache-driver-reconciliation-implementation` |
+| M8: bootstrap | **active (developer graph)** | exact 33-package CLI boundary plus accepted Gates A-B; Gate C1 has 43 green test targets; one-label BuildBuddy cache/RBE proofs and the reconciled full-cache driver are offline-accepted | Implement the separate manifest-aware managed-RBE driver before either full live gate | `WP-10-m8-bazel-buildbuddy-full-rbe-driver-implementation` |
 
 ### Current packet
 
-`WP-10-m8-bazel-buildbuddy-full-cache-driver-reconciliation-implementation`.
+`WP-10-m8-bazel-buildbuddy-full-rbe-driver-implementation`.
 
 Read its bounded contract from the
 [current-packet manifest](./slug-v2-subplans/current-packet.md).

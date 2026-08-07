@@ -2401,6 +2401,25 @@ hardening the older full-cache driver to the frozen cache contract. Offline test
 and independent schema/privacy/lifecycle review only; no Bazel, network, home RC,
 artifact, service, config, manifest, target, or fixture access/change.
 
+The full-cache reconciliation is accepted in `b1b64f41…` at 376 library, 20 CLI,
+260 test, and 656 total lines. Eleven focused and 92 complete offline BuildBuddy
+tests pass with compilation, scope, cap, AST-identity, and diff gates. Independent
+review accepts transport-faithful BEP defaults, exact singleton target/test/cache
+evidence, closed normalization, the fixed component-anchored manifest, distinct
+cache lifecycle namespace, replacement-safe private artifacts/output, cleanup
+suppression, and canonical CLI. The five shared parser helpers and legacy
+diagnostic command remain AST-identical; all one-label files are unchanged.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-full-rbe-driver-implementation`. Add a separate
+manifest-aware full-RBE library/CLI/tests at 300/20/360 and 680 total lines. Use
+the frozen full-RBE vector and distinct `PROVED_RBE` record over the unchanged
+one-build/43-test manifest; reuse the accepted fixed-manifest, singleton BEP,
+all-SpawnExec, anchored private-artifact/output, and clean lifecycle semantics
+without changing full-cache or one-label code. Offline tests and independent
+schema/privacy/lifecycle review only; no Bazel, network, home RC, artifact,
+service, config, manifest, target, or fixture access/change.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
