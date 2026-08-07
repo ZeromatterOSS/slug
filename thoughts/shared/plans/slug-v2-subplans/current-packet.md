@@ -1,31 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-build-rbe-vertical-transported-live-evidence`
+Packet: `WP-10-m8-bazel-buildbuddy-full-gate-driver-reconciliation-design`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one transported structured one-label managed-RBE record.
+Result: one frozen manifest-aware full-cache/full-RBE expansion contract.
 
 ## Goal and required evidence
 
-From the clean scheduling commit containing accepted `e48213bb…`, invoke
-`python3 tools/v2_oracle/buildbuddy_build_rbe_gate.py` exactly once through the
-accepted anonymous outer transport with inherited environment and retained-
-session polling. The child therefore uses ordinary Bazel RC discovery, including
-the private home authentication RC, without the transport reading or exposing it.
+Edit only the canonical, owner, and current-packet documents at respectively 8,
+110, and 45 changed/total lines, at most 163 changed lines overall. Preserve the
+tracked `slug-buildbuddy-targets-v1` manifest byte-for-byte at SHA-256
+`3a717cb4b0a1f5cab06d336e69d2382861a9c21af9a1502ea20c54b990adf6d5`:
+one production build label plus 43 sorted green test labels, including
+`runtime_test` and excluding the expected-red `cli_fixture_test`.
 
 ## Stops and budget
 
-The transport uses anonymous private stdout/stderr files, caps stdout at 4 KiB,
-requires empty stderr, validates the exact normalized compact schema, and emits
-only a fixed `DELIVERED|REJECTED` envelope with child status and public record.
-Accept only outer and child exit zero, `DELIVERED`, and `PROVED_BUILD_RBE` with
-process/BuildFinished/target/output counts one, nonempty spawns,
-`remote_execution == count`, and all cache-hit, persistent-cache, field-error,
-local, worker, sandbox, and other counts zero.
+Reconcile the tracked 361-line full-cache library, 29-line CLI, and 361-line
+tests with the accepted one-label primitives; do not run that older driver
+unchanged. Freeze four separate meanings: one-label `PROVED_BUILD_CACHE`, one-label
+`PROVED_BUILD_RBE`, full-manifest `PROVED_CACHE_ONLY`, and distinct full-manifest
+`PROVED_RBE`. Cache uses one manifest-aware CLI with fresh prime/replay output
+bases and equal nonempty eligible digest multisets; RBE uses a separate CLI and
+third fresh output base, all-SpawnExec remote-only proof, and 43 exact test
+completions. Do not require cache/RBE cross-profile action equality.
 
-Before and after, require clean Git, zero `slugd`, zero roots prefixed
-`slug-buildbuddy-rbe-`, and zero processes whose arguments contain
-`--output_base=/tmp/slug-buildbuddy-rbe-`. Poll the same returned session; do not
-reissue. Any transport/session/schema/lifecycle failure stops at `REPLAN`.
-Do not inspect raw output, home RC, private artifacts, BuildBuddy UI/service, or
-effective options; do not edit code/config or claim the full 43-target gate.
+Specify bounded offline implementation/review packets followed by two serialized
+live packets: full cache once, then full RBE once. Reuse hardened no-follow
+private-artifact, schema, shutdown, and clean-lifecycle primitives while leaving
+the accepted one-label drivers unchanged. Return `REPLAN` on manifest/config/
+platform drift, required target or credential changes, local-only tests, relaxed
+classification, raw/home/UI access, cleanup residue, or any live retry. Validate
+scope/caps, scheduling agreement, `git diff --check`, and independent design
+review. No code/config/manifest/test/Bazel/network/home/artifact/service access.

@@ -2299,6 +2299,25 @@ environment. Accept only outer/child zero, empty stderr, `DELIVERED`, exact
 normalized `PROVED_BUILD_RBE`, and clean root/process/daemon/Git lifecycle. No
 retry, raw/home/artifact/UI/service access, code/config edit, or 43-target claim.
 
+The single invocation from clean `475c6f17…` delivers outer/child zero, empty
+child stderr, and fixed `PROVED_BUILD_RBE`. Process, BuildFinished, target, and
+output counts are one; all 877 SpawnExec records have valid digests and runner
+`remote`, with zero cache hits, field errors, local/worker/sandbox/other runners,
+or persistent action-cache hits. Three stale reserved roots were removed through
+the identity-bound no-follow helper before invocation without reading contents.
+Afterward there are zero matching roots, output-base processes, or `slugd`, and
+Git is clean. No raw/home/artifact/UI/service data was inspected. This proves
+only the one build-label managed-RBE vertical.
+
+Next design only
+`WP-10-m8-bazel-buildbuddy-full-gate-driver-reconciliation-design`. Preserve the
+frozen one-build/43-green-test manifest and reconcile the older full-cache driver
+with the accepted one-label command, parser, closed-schema, anchored-artifact,
+and cleanup semantics. Define separate full-manifest cache and RBE implementations
+and serialized evidence packets without widening either one-label proof. Do not
+run the older driver unchanged. No code/config/manifest/test, Bazel, network,
+home RC, artifact, or service access in the design.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
