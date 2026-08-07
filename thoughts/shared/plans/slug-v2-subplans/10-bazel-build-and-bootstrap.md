@@ -2118,6 +2118,26 @@ transport with retained-session polling and inherited environment. Review only
 the fixed envelope, empty child stderr, and normalized stage. No retry, raw/
 home/artifact/service access, code/config edit, or cache/RBE claim.
 
+That transported invocation delivers outer/child zero, empty child stderr, and
+fixed `PRIME_SEMANTICS_REJECTED`, but returns lifecycle `REPLAN`: one matching
+temporary root remains for more than 30 seconds after return. No matching probe
+or Bazel-output-base process or `slugd` remains; the root is removed with the
+accepted no-follow helper without reading its contents, and a later audit is
+clean. Because the external observation is not identity-bound, quarantine the
+semantic stage as routing input rather than accepted live evidence. No raw,
+home, artifact, invocation, or service data was inspected.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-lifecycle-guard-implementation`.
+Add separate stdlib library/CLI/tests at 220/30/300 and 550 total lines, without
+editing existing probe code. Require an empty reserved-root namespace before
+starting, invoke the frozen output-semantics CLI once with inherited environment
+and anonymous bounded transport, then recheck the namespace, Git, and daemon
+state. Only `LIFECYCLE_CLEAN` may expose the normalized child stage. A single
+new residue is removed through the existing no-follow helper but suppresses the
+stage; all other lifecycle failures fail closed. Offline tests and independent
+review only; no Bazel, network, home RC, live artifact, or service access.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
