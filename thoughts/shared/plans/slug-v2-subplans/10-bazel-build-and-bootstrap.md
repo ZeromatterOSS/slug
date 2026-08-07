@@ -2437,6 +2437,25 @@ clean cache-root/process/daemon/Git lifecycle. This one CLI owns two serialized
 Bazel children. No retry, raw/home/artifact/UI/service access, code/config edit,
 or RBE invocation; any non-proof stops before the full-RBE live packet.
 
+The single full-cache CLI invocation from clean `c5e50dde…` delivers outer/child
+zero, empty stderr, and fixed `PROVED_CACHE_ONLY`. Both phases report one process,
+BuildFinished, production completion, and executable output plus all 43 test
+completions, passes, and exact runs. Prime has zero remotely cached tests and
+1,006 `linux-sandbox` eligible misses; replay has 43 remotely cached tests and
+1,006 remote-cache hits. Both have zero persistent action-cache and spawn errors,
+and their eligible digest multisets are identical at
+`9ae19e6b3cfb218033a633c630967e70161c4acd47b435c3f446e76e7cc93de5`.
+Afterward there are zero cache roots, output-base processes, or `slugd`, and Git
+is clean. No raw/home/artifact/UI/service data was inspected.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-full-rbe-transported-live-evidence`. Invoke the frozen
+full-RBE CLI exactly once through anonymous bounded transport with an 8 KiB
+stdout cap, retained-session polling, and inherited environment. Accept only
+outer/child zero, empty stderr, `DELIVERED`, exact `PROVED_RBE`, and clean full-
+RBE root/process/daemon/Git lifecycle. No retry, raw/home/artifact/UI/service
+access, code/config edit, or weakening of the all-SpawnExec/43-test proof.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
