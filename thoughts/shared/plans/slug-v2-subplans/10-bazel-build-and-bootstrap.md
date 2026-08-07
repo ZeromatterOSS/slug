@@ -2210,6 +2210,21 @@ changed lines. Do not change parsers, schema, stages, lifecycle, RC/config,
 fixtures, or any other option. Offline tests and independent source review only;
 no Bazel, network, home RC, live artifact, or service access.
 
+The cache-read repair is accepted in `89b848b9…`: one production argument and
+18 test changed lines across the exact six files. Three focused and 67 related
+tests pass with compile, scope, cap, digest, and diff gates. Independent pinned-
+source review accepts one positioned `--noremote_accept_cached`, strict unchanged
+cache-hit parsing, the complete prime/replay field matrix, and no other command
+drift.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-disable-cache-reads-transported-live-evidence`.
+Invoke the unchanged lifecycle-guard CLI exactly once through the accepted
+anonymous bounded outer transport with retained-session polling and inherited
+environment. Review only the fixed transport envelope, empty guard stderr,
+`LIFECYCLE_CLEAN`, and its nested semantic stage. No retry, raw/home/artifact/
+service access, code/config edit, or cache/RBE claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
