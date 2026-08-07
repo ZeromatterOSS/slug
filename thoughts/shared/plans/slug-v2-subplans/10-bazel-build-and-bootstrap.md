@@ -2117,6 +2117,20 @@ retained-session polling with inherited environment. Review only the fixed
 envelope, empty child stderr, and normalized stage. No retry, raw/home/artifact/
 service access, code/config edit, or cache/RBE claim.
 
+The transported execution invocation from clean `3235a511…` delivers
+outer/child zero, empty child stderr, and fixed `EXECUTION_READY`; its private
+root is absent afterward, Git is clean, and no `slugd` exists. No raw/home/
+artifact/service data was inspected. Together with `BEP_READY`, this closes both
+private parser boundaries but not output or aggregate prime semantics.
+
+Next implementation only
+`WP-10-m8-bazel-buildbuddy-build-cache-prime-output-semantics-probe-implementation`.
+Add separate stdlib library/CLI/tests at 190/30/260 and 480 total lines. One
+prime checks anchored output materialization before any BEP/execution read, then
+reuses the accepted readers/parsers and opaque prime predicate. Emit only fixed
+output/read/parse/semantics/ready stages. Offline tests and independent review
+only; no Bazel/home RC/network/live artifact or existing-file edit.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
