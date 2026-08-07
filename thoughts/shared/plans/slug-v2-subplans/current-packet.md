@@ -1,34 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-bep-zero-default-repair`
+Packet: `WP-10-m8-bazel-buildbuddy-bep-zero-default-transported-live-evidence`
 Milestone: M8 Bazel developer graph
 Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: exact Bazel 9 ProtoJSON absent-zero compatibility.
+Result: one transported repaired BEP-stage result.
 
-## Goal and required implementation
+## Goal and required evidence
 
-Edit only the gate/BEP-probe libraries, their focused tests, and the prime-stage
-test's frozen gate-source digest. Change only the two exit-code reads to default
-an absent field before strict validation:
+From the clean scheduling commit, use the accepted in-memory wrapper to invoke
+exactly one child with repository cwd, `env` omitted, `shell=False`, and
+anonymous `TemporaryFile` stdout/stderr:
 
-```python
-_count(exit_data.get("code", 0))
+```sh
+python3 tools/v2_oracle/buildbuddy_build_cache_prime_bep_stage_probe.py
 ```
 
-Pinned Bazel 9.2 uses protobuf 33.4 JSON without default-value inclusion;
-`ExitCode.code` is `int32`, so zero is omitted and nonzero remains a JSON number.
-Do not change `_count`, the already-correct omitted `hits` handling, commands,
-schemas, stages, descriptor/lifecycle logic, or any execution/output behavior.
-
-Production is capped at 12 net lines, tests at 68, total 80. Make successful
-BEP fixtures omit code zero. Prove gate success and `BEP_READY`; reject supplied
-null, false, true, string `"0"`, negative, subclasses, and malformed values;
-retain valid explicit nonzero remote-error behavior and privacy/schema pins.
+The wrapper checks stderr size only, bounds stdout at 2 KiB, validates exact
+normalized/canonical JSON, and emits only the fixed transport envelope. The
+terminal caller retains and polls one session ID and never starts another
+command. Inherit the environment unchanged so Bazel alone may consume private
+ordinary/home RC. Never inspect raw child, RC/token, BEP/execution, invocation,
+or service data.
 
 ## Stops and budget
 
-Run only focused offline tests, compilation, caps/scope/diff, and independent
-review. No Bazel, network, ordinary/home RC, artifact, config, docs, or new
-files. Any broader numeric coercion, public/lifecycle change, extra production
-owner, or second material correction is `REPLAN`. A later packet owns one
-transported BEP probe; cache/RBE and the 43-test gate remain open.
+Do not reissue, inspect artifacts, or modify code/config. Session loss, invalid
+envelope, `REJECTED`, nonempty child stderr, sanitizer result, cleanup/Git/daemon
+drift, or raw exposure is `REPLAN`. `DELIVERED` accepts transport only.
+`BEP_READY` routes to an execution-only discriminator; any fixed rejection gets
+one new narrow source design. Cache/RBE and the 43-test gate remain open.

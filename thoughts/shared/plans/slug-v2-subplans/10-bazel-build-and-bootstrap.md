@@ -2079,6 +2079,18 @@ production/68 test/80 total net lines;
 offline validation and independent review only. No Bazel/home RC/network/live
 artifact/config/schema/command/lifecycle change.
 
+The omitted-zero repair is accepted in `6758d97f…`: both parser sites default
+only absent exit `code` to integer zero before unchanged strict validation.
+Source-faithful fixtures and explicit invalid-value regressions pass 40 related
+tests; independent review accepts the five-file, net-zero-production change.
+
+Next evidence only
+`WP-10-m8-bazel-buildbuddy-bep-zero-default-transported-live-evidence`. Invoke
+the repaired BEP-stage CLI exactly once through the accepted anonymous bounded
+transport with retained-session polling and inherited environment. Review only
+the fixed envelope, empty child stderr, and normalized stage. No retry,
+raw/home/artifact/service access, code/config edit, or cache/RBE claim.
+
 ### 10.3 Slug-as-Bazel Analysis Gate
 
 - Use the Slug repository itself as a Stage 1 oracle workspace.
