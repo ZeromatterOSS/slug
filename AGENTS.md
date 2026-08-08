@@ -2,21 +2,38 @@
 
 Project-wide instructions for AI agents on slug.
 
-## Bazel target
+## Compatibility target
 
-**Bazel 9 parity only.** Slug matches Bazel 9 success, failure, diagnostics,
-outputs, and paths; it does not preserve Bazel 8 or prototype behavior.
+**Bazel 9 is the reference for named admitted compatibility surfaces.** Every
+active packet must classify changed behavior as **exact**, **Slug-native**, or
+**unsupported/deferred**. Existing accepted exact slices remain exact; do not
+silently widen a Slug-native or unsupported surface into a parity claim.
 
 - Canonical plan:
   `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`.
   V1 plans are archive material unless the V2 plan requests them.
-- Reproduce observable semantics in Rust, not Bazel's machinery. JVM bytecode,
-  an embedded JVM, and delegation to Bazel/Java are oracle tools only unless
-  the user explicitly approves them as Slug architecture. Record an unsupported
-  boundary or `REPLAN` when no bounded exact Rust implementation exists.
+- Slug production is permanently Rust-native. Do not embed or launch a JVM,
+  ship or interpret Java bytecode for Slug semantics, or delegate semantic work
+  to Bazel/Java. Pinned Bazel may still run externally as an oracle; no Java
+  helper, runtime, bytecode, or probe artifact enters Slug. User-declared build
+  actions that happen to execute Java are outside this architecture rule.
+- Approved Slug-native divergences are Rust Host observations rather than
+  bitwise HotSpot state, Rust valid-Unicode strings/regex rather than exact Java
+  UTF-16/`Pattern` edge behavior, and collision-safe, explicitly Slug-native
+  configuration/path/action identity bytes rather than Bazel checksum,
+  `bazel-out`, or ActionKey bytes.
+  Exact Bazel identity-byte reproduction is a later milestone.
+- Relaxing identity bytes never relaxes semantic identity or integrity. Every
+  admitted configuration-affecting input must participate structurally in DICE
+  equality and invalidation; unmodeled inputs fail closed. Keep semantic
+  configuration identity, display/path tokens, Bazel checksum, Bazel ActionKey,
+  and REAPI/CAS digests as distinct domains. Content, repository, lockfile, and
+  REAPI/CAS hashes remain exact for Slug's actual graph.
+- Record an unsupported boundary or `REPLAN` when no bounded Rust-native
+  implementation exists within the packet's declared compatibility class.
 - Port `@bazel_tools` content verbatim from upstream; do not invent it.
-- This is a prototype with no compatibility surface. No shims, deprecations, or
-  migration support unless the user asks.
+- This prototype has no stability or migration obligation to earlier Slug
+  versions. No shims, deprecations, or migration support unless the user asks.
 
 ## Repo workflow for agents
 

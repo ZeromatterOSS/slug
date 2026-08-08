@@ -2984,3 +2984,19 @@ formatting, diff, archive, and stale-daemon checks. Independent final review
 used one focused evidence correction, then returned `ACCEPT`. The remaining
 three functions depend on an exact Java-compatible `Pattern` substrate and
 remain deferred.
+
+## Rust-native regex compatibility reset (2026-08-08)
+
+The exact Java `Pattern` requirement above is historical. Explicit user
+direction permanently forbids JVM/Java-bytecode integration and admits a named
+Slug-native valid-Unicode Rust regex surface without Java lone-surrogate,
+dialect-edge, renderer, or diagnostic parity. Existing exact query functions
+remain exact; no prior Java-regex rejection becomes an implementation claim.
+
+M3 remains parked while M2 establishes complete semantic configuration identity.
+A later reviewed packet may select the Rust regex crate and freeze supported
+syntax, compile/match behavior, diagnostics, resource limits, and fail-closed
+handling before enabling `filter` and `kind`. `attr` still requires its separate
+typed attribute-string representation, and rank/external/pattern/formatter
+representation gaps remain unchanged. No Java helper, standalone Java probe,
+bytecode, embedded/launched JVM, or production Bazel delegation is permitted.

@@ -5018,3 +5018,82 @@ disagreement, persistent fixture need, or production-JVM implication is
 `REPLAN`. Descriptor/family conversion grammar, Rust, contextual/regex paths,
 normalization, checksum, wire, DICE, and configured-cycle semantics remain
 deferred.
+
+### Rust-only semantic configuration identity direction reset (2026-08-08)
+
+Explicit user direction supersedes the terminal exact-JDK/exact-hash scheduling
+assumption. Slug will not embed or launch a JVM, ship or interpret Java bytecode
+for its semantics, use a Java helper, or delegate production behavior to Bazel
+or Java. Pinned Bazel remains an external oracle only. This prohibition is
+permanent architecture, not a packet stop that a later agent may retry.
+
+Bazel 9 remains the semantic reference, but affected surfaces now carry one of
+three explicit compatibility classes: exact, Slug-native, or unsupported/
+deferred. Rust-native OS, architecture, home, processor, memory, and container
+observations replace bitwise HotSpot state. Valid-Unicode Rust strings and a
+selected Rust regex contract replace Java UTF-16 lone-surrogate and `Pattern`
+idiosyncrasies. Exact Bazel configuration checksum, configured-output-directory,
+and ActionKey bytes move to M9 for later source-level algorithm analysis and a
+Rust-only reproduction attempt.
+
+The relaxation applies only to identity spelling and the named Host/regex edge
+domain. Labels, targets, option behavior inside the admitted domain, structural
+configuration partitioning, transitions, platforms/toolchains, providers,
+actions, failures outside named divergences, artifact relative names/types/
+modes/symlinks/content, lifecycle, and invalidation remain exact. REAPI/CAS,
+content, repository, and lockfile digests remain exact for Slug's actual graph.
+They are never normalized merely because they are hashes.
+
+#### Semantic identity firewall
+
+No provisional digest may become semantic truth. Complete typed admitted
+configuration inputs—including native and Starlark values/scopes, repository/
+platform/transition inputs, and relevant Rust-native Host facts—must own
+structural equality and DICE invalidation. An unmodeled configuration-affecting
+input fails before analysis; it may not alias the default. The current
+caller-supplied `ConfigurationChecksum`/`first-build` carrier is quarantined to
+existing bounded slices and gains no new caller.
+
+Keep five domains separate:
+
+1. structural Slug semantic configuration identity;
+2. a collision-safe, domain/version-namespaced display and configured-path
+   projection derived from that structure;
+3. deferred Bazel `BuildOptions` checksum bytes;
+4. deferred Bazel ActionKey bytes; and
+5. exact REAPI/CAS content digests over Slug's action graph.
+
+A display/path projection is never the sole DICE, action, AC, or cache key. It
+must not use Rust `DefaultHasher`, truncate to a Bazel-looking seven-character
+token, reuse an output path, or alias a REAPI digest. `cquery`/`aquery` comparison
+may normalize only configuration IDs, configured-path configuration segments,
+and ActionKey opaque identifiers to graph-scoped tokens while preserving their
+equality/change/restoration relationships. It may not normalize arguments,
+environment, mnemonics, owner labels, selected platforms, topology, relative
+artifact names, contents, order, or failures.
+
+Run next only `WP-6-m2-slug-native-configuration-identity-boundary-design`,
+documentation/source-audit only. Inventory every live consumer of
+`ConfigurationChecksum`/`ConfigurationKey` stable serialization,
+`ConfiguredTargetKey`/DICE equality, configured layout/path construction,
+action ownership, cquery/aquery output, and REAPI AC/CAS. Freeze the five-domain
+ownership and no-new-placeholder-caller rules, every admitted structural input,
+Host lifetime/injection, fail-closed unsupported-input behavior, projection
+syntax/versioning/collision requirements, and semantic C0 -> C1 -> C0 evidence.
+
+The design must schedule one observable successor,
+`WP-6-m2-slug-native-default-configuration-vertical`, that replaces production
+`first-build` end-to-end for the admitted no-argument/default configuration and
+accepted root string transition, supplies one Rust-native process Host source,
+uses structural typed defaults, and exposes an unmistakably Slug-native
+display/path identity. It may not create dormant key/value substrate. Independent
+identity/cache review precedes implementation.
+
+This design authorizes no Rust, Cargo/dependency, hashing algorithm, new DICE
+key, wire, configured output, aquery, action/cache activation, fixture, oracle,
+JVM/Java artifact, or semantic relaxation beyond the explicit decision. Owner
+documentation is capped at 260 changed lines; terminal scheduling may change
+the current manifest and at most 15 canonical lines. Stop on digest-only
+equality, silent flag omission, a Bazel-looking Slug token, content/graph
+normalization, Java/JVM use, or an implementation successor that cannot remove
+the production placeholder across one-shot and daemon paths.

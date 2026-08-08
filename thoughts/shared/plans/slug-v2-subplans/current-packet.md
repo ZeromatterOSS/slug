@@ -1,33 +1,40 @@
 # Current Slug V2 Packet
 
-Packet: none — blocked on a new architecture or scope decision for terminal M2 inputs
+Packet: `WP-6-m2-slug-native-configuration-identity-boundary-design`
 Milestone: M2 analysis graph
-Owner: none
-Blocking evidence: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: the M8 developer graph is accepted and parked with CI not admitted.
+Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+Result: one reviewed semantic-identity firewall and observable successor.
 
 ## Goal and required evidence
 
-The user explicitly declined CI for this single-agent, no-customer prototype.
-The supported validation path is the accepted pair of local, no-argument gates,
-run manually and serially with ordinary Bazel RC discovery:
+Inventory every live consumer of `ConfigurationChecksum`/`ConfigurationKey`,
+stable serialization, `ConfiguredTargetKey` and DICE equality,
+`BazelLayout::bazel_out`, configured paths/aquery, action ownership, and REAPI
+AC/CAS. Freeze distinct domains for complete structural semantic identity,
+versioned display/path projection, deferred Bazel checksum, deferred Bazel
+ActionKey, and exact REAPI/content digests.
 
-```text
-python3 tools/v2_oracle/buildbuddy_cache_gate.py
-python3 tools/v2_oracle/buildbuddy_rbe_gate.py
-```
+Classify each affected surface as exact, Slug-native, or unsupported/deferred.
+Preserve exact graph, transition, platform/toolchain, provider/action,
+invalidation, artifact content/type/mode/symlink, lifecycle, and CAS behavior.
+Only configuration/path/ActionKey identity bytes and named Host/regex edge
+behavior may use the approved Slug-native contract.
 
 ## Stops and budget
 
-CI is not admitted: add no provider, workflow, trigger, runner, permission,
-secret-injection, concurrency, cost, timeout, or retention configuration. The
-local gates remain separate, serialized, and unchanged; only
-`PROVED_CACHE_ONLY` and `PROVED_RBE` pass their respective gates, with no
-reconstruction, combination, retry, or fallback.
+No Rust, Cargo/dependency, hash algorithm, DICE key, wire, output path, aquery,
+action/cache activation, fixture, oracle, JVM, Java bytecode/helper/probe, or
+Bazel delegation is allowed. Add no caller of placeholder `first-build` or a
+digest-only semantic key. Do not use `DefaultHasher`, a truncated/unprefixed
+Bazel-looking token, configured path, or REAPI digest as configuration equality.
+Unmodeled configuration-affecting inputs must fail closed.
 
-This closes only the 43-test M8 developer-graph slice. Stage 10.3/10.4 remain
-behind M2 configuration inputs, M5 exact aquery, and M6 REAPI execution. The
-remaining M2 Host, RunUnder/full-Java-String, and eight Java-regex routes are
-terminal `REPLAN` boundaries, so no implementation packet is schedulable without
-a new architecture or scope decision. Do not invent a duplicate evidence packet,
-weaken Bazel 9 parity, or claim Stage 10/M8 completion.
+The design must schedule one complete observable successor:
+`WP-6-m2-slug-native-default-configuration-vertical`. It replaces production
+`first-build` end-to-end for the admitted no-argument/default configuration and
+accepted root string transition, consumes one Rust-native process Host snapshot,
+uses structural typed defaults, produces a versioned namespaced Slug display/
+path projection, proves one-shot/daemon C0 -> C1 -> C0 equality/invalidation,
+and rejects unsupported explicit inputs. Independent identity/cache review is
+required before implementation. Owner-plan documentation cap is 260 lines;
+terminal scheduling may change this manifest and at most 15 canonical lines.

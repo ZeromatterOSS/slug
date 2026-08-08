@@ -25,18 +25,28 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **partial, parked** | recursive configured analysis, bounded root cquery in `135b0567`, implicit empty-default normalization in `7c6eeae5`, internal string build-setting transitions in `dfc1705e`, root-only integrated first-compatible toolchain selection/context in `1533569f`, command-retained recursive action closure in `afd2a606`, four-domain action-query identity evidence in `f00e99db`, the complete target-configuration input ledger, the 17-class/341-option metadata/cache grammar in `b043d54d`, exact renderer/identity/source/family contracts, the accepted 287-row descriptor attachment ledger, the private pure native value/default/cache kernel, the accepted two-context Host/repository design, exact mapping-free visible/non-visible option-label identity in `b035dfbb`, the success/fallback-preserving Windows option-path Host/DICE fact, accepted source-exact Host lifetime partition, accepted converter-call event schedule/Host-fact redesign, accepted Host conversion-input event schema correction, accepted per-converter-call Windows observation design, process-owner state/injection, accepted 30-, seven-, Map/Alias, and mixed RunUnder/CustomFlag route converters, exact source closure for the eight Java-regex routes, and three fixed RegexFilter default seeds | native capture remains terminal **REPLAN/Unsupported**; exact RunUnder record rendering/cache and full Java-String input remain **REPLAN**; all eight explicit Java-regex routes remain **REPLAN**; a complete configuration substrate cannot omit those values | preserve accepted boundaries while the independent M8 developer graph advances |
-| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output; full evidence is in the Stage 8 owner plan | Pattern functions remain `REPLAN`; rank auto order needs original dependency order absent from the selected graph; external repositories, pattern breadth, and remaining formats require new representation | preserve accepted slices while the independent M8 developer graph advances |
-| M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs the unmodeled configuration checksum; broader expressions/functions/formats remain open | preserve the accepted configuration-opaque slice |
-| M5: `aquery` | **replan** | Bazel 9.2 recursive action ownership and live `AnalysisResult` action traversal are retained | every exact formatter exposes unmodeled configuration/platform/action-key/configured-path facts | wait for the M2 configuration-input chain |
-| M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | exact `aquery` handoff | preserve regressions only |
+| M2: analysis graph | **active (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the complete 341-option ledger/kernel/contextual groundwork | replace placeholder identity with complete structural admitted-input identity; keep display/path/Bazel/REAPI digest domains separate | `WP-6-m2-slug-native-configuration-identity-boundary-design` |
+| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output | select an explicit Rust-native valid-Unicode regex contract; `attr`, rank order, external repositories, patterns, and remaining formats still need representation | preserve accepted slices while M2 identity advances |
+| M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs complete Slug semantic identity and an explicitly Slug-native display token; exact Bazel checksum bytes are M9 | wait for M2 semantic identity |
+| M5: `aquery` | **replan** | recursive action ownership and four-domain change/restoration evidence are retained | consume complete Slug semantic configuration/action identity and compare provisional ID bytes as opaque graph-scoped tokens without normalizing graph/content/platform differences | wait for the M2 identity chain |
+| M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | semantic `aquery` handoff and collision-safe Slug action/cache identity | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
-| M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | none — blocked on a new architecture or scope decision for terminal M2 inputs |
+| M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
+| M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-None; the [current-packet manifest](./slug-v2-subplans/current-packet.md) records
-the M2 stop and accepted local validation path.
+[`WP-6-m2-slug-native-configuration-identity-boundary-design`](./slug-v2-subplans/current-packet.md).
+
+### Rust-only semantic-compatibility reset (2026-08-08)
+
+Explicit user direction permanently excludes JVM/Java integration or semantic
+delegation. Rust Host observations and valid-Unicode regex/string behavior are
+Slug-native; exact Bazel configuration/output-directory/ActionKey bytes move to
+M9. Complete structural equality/invalidation remains mandatory for admitted
+inputs, unmodeled inputs fail closed, and a namespaced display/path projection
+never becomes the semantic key. REAPI/CAS, content, repository, and lockfile
+digests remain exact and separate.
 
 The direct-local external exported-source build activation is accepted in
 `42f4a64b` at 259 production/186 test/445 total formatted net lines. It closes
@@ -831,13 +841,14 @@ order. Use this overlay for scheduling new packets:
 |-----------|-----------------|---------------|-----------|
 | M0: archive and baseline health | V1 refs and clean-root checker are truthful; Bazel/Buck2/actiond sources are pinned | 0, 1, 9 | Archive status is green and every new fixture carries immutable provenance. |
 | M1: one semantic spine | One daemon-owned DICE instance and explicit create/edit/delete inputs serve loading, bzlmod, analysis, and commands | 2, 4, 5 | Same-daemon tests explain invalidation without a fallback scanner or fresh per-request graph. |
-| M2: analysis graph | Recursive configured targets return real providers and deterministic declared actions without execution | 3, 4, 5, 6 | Focused Bazel analysis fixtures and upstream test themes match. |
-| M3: `query` | Full Bazel 9 unconfigured query language evaluates the loading graph | 8, 9 | Parser, function, set-operation, pattern, ordering, and formatter fixtures match. |
-| M4: `cquery` | Configured query reads the same configured-target graph as analysis | 6, 8 | Configuration identity, transitions, providers, and Starlark output match. |
-| M5: `aquery` | Action query reads the same Stage 6 action graph and implements Bazel 9.2.0's text, commands, summary, textproto, proto, streamed_proto, and jsonproto formatters | 6, 8 | Normalized `ActionGraphContainer` content and human-readable renderings are identical for the gate matrix. |
+| M2: analysis graph | Recursive configured targets return real providers and deterministic declared actions without execution | 3, 4, 5, 6 | Admitted inputs have complete structural identity/invalidation; named Slug-native ID bytes are explicit. |
+| M3: `query` | Bazel 9 unconfigured query semantics evaluate the loading graph | 8, 9 | Admitted non-regex semantics are exact; named regex functions follow the reviewed Slug-native valid-Unicode contract. |
+| M4: `cquery` | Configured query reads the same configured-target graph as analysis | 6, 8 | Transitions/providers/graph semantics match; provisional configuration ID bytes are explicitly Slug-native. |
+| M5: `aquery` | Action query reads the same Stage 6 action graph and implements Bazel 9.2.0's formatter shapes | 6, 8 | Graph/content/platform relationships match after only configuration/path/ActionKey opaque-token normalization. |
 | M6: execution and caching | Stage 6 actions execute and replay only through REAPI | 7 | BuildBuddy and local actiond evidence prove upload, execute, AC, and materialization with zero direct-local actions. |
 | M7: command/ruleset breadth | `build`, `run`, `test`, BEP, and public rulesets use the accepted graph and executor | 8 | Focused public fixtures match; stress projects remain supplemental. |
 | M8: bootstrap | Bazel-built Slug builds Slug and reaches a self-hosted fixed point | 10 | Stage1 and stage2 action graphs and declared outputs match. |
+| M9: exact Bazel identity bytes | Reproduce Bazel configuration, configured-output, and ActionKey byte algorithms in Rust | 6, 8 | Existing four-domain evidence and new source audits prove exact bytes without JVM production code. |
 
 M3 progress: implementation commit `61ca25db` lands the first accepted
 DICE-backed loading-query thin vertical over the root repository, with

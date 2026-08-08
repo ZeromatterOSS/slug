@@ -2618,3 +2618,20 @@ stage1/stage2 action and output manifest comparison
 REAPI evidence proving direct_local_actions=0
 Cargo-versus-Bazel active workspace coverage audit
 ```
+
+### Slug-native identity comparison boundary (2026-08-08)
+
+The Rust-only compatibility reset changes Stage 10.3/10.4 comparison, not the
+accepted BuildBuddy developer gate. Configuration IDs, configured-path
+configuration segments, and ActionKey bytes may be mapped to graph-scoped opaque
+tokens while preserving equality/change/restoration relationships. Do not
+normalize action arguments, environment, mnemonics, owner labels, selected
+platforms, input/output topology, relative artifact names, content, ordering,
+failures, REAPI/CAS digests, or materialized results. Stage 10 remains behind a
+complete collision-safe Slug semantic action/cache identity and may not consume
+`first-build`, a display token, or a REAPI digest as configuration identity.
+
+No JVM, Java bytecode/helper, or Bazel/Java semantic delegation may enter Slug.
+Exact Bazel configuration/output-directory/ActionKey bytes are M9 work and are
+not a Stage 10 completion requirement; the explicit opaque-token comparison and
+every non-identity graph/output invariant are.
