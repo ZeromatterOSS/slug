@@ -25,7 +25,7 @@ and must name the same packet.
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
-| M2: analysis graph | **active (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the complete 341-option ledger/kernel/contextual groundwork | replace placeholder identity with complete structural admitted-input identity; keep display/path/Bazel/REAPI digest domains separate | `WP-6-m2-slug-native-configuration-identity-boundary-design` |
+| M2: analysis graph | **active (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the accepted Rust-only identity boundary design | replace placeholder identity with the reviewed complete default structural vertical; keep display/path/Bazel/REAPI digest domains separate | `WP-6-m2-slug-native-default-configuration-vertical` |
 | M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output | select an explicit Rust-native valid-Unicode regex contract; `attr`, rank order, external repositories, patterns, and remaining formats still need representation | preserve accepted slices while M2 identity advances |
 | M4: `cquery` | **partial** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567` | default/label needs complete Slug semantic identity and an explicitly Slug-native display token; exact Bazel checksum bytes are M9 | wait for M2 semantic identity |
 | M5: `aquery` | **replan** | recursive action ownership and four-domain change/restoration evidence are retained | consume complete Slug semantic configuration/action identity and compare provisional ID bytes as opaque graph-scoped tokens without normalizing graph/content/platform differences | wait for the M2 identity chain |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-m2-slug-native-configuration-identity-boundary-design`](./slug-v2-subplans/current-packet.md).
+[`WP-6-m2-slug-native-default-configuration-vertical`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

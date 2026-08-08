@@ -5097,3 +5097,153 @@ the current manifest and at most 15 canonical lines. Stop on digest-only
 equality, silent flag omission, a Bazel-looking Slug token, content/graph
 normalization, Java/JVM use, or an implementation successor that cannot remove
 the production placeholder across one-shot and daemon paths.
+
+### Slug-native configuration identity boundary design (2026-08-08)
+
+`WP-6-m2-slug-native-configuration-identity-boundary-design` is `ACCEPT`.
+The source audit found no existing production output-layout consumer to preserve:
+`BazelLayout::{bazel_out,bin_dir,testlogs_dir}` is exercised only by identity
+crate tests. Current execution instead materializes every configuration into
+workspace `bazel-bin`. The first configured projection can therefore enter as
+an explicitly Slug-native contract without rewriting a hidden Bazel checksum
+consumer.
+
+#### Live owner and consumer inventory
+
+| Surface | Live owner/consumer | Present identity behavior | Required boundary |
+|---|---|---|---|
+| Configuration carrier | `slug_analysis_v2/src/key.rs:42-145` | `ConfigurationKey` derives structural `Eq`/`Hash` over kind, caller checksum, and optional root string; its display omits the root string | Replace the public opaque-checksum constructor in the production vertical; structural fields, not display bytes, remain semantic truth |
+| Configured graph | `slug_analysis_v2/src/dice.rs:108-190,261-390,470-503,623-628,940-993,1098-1107` | Full `ConfiguredTargetKey` participates in DICE keys, dependency dedup/join, transitions, toolchain implementation analysis, and root-setting resolution | Preserve full structural equality through every recursive edge; never key joins or DICE by a projection |
+| Build roots | `slug_core_v2/src/runtime/dice.rs:1519-1524,1626-1657,1938-2053,2056-2169` | `BuildCommandRootKey`, BFS seen/frontier sets, action closure, and action-result ownership retain the configuration/key structurally | Assemble one configuration before the root; action ownership remains target/configuration structural identity |
+| Placeholder constructors | `slug_core_v2/src/runtime/dice.rs:2867-2874,2912-2923,3364-3373`; `slug_analysis_v2/src/dice.rs:1098-1107` | Three production entry paths and the accepted root-setting resolver manufacture `target:first-build` | The vertical removes all production `first-build`; no replacement caller may supply opaque identity text |
+| Presentation | `slug_analysis_v2/src/key.rs:138-145,170-182`; `slug_core_v2/src/runtime/dice.rs:5417-5421` | Stable text is used by `Display` and one activation assertion; it is not a cache key | Display includes the Slug namespace and distinguishes every structural C0/C1 value |
+| Layout/materialization | `slug_identity_v2/src/layout.rs:48-58`; `slug_cli_v2/src/commands/build.rs:183-204`; `slug_server_v2/src/reapi.rs:39-60` | Configured layout methods are test-only; one-shot and daemon materialize under workspace `bazel-bin` | Introduce one shared configured output owner; display and filesystem encodings remain separate typed projections of the same structure |
+| cquery/aquery | `slug_core_v2/src/runtime/dice.rs:2889-2935`; `slug_cli_v2/src/commands/aquery.rs:12-15`; `slug_commands_v2/src/aquery.rs:18-34` | cquery retains a full configured key but prints only the requested label; aquery is still an explicit placeholder | Preserve accepted cquery bytes; use internal or separately admitted projection evidence, and leave aquery activation for later |
+| Actions/platform | `slug_analysis_v2/src/result.rs:49-109`; `slug_analysis_v2/src/starlark_rule.rs:98-110`; `slug_analysis_v2/src/dice.rs:940-993`; `slug_build_api_v2/src/actions/spec.rs:126-220` | Analysis owns actions under a configured key, but `PreparedToolchain` drops selected execution platform before `ActionSpec` | Do not synthesize ActionKey or platform identity here; later aquery work must retain platform structurally before projecting it |
+| REAPI/CAS/AC | `slug_reapi_v2/src/command.rs:119-170`; `slug_reapi_v2/src/executor.rs:93-125,181-210,240-258`; `slug_reapi_v2/src/action_cache.rs:92-146` | Command, input-root, Action proto, uploads, AC lookup, and results use exact SHA-256 content digests | Remains an independent exact domain; no configuration token enters AC/CAS except through actual action fields/paths |
+| Host source | `slug_core_v2/src/runtime/process_host.rs:345-459`; `slug_core_v2/src/runtime/mod.rs:49-68`; `slug_server_v2/src/lib.rs:52-69` | A process owner has lazy OS/CPU/resource/home timing but all one-shot and daemon constructors install `UnsupportedSource`; `HostConversionInputs` is otherwise producer-free | Install one Rust source at process/daemon construction and project only demanded typed facts into configuration assembly |
+| Command flags | `slug_commands_v2/src/build.rs:23-48`; `slug_commands_v2/src/common.rs:28-41,173-195,367-413` | All flags are retained, but unsupported/planned configuration flags can pass while production builds the same placeholder | Explicitly classify admitted nonconfiguration controls; reject every other configuration-affecting flag before root construction |
+
+`ConfigurationChecksum` and `ConfigurationKey::target/exec/host_like` may remain
+temporarily for tests and bounded nonproduction scaffolding, but production gets
+no new caller. `stable_serialize` is presentation only. `ConfiguredTargetKey`,
+DICE keys, `SmallSet`/`SmallMap` graph ownership, and transition restoration
+continue to compare the complete structural value.
+
+Dependency direction is fixed: public structural/default/projection types live
+in `slug_configuration_v2`; `slug_analysis_v2` may depend downward on that crate
+and embed the value; `slug_core_v2` supplies Host/request inputs. Configuration
+must never depend on core, commands, workspace IO, or DICE. Existing private
+default values are not yet a public hashable aggregate, so the successor must
+close that representation rather than wrapping the old checksum string.
+
+#### Five-domain ownership
+
+1. `SlugConfiguration` is the sole semantic configuration value. For this
+   vertical it contains target kind, the complete typed native default values
+   admitted by the default kernel, and the optional typed root string setting.
+   Equality/hash/ordering and DICE invalidation use this structure directly.
+2. `SlugConfigurationProjection` is derived presentation. Display syntax is
+   `slugcfg-v1:<opaque>` and the filesystem segment is
+   `slugcfg-v1-<opaque>`. `<opaque>` is deterministic lowercase ASCII with at
+   least 256-bit collision resistance over a tagged, length-delimited,
+   versioned serialization. It is never truncated, parsed back as semantics,
+   or accepted as caller input. Algorithm selection and implementation receive
+   the required independent identity/cache review in the successor.
+3. Bazel `BuildOptions` checksum text is unsupported/deferred to M9. Slug does
+   not label its projection a Bazel checksum or imitate Bazel's short token.
+4. Bazel ActionKey bytes are unsupported/deferred to M9. A later Slug action
+   identity must include complete action/platform ownership and cannot reuse
+   the configuration projection.
+5. REAPI Command, Directory/input-root, Action, CAS, and AC digests remain exact
+   hashes of their protobuf/blob bytes. Their existing owners do not consume
+   `SlugConfigurationProjection` as a cache key.
+
+The filesystem projection is collision-safe spelling, not semantic ownership.
+Two unequal structures must not alias a configured directory; detection of an
+impossible projection collision is a hard infrastructure failure. cquery/aquery
+comparators may replace only display/path/ActionKey opaque IDs with graph-local
+tokens after recording equality classes. They may not normalize any graph,
+action, platform, path-relative, content, ordering, or failure field.
+
+#### Admitted default vertical
+
+The successor admits only target configuration constructed from the complete
+typed default native-option set already supported by the native kernel, plus
+the existing root string build setting and its one-output transition. Target
+labels and Bzlmod command/environment/lockfile/registry inputs keep their
+existing exact owners; they are not configuration merely because they share a
+request. UI, `output_base`, BEP, and remote transport/execution controls are
+likewise operational, not semantic configuration.
+
+Every build/cquery request passes its complete parsed flag list to a single
+configuration assembler. That assembler uses an explicit allowlist for the
+above nonconfiguration controls and rejects any other explicit configuration-
+affecting flag as unsupported before `BuildCommandRootKey` or cquery analysis
+is constructed. In particular, `--config` and unknown/planned native options
+must not silently select C0. No absent descriptor, converter failure, Host read
+failure, unmodeled Starlark setting, transition output, platform, or repository
+input may fall back to C0.
+
+The existing cquery parser's explicit allowlist remains authoritative; the new
+build classification must reach equivalent fail-closed behavior without
+rejecting admitted Bzlmod/UI/output-base/BEP/remote operational controls merely
+because the current broad disposition calls them parse-only or planned.
+
+One Rust-native `ProcessHostSource` is installed when a one-shot process or
+daemon is constructed. OS/architecture and container-aware available processor
+and memory limits are process-latched; home is read at each eligible conversion
+as required by the retained lifecycle. Configuration owns only the typed Host-
+dependent default outcomes actually demanded by conversion (auto CPU, path
+flavor, capacity, and eligible home/path outcomes), not a pointer to the source
+or unused raw facts. Valid Rust Unicode replaces lone-surrogate semantics.
+Source errors are explicit unsupported/infrastructure results, never identity
+defaults. No lock is held across DICE computation.
+
+#### Successor and acceptance evidence
+
+Run next only `WP-6-m2-slug-native-default-configuration-vertical`. It is one
+observable implementation because a schema-only or producer-only packet would
+leave the placeholder authoritative. Before code, a reserved independent
+identity/cache reviewer must accept the concrete tagged serialization,
+collision behavior, dependency direction, and proof that REAPI digests remain
+content-derived.
+
+The implementation must, in one bounded change:
+
+- make the typed structural configuration and projection V2-owned, with retained
+  Arc-backed values and no `DefaultHasher`, path-as-key, or digest-only equality;
+- install the Rust Host source in one-shot and daemon owners, assemble complete
+  admitted defaults once per request, and pass the same structural value into
+  build, cquery, recursive dependencies, transitions, toolchains, and actions;
+- replace `UnsupportedSource` in every production runtime constructor, including
+  legacy public wrappers, while preserving one Arc owner per process/daemon;
+- delete every production `"first-build"` construction and make legacy
+  `evaluate_workspace_targets*` either use the same assembler or fail as an
+  unsupported legacy route—never manufacture another placeholder;
+- route configured artifacts/materialization through one
+  `bazel-out/slugcfg-v1-<opaque>/bin` owner while keeping relative action paths,
+  contents, modes, symlinks, and REAPI digest computation unchanged;
+- expose `slugcfg-v1:<opaque>` through internal/display assertions or a
+  separately admitted new surface while preserving the accepted
+  `str(target.label)` cquery output byte-for-byte; keep aquery/ActionKey
+  activation out of scope; and
+- reject unsupported explicit configuration inputs with stable diagnostics in
+  both one-shot and daemon modes.
+
+Evidence is structural C0 -> C1 -> C0 in one retained daemon and equivalent
+one-shot commands. C0 is default; C1 changes only the accepted root string
+setting. The proof must show C0 equality and projection restoration, C1
+inequality, DICE recomputation/pruning at the correct configured nodes, distinct
+configured output directories, unchanged labels/providers/action topology,
+and changed action/REAPI bytes only when the configuration changes an actual
+action field or configured path. It must also show identical one-shot/daemon
+configuration projections for identical typed inputs, Host-source process
+reuse versus per-eligible home reads, and pre-analysis rejection of `--config`
+plus one unknown configuration flag.
+
+Stop and `REPLAN` on a crate dependency cycle, partial default descriptor set,
+new opaque-checksum caller, source/Host IO inside configuration conversion,
+digest-only DICE identity, shortened or Bazel-looking token, configured-path
+alias, ActionKey/aquery invention, REAPI digest normalization, Java/JVM artifact
+or execution, or an implementation that leaves any production `first-build`.
