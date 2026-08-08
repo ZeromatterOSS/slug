@@ -1,28 +1,33 @@
 # Current Slug V2 Packet
 
-Packet: `WP-10-m8-bazel-buildbuddy-ci-admission-design`
-Milestone: M8 Bazel developer graph
-Owner: `slug-v2-subplans/10-bazel-build-and-bootstrap.md`
-Result: one explicit, security-reviewed CI admission contract.
+Packet: none — blocked on a new architecture or scope decision for terminal M2 inputs
+Milestone: M2 analysis graph
+Owner: none
+Blocking evidence: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
+Result: the M8 developer graph is accepted and parked with CI not admitted.
 
 ## Goal and required evidence
 
-Edit only the owner plan (120 changed lines), this manifest (50 total), and the
-canonical plan (8 changed lines), at most 178 changed lines. Obtain explicit user
-approval for provider/workflow path, trusted event matrix, Linux x86_64 runner,
-permissions, concurrency/cost/timeouts, and environment-only secret injection.
+The user explicitly declined CI for this single-agent, no-customer prototype.
+The supported validation path is the accepted pair of local, no-argument gates,
+run manually and serially with ordinary Bazel RC discovery:
+
+```text
+python3 tools/v2_oracle/buildbuddy_cache_gate.py
+python3 tools/v2_oracle/buildbuddy_rbe_gate.py
+```
 
 ## Stops and budget
 
-Freeze two separate serialized trusted jobs/steps using only the canonical no-arg
-CLIs: full cache once, then full RBE once, with no reconstruction, combination,
-fallback, or retry. Untrusted/fork PRs receive no secrets and claim no remote
-proof. Map each fixed public class faithfully to CI status; only its proof class
-passes, while remote infrastructure and target failures remain distinguishable.
+CI is not admitted: add no provider, workflow, trigger, runner, permission,
+secret-injection, concurrency, cost, timeout, or retention configuration. The
+local gates remain separate, serialized, and unchanged; only
+`PROVED_CACHE_ONLY` and `PROVED_RBE` pass their respective gates, with no
+reconstruction, combination, retry, or fallback.
 
-Bind CI to Bazel 9.2, exact RC/manifest hashes, `{build:1,test:43}`, Linux x86_64,
-managed Linux/amd64, clean lifecycle, and the unchanged expected-red/core-unit
-boundaries. Select an exact later workflow allowlist/cap and independent security
-review. Missing provider/security/cost authority, secret exposure, raw retention,
-driver/config/manifest changes, fallback/retry, or a Stage 10 completion claim is
-`REPLAN`. No workflow/code/config/home/remote access or change in this design.
+This closes only the 43-test M8 developer-graph slice. Stage 10.3/10.4 remain
+behind M2 configuration inputs, M5 exact aquery, and M6 REAPI execution. The
+remaining M2 Host, RunUnder/full-Java-String, and eight Java-regex routes are
+terminal `REPLAN` boundaries, so no implementation packet is schedulable without
+a new architecture or scope decision. Do not invent a duplicate evidence packet,
+weaken Bazel 9 parity, or claim Stage 10/M8 completion.

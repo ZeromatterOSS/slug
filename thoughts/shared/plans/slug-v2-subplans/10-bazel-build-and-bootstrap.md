@@ -2475,6 +2475,38 @@ jobs and their public classification/status mapping before any workflow edit. No
 workflow/code/config/driver/manifest/target/fixture/lock/credential access/change
 or remote invocation in the design.
 
+### BuildBuddy CI admission decision: ACCEPT, CI not admitted (2026-08-07)
+
+`WP-10-m8-bazel-buildbuddy-ci-admission-design` is **ACCEPT** with no CI lane.
+The user explicitly declined CI for this single-agent, no-customer prototype as
+unnecessary overhead. Therefore no provider, workflow path, trigger matrix,
+runner, permissions, secret injection, concurrency, cost, timeout, or retention
+policy is selected, and no workflow or credential-bearing repository state may
+be added under this decision. Reopening CI requires a new explicit user request.
+
+The supported developer validation remains the two accepted local, no-argument
+gates, run manually and serially with ordinary Bazel RC discovery:
+
+```text
+python3 tools/v2_oracle/buildbuddy_cache_gate.py
+python3 tools/v2_oracle/buildbuddy_rbe_gate.py
+```
+
+The cache gate must emit only `PROVED_CACHE_ONLY`; the RBE gate must emit only
+`PROVED_RBE`. They must not be reconstructed, combined, retried, or given a
+fallback. The accepted records cover all 43 manifest tests and 1,006 eligible
+actions per phase with clean lifecycle; the cache prime/replay digest multiset
+is `9ae19e6b3cfb218033a633c630967e70161c4acd47b435c3f446e76e7cc93de5`.
+Those records are sufficient local developer-gate evidence and do not require
+routine remote reruns.
+
+This accepts and parks only the M8 developer-graph slice. Stage 10.3 analysis
+and Stage 10.4 self-hosting remain gated in dependency order behind the terminal
+M2 configuration-input boundaries, M5 exact aquery, and M6 REAPI execution and
+materialization. No further implementation packet is currently schedulable
+without a new architecture or scope decision for M2; this is not a Stage 10 or
+M8 completion claim.
+
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests
 pass; independent review accepts private dual-artifact setup, replacement-aware
