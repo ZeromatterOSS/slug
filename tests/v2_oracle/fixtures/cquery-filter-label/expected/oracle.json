@@ -1,0 +1,128 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "anchored_starlark_label",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 2 targets (5 packages loaded, 8 targets configured).\nINFO: Found 2 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:bin",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 2 targets (5 packages loaded, 8 targets configured).\nINFO: Found 2 targets...\nINFO: Elapsed time: 4.236s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:bin\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "ordered_starlark_label",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 2 targets (5 packages loaded, 8 targets configured).\nINFO: Found 2 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:lib\n@@//pkg:bin",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 2 targets (5 packages loaded, 8 targets configured).\nINFO: Found 2 targets...\nINFO: Elapsed time: 0.109s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:lib\n@@//pkg:bin\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "filter('^//missing:', set(//pkg:lib //pkg:bin))",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "filter('^//missing:', set(//pkg:lib //pkg:bin))",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_nonmatch",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (0 packages loaded, 0 targets configured).\nINFO: Found 2 targets...\nINFO: Empty query results\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (0 packages loaded, 0 targets configured).\nINFO: Found 2 targets...\nINFO: Empty query results\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "filter('(', //pkg:missing)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "filter('(', //pkg:missing)",
+        "--output=label"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_before_malformed_regex",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//pkg:missing': no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel\nERROR: no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//pkg:missing': no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-filter-label/20260809-133329-825402-bazel/workspace/pkg/BUILD.bazel\nERROR: no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-filter-label/20260809-133329-825402-bazel/workspace/pkg/BUILD.bazel\nINFO: Elapsed time: 0.026s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "cquery-filter-label",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

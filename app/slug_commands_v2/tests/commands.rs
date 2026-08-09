@@ -480,6 +480,15 @@ fn cquery_accepts_only_the_label_output_matrix() {
     assert_eq!(set.output_mode, CqueryOutputMode::Label);
     assert_eq!(set.expression, "set(//pkg:bin //pkg:lib) union //pkg:bin");
     assert!(CqueryRequest::parse(&["let x = set() in $x"]).is_ok());
+    assert!(CqueryRequest::parse(&["filter('^//pkg:', set(//pkg:bin //pkg:lib))"]).is_ok());
+    assert!(CqueryRequest::parse(&["filter('(', //pkg:bin)"]).is_ok());
+    for expression in [
+        "kind('rule', //pkg:bin)",
+        "filter()",
+        "filter(set(//pkg:bin), //pkg:bin)",
+    ] {
+        assert!(CqueryRequest::parse(&[expression]).is_err(), "{expression}");
+    }
 
     for expression in [
         "set(//pkg:bin //pkg:lib //pkg:bin)",

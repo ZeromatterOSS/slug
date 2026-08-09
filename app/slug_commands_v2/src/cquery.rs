@@ -11,8 +11,8 @@ use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryExpression;
-use slug_query_v2::function_free_literals;
-use slug_query_v2::validate_function_free_query;
+use slug_query_v2::cquery_literals;
+use slug_query_v2::validate_cquery_query;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
@@ -60,9 +60,9 @@ impl CqueryRequest {
         let cquery_expression = parsed.positionals[0].clone();
         let parsed_expression = QueryExpression::parse(&cquery_expression)
             .map_err(|error| unsupported(&error.to_string()))?;
-        validate_function_free_query(&parsed_expression)
+        validate_cquery_query(&parsed_expression)
             .map_err(|error| unsupported(&error.to_string()))?;
-        for literal in function_free_literals(&parsed_expression) {
+        for literal in cquery_literals(&parsed_expression) {
             let target = TargetPattern::parse(literal).map_err(|message| {
                 CommandParseError::InvalidTargetPattern {
                     value: literal.to_owned(),

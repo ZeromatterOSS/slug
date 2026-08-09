@@ -5562,3 +5562,63 @@ and the Buck2-derived evaluator. Do not select provider projection without a
 complete qualified-provider/builtin-value boundary, configured `kind`/`attr`
 without retained configured metadata, or `deps` without observable platform
 and constraint nodes. Carry the audit record with its functional successor.
+
+### Configured-query successor audit 2 ACCEPT (2026-08-09)
+
+`WP-6-m4-configured-query-successor-audit-2` selected
+`WP-6-m4-cquery-filter-label-rust-native-implementation`. Admit only
+`filter(regex, expression)` over the accepted configured root/set forms. The
+predicate candidate is the retained configured target key's original apparent
+root label (`//pkg:target`), while Starlark-label output remains canonical
+`@@//pkg:target`. Grammar, arity, unanchored find, left-to-right operand/set
+semantics, ordering, and full configured-key deduplication are exact. Regex
+syntax, valid-Unicode behavior, resource limits, and diagnostics reuse the
+accepted M3 Rust-native contract; Java regex/UTF-16 parity is excluded by user
+direction.
+
+The implementation must reuse the sole Buck2-derived recursive fold and the
+existing bounded regex compiler/filter primitive. Fresh Bazel 9.2 evidence
+corrected the audit's initial lazy-resolution premise: `filter('(',
+//pkg:missing)` reports the missing target, not the malformed regex. Keep the
+existing eager lexical `RootConfiguredTargetAnalysisKey` universe, compatible
+Needs union/restart, and first typed root error unchanged. Only after that
+universe completes does the shared evaluator compile the regex before folding
+its already-resolved operand. Add no DICE key, graph, cache, evaluator, parser,
+or regex identity.
+
+Before Rust acceptance, add focused Bazel 9.2 cquery evidence for anchored root
+label matching with canonical Starlark output, ordered composition/deduplication,
+and empty nonmatch. Tests must additionally prove missing-before-malformed-regex
+ordering, validator-time unsupported-function failures, existing set and
+C0/C1/C0 behavior, one-shot/daemon equality, and missing recovery. `kind`,
+`attr`, `deps`, providers, patterns, externals, new output/wire modes, exact
+hashes, JVM, and Java remain excluded.
+
+### Configured label filter ACCEPT (2026-08-09)
+
+`WP-6-m4-cquery-filter-label-rust-native-implementation` is **ACCEPT**.
+Configured query now admits only recursive `filter(regex, expression)` in
+addition to the accepted ordered set forms. It reuses the sole Buck2-derived
+expression fold and the same bounded regex compiler/filter invocation as
+loading query. The predicate sees the apparent root label, while result identity
+remains the full configured key and Starlark-label output remains canonical.
+
+Fresh four-lane Bazel 9.2 evidence pins anchored matching, insertion order and
+deduplication, empty nonmatch, and missing-target precedence over malformed
+regex. The existing eager root/Needs/typed-error loop is unchanged; regex
+compilation happens only after the root universe completes. The implementation
+adds no graph, key, cache, parser, recursive evaluator, configured metadata,
+provider/dependency traversal, exact hash, JVM, or Java surface.
+
+Validation passed the Bazel fixture update and clean replay, three oracle
+integrity tests, 100 query tests, 18 command tests, three core cquery tests,
+five server cquery tests, five rebuilt-CLI cquery tests, formatting, archive
+status, and diff checks. Stale `slugd` processes were absent after validation.
+Independent review returned `ACCEPT` with no findings; the direct core `regex`
+dependency is required by the typed configured-query environment boundary.
+
+Run next only `WP-6-m4-configured-query-successor-audit-3`. Select one bounded
+functional behavior supported by retained configured state and the shared
+evaluator; carry its bookkeeping with implementation rather than committing
+documentation alone. Keep `deps`, configured `kind`/`attr`, and provider
+projection behind their already recorded missing-state boundaries.

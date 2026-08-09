@@ -96,7 +96,7 @@ impl TestSuiteAttribute {
 }
 
 #[async_trait]
-pub trait FunctionFreeQueryEnvironment {
+pub trait CqueryQueryEnvironment {
     type Set: Clone + Send + Sync;
 
     fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set;
@@ -104,28 +104,30 @@ pub trait FunctionFreeQueryEnvironment {
     fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
+    async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
+    -> Result<Self::Set, QueryError>;
 }
 
-/// Evaluates the query forms shared by loading and configured query without
-/// admitting query functions or graph traversal.
-pub async fn evaluate_function_free_query<E>(
+/// Evaluates the bounded configured-query subset with the shared expression
+/// fold. Root resolution belongs to the caller and happens before this fold.
+pub async fn evaluate_cquery_query<E>(
     environment: &mut E,
     expression: &QueryExpression,
 ) -> Result<E::Set, QueryError>
 where
-    E: FunctionFreeQueryEnvironment + Send,
+    E: CqueryQueryEnvironment + Send,
 {
     let mut variables = SmallMap::new();
-    let mut context = FunctionFreeContext(environment);
+    let mut context = CqueryContext(environment);
     evaluate_query_expression_inner(&mut context, expression, &mut variables).await
 }
 
-struct FunctionFreeContext<'a, E>(&'a mut E);
+struct CqueryContext<'a, E>(&'a mut E);
 
 #[async_trait]
-impl<E> FunctionFreeQueryEnvironment for FunctionFreeContext<'_, E>
+impl<E> CqueryQueryEnvironment for CqueryContext<'_, E>
 where
-    E: FunctionFreeQueryEnvironment + Send,
+    E: CqueryQueryEnvironment + Send,
 {
     type Set = E::Set;
 
@@ -148,9 +150,17 @@ where
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         self.0.resolve_literal(literal).await
     }
+
+    async fn filter(
+        &mut self,
+        regex: &Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        self.0.filter(regex, targets).await
+    }
 }
 
-trait QueryExpressionContext: FunctionFreeQueryEnvironment {
+trait QueryExpressionContext: CqueryQueryEnvironment {
     fn evaluate_integer<'a>(
         &'a mut self,
         value: u64,
@@ -164,9 +174,9 @@ trait QueryExpressionContext: FunctionFreeQueryEnvironment {
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>>;
 }
 
-impl<E> QueryExpressionContext for FunctionFreeContext<'_, E>
+impl<E> QueryExpressionContext for CqueryContext<'_, E>
 where
-    E: FunctionFreeQueryEnvironment + Send,
+    E: CqueryQueryEnvironment + Send,
 {
     fn evaluate_integer<'a>(
         &'a mut self,
@@ -177,11 +187,17 @@ where
 
     fn evaluate_function<'a>(
         &'a mut self,
-        _name: &'a crate::Spanned<CompactString>,
-        _args: &'a [QueryExpression],
-        _variables: &'a mut SmallMap<CompactString, Self::Set>,
+        name: &'a crate::Spanned<CompactString>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, Self::Set>,
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
-        async move { Err(QueryError::syntax("query functions are not supported")) }.boxed()
+        async move {
+            if name.value != "filter" {
+                return Err(QueryError::syntax("query functions are not supported"));
+            }
+            invoke_filter(self, args, variables).await
+        }
+        .boxed()
     }
 }
 
@@ -349,7 +365,7 @@ where
 }
 
 #[async_trait]
-impl<E> FunctionFreeQueryEnvironment for QueryEvaluator<E>
+impl<E> CqueryQueryEnvironment for QueryEvaluator<E>
 where
     E: QueryEnvironment + Send,
 {
@@ -373,6 +389,14 @@ where
 
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         self.environment.resolve_literal(literal).await
+    }
+
+    async fn filter(
+        &mut self,
+        regex: &Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        self.environment.filter(regex, targets).await
     }
 }
 
@@ -827,6 +851,35 @@ fn compile_slug_regex(pattern: &str) -> Result<Regex, QueryError> {
     })
 }
 
+/// The only configured-query function is also a loading-query function. Keep
+/// its compilation-before-operand order in one place so configured query uses
+/// the established Rust-native regex contract without a second evaluator.
+fn invoke_filter<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        let pattern = match args.first().map(|argument| &argument.kind) {
+            Some(QueryExpressionKind::TargetLiteral(value)) => value.as_str(),
+            Some(_) => return Err(QueryError::syntax("regex pattern must be a word")),
+            None => return Err(QueryError::syntax("missing query function argument")),
+        };
+        let operand = args
+            .get(1)
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        // This is deliberately after cquery's eager root universe has
+        // completed, but before the already-resolved operand is folded.
+        let regex = compile_slug_regex(pattern)?;
+        let targets = evaluate_query_expression_inner(context, operand, variables).await?;
+        context.filter(&regex, &targets).await
+    }
+    .boxed()
+}
+
 impl<E> QueryFunction<E> for AttrFunction
 where
     E: QueryEnvironment + Send,
@@ -882,6 +935,9 @@ where
         variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
         async move {
+            if matches!(self, Self::Filter) {
+                return invoke_filter(evaluator, args, variables).await;
+            }
             let pattern = match &args[0].kind {
                 QueryExpressionKind::TargetLiteral(value) => value.as_str(),
                 _ => return Err(QueryError::syntax("regex pattern must be a word")),
@@ -890,10 +946,7 @@ where
             // then reused for each candidate in every callback delivery.
             let regex = compile_slug_regex(pattern)?;
             let targets = eval_set_arg(evaluator, args, variables, 1).await?;
-            match self {
-                Self::Filter => evaluator.environment.filter(&regex, &targets).await,
-                Self::Kind => evaluator.environment.kind(&regex, &targets).await,
-            }
+            evaluator.environment.kind(&regex, &targets).await
         }
         .boxed()
     }
@@ -1158,6 +1211,84 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct CqueryEnvironment {
+        events: Vec<String>,
+    }
+
+    #[async_trait]
+    impl CqueryQueryEnvironment for CqueryEnvironment {
+        type Set = Vec<String>;
+
+        fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
+            let mut result = Vec::new();
+            for set in sets {
+                for value in set {
+                    if !result.contains(value) {
+                        result.push(value.clone());
+                    }
+                }
+            }
+            result
+        }
+
+        fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set {
+            self.one_delivery(&[left, right])
+        }
+
+        fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+            left.iter()
+                .filter(|value| right.contains(value))
+                .cloned()
+                .collect()
+        }
+
+        fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+            left.iter()
+                .filter(|value| !right.contains(value))
+                .cloned()
+                .collect()
+        }
+
+        async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
+            self.events.push(format!("resolve:{literal}"));
+            Ok(vec![literal.to_owned()])
+        }
+
+        async fn filter(
+            &mut self,
+            regex: &Regex,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.events.push(format!("filter:{}", targets.join(",")));
+            Ok(targets
+                .iter()
+                .filter(|target| regex.find(target).is_some())
+                .cloned()
+                .collect())
+        }
+    }
+
+    #[test]
+    fn cquery_filter_reuses_the_shared_fold_in_operand_order() {
+        let expression =
+            QueryExpression::parse("filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))")
+                .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:lib",
+                "resolve://pkg:bin",
+                "resolve://pkg:lib",
+                "filter://pkg:lib,//pkg:bin",
+            ]
+        );
+    }
 
     struct VisibleEnvironment {
         events: std::sync::Mutex<Vec<String>>,

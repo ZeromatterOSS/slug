@@ -3436,6 +3436,7 @@ dependencies = [
  "hyper-util",
  "libc",
  "nix 0.30.1",
+ "regex",
  "sha2",
  "slug_analysis_v2",
  "slug_bzlmod_v2",

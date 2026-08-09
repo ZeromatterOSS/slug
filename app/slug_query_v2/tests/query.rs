@@ -13,8 +13,9 @@ use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryExpressionKind;
 use slug_query_v2::QueryFunctionStatus;
 use slug_query_v2::SourceSpan;
+use slug_query_v2::cquery_literals;
 use slug_query_v2::loading_query_functions;
-use slug_query_v2::validate_function_free_query;
+use slug_query_v2::validate_cquery_query;
 use slug_query_v2::validate_loading_query;
 
 // Bazel 9.2 QueryParser.java: all binary operators have equal precedence and
@@ -51,13 +52,15 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 #[test]
-fn function_free_validator_tracks_lexical_let_bindings() {
+fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter() {
     for source in [
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
+        "filter('^//pkg:bin$', let x = set(//pkg:bin //pkg:lib) in $x)",
+        "filter('(', filter('^//pkg:', set(//pkg:bin //pkg:lib)))",
     ] {
-        validate_function_free_query(&QueryExpression::parse(source).unwrap()).unwrap();
+        validate_cquery_query(&QueryExpression::parse(source).unwrap()).unwrap();
     }
 
     for source in [
@@ -65,16 +68,34 @@ fn function_free_validator_tracks_lexical_let_bindings() {
         "let x = set() in $y",
         "let x = $x in //pkg:bin",
         "set($x)",
+        "filter()",
+        "filter(//pkg:bin)",
+        "filter(set(//pkg:bin), //pkg:bin)",
+        "kind('rule', //pkg:bin)",
     ] {
-        let error = validate_function_free_query(&QueryExpression::parse(source).unwrap())
+        let error = validate_cquery_query(&QueryExpression::parse(source).unwrap())
             .unwrap_err()
             .to_string();
         assert!(
             error.contains("undefined query variable")
-                || error.contains("concrete target literals"),
+                || error.contains("concrete target literals")
+                || error.contains("arguments to function 'filter'")
+                || error.contains("must be a word")
+                || error.contains("not supported by this cquery"),
             "{source}: {error}"
         );
     }
+
+    assert!(
+        validate_cquery_query(&QueryExpression::parse("filter('(', //pkg:bin)").unwrap()).is_ok()
+    );
+    assert_eq!(
+        cquery_literals(
+            &QueryExpression::parse("filter('^//pkg:', let x = //pkg:bin in $x union //pkg:lib)")
+                .unwrap()
+        ),
+        ["//pkg:bin", "//pkg:lib"]
+    );
 }
 
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query

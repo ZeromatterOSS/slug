@@ -27,7 +27,7 @@ and must name the same packet.
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
-| M4: `cquery` | **active (ordered label/Starlark-label sets accepted)** | projected label and exact `str(target.label)` output, C0/C1/C0 restoration, and function-free `set`/`let`/`union`/`intersect`/`except` over configured roots | dependency traversal remains gated by missing observable platform/configuration nodes; provider projection and broader functions/formats remain unselected | `WP-6-m4-configured-query-successor-audit-2` |
+| M4: `cquery` | **active (configured label filter accepted)** | projected label and exact `str(target.label)` output, C0/C1/C0 restoration, ordered configured sets, and Rust-native label `filter` | dependency traversal remains gated by missing observable platform/configuration nodes; configured metadata/provider boundaries remain incomplete | `WP-6-m4-configured-query-successor-audit-3` |
 | M5: `aquery` | **replan** | recursive action ownership, complete Slug configuration identity, and four-domain change/restoration evidence are retained | retain selected execution platform/action ownership, then compare provisional configuration/path/ActionKey IDs only as opaque graph-scoped tokens | wait for configured-query breadth after M3 |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | semantic `aquery` handoff and collision-safe Slug action/cache identity | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-m4-configured-query-successor-audit-2`](./slug-v2-subplans/current-packet.md).
+[`WP-6-m4-configured-query-successor-audit-3`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

@@ -364,8 +364,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
 fn validate_cquery_expression(expression: &str) -> Result<(), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
-    slug_query_v2::validate_function_free_query(&expression).map_err(|error| error.to_string())?;
-    for literal in slug_query_v2::function_free_literals(&expression) {
+    slug_query_v2::validate_cquery_query(&expression).map_err(|error| error.to_string())?;
+    for literal in slug_query_v2::cquery_literals(&expression) {
         let target = TargetPattern::parse(literal)?;
         if !matches!(target, TargetPattern::Single(ref label) if label.repo().is_root()) {
             return Err("cquery accepts only root literal target labels".to_owned());

@@ -1,0 +1,31 @@
+[fixture]
+name = "cquery-filter-label"
+description = "Bazel 9.2 cquery filter preserves apparent-label matching, ordered configured roots, and missing-target precedence."
+comparison = "semantic"
+oracle_notes = "The regex contract is Rust-native; this fixture pins the admitted label/order/error boundary only."
+
+[[commands]]
+name = "anchored_starlark_label"
+argv = ["cquery", "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))", "--output=starlark", "--starlark:expr=str(target.label)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@@//pkg:bin"]
+
+[[commands]]
+name = "ordered_starlark_label"
+argv = ["cquery", "filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))", "--output=starlark", "--starlark:expr=str(target.label)"]
+compare = "semantic"
+expected_exit = 0
+stdout_contains = ["@@//pkg:lib", "@@//pkg:bin"]
+
+[[commands]]
+name = "empty_nonmatch"
+argv = ["cquery", "filter('^//missing:', set(//pkg:lib //pkg:bin))", "--output=label"]
+compare = "semantic"
+expected_exit = 0
+
+[[commands]]
+name = "missing_before_malformed_regex"
+argv = ["cquery", "filter('(', //pkg:missing)", "--output=label"]
+compare = "semantic"
+expected_exit = 1

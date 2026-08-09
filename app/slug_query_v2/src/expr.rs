@@ -223,13 +223,13 @@ pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryP
     validate_expression(expression)
 }
 
-/// Validates the intentionally function-free expression subset used by cquery.
-pub fn validate_function_free_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
+/// Validates the deliberately small configured-query subset.
+pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
     let mut bindings = SmallSet::new();
-    validate_function_free_query_inner(expression, &mut bindings)
+    validate_cquery_query_inner(expression, &mut bindings)
 }
 
-fn validate_function_free_query_inner(
+fn validate_cquery_query_inner(
     expression: &QueryExpression,
     bindings: &mut SmallSet<CompactString>,
 ) -> Result<(), QueryParseError> {
@@ -254,19 +254,19 @@ fn validate_function_free_query_inner(
             Ok(())
         }
         QueryExpressionKind::Let { name, value, body } => {
-            validate_function_free_query_inner(value, bindings)?;
+            validate_cquery_query_inner(value, bindings)?;
             let shadows_existing = bindings.contains(name.value.as_str());
             bindings.insert(name.value.clone());
-            let result = validate_function_free_query_inner(body, bindings);
+            let result = validate_cquery_query_inner(body, bindings);
             if !shadows_existing {
                 bindings.shift_remove(name.value.as_str());
             }
             result
         }
         QueryExpressionKind::BinaryOpSequence { left, operations } => {
-            validate_function_free_query_inner(left, bindings)?;
+            validate_cquery_query_inner(left, bindings)?;
             for (_, right) in operations.iter() {
-                validate_function_free_query_inner(right, bindings)?;
+                validate_cquery_query_inner(right, bindings)?;
             }
             Ok(())
         }
@@ -274,6 +274,11 @@ fn validate_function_free_query_inner(
             "integer literals are not supported by this cquery",
             expression.span,
         )),
+        QueryExpressionKind::Function { name, args } if name.value == "filter" => {
+            let spec = cquery_filter_function();
+            validate_function_arguments(expression, args, spec)?;
+            validate_cquery_query_inner(&args[1], bindings)
+        }
         QueryExpressionKind::Function { name, .. } => Err(QueryParseError::new(
             format!(
                 "query function '{}' is not supported by this cquery",
@@ -286,16 +291,13 @@ fn validate_function_free_query_inner(
 
 /// Returns concrete literals in lexical resolution order. Variables are
 /// intentionally absent: they are resolved by the shared evaluator.
-pub fn function_free_literals(expression: &QueryExpression) -> Vec<&str> {
+pub fn cquery_literals(expression: &QueryExpression) -> Vec<&str> {
     let mut literals = Vec::new();
-    collect_function_free_literals(expression, &mut literals);
+    collect_cquery_literals(expression, &mut literals);
     literals
 }
 
-fn collect_function_free_literals<'a>(
-    expression: &'a QueryExpression,
-    literals: &mut Vec<&'a str>,
-) {
+fn collect_cquery_literals<'a>(expression: &'a QueryExpression, literals: &mut Vec<&'a str>) {
     match &expression.kind {
         QueryExpressionKind::TargetLiteral(literal) if !literal.starts_with('$') => {
             literals.push(literal)
@@ -304,14 +306,17 @@ fn collect_function_free_literals<'a>(
             literals.extend(values.iter().map(|value| value.value.as_str()));
         }
         QueryExpressionKind::Let { value, body, .. } => {
-            collect_function_free_literals(value, literals);
-            collect_function_free_literals(body, literals);
+            collect_cquery_literals(value, literals);
+            collect_cquery_literals(body, literals);
         }
         QueryExpressionKind::BinaryOpSequence { left, operations } => {
-            collect_function_free_literals(left, literals);
+            collect_cquery_literals(left, literals);
             for (_, right) in operations.iter() {
-                collect_function_free_literals(right, literals);
+                collect_cquery_literals(right, literals);
             }
+        }
+        QueryExpressionKind::Function { name, args } if name.value == "filter" => {
+            collect_cquery_literals(&args[1], literals);
         }
         QueryExpressionKind::TargetLiteral(_)
         | QueryExpressionKind::Integer(_)
@@ -342,6 +347,60 @@ impl QueryExpression {
         };
         raw.parse::<i32>().map_err(|_| raw)
     }
+}
+
+fn cquery_filter_function() -> &'static QueryFunctionSpec {
+    loading_query_function("filter").expect("filter is in the static Bazel registry")
+}
+
+fn validate_function_arguments(
+    expression: &QueryExpression,
+    args: &[QueryExpression],
+    spec: &QueryFunctionSpec,
+) -> Result<(), QueryParseError> {
+    if args.len() < spec.mandatory_arguments {
+        return Err(QueryParseError::new(
+            format!("too few arguments to function '{}'", spec.name),
+            expression.span,
+        ));
+    }
+    if args.len() > spec.argument_kinds.len() {
+        return Err(QueryParseError::new(
+            format!("too many arguments to function '{}'", spec.name),
+            expression.span,
+        ));
+    }
+    for (index, (argument, expected)) in args.iter().zip(spec.argument_kinds).enumerate() {
+        let valid = match expected {
+            // Bazel treats an integer token in an expression position as a
+            // target literal (for example `1` becomes `//:1`).
+            QueryArgumentKind::Expression => true,
+            QueryArgumentKind::Word => {
+                matches!(argument.kind, QueryExpressionKind::TargetLiteral(_))
+            }
+            QueryArgumentKind::Integer => match argument.java_integer_literal() {
+                Ok(_) => true,
+                Err(raw) => {
+                    return Err(QueryParseError::new(
+                        format!("expected an integer literal: '{raw}'"),
+                        argument.span,
+                    ));
+                }
+            },
+        };
+        if !valid {
+            return Err(QueryParseError::new(
+                format!(
+                    "argument {} to function '{}' must be {}",
+                    index + 1,
+                    spec.name,
+                    expected
+                ),
+                argument.span,
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn validate_expression(expression: &QueryExpression) -> Result<(), QueryParseError> {
@@ -375,47 +434,8 @@ fn validate_expression(expression: &QueryExpression) -> Result<(), QueryParseErr
                     name.span,
                 ));
             };
-            if args.len() < spec.mandatory_arguments {
-                return Err(QueryParseError::new(
-                    format!("too few arguments to function '{}'", spec.name),
-                    expression.span,
-                ));
-            }
-            if args.len() > spec.argument_kinds.len() {
-                return Err(QueryParseError::new(
-                    format!("too many arguments to function '{}'", spec.name),
-                    expression.span,
-                ));
-            }
-            for (index, (argument, expected)) in args.iter().zip(spec.argument_kinds).enumerate() {
-                let valid = match expected {
-                    // Bazel treats an integer token in an expression position
-                    // as a target literal (for example `1` becomes `//:1`).
-                    QueryArgumentKind::Expression => true,
-                    QueryArgumentKind::Word => {
-                        matches!(argument.kind, QueryExpressionKind::TargetLiteral(_))
-                    }
-                    QueryArgumentKind::Integer => match argument.java_integer_literal() {
-                        Ok(_) => true,
-                        Err(raw) => {
-                            return Err(QueryParseError::new(
-                                format!("expected an integer literal: '{raw}'"),
-                                argument.span,
-                            ));
-                        }
-                    },
-                };
-                if !valid {
-                    return Err(QueryParseError::new(
-                        format!(
-                            "argument {} to function '{}' must be {}",
-                            index + 1,
-                            spec.name,
-                            expected
-                        ),
-                        argument.span,
-                    ));
-                }
+            validate_function_arguments(expression, args, spec)?;
+            for argument in args.iter() {
                 validate_expression(argument)?;
             }
             if spec.status == QueryFunctionStatus::Deferred {

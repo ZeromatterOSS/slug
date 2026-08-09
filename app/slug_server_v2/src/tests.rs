@@ -872,6 +872,14 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             .contains("undefined query variable '$late'")
     );
     assert_eq!(undefined.invalidated_files, 0);
+    let unsupported = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"expression":"kind('rule', //pkg:probe)","output":"label"}}"#,
+    );
+    assert_eq!(unsupported.exit_code, 2, "{unsupported:?}");
+    assert!(unsupported.stdout.is_empty());
+    assert!(unsupported.stderr.contains("cquery_request_error"));
+    assert_eq!(unsupported.invalidated_files, 0);
     let empty_starlark = handle_request(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"set()","output":"starlark_label"}}"#,
@@ -960,6 +968,20 @@ fn retained_cquery_starlark_formats_ordered_sets() {
     assert_eq!(result.stdout, "@@//pkg:bin\n@@//pkg:lib\n");
     assert!(result.stderr.is_empty());
     assert_eq!(result.invalidated_files, 0);
+
+    let filtered = daemon.cquery_with_bzlmod_inputs(
+        "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))",
+        CqueryOutput::StarlarkLabel,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+        Vec::new(),
+        None,
+    );
+    assert_eq!(filtered.exit_code, 0, "{filtered:?}");
+    assert_eq!(filtered.stdout, "@@//pkg:bin\n");
+    assert!(filtered.stderr.is_empty());
+    assert_eq!(filtered.invalidated_files, 0);
 }
 
 #[test]

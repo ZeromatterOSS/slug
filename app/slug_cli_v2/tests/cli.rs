@@ -1094,6 +1094,68 @@ fn cquery_set_expression_matches_between_one_shot_and_daemon() {
 }
 
 #[test]
+fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
+    let workspace = scratch("cquery-filter-expression-workspace");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"filters\")\n",
+    );
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"lib\")\n",
+    );
+    let starlark = ["--output=starlark", "--starlark:expr=str(target.label)"];
+    let anchored = "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))";
+    let ordered = "filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))";
+    let empty = "filter('^//missing:', set(//pkg:lib //pkg:bin))";
+    let run = |output_base: Option<&str>, expression: &str| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .arg("cquery")
+            .arg(expression)
+            .args(starlark)
+            .output()
+            .unwrap()
+    };
+    let anchored_one_shot = run(None, anchored);
+    assert!(anchored_one_shot.status.success(), "{anchored_one_shot:?}");
+    assert_eq!(anchored_one_shot.stdout, b"@@//pkg:bin\n");
+    assert!(anchored_one_shot.stderr.is_empty());
+    let ordered_one_shot = run(None, ordered);
+    assert!(ordered_one_shot.status.success(), "{ordered_one_shot:?}");
+    assert_eq!(ordered_one_shot.stdout, b"@@//pkg:lib\n@@//pkg:bin\n");
+    assert!(ordered_one_shot.stderr.is_empty());
+    let empty_one_shot = run(None, empty);
+    assert!(empty_one_shot.status.success(), "{empty_one_shot:?}");
+    assert!(empty_one_shot.stdout.is_empty());
+    assert!(empty_one_shot.stderr.is_empty());
+
+    let output_base = scratch("cquery-filter-expression-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base = format!("--output_base={}", output_base.display());
+    let anchored_daemon = run(Some(&output_base), anchored);
+    assert!(anchored_daemon.status.success(), "{anchored_daemon:?}");
+    assert_eq!(anchored_daemon.stdout, anchored_one_shot.stdout);
+    assert!(anchored_daemon.stderr.is_empty());
+    let ordered_daemon = run(Some(&output_base), ordered);
+    assert!(ordered_daemon.status.success(), "{ordered_daemon:?}");
+    assert_eq!(ordered_daemon.stdout, ordered_one_shot.stdout);
+    assert!(ordered_daemon.stderr.is_empty());
+    let empty_daemon = run(Some(&output_base), empty);
+    assert!(empty_daemon.status.success(), "{empty_daemon:?}");
+    assert!(empty_daemon.stdout.is_empty());
+    assert!(empty_daemon.stderr.is_empty());
+}
+
+#[test]
 fn cquery_starlark_label_daemon_recovers_after_missing() {
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
     let output_base = scratch("cquery-starlark-output-base");

@@ -104,7 +104,7 @@ use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
-use slug_query_v2::FunctionFreeQueryEnvironment;
+use slug_query_v2::CqueryQueryEnvironment;
 use slug_query_v2::QueryError;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryOrder;
@@ -113,10 +113,10 @@ use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
 use slug_query_v2::RootQueryCommandKey;
 use slug_query_v2::TargetSet;
-use slug_query_v2::evaluate_function_free_query;
+use slug_query_v2::cquery_literals;
+use slug_query_v2::evaluate_cquery_query;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
-use slug_query_v2::function_free_literals;
-use slug_query_v2::validate_function_free_query;
+use slug_query_v2::validate_cquery_query;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -1309,7 +1309,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
             });
         }
         let mut environment = CquerySetEnvironment::new(&self.literal_roots, &targets);
-        let terminal = evaluate_function_free_query(&mut environment, &self.expression)
+        let terminal = evaluate_cquery_query(&mut environment, &self.expression)
             .await
             .map(|targets| CqueryCommandEvaluation { targets })
             .map_err(|error| CqueryCommandError::request(error.to_string()));
@@ -1658,7 +1658,7 @@ impl CquerySetEnvironment {
 }
 
 #[async_trait]
-impl FunctionFreeQueryEnvironment for CquerySetEnvironment {
+impl CqueryQueryEnvironment for CquerySetEnvironment {
     type Set = TargetSet<CqueryResultTarget>;
 
     fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
@@ -1694,6 +1694,20 @@ impl FunctionFreeQueryEnvironment for CquerySetEnvironment {
             .get(literal)
             .cloned()
             .ok_or_else(|| QueryError::evaluation(format!("unresolved cquery literal '{literal}'")))
+    }
+
+    async fn filter(
+        &mut self,
+        regex: &regex::Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        let mut result = TargetSet::default();
+        for target in targets.iter() {
+            if regex.find(&target.display_label).is_some() {
+                result.insert(target.clone());
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -3159,7 +3173,7 @@ impl WorkspaceRuntime {
     > {
         let expression = QueryExpression::parse(expression)
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
-        validate_function_free_query(&expression)
+        validate_cquery_query(&expression)
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(CqueryCommandError::infrastructure)?;
@@ -3182,7 +3196,7 @@ impl WorkspaceRuntime {
         let mut roots = Vec::new();
         let mut root_indices = SmallMap::new();
         let mut literal_roots = Vec::new();
-        for literal in function_free_literals(&expression) {
+        for literal in cquery_literals(&expression) {
             let target = TargetPattern::parse(literal)
                 .map_err(|error| CqueryCommandError::request(error))?;
             let TargetPattern::Single(ref label) = target else {
@@ -6180,6 +6194,17 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         );
         assert!(run("//pkg:bin intersect //pkg:lib").is_empty());
         assert_eq!(labels(run("//pkg:bin except //pkg:lib")), ["//pkg:bin"]);
+        assert_eq!(
+            labels(run(
+                "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))"
+            )),
+            ["//pkg:bin"]
+        );
+        assert_eq!(
+            labels(run("filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib))")),
+            ["//pkg:lib", "//pkg:bin"]
+        );
+        assert!(run("filter('^//missing:', set(//pkg:lib //pkg:bin))").is_empty());
         let starlark = runtime
             .cquery_command_with_bzlmod_inputs(
                 "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
@@ -6212,6 +6237,36 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .unwrap();
         let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
         assert!(error.missing_stderr().unwrap().contains("//pkg:missing"));
+
+        let missing_before_malformed = runtime
+            .cquery_command_with_bzlmod_inputs(
+                "filter('(', //pkg:missing)",
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        let error = missing_before_malformed
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap_err();
+        assert!(error.missing_stderr().unwrap().contains("//pkg:missing"));
+
+        let malformed = runtime
+            .cquery_command_with_bzlmod_inputs(
+                "filter('(', //pkg:bin)",
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        let error = malformed.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert!(error.to_string().contains("invalid Slug regex"));
     }
 
     #[test]
