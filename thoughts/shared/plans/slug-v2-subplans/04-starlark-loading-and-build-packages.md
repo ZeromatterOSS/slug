@@ -1679,6 +1679,20 @@ JVM, or configured-analysis work entered the correction. Run next only
 `WP-4-8-m3-attr-five-source-template-oracle-design-retry`, retaining the four
 source-template blockers above and binding all source work to this digest.
 
+The source-template retry returned `REPLAN` before checkout edits. A minimal
+Bazel 9.2 root accepted `licenses(["notice"])` beside the required
+`default_package_metadata`, but an anchored ordinary `attr("licenses",...)`
+query over its filegroup returned empty. Explicit rule licenses produce the
+rendering but contradict the frozen package-derived construction. The probe
+root and output were removed; no source template, fixture, payload, Rust,
+Cargo, JVM artifact, or generated file exists.
+
+Run next only `WP-4-8-m3-attr-license-default-source-evidence`. Audit pinned
+license ownership and execute a minimal native/Starlark/config-setting matrix
+with package metadata, package licenses, and explicit licenses. Select but do
+not apply either an exact package-derived construction or a finite manifest
+correction, retaining the other four accepted template obligations.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

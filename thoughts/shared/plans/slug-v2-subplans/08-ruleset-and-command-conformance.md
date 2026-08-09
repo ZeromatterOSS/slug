@@ -3531,3 +3531,14 @@ Independent review returned `ACCEPT` for the one-row timeout correction. Run
 next only `WP-4-8-m3-attr-five-source-template-oracle-design-retry`, applying
 all four retained source-template corrections and hidden focused probes before
 the full-diff rereview.
+
+The source-template retry then returned `REPLAN` before docs edits. Bazel 9.2
+accepted package `licenses(["notice"])` in the required metadata layout, but
+ordinary `attr("licenses","^\\[notice\\]$",//attr:x)` returned empty. Explicit
+target licenses pass but do not satisfy the manifest's package-derived claim.
+All disposable material was removed.
+
+Run next only `WP-4-8-m3-attr-license-default-source-evidence`. Freeze pinned
+source and a minimal package/default/explicit matrix, then select the smallest
+finite source construction or manifest correction. Add no template, fixture,
+payload, code, JVM artifact, configured analysis, or production delegation.
