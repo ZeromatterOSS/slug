@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-six-ownership-mismatch-evidence`
+Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-retry`
 Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: focused exact evidence after a full disposable reconstruction reached
-two operational roots but failed strict primary-label ownership.
+Result: fresh full reconstruction retry after focused Bazel 9.2 evidence
+accepted all six disputed rows without a manifest correction.
 
 ## Immutable semantic boundary
 
@@ -19,29 +19,33 @@ supports, package-derived notice construction, medium/small computed timeout,
 Starlark/native `legacy_macro`, suite/manual closure, separate test/exec
 schemas, transition allowlist, and external baseline remain viable.
 
-## Required focused evidence
+## Required reconstruction retry
 
-- Use minimal exact Bazel 9.2 constructions (five or fewer) and pinned source
-  only where necessary to decide whether each disputed row is a manifest error
-  or a source-synthesis error. Do not reconstruct the five-file corpus.
-- Freeze one correction decision and the exact affected rows for: lane 5
-  `label_list_dict` order/rendering; lane 13 alias `:action_listener`
-  fallback; lane 13 explicit `licenses=[none]` beside package `licenses()`;
-  and lanes 16/17 explicit empty `package_metadata` on a filegroup versus an
-  absent constraint setting, constraint value, or platform attribute.
-- Preserve the immutable 165-row stream unless the focused evidence proves the
-  one exact manifest correction. Record the observed selected labels and the
-  body-construction alternative for every one of
-  `l05_a003`, `l13_a011`, `l13_a017`, `l16_a007`, `l16_a013`, and `l17_a012`.
-- Obtain terminal independent review before scheduling any renewed full
-  reconstruction.
+- Reconstruct the five LF-exact bodies, all 18 primary argv, nine controls,
+  focused probes, execution, and mechanical Stage 4/Stage 8 rendering in one
+  disposable machine-readable/executable representation. No second manual
+  representation or post-render transcription is admitted.
+- Apply the accepted source corrections exactly: `l05_a003` uses
+  `attr.string_list_dict()` with accepted `a`/`z` order; `l13_a011_no` is an
+  alias with absent `:action_listener`; `l13_a017_no` is a native explicit
+  `licenses=[none]` beside package notice; and `l16_a007_yes`,
+  `l16_a013_yes`, and `l17_a012_yes` are explicit
+  `filegroup(package_metadata=[])` declarations.
+- Use two independent `mktemp -d` parents with direct sibling `workspace` and
+  `out` paths. Run all 18 lanes in both roots, compare exact stdout, record all
+  nine literal-empty controls, and run the lane-1, license, timeout, macro,
+  tag-closure, and corrected-six-row probes.
+- Preserve actual single-backslash OI `^\[z, a, z\]$` and generator
+  `^attr/BUILD\.bazel:[0-9]+:[0-9]+$` argv bytes. Render candidate/pending
+  documents mechanically only after strict 165-label ownership passes.
+- Obtain terminal independent review before any generation scheduling.
 
 ## Boundary and stops
 
 Edit only Stage 4 and Stage 8. Temporary material stays outside the checkout;
-add no fixture, payload, expected record, full source template, Python, Rust,
+add no fixture, payload, expected record, generated source, Python, Rust,
 Cargo/lockfile, graph/DICE/regex state, configured analysis, toolchain
 resolution, JVM/Java artifact, or production Bazel delegation. Use ordinary RC
 discovery without inspecting or copying the private RC. Stop and `REPLAN` on a
-need for more than five focused constructions, a second correction decision,
-probe disagreement, or any excluded work.
+manifest semantic change, any ownership/probe/root mismatch, a need beyond the
+five files/two packages, or any excluded work.

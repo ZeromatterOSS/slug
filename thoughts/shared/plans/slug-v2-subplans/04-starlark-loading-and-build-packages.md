@@ -2033,3 +2033,49 @@ classify those six rows, freeze one correction decision and exact affected
 records, then obtain terminal review. Do not rebuild the full corpus or add a
 fixture, code, configured analysis, toolchain, JVM/Java, or production-Bazel
 work.
+
+### `attr` six-ownership-mismatch focused evidence accepted (2026-08-09)
+
+One disposable Bazel 9.2 workspace, with four focused constructions (therefore
+within the five-construction cap), resolves all six ownership questions without
+pinned-source escalation. The exact ordinary-query argv and stdout were:
+
+```text
+attr("label_list_dict", "^\{a=\[//attr:leaf\], z=\[//attr:BUILD\.bazel, //attr:leaf\]\}$", (//attr:l05_a003_yes + //attr:l05_a003_no))
+//attr:l05_a003_yes
+attr(":action_listener", "^\[\]$", (//attr:l13_a011_yes + //attr:l13_a011_no))
+//attr:l13_a011_yes
+attr("licenses", "^\[notice\]$", (//attr:l13_a017_yes + //attr:l13_a017_no))
+//attr:l13_a017_yes
+attr("package_metadata", "^\[\]$", (//attr:l16_a007_yes + //attr:l16_a007_no))
+//attr:l16_a007_yes
+attr("package_metadata", "^\[\]$", (//attr:l16_a013_yes + //attr:l16_a013_no))
+//attr:l16_a013_yes
+attr("package_metadata", "^\[\]$", (//attr:l17_a012_yes + //attr:l17_a012_no))
+//attr:l17_a012_yes
+```
+
+The four constructions are: (1) a normal Starlark rule using
+`attr.string_list_dict()` with the accepted `a`/`z` label strings and the
+reversed negative; (2) a native filegroup positive and alias negative with
+`actual = ":leaf"`; (3) package `licenses(["notice"])`, an inherited
+filegroup positive, and a native `filegroup(licenses = ["none"])` negative;
+and (4) three `filegroup(package_metadata = [])` positives against respectively
+absent `constraint_setting`, `constraint_value`, and `platform` attrs. Thus
+the sole correction decision is **no manifest correction**: retain exact rows
+`l05_a003`, `l13_a011`, `l13_a017`, `l16_a007`, `l16_a013`, and `l17_a012`, the
+165-row vector, and SHA-256
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d` unchanged.
+The prior six mismatches are source-synthesis/argv errors. Temporary workspace,
+output base, harness, and captured output are removed; no fixture, code,
+configured analysis, toolchain, JVM/Java, or production-Bazel work entered.
+
+Independent terminal review returned `ACCEPT`: four focused constructions are
+within cap, every literal query selected only its positive, and the evidence
+supports one correction decision—no manifest change. Run next only
+`WP-4-8-m3-attr-five-source-executable-reconstruction-retry`, applying the
+accepted `string_list_dict`, alias, explicit-license, and explicit-empty-
+metadata constructions in one executable source before any mechanical candidate
+rendering. Preserve the five-file/two-package, hidden-construction,
+single-backslash, two-root, 18-lane, nine-control, focused-probe, Rust-native,
+and no-JVM/code/configured/toolchain boundaries.

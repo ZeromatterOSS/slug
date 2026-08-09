@@ -3612,3 +3612,33 @@ Run next only `WP-4-8-m3-attr-six-ownership-mismatch-evidence`, design-only:
 at most five focused Bazel 9.2 constructions and pinned source as needed decide
 one exact correction and affected rows. No full reconstruction, fixture, code,
 configured analysis, toolchain, JVM/Java, or production-Bazel work is allowed.
+
+## `attr` six-ownership-mismatch focused evidence accepted (2026-08-09)
+
+Four minimal constructions in one disposable Bazel 9.2 workspace resolve the
+six disputed primary rows. Each exact query selected only its positive:
+
+```text
+attr("label_list_dict", "^\{a=\[//attr:leaf\], z=\[//attr:BUILD\.bazel, //attr:leaf\]\}$", (//attr:l05_a003_yes + //attr:l05_a003_no)) → //attr:l05_a003_yes
+attr(":action_listener", "^\[\]$", (//attr:l13_a011_yes + //attr:l13_a011_no)) → //attr:l13_a011_yes
+attr("licenses", "^\[notice\]$", (//attr:l13_a017_yes + //attr:l13_a017_no)) → //attr:l13_a017_yes
+attr("package_metadata", "^\[\]$", (//attr:l16_a007_yes + //attr:l16_a007_no)) → //attr:l16_a007_yes
+attr("package_metadata", "^\[\]$", (//attr:l16_a013_yes + //attr:l16_a013_no)) → //attr:l16_a013_yes
+attr("package_metadata", "^\[\]$", (//attr:l17_a012_yes + //attr:l17_a012_no)) → //attr:l17_a012_yes
+```
+
+The body construction is exact: a normal `attr.string_list_dict()` for lane 5;
+native filegroup versus alias `actual = ":leaf"` for lane 13 action-listener;
+inherited notice versus native `licenses = ["none"]`; and explicit empty
+filegroup metadata versus absent constraint-setting, constraint-value, and
+platform schemas. The single correction decision is **no manifest correction**:
+all six rows, the 165-row vector, and SHA-256
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d` remain
+unchanged. The prior mismatch was source synthesis/argv construction, not
+ordinary-query semantics. Temporary material is removed. Independent terminal
+review returned `ACCEPT`; run next only
+`WP-4-8-m3-attr-five-source-executable-reconstruction-retry`, with the four
+accepted construction corrections, one executable representation, two sibling
+`mktemp` roots, all 18 lanes twice, nine controls, focused probes, mechanical
+pending rendering, and the retained Rust-native/no-JVM/code/configured/toolchain
+boundary.
