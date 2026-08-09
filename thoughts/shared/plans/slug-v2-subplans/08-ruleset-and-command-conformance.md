@@ -3333,3 +3333,20 @@ changes, JVM/Java artifacts, or Bazel delegation.
 Independent Sol design review returned `ACCEPT`; the residual generation risk
 is dense fixture transcription, bounded by exact canonical-token freezing,
 replay of all 39 protected rows, and the stated growth caps.
+
+Generation returned `REPLAN` without retained changes. A draft passed one
+Bazel update and one clean replay for 57 rows and froze `@@ext+//leaf:label`,
+but completeness review found omitted atoms and positive-label reuse. Its
+focused correction then proved the shared fixture is architecturally invalid:
+required constructors such as `attr.string_list()` in `pkg/defs.bzl` are loaded
+by the protected 29-row Slug CLI consumer before row one, outside Slug's
+currently admitted Starlark attr surface. Production expansion is forbidden in
+this evidence packet and matrix weakening is not acceptable, so all five draft
+files were restored to `6c9a529e`.
+
+Run next only `WP-4-8-m3-attr-isolated-observable-candidate-oracle-design` to
+inventory a separate Bazel-only payload workspace/fixture, prove it is absent
+from protected Slug CLI/server consumers, and assign a distinct positive and
+negative instance to every accepted atom before generation. No fixture,
+payload, oracle, production Rust, Cargo, graph/DICE, JVM/Java artifact, or Bazel
+delegation is authorized by that design packet.

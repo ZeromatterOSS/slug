@@ -1067,6 +1067,45 @@ an external canonical token other than the pinned/generated exact value, a
 need for configured analysis, or any production/Rust-semantic, graph, DICE,
 JVM, Java artifact, or Bazel-delegation change.
 
+## `attr` observable-candidate generation stop (2026-08-09)
+
+`WP-4-8-m3-attr-observable-candidate-oracle-generation` reached a concrete
+fixture-isolation prerequisite and returned `REPLAN`. A five-file draft used
+the accepted shared-workspace arrangement, froze the generic external spelling
+as `@@ext+//leaf:label`, and completed both a 57-row Bazel update and a clean
+57-row distinct-root replay. It was not accepted: root integration review and
+an independent Terra audit found that the dense first transcription omitted
+many ledger atoms and reused positive labels inside unions, contrary to the
+accepted discriminator invariant.
+
+The permitted focused correction then reached the architecture stop. Extending
+the existing workspace's shared `pkg/defs.bzl` with required constructors such
+as `attr.string_list()` makes the protected 29-row Slug CLI consumer load syntax
+outside Slug's current admitted Starlark attr surface; it fails before protected
+row one. The transition probe initially exposed the same shared-consumer issue
+through Slug's deliberately bounded transition declaration. Adding those
+production semantics is forbidden in an oracle-only packet, while deleting the
+atoms would weaken the total-schema evidence. Therefore the existing
+`query-labels-attribute-metadata` workspace is not an honest host for this
+oracle despite its smaller physical fixture delta.
+
+All five unaccepted draft files were restored exactly to accepted tree
+`6c9a529e`; no fixture, payload, expected record, integrity constant, Rust, or
+generated content remains. The fixture-growth reset remains `51540963` because
+the stopped packet added no accepted breadth.
+
+Run next only `WP-4-8-m3-attr-isolated-observable-candidate-oracle-design`.
+Design the smallest isolated Bazel-only payload workspace and fixture that is
+not selected by any protected Slug CLI/server consumer, inventory its complete
+module/package/Starlark/external source closure and derived payload consumers,
+and remap every accepted lane to distinct positive/negative rule instances.
+Preserve the frozen `@@ext+//leaf:label` evidence only if the new isolated
+update independently reproduces it. Add no fixture, payload, expected record,
+Rust, Cargo, graph, DICE, JVM/Java artifact, or Bazel delegation during that
+design packet. Stop if discovery necessarily routes the isolated workspace
+through an existing Slug semantic regression or if exact evidence would require
+production activation first.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
