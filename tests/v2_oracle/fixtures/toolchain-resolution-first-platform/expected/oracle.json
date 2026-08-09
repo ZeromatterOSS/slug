@@ -207,6 +207,204 @@
       "startup_argv": [],
       "stderr": "INFO: Invocation ID: f84b7b7f-236e-4e17-8d20-448d603b97c6\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f84b7b7f-236e-4e17-8d20-448d603b97c6\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 163 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.041s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/f84b7b7f-236e-4e17-8d20-448d603b97c6\n",
       "stdout": "label=@@//:probe provider=ProbeInfo marker=first\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe, 0)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe, 0)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_depth_zero_default_root_configuration",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (a7a71fd)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (a7a71fd)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe, 1)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe, 1)",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_depth_one_label_direct_configured_edges",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.034s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe, 2)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe, 2)",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_depth_two_label_platform_constraint_edges",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n@@platforms//os:linux (3030ed4)\n//:first (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n//:second (3030ed4)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n@@platforms//os:linux (3030ed4)\n//:first (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n//:second (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_full_default_complete_platform_constraint_topology",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n@@platforms//os:linux (3030ed4)\n//:first (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n//:second (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n//:selection (3030ed4)\n@@platforms//os:os (3030ed4)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.031s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n@@platforms//os:linux (3030ed4)\n//:first (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n//:second (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n//:selection (3030ed4)\n@@platforms//os:os (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe, 1)",
+        "--output=label",
+        "--noimplicit_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe, 1)",
+        "--output=label",
+        "--noimplicit_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_depth_one_noimplicit_deps_excludes_configured_edges",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (a7a71fd)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.026s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (a7a71fd)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe)",
+        "--output=label",
+        "--notool_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe)",
+        "--output=label",
+        "--notool_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_full_notool_deps_preserves_configured_topology",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n@@platforms//os:linux (3030ed4)\n//:first (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n//:second (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n//:selection (3030ed4)\n@@platforms//os:os (3030ed4)",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.026s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:probe (a7a71fd)\n@bazel_tools//tools:host_platform (3030ed4)\n//:demo_type (a7a71fd)\n//:first_impl (a7a71fd)\n@@platforms//host:host (3030ed4)\n//:first_platform (3030ed4)\n//:second_platform (3030ed4)\n@@platforms//os:linux (3030ed4)\n//:first (3030ed4)\n@@platforms//cpu:x86_64 (3030ed4)\n//:second (3030ed4)\n@@platforms//cpu:cpu (3030ed4)\n//:selection (3030ed4)\n@@platforms//os:os (3030ed4)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:probe)",
+        "--output=graph",
+        "--nograph:factored"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:probe)",
+        "--output=graph",
+        "--nograph:factored"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "deps_full_graph_direct_platform_constraint_adjacency",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:probe (a7a71fd)\"\n  \"//:probe (a7a71fd)\" -> \"//:demo_type (a7a71fd)\"\n  \"//:probe (a7a71fd)\" -> \"//:first_impl (a7a71fd)\"\n  \"//:probe (a7a71fd)\" -> \"//:first_platform (3030ed4)\"\n  \"//:probe (a7a71fd)\" -> \"//:second_platform (3030ed4)\"\n  \"//:probe (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:probe (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:first_impl (a7a71fd)\"\n  \"//:first_impl (a7a71fd)\" -> \"//:first_platform (3030ed4)\"\n  \"//:first_impl (a7a71fd)\" -> \"//:second_platform (3030ed4)\"\n  \"//:first_impl (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:first_impl (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\" -> \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\" -> \"@@platforms//cpu:cpu (3030ed4)\"\n  \"@@platforms//cpu:cpu (3030ed4)\"\n  \"//:second_platform (3030ed4)\"\n  \"//:second_platform (3030ed4)\" -> \"//:second (3030ed4)\"\n  \"//:second (3030ed4)\"\n  \"//:second (3030ed4)\" -> \"//:selection (3030ed4)\"\n  \"//:first_platform (3030ed4)\"\n  \"//:first_platform (3030ed4)\" -> \"//:first (3030ed4)\"\n  \"//:first (3030ed4)\"\n  \"//:first (3030ed4)\" -> \"//:selection (3030ed4)\"\n  \"//:selection (3030ed4)\"\n  \"//:demo_type (a7a71fd)\"\n}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.027s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:probe (a7a71fd)\"\n  \"//:probe (a7a71fd)\" -> \"//:demo_type (a7a71fd)\"\n  \"//:probe (a7a71fd)\" -> \"//:first_impl (a7a71fd)\"\n  \"//:probe (a7a71fd)\" -> \"//:first_platform (3030ed4)\"\n  \"//:probe (a7a71fd)\" -> \"//:second_platform (3030ed4)\"\n  \"//:probe (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:probe (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:first_impl (a7a71fd)\"\n  \"//:first_impl (a7a71fd)\" -> \"//:first_platform (3030ed4)\"\n  \"//:first_impl (a7a71fd)\" -> \"//:second_platform (3030ed4)\"\n  \"//:first_impl (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:first_impl (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\" -> \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\" -> \"@@platforms//cpu:cpu (3030ed4)\"\n  \"@@platforms//cpu:cpu (3030ed4)\"\n  \"//:second_platform (3030ed4)\"\n  \"//:second_platform (3030ed4)\" -> \"//:second (3030ed4)\"\n  \"//:second (3030ed4)\"\n  \"//:second (3030ed4)\" -> \"//:selection (3030ed4)\"\n  \"//:first_platform (3030ed4)\"\n  \"//:first_platform (3030ed4)\" -> \"//:first (3030ed4)\"\n  \"//:first (3030ed4)\"\n  \"//:first (3030ed4)\" -> \"//:selection (3030ed4)\"\n  \"//:selection (3030ed4)\"\n  \"//:demo_type (a7a71fd)\"\n}\n"
     }
   ],
   "fixture": "toolchain-resolution-first-platform",

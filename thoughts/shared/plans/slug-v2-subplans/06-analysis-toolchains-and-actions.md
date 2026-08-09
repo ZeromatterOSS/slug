@@ -6057,3 +6057,63 @@ state. Traversal needs the complete configured node universe, including
 toolchain/platform/constraint and non-root nodes; attrs/labels/providers/tests
 retain separate metadata/runtime prerequisites. Design next only
 `WP-6-m4-configured-query-graph-ownership-design` under reserved review.
+
+### Configured-query graph ownership design REPLAN (2026-08-09)
+
+Reserved review returned **REPLAN**. The active configured key/result cannot
+yet represent Bazel's traversal universe: null-configuration file/package-group
+nodes are absent; active analysis accepts only Starlark rules; ordinary attrs
+lose edge classification; selected toolchain analysis discards type,
+declaration, platform, and constraint identities; target platform is unmodeled.
+Bazel traversal instead follows and flattens classified Skyframe dependencies.
+Choosing a Rust node enum now would guess topology or create a second graph.
+
+Run evidence first: `WP-6-m4-configured-query-toolchain-topology-oracle` extends
+only the existing first-platform fixture TOML/expected JSON with depth 0/1/2/
+full configured `deps` plus implicit/tool controls. Then pin alias/output/file/
+package-group delegation, design platform/configured-node identity, generalize
+the existing DICE analysis result to own oracle-admitted nodes/ordered edges,
+and activate `deps` before other traversal functions. No lock may cross a DICE
+compute.
+
+### Configured toolchain topology oracle REPLAN (2026-08-09)
+
+The first oracle attempt is **REPLAN** and its fixture delta is discarded. Six
+depth/control probes established deterministic node tiers, opaque target/exec
+configuration relationships, `--noimplicit_deps` root-only behavior, and
+`--notool_deps` preservation. The focused correction added graph output and
+restored inherited records, but correction rereview found its ten independent
+message-shape patterns did not pin graph order, shared configuration identity,
+or graph-only selected-implementation edges.
+
+The packet exhausted its correction budget. Design next only
+`WP-6-m4-configured-query-toolchain-topology-oracle-retry-design`: freeze a
+single anchored multiline graph discriminator with named configuration
+backreferences and every claimed parent edge before regenerating evidence. No
+fixture, Bazel, Rust, harness, or workspace edit belongs in the design packet;
+bundle its bookkeeping with a later accepted oracle change.
+
+### Configured topology oracle retry design ACCEPT (2026-08-09)
+
+Pre-edit review accepted one anchored multiline unfactored-graph pattern. It
+binds exact line order; root and selected-implementation edges; platform to
+constraint-value edges; constraint-value to setting edges; common opaque target
+and execution configuration classes; and rejects extra lines. Keep the six
+depth/control probes, for seven new commands total. Generate next only
+`WP-6-m4-configured-query-toolchain-topology-oracle-retry`.
+
+### Configured toolchain topology oracle retry ACCEPT (2026-08-09)
+
+The retry is **ACCEPTED**. Seven new Bazel 9.2 commands pin depth 0/1/2/full
+label order, opaque target/exec configuration equivalence, implicit/tool option
+behavior, and one exact unfactored graph. The anchored graph binds root and
+selected-implementation toolchain edges, registered/host platforms, platform
+to constraint values, constraint values to settings, line order, and no extras.
+
+Generation/replay, integrity (3), archive, and diff checks pass. The six
+inherited lifecycle records remain byte-identical. Independent pre-edit and
+final reviews returned `ACCEPT`; only fixture TOML/generated JSON changed.
+
+Pin delegation topology next in
+`WP-6-m4-configured-query-delegation-topology-oracle`, then resume configured
+platform/node ownership design. No Rust graph may precede that evidence.

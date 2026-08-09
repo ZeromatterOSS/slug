@@ -18,6 +18,12 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleContext.java#toolchains",
   "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkToolchainContext.java#getIndex",
   "src/main/java/com/google/devtools/build/lib/analysis/platform/ToolchainInfo.java",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#getFwdDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/ConfiguredTargetQueryEnvironment.java#getDefaultOutputFormatters",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/LabelAndConfigurationOutputFormatterCallback.java#processOutput",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/GraphOutputFormatterCallback.java#processOutput",
+  "src/main/java/com/google/devtools/build/lib/query2/common/CommonQueryOptions.java#includeToolDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/common/CommonQueryOptions.java#includeImplicitDeps",
   "src/main/java/com/google/devtools/build/lib/query2/cquery/StarlarkOutputFormatterCallback.java#providers",
 ]
 translation_notes = "Root-module registration supplies ordered execution-platform candidates and registered toolchain declarations. Constraint resolution leaves exactly one matching toolchain per fixture platform, multi-toolchain selection chooses the first suitable candidate, ResolvedToolchainContext loads that ToolchainInfo, and the prepared Starlark rule context indexes it by the mandatory type label. The cquery formatter is evidence only for the exact ProbeInfo marker and grants no public formatter or platform identity surface."
@@ -79,3 +85,80 @@ stdout_patterns = ["\\Alabel=@@//:probe provider=ProbeInfo marker=first\\Z"]
   path = "BUILD.bazel"
   find = 'marker = "edited-first"'
   replace = 'marker = "first"'
+
+[[commands]]
+name = "deps_depth_zero_default_root_configuration"
+argv = ["cquery", "deps(//:probe, 0)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:probe \\([0-9a-f]+\\)\\Z"]
+
+[[commands]]
+name = "deps_depth_one_label_direct_configured_edges"
+argv = ["cquery", "deps(//:probe, 1)", "--output=label"]
+expected_exit = 0
+stdout_patterns = ["\\A//:probe \\((?P<target>[0-9a-f]+)\\)\\n@bazel_tools//tools:host_platform \\((?P<exec>[0-9a-f]+)\\)\\n//:demo_type \\((?P=target)\\)\\n//:first_impl \\((?P=target)\\)\\n@@platforms//host:host \\((?P=exec)\\)\\n//:first_platform \\((?P=exec)\\)\\n//:second_platform \\((?P=exec)\\)\\Z"]
+
+[[commands]]
+name = "deps_depth_two_label_platform_constraint_edges"
+argv = ["cquery", "deps(//:probe, 2)", "--output=label"]
+expected_exit = 0
+stdout_patterns = ["\\A//:probe \\((?P<target>[0-9a-f]+)\\)\\n@bazel_tools//tools:host_platform \\((?P<exec>[0-9a-f]+)\\)\\n//:demo_type \\((?P=target)\\)\\n//:first_impl \\((?P=target)\\)\\n@@platforms//host:host \\((?P=exec)\\)\\n//:first_platform \\((?P=exec)\\)\\n//:second_platform \\((?P=exec)\\)\\n@@platforms//os:linux \\((?P=exec)\\)\\n//:first \\((?P=exec)\\)\\n@@platforms//cpu:x86_64 \\((?P=exec)\\)\\n//:second \\((?P=exec)\\)\\Z"]
+
+[[commands]]
+name = "deps_full_default_complete_platform_constraint_topology"
+argv = ["cquery", "deps(//:probe)"]
+expected_exit = 0
+stdout_patterns = ["\\A//:probe \\((?P<target>[0-9a-f]+)\\)\\n@bazel_tools//tools:host_platform \\((?P<exec>[0-9a-f]+)\\)\\n//:demo_type \\((?P=target)\\)\\n//:first_impl \\((?P=target)\\)\\n@@platforms//host:host \\((?P=exec)\\)\\n//:first_platform \\((?P=exec)\\)\\n//:second_platform \\((?P=exec)\\)\\n@@platforms//os:linux \\((?P=exec)\\)\\n//:first \\((?P=exec)\\)\\n@@platforms//cpu:x86_64 \\((?P=exec)\\)\\n//:second \\((?P=exec)\\)\\n@@platforms//cpu:cpu \\((?P=exec)\\)\\n//:selection \\((?P=exec)\\)\\n@@platforms//os:os \\((?P=exec)\\)\\Z"]
+
+[[commands]]
+name = "deps_depth_one_noimplicit_deps_excludes_configured_edges"
+argv = ["cquery", "deps(//:probe, 1)", "--output=label", "--noimplicit_deps"]
+expected_exit = 0
+stdout_patterns = ["\\A//:probe \\([0-9a-f]+\\)\\Z"]
+
+[[commands]]
+name = "deps_full_notool_deps_preserves_configured_topology"
+argv = ["cquery", "deps(//:probe)", "--output=label", "--notool_deps"]
+expected_exit = 0
+stdout_patterns = ["\\A//:probe \\((?P<target>[0-9a-f]+)\\)\\n@bazel_tools//tools:host_platform \\((?P<exec>[0-9a-f]+)\\)\\n//:demo_type \\((?P=target)\\)\\n//:first_impl \\((?P=target)\\)\\n@@platforms//host:host \\((?P=exec)\\)\\n//:first_platform \\((?P=exec)\\)\\n//:second_platform \\((?P=exec)\\)\\n@@platforms//os:linux \\((?P=exec)\\)\\n//:first \\((?P=exec)\\)\\n@@platforms//cpu:x86_64 \\((?P=exec)\\)\\n//:second \\((?P=exec)\\)\\n@@platforms//cpu:cpu \\((?P=exec)\\)\\n//:selection \\((?P=exec)\\)\\n@@platforms//os:os \\((?P=exec)\\)\\Z"]
+
+[[commands]]
+name = "deps_full_graph_direct_platform_constraint_adjacency"
+argv = ["cquery", "deps(//:probe)", "--output=graph", "--nograph:factored"]
+expected_exit = 0
+stdout_patterns = ['''\Adigraph mygraph \{
+  node \[shape=box\];
+  "//:probe \((?P<target>[0-9a-f]+)\)"
+  "//:probe \((?P=target)\)" -> "//:demo_type \((?P=target)\)"
+  "//:probe \((?P=target)\)" -> "//:first_impl \((?P=target)\)"
+  "//:probe \((?P=target)\)" -> "//:first_platform \((?P<exec>[0-9a-f]+)\)"
+  "//:probe \((?P=target)\)" -> "//:second_platform \((?P=exec)\)"
+  "//:probe \((?P=target)\)" -> "@bazel_tools//tools:host_platform \((?P=exec)\)"
+  "//:probe \((?P=target)\)" -> "@@platforms//host:host \((?P=exec)\)"
+  "//:first_impl \((?P=target)\)"
+  "//:first_impl \((?P=target)\)" -> "//:first_platform \((?P=exec)\)"
+  "//:first_impl \((?P=target)\)" -> "//:second_platform \((?P=exec)\)"
+  "//:first_impl \((?P=target)\)" -> "@bazel_tools//tools:host_platform \((?P=exec)\)"
+  "//:first_impl \((?P=target)\)" -> "@@platforms//host:host \((?P=exec)\)"
+  "@bazel_tools//tools:host_platform \((?P=exec)\)"
+  "@bazel_tools//tools:host_platform \((?P=exec)\)" -> "@@platforms//host:host \((?P=exec)\)"
+  "@@platforms//host:host \((?P=exec)\)"
+  "@@platforms//host:host \((?P=exec)\)" -> "@@platforms//cpu:x86_64 \((?P=exec)\)"
+  "@@platforms//host:host \((?P=exec)\)" -> "@@platforms//os:linux \((?P=exec)\)"
+  "@@platforms//os:linux \((?P=exec)\)"
+  "@@platforms//os:linux \((?P=exec)\)" -> "@@platforms//os:os \((?P=exec)\)"
+  "@@platforms//os:os \((?P=exec)\)"
+  "@@platforms//cpu:x86_64 \((?P=exec)\)"
+  "@@platforms//cpu:x86_64 \((?P=exec)\)" -> "@@platforms//cpu:cpu \((?P=exec)\)"
+  "@@platforms//cpu:cpu \((?P=exec)\)"
+  "//:second_platform \((?P=exec)\)"
+  "//:second_platform \((?P=exec)\)" -> "//:second \((?P=exec)\)"
+  "//:second \((?P=exec)\)"
+  "//:second \((?P=exec)\)" -> "//:selection \((?P=exec)\)"
+  "//:first_platform \((?P=exec)\)"
+  "//:first_platform \((?P=exec)\)" -> "//:first \((?P=exec)\)"
+  "//:first \((?P=exec)\)"
+  "//:first \((?P=exec)\)" -> "//:selection \((?P=exec)\)"
+  "//:selection \((?P=exec)\)"
+  "//:demo_type \((?P=target)\)"
+\}\Z''']
