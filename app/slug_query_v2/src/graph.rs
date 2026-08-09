@@ -493,6 +493,12 @@ impl QueryError {
         matches!(self.kind, QueryErrorKind::PackageLoading)
     }
 
+    /// True only for failures raised while evaluating an already prepared
+    /// query expression, rather than syntax or loading/preparation failures.
+    pub fn is_evaluation_failure(&self) -> bool {
+        matches!(self.kind, QueryErrorKind::Evaluation)
+    }
+
     pub fn error_kind(&self) -> &'static str {
         match self.kind {
             QueryErrorKind::UnsupportedFeature => "unsupported_feature",

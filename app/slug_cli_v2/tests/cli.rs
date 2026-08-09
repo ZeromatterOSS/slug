@@ -998,7 +998,7 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
 }
 
 #[test]
-fn cquery_set_expression_matches_between_one_shot_and_daemon() {
+fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
     let workspace = scratch("cquery-set-expression-workspace");
     write(&workspace.join("MODULE.bazel"), "module(name = \"sets\")\n");
     write(
@@ -1091,6 +1091,54 @@ fn cquery_set_expression_matches_between_one_shot_and_daemon() {
     assert!(empty_daemon.status.success(), "{empty_daemon:?}");
     assert!(empty_daemon.stdout.is_empty());
     assert!(empty_daemon.stderr.is_empty());
+
+    let some_expression = "some(filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib)), 2)";
+    let some_one_shot = slug()
+        .current_dir(&workspace)
+        .args([
+            "cquery",
+            some_expression,
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
+        .output()
+        .unwrap();
+    assert!(some_one_shot.status.success(), "{some_one_shot:?}");
+    assert_eq!(some_one_shot.stdout, b"@@//pkg:lib\n@@//pkg:bin\n");
+    assert!(some_one_shot.stderr.is_empty());
+    let some_daemon = slug()
+        .current_dir(&workspace)
+        .args([
+            output_base.as_str(),
+            "cquery",
+            some_expression,
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
+        .output()
+        .unwrap();
+    assert!(some_daemon.status.success(), "{some_daemon:?}");
+    assert_eq!(some_daemon.stdout, some_one_shot.stdout);
+    assert!(some_daemon.stderr.is_empty());
+
+    for output_base in [None, Some(output_base.as_str())] {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        let empty = command
+            .args(["cquery", "some(//pkg:bin, '-1')"])
+            .output()
+            .unwrap();
+        assert_eq!(empty.status.code(), Some(1), "{empty:?}");
+        assert!(empty.stdout.is_empty());
+        assert!(
+            String::from_utf8(empty.stderr)
+                .unwrap()
+                .contains("argument set is empty")
+        );
+    }
 }
 
 #[test]

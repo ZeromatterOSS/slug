@@ -1,0 +1,5 @@
+load(":defs.bzl", "probe")
+
+probe(name = "alpha")
+probe(name = "middle")
+probe(name = "zeta")

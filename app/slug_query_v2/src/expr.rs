@@ -275,9 +275,16 @@ fn validate_cquery_query_inner(
             expression.span,
         )),
         QueryExpressionKind::Function { name, args } if name.value == "filter" => {
-            let spec = cquery_filter_function();
+            let spec = cquery_function("filter");
             validate_function_arguments(expression, args, spec)?;
             validate_cquery_query_inner(&args[1], bindings)
+        }
+        QueryExpressionKind::Function { name, args } if name.value == "some" => {
+            let spec = cquery_function("some");
+            validate_function_arguments(expression, args, spec)?;
+            // The optional count is an integer parameter, never a target
+            // expression. It has already been validated above.
+            validate_cquery_query_inner(&args[0], bindings)
         }
         QueryExpressionKind::Function { name, .. } => Err(QueryParseError::new(
             format!(
@@ -318,6 +325,11 @@ fn collect_cquery_literals<'a>(expression: &'a QueryExpression, literals: &mut V
         QueryExpressionKind::Function { name, args } if name.value == "filter" => {
             collect_cquery_literals(&args[1], literals);
         }
+        QueryExpressionKind::Function { name, args } if name.value == "some" => {
+            // A selection count is not a target literal and must not create a
+            // configured root before the expression is evaluated.
+            collect_cquery_literals(&args[0], literals);
+        }
         QueryExpressionKind::TargetLiteral(_)
         | QueryExpressionKind::Integer(_)
         | QueryExpressionKind::Function { .. } => {}
@@ -349,8 +361,8 @@ impl QueryExpression {
     }
 }
 
-fn cquery_filter_function() -> &'static QueryFunctionSpec {
-    loading_query_function("filter").expect("filter is in the static Bazel registry")
+fn cquery_function(name: &str) -> &'static QueryFunctionSpec {
+    loading_query_function(name).expect("cquery function is in the static Bazel registry")
 }
 
 fn validate_function_arguments(

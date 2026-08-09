@@ -5622,3 +5622,108 @@ functional behavior supported by retained configured state and the shared
 evaluator; carry its bookkeeping with implementation rather than committing
 documentation alone. Keep `deps`, configured `kind`/`attr`, and provider
 projection behind their already recorded missing-state boundaries.
+
+### Configured-query successor audit 3 ACCEPT (2026-08-09)
+
+`WP-6-m4-configured-query-successor-audit-3` selected
+`WP-6-m4-cquery-some-selection-implementation`. Admit the complete existing
+`some(expr[, count])` signature over the accepted configured literal/set/filter
+language. Omitted count is one; the optional count uses the existing signed
+`i32` validation seam. Positive counts return an arbitrary distinct subset up
+to the requested size, counts at or above cardinality return all, and an empty
+selection (empty input or nonpositive count) fails with `argument set is
+empty`.
+
+Reuse the static `some` function specification, `QuerySelectionCount`, sole
+Buck2-derived recursive fold, and ordered configured `TargetSet`. Slug's
+deterministic first-insertion subset is one valid witness of Bazel's explicitly
+arbitrary choice; it must never be described as Bazel's selected label.
+Validation errors precede literal preparation. Otherwise preserve the eager
+root/Needs universe, so all valid operand literals resolve before selection.
+Add no graph, key, parser, evaluator, traversal, metadata, provider, pattern,
+external repository, output/wire mode, exact hash, JVM, or Java surface.
+
+Fresh Bazel 9.2 cquery evidence must use fully anchored finite alternatives for
+one- and two-member arbitrary subsets rather than pinning a winner. Cover
+omitted/positive/at-cardinality/oversized counts, composition/dedup/filter,
+zero/negative/empty failures, signed-i32 boundaries, invalid-count-before-
+missing validation, and early-valid/later-missing eager resolution. Stop and
+`REPLAN` on an eager-universe contradiction or a terminal requiring new wire
+ownership. `executables` remains blocked because Bazel reads underlying Rule
+capability, not retained `DefaultInfo` provider state.
+
+### Configured `some` evaluation-terminal REPLAN (2026-08-09)
+
+`WP-6-m4-cquery-some-selection-implementation` reached its explicit terminal
+stop after fresh Bazel 9.2 evidence. Twelve oracle rows pass update and clean
+replay, and the shared evaluator draft implements the complete optional-count
+surface without graph or DICE changes. However `some(//pkg:alpha, '-1')` and
+other valid expressions whose configured evaluation fails exit 1 in Bazel.
+Slug currently maps every non-missing `CqueryCommandError` terminal to the
+request/runtime JSON family with exit 2.
+
+This is not an evaluator or parser correction. It requires a distinct typed
+configured-evaluation terminal owned consistently by core, one-shot CLI, and
+daemon publication. The initial packet is therefore **REPLAN** before accepting
+its otherwise green draft. Preserve request-validation exit 2, missing-target
+exit 1 with its accepted diagnostics, analysis/infrastructure ownership, empty
+stdout, invalidated-file accounting, and one-shot/daemon JSON family unless
+Bazel 9.2 evidence requires a narrower change.
+
+Run next only `WP-6-m4-cquery-evaluation-terminal-ownership-design`. Review the
+minimal new core variant/classification and both publishers, then schedule a
+narrow retry using the retained `some` draft and 12-row fixture. Add no query
+function, graph/key, output/wire request field, exact hash, JVM, or Java work.
+
+### Configured evaluation terminal design ACCEPT (2026-08-09)
+
+Reserved review accepted a single new
+`CqueryCommandError::Evaluation(Arc<str>)` classification. A narrow public
+`QueryError::is_evaluation_failure()` identifies only the existing evaluation
+kind; post-preparation cquery evaluator errors use one constructor that maps
+that kind to `Evaluation` and retains all other kinds, including bounded-regex
+syntax, as `Request`. Core `exit_code()` returns 1 only for `MissingTarget` and
+`Evaluation`, and 2 for `Request`, `Analysis`, and `Infrastructure`.
+
+`missing_stderr()` remains exclusive to `MissingTarget`; Evaluation Display is
+its message. One-shot and daemon keep `cquery_runtime_error`, empty stdout,
+runtime mode, and invalidated-file accounting. Both publishers must use the
+core exit-code accessor rather than infer classification. Analysis and
+infrastructure remain exit 2 absent discriminating evidence.
+
+Run next only `WP-6-m4-cquery-some-selection-evaluation-terminal-retry` using
+the retained `some` draft and 12-row fixture. Add core classification tests,
+one-shot/daemon evaluation-exit-1 coverage, pre-observation invalid-count exit
+2, invalidation preservation, and unchanged missing diagnostics. Stop on wire
+or JSON-kind changes, broad QueryError exit-1 mapping, analysis/infrastructure
+reclassification, root/Needs changes, nonempty failure stdout, or function
+breadth.
+
+### Configured `some` selection retry ACCEPT (2026-08-09)
+
+`WP-6-m4-cquery-some-selection-evaluation-terminal-retry` is **ACCEPT**.
+Configured query now supports the complete `some(expr[, count])` signature
+over its admitted literal/set/filter language through the shared recursive
+fold. Signed-i32 validation, default count one, arbitrary distinct subset,
+full-key deduplication, eager root preparation, and empty/nonpositive failure
+semantics match the accepted source and 12-row Bazel 9.2 cquery fixture.
+
+Only post-preparation `QueryError` evaluation failures become the new typed
+`CqueryCommandError::Evaluation` and exit 1. Syntax/request, analysis, and
+infrastructure remain exit 2; missing targets retain exact exit-1 diagnostics.
+One-shot and daemon use the core classification while preserving empty stdout,
+the `cquery_runtime_error` JSON family, runtime mode, request wire, and daemon
+invalidated-file counts. No graph, key, parser, second evaluator, traversal,
+metadata/provider, hash, JVM, or Java surface was added.
+
+Validation passed 12/12 Bazel replay rows, 102 query tests, 18 command tests,
+four core cquery tests, six server cquery tests, five rebuilt-CLI cquery tests,
+three oracle integrity tests, formatting, archive status, and diff checks.
+Stale `slugd` processes were absent before and after CLI validation.
+Independent final review returned `ACCEPT` with no findings.
+
+Run next only `WP-6-m4-configured-query-successor-audit-4`, selecting another
+semantically closed behavior from retained configured state. Keep traversal,
+configured metadata/provider projection, patterns/externals, exact hashes,
+JVM, and Java behind their existing boundaries; bundle audit bookkeeping with
+its functional successor.

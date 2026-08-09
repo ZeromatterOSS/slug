@@ -1,0 +1,358 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle))",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle))",
+        "--output=label"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "omitted_count_current_label",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 3 targets (5 packages loaded, 9 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//pkg:zeta (a7a71fd)",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-some-root-selection/20260809-135208-839499-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-some-root-selection/20260809-135231-841269-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 3 targets (5 packages loaded, 9 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 4.695s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//pkg:zeta (a7a71fd)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 1)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 1)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "one_count_exact_starlark_label",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 3 targets (5 packages loaded, 9 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:zeta",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (5 packages loaded, 6 targets configured)\nINFO: Analyzed 3 targets (5 packages loaded, 9 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 0.109s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:zeta\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 2)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 2)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "two_count_exact_starlark_label",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:zeta\n@@//pkg:alpha",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 0.026s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:zeta\n@@//pkg:alpha\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 2147483647)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 2147483647)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "cardinality_and_oversized_count_exact_starlark_label",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:zeta\n@@//pkg:alpha\n@@//pkg:middle",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 0.024s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:zeta\n@@//pkg:alpha\n@@//pkg:middle\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(filter('^//pkg:(alpha|zeta)$', set(//pkg:zeta //pkg:alpha //pkg:zeta)) union //pkg:middle, 10)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(filter('^//pkg:(alpha|zeta)$', set(//pkg:zeta //pkg:alpha //pkg:zeta)) union //pkg:middle, 10)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "composition_dedupe_and_filter",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:zeta\n@@//pkg:alpha\n@@//pkg:middle",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 0.021s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:zeta\n@@//pkg:alpha\n@@//pkg:middle\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(set())",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(set())",
+        "--output=label"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_input",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 0 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 0 targets (0 packages loaded, 0 targets configured).\nINFO: Found 0 targets...\nERROR: Error doing post analysis query: Evaluation of query \"some(set())\" failed: argument set is empty\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 0 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 0 targets (0 packages loaded, 0 targets configured).\nINFO: Found 0 targets...\nERROR: Error doing post analysis query: Evaluation of query \"some(set())\" failed: argument set is empty\nINFO: Elapsed time: 0.024s, Critical Path: 0.00s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(//pkg:alpha, 0)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(//pkg:alpha, 0)",
+        "--output=label"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "zero_count_prepares_valid_root",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:alpha (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:alpha (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nERROR: Error doing post analysis query: Evaluation of query \"some(//pkg:alpha, 0)\" failed: argument set is empty\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:alpha (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:alpha (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nERROR: Error doing post analysis query: Evaluation of query \"some(//pkg:alpha, 0)\" failed: argument set is empty\nINFO: Elapsed time: 0.021s, Critical Path: 0.00s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(//pkg:alpha, '-1')",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(//pkg:alpha, '-1')",
+        "--output=label"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "quoted_negative_count_prepares_valid_root",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:alpha (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:alpha (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nERROR: Error doing post analysis query: Evaluation of query \"some(//pkg:alpha, -1)\" failed: argument set is empty\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:alpha (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:alpha (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nERROR: Error doing post analysis query: Evaluation of query \"some(//pkg:alpha, -1)\" failed: argument set is empty\nINFO: Elapsed time: 0.021s, Critical Path: 0.00s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(//pkg:alpha, 2147483647)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(//pkg:alpha, 2147483647)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "i32_max_count",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:alpha (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:alpha (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:alpha",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:alpha (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:alpha (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.018s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:alpha\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(//pkg:missing, nope)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(//pkg:missing, nope)",
+        "--output=label"
+      ],
+      "exit_code": 2,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "noninteger_before_missing",
+      "normalized_stderr": "Computing main repo mapping: \nERROR: Error while parsing 'some(//pkg:missing, nope)': expected an integer literal: 'nope'",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nERROR: Error while parsing 'some(//pkg:missing, nope)': expected an integer literal: 'nope'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(//pkg:missing, 2147483648)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(//pkg:missing, 2147483648)",
+        "--output=label"
+      ],
+      "exit_code": 2,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "overflow_before_missing",
+      "normalized_stderr": "Computing main repo mapping: \nERROR: Error while parsing 'some(//pkg:missing, 2147483648)': expected an integer literal: '2147483648'",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nERROR: Error while parsing 'some(//pkg:missing, 2147483648)': expected an integer literal: '2147483648'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(//pkg:alpha union //pkg:missing, 1)",
+        "--output=label"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(//pkg:alpha union //pkg:missing, 1)",
+        "--output=label"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "early_valid_later_missing_prepares_universe",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//pkg:missing': no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel\nERROR: no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//pkg:missing': no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-some-root-selection/20260809-135231-841269-bazel/workspace/pkg/BUILD.bazel\nERROR: no such target '//pkg:missing': target 'missing' not declared in package 'pkg' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-some-root-selection/20260809-135231-841269-bazel/workspace/pkg/BUILD.bazel\nINFO: Elapsed time: 0.018s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "cquery-some-root-selection",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

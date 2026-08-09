@@ -103,6 +103,7 @@ pub trait CqueryQueryEnvironment {
     fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set;
     fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
+    fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError>;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
     async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
     -> Result<Self::Set, QueryError>;
@@ -145,6 +146,10 @@ where
 
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
         self.0.except(left, right)
+    }
+
+    fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError> {
+        self.0.select_some(targets, count)
     }
 
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
@@ -192,10 +197,11 @@ where
         variables: &'a mut SmallMap<CompactString, Self::Set>,
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
         async move {
-            if name.value != "filter" {
-                return Err(QueryError::syntax("query functions are not supported"));
+            match name.value.as_str() {
+                "filter" => invoke_filter(self, args, variables).await,
+                "some" => invoke_some(self, args, variables).await,
+                _ => Err(QueryError::syntax("query functions are not supported")),
             }
-            invoke_filter(self, args, variables).await
         }
         .boxed()
     }
@@ -387,6 +393,21 @@ where
         self.environment.except(left, right)
     }
 
+    fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError> {
+        let candidates = self.environment.eval_all(targets);
+        let mut selected = TargetSet::default();
+        if count > 0 {
+            for candidate in candidates.iter().take(count as usize) {
+                selected.insert(candidate.clone());
+            }
+        }
+        if selected.iter().next().is_none() {
+            Err(QueryError::evaluation("argument set is empty"))
+        } else {
+            Ok(self.environment.lift_one_delivery(selected))
+        }
+    }
+
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         self.environment.resolve_literal(literal).await
     }
@@ -545,6 +566,15 @@ impl<E: QueryEnvironment> QueryFunctionArg<E> for QueryDepth {
 #[derive(Debug, Clone, Copy)]
 struct QuerySelectionCount(i32);
 
+impl QuerySelectionCount {
+    fn from_expression(expression: &QueryExpression) -> Result<Self, QueryError> {
+        expression
+            .java_integer_literal()
+            .map(Self)
+            .map_err(|raw| QueryError::syntax(format!("expected an integer literal: '{raw}'")))
+    }
+}
+
 impl<E: QueryEnvironment> QueryFunctionArg<E> for QuerySelectionCount {
     fn accept_none() -> Option<Self> {
         Some(Self(1))
@@ -555,13 +585,7 @@ impl<E: QueryEnvironment> QueryFunctionArg<E> for QuerySelectionCount {
         expression: &'a QueryExpression,
         _variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<Self, QueryError>> {
-        async move {
-            expression
-                .java_integer_literal()
-                .map(Self)
-                .map_err(|raw| QueryError::syntax(format!("expected an integer literal: '{raw}'")))
-        }
-        .boxed()
+        async move { Self::from_expression(expression) }.boxed()
     }
 }
 
@@ -698,24 +722,32 @@ where
         args: &'a [QueryExpression],
         variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
-        async move {
-            let candidates = eval_set_arg(evaluator, args, variables, 0).await?;
-            let count: QuerySelectionCount = eval_arg(evaluator, args, variables, 1).await?;
-            let candidates = evaluator.environment.eval_all(&candidates);
-            let mut selected = TargetSet::default();
-            if count.0 > 0 {
-                for candidate in candidates.iter().take(count.0 as usize) {
-                    selected.insert(candidate.clone());
-                }
-            }
-            if selected.iter().next().is_none() {
-                Err(QueryError::evaluation("argument set is empty"))
-            } else {
-                Ok(evaluator.environment.lift_one_delivery(selected))
-            }
-        }
-        .boxed()
+        invoke_some(evaluator, args, variables)
     }
+}
+
+/// Shared `some()` invocation for loading and configured query. The caller's
+/// environment defines the ordered, distinct selection domain.
+fn invoke_some<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        let operand = args
+            .first()
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        let count = match args.get(1) {
+            Some(expression) => QuerySelectionCount::from_expression(expression)?,
+            None => QuerySelectionCount(1),
+        };
+        let targets = evaluate_query_expression_inner(context, operand, variables).await?;
+        context.select_some(&targets, count.0)
+    }
+    .boxed()
 }
 
 impl<E> QueryFunction<E> for AllPathsFunction
@@ -1250,6 +1282,19 @@ mod tests {
                 .collect()
         }
 
+        fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError> {
+            let selected = if count > 0 {
+                targets.iter().take(count as usize).cloned().collect()
+            } else {
+                Vec::new()
+            };
+            if selected.is_empty() {
+                Err(QueryError::evaluation("argument set is empty"))
+            } else {
+                Ok(selected)
+            }
+        }
+
         async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
             self.events.push(format!("resolve:{literal}"));
             Ok(vec![literal.to_owned()])
@@ -1279,6 +1324,28 @@ mod tests {
             futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
                 .unwrap();
         assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:lib",
+                "resolve://pkg:bin",
+                "resolve://pkg:lib",
+                "filter://pkg:lib,//pkg:bin",
+            ]
+        );
+    }
+
+    #[test]
+    fn cquery_some_reuses_the_shared_count_and_recursive_fold() {
+        let expression = QueryExpression::parse(
+            "some(filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:lib)), 2)",
+        )
+        .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:lib", "//pkg:bin"]);
         assert_eq!(
             environment.events,
             [

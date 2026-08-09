@@ -57,10 +57,10 @@ pub fn run(argv: Vec<String>) -> i32 {
         Err(error) => {
             if let Some(stderr) = error.missing_stderr() {
                 eprint!("{stderr}");
-                return 1;
+                return error.exit_code();
             }
             eprint!("{}", cquery_error_json(&error, "one-shot"));
-            return 2;
+            return error.exit_code();
         }
     };
     let published = accepted
@@ -119,8 +119,12 @@ fn run_daemon(
 
 fn terminal_error(error: &CqueryCommandError, runtime_mode: &str) -> TerminalOutput {
     match error.missing_stderr() {
-        Some(stderr) => TerminalOutput::new(1, String::new(), stderr),
-        None => TerminalOutput::new(2, String::new(), cquery_error_json(error, runtime_mode)),
+        Some(stderr) => TerminalOutput::new(error.exit_code(), String::new(), stderr),
+        None => TerminalOutput::new(
+            error.exit_code(),
+            String::new(),
+            cquery_error_json(error, runtime_mode),
+        ),
     }
 }
 

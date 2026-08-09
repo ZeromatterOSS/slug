@@ -985,6 +985,63 @@ fn retained_cquery_starlark_formats_ordered_sets() {
 }
 
 #[test]
+fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidation() {
+    let workspace = scratch("cquery-selection-evaluation-terminal");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"cquery_selection\")\n",
+    );
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, expression: &str| {
+        daemon.cquery_with_bzlmod_inputs(
+            expression,
+            CqueryOutput::StarlarkLabel,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+
+    let first = run(&mut daemon, "some(//pkg:bin, '-1')");
+    assert_eq!(first.exit_code, 1, "{first:?}");
+    assert!(first.stdout.is_empty());
+    assert_eq!(first.invalidated_files, 0);
+    assert!(first.stderr.contains("cquery_runtime_error"));
+    assert!(first.stderr.contains("argument set is empty"));
+
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"edited\")\n",
+    );
+    let after_edit = run(&mut daemon, "some(//pkg:bin, 0)");
+    assert_eq!(after_edit.exit_code, 1, "{after_edit:?}");
+    assert!(after_edit.stdout.is_empty());
+    assert_eq!(after_edit.invalidated_files, 1);
+    assert!(after_edit.stderr.contains("cquery_runtime_error"));
+    assert!(after_edit.stderr.contains("argument set is empty"));
+
+    let invalid = run(&mut daemon, "some(//pkg:missing, 2147483648)");
+    assert_eq!(invalid.exit_code, 2, "{invalid:?}");
+    assert!(invalid.stdout.is_empty());
+    assert_eq!(invalid.invalidated_files, 0);
+    assert!(
+        invalid
+            .stderr
+            .contains("expected an integer literal: '2147483648'")
+    );
+}
+
+#[test]
 fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
     let workspace = scratch("cquery-configuration-c0-c1-c0");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

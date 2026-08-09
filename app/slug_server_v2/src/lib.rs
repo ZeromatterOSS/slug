@@ -386,10 +386,12 @@ impl Daemon {
                     TerminalOutput::new(0, stdout, String::new())
                 }
                 Err(error) => match error.missing_stderr() {
-                    Some(stderr) => TerminalOutput::new(1, String::new(), stderr),
-                    None => {
-                        TerminalOutput::new(2, String::new(), cquery_error_json(error, invalidated))
-                    }
+                    Some(stderr) => TerminalOutput::new(error.exit_code(), String::new(), stderr),
+                    None => TerminalOutput::new(
+                        error.exit_code(),
+                        String::new(),
+                        cquery_error_json(error, invalidated),
+                    ),
                 },
             })
             .publish();
@@ -493,12 +495,17 @@ fn cquery_error_result_for_terminal(
 ) -> QueryResult {
     match error.missing_stderr() {
         Some(stderr) => QueryResult {
-            exit_code: 1,
+            exit_code: error.exit_code(),
             stdout: String::new(),
             stderr,
             invalidated_files,
         },
-        None => cquery_error_result(&error.to_string(), invalidated_files),
+        None => QueryResult {
+            exit_code: error.exit_code(),
+            stdout: String::new(),
+            stderr: cquery_error_json(error, invalidated_files),
+            invalidated_files,
+        },
     }
 }
 

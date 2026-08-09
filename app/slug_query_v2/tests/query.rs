@@ -9,6 +9,7 @@
  */
 
 use slug_query_v2::BinaryOperator;
+use slug_query_v2::QueryError;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryExpressionKind;
 use slug_query_v2::QueryFunctionStatus;
@@ -52,13 +53,15 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 #[test]
-fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter() {
+fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_and_some() {
     for source in [
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
         "filter('^//pkg:bin$', let x = set(//pkg:bin //pkg:lib) in $x)",
         "filter('(', filter('^//pkg:', set(//pkg:bin //pkg:lib)))",
+        "some(let x = set(//pkg:bin //pkg:lib) in filter('^//pkg:', $x))",
+        "some(set(//pkg:bin //pkg:lib), '-2147483648')",
     ] {
         validate_cquery_query(&QueryExpression::parse(source).unwrap()).unwrap();
     }
@@ -71,6 +74,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter() {
         "filter()",
         "filter(//pkg:bin)",
         "filter(set(//pkg:bin), //pkg:bin)",
+        "some()",
+        "some(//pkg:bin, //pkg:lib)",
+        "some(//pkg:bin, 2147483648)",
         "kind('rule', //pkg:bin)",
     ] {
         let error = validate_cquery_query(&QueryExpression::parse(source).unwrap())
@@ -80,6 +86,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter() {
             error.contains("undefined query variable")
                 || error.contains("concrete target literals")
                 || error.contains("arguments to function 'filter'")
+                || error.contains("arguments to function 'some'")
+                || error.contains("expected an integer literal")
                 || error.contains("must be a word")
                 || error.contains("not supported by this cquery"),
             "{source}: {error}"
@@ -91,8 +99,10 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter() {
     );
     assert_eq!(
         cquery_literals(
-            &QueryExpression::parse("filter('^//pkg:', let x = //pkg:bin in $x union //pkg:lib)")
-                .unwrap()
+            &QueryExpression::parse(
+                "some(filter('^//pkg:', let x = //pkg:bin in $x union //pkg:lib), 2)"
+            )
+            .unwrap()
         ),
         ["//pkg:bin", "//pkg:lib"]
     );
@@ -243,6 +253,13 @@ fn signed_java_integer_slots_validate_without_narrowing_expression_integers() {
             "{source}"
         );
     }
+}
+
+#[test]
+fn query_error_evaluation_classification_is_narrow() {
+    assert!(QueryError::evaluation("selection is empty").is_evaluation_failure());
+    assert!(!QueryError::syntax("bad query").is_evaluation_failure());
+    assert!(!QueryError::package_loading("bad package").is_evaluation_failure());
 }
 
 #[test]

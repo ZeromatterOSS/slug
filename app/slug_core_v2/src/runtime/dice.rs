@@ -1312,7 +1312,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
         let terminal = evaluate_cquery_query(&mut environment, &self.expression)
             .await
             .map(|targets| CqueryCommandEvaluation { targets })
-            .map_err(|error| CqueryCommandError::request(error.to_string()));
+            .map_err(CqueryCommandError::from_evaluator_error);
         Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
             Arc::new(terminal),
         ))
@@ -1689,6 +1689,20 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
         result
     }
 
+    fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError> {
+        let mut selected = TargetSet::default();
+        if count > 0 {
+            for target in targets.iter().take(count as usize) {
+                selected.insert(target.clone());
+            }
+        }
+        if selected.iter().next().is_none() {
+            Err(QueryError::evaluation("argument set is empty"))
+        } else {
+            Ok(selected)
+        }
+    }
+
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         self.targets
             .get(literal)
@@ -1718,6 +1732,7 @@ pub enum CqueryCommandError {
         label: CanonicalLabel,
         build_file: PathBuf,
     },
+    Evaluation(Arc<str>),
     Analysis(AnalysisError),
     Request(Arc<str>),
     Infrastructure(Arc<str>),
@@ -1915,6 +1930,21 @@ impl CqueryCommandError {
         Self::Infrastructure(Arc::from(error.to_string()))
     }
 
+    fn from_evaluator_error(error: QueryError) -> Self {
+        if error.is_evaluation_failure() {
+            Self::Evaluation(error.message)
+        } else {
+            Self::Request(error.message)
+        }
+    }
+
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            Self::MissingTarget { .. } | Self::Evaluation(_) => 1,
+            Self::Request(_) | Self::Analysis(_) | Self::Infrastructure(_) => 2,
+        }
+    }
+
     pub fn missing_stderr(&self) -> Option<String> {
         let Self::MissingTarget {
             requested,
@@ -1949,7 +1979,9 @@ impl fmt::Display for CqueryCommandError {
                 )
             }
             Self::Analysis(error) => error.fmt(f),
-            Self::Request(message) | Self::Infrastructure(message) => f.write_str(message),
+            Self::Evaluation(message) | Self::Request(message) | Self::Infrastructure(message) => {
+                f.write_str(message)
+            }
         }
     }
 }
@@ -4707,6 +4739,24 @@ mod tests {
         assert_eq!(Arc::strong_count(&owner), 2);
     }
 
+    #[test]
+    fn cquery_evaluator_terminal_classification_is_narrow() {
+        let evaluation = CqueryCommandError::from_evaluator_error(QueryError::evaluation(
+            "argument set is empty",
+        ));
+        assert_eq!(evaluation.exit_code(), 1);
+        assert_eq!(evaluation.to_string(), "argument set is empty");
+        assert!(evaluation.missing_stderr().is_none());
+
+        let syntax = CqueryCommandError::from_evaluator_error(QueryError::syntax("bad count"));
+        assert!(matches!(syntax, CqueryCommandError::Request(_)));
+        assert_eq!(syntax.exit_code(), 2);
+        assert_eq!(
+            CqueryCommandError::infrastructure("infrastructure").exit_code(),
+            2
+        );
+    }
+
     #[derive(Debug, Clone, Allocative)]
     struct NativeDemandHandshakeKey {
         requests: Arc<[Arc<RepositoryMaterializationRequest>]>,
@@ -6157,6 +6207,23 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             assert!(evaluation.starlark_label_stdout().is_empty());
             assert!(activation_audit.take_configured_roots().is_empty());
         }
+        let invalid_count = runtime
+            .cquery_command_with_bzlmod_inputs(
+                "some(//pkg:missing, 2147483648)",
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap_err();
+        assert_eq!(invalid_count.exit_code(), 2);
+        assert!(
+            invalid_count
+                .to_string()
+                .contains("expected an integer literal: '2147483648'")
+        );
+        assert!(activation_audit.take_configured_roots().is_empty());
         let run = |expression: &str| {
             runtime
                 .cquery_command_with_bzlmod_inputs(
@@ -6205,6 +6272,34 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             ["//pkg:lib", "//pkg:bin"]
         );
         assert!(run("filter('^//missing:', set(//pkg:lib //pkg:bin))").is_empty());
+        assert_eq!(labels(run("some(set(//pkg:lib //pkg:bin))")), ["//pkg:lib"]);
+        assert_eq!(
+            labels(run("some(set(//pkg:lib //pkg:bin //pkg:lib), 2)")),
+            ["//pkg:lib", "//pkg:bin"]
+        );
+        assert_eq!(
+            labels(run(
+                "some(filter('^//pkg:bin$', set(//pkg:lib //pkg:bin)), 10)"
+            )),
+            ["//pkg:bin"]
+        );
+        for expression in ["some(set())", "some(//pkg:bin, 0)", "some(//pkg:bin, '-1')"] {
+            let accepted = runtime
+                .cquery_command_with_bzlmod_inputs(
+                    expression,
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    None,
+                )
+                .unwrap();
+            let error = accepted.terminal_for_test().as_ref().as_ref().unwrap_err();
+            assert!(
+                error.to_string().contains("argument set is empty"),
+                "{expression}"
+            );
+        }
         let starlark = runtime
             .cquery_command_with_bzlmod_inputs(
                 "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",

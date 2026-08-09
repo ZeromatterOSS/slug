@@ -1,0 +1,95 @@
+[fixture]
+name = "cquery-some-root-selection"
+description = "Bazel 9.2 cquery some() arbitrary configured-root selection, eager root preparation, and signed count validation."
+comparison = "semantic"
+oracle_notes = "The selected winner is deliberately not pinned: finite anchored alternatives admit every distinct configured root subset that Bazel permits. Slug's first-insertion witness is Slug-native; the named selection/error surface is otherwise exact."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/engine/SomeFunction.java",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testSomeOperator",
+  "src/test/java/com/google/devtools/build/lib/query2/testutil/AbstractQueryTest.java#testUnconditionalQueryException",
+]
+translation_notes = "A minimal custom-rule workspace keeps cquery on configured targets. Omitted/one and count-two results use complete finite alternatives; count at or above cardinality uses exact Starlark-label output. Count conversion is validated before any missing target literal is observed, while valid operands prepare the complete root universe before selection."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture cquery-some-root-selection --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture cquery-some-root-selection --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "omitted_count_current_label"
+argv = ["cquery", "some(set(//pkg:zeta //pkg:alpha //pkg:middle))", "--output=label"]
+expected_exit = 0
+stdout_patterns = ["\\A//pkg:(?:alpha|middle|zeta) \\([^)]+\\)\\Z"]
+
+[[commands]]
+name = "one_count_exact_starlark_label"
+argv = ["cquery", "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 1)", "--output=starlark", "--starlark:expr=str(target.label)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?:@@//pkg:alpha|@@//pkg:middle|@@//pkg:zeta)\\Z"]
+
+[[commands]]
+name = "two_count_exact_starlark_label"
+argv = ["cquery", "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 2)", "--output=starlark", "--starlark:expr=str(target.label)"]
+expected_exit = 0
+stdout_patterns = ["\\A(?:@@//pkg:alpha\\n@@//pkg:middle|@@//pkg:alpha\\n@@//pkg:zeta|@@//pkg:middle\\n@@//pkg:alpha|@@//pkg:middle\\n@@//pkg:zeta|@@//pkg:zeta\\n@@//pkg:alpha|@@//pkg:zeta\\n@@//pkg:middle)\\Z"]
+
+[[commands]]
+name = "cardinality_and_oversized_count_exact_starlark_label"
+argv = ["cquery", "some(set(//pkg:zeta //pkg:alpha //pkg:middle), 2147483647)", "--output=starlark", "--starlark:expr=str(target.label)"]
+expected_exit = 0
+stdout_patterns = ["\\A@@//pkg:zeta\\n@@//pkg:alpha\\n@@//pkg:middle\\Z"]
+
+[[commands]]
+name = "composition_dedupe_and_filter"
+argv = ["cquery", "some(filter('^//pkg:(alpha|zeta)$', set(//pkg:zeta //pkg:alpha //pkg:zeta)) union //pkg:middle, 10)", "--output=starlark", "--starlark:expr=str(target.label)"]
+expected_exit = 0
+stdout_patterns = ["\\A@@//pkg:zeta\\n@@//pkg:alpha\\n@@//pkg:middle\\Z"]
+
+[[commands]]
+name = "empty_input"
+argv = ["cquery", "some(set())", "--output=label"]
+expected_exit = 1
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "zero_count_prepares_valid_root"
+argv = ["cquery", "some(//pkg:alpha, 0)", "--output=label"]
+expected_exit = 1
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "quoted_negative_count_prepares_valid_root"
+argv = ["cquery", "some(//pkg:alpha, '-1')", "--output=label"]
+expected_exit = 1
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["argument set is empty"]
+
+[[commands]]
+name = "i32_max_count"
+argv = ["cquery", "some(//pkg:alpha, 2147483647)", "--output=starlark", "--starlark:expr=str(target.label)"]
+expected_exit = 0
+stdout_patterns = ["\\A@@//pkg:alpha\\Z"]
+
+[[commands]]
+name = "noninteger_before_missing"
+argv = ["cquery", "some(//pkg:missing, nope)", "--output=label"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: 'nope'"]
+
+[[commands]]
+name = "overflow_before_missing"
+argv = ["cquery", "some(//pkg:missing, 2147483648)", "--output=label"]
+expected_exit = 2
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["expected an integer literal: '2147483648'"]
+
+[[commands]]
+name = "early_valid_later_missing_prepares_universe"
+argv = ["cquery", "some(//pkg:alpha union //pkg:missing, 1)", "--output=label"]
+expected_exit = 1
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["no such target '//pkg:missing'"]
