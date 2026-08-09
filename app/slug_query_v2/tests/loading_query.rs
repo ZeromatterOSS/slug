@@ -1854,7 +1854,7 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
          test_suite(name = \"implicit\")\n\
          test_suite(name = \"empty_suite\", tests = [])\n\
          test_suite(name = \"explicit_suite\", tests = [\":auto\", \":manual_test\"], tags = [\"suite\", \"manual\"])\n\
-         probe(name = \"attrs\", explicit = \":explicit.txt\", many = select({\":condition\": [\":dupe.txt\"]}) + [\":dupe.txt\"], note = \"literal\", mapping = {\"first\": \":one.txt\", \"second\": \":two.txt\"})\n\
+         probe(name = \"attrs\", visibility = [\"//visibility:public\", \":group\"], explicit = \":explicit.txt\", many = select({\":condition\": [\":dupe.txt\"]}) + [\":dupe.txt\"], note = \"literal\", mapping = {\"first\": \":one.txt\", \"second\": \":two.txt\"})\n\
          probe_test(name = \"auto\", tags = [\"z\", \"a\", \"z\"])\n\
          probe_test(name = \"manual_test\", tags = [\"manual\", \"-+tag\"], size = \"large\")\n",
     );
@@ -1889,21 +1889,55 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     assert!(attribute("attrs", "explicit").explicit);
     assert!(!attribute("attrs", "defaulted").explicit);
     assert!(!attribute("attrs", "$implicit").explicit);
+    let visibility = attribute("attrs", "visibility");
+    assert!(visibility.explicit);
+    assert!(visibility.labels.is_empty());
+    assert!(matches!(
+        &visibility.value.as_ref().unwrap().value,
+        CoercedAttributeValue::LabelList(labels)
+            if labels.as_ref() == [CanonicalLabel::parse("@@//visibility:public").unwrap()]
+    ));
+    let attribute_names = node("attrs")
+        .attributes
+        .iter()
+        .map(|attribute| attribute.name.as_str())
+        .collect::<Vec<_>>();
     assert_eq!(
-        node("attrs")
-            .attributes
-            .iter()
-            .map(|attribute| attribute.name.as_str())
-            .collect::<Vec<_>>(),
+        &attribute_names[..22],
+        [
+            "name",
+            "visibility",
+            "transitive_configs",
+            "deprecation",
+            "tags",
+            "generator_name",
+            "generator_function",
+            "generator_location",
+            "testonly",
+            "features",
+            ":action_listener",
+            "compatible_with",
+            "restricted_to",
+            "$config_dependencies",
+            "package_metadata",
+            "aspect_hints",
+            "expect_failure",
+            "toolchains",
+            "exec_properties",
+            "exec_compatible_with",
+            "exec_group_compatible_with",
+            "target_compatible_with",
+        ]
+    );
+    assert_eq!(
+        &attribute_names[22..],
         [
             "explicit",
             "defaulted",
             "$implicit",
             "many",
             "note",
-            "mapping",
-            "tags",
-            "visibility",
+            "mapping"
         ]
     );
     assert_eq!(

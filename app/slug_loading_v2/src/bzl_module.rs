@@ -2314,7 +2314,10 @@ fn loaded_external_starlark_rule_reason(
             .schema()
             .iter()
             .zip(implementation.values())
-            .filter(|(schema, _)| schema.dependency_reachable())
+            .filter(|(schema, _)| {
+                schema.dependency_reachable()
+                    && (!schema.is_builtin() || schema.ordinary_dependency())
+            })
             .find_map(|(schema, value)| {
                 let mut labels = Vec::new();
                 value.value.labels(&mut labels);

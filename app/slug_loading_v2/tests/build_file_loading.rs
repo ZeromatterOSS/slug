@@ -436,26 +436,42 @@ fn rule_capabilities_use_exported_class_names_and_keep_native_rules_non_executab
 def _impl(ctx):
     return [DefaultInfo()]
 
+def _transition_impl(settings, attr):
+    return {}
+
+def legacy_macro(name):
+    plain_rule(name = name)
+
+def legacy_macro_override(name):
+    plain_rule(name = name, generator_name = "macro_override")
+
 exec_arbitrary = rule(implementation = _impl, executable = True)
 plain_rule = rule(implementation = _impl)
 implicit_test_test = rule(implementation = _impl, test = True)
 explicit_test_test = rule(implementation = _impl, test = True, executable = False)
 output_rule = rule(implementation = _impl, attrs = {"outs": attr.output_list()})
+string_flag = rule(implementation = _impl, build_setting = config.string(flag = True))
+transition_rule = rule(implementation = _impl, attrs = {"dep": attr.label(cfg = transition(implementation = _transition_impl, outputs = ["//:setting"]))})
 "#,
     )
     .unwrap();
     fs::write(
         package.join("BUILD.bazel"),
         r#"
-load(":defs.bzl", "exec_arbitrary", "explicit_test_test", "implicit_test_test", "output_rule", "plain_rule")
+load(":defs.bzl", "exec_arbitrary", "explicit_test_test", "implicit_test_test", "legacy_macro", "legacy_macro_override", "output_rule", "plain_rule", "string_flag", "transition_rule")
 
 exports_files(["BUILD.bazel", "data.txt"])
-exec_arbitrary(name = "arbitrary_target")
+exec_arbitrary(name = "arbitrary_target", args = ["z", "z", "a"], output_licenses = ["z", "a"], tags = ["z", "a"])
 exec_arbitrary(name = "target_test")
-plain_rule(name = "plain")
-implicit_test_test(name = "ordinary_target")
+plain_rule(name = "plain", visibility = ["//visibility:public", ":group"], transitive_configs = [":cfg"], generator_name = "direct_generator", toolchains = [":toolchain_one", ":toolchain_two"], features = ["z", "a"])
+plain_rule(name = "direct_default")
+legacy_macro(name = "macro_target")
+legacy_macro_override(name = "macro_override_target")
+implicit_test_test(name = "ordinary_target", timeout = "long", flaky = True, shard_count = 3, local = True)
 explicit_test_test(name = "explicit_test_target")
 output_rule(name = "generated_owner", outs = ["generated.txt"])
+string_flag(name = "string_flag", build_setting_default = "plain", help = "fixture flag")
+transition_rule(name = "transition_rule")
 filegroup(name = "files", srcs = [":data.txt"])
 alias(name = "alias_exec", actual = ":arbitrary_target")
 config_setting(name = "setting", values = {"cpu": "k8"})
@@ -464,6 +480,17 @@ config_setting(name = "setting", values = {"cpu": "k8"})
     .unwrap();
 
     let loaded = load_package(&workspace, &package);
+    let schema_len = |name: &str| {
+        loaded
+            .targets
+            .iter()
+            .find(|target| target.name == name)
+            .and_then(|target| match &target.kind {
+                PackageTargetKind::StarlarkRule(rule) => Some(rule.schema().len()),
+                _ => None,
+            })
+            .unwrap()
+    };
     let capability = |name: &str| {
         loaded
             .targets
@@ -506,6 +533,240 @@ config_setting(name = "setting", values = {"cpu": "k8"})
     assert_eq!(capability("BUILD.bazel"), None);
     assert_eq!(capability("data.txt"), None);
     assert_eq!(capability("generated.txt"), None);
+    assert_eq!(schema_len("plain"), 22);
+    assert_eq!(schema_len("arbitrary_target"), 25);
+    assert_eq!(schema_len("ordinary_target"), 39);
+    assert_eq!(schema_len("explicit_test_target"), 39);
+    assert_eq!(schema_len("string_flag"), 24);
+    assert_eq!(schema_len("transition_rule"), 24);
+    let PackageTargetKind::StarlarkRule(string_flag) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "string_flag")
+        .unwrap()
+        .kind
+    else {
+        unreachable!()
+    };
+    assert_eq!(
+        string_flag.root_string_build_setting_default(),
+        Some("plain")
+    );
+    assert!(matches!(
+        string_flag
+            .values()
+            .iter()
+            .find(|value| value.declaration_name == "help")
+            .unwrap()
+            .value
+            .as_ref(),
+        CoercedAttributeValue::String(value) if value == "fixture flag"
+    ));
+    let values = |target: &str| {
+        let PackageTargetKind::StarlarkRule(rule) = &loaded
+            .targets
+            .iter()
+            .find(|candidate| candidate.name == target)
+            .unwrap()
+            .kind
+        else {
+            unreachable!()
+        };
+        rule.values()
+    };
+    let value = |target: &str, name: &str| {
+        values(target)
+            .iter()
+            .find(|value| value.declaration_name == name)
+            .unwrap()
+    };
+    assert!(matches!(
+        value("plain", "transitive_configs").value.as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.len() == 1
+    ));
+    assert!(matches!(
+        value("plain", "visibility").value.as_ref(),
+        CoercedAttributeValue::LabelList(labels)
+            if labels.as_ref() == [CanonicalLabel::parse("@@//visibility:public").unwrap()]
+    ));
+    assert!(matches!(
+        &loaded
+            .targets
+            .iter()
+            .find(|target| target.name == "plain")
+            .unwrap()
+            .visibility,
+        VisibilitySource::Declared(slug_loading_v2::RuleVisibility::Public)
+    ));
+    assert!(matches!(
+        value("plain", "generator_name").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "direct_generator"
+    ));
+    assert!(matches!(
+        value("direct_default", "generator_name").value.as_ref(),
+        CoercedAttributeValue::String(value) if value.is_empty()
+    ));
+    assert!(matches!(
+        value("macro_target", "generator_name").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "macro_target"
+    ));
+    assert!(matches!(
+        value("macro_target", "generator_function").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "legacy_macro"
+    ));
+    assert!(matches!(
+        value("macro_override_target", "generator_name").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "macro_override"
+    ));
+    assert!(matches!(
+        value("plain", "toolchains").value.as_ref(),
+        CoercedAttributeValue::LabelList(labels) if labels.len() == 2
+    ));
+    assert!(matches!(
+        value("arbitrary_target", "args").value.as_ref(),
+        CoercedAttributeValue::StringList(values) if values.as_ref() == ["z", "z", "a"]
+    ));
+    assert!(matches!(
+        value("arbitrary_target", "tags").value.as_ref(),
+        CoercedAttributeValue::StringList(values) if values.as_ref() == ["a", "z"]
+    ));
+    assert!(matches!(
+        value("plain", "features").value.as_ref(),
+        CoercedAttributeValue::StringList(values) if values.as_ref() == ["a", "z"]
+    ));
+    assert!(matches!(
+        value("arbitrary_target", "output_licenses").value.as_ref(),
+        CoercedAttributeValue::StringList(values) if values.as_ref() == ["z", "a"]
+    ));
+    assert!(matches!(
+        value("ordinary_target", "timeout").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "long"
+    ));
+    assert!(matches!(
+        value("ordinary_target", "flaky").value.as_ref(),
+        CoercedAttributeValue::Boolean(true)
+    ));
+    assert!(matches!(
+        value("ordinary_target", "shard_count").value.as_ref(),
+        CoercedAttributeValue::Integer(3)
+    ));
+    assert!(matches!(
+        value("explicit_test_target", "size").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "medium"
+    ));
+    assert!(matches!(
+        value("explicit_test_target", "timeout").value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "moderate"
+    ));
+    assert!(matches!(
+        value("explicit_test_target", "flaky").value.as_ref(),
+        CoercedAttributeValue::Boolean(false)
+    ));
+    assert!(matches!(
+        value("explicit_test_target", "shard_count").value.as_ref(),
+        CoercedAttributeValue::Integer(-1)
+    ));
+    assert!(matches!(
+        value("explicit_test_target", "local").value.as_ref(),
+        CoercedAttributeValue::Boolean(false)
+    ));
+    assert!(matches!(
+        value("ordinary_target", ":run_under_exec_config")
+            .value
+            .as_ref(),
+        CoercedAttributeValue::None
+    ));
+    assert!(matches!(
+        value("ordinary_target", "$test_wrapper").value.as_ref(),
+        CoercedAttributeValue::Label(label) if label.to_string() == "@@bazel_tools//tools/test:test_wrapper"
+    ));
+    for (name, expected) in [
+        ("$test_wrapper", "@@bazel_tools//tools/test:test_wrapper"),
+        ("$xml_writer", "@@bazel_tools//tools/test:xml_writer"),
+        ("$test_runtime", "@@bazel_tools//tools/test:runtime"),
+        ("$test_setup_script", "@@bazel_tools//tools/test:test_setup"),
+        (
+            "$xml_generator_script",
+            "@@bazel_tools//tools/test:test_xml_generator",
+        ),
+        (
+            "$collect_coverage_script",
+            "@@bazel_tools//tools/test:collect_coverage",
+        ),
+        (
+            ":coverage_support",
+            "@@bazel_tools//tools/test:coverage_support",
+        ),
+        (
+            ":coverage_report_generator",
+            "@@bazel_tools//tools/test:coverage_report_generator",
+        ),
+    ] {
+        let mut labels = Vec::new();
+        value("explicit_test_target", name)
+            .value
+            .labels(&mut labels);
+        assert_eq!(labels, [CanonicalLabel::parse(expected).unwrap()], "{name}");
+    }
+    for name in [":run_under_exec_config", ":run_under_target_config"] {
+        assert!(matches!(
+            value("explicit_test_target", name).value.as_ref(),
+            CoercedAttributeValue::None
+        ));
+    }
+    let PackageTargetKind::StarlarkRule(normal) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "direct_default")
+        .unwrap()
+        .kind
+    else {
+        unreachable!()
+    };
+    let nonordinary_label_builtins = normal
+        .schema()
+        .iter()
+        .filter(|schema| {
+            schema.is_builtin()
+                && matches!(
+                    schema.kind(),
+                    AttributeKind::Label
+                        | AttributeKind::LabelList
+                        | AttributeKind::StringKeyedLabelDict
+                        | AttributeKind::LabelKeyedStringDict
+                        | AttributeKind::LabelListDict
+                )
+                && !schema.ordinary_dependency()
+        })
+        .map(|schema| schema.declaration_name())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        nonordinary_label_builtins,
+        ["visibility", "transitive_configs"]
+    );
+    assert!(matches!(
+        value("transition_rule", "$allowlist_function_transition")
+            .value
+            .as_ref(),
+        CoercedAttributeValue::Label(label)
+            if label.to_string()
+                == "@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist"
+    ));
+    let PackageTargetKind::StarlarkRule(transition_rule) = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "transition_rule")
+        .unwrap()
+        .kind
+    else {
+        unreachable!()
+    };
+    assert!(transition_rule.dependencies().contains(
+        &CanonicalLabel::parse(
+            "@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist",
+        )
+        .unwrap()
+    ));
 }
 
 #[test]
@@ -1623,7 +1884,7 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
         ),
         (
             "with_deps(name = \"bad\", deps = [1])\n",
-            "attribute `deps` must contain only string labels",
+            "attribute `label list` must be a string",
         ),
         (
             "with_deps(name = \"bad\", deps = [\"pkg:target\"])\n",
@@ -1830,7 +2091,7 @@ probe(
         panic!("expected Starlark rule")
     };
     assert_eq!(
-        rule.schema()
+        rule.schema()[22..]
             .iter()
             .map(|schema| schema.kind())
             .collect::<Vec<_>>(),
@@ -1849,39 +2110,60 @@ probe(
             AttributeKind::Label,
             AttributeKind::LabelList,
             AttributeKind::LabelList,
-            AttributeKind::StringList,
         ]
     );
-    assert_eq!(rule.schema()[3].declaration_name(), "_implicit");
-    assert_eq!(rule.schema()[3].query_name(), "$implicit");
-    assert!(rule.schema()[3].default().is_some());
-    assert!(rule.schema()[8].mandatory());
-    assert!(rule.schema()[0].configurable());
-    assert!(!rule.schema()[8].configurable());
-    assert!(!rule.schema()[9].configurable());
-    assert!(!rule.schema()[11].configurable());
-    assert!(rule.schema()[2].dependency_reachable() == false);
+    let schema = &rule.schema()[22..];
+    assert_eq!(schema[3].declaration_name(), "_implicit");
+    assert_eq!(schema[3].query_name(), "$implicit");
+    assert!(schema[3].default().is_some());
+    assert!(schema[8].mandatory());
+    assert!(schema[0].configurable());
+    assert!(!schema[8].configurable());
+    assert!(!schema[9].configurable());
+    assert!(!schema[11].configurable());
+    assert!(schema[2].dependency_reachable() == false);
     assert!(matches!(
-        rule.schema()[0].default(),
+        schema[0].default(),
         Some(CoercedAttributeValue::None)
     ));
     assert!(
-        matches!(rule.schema()[4].default(), Some(CoercedAttributeValue::LabelList(values)) if values.is_empty())
+        matches!(schema[4].default(), Some(CoercedAttributeValue::LabelList(values)) if values.is_empty())
     );
     assert!(
-        matches!(rule.schema()[5].default(), Some(CoercedAttributeValue::StringKeyedLabelDict(values)) if values.is_empty())
+        matches!(schema[5].default(), Some(CoercedAttributeValue::StringKeyedLabelDict(values)) if values.is_empty())
     );
     assert!(
-        matches!(rule.schema()[6].default(), Some(CoercedAttributeValue::LabelKeyedStringDict(values)) if values.is_empty())
+        matches!(schema[6].default(), Some(CoercedAttributeValue::LabelKeyedStringDict(values)) if values.is_empty())
     );
     assert!(
-        matches!(rule.schema()[7].default(), Some(CoercedAttributeValue::LabelListDict(values)) if values.is_empty())
+        matches!(schema[7].default(), Some(CoercedAttributeValue::LabelListDict(values)) if values.is_empty())
     );
     assert!(
-        matches!(rule.schema()[9].default(), Some(CoercedAttributeValue::OutputList(values)) if values.is_empty())
+        matches!(schema[9].default(), Some(CoercedAttributeValue::OutputList(values)) if values.is_empty())
     );
 
     let values = rule.values();
+    let CoercedAttributeValue::LabelList(config_dependencies) = values
+        .iter()
+        .find(|value| value.declaration_name == "$config_dependencies")
+        .unwrap()
+        .value
+        .as_ref()
+    else {
+        panic!("config dependency field should be a label list")
+    };
+    assert_eq!(
+        config_dependencies
+            .iter()
+            .map(|label| label.target().as_str())
+            .collect::<Vec<_>>(),
+        ["condition", "second_condition"]
+    );
+    assert!(
+        rule.dependencies()
+            .contains(&CanonicalLabel::parse("@@//pkg:condition").unwrap())
+    );
+    let values = &values[22..];
     assert_eq!(values[0].provenance, AttributeProvenance::Explicit);
     assert_eq!(values[1].provenance, AttributeProvenance::Default);
     assert_eq!(values[2].provenance, AttributeProvenance::Default);
@@ -2311,11 +2593,6 @@ fn rule_toolchains_and_toolchain_info_fail_closed_outside_the_fixture_subset() {
         ("toolchains = (\":demo_type\",)", "list"),
         ("toolchains = [1]", "expected `list[str]`"),
         ("toolchains = [\"@external//:type\"]", "external repository"),
-        ("toolchains = [\":one\", \":two\"]", "at most one"),
-        (
-            "toolchains = [\":demo_type\", \":demo_type\"]",
-            "at most one",
-        ),
         ("toolchains = [\"...\"]", "direct target label"),
         ("toolchains = [\":all\"]", "direct target label"),
     ];

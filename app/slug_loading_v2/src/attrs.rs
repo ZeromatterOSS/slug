@@ -67,6 +67,9 @@ pub struct AttributeSchema {
     mandatory: bool,
     configurable: bool,
     label_reachable: bool,
+    order_independent: bool,
+    ordinary_dependency: bool,
+    builtin: bool,
     default: Option<Arc<CoercedAttributeValue>>,
     transition: Option<TransitionDefinition>,
 }
@@ -92,9 +95,38 @@ impl AttributeSchema {
             mandatory,
             configurable,
             label_reachable: kind.reaches_labels(),
+            order_independent: false,
+            ordinary_dependency: kind.contributes_ordinary_dependencies(),
+            builtin: false,
             default: default.map(Arc::new),
             transition,
         }
+    }
+
+    /// Constructs one of Bazel's fixed RuleClass attributes.  User-declared
+    /// Starlark attributes retain the ordinary `new` defaults above; built-ins
+    /// carry their separately observable ordering and topology policy.
+    pub(crate) fn builtin(
+        declaration_name: impl Into<CompactString>,
+        kind: AttributeKind,
+        mandatory: bool,
+        configurable: bool,
+        default: Option<CoercedAttributeValue>,
+        order_independent: bool,
+        ordinary_dependency: bool,
+    ) -> Self {
+        let mut schema = Self::new(
+            declaration_name,
+            kind,
+            mandatory,
+            configurable,
+            default,
+            None,
+        );
+        schema.order_independent = order_independent;
+        schema.ordinary_dependency = ordinary_dependency;
+        schema.builtin = true;
+        schema
     }
 
     pub fn declaration_name(&self) -> &str {
@@ -114,6 +146,15 @@ impl AttributeSchema {
     }
     pub fn dependency_reachable(&self) -> bool {
         self.label_reachable
+    }
+    pub fn ordinary_dependency(&self) -> bool {
+        self.ordinary_dependency
+    }
+    pub fn is_builtin(&self) -> bool {
+        self.builtin
+    }
+    pub(crate) fn order_independent(&self) -> bool {
+        self.order_independent
     }
     pub fn default(&self) -> Option<&CoercedAttributeValue> {
         self.default.as_deref()

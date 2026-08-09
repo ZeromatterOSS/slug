@@ -902,9 +902,9 @@ impl PackageRecorder {
             let schema = schema
                 .iter()
                 .find(|schema| schema.declaration_name() == value.declaration_name);
-            if schema.is_some_and(|schema| {
-                schema.dependency_reachable() && schema.kind().contributes_ordinary_dependencies()
-            }) {
+            if schema
+                .is_some_and(|schema| schema.dependency_reachable() && schema.ordinary_dependency())
+            {
                 value.value.labels(&mut dependencies);
             }
         }
@@ -1715,9 +1715,6 @@ fn rule_toolchain_requirement(
     eval: &Evaluator<'_, '_, '_>,
 ) -> anyhow::Result<Arc<[CanonicalLabel]>> {
     let values = values.map_or_else(Vec::new, |values| values.items);
-    if values.len() > 1 {
-        anyhow::bail!("rule(toolchains = ...) supports at most one requirement");
-    }
     if values.is_empty() {
         return Ok(Arc::from([]));
     }
@@ -1845,6 +1842,12 @@ fn raw_attribute_value(value: Value) -> anyhow::Result<RawAttributeValue> {
     if let Some(value) = value.unpack_str() {
         return Ok(RawAttributeValue::String(value.into()));
     }
+    if let Some(value) = value.unpack_bool() {
+        return Ok(RawAttributeValue::Boolean(value));
+    }
+    if let Some(value) = value.unpack_i32() {
+        return Ok(RawAttributeValue::Integer(value));
+    }
     if let Some(values) = ListRef::from_value(value) {
         return values
             .iter()
@@ -1859,7 +1862,9 @@ fn raw_attribute_value(value: Value) -> anyhow::Result<RawAttributeValue> {
             .collect::<anyhow::Result<Vec<_>>>()
             .map(|values| RawAttributeValue::Dict(values.into()));
     }
-    anyhow::bail!("attribute values must contain strings, lists, or dictionaries")
+    anyhow::bail!(
+        "attribute values must contain strings, booleans, integers, lists, or dictionaries"
+    )
 }
 
 fn raw_string(value: &RawAttributeValue, context: &str) -> anyhow::Result<CompactString> {
@@ -2057,18 +2062,39 @@ fn coerce_raw_value(
             "output",
         )?)),
         AttributeKind::String => Ok(CoercedAttributeValue::String(raw_string(raw, "string")?)),
-        AttributeKind::Boolean | AttributeKind::Integer | AttributeKind::StringDict => {
-            anyhow::bail!("attribute kind is native-only")
+        AttributeKind::Boolean => match raw {
+            RawAttributeValue::Boolean(value) => Ok(CoercedAttributeValue::Boolean(*value)),
+            _ => anyhow::bail!("attribute must be a bool"),
+        },
+        AttributeKind::Integer => match raw {
+            RawAttributeValue::Integer(value) => Ok(CoercedAttributeValue::Integer(*value)),
+            _ => anyhow::bail!("attribute must be an integer"),
+        },
+        AttributeKind::StringDict => {
+            let RawAttributeValue::Dict(values) = raw else {
+                anyhow::bail!("attribute must be a string dictionary");
+            };
+            Ok(CoercedAttributeValue::StringDict(
+                values
+                    .iter()
+                    .map(|(key, value)| {
+                        Ok((
+                            raw_string(key, "dictionary key")?,
+                            raw_string(value, "dictionary value")?,
+                        ))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into(),
+            ))
         }
         AttributeKind::StringList => {
             let RawAttributeValue::List(values) = raw else {
                 anyhow::bail!("attribute must be a list of strings");
             };
-            let mut values = values
+            let values = values
                 .iter()
                 .map(|value| raw_string(value, "string list"))
                 .collect::<anyhow::Result<Vec<_>>>()?;
-            values.sort_unstable();
             Ok(CoercedAttributeValue::StringList(values.into()))
         }
         AttributeKind::LabelList | AttributeKind::OutputList => {
@@ -2361,6 +2387,8 @@ impl<'v> StarlarkValue<'v> for RuleDefinition<'v> {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum RawAttributeValue {
     String(CompactString),
+    Boolean(bool),
+    Integer(i32),
     List(Arc<[RawAttributeValue]>),
     Dict(Arc<[(RawAttributeValue, RawAttributeValue)]>),
 }
@@ -2378,9 +2406,357 @@ struct RuleAttributeSchemaGen<V> {
     #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
     transition: Option<TransitionDefinitionGen<V>>,
+    #[trace(unsafe_ignore)]
+    builtin: bool,
 }
 type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
 type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
+
+// These are loading-owned RuleClass members, rather than public `attr.*`
+// descriptors.  Keeping the finite shape here lets target invocation retain
+// the same typed values as user declarations without broadening the
+// descriptor surface.
+fn starlark_builtin_schema<V>(
+    executable: bool,
+    test: bool,
+    root_string_build_setting: bool,
+    has_transition: bool,
+) -> Vec<RuleAttributeSchemaGen<V>> {
+    let mut result = Vec::new();
+    let mut push = |name, kind, mandatory, configurable| {
+        result.push(RuleAttributeSchemaGen {
+            name: CompactString::new(name),
+            kind,
+            mandatory,
+            configurable,
+            default: None,
+            transition: None,
+            builtin: true,
+        });
+    };
+    push("name", AttributeKind::String, true, false);
+    push("visibility", AttributeKind::LabelList, false, false);
+    push("transitive_configs", AttributeKind::LabelList, false, false);
+    push("deprecation", AttributeKind::String, false, false);
+    push("tags", AttributeKind::StringList, false, false);
+    push("generator_name", AttributeKind::String, false, false);
+    push("generator_function", AttributeKind::String, false, false);
+    push("generator_location", AttributeKind::String, false, false);
+    push("testonly", AttributeKind::Boolean, false, false);
+    push("features", AttributeKind::StringList, false, true);
+    push(":action_listener", AttributeKind::LabelList, false, true);
+    push("compatible_with", AttributeKind::LabelList, false, false);
+    push("restricted_to", AttributeKind::LabelList, false, false);
+    push(
+        "$config_dependencies",
+        AttributeKind::LabelList,
+        false,
+        false,
+    );
+    push("package_metadata", AttributeKind::LabelList, false, false);
+    push("aspect_hints", AttributeKind::LabelList, false, true);
+    push("expect_failure", AttributeKind::String, false, true);
+    push("toolchains", AttributeKind::LabelList, false, true);
+    push("exec_properties", AttributeKind::StringDict, false, true);
+    push(
+        "exec_compatible_with",
+        AttributeKind::LabelList,
+        false,
+        false,
+    );
+    push(
+        "exec_group_compatible_with",
+        AttributeKind::LabelListDict,
+        false,
+        false,
+    );
+    push(
+        "target_compatible_with",
+        AttributeKind::LabelList,
+        false,
+        true,
+    );
+    if executable && !test {
+        push("args", AttributeKind::StringList, false, true);
+        push("output_licenses", AttributeKind::StringList, false, true);
+        push("$is_executable", AttributeKind::Boolean, false, false);
+    }
+    if test {
+        push("size", AttributeKind::String, false, false);
+        push("timeout", AttributeKind::String, false, false);
+        push("flaky", AttributeKind::Boolean, false, false);
+        push("shard_count", AttributeKind::Integer, false, true);
+        push("local", AttributeKind::Boolean, false, false);
+        push("args", AttributeKind::StringList, false, true);
+        for (name, kind) in [
+            ("$test_wrapper", AttributeKind::Label),
+            ("$xml_writer", AttributeKind::Label),
+            ("$test_runtime", AttributeKind::LabelList),
+            ("$test_setup_script", AttributeKind::Label),
+            ("$xml_generator_script", AttributeKind::Label),
+            ("$collect_coverage_script", AttributeKind::Label),
+            (":coverage_support", AttributeKind::Label),
+            (":coverage_report_generator", AttributeKind::Label),
+            (":run_under_exec_config", AttributeKind::Label),
+            (":run_under_target_config", AttributeKind::Label),
+        ] {
+            push(name, kind, false, true);
+        }
+        push("$is_executable", AttributeKind::Boolean, false, false);
+    }
+    if root_string_build_setting {
+        push("build_setting_default", AttributeKind::String, true, false);
+        push("help", AttributeKind::String, false, false);
+    }
+    if has_transition {
+        push(
+            "$allowlist_function_transition",
+            AttributeKind::Label,
+            false,
+            true,
+        );
+    }
+    result
+}
+
+fn starlark_builtin_callable(name: &str) -> bool {
+    !name.starts_with(':') && !name.starts_with('$')
+}
+
+fn starlark_builtin_order_independent(name: &str) -> bool {
+    matches!(
+        name,
+        "visibility" | "transitive_configs" | "tags" | "features"
+    )
+}
+
+// Bazel's common RuleClass source marks only visibility and
+// transitive_configs as NODEP. `$config_dependencies` is a normal label list:
+// it records selector keys and therefore contributes those keys as edges.
+fn starlark_builtin_ordinary_dependency(name: &str, kind: AttributeKind) -> bool {
+    kind.contributes_ordinary_dependencies() && !matches!(name, "visibility" | "transitive_configs")
+}
+
+fn starlark_effective_visibility(
+    visibility: &RuleVisibility,
+) -> anyhow::Result<CoercedAttributeValue> {
+    let labels: Arc<[CanonicalLabel]> =
+        match visibility {
+            RuleVisibility::Public => Arc::from([
+                CanonicalLabel::parse("@@//visibility:public").map_err(anyhow::Error::msg)?
+            ]),
+            RuleVisibility::Private => Arc::from([
+                CanonicalLabel::parse("@@//visibility:private").map_err(anyhow::Error::msg)?
+            ]),
+            RuleVisibility::Restricted(restricted) => restricted.declared_labels().to_vec().into(),
+        };
+    Ok(CoercedAttributeValue::LabelList(labels))
+}
+
+fn starlark_generator_metadata(
+    recorder: &PackageRecorder,
+    eval: &Evaluator<'_, '_, '_>,
+) -> (CompactString, CompactString, CompactString) {
+    let Some(context) = eval.native_call_context("name") else {
+        return (
+            CompactString::default(),
+            CompactString::default(),
+            CompactString::default(),
+        );
+    };
+    let position = context.call_location.resolve_span_for_reporting().begin;
+    let build_file = Path::new(context.call_location.filename())
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("BUILD.bazel");
+    let build_file = if recorder.package.is_empty() {
+        build_file.to_owned()
+    } else {
+        format!("{}/{}", recorder.package, build_file)
+    };
+    (
+        context.local_value.unwrap_or_default().into(),
+        context.function_name.into(),
+        format!("{build_file}:{}:{}", position.line + 1, position.column + 1).into(),
+    )
+}
+
+fn starlark_fixed_label(value: &str) -> CoercedAttributeValue {
+    CoercedAttributeValue::Label(CanonicalLabel::parse(value).expect("static Bazel tools label"))
+}
+
+fn starlark_builtin_default(
+    name: &str,
+    kind: AttributeKind,
+    test: bool,
+    visibility: &CoercedAttributeValue,
+    deprecation: Option<&CompactString>,
+    default_testonly: bool,
+    package_metadata: &Arc<[CanonicalLabel]>,
+    generator: &(CompactString, CompactString, CompactString),
+) -> (AttributeProvenance, CoercedAttributeValue) {
+    let default = || (AttributeProvenance::Default, intrinsic_default(kind));
+    match name {
+        "visibility" => (AttributeProvenance::Default, visibility.clone()),
+        "deprecation" => (
+            AttributeProvenance::Default,
+            deprecation
+                .cloned()
+                .map(CoercedAttributeValue::String)
+                .unwrap_or(CoercedAttributeValue::None),
+        ),
+        "generator_name" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::String(generator.0.clone()),
+        ),
+        "generator_function" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::String(generator.1.clone()),
+        ),
+        "generator_location" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::String(generator.2.clone()),
+        ),
+        "testonly" => (
+            AttributeProvenance::Default,
+            CoercedAttributeValue::Boolean(test || default_testonly),
+        ),
+        "package_metadata" => (
+            AttributeProvenance::Default,
+            CoercedAttributeValue::LabelList(package_metadata.clone()),
+        ),
+        "$config_dependencies" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::LabelList(Arc::from([])),
+        ),
+        "size" => (
+            AttributeProvenance::Default,
+            CoercedAttributeValue::String("medium".into()),
+        ),
+        "timeout" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::String("moderate".into()),
+        ),
+        "shard_count" => (
+            AttributeProvenance::Default,
+            CoercedAttributeValue::Integer(-1),
+        ),
+        "$is_executable" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::Boolean(true),
+        ),
+        "$test_wrapper" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:test_wrapper"),
+        ),
+        "$xml_writer" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:xml_writer"),
+        ),
+        "$test_runtime" => (
+            AttributeProvenance::Implicit,
+            CoercedAttributeValue::LabelList(Arc::from([CanonicalLabel::parse(
+                "@@bazel_tools//tools/test:runtime",
+            )
+            .expect("static Bazel tools label")])),
+        ),
+        "$test_setup_script" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:test_setup"),
+        ),
+        "$xml_generator_script" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:test_xml_generator"),
+        ),
+        "$collect_coverage_script" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:collect_coverage"),
+        ),
+        ":coverage_support" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:coverage_support"),
+        ),
+        ":coverage_report_generator" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label("@@bazel_tools//tools/test:coverage_report_generator"),
+        ),
+        ":run_under_exec_config" | ":run_under_target_config" => {
+            (AttributeProvenance::Implicit, CoercedAttributeValue::None)
+        }
+        "$allowlist_function_transition" => (
+            AttributeProvenance::Implicit,
+            starlark_fixed_label(
+                "@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist",
+            ),
+        ),
+        _ => default(),
+    }
+}
+
+fn normalize_starlark_value(
+    value: CoercedAttributeValue,
+    order_independent: bool,
+) -> CoercedAttributeValue {
+    if !order_independent {
+        return value;
+    }
+    match value {
+        CoercedAttributeValue::StringList(values) => {
+            let mut values = values.to_vec();
+            values.sort_unstable();
+            CoercedAttributeValue::StringList(values.into())
+        }
+        CoercedAttributeValue::LabelList(values) => {
+            let mut values = values.to_vec();
+            values.sort_by(CanonicalLabel::bazel_natural_cmp);
+            CoercedAttributeValue::LabelList(values.into())
+        }
+        CoercedAttributeValue::Selector { branches, default } => CoercedAttributeValue::Selector {
+            branches: branches
+                .iter()
+                .map(|(condition, value)| {
+                    (
+                        condition.clone(),
+                        Arc::new(normalize_starlark_value((**value).clone(), true)),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .into(),
+            default: default
+                .map(|value| Arc::new(normalize_starlark_value((*value).clone(), true))),
+        },
+        CoercedAttributeValue::Concatenation(left, right) => CoercedAttributeValue::Concatenation(
+            Arc::new(normalize_starlark_value((*left).clone(), true)),
+            Arc::new(normalize_starlark_value((*right).clone(), true)),
+        ),
+        value => value,
+    }
+}
+
+fn replace_starlark_builtin_value(
+    values: &mut [AttributeValue],
+    name: &str,
+    value: CoercedAttributeValue,
+    provenance: AttributeProvenance,
+) {
+    if let Some(existing) = values
+        .iter_mut()
+        .find(|existing| existing.declaration_name == name)
+    {
+        existing.value = Arc::new(value);
+        existing.provenance = provenance;
+    }
+}
+
+fn starlark_test_timeout(size: &str) -> &'static str {
+    match size {
+        "small" => "short",
+        "medium" => "moderate",
+        "large" => "long",
+        "enormous" => "eternal",
+        _ => "illegal",
+    }
+}
 
 #[derive(
     Debug,
@@ -2469,6 +2845,7 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
                 .transition
                 .map(|value| value.freeze(freezer))
                 .transpose()?,
+            builtin: self.builtin,
         })
     }
 }
@@ -2913,34 +3290,78 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
         let capability = self.capability.clone();
         PackageRecorder::from_evaluator(eval)
             .and_then(|recorder| {
+                let (default_visibility, default_deprecation, default_testonly, default_metadata) = {
+                    let state = recorder.state.borrow();
+                    (
+                        state.default_visibility.clone(),
+                        state.default_deprecation.clone(),
+                        state.default_testonly,
+                        state.default_package_metadata.clone(),
+                    )
+                };
+                let effective_visibility = visibility
+                    .as_ref()
+                    .map(|values| recorder.parse_visibility(values.clone()))
+                    .transpose()?
+                    .unwrap_or(default_visibility);
+                let visibility_value = starlark_effective_visibility(&effective_visibility)?;
+                let generator = starlark_generator_metadata(recorder, eval);
                 let mut schema = Vec::with_capacity(self.schema.len());
                 let mut values = Vec::with_capacity(self.schema.len());
                 let mut generated = Vec::new();
                 for declaration in self.schema.iter() {
-                    let attribute_schema = AttributeSchema::new(
-                        declaration.name.clone(),
-                        declaration.kind,
-                        declaration.mandatory,
-                        declaration.configurable,
-                        Some(
-                            declaration
-                                .default
-                                .clone()
-                                .unwrap_or_else(|| intrinsic_default(declaration.kind)),
-                        ),
-                        declaration.transition.as_ref().map(|transition| {
-                            LoadingTransitionDefinition::new(
-                                transition.implementation,
-                                transition.output.clone(),
-                            )
-                        }),
-                    );
+                    let builtin = declaration.builtin;
+                    let attribute_schema = if builtin {
+                        AttributeSchema::builtin(
+                            declaration.name.clone(),
+                            declaration.kind,
+                            declaration.mandatory,
+                            declaration.configurable,
+                            None,
+                            starlark_builtin_order_independent(&declaration.name),
+                            starlark_builtin_ordinary_dependency(
+                                &declaration.name,
+                                declaration.kind,
+                            ),
+                        )
+                    } else {
+                        AttributeSchema::new(
+                            declaration.name.clone(),
+                            declaration.kind,
+                            declaration.mandatory,
+                            declaration.configurable,
+                            Some(
+                                declaration
+                                    .default
+                                    .clone()
+                                    .unwrap_or_else(|| intrinsic_default(declaration.kind)),
+                            ),
+                            declaration.transition.as_ref().map(|transition| {
+                                LoadingTransitionDefinition::new(
+                                    transition.implementation,
+                                    transition.output.clone(),
+                                )
+                            }),
+                        )
+                    };
                     // Keep the full declaration schema even for an omitted
                     // optional value. Stage 8 must distinguish absent-looking
                     // values from a missing declaration.
                     schema.push(attribute_schema.clone());
                     let explicit = names.get(declaration.name.as_str()).copied();
+                    if builtin
+                        && explicit.is_some()
+                        && !starlark_builtin_callable(declaration.name.as_str())
+                    {
+                        anyhow::bail!(
+                            "target `{name}` cannot set implicit attribute `{}`",
+                            declaration.name
+                        );
+                    }
                     let (provenance, value) = match explicit {
+                        Some(_) if builtin && declaration.name == "visibility" => {
+                            (AttributeProvenance::Explicit, visibility_value.clone())
+                        }
                         Some(value) => (
                             AttributeProvenance::Explicit,
                             coerce_starlark_value(
@@ -2954,6 +3375,16 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         None if declaration.mandatory => anyhow::bail!(
                             "missing value for mandatory attribute '{}'",
                             declaration.name
+                        ),
+                        None if builtin => starlark_builtin_default(
+                            declaration.name.as_str(),
+                            declaration.kind,
+                            self.capability.test_kind.is_some(),
+                            &visibility_value,
+                            default_deprecation.as_ref(),
+                            default_testonly,
+                            &default_metadata,
+                            &generator,
                         ),
                         None if declaration.name.starts_with('_') => (
                             AttributeProvenance::Implicit,
@@ -2970,6 +3401,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 .clone(),
                         ),
                     };
+                    let value = normalize_starlark_value(value, attribute_schema.order_independent());
                     if matches!(
                         attribute_schema.kind(),
                         AttributeKind::Output | AttributeKind::OutputList
@@ -2981,6 +3413,41 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                         provenance,
                         value: Arc::new(value),
                     });
+                }
+                let config_dependencies = values
+                    .iter()
+                    .flat_map(|value| selector_key_labels(&value.value))
+                    .fold(Vec::new(), |mut labels, label| {
+                        if !labels.contains(&label) {
+                            labels.push(label);
+                        }
+                        labels
+                    });
+                replace_starlark_builtin_value(
+                    &mut values,
+                    "$config_dependencies",
+                    CoercedAttributeValue::LabelList(config_dependencies.into()),
+                    AttributeProvenance::Implicit,
+                );
+                if values
+                    .iter()
+                    .find(|value| value.declaration_name == "timeout")
+                    .is_some_and(|value| value.provenance != AttributeProvenance::Explicit)
+                {
+                    let timeout = values
+                        .iter()
+                        .find(|value| value.declaration_name == "size")
+                        .and_then(|value| match value.value.as_ref() {
+                            CoercedAttributeValue::String(size) => Some(starlark_test_timeout(size)),
+                            _ => None,
+                        })
+                        .unwrap_or("illegal");
+                    replace_starlark_builtin_value(
+                        &mut values,
+                        "timeout",
+                        CoercedAttributeValue::String(timeout.into()),
+                        AttributeProvenance::Implicit,
+                    );
                 }
                 let schema: Arc<[AttributeSchema]> = schema.into();
                 let values: Arc<[AttributeValue]> = values.into();
@@ -3231,10 +3698,15 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         if build_setting.is_some() && !root_string_build_setting {
             anyhow::bail!("only rule(build_setting = config.string(flag = True)) is supported")
         }
-        let mut schema = Vec::new();
+        let declared_builtin_names =
+            starlark_builtin_schema::<Value<'v>>(executable, test, root_string_build_setting, true);
+        let mut user_schema = Vec::new();
         if let Some(attrs) = attrs {
             for (name, value) in attrs {
-                if name == "tags" || (test && name == "size") {
+                if declared_builtin_names
+                    .iter()
+                    .any(|schema| schema.name == name)
+                {
                     anyhow::bail!("rule attribute `{name}` is built in and cannot be redeclared");
                 }
                 let definition = AttributeDefinition::from_value(value)
@@ -3243,46 +3715,21 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         starlark::__macro_refs::Either::Right(_) => None,
                     })
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
-                schema.push(RuleAttributeSchema {
+                user_schema.push(RuleAttributeSchema {
                     name: CompactString::new(name),
                     kind: definition.kind,
                     mandatory: definition.mandatory,
                     configurable: definition.configurable,
                     default: definition.default.clone(),
                     transition: definition.transition.clone(),
+                    builtin: false,
                 });
             }
         }
-        if root_string_build_setting {
-            schema.push(RuleAttributeSchema {
-                name: CompactString::const_new("build_setting_default"),
-                kind: AttributeKind::String,
-                mandatory: true,
-                configurable: false,
-                default: None,
-                transition: None,
-            });
-        }
-        schema.push(RuleAttributeSchema {
-            name: CompactString::const_new("tags"),
-            kind: AttributeKind::StringList,
-            mandatory: false,
-            configurable: false,
-            default: Some(CoercedAttributeValue::StringList(Arc::from([]))),
-            transition: None,
-        });
-        if test {
-            schema.push(RuleAttributeSchema {
-                name: CompactString::const_new("size"),
-                kind: AttributeKind::String,
-                mandatory: false,
-                configurable: false,
-                default: Some(CoercedAttributeValue::String(CompactString::const_new(
-                    "medium",
-                ))),
-                transition: None,
-            });
-        }
+        let has_transition = user_schema.iter().any(|schema| schema.transition.is_some());
+        let mut schema =
+            starlark_builtin_schema(executable, test, root_string_build_setting, has_transition);
+        schema.extend(user_schema);
         Ok(RuleDefinition {
             implementation,
             required_toolchains: rule_toolchain_requirement(toolchains, eval)?,

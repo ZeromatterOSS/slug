@@ -846,7 +846,8 @@ fn package_graph_from_loaded(
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
                     edges,
-                    project_attributes(implementation).to_vec(),
+                    project_attributes(implementation, raw_visibility(&target.visibility), None)?
+                        .to_vec(),
                 )
             }
             PackageTargetKind::GeneratedFile {
@@ -876,7 +877,7 @@ fn package_graph_from_loaded(
             attributes =
                 project_native_attributes(native_attributes, target.raw_visibility_labels(), None)?
                     .to_vec();
-        } else if kind.is_rule() {
+        } else if kind.is_rule() && !matches!(target.kind, PackageTargetKind::StarlarkRule(_)) {
             attributes.push(project_visibility_attribute(target));
         }
         if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
@@ -1232,12 +1233,15 @@ fn external_package_graph_from_targets(
                 )
             }
             PackageTargetKind::StarlarkRule(implementation) => {
-                let mut attributes = project_attributes(implementation).to_vec();
-                attributes.push(project_visibility_attribute(target));
+                let attributes = project_attributes(
+                    implementation,
+                    raw_visibility(&target.visibility),
+                    Some((canonical_repo, apparent_repo)),
+                )?;
                 (
                     QueryNodeKind::Rule(CompactString::new("rule")),
                     Arc::from([]),
-                    attributes.into(),
+                    attributes,
                 )
             }
             _ => {
@@ -1427,7 +1431,8 @@ fn validate_external_starlark_rule(
         return Err(fail("schema/value relationship is malformed"));
     }
     for (schema, value) in implementation.schema().iter().zip(implementation.values()) {
-        if !schema.dependency_reachable() {
+        if !schema.dependency_reachable() || (schema.is_builtin() && !schema.ordinary_dependency())
+        {
             continue;
         }
         let mut labels = Vec::new();
@@ -1743,28 +1748,65 @@ fn project_visibility_attribute(target: &slug_loading_v2::PackageTarget) -> Quer
     }
 }
 
-fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[QueryAttribute]> {
+fn raw_visibility(source: &VisibilitySource) -> &[CanonicalLabel] {
+    match source {
+        VisibilitySource::Declared(visibility) => visibility.raw_declared_labels(),
+        VisibilitySource::PackageDefault
+        | VisibilitySource::GeneratingRule
+        | VisibilitySource::AlwaysPublic => &[],
+    }
+}
+
+fn project_attributes(
+    implementation: &StarlarkRuleImplementation,
+    raw_visibility: &[CanonicalLabel],
+    external_route: Option<(&CanonicalRepoName, &ApparentRepoName)>,
+) -> Result<Arc<[QueryAttribute]>, QueryError> {
     implementation
         .schema()
         .iter()
         .zip(implementation.values())
         .map(|(schema, value)| {
+            let projected_value = match external_route {
+                Some((canonical_repo, _)) => value
+                    .value
+                    .rebind_provisional_root_labels(canonical_repo)
+                    .map_err(QueryError::evaluation)?,
+                None => (*value.value).clone(),
+            };
             debug_assert_eq!(value.declaration_name, schema.declaration_name());
             let mut labels = Vec::new();
-            value.value.labels(&mut labels);
-            QueryAttribute {
-                name: CompactString::new(schema.query_name()),
-                labels: labels
-                    .into_iter()
-                    .map(QueryLabel::from_canonical)
-                    .collect::<Vec<_>>()
-                    .into(),
-                explicit: value.provenance == AttributeProvenance::Explicit,
-                value: Some(value.query_value(schema)),
+            if schema.query_name() == "visibility" {
+                labels.extend_from_slice(raw_visibility);
+            } else {
+                projected_value.labels(&mut labels);
             }
+            let labels = labels
+                .into_iter()
+                .map(|label| match external_route {
+                    Some((canonical_repo, apparent_repo)) => {
+                        Ok(QueryLabel::from_canonical_for_external_owner(
+                            label,
+                            canonical_repo,
+                            apparent_repo,
+                        ))
+                    }
+                    None => Ok(QueryLabel::from_canonical(label)),
+                })
+                .collect::<Result<Vec<_>, QueryError>>()?;
+            Ok(QueryAttribute {
+                name: CompactString::new(schema.query_name()),
+                labels: labels.into(),
+                explicit: value.provenance == AttributeProvenance::Explicit,
+                value: Some(AttributeQueryValue {
+                    kind: schema.kind(),
+                    provenance: value.provenance,
+                    value: projected_value,
+                }),
+            })
         })
-        .collect::<Vec<_>>()
-        .into()
+        .collect::<Result<Vec<_>, QueryError>>()
+        .map(Into::into)
 }
 
 fn project_native_attributes(
