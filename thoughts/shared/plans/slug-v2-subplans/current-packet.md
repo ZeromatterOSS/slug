@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-design`
+Packet: `WP-4-8-m3-attr-six-ownership-mismatch-evidence`
 Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: design-only fresh reconstruction after retry-3 correctly stopped on an
-unrecoverable deleted source-template representation.
+Result: focused exact evidence after a full disposable reconstruction reached
+two operational roots but failed strict primary-label ownership.
 
 ## Immutable semantic boundary
 
@@ -19,34 +19,29 @@ supports, package-derived notice construction, medium/small computed timeout,
 Starlark/native `legacy_macro`, suite/manual closure, separate test/exec
 schemas, transition allowlist, and external baseline remain viable.
 
-## Required reconstruction design
+## Required focused evidence
 
-- Reconstruct fresh five LF-exact bodies from the accepted 165-row semantic
-  manifest and every reviewed hidden construction obligation into one
-  disposable machine-readable/executable representation. The old unaccepted
-  body hashes are not requirements; fresh byte counts and hashes are expected.
-- That one representation owns the bodies, all 18 primary argv, nine controls,
-  focused probes, execution, and mechanical documentation rendering. Execute
-  its exact bytes before rendering prose or command records; no second manual
-  representation or post-render transcription is admitted.
-- Use two independent `mktemp -d` scratch parents. Each has direct-written
-  sibling `workspace` and `out` paths; run all 18 lanes in both, compare exact
-  stdout, and prove the location-sensitive primary in both roots.
-- Run and record all nine zero-output controls with their exact argv and
-  literal empty stdout, separately from the 165 stable IDs. Run focused
-  lane-1, license, timeout, macro, and tag-closure probes.
-- The executable source must use the discriminating single-backslash OI regex
-  `^\[z, a, z\]$` and generator regex
-  `^attr/BUILD\.bazel:[0-9]+:[0-9]+$`; review compares the rendered record
-  byte-for-byte with that source rather than retyping either expression.
-- Obtain terminal independent review before any generation scheduling.
+- Use minimal exact Bazel 9.2 constructions (five or fewer) and pinned source
+  only where necessary to decide whether each disputed row is a manifest error
+  or a source-synthesis error. Do not reconstruct the five-file corpus.
+- Freeze one correction decision and the exact affected rows for: lane 5
+  `label_list_dict` order/rendering; lane 13 alias `:action_listener`
+  fallback; lane 13 explicit `licenses=[none]` beside package `licenses()`;
+  and lanes 16/17 explicit empty `package_metadata` on a filegroup versus an
+  absent constraint setting, constraint value, or platform attribute.
+- Preserve the immutable 165-row stream unless the focused evidence proves the
+  one exact manifest correction. Record the observed selected labels and the
+  body-construction alternative for every one of
+  `l05_a003`, `l13_a011`, `l13_a017`, `l16_a007`, `l16_a013`, and `l17_a012`.
+- Obtain terminal independent review before scheduling any renewed full
+  reconstruction.
 
 ## Boundary and stops
 
 Edit only Stage 4 and Stage 8. Temporary material stays outside the checkout;
-add no fixture, payload, expected record, generated source, Python, Rust,
-Cargo/lockfile, BUILD, graph/DICE/regex state, configured analysis, toolchain
+add no fixture, payload, expected record, full source template, Python, Rust,
+Cargo/lockfile, graph/DICE/regex state, configured analysis, toolchain
 resolution, JVM/Java artifact, or production Bazel delegation. Use ordinary RC
-discovery without inspecting or copying the private RC. Stop and `REPLAN` if a
-manifest semantic change, probe disagreement, different roots, a need beyond
-the five files/two packages, or any excluded work is needed.
+discovery without inspecting or copying the private RC. Stop and `REPLAN` on a
+need for more than five focused constructions, a second correction decision,
+probe disagreement, or any excluded work.

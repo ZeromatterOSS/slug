@@ -3592,3 +3592,23 @@ Stage 4/Stage 8 rendering. Its exact OI and generator regex bytes are
 `^\[z, a, z\]$` and `^attr/BUILD\.bazel:[0-9]+:[0-9]+$`. Stop on a manifest
 semantic change or need beyond five files/two packages. No fixture, code,
 configured analysis, toolchain, JVM/Java, or production-Bazel work is allowed.
+
+## `attr` five-source executable reconstruction terminal REPLAN (2026-08-09)
+
+The sole disposable reconstruction reached two operational Bazel 9.2 roots but
+failed strict primary ownership: `l05_a003_yes`, `l16_a007_yes`,
+`l16_a013_yes`, and `l17_a012_yes` were absent, while `l13_a011_no` and
+`l13_a017_no` were selected. It rendered no candidate. Its script, JSON,
+scratch/output roots, and processes were removed; the checkout is clean at
+`2f83f90b`.
+
+The explicit native `licenses=[none]` negative for `l13_a017` and the three
+explicit-empty filegroup `package_metadata=[]` positives are source-synthesis
+omissions. Whether `l05_a003`'s `label_list_dict` rendering and
+`l13_a011`'s alias `:action_listener` fallback instead require a manifest
+correction remains unresolved.
+
+Run next only `WP-4-8-m3-attr-six-ownership-mismatch-evidence`, design-only:
+at most five focused Bazel 9.2 constructions and pinned source as needed decide
+one exact correction and affected rows. No full reconstruction, fixture, code,
+configured analysis, toolchain, JVM/Java, or production-Bazel work is allowed.

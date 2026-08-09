@@ -2009,3 +2009,27 @@ mechanical Stage 4/Stage 8 rendering. It must retain exact single-backslash OI
 `^attr/BUILD\.bazel:[0-9]+:[0-9]+$` bytes. Stop on a manifest semantic change
 or any need beyond five files/two packages; add no fixture, code, configured
 analysis, toolchain, JVM/Java, or production-Bazel work.
+
+### `attr` five-source executable reconstruction terminal REPLAN (2026-08-09)
+
+One disposable executable representation verified the immutable 165-record
+stream and reached two operational Bazel 9.2 sibling `workspace`/`out` roots,
+but strict ownership failed: missing positives were `l05_a003_yes`,
+`l16_a007_yes`, `l16_a013_yes`, and `l17_a012_yes`; unexpected positives were
+`l13_a011_no` and `l13_a017_no`. No candidate was rendered. The sole script,
+JSON result, scratch roots, output bases, and processes were removed, leaving
+clean `2f83f90b`.
+
+`l13_a017` is a body-construction omission: its negative must be an explicit
+native `licenses=[none]` beside package `licenses([notice])`. The three missing
+explicit-empty filegroup `package_metadata=[]` rows (`l16_a007`, `l16_a013`,
+and `l17_a012`) are likewise construction omissions. `l05_a003`
+`label_list_dict` rendering and `l13_a011` alias `:action_listener` fallback
+remain unresolved exact-semantics questions.
+
+Run next only `WP-4-8-m3-attr-six-ownership-mismatch-evidence`: use at most
+five minimal exact Bazel 9.2 constructions plus pinned source as needed to
+classify those six rows, freeze one correction decision and exact affected
+records, then obtain terminal review. Do not rebuild the full corpus or add a
+fixture, code, configured analysis, toolchain, JVM/Java, or production-Bazel
+work.
