@@ -1,0 +1,80 @@
+[fixture]
+name = "cquery-delegation-topology"
+description = "Bazel 9.2 cquery graph topology for transitioned ordinary edges, aliases, file/output delegation, reverse traversal, visibility, and implicit nodes."
+comparison = "semantic"
+oracle_notes = "Configuration IDs are opaque graph-local captures. Unfactored DOT, rather than multi-node labels, pins deterministic traversal order."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#getFwdDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#getReverseDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#skipDelegatingAncestors",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#unwindReverseDependencyDelegationLayers",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#targetifyValues",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/ConfiguredTargetQueryEnvironment.java#getConfiguredTarget",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/ConfiguredTargetQueryEnvironment.java#getConfiguredTargetsForLabel",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/ConfiguredTargetQueryEnvironment.java#getNullConfiguredTarget",
+  "src/main/java/com/google/devtools/build/lib/rules/AliasConfiguredTarget.java#AliasConfiguredTarget",
+  "src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/OutputFileConfiguredTarget.java#getGeneratingRule",
+  "src/main/java/com/google/devtools/build/lib/analysis/configuredtargets/PackageGroupConfiguredTarget.java#PackageGroupConfiguredTarget",
+  "src/main/java/com/google/devtools/build/lib/analysis/TransitiveVisibilityProvider.java#getTransitiveVisibilityLabels",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkRuleClassFunctions.java#transition",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttrModule.java#convertCfg",
+  "src/main/java/com/google/devtools/build/lib/analysis/starlark/StarlarkAttributeTransitionProvider.java#StarlarkAttributeTransitionProvider",
+  "src/main/java/com/google/devtools/build/lib/query2/cquery/GraphOutputFormatterCallback.java#processOutput",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/GraphOutputWriter.java#write",
+  "src/main/java/com/google/devtools/build/lib/query2/query/output/GraphOutputWriter.java#outputUnfactored",
+  "src/main/java/com/google/devtools/build/lib/query2/common/CommonQueryOptions.java#includeImplicitDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/common/CommonQueryOptions.java#includeToolDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/RdepsFunction.java#eval",
+]
+generation_command = "python3 -B -m tools.v2_oracle run --fixture cquery-delegation-topology --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture cquery-delegation-topology --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "root_singleton_noimplicit"
+argv = ["cquery", "deps(//:root, 0)", "--output=label", "--noimplicit_deps"]
+expected_exit = 0
+stdout_patterns = ['\A//:root \((?P<base>[0-9a-f]{7})\)\Z']
+
+[[commands]]
+name = "full_deps_graph_noimplicit"
+argv = ["cquery", "deps(//:root)", "--output=graph", "--nograph:factored", "--noimplicit_deps"]
+expected_exit = 0
+stdout_patterns = ['\Adigraph mygraph \{\n  node \[shape=box\];\n  "//:root \((?P<base>[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:alias_outer \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P<transition>(?!(?P=base)\))[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:producer\.out \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:source\.txt \(null\)"\n  "//:root \((?P=base)\)" -> "//:vis_top \(null\)"\n  "//:vis_top \(null\)"\n  "//:source\.txt \(null\)"\n  "//:producer\.out \((?P=base)\)"\n  "//:producer\.out \((?P=base)\)" -> "//:producer \((?P=base)\)"\n  "//:producer \((?P=base)\)"\n  "//:ordinary \((?P=transition)\)"\n  "//:alias_outer \((?P=base)\)"\n  "//:alias_outer \((?P=base)\)" -> "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=base)\)"\n\}\Z']
+
+[[commands]]
+name = "full_deps_graph_default_implicit"
+argv = ["cquery", "deps(//:root)", "--output=graph", "--nograph:factored"]
+expected_exit = 0
+stdout_patterns = ['\Adigraph mygraph \{\n  node \[shape=box\];\n  "//:root \((?P<base>[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:alias_outer \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P<transition>(?!(?P=base)\))[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:producer\.out \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:source\.txt \(null\)"\n  "//:root \((?P=base)\)" -> "//:vis_top \(null\)"\n  "//:root \((?P=base)\)" -> "@bazel_tools//tools:host_platform \((?P<exec>[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist \(null\)"\n  "//:root \((?P=base)\)" -> "@@platforms//host:host \((?P=exec)\)"\n  "//:vis_top \(null\)"\n  "//:vis_top \(null\)" -> "//:vis_leaf \(null\)"\n  "//:vis_leaf \(null\)"\n  "//:source\.txt \(null\)"\n  "//:producer\.out \((?P=base)\)"\n  "//:producer\.out \((?P=base)\)" -> "//:producer \((?P=base)\)"\n  "//:producer\.out \((?P=base)\)" -> "@bazel_tools//tools:host_platform \((?P=exec)\)"\n  "//:producer\.out \((?P=base)\)" -> "@@platforms//host:host \((?P=exec)\)"\n  "//:producer \((?P=base)\)"\n  "//:producer \((?P=base)\)" -> "@bazel_tools//tools:host_platform \((?P=exec)\)"\n  "//:producer \((?P=base)\)" -> "@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist \(null\)"\n  "//:producer \((?P=base)\)" -> "@@platforms//host:host \((?P=exec)\)"\n  "//:ordinary \((?P=transition)\)"\n  "//:ordinary \((?P=transition)\)" -> "@bazel_tools//tools:host_platform \((?P=exec)\)"\n  "//:ordinary \((?P=transition)\)" -> "@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist \(null\)"\n  "//:ordinary \((?P=transition)\)" -> "@@platforms//host:host \((?P=exec)\)"\n  "//:alias_outer \((?P=base)\)"\n  "//:alias_outer \((?P=base)\)" -> "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=base)\)" -> "@bazel_tools//tools:host_platform \((?P=exec)\)"\n  "//:ordinary \((?P=base)\)" -> "@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist \(null\)"\n  "//:ordinary \((?P=base)\)" -> "@@platforms//host:host \((?P=exec)\)"\n  "@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist \(null\)"\n  "@bazel_tools//tools:host_platform \((?P=exec)\)"\n  "@bazel_tools//tools:host_platform \((?P=exec)\)" -> "@@platforms//host:host \((?P=exec)\)"\n  "@@platforms//host:host \((?P=exec)\)"\n  "@@platforms//host:host \((?P=exec)\)" -> "@@platforms//cpu:x86_64 \((?P=exec)\)"\n  "@@platforms//host:host \((?P=exec)\)" -> "@@platforms//os:linux \((?P=exec)\)"\n  "@@platforms//os:linux \((?P=exec)\)"\n  "@@platforms//os:linux \((?P=exec)\)" -> "@@platforms//os:os \((?P=exec)\)"\n  "@@platforms//os:os \((?P=exec)\)"\n  "@@platforms//cpu:x86_64 \((?P=exec)\)"\n  "@@platforms//cpu:x86_64 \((?P=exec)\)" -> "@@platforms//cpu:cpu \((?P=exec)\)"\n  "@@platforms//cpu:cpu \((?P=exec)\)"\n\}\Z']
+
+[[commands]]
+name = "rdeps_graph_noimplicit"
+argv = ["cquery", "rdeps(deps(//:root), //:ordinary)", "--output=graph", "--nograph:factored", "--noimplicit_deps"]
+expected_exit = 0
+stdout_patterns = ['\Adigraph mygraph \{\n  node \[shape=box\];\n  "//:root \((?P<base>[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:alias_outer \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P<transition>(?!(?P=base)\))[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=transition)\)"\n  "//:alias_outer \((?P=base)\)"\n  "//:alias_outer \((?P=base)\)" -> "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=base)\)"\n\}\Z']
+
+[[commands]]
+name = "rdeps_alias_bypass_graph"
+argv = ["cquery", "rdeps(deps(//:root), //:ordinary)", "--output=graph", "--nograph:factored", "--noimplicit_deps"]
+expected_exit = 0
+stdout_patterns = ['\Adigraph mygraph \{\n  node \[shape=box\];\n  "//:root \((?P<base>[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P<transition>(?!(?P=base)\))[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=transition)\)"\n\}\Z']
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'aliased = ":alias_outer"'
+  replace = 'aliased = ":ordinary"'
+
+[[commands]]
+name = "rdeps_alias_restore_graph"
+argv = ["cquery", "rdeps(deps(//:root), //:ordinary)", "--output=graph", "--nograph:factored", "--noimplicit_deps"]
+expected_exit = 0
+stdout_patterns = ['\Adigraph mygraph \{\n  node \[shape=box\];\n  "//:root \((?P<base>[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:alias_outer \((?P=base)\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P<transition>(?!(?P=base)\))[0-9a-f]{7})\)"\n  "//:root \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=transition)\)"\n  "//:alias_outer \((?P=base)\)"\n  "//:alias_outer \((?P=base)\)" -> "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)"\n  "//:alias_inner \((?P=base)\)" -> "//:ordinary \((?P=base)\)"\n  "//:ordinary \((?P=base)\)"\n\}\Z']
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = 'aliased = ":ordinary"'
+  replace = 'aliased = ":alias_outer"'

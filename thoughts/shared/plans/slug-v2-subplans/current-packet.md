@@ -1,24 +1,25 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m4-configured-query-delegation-topology-oracle`
+Packet: `WP-6-m2-configured-node-platform-identity-owner-design`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: second topology prerequisite after accepted toolchain graph evidence.
+Result: reserved ownership design after accepted configured topology evidence.
 
 ## Observable slice
 
-Pin ordinary transitioned dependencies, alias delegation, input/output files,
-package groups, reverse-dependency unwinding, and deterministic order.
+Design target, execution, host-like, transitioned, and null configuration
+identity ownership for every oracle-admitted configured node kind.
 
 ## Ownership and stops
 
-Design or extend one isolated Bazel 9.2 oracle without Rust. Distinguish
-configured versus null-configuration nodes and direct versus delegated edges.
-Do not infer topology from depth alone or add a query graph/harness shortcut.
+Reuse current Rust-native configuration identity and existing DICE analysis
+keys/results. Account for platform labels and configuration assignment without
+claiming exact Bazel hash bytes. Add no second graph/cache, command-local node
+identity, filesystem bypass, JVM/Java, CI, or compatibility shim.
 
 ## Validation
 
-First perform a bounded source/fixture audit and freeze exact commands, output
-patterns, allowlist, and caps. Stop on ambiguous delegation/order, unsupported
-aspects/settings, exact-hash dependence, JVM/Java, or required Rust changes.
+Return a bounded serial implementation sequence with owners, representations,
+DICE equality/invalidation, allowlists/caps, lifecycle/activation evidence, and
+hard stops. Obtain reserved review; do not edit Rust in this design packet.

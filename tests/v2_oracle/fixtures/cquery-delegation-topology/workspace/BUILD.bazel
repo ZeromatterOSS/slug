@@ -1,0 +1,43 @@
+load(":defs.bzl", "ordinary_rule", "string_setting")
+
+string_setting(
+    name = "setting",
+    build_setting_default = "default",
+)
+
+ordinary_rule(name = "ordinary")
+
+ordinary_rule(
+    name = "producer",
+    out = "producer.out",
+)
+
+alias(
+    name = "alias_inner",
+    actual = ":ordinary",
+)
+
+alias(
+    name = "alias_outer",
+    actual = ":alias_inner",
+)
+
+package_group(
+    name = "vis_leaf",
+    packages = ["//..."],
+)
+
+package_group(
+    name = "vis_top",
+    includes = [":vis_leaf"],
+)
+
+ordinary_rule(
+    name = "root",
+    normal = ":ordinary",
+    transitioned = ":ordinary",
+    aliased = ":alias_outer",
+    src = "source.txt",
+    generated = ":producer.out",
+    visibility = [":vis_top"],
+)

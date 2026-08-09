@@ -1,0 +1,214 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "deps(//:root, 0)",
+        "--output=label",
+        "--noimplicit_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:root, 0)",
+        "--output=label",
+        "--noimplicit_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "root_singleton_noimplicit",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:root (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:root (6 packages loaded, 17 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "//:root (a7a71fd)",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-delegation-topology/20260809-164348-999224-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-delegation-topology/20260809-165207-1005307-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:root (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:root (6 packages loaded, 17 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 5.383s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "//:root (a7a71fd)\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:root)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:root)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "full_deps_graph_noimplicit",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:root (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:root (6 packages loaded, 17 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:producer.out (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:source.txt (null)\"\n  \"//:root (a7a71fd)\" -> \"//:vis_top (null)\"\n  \"//:vis_top (null)\"\n  \"//:source.txt (null)\"\n  \"//:producer.out (a7a71fd)\"\n  \"//:producer.out (a7a71fd)\" -> \"//:producer (a7a71fd)\"\n  \"//:producer (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:root (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:root (6 packages loaded, 17 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.121s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:producer.out (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:source.txt (null)\"\n  \"//:root (a7a71fd)\" -> \"//:vis_top (null)\"\n  \"//:vis_top (null)\"\n  \"//:source.txt (null)\"\n  \"//:producer.out (a7a71fd)\"\n  \"//:producer.out (a7a71fd)\" -> \"//:producer (a7a71fd)\"\n  \"//:producer (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n}\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "deps(//:root)",
+        "--output=graph",
+        "--nograph:factored"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "deps(//:root)",
+        "--output=graph",
+        "--nograph:factored"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "full_deps_graph_default_implicit",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:root (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:root (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:producer.out (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:source.txt (null)\"\n  \"//:root (a7a71fd)\" -> \"//:vis_top (null)\"\n  \"//:root (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:root (a7a71fd)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:root (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:vis_top (null)\"\n  \"//:vis_top (null)\" -> \"//:vis_leaf (null)\"\n  \"//:vis_leaf (null)\"\n  \"//:source.txt (null)\"\n  \"//:producer.out (a7a71fd)\"\n  \"//:producer.out (a7a71fd)\" -> \"//:producer (a7a71fd)\"\n  \"//:producer.out (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:producer.out (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:producer (a7a71fd)\"\n  \"//:producer (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:producer (a7a71fd)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:producer (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:ordinary (0926246)\"\n  \"//:ordinary (0926246)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:ordinary (0926246)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:ordinary (0926246)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:ordinary (a7a71fd)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:ordinary (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\" -> \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\" -> \"@@platforms//cpu:cpu (3030ed4)\"\n  \"@@platforms//cpu:cpu (3030ed4)\"\n}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:root (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //:root (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.026s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:producer.out (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:source.txt (null)\"\n  \"//:root (a7a71fd)\" -> \"//:vis_top (null)\"\n  \"//:root (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:root (a7a71fd)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:root (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:vis_top (null)\"\n  \"//:vis_top (null)\" -> \"//:vis_leaf (null)\"\n  \"//:vis_leaf (null)\"\n  \"//:source.txt (null)\"\n  \"//:producer.out (a7a71fd)\"\n  \"//:producer.out (a7a71fd)\" -> \"//:producer (a7a71fd)\"\n  \"//:producer.out (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:producer.out (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:producer (a7a71fd)\"\n  \"//:producer (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:producer (a7a71fd)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:producer (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:ordinary (0926246)\"\n  \"//:ordinary (0926246)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:ordinary (0926246)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:ordinary (0926246)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\" -> \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"//:ordinary (a7a71fd)\" -> \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"//:ordinary (a7a71fd)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist (null)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\"\n  \"@bazel_tools//tools:host_platform (3030ed4)\" -> \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//host:host (3030ed4)\" -> \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\"\n  \"@@platforms//os:linux (3030ed4)\" -> \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//os:os (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\"\n  \"@@platforms//cpu:x86_64 (3030ed4)\" -> \"@@platforms//cpu:cpu (3030ed4)\"\n  \"@@platforms//cpu:cpu (3030ed4)\"\n}\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "rdeps(deps(//:root), //:ordinary)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "rdeps(deps(//:root), //:ordinary)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "rdeps_graph_noimplicit",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (0 packages loaded, 0 targets configured).\nINFO: Found 2 targets...\nWARNING: Targets were missing from graph: [ConfiguredTargetKey{label=//:root, config=BuildConfigurationKey[a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18]}]\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (0 packages loaded, 0 targets configured).\nINFO: Found 2 targets...\nWARNING: Targets were missing from graph: [ConfiguredTargetKey{label=//:root, config=BuildConfigurationKey[a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18]}]\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n}\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "rdeps(deps(//:root), //:ordinary)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "rdeps(deps(//:root), //:ordinary)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "aliased = \":alias_outer\"",
+          "old_digest_hint": "711",
+          "path": "BUILD.bazel",
+          "replace": "aliased = \":ordinary\""
+        }
+      ],
+      "name": "rdeps_alias_bypass_graph",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (1 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (1 packages loaded, 8 targets configured).\nINFO: Found 2 targets...\nWARNING: Targets were missing from graph: [ConfiguredTargetKey{label=//:root, config=BuildConfigurationKey[a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18]}]\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (1 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (1 packages loaded, 8 targets configured).\nINFO: Found 2 targets...\nWARNING: Targets were missing from graph: [ConfiguredTargetKey{label=//:root, config=BuildConfigurationKey[a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18]}]\nINFO: Elapsed time: 0.041s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n}\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "rdeps(deps(//:root), //:ordinary)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "rdeps(deps(//:root), //:ordinary)",
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "aliased = \":ordinary\"",
+          "old_digest_hint": "708",
+          "path": "BUILD.bazel",
+          "replace": "aliased = \":alias_outer\""
+        }
+      ],
+      "name": "rdeps_alias_restore_graph",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (1 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (1 packages loaded, 10 targets configured).\nINFO: Found 2 targets...\nWARNING: Targets were missing from graph: [ConfiguredTargetKey{label=//:root, config=BuildConfigurationKey[a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18]}]\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 2 targets (1 packages loaded, 0 targets configured)\nINFO: Analyzed 2 targets (1 packages loaded, 10 targets configured).\nINFO: Found 2 targets...\nWARNING: Targets were missing from graph: [ConfiguredTargetKey{label=//:root, config=BuildConfigurationKey[a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18]}]\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "digraph mygraph {\n  node [shape=box];\n  \"//:root (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:alias_outer (a7a71fd)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (0926246)\"\n  \"//:root (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (0926246)\"\n  \"//:alias_outer (a7a71fd)\"\n  \"//:alias_outer (a7a71fd)\" -> \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\"\n  \"//:alias_inner (a7a71fd)\" -> \"//:ordinary (a7a71fd)\"\n  \"//:ordinary (a7a71fd)\"\n}\n"
+    }
+  ],
+  "fixture": "cquery-delegation-topology",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

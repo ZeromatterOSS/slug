@@ -6117,3 +6117,68 @@ final reviews returned `ACCEPT`; only fixture TOML/generated JSON changed.
 Pin delegation topology next in
 `WP-6-m4-configured-query-delegation-topology-oracle`, then resume configured
 platform/node ownership design. No Rust graph may precede that evidence.
+
+### Configured delegation topology oracle design ACCEPT (2026-08-09)
+
+The read-only audit selected a new isolated root-only
+`cquery-delegation-topology` fixture. Seven commands cover filtered depth/full
+labels, exact unfactored graphs, `rdeps` delegation unwinding, and alias-bypass
+mutation/restoration. The workspace combines an ordinary and transitioned
+edge, two-hop alias chain, explicit source, declared output/producer, and nested
+visibility package groups without toolchain/action execution.
+
+Every output is fully anchored; target/configuration bytes are opaque captures
+and backreferences. Package groups are claimed only if the default Bazel graph
+exposes the exact null-config top/leaf chain; absence triggers a split/replan.
+Allow only six new fixture files, seven commands, and 850 added lines. Run next
+`WP-6-m4-configured-query-delegation-topology-oracle-implementation` with no
+Rust, harness, payload, Cargo, or plan edits by the worker.
+
+### Configured delegation topology oracle REPLAN (2026-08-09)
+
+The combined fixture is **REPLAN** and was removed before acceptance. Bazel's
+default graph exposes `root(cfg) -> vis_top(null) -> vis_leaf(null)`, but also
+adds host-platform, external platform, and transition-allowlist nodes.
+`--noimplicit_deps` removes that noise and the nested package-group edge while
+retaining only `root -> vis_top`. One fixture cannot claim both clean core
+delegation and complete visibility topology under the accepted stops.
+
+Split the evidence. Run next `WP-6-m4-configured-query-delegation-core-oracle`
+with visibility removed and `--noimplicit_deps` throughout, covering only
+transitioned ordinary edges, aliases, source/output targets, and `rdeps`
+unwinding. Preserve the observed package-group/default-versus-noimplicit split
+for a later oracle explicitly composed with accepted implicit/toolchain nodes.
+
+### Configured delegation core oracle REPLAN (2026-08-09)
+
+The noimplicit core retry is **REPLAN** and was discarded. Its topology was
+clean, but `rdeps` multi-label output changed order across fresh roots. Pinned
+Bazel source confirms cquery has no ordinary-query `order_output` path: label
+formatting preserves callback iteration, while unfactored graph formatting
+sorts nodes deterministically by label and configuration.
+
+Retry as `WP-6-m4-configured-query-delegation-graph-oracle-retry`. Keep only a
+singleton label row; use exact anchored unfactored DOT for every multi-node
+deps/rdeps/mutation assertion. Explicitly model the default graph's visibility
+and accepted implicit/external nodes rather than hiding them. Cap the new
+fixture at six commands, six files, and 760 lines; stop on any cross-root graph
+variation or missing logical alias/package-group chain.
+
+### Configured delegation graph oracle retry ACCEPT (2026-08-09)
+
+The graph-output retry is **ACCEPTED**. One isolated six-file, six-command
+fixture uses a singleton label row and fully anchored unfactored DOT for all
+multi-node assertions. It pins base/transitioned configurations, ordinary and
+two-hop alias edges, source/null and output/producer nodes, reverse-delegation
+membership, visibility package groups, every observed implicit host/platform/
+transition-allowlist edge, and alias mutation/restoration.
+
+Bazel 9.2 generation and distinct-root replay pass. Integrity (3), archive,
+and diff checks pass. Independent review accepted exact graph patterns and a
+focused provenance correction. No Rust, harness, payload, Cargo, or existing
+fixture changed.
+
+Toolchain and delegation topology evidence now closes the prerequisite for
+`WP-6-m2-configured-node-platform-identity-owner-design`. Freeze platform and
+node identity ownership before generalizing the existing DICE analysis result;
+exact Bazel configuration hash bytes remain deferred.
