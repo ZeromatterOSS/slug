@@ -1621,6 +1621,20 @@ roots, then remove them. Add no fixture, payload, expected record, production
 Rust, Cargo, graph/DICE/regex state, JVM/Java artifact, or production Bazel
 delegation during that design packet.
 
+Disposable source-template synthesis subsequently returned `REPLAN` without
+checkout edits. Bazel 9.2 loaded the five proposed bodies, but ordinary query
+proved `l12_a003`'s exact `$allowlist_function_transition` value is
+`@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`.
+The current shorter anchored regex selects nothing, so source syntax cannot
+repair it and the accepted semantic record/checksum must change. Both temporary
+roots and output bases were removed; no fixture, payload, source template,
+Rust, Cargo, JVM artifact, or generated file remains.
+
+Run next only `WP-4-8-m3-attr-transition-allowlist-manifest-correction`. Change
+only `l12_a003`'s regex/rendered/support label, recompute the unchanged 165-row
+vector's digest, and obtain latest-diff review before returning to
+`WP-4-8-m3-attr-five-source-template-oracle-design`.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

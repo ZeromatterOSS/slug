@@ -3479,3 +3479,17 @@ bijective ID/declaration/command mapping, and validate the templates from two
 temporary Bazel 9.2 roots. Retain no fixture/payload/generated source and add no
 production Rust, configured analysis, graph/DICE/regex state, JVM/Java
 artifact, or production Bazel delegation.
+
+Disposable source-template synthesis then returned `REPLAN` before checkout
+writes. The five bodies loaded, but Bazel 9.2 rendered `l12_a003`'s transition
+allowlist as
+`@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`;
+the frozen shorter anchored regex returned empty. This is a one-row semantic
+manifest correction, not a source-template choice. All temporary roots and
+output bases were removed.
+
+Run next only `WP-4-8-m3-attr-transition-allowlist-manifest-correction`. Correct
+that exact regex/value/support label, recompute and review the 165-row digest,
+then resume `WP-4-8-m3-attr-five-source-template-oracle-design`. Add no fixture,
+payload, source template, Rust, Cargo, configured analysis, JVM/Java artifact,
+or production Bazel delegation during the correction.
