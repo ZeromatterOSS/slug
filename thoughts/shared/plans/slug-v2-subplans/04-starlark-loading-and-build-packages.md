@@ -700,6 +700,59 @@ must decide under the ordinary fixture-growth rules whether extending
 Freeze a compact typed loading representation and request-local existential
 early-exit traversal only after that evidence; authorize neither here.
 
+## `attr` observable-candidate oracle design replanned (2026-08-09)
+
+`WP-4-8-m3-attr-observable-candidate-oracle-design` reaches `REPLAN` before a
+fixture design is accepted. The narrowed phrase “retained attributes” is not a
+truthful boundary for Bazel's default `attr()` function. `AttrFunction` asks the
+rule for its complete `RuleClass` attribute definition, so inherited, hidden,
+computed-default, and automatically populated attributes are observable even
+when V2's BUILD callable neither accepts nor retains them.
+
+Every current native rule begins with `name` and the `NativeBuildRule` family:
+`visibility`, `transitive_configs`, `deprecation`, `tags`, the three
+`generator_*` strings, `testonly`, `features`, `:action_listener`,
+`compatible_with`, `restricted_to`, `$config_dependencies`,
+`package_metadata`, `aspect_hints`, `licenses`, `distribs`, and
+`target_compatible_with`. Derived classes remove and override different
+subsets. They also add more than the V2-carried fields: for example,
+`filegroup` has `data`, `output_group`, and `output_licenses`;
+`config_setting` has three dictionaries, two label lists, and a late-bound
+alias list; platform/toolchain classes have parents, flags, settings,
+compatibility, error text, dictionaries, and booleans. `test_suite` overrides
+`testonly` to true. Config, constraint, platform, and toolchain classes override
+`tags` to `[manual]`.
+
+The same issue applies to current Starlark rules. Their base class adds
+`expect_failure`, `toolchains`, execution properties/constraints, and common
+attributes. Executable and test bases add further fields; tests include size,
+timeout, booleans, shard count, args, and loading-time `@bazel_tools` label
+defaults. Legacy macro calls can also populate `generator_*` values. These are
+ordinary loading-query observations, not configured analysis. In particular,
+BOOLEAN formatting is now required: `TargetUtils.convertAttributeValue`
+renders `testonly` and other booleans as `0`/`1`, disproving the prior claim
+that no currently admitted type needs that compatibility path.
+
+The inventory is finite, but a 34-row retained-field fixture—or a mechanically
+expanded 46-row draft without a closed schema ledger—would still omit real
+queries such as `attr(testonly,^0$,//:fg)`, the `[manual]` `tags` value on a
+platform, and the test-base hidden-label defaults. No fixture choice or row
+count is accepted until removals, overrides, null suppression, computed and
+late-bound loading defaults, order-independent normalization, macro provenance,
+and canonical built-in labels are mechanically complete.
+
+Run next only `WP-4-8-m3-attr-total-ruleclass-schema-source-ledger-design`.
+Using pinned Bazel 9.2 source, it must enumerate the exact attr-visible schema
+and loading value source for current normal/executable/test Starlark rules and
+all nine current native rule classes; partition fields into shared typed/default
+equivalence classes; identify every per-class removal/override and every V2
+capture gap; and specify which finite discriminators the later observable-
+candidate oracle must generate. It must preserve the accepted unobservable-
+candidate-order boundary and isolate native-toolchain graph projection as a
+later prerequisite. No fixture, oracle record, representation, query
+activation, `@bazel_tools` content, JVM/Java artifact, or Rust change is
+authorized.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

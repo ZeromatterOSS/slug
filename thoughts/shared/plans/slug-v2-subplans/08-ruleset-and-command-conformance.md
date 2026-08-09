@@ -3224,3 +3224,29 @@ exclude candidate position and equal-candidate multiplicity from the contract;
 and select the smallest fixture shape under the existing growth checkpoint.
 No `attr` activation, graph broadening, representation Rust, query-time
 loading, DICE identity, regex change, or JVM/Java artifact is authorized.
+
+That oracle design reaches `REPLAN` before selecting a fixture. The proposed
+retained-field matrix does not cover Bazel's actual accessor: `attr()` looks up
+the full `RuleClass` schema. Current native and Starlark targets therefore have
+observable inherited and hidden values that `QueryAttribute` does not carry,
+including boolean `0`/`1`, empty typed defaults, class-specific `[manual]` and
+test-only overrides, computed/package defaults, late-bound loading defaults,
+macro `generator_*` provenance, and Starlark-test `@bazel_tools` labels.
+
+This is not configured-query breadth and cannot be dismissed as an unsupported
+BUILD argument. The target already exists in the admitted ordinary-query graph,
+and an arbitrary attr name can select it from its default or automatically
+populated value. A schema limited to V2-accepted call arguments would therefore
+make the sixteenth default function only partially compatible while reporting
+it as exact.
+
+Run next only `WP-4-8-m3-attr-total-ruleclass-schema-source-ledger-design`, a
+Stage 4/Stage 8 pinned-source documentation packet. Close the finite schema,
+typed loading-value source, removals/overrides, null behavior, normalization,
+canonical-label, and macro-provenance ledger before returning to fixture
+design. The later oracle must derive a minimal discriminator for every ledger
+equivalence class and class-specific exception, not one row per redundant
+empty default. Candidate position and equal-candidate multiplicity remain
+unobservable and excluded. No fixture generation, graph broadening,
+representation, query activation, DICE work, regex change, JVM/Java artifact,
+or production Bazel delegation is authorized.
