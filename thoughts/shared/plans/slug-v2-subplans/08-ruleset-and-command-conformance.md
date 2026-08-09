@@ -3436,3 +3436,33 @@ exact attr/regex/yes/no binding. Run next only
 schemas, values/absences, regexes, expected labels, and support dependencies in
 Stage 4 before another generation attempt. No fixture, payload, Rust, Cargo,
 graph/DICE, JVM/Java artifact, or Bazel delegation is authorized.
+
+## `attr` atomic discriminator manifest summary (2026-08-09)
+
+The Stage 4 owner now freezes the complete manifest, rather than leaving ID
+assignment to fixture generation. Its canonical record stream contains 165
+UTF-8/LF records with vector
+`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10`; every record has a unique
+stable ID and one distinct positive/negative pair, except the explicitly named
+two-package external negatives for `l02_a007`, `l09_a004`, and `l13_a004`.
+Those are respectively two same-schema normal rules and one native filegroup,
+all in the existing `@@ext+//leaf` package loaded through
+`@@//attr:defs.bzl`; they retain null package deprecation defaults without a
+sixth source. The nine negative-only controls are outside both the count and
+checksum scope.
+
+The checksum scope is exactly the semicolon-delimited records between the
+Stage 4 `attr-manifest-records:start` and `:end` markers, joined with LF and
+terminated by one LF. SHA-256 is
+`3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`.
+Generation must reproduce this count, vector, and digest before transcribing
+any fixture row. The lane-5 source support token is `//attr:BUILD.bazel`, the
+isolated five-file layout's exported source nonrule; it supersedes the stale
+`//pkg:source.txt` prose without changing the dictionary semantics.
+
+Correction-only independent rereview returned `ACCEPT`: all five construction
+and discrimination blockers are closed, no JVM/bytecode/configured-analysis or
+production Bazel delegation entered the design, and residual risk is limited
+to faithful generation. Run next only
+`WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`, bound to
+the count, vector, and digest above.

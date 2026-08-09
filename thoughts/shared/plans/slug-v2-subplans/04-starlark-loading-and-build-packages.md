@@ -1337,6 +1337,274 @@ baseline, five-file layout, caps, isolation, and no-reuse rule. Add no fixture,
 payload, expected record, Rust, Cargo, graph, DICE, JVM/Java artifact, or Bazel
 delegation during that design packet.
 
+## `attr` atomic discriminator manifest (2026-08-09)
+
+This is the authoritative UTF-8/LF manifest.  Each semicolon-delimited record
+has seven fields: stable ID; query spelling; anchored regex; positive operand;
+negative operand; expected result; support targets.  `yes` means only the
+positive operand is selected and `no` means the negative operand is not.  The
+checksum scope is exactly the record lines between the two markers below,
+joined with one LF and followed by one final LF; headings, blank lines, and the
+negative-only controls are excluded. `normal`, `exec`, `test`, and
+`string_setting` name the closed Starlark shapes from the ledger. Every listed
+`_yes`/`_no` is a distinct probe instance unless a record explicitly names the
+external two-package baseline.
+
+### Constructor and support policy
+
+Every manifest operand is a syntactically valid loading-phase declaration. The
+global constructor fills are exact: every `string_setting` has
+`build_setting_default=base`; every `alias` has `actual=//attr:leaf`; every
+`constraint_value` has `constraint_setting=//attr:constraint_setting`; and
+every `toolchain` has `toolchain_type=//attr:toolchain_type` plus
+`toolchain=//attr:leaf`. An explicit field in a manifest record overrides its
+corresponding global fill, including the paired names used to distinguish the
+two operands. These globally supplied supports are part of the support
+inventory even when a record's support field lists only row-specific
+dependencies. The sole identity-transition normal rule declares its output as
+`//attr:base_string_setting`, the same string build setting that is constructed
+with `build_setting_default=base`; it does not name a configured value.
+
+`//attr:required_config_setting` and `//attr:target_config_setting` are native
+`config_setting` support targets. They are respectively the only nonempty
+supports for `platform.required_settings` and `toolchain.target_settings`; a
+build setting is not admitted there. The other named support labels are
+ordinary constructible leaves, constraints, platforms, toolchain types, or
+test rules. `//attr:l01_generated_nonrule` is produced by the normal
+`//attr:l01_generated_owner` output declaration; `//attr:l03_null_output` is
+an output-rule declaration with its nullable output omitted; and each null
+run-under control is a test-rule declaration. Thus controls, too, have a
+producer without becoming pairs.
+
+For automatic suite membership, the only non-manual test in the package is
+`//attr:implicit_member_test`, with `tags=[suite]` and `size=medium`.
+`//attr:explicit_member_test` has `tags=[manual]`, as does every other test
+probe including all lane-11 probes, so they are excluded by Bazel's
+implicit-test accumulator. The implicit suites in lanes 12 and 16 have
+`tests=[]` and `tags=[suite]`; their singleton implicit candidate is therefore
+exactly `[//attr:implicit_member_test]`. Their explicit negative has
+`tests=[//attr:explicit_member_test]` and the same suite tag, so automatic
+population is suppressed rather than merely filtered. This is the pinned
+`TestSuiteImplicitTestsAccumulator` rule: it retains non-manual test rules,
+filters their `tags` plus `size`, then sorts the retained labels at package
+finalization.
+
+<!-- attr-manifest-records:start -->
+```text
+l01_a001;name;^l01_a001_yes$;//attr:l01_a001_yes,normal,name;//attr:l01_a001_no,normal,name;yes/no;-
+l01_a002;name;^l01_a002_yes$;//attr:l01_a002_yes,exec,name;//attr:l01_a002_no,exec,name;yes/no;-
+l01_a003;name;^l01_a003_yes$;//attr:l01_a003_yes,test,name;//attr:l01_a003_no,test,name;yes/no;-
+l01_a004;name;^l01_a004_yes$;//attr:l01_a004_yes,string_setting,name,build_setting_default=base;//attr:l01_a004_no,string_setting,name,build_setting_default=base;yes/no;-
+l01_a005;name;^l01_a005_yes$;//attr:l01_a005_yes,filegroup,name;//attr:l01_a005_no,filegroup,name;yes/no;-
+l01_a006;name;^l01_a006_yes$;//attr:l01_a006_yes,alias,name,actual=//attr:leaf;//attr:l01_a006_no,alias,name,actual=//attr:leaf;yes/no;//attr:leaf
+l01_a007;name;^l01_a007_yes$;//attr:l01_a007_yes,config_setting,name;//attr:l01_a007_no,config_setting,name;yes/no;-
+l01_a008;name;^l01_a008_yes$;//attr:l01_a008_yes,test_suite,name;//attr:l01_a008_no,test_suite,name;yes/no;-
+l01_a009;name;^l01_a009_yes$;//attr:l01_a009_yes,constraint_setting,name;//attr:l01_a009_no,constraint_setting,name;yes/no;-
+l01_a010;name;^l01_a010_yes$;//attr:l01_a010_yes,constraint_value,name,constraint_setting=//attr:l01_a009_yes;//attr:l01_a010_no,constraint_value,name,constraint_setting=//attr:l01_a009_no;yes/no;l01_a009
+l01_a011;name;^l01_a011_yes$;//attr:l01_a011_yes,platform,name,constraint_values=[//attr:l01_a010_yes];//attr:l01_a011_no,platform,name,constraint_values=[//attr:l01_a010_no];yes/no;l01_a010
+l01_a012;name;^l01_a012_yes$;//attr:l01_a012_yes,toolchain_type,name;//attr:l01_a012_no,toolchain_type,name;yes/no;-
+l01_a013;name;^l01_a013_yes$;//attr:l01_a013_yes,toolchain,name,toolchain_type=//attr:l01_a012_yes,toolchain=//attr:leaf;//attr:l01_a013_no,toolchain,name,toolchain_type=//attr:l01_a012_no,toolchain=//attr:leaf;yes/no;//attr:leaf,l01_a012
+l02_a001;expect_failure;^boom$;//attr:l02_a001_yes,normal,expect_failure=boom;//attr:l02_a001_no,normal,expect_failure=nope;yes/no;-
+l02_a002;shard_count;^-1$;//attr:l02_a002_yes,test,shard_count=-1;//attr:l02_a002_no,test,shard_count=0;yes/no;-
+l02_a003;testonly;^0$;//attr:l02_a003_yes,normal,testonly=0;//attr:l02_a003_no,normal,testonly=1;yes/no;-
+l02_a004;testonly;^1$;//attr:l02_a004_yes,normal,package_testonly=1;//attr:l02_a004_no,normal,testonly=0;yes/no;-
+l02_a005;licenses;^\\[notice\\]$;//attr:l02_a005_yes,filegroup,package_licenses=[notice];//attr:l02_a005_no,config_setting,licenses=[none];yes/no;-
+l02_a006;licenses;^\\[none\\]$;//attr:l02_a006_yes,config_setting,licenses=[none];//attr:l02_a006_no,filegroup,package_licenses=[notice];yes/no;-
+l02_a007;deprecation;^deprecated$;//attr:l02_a007_yes,normal,package_deprecation=deprecated;@@ext+//leaf:l02_a007_no,normal,same_schema,package_deprecation=null;yes/no;@@ext+//leaf,load(@@//attr:defs.bzl)
+l03_a001;empty_string;^$;//attr:l03_a001_yes,normal,string,empty_string=;//attr:l03_a001_no,normal,string,empty_string=x;yes/no;-
+l03_a002;empty_label_list;^\\[\\]$;//attr:l03_a002_yes,normal,label_list,default=[];//attr:l03_a002_no,normal,label_list=[//attr:leaf];yes/no;//attr:leaf
+l03_a003;empty_string_keyed_label_dict;^\\{\\}$;//attr:l03_a003_yes,normal,string_keyed_label_dict,default={};//attr:l03_a003_no,normal,string_keyed_label_dict={a=//attr:leaf};yes/no;//attr:leaf
+l03_a004;nullable_label;^//attr:leaf$;//attr:l03_a004_yes,normal,label,nullable_label=//attr:leaf;//attr:l03_a004_no,normal,label,nullable_label=null;yes/no;//attr:leaf
+l03_a005;$private;^secret$;//attr:l03_a005_yes,normal,_private=secret;//attr:l03_a005_no,normal,_private=other;yes/no;-
+l04_a001;args;^\\[z, z, a\\]$;//attr:l04_a001_yes,exec,args=[z,z,a];//attr:l04_a001_no,exec,args=[a,z,z];yes/no;-
+l04_a002;tags;^\\[a, z, z\\]$;//attr:l04_a002_yes,normal,tags=[z,a,z],OI;//attr:l04_a002_no,normal,tags=[z,a],OI;yes/no;-
+l04_a003;features;^\\[a, z, z\\]$;//attr:l04_a003_yes,normal,features=[z,a,z],OI;//attr:l04_a003_no,normal,features=[z,a],OI;yes/no;-
+l04_a004;string_dict;^\\{z=1, a=2\\}$;//attr:l04_a004_yes,normal,string_dict={z=1,a=2};//attr:l04_a004_no,normal,string_dict={a=2,z=1};yes/no;-
+l05_a001;string_keyed_label_dict;^\\{a=//attr:leaf, z=//attr:BUILD\\.bazel\\}$;//attr:l05_a001_yes,normal,string_keyed_label_dict={a=//attr:leaf,z=//attr:BUILD.bazel};//attr:l05_a001_no,normal,string_keyed_label_dict={z=//attr:BUILD.bazel,a=//attr:leaf};yes/no;//attr:leaf,//attr:BUILD.bazel
+l05_a002;label_keyed_string_dict;^\\{//attr:leaf=a, //attr:BUILD\\.bazel=z\\}$;//attr:l05_a002_yes,normal,label_keyed_string_dict={//attr:leaf=a,//attr:BUILD.bazel=z};//attr:l05_a002_no,normal,label_keyed_string_dict={//attr:BUILD.bazel=z,//attr:leaf=a};yes/no;//attr:leaf,//attr:BUILD.bazel
+l05_a003;label_list_dict;^\\{a=\\[//attr:leaf\\], z=\\[//attr:BUILD\\.bazel, //attr:leaf\\]\\}$;//attr:l05_a003_yes,normal,label_list_dict={a=[//attr:leaf],z=[//attr:BUILD.bazel,//attr:leaf]};//attr:l05_a003_no,normal,label_list_dict={z=[//attr:BUILD.bazel,//attr:leaf],a=[//attr:leaf]};yes/no;//attr:leaf,//attr:BUILD.bazel
+l06_a001;scalar_label;^//attr:leaf$;//attr:l06_a001_yes,normal,label,scalar_label=//attr:leaf;//attr:l06_a001_no,normal,label,scalar_label=//attr:BUILD.bazel;yes/no;//attr:leaf,//attr:BUILD.bazel
+l06_a002;scalar_label;^@@ext\\+//leaf:label$;//attr:l06_a002_yes,normal,label,scalar_label=@@ext+//leaf:label;//attr:l06_a002_no,normal,label,scalar_label=//attr:leaf;yes/no;@@ext+//leaf:label,//attr:leaf
+l06_a003;$test_wrapper;^@@bazel_tools//tools/test:test_wrapper$;//attr:l06_a003_yes,test,$test_wrapper=@@bazel_tools//tools/test:test_wrapper;//attr:l06_a003_no,normal,$test_wrapper=absent;yes/no;@@bazel_tools//tools/test:test_wrapper
+l07_a001;equal_select_string;^aa$;//attr:l07_a001_yes,normal,select(cfg_a=a,cfg_b=b,default=d)+select(same_keys=a,b,d)->aa,bb,dd;//attr:l07_a001_no,normal,select(cfg_a=a,cfg_b=b,default=d)+select(same_keys=b,d,a)->ab,bd,da;yes/no;//attr:cfg_a,//attr:cfg_b
+l07_a002;equal_select_string;^bb$;//attr:l07_a002_yes,normal,select(cfg_a=a,cfg_b=b,default=d)+select(same_keys=a,b,d)->aa,bb,dd;//attr:l07_a002_no,normal,select(cfg_a=a,cfg_b=b,default=d)+select(same_keys=b,d,a)->ab,bd,da;yes/no;//attr:cfg_a,//attr:cfg_b
+l07_a003;equal_select_string;^dd$;//attr:l07_a003_yes,normal,select(cfg_a=a,cfg_b=b,default=d)+select(same_keys=a,b,d)->aa,bb,dd;//attr:l07_a003_no,normal,select(cfg_a=a,cfg_b=b,default=d)+select(same_keys=b,d,a)->ab,bd,da;yes/no;//attr:cfg_a,//attr:cfg_b
+l08_a001;cross_select_string;^ap$;//attr:l08_a001_yes,normal,cross_select_string=select(cfg_a=a,cfg_b=b)+select(cfg_p=p,cfg_q=q); //attr:l08_a001_no,normal,cross_select_string=aa;yes/no;//attr:cfg_a,//attr:cfg_b,//attr:cfg_p,//attr:cfg_q
+l08_a002;cross_select_string;^aq$;//attr:l08_a002_yes,normal,cross_select_string=select(cfg_a=a,cfg_b=b)+select(cfg_p=p,cfg_q=q); //attr:l08_a002_no,normal,cross_select_string=pp;yes/no;//attr:cfg_a,//attr:cfg_b,//attr:cfg_p,//attr:cfg_q
+l08_a003;cross_select_string;^bp$;//attr:l08_a003_yes,normal,cross_select_string=select(cfg_a=a,cfg_b=b)+select(cfg_p=p,cfg_q=q); //attr:l08_a003_no,normal,cross_select_string=ba;yes/no;//attr:cfg_a,//attr:cfg_b,//attr:cfg_p,//attr:cfg_q
+l08_a004;string_concat;^pa$;//attr:l08_a004_yes,normal,string_concat=select(cfg_p=p)+select(cfg_a=a); //attr:l08_a004_no,normal,string_concat=ap;yes/no;//attr:cfg_p,//attr:cfg_a
+l08_a005;args;^\\[p, a, p\\]$;//attr:l08_a005_yes,exec,args=select(cfg_p=[p])+select(cfg_a=[a,p]); //attr:l08_a005_no,exec,args=[p,a];yes/no;//attr:cfg_p,//attr:cfg_a
+l08_a006;args;^\\[p, a, p\\]$;//attr:l08_a006_yes,test,args=select(cfg_p=[p])+select(cfg_a=[a,p]); //attr:l08_a006_no,test,args=[p,a];yes/no;//attr:cfg_p,//attr:cfg_a
+l09_a001;visibility;^\\[//visibility:public\\]$;//attr:l09_a001_yes,normal,package_visibility=[//visibility:public];//attr:l09_a001_no,normal,visibility=[//visibility:private];yes/no;-
+l09_a002;testonly;^1$;//attr:l09_a002_yes,normal,package_testonly=1;//attr:l09_a002_no,normal,testonly=0;yes/no;-
+l09_a003;package_metadata;^\\[//attr:metadata\\]$;//attr:l09_a003_yes,normal,package_metadata=[//attr:metadata];//attr:l09_a003_no,normal,package_metadata=[];yes/no;//attr:metadata
+l09_a004;deprecation;^deprecated$;//attr:l09_a004_yes,normal,package_deprecation=deprecated;@@ext+//leaf:l09_a004_no,normal,same_schema,package_deprecation=null;yes/no;@@ext+//leaf,load(@@//attr:defs.bzl)
+l09_a005;licenses;^\\[notice\\]$;//attr:l09_a005_yes,filegroup,package_licenses=[notice];//attr:l09_a005_no,config_setting,licenses=[none];yes/no;-
+l09_a006;generator_name;^macro_case$;//attr:l09_a006_yes,normal,legacy_macro,generator_name=macro_case;//attr:l09_a006_no,normal,direct,generator_name=;yes/no;legacy_macro
+l09_a007;generator_function;^legacy_macro$;//attr:l09_a007_yes,normal,legacy_macro,generator_function=legacy_macro;//attr:l09_a007_no,normal,direct,generator_function=;yes/no;legacy_macro
+l09_a008;generator_location;^attr/BUILD\\.bazel:[0-9]+:[0-9]+$;//attr:l09_a008_yes,normal,legacy_macro,generator_location=attr/BUILD.bazel:line:column;//attr:l09_a008_no,normal,direct,generator_location=;yes/no;legacy_macro
+l09_a009;generator_name;^$;//attr:l09_a009_yes,normal,direct,generator_name=;//attr:l09_a009_no,normal,legacy_macro,generator_name=macro_case;yes/no;legacy_macro
+l09_a010;generator_function;^$;//attr:l09_a010_yes,normal,direct,generator_function=;//attr:l09_a010_no,normal,legacy_macro,generator_function=legacy_macro;yes/no;legacy_macro
+l09_a011;generator_location;^$;//attr:l09_a011_yes,normal,direct,generator_location=;//attr:l09_a011_no,normal,legacy_macro,generator_location=attr/BUILD.bazel:line:column;yes/no;legacy_macro
+l10_a001;expect_failure;^boom$;//attr:l10_a001_yes,normal,expect_failure=boom;//attr:l10_a001_no,normal,expect_failure=;yes/no;-
+l10_a002;toolchains;^\\[//attr:toolchain_type\\]$;//attr:l10_a002_yes,normal,toolchains=[//attr:toolchain_type];//attr:l10_a002_no,normal,toolchains=[];yes/no;//attr:toolchain_type
+l10_a003;exec_properties;^\\{cpu=k8\\}$;//attr:l10_a003_yes,normal,exec_properties={cpu=k8};//attr:l10_a003_no,normal,exec_properties={};yes/no;-
+l10_a004;exec_compatible_with;^\\[//attr:constraint_value\\]$;//attr:l10_a004_yes,normal,exec_compatible_with=[//attr:constraint_value];//attr:l10_a004_no,normal,exec_compatible_with=[];yes/no;//attr:constraint_value
+l10_a005;exec_group_compatible_with;^\\{group=\\[//attr:constraint_value\\]\\}$;//attr:l10_a005_yes,normal,exec_group_compatible_with={group=[//attr:constraint_value]};//attr:l10_a005_no,normal,exec_group_compatible_with={};yes/no;//attr:constraint_value
+l10_a006;target_compatible_with;^\\[//attr:constraint_value\\]$;//attr:l10_a006_yes,normal,target_compatible_with=[//attr:constraint_value];//attr:l10_a006_no,normal,target_compatible_with=[];yes/no;//attr:constraint_value
+l10_a007;$config_dependencies;^\\[//attr:cfg_a\\]$;//attr:l10_a007_yes,normal,selector_key=//attr:cfg_a;//attr:l10_a007_no,normal,no_selector_keys;yes/no;//attr:cfg_a
+l10_a008;args;^\\[a\\]$;//attr:l10_a008_yes,exec,args=[a];//attr:l10_a008_no,exec,args=[];yes/no;-
+l10_a009;output_licenses;^\\[notice\\]$;//attr:l10_a009_yes,exec,output_licenses=[notice];//attr:l10_a009_no,exec,output_licenses=[];yes/no;-
+l10_a010;$is_executable;^1$;//attr:l10_a010_yes,exec,$is_executable=1;//attr:l10_a010_no,normal,$is_executable=absent;yes/no;-
+l10_a011;build_setting_default;^base$;//attr:l10_a011_yes,string_setting,build_setting_default=base;//attr:l10_a011_no,string_setting,build_setting_default=other;yes/no;-
+l10_a012;help;^$;//attr:l10_a012_yes,string_setting,help=;//attr:l10_a012_no,string_setting,help=describe;yes/no;-
+l11_a001;testonly;^1$;//attr:l11_a001_yes,test,testonly=1;//attr:l11_a001_no,normal,testonly=0;yes/no;-
+l11_a002;size;^medium$;//attr:l11_a002_yes,test,size=medium;//attr:l11_a002_no,test,size=large;yes/no;-
+l11_a003;timeout;^moderate$;//attr:l11_a003_yes,test,size=medium,timeout=moderate;//attr:l11_a003_no,test,size=short,timeout=short;yes/no;-
+l11_a004;flaky;^0$;//attr:l11_a004_yes,test,flaky=0;//attr:l11_a004_no,test,flaky=1;yes/no;-
+l11_a005;shard_count;^-1$;//attr:l11_a005_yes,test,shard_count=-1;//attr:l11_a005_no,test,shard_count=0;yes/no;-
+l11_a006;local;^0$;//attr:l11_a006_yes,test,local=0;//attr:l11_a006_no,test,local=1;yes/no;-
+l11_a007;args;^\\[p, a, p\\]$;//attr:l11_a007_yes,test,args=[p,a,p];//attr:l11_a007_no,test,args=[p,a];yes/no;-
+l11_a008;$is_executable;^1$;//attr:l11_a008_yes,test,$is_executable=1;//attr:l11_a008_no,normal,$is_executable=absent;yes/no;-
+l11_a009;$test_wrapper;^@@bazel_tools//tools/test:test_wrapper$;//attr:l11_a009_yes,test,$test_wrapper=@@bazel_tools//tools/test:test_wrapper;//attr:l11_a009_no,normal,$test_wrapper=absent;yes/no;@@bazel_tools//tools/test:test_wrapper
+l11_a010;$xml_writer;^@@bazel_tools//tools/test:xml_writer$;//attr:l11_a010_yes,test,$xml_writer=@@bazel_tools//tools/test:xml_writer;//attr:l11_a010_no,normal,$xml_writer=absent;yes/no;@@bazel_tools//tools/test:xml_writer
+l11_a011;$test_runtime;^\\[@@bazel_tools//tools/test:runtime\\]$;//attr:l11_a011_yes,test,$test_runtime=[@@bazel_tools//tools/test:runtime];//attr:l11_a011_no,normal,$test_runtime=absent;yes/no;@@bazel_tools//tools/test:runtime
+l11_a012;$test_setup_script;^@@bazel_tools//tools/test:test_setup$;//attr:l11_a012_yes,test,$test_setup_script=@@bazel_tools//tools/test:test_setup;//attr:l11_a012_no,normal,$test_setup_script=absent;yes/no;@@bazel_tools//tools/test:test_setup
+l11_a013;$xml_generator_script;^@@bazel_tools//tools/test:test_xml_generator$;//attr:l11_a013_yes,test,$xml_generator_script=@@bazel_tools//tools/test:test_xml_generator;//attr:l11_a013_no,normal,$xml_generator_script=absent;yes/no;@@bazel_tools//tools/test:test_xml_generator
+l11_a014;$collect_coverage_script;^@@bazel_tools//tools/test:collect_coverage$;//attr:l11_a014_yes,test,$collect_coverage_script=@@bazel_tools//tools/test:collect_coverage;//attr:l11_a014_no,normal,$collect_coverage_script=absent;yes/no;@@bazel_tools//tools/test:collect_coverage
+l11_a015;:coverage_support;^@@bazel_tools//tools/test:coverage_support$;//attr:l11_a015_yes,test,:coverage_support=@@bazel_tools//tools/test:coverage_support;//attr:l11_a015_no,normal,:coverage_support=absent;yes/no;@@bazel_tools//tools/test:coverage_support
+l11_a016;:coverage_report_generator;^@@bazel_tools//tools/test:coverage_report_generator$;//attr:l11_a016_yes,test,:coverage_report_generator=@@bazel_tools//tools/test:coverage_report_generator;//attr:l11_a016_no,normal,:coverage_report_generator=absent;yes/no;@@bazel_tools//tools/test:coverage_report_generator
+l12_a001;tests;^\\[//attr:explicit_member_test\\]$;//attr:l12_a001_yes,test_suite,tests=[//attr:explicit_member_test],tags=[suite];//attr:l12_a001_no,test_suite,tests=[],tags=[suite];yes/no;//attr:explicit_member_test
+l12_a002;$implicit_tests;^\\[//attr:implicit_member_test\\]$;//attr:l12_a002_yes,test_suite,tests=[],tags=[suite],implicit_tests=[//attr:implicit_member_test];//attr:l12_a002_no,test_suite,tests=[//attr:explicit_member_test],tags=[suite],implicit_tests=[];yes/no;//attr:implicit_member_test,//attr:explicit_member_test
+l12_a003;$allowlist_function_transition;^@@bazel_tools//tools/allowlists:function_transition_allowlist$;//attr:l12_a003_yes,normal,identity_transition,outputs=[//attr:base_string_setting],allowlist=@@bazel_tools//tools/allowlists:function_transition_allowlist;//attr:l12_a003_no,normal,no_transition,allowlist=absent;yes/no;//attr:base_string_setting,@@bazel_tools//tools/allowlists:function_transition_allowlist
+l13_a001;name;^l13_a001_yes$;//attr:l13_a001_yes,filegroup,name;//attr:l13_a001_no,filegroup,name;yes/no;-
+l13_a002;visibility;^\\[//visibility:public\\]$;//attr:l13_a002_yes,filegroup,visibility=[//visibility:public];//attr:l13_a002_no,filegroup,visibility=[//visibility:private];yes/no;-
+l13_a003;transitive_configs;^\\[\\]$;//attr:l13_a003_yes,filegroup,transitive_configs=[];//attr:l13_a003_no,filegroup,transitive_configs=[//attr:cfg_a];yes/no;//attr:cfg_a
+l13_a004;deprecation;^deprecated$;//attr:l13_a004_yes,filegroup,package_deprecation=deprecated;@@ext+//leaf:l13_a004_no,filegroup,package_deprecation=null;yes/no;@@ext+//leaf
+l13_a005;tags;^\\[a, z\\]$;//attr:l13_a005_yes,filegroup,tags=[z,a],OI;//attr:l13_a005_no,filegroup,tags=[a];yes/no;-
+l13_a006;generator_name;^$;//attr:l13_a006_yes,filegroup,direct,generator_name=;//attr:l13_a006_no,filegroup,legacy_macro,generator_name=macro_case;yes/no;legacy_macro
+l13_a007;generator_function;^$;//attr:l13_a007_yes,filegroup,direct,generator_function=;//attr:l13_a007_no,filegroup,legacy_macro,generator_function=legacy_macro;yes/no;legacy_macro
+l13_a008;generator_location;^$;//attr:l13_a008_yes,filegroup,direct,generator_location=;//attr:l13_a008_no,filegroup,legacy_macro,generator_location=attr/BUILD.bazel:line:column;yes/no;legacy_macro
+l13_a009;testonly;^1$;//attr:l13_a009_yes,filegroup,package_testonly=1;//attr:l13_a009_no,filegroup,testonly=0;yes/no;-
+l13_a010;features;^\\[a, z\\]$;//attr:l13_a010_yes,filegroup,features=[z,a],OI;//attr:l13_a010_no,filegroup,features=[a],OI;yes/no;-
+l13_a011;:action_listener;^\\[\\]$;//attr:l13_a011_yes,filegroup,:action_listener=[];//attr:l13_a011_no,alias,:action_listener=absent,actual=//attr:leaf;yes/no;//attr:leaf
+l13_a012;compatible_with;^\\[//attr:constraint_value\\]$;//attr:l13_a012_yes,filegroup,compatible_with=[//attr:constraint_value];//attr:l13_a012_no,filegroup,compatible_with=[];yes/no;//attr:constraint_value
+l13_a013;restricted_to;^\\[//attr:constraint_value\\]$;//attr:l13_a013_yes,filegroup,restricted_to=[//attr:constraint_value];//attr:l13_a013_no,filegroup,restricted_to=[];yes/no;//attr:constraint_value
+l13_a014;$config_dependencies;^\\[//attr:cfg_a\\]$;//attr:l13_a014_yes,filegroup,selector_key=//attr:cfg_a;//attr:l13_a014_no,filegroup,no_selector_keys;yes/no;//attr:cfg_a
+l13_a015;package_metadata;^\\[//attr:metadata\\]$;//attr:l13_a015_yes,filegroup,package_metadata=[//attr:metadata];//attr:l13_a015_no,filegroup,package_metadata=[];yes/no;//attr:metadata
+l13_a016;aspect_hints;^\\[//attr:leaf\\]$;//attr:l13_a016_yes,filegroup,aspect_hints=[//attr:leaf];//attr:l13_a016_no,filegroup,aspect_hints=[];yes/no;//attr:leaf
+l13_a017;licenses;^\\[notice\\]$;//attr:l13_a017_yes,filegroup,package_licenses=[notice];//attr:l13_a017_no,filegroup,licenses=[none];yes/no;-
+l13_a018;distribs;^\\[internal\\]$;//attr:l13_a018_yes,filegroup,distribs=[internal];//attr:l13_a018_no,filegroup,distribs=[];yes/no;-
+l13_a019;target_compatible_with;^\\[//attr:constraint_value\\]$;//attr:l13_a019_yes,filegroup,target_compatible_with=[//attr:constraint_value];//attr:l13_a019_no,filegroup,target_compatible_with=[];yes/no;//attr:constraint_value
+l13_a020;srcs;^\\[//attr:leaf\\]$;//attr:l13_a020_yes,filegroup,srcs=[//attr:leaf];//attr:l13_a020_no,filegroup,srcs=[];yes/no;//attr:leaf
+l13_a021;output_group;^group$;//attr:l13_a021_yes,filegroup,output_group=group;//attr:l13_a021_no,filegroup,output_group=;yes/no;-
+l13_a022;data;^\\[//attr:leaf\\]$;//attr:l13_a022_yes,filegroup,data=[//attr:leaf];//attr:l13_a022_no,filegroup,data=[];yes/no;//attr:leaf
+l13_a023;output_licenses;^\\[notice\\]$;//attr:l13_a023_yes,filegroup,output_licenses=[notice];//attr:l13_a023_no,filegroup,output_licenses=[];yes/no;-
+l14_a001;actual;^//attr:leaf$;//attr:l14_a001_yes,alias,actual=//attr:leaf;//attr:l14_a001_no,alias,actual=//attr:BUILD.bazel;yes/no;//attr:leaf,//attr:BUILD.bazel
+l14_a002;no_match_error;^no match$;//attr:l14_a002_yes,toolchain_type,no_match_error=no match;//attr:l14_a002_no,toolchain_type,no_match_error=;yes/no;-
+l14_a003;licenses;^\\[notice\\]$;//attr:l14_a003_yes,filegroup,package_licenses=[notice];//attr:l14_a003_no,alias,licenses=absent;yes/no;-
+l14_a004;distribs;^\\[internal\\]$;//attr:l14_a004_yes,filegroup,distribs=[internal];//attr:l14_a004_no,toolchain_type,distribs=absent;yes/no;-
+l14_a005;:action_listener;^\\[\\]$;//attr:l14_a005_yes,filegroup,:action_listener=[];//attr:l14_a005_no,alias,:action_listener=absent;yes/no;-
+l15_a001;tags;^\\[manual\\]$;//attr:l15_a001_yes,config_setting,tags=[manual];//attr:l15_a001_no,filegroup,tags=[];yes/no;-
+l15_a002;licenses;^\\[none\\]$;//attr:l15_a002_yes,config_setting,licenses=[none];//attr:l15_a002_no,filegroup,package_licenses=[notice];yes/no;-
+l15_a003;values;^\\{mode=fast\\}$;//attr:l15_a003_yes,config_setting,values={mode=fast};//attr:l15_a003_no,config_setting,values={};yes/no;-
+l15_a004;define_values;^\\{feature=on\\}$;//attr:l15_a004_yes,config_setting,define_values={feature=on};//attr:l15_a004_no,config_setting,define_values={};yes/no;-
+l15_a005;flag_values;^\\{//attr:flag=on\\}$;//attr:l15_a005_yes,config_setting,flag_values={//attr:flag=on};//attr:l15_a005_no,config_setting,flag_values={};yes/no;//attr:flag
+l15_a006;constraint_values;^\\[//attr:constraint_value\\]$;//attr:l15_a006_yes,config_setting,constraint_values=[//attr:constraint_value];//attr:l15_a006_no,config_setting,constraint_values=[];yes/no;//attr:constraint_value
+l15_a007;:flag_alias_settings;^\\[\\]$;//attr:l15_a007_yes,config_setting,:flag_alias_settings=[];//attr:l15_a007_no,normal,:flag_alias_settings=absent;yes/no;-
+l15_a008;compatible_with;^\\[\\]$;//attr:l15_a008_yes,filegroup,compatible_with=[];//attr:l15_a008_no,config_setting,compatible_with=absent;yes/no;-
+l15_a009;restricted_to;^\\[\\]$;//attr:l15_a009_yes,filegroup,restricted_to=[];//attr:l15_a009_no,config_setting,restricted_to=absent;yes/no;-
+l15_a010;target_compatible_with;^\\[\\]$;//attr:l15_a010_yes,filegroup,target_compatible_with=[];//attr:l15_a010_no,config_setting,target_compatible_with=absent;yes/no;-
+l16_a001;testonly;^1$;//attr:l16_a001_yes,test_suite,testonly=1;//attr:l16_a001_no,filegroup,testonly=0;yes/no;-
+l16_a002;tests;^\\[//attr:explicit_member_test\\]$;//attr:l16_a002_yes,test_suite,tests=[//attr:explicit_member_test],tags=[suite];//attr:l16_a002_no,test_suite,tests=[],tags=[suite];yes/no;//attr:explicit_member_test
+l16_a003;$implicit_tests;^\\[//attr:implicit_member_test\\]$;//attr:l16_a003_yes,test_suite,tests=[],tags=[suite],implicit_tests=[//attr:implicit_member_test];//attr:l16_a003_no,test_suite,tests=[//attr:explicit_member_test],tags=[suite],implicit_tests=[];yes/no;//attr:implicit_member_test,//attr:explicit_member_test
+l16_a004;default_constraint_value;^//attr:constraint_value$;//attr:l16_a004_yes,constraint_setting,default_constraint_value=//attr:constraint_value;//attr:l16_a004_no,constraint_setting,default_constraint_value=null;yes/no;//attr:constraint_value
+l16_a005;refines_constraint_value;^//attr:constraint_value$;//attr:l16_a005_yes,constraint_setting,refines_constraint_value=//attr:constraint_value;//attr:l16_a005_no,constraint_setting,refines_constraint_value=null;yes/no;//attr:constraint_value
+l16_a006;:action_listener;^\\[\\]$;//attr:l16_a006_yes,filegroup,:action_listener=[];//attr:l16_a006_no,constraint_setting,:action_listener=absent;yes/no;-
+l16_a007;package_metadata;^\\[\\]$;//attr:l16_a007_yes,filegroup,package_metadata=[];//attr:l16_a007_no,constraint_setting,package_metadata=absent;yes/no;-
+l16_a008;compatible_with;^\\[\\]$;//attr:l16_a008_yes,filegroup,compatible_with=[];//attr:l16_a008_no,constraint_setting,compatible_with=absent;yes/no;-
+l16_a009;restricted_to;^\\[\\]$;//attr:l16_a009_yes,filegroup,restricted_to=[];//attr:l16_a009_no,constraint_setting,restricted_to=absent;yes/no;-
+l16_a010;target_compatible_with;^\\[\\]$;//attr:l16_a010_yes,filegroup,target_compatible_with=[];//attr:l16_a010_no,constraint_setting,target_compatible_with=absent;yes/no;-
+l16_a011;constraint_setting;^//attr:constraint_setting$;//attr:l16_a011_yes,constraint_value,constraint_setting=//attr:constraint_setting;//attr:l16_a011_no,constraint_value,constraint_setting=//attr:other_constraint_setting;yes/no;//attr:constraint_setting,//attr:other_constraint_setting
+l16_a012;:action_listener;^\\[\\]$;//attr:l16_a012_yes,filegroup,:action_listener=[];//attr:l16_a012_no,constraint_value,:action_listener=absent;yes/no;-
+l16_a013;package_metadata;^\\[\\]$;//attr:l16_a013_yes,filegroup,package_metadata=[];//attr:l16_a013_no,constraint_value,package_metadata=absent;yes/no;-
+l16_a014;compatible_with;^\\[\\]$;//attr:l16_a014_yes,filegroup,compatible_with=[];//attr:l16_a014_no,constraint_value,compatible_with=absent;yes/no;-
+l16_a015;restricted_to;^\\[\\]$;//attr:l16_a015_yes,filegroup,restricted_to=[];//attr:l16_a015_no,constraint_value,restricted_to=absent;yes/no;-
+l16_a016;target_compatible_with;^\\[\\]$;//attr:l16_a016_yes,filegroup,target_compatible_with=[];//attr:l16_a016_no,constraint_value,target_compatible_with=absent;yes/no;-
+l17_a001;tags;^\\[manual\\]$;//attr:l17_a001_yes,platform,tags=[manual];//attr:l17_a001_no,filegroup,tags=[];yes/no;-
+l17_a002;constraint_values;^\\[//attr:constraint_value\\]$;//attr:l17_a002_yes,platform,constraint_values=[//attr:constraint_value];//attr:l17_a002_no,platform,constraint_values=[];yes/no;//attr:constraint_value
+l17_a003;parents;^\\[//attr:parent_platform\\]$;//attr:l17_a003_yes,platform,parents=[//attr:parent_platform];//attr:l17_a003_no,platform,parents=[];yes/no;//attr:parent_platform
+l17_a004;remote_execution_properties;^remote$;//attr:l17_a004_yes,platform,remote_execution_properties=remote;//attr:l17_a004_no,platform,remote_execution_properties=;yes/no;-
+l17_a005;exec_properties;^\\{cpu=k8\\}$;//attr:l17_a005_yes,platform,exec_properties={cpu=k8};//attr:l17_a005_no,platform,exec_properties={};yes/no;-
+l17_a006;flags;^\\[--cpu=k8\\]$;//attr:l17_a006_yes,platform,flags=[--cpu=k8];//attr:l17_a006_no,platform,flags=[];yes/no;-
+l17_a007;missing_toolchain_error;^For more information on platforms or toolchains see https://bazel\\.build/concepts/platforms-intro\\.$;//attr:l17_a007_yes,platform,missing_toolchain_error=default;//attr:l17_a007_no,platform,missing_toolchain_error=custom;yes/no;-
+l17_a008;required_settings;^\\[//attr:required_config_setting\\]$;//attr:l17_a008_yes,platform,required_settings=[//attr:required_config_setting];//attr:l17_a008_no,platform,required_settings=[];yes/no;//attr:required_config_setting
+l17_a009;check_toolchain_types;^0$;//attr:l17_a009_yes,platform,check_toolchain_types=0;//attr:l17_a009_no,platform,check_toolchain_types=1;yes/no;-
+l17_a010;allowed_toolchain_types;^\\[//attr:toolchain_type\\]$;//attr:l17_a010_yes,platform,allowed_toolchain_types=[//attr:toolchain_type];//attr:l17_a010_no,platform,allowed_toolchain_types=[];yes/no;//attr:toolchain_type
+l17_a011;:action_listener;^\\[\\]$;//attr:l17_a011_yes,filegroup,:action_listener=[];//attr:l17_a011_no,platform,:action_listener=absent;yes/no;-
+l17_a012;package_metadata;^\\[\\]$;//attr:l17_a012_yes,filegroup,package_metadata=[];//attr:l17_a012_no,platform,package_metadata=absent;yes/no;-
+l17_a013;compatible_with;^\\[\\]$;//attr:l17_a013_yes,filegroup,compatible_with=[];//attr:l17_a013_no,platform,compatible_with=absent;yes/no;-
+l17_a014;restricted_to;^\\[\\]$;//attr:l17_a014_yes,filegroup,restricted_to=[];//attr:l17_a014_no,platform,restricted_to=absent;yes/no;-
+l17_a015;target_compatible_with;^\\[\\]$;//attr:l17_a015_yes,filegroup,target_compatible_with=[];//attr:l17_a015_no,platform,target_compatible_with=absent;yes/no;-
+l18_a001;tags;^\\[manual\\]$;//attr:l18_a001_yes,toolchain,tags=[manual];//attr:l18_a001_no,filegroup,tags=[];yes/no;-
+l18_a002;target_compatible_with;^\\[\\]$;//attr:l18_a002_yes,toolchain,target_compatible_with=[];//attr:l18_a002_no,filegroup,target_compatible_with=[//attr:constraint_value];yes/no;//attr:constraint_value
+l18_a003;toolchain_type;^//attr:toolchain_type$;//attr:l18_a003_yes,toolchain,toolchain_type=//attr:toolchain_type;//attr:l18_a003_no,toolchain,toolchain_type=//attr:other_toolchain_type;yes/no;//attr:toolchain_type,//attr:other_toolchain_type
+l18_a004;toolchain;^//attr:leaf$;//attr:l18_a004_yes,toolchain,toolchain=//attr:leaf;//attr:l18_a004_no,toolchain,toolchain=//attr:BUILD.bazel;yes/no;//attr:leaf,//attr:BUILD.bazel
+l18_a005;exec_compatible_with;^\\[//attr:constraint_value\\]$;//attr:l18_a005_yes,toolchain,exec_compatible_with=[//attr:constraint_value];//attr:l18_a005_no,toolchain,exec_compatible_with=[];yes/no;//attr:constraint_value
+l18_a006;use_target_platform_constraints;^0$;//attr:l18_a006_yes,toolchain,use_target_platform_constraints=0;//attr:l18_a006_no,toolchain,use_target_platform_constraints=1;yes/no;-
+l18_a007;target_settings;^\\[//attr:target_config_setting\\]$;//attr:l18_a007_yes,toolchain,target_settings=[//attr:target_config_setting];//attr:l18_a007_no,toolchain,target_settings=[];yes/no;//attr:target_config_setting
+l18_a008;:action_listener;^\\[\\]$;//attr:l18_a008_yes,filegroup,:action_listener=[];//attr:l18_a008_no,toolchain,:action_listener=absent;yes/no;-
+l18_a009;compatible_with;^\\[\\]$;//attr:l18_a009_yes,filegroup,compatible_with=[];//attr:l18_a009_no,toolchain,compatible_with=absent;yes/no;-
+l18_a010;restricted_to;^\\[\\]$;//attr:l18_a010_yes,filegroup,restricted_to=[];//attr:l18_a010_no,toolchain,restricted_to=absent;yes/no;-
+```
+<!-- attr-manifest-records:end -->
+
+Negative-only controls, excluded from the 165 records: `attr(name,"^.*$",
+//attr:BUILD.bazel)` is no because a source file is not a Rule;
+`attr(name,"^.*$",//attr:l01_generated_nonrule)` is no because that generated
+output is not a Rule; and `attr(name,"^.*$",//attr:l01_package_group_nonrule)`
+is no because a package group is not a Rule. `attr(nullable_output,"^.*$",
+//attr:l03_null_output)` is no for the null output default; and
+`attr(_private,"^.*$",//attr:l03_private_spelling)` is no because the private
+schema spelling is `$private`. These five controls consume neither IDs nor pair
+instances.
+
+Lane 4 also has two negative-only spelling controls, excluded from the record
+count: each OI declaration above is queried with `^\\[z, a, z\\]$` and selects
+nothing. They establish that declaration order is not the rendered order.
+The remaining two negative-only controls are
+`attr(:run_under_exec_config,"^.*$",//attr:l11_run_under_exec_null)` and
+`attr(:run_under_target_config,"^.*$",//attr:l11_run_under_target_null)`;
+both have null loading fallbacks and select nothing. Together with the five
+listed above and the two lane-4 controls, these are the nine controls.
+
+Lane 7 is three independent ordinary-query rows, whose exact normalized stdout
+is respectively `//attr:l07_a001_yes`, `//attr:l07_a002_yes`, and
+`//attr:l07_a003_yes`. For every row the positive equal-key pair has candidate
+set `{aa,bb,dd}`. Its negative is also two `select`s over exactly
+`cfg_a,cfg_b,default`, with correlated candidate set `{ab,bd,da}`. The queried
+`aa`, `bb`, or `dd` is absent from that correct set, while an erroneous
+distinct-key cross-product of the two negative select value sets would include
+all three. This is the correlation discriminator; no negative is a scalar
+shortcut.
+
+The three retained external baselines all live in the one existing
+`modules/ext/leaf/BUILD.bazel` package, which loads `@@//attr:defs.bzl`; no
+sixth source is introduced. `@@ext+//leaf:l02_a007_no` and
+`@@ext+//leaf:l09_a004_no` are identical main-defined normal rules with the
+external package's null deprecation default. `@@ext+//leaf:l13_a004_no` is a
+native `filegroup` with that same null package default. They are distinct
+external probe instances; `filegroup(name="label")` remains the lane-6
+external leaf in the same file.
+
+Correction-only independent rereview returned `ACCEPT` for the complete
+165-record manifest, its constructibility and discriminators, and the retained
+five-file/two-package boundary. Run next only
+`WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`; generation
+must reproduce SHA-256
+`3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`
+before transcribing any row.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

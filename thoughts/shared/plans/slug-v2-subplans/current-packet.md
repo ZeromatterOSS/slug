@@ -1,52 +1,57 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-atomic-discriminator-manifest-design`
-Milestone: M3 query / Stage 4 exact oracle design
+Packet: `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`
+Milestone: M3 query / Stage 4 exact oracle generation
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: freeze the complete stable-ID manifest for all 165 ordinary-`attr()`
-discriminator atoms before fixture generation.
+Result: generate and validate the isolated Bazel 9.2 loading oracle from the
+reviewed 165-record ordinary-`attr()` manifest without inference or drift.
 
 ## Background and boundary
 
-The corrected vector and two-package layout are accepted, but only lane 2's
-`l02_a007` has a stable exact binding. Family prose and totals do not tell a
-writer which ID owns each attr spelling, regex, typed yes/no value, absence,
-support target, or expected label. Earlier drafts showed that inferring those
-choices during generation can yield green yet incomplete evidence.
+The Stage 4 owner freezes all 165 bindings, constructor fills, support targets,
+nine negative-only controls, three external null-deprecation baselines, and
+exact lane-7 and test-suite discriminators. Its authoritative LF-terminated
+record stream has vector
+`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` and SHA-256
+`3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`.
+Independent correction rereview returned `ACCEPT`; generation may transcribe
+that manifest but may not reinterpret it.
 
-## Required manifest
+## Required generation
 
-- Add one authoritative 165-row table to the Stage 4 owner. IDs are contiguous
-  within vector `13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` and use
-  `lNN_aMMM` names.
-- Each row freezes: query attribute spelling; anchored whole-value regex;
-  positive label, exact rule class/schema, declaration/default value and
-  rendered candidate; negative label/operand, exact schema/value or reason for
-  absence; expected positive/negative behavior; and named support targets.
-- Mark source/generated/package-group, null output/run-under, `_private`, and
-  other negative-only controls explicitly. Never invent a positive pair for
-  them or reuse a positive label between atoms in a lane.
-- Preserve lane 2 `l02_a007` positive main/default package and negative
-  `@@ext+//leaf` same-schema baseline, canonical-main `.bzl` load, lane 6 exact
-  external label, lane 9 direct/macro provenance, lane 12 transition output,
-  all native additions/removals, and loading-only toolchain boundary.
-- Derive a deterministic manifest checksum/count summary for Stage 8 so later
-  generation can prove it transcribed the reviewed table without silently
-  dropping or renumbering atoms.
+- Recompute the authoritative record count, vector, and digest before writing
+  a fixture row; stop if any differs.
+- Add only the new fixture TOML/expected record, the five-file canonical payload
+  projection (`MODULE.bazel`, main `attr/defs.bzl` and `attr/BUILD.bazel`, local
+  module/leaf BUILD files), Python derived global/projection integrity, and the
+  Rust global SHA plus the accepted 275-to-285 entry-count update. Do not add a
+  Rust projection.
+- Produce exactly 18 query rows, 165 globally unique positive/negative pairs,
+  330 probe instances, and the nine named negative-only controls. Exact stdout
+  lists every `_yes` once and no `_no`; lane 7, suite closure, macro/direct
+  provenance, canonical-main external loads, transition allowlist, and all
+  native loading-only additions/removals follow the manifest literally.
+- Keep the accepted cap: +7 payload-expanded regular files, +5 directories,
+  zero links, and at most +2,400 logical lines. Preserve all fourteen existing
+  projections and the isolated root-without-`BUILD.bazel` layout.
+- Run update and clean replay independently with pinned Bazel 9.2; both must
+  freeze `@@ext+//leaf:label`, all 18 exact rows, payload metadata/integrity,
+  the protected 29-row CLI suite, and the two generated-kind CLI/server cases.
 
-## Files and review
+## Boundary and review
 
-Edit only Stage 4 and Stage 8 owner plans. Read the total schema ledger, pinned
-Bazel 9.2 source, stopped attempts, payload format, and consumer boundary
-without edits. Add no fixture, payload, expected record, Rust, Cargo/lockfile,
-BUILD, canonical plan, manifest scheduler, routing log, generated content,
-JVM/Java artifact, or Bazel delegation. Obtain independent review of the full
-165-row latest text before scheduling generation.
+Use pinned Bazel only as the external oracle. Production remains Rust-native:
+add no production Rust query projection, graph/DICE/regex state, configured
+analysis, toolchain resolution, JVM, Java source/bytecode/helper, or production
+Bazel delegation. Run the fixture hygiene review required at this growth
+boundary, then obtain independent review of the generated evidence before
+activation is scheduled.
 
 ## Stops
 
-Stop and `REPLAN` if any accepted family lacks a finite exact atom binding, if
-the vector or two-package architecture must change, if a row relies on
-configured analysis/unbounded registry, or if the work would activate Slug,
-add graph/DICE/regex state, JVM/Java, or production Bazel delegation.
+Stop and `REPLAN` before generation if the manifest cannot be transcribed
+literally, if count/vector/digest or five-file/two-package arithmetic changes,
+if another material contract correction is required, or if any row needs
+configured analysis, an unbounded registry, JVM/Java, or production Bazel
+delegation.
