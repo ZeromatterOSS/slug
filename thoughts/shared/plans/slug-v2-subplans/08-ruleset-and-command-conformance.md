@@ -3428,3 +3428,11 @@ Independent Sol review returned `ACCEPT` for the canonical-main load,
 package-local null default, unchanged 165-pair ledger, five-file arithmetic,
 and isolation. Run next only
 `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`.
+
+Generation preflight returned `REPLAN` before writes or Bazel because the
+accepted plan has no complete stable-ID atom map: only `l02_a007` freezes its
+exact attr/regex/yes/no binding. Run next only
+`WP-4-8-m3-attr-atomic-discriminator-manifest-design` to freeze all 165 IDs,
+schemas, values/absences, regexes, expected labels, and support dependencies in
+Stage 4 before another generation attempt. No fixture, payload, Rust, Cargo,
+graph/DICE, JVM/Java artifact, or Bazel delegation is authorized.

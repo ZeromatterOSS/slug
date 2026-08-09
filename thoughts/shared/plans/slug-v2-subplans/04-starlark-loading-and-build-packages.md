@@ -1318,6 +1318,25 @@ deprecation default remains package-local. Residual risk is limited to the
 isolated update/replay confirming the canonical load and null result. Run next
 only `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`.
 
+Generation preflight then returned `REPLAN` without file changes or a Bazel
+run. The owner text freezes all semantic families and lane totals, but it does
+not assign the remaining 164 stable `lNN_aMMM` IDs to an exact attribute
+spelling, anchored regex, positive rule schema/value, negative schema/value or
+absence, and expected label. Only lane 2 deprecation `l02_a007` is frozen.
+Inventing that mapping while writing the fixture would combine unreviewed
+oracle design with generation, precisely the ambiguity that allowed earlier
+green-but-incomplete drafts.
+
+Run next only `WP-4-8-m3-attr-atomic-discriminator-manifest-design`. Add to the
+Stage 4 owner plan a complete 165-row authoritative atom manifest keyed by the
+corrected vector. Every row must freeze query spelling, regex, yes/no labels,
+rule classes and values/absence, expected presence, support-target dependency,
+and whether a control is negative-only. Stage 8 receives only a compact
+checksum/count summary. The manifest must preserve the reviewed external
+baseline, five-file layout, caps, isolation, and no-reuse rule. Add no fixture,
+payload, expected record, Rust, Cargo, graph, DICE, JVM/Java artifact, or Bazel
+delegation during that design packet.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
