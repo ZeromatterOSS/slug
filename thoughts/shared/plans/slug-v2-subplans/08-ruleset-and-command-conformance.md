@@ -3571,3 +3571,24 @@ discarded; no fixture/code/JVM/configured/toolchain work remains. Run next only
 `WP-4-8-m3-attr-five-source-template-oracle-design-retry-3` with executable
 exact argv before documentation, two independent scratch parents, all 18 lanes
 twice, all nine controls, focused probes, and terminal review.
+
+## `attr` five-source template retry-3 terminal REPLAN (2026-08-09)
+
+Retry-3 made no Stage 4 or Stage 8 edits, created no temporary root, and ran no
+Bazel command. The exact deleted five-body representation and its unaccepted
+hash anchors are unrecoverable from `HEAD`, reachable log history, and the
+unreachable-object audit. Manual recovery would introduce the forbidden second
+representation, so this is terminal `REPLAN`, not an evidence failure.
+
+Run next only
+`WP-4-8-m3-attr-five-source-executable-reconstruction-design`, design-only.
+It reconstructs fresh five LF bodies from the accepted 165-row semantic
+manifest and reviewed construction obligations; fresh hashes are expected and
+the old unaccepted hashes are not requirements. One disposable
+machine-readable/executable representation must own bodies, 18 primary argv,
+nine literal-empty controls, focused probes, execution in two independent
+`mktemp -d` sibling `workspace`/`out` roots, and mechanical candidate/pending
+Stage 4/Stage 8 rendering. Its exact OI and generator regex bytes are
+`^\[z, a, z\]$` and `^attr/BUILD\.bazel:[0-9]+:[0-9]+$`. Stop on a manifest
+semantic change or need beyond five files/two packages. No fixture, code,
+configured analysis, toolchain, JVM/Java, or production-Bazel work is allowed.

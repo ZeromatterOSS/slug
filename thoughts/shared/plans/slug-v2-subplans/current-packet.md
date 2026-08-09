@@ -1,10 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-five-source-template-oracle-design-retry-3`
+Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-design`
 Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: design-only retry after retry-2's second literal-argv evidence defect.
+Result: design-only fresh reconstruction after retry-3 correctly stopped on an
+unrecoverable deleted source-template representation.
 
 ## Immutable semantic boundary
 
@@ -18,12 +19,16 @@ supports, package-derived notice construction, medium/small computed timeout,
 Starlark/native `legacy_macro`, suite/manual closure, separate test/exec
 schemas, transition allowlist, and external baseline remain viable.
 
-## Required retry-3 design
+## Required reconstruction design
 
-- Freeze the five LF-exact bodies, byte counts, hashes, roles, and all command
-  argv in one machine-readable/executable representation; execute those exact
-  bytes before rendering any prose or command record. No second transcription
-  layer is admitted.
+- Reconstruct fresh five LF-exact bodies from the accepted 165-row semantic
+  manifest and every reviewed hidden construction obligation into one
+  disposable machine-readable/executable representation. The old unaccepted
+  body hashes are not requirements; fresh byte counts and hashes are expected.
+- That one representation owns the bodies, all 18 primary argv, nine controls,
+  focused probes, execution, and mechanical documentation rendering. Execute
+  its exact bytes before rendering prose or command records; no second manual
+  representation or post-render transcription is admitted.
 - Use two independent `mktemp -d` scratch parents. Each has direct-written
   sibling `workspace` and `out` paths; run all 18 lanes in both, compare exact
   stdout, and prove the location-sensitive primary in both roots.
@@ -43,5 +48,5 @@ add no fixture, payload, expected record, generated source, Python, Rust,
 Cargo/lockfile, BUILD, graph/DICE/regex state, configured analysis, toolchain
 resolution, JVM/Java artifact, or production Bazel delegation. Use ordinary RC
 discovery without inspecting or copying the private RC. Stop and `REPLAN` if a
-semantic body/manifest change, probe disagreement, different roots, extra
-source, or any excluded work is needed.
+manifest semantic change, probe disagreement, different roots, a need beyond
+the five files/two packages, or any excluded work is needed.

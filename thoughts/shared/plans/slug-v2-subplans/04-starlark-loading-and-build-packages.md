@@ -1988,3 +1988,24 @@ execute those exact bytes before rendering documentation; recreate the five
 exact bodies; use two independent `mktemp` parents with sibling `workspace` and
 `out`; run all 18 lanes twice, all nine controls, and focused probes; then
 obtain terminal independent review. Do not add a second transcription layer.
+
+### `attr` five-source template retry-3 terminal REPLAN (2026-08-09)
+
+Retry-3 made no Stage 4 or Stage 8 edits, created no temporary root, and ran no
+Bazel command. The exact deleted bodies and their unaccepted hash anchors are
+unrecoverable from `HEAD`, reachable log history, and the unreachable-object
+audit. Recovering them would require a manual second representation, which
+violates retry-3's executable-source contract.
+
+Run next only
+`WP-4-8-m3-attr-five-source-executable-reconstruction-design`. It may
+reconstruct fresh five LF bodies from the accepted 165-row semantic manifest
+and reviewed construction obligations, with new hashes expected rather than
+the old unaccepted hashes. One disposable machine-readable/executable source
+must own those bodies, all 18 primary argv, nine zero-output controls, focused
+probes, two independent `mktemp -d` sibling `workspace`/`out` executions, and
+mechanical Stage 4/Stage 8 rendering. It must retain exact single-backslash OI
+`^\[z, a, z\]$` and generator
+`^attr/BUILD\.bazel:[0-9]+:[0-9]+$` bytes. Stop on a manifest semantic change
+or any need beyond five files/two packages; add no fixture, code, configured
+analysis, toolchain, JVM/Java, or production-Bazel work.
