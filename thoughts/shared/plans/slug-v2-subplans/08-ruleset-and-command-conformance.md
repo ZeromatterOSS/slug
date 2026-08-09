@@ -3542,3 +3542,20 @@ Run next only `WP-4-8-m3-attr-license-default-source-evidence`. Freeze pinned
 source and a minimal package/default/explicit matrix, then select the smallest
 finite source construction or manifest correction. Add no template, fixture,
 payload, code, JVM artifact, configured analysis, or production delegation.
+
+Pinned-source and Bazel 9.2 matrix evidence returns `ACCEPT` for the exact
+construction: BUILD-only `licenses(["notice"])` supplies `[notice]` to native
+filegroups even beside `default_package_metadata`; it does not add a Starlark
+rule schema attr and does not replace config_setting's `[none]`. The six finite
+package-derived filegroup operands are `l02_a005_yes`, `l02_a006_no`,
+`l09_a005_yes`, `l13_a017_yes`, `l14_a003_yes`, and `l15_a002_no`; remove only
+their explicit notice arguments in the next source-template retry. Manifest
+rows, count/vector, and SHA `99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`
+stay unchanged. Retain the four other reviewed source obligations and the
+Rust-native/no-JVM, loading-only boundary. Run next only
+`WP-4-8-m3-attr-five-source-template-oracle-design-retry-2`.
+
+Independent review returned `ACCEPT`: BUILD `licenses()` remains active despite
+the Starlark `attr.license` disable flag, native package-license injection is
+separate from metadata, and the six-filegroup construction preserves the
+165-record SHA. The retry-2 packet owns full two-root hidden-probe review.

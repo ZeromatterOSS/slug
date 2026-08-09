@@ -1,57 +1,57 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-license-default-source-evidence`
-Milestone: M3 query / Stage 4 loading-default evidence
+Packet: `WP-4-8-m3-attr-five-source-template-oracle-design-retry-2`
+Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: determine exactly whether Bazel 9.2 can render package-derived
-`licenses=[notice]` for the required rule families/layout, and freeze the
-smallest evidence-backed correction before source-template work resumes.
+Result: freeze and validate exact five-file source and 18 command/output bytes,
+including every reviewed hidden construction without changing the accepted
+165-row semantic manifest.
 
 ## Background and boundary
 
-The current semantic manifest has 165 rows with vector
+The accepted manifest has 165 rows with vector
 `13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` and SHA-256
 `99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`.
-The source-template retry stopped before plan edits: a minimal Bazel 9.2 package
-with required `default_package_metadata`, `licenses(["notice"])`, and a
-`filegroup` loads successfully, but
-`attr("licenses","^\\[notice\\]$",//attr:x)` returns empty. The package-derived
-license obligation therefore has no validated source construction. Explicit
-target licenses produce the value but would change the frozen provenance.
+Pinned source and reviewed Bazel 9.2 matrix evidence establish the exact
+package-license construction: retain `default_package_metadata`, add BUILD-only
+`licenses(["notice"])`, and omit explicit notice only on the six named
+package-derived filegroups. Starlark normal remains attr-absent and
+`config_setting` remains `[none]`. The earlier empty result was an over-escaped
+regex, not a Bazel semantic boundary.
 
-## Required evidence
+## Required design
 
-- Read pinned Bazel 9.2 license declaration/default/injection and query-renderer
-  sources at commit `8220c6198837d5c13d53fea211cf3282aa12408a`; distinguish
-  package metadata, package license declarations, explicit rule licenses, and
-  any incompatible/disabled legacy path.
-- In disposable roots, run a minimal matrix with and without
-  `default_package_metadata`, package `licenses(["notice"])`, and explicit
-  licenses across Starlark normal, native filegroup, and config_setting targets.
-  Freeze exact `attr("licenses",...)` outputs and relevant diagnostics under
-  ordinary RC discovery; remove every temp root afterward.
-- Decide one bounded outcome: an exact package-derived source construction that
-  preserves all six manifest atoms, or a manifest correction changing those
-  operands to their actually observable explicit/default semantics. List every
-  affected stable ID and the resulting checksum work; do not apply it here.
-- Preserve the other accepted source-template obligations: pair-specific
-  lane-1 supports, computed medium/small timeout, lane-13 `legacy_macro`
-  provenance, and suite/manual tag closure.
-- Obtain independent review of the source ranges, oracle matrix, and chosen
-  outcome before scheduling any manifest or template edit.
+- Freeze complete LF-exact bodies, byte counts, SHA-256s, and roles for only
+  `MODULE.bazel`, `attr/defs.bzl`, `attr/BUILD.bazel`,
+  `modules/ext/MODULE.bazel`, and `modules/ext/leaf/BUILD.bazel`; no root BUILD.
+- Apply every accepted construction: pair-specific lane-1 supports; one
+  package-level `licenses(["notice"])` and no explicit notice on exactly
+  `l02_a005_yes`, `l02_a006_no`, `l09_a005_yes`, `l13_a017_yes`,
+  `l14_a003_yes`, `l15_a002_no`; medium/small computed timeout; one named
+  `legacy_macro` for Starlark/native provenance; suite tags; all-other-test
+  manual tags; separate executable/test attr dictionaries; corrected transition
+  allowlist and external baselines.
+- Freeze 18 literal primary expressions and normalized outputs, complete source
+  declarations and supports, plus the 165-ID/nine-control bijection.
+- In two fresh disposable roots/output bases, run all primary commands and
+  focused hidden probes for lane-1 supports, license provenance, computed
+  timeout, macro function, and tag closure. Primary outputs must be identical,
+  contain every `_yes` once/no `_no`, and retain canonical external/tool labels.
+- Refresh exact file/total bytes and lines and future generation cap. Remove all
+  temporary roots/outputs/lockfiles/helpers and obtain full independent review.
 
 ## Boundary and review
 
-Edit only Stage 4 and Stage 8. Temporary sources stay outside the checkout and
-are removed. Add no fixture, payload, expected record, source template, Python,
+Edit only Stage 4 and Stage 8. Temporary source material remains outside the
+checkout. Add no fixture, payload, expected record, generated source, Python,
 Rust, Cargo/lockfile, BUILD, graph/DICE/regex state, configured analysis,
 toolchain resolution, JVM, Java source/bytecode/helper, or production Bazel
 delegation. Use ordinary RC discovery without reading/copying the private RC.
 
 ## Stops
 
-Stop and `REPLAN` if pinned source and the disposable matrix disagree, the
-behavior depends on configured analysis/toolchain resolution or unbounded
-flags, the affected manifest family is not finite, or fixture/code/JVM/
-production-delegation work is needed.
+Stop and `REPLAN` if the accepted semantic manifest must change, any reviewed
+construction fails a focused probe, five files/two packages are insufficient,
+the two roots differ, or fixture/code/JVM/configured-analysis/toolchain-resolution
+work is needed.

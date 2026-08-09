@@ -1693,6 +1693,61 @@ with package metadata, package licenses, and explicit licenses. Select but do
 not apply either an exact package-derived construction or a finite manifest
 correction, retaining the other four accepted template obligations.
 
+## Package-license default source evidence (2026-08-09)
+
+Pinned Bazel source closes this loading-only question. At
+`src/main/java/com/google/devtools/build/lib/packages/BuildGlobals.java:106-130`,
+the BUILD-only `licenses()` global parses its string list as `BuildType.LICENSE`
+and stores it in `PackageArgs`. `PackageArgs.java:176-195` separately handles
+`licenses` and aliases `default_applicable_licenses` to
+`default_package_metadata`, rejecting their simultaneous use. The rule
+accessor keeps a `BuildType.LICENSE` attribute at
+`AttributeProvider.java:354-380`; the relevant legacy-disable flag is
+`BuildLanguageOptions.java:476-481` (`--incompatible_no_attr_license`), which
+was not supplied to the oracle. These are loading/package declarations, not
+configured analysis or toolchain resolution.
+
+The fresh Bazel 9.2 matrix used one Starlark `normal`, one native `filegroup`,
+and one `config_setting`, with and without `default_package_metadata`, with and
+without `licenses(["notice"])`, and with explicit native/config-setting
+`licenses`. Its exact positive command was:
+
+```text
+/usr/bin/bazel query 'attr("licenses", "^\[notice\]$", //pkg:all)'
+```
+
+Without package `licenses()`, only an explicit native `filegroup` rendered
+`[notice]`; `normal` has no `licenses` attr, and `config_setting` renders its
+native `[none]` default even when passed an explicit license. With package
+`licenses(["notice"])`, both metadata/no-metadata layouts rendered `[notice]`
+for the ordinary native `filegroup` (and the metadata filegroup); explicit
+filegroup licenses rendered the same value. `config_setting` remained `[none]`
+and the Starlark normal remained attr-absent. The earlier empty result used an
+over-escaped query regex, not a Bazel semantic boundary. No diagnostic occurred
+in the valid matrix; the only rejected construction is explicit `licenses` on
+the Starlark rule, which lacks that schema field.
+
+The bounded outcome is therefore an exact source construction: retain
+`package(default_package_metadata=[":metadata"])`, add one package-level
+`licenses(["notice"])`, and remove explicit notice arguments from exactly
+`l02_a005_yes`, `l02_a006_no`, `l09_a005_yes`, `l13_a017_yes`,
+`l14_a003_yes`, and `l15_a002_no`. Their `licenses=[notice]` atoms remain
+package-derived; `config_setting` `[none]` rows and the external null baseline
+remain unchanged. The 165 rows, fields, vector, and SHA
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d` require no
+digest work. The successor must apply this construction together with the four
+retained obligations—paired lane-1 supports, computed medium/small timeout,
+lane-13 `legacy_macro` provenance, and suite/manual tag closure—then rerun the
+two-root source-template oracle. No JVM, Java helper, fixture, code, configured
+analysis, or production Bazel delegation is admitted.
+
+Independent review returned `ACCEPT` for the pinned source ranges, corrected
+single-backslash matrix, exactly six package-derived filegroup operands, and
+the no-manifest-change outcome. Run next only
+`WP-4-8-m3-attr-five-source-template-oracle-design-retry-2`, applying this
+license construction with every other retained source obligation and focused
+hidden probe.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
