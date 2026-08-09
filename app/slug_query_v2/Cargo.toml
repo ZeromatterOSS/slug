@@ -14,6 +14,7 @@ dice = { workspace = true }
 dupe = { workspace = true }
 futures = { workspace = true }
 nom = { workspace = true }
+regex = { workspace = true }
 slug_identity_v2 = { workspace = true }
 slug_bzlmod_v2 = { workspace = true }
 slug_loading_v2 = { workspace = true }

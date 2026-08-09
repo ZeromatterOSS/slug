@@ -3260,6 +3260,17 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
     let build_index = one_shot_stderr.find("EXTERNAL_BUILD_EVENT").unwrap();
     assert!(module_index < build_index, "{one_shot_stderr}");
 
+    let one_shot_filter = slug()
+        .current_dir(&workspace)
+        .args(["query", "filter('@dep//:target\\.txt$', @dep//:target.txt)"])
+        .output()
+        .unwrap();
+    assert!(one_shot_filter.status.success(), "{one_shot_filter:?}");
+    assert_eq!(
+        String::from_utf8(one_shot_filter.stdout).unwrap(),
+        "@dep//:target.txt\n"
+    );
+
     let one_shot_macro = slug()
         .current_dir(&workspace)
         .args(["query", "--output=label_kind", "@dep//macro:macro_files"])
@@ -3394,6 +3405,20 @@ fn direct_external_query_matches_one_shot_and_retained_daemon_output_and_events(
         ),
         (
             vec!["query", "loadfiles(@dep//macro:macro_files)"],
+            "@dep//macro:defs.bzl\n",
+        ),
+        (
+            vec![
+                "query",
+                "filter('@dep//macro:defs\\.bzl$', loadfiles(@dep//macro:macro_files))",
+            ],
+            "@dep//macro:defs.bzl\n",
+        ),
+        (
+            vec![
+                "query",
+                "kind('^source file$', loadfiles(@dep//macro:macro_files))",
+            ],
             "@dep//macro:defs.bzl\n",
         ),
         (
@@ -3849,6 +3874,49 @@ fn only_package_loading_query_errors_receive_evaluation_context() {
         assert!(
             !stderr.contains("Evaluation of query"),
             "daemon {expression}: {stderr}"
+        );
+    }
+}
+
+#[test]
+fn rust_native_regex_query_diagnostics_fail_before_operand_evaluation_one_shot_and_daemon() {
+    let workspace = scratch("regex-query-diagnostics");
+    let output_base = scratch("regex-query-diagnostics-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    write(workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(workspace.join("BUILD.bazel"), "filegroup(name = \"one\")\n");
+    let output_base_arg = format!("--output_base={}", output_base.display());
+
+    for expression in [
+        "filter('(?=unsupported)', //:missing)",
+        r"kind('\1', //:missing)",
+    ] {
+        let one_shot = slug()
+            .current_dir(&workspace)
+            .args(["query", expression])
+            .output()
+            .unwrap();
+        assert_eq!(
+            one_shot.status.code(),
+            Some(2),
+            "{expression}: {one_shot:?}"
+        );
+        assert!(one_shot.stdout.is_empty(), "{expression}: {one_shot:?}");
+        assert!(
+            String::from_utf8_lossy(&one_shot.stderr)
+                .contains("invalid Slug regex: unsupported or malformed syntax")
+        );
+
+        let daemon = slug()
+            .current_dir(&workspace)
+            .args([output_base_arg.as_str(), "query", expression])
+            .output()
+            .unwrap();
+        assert_eq!(daemon.status.code(), Some(2), "{expression}: {daemon:?}");
+        assert!(daemon.stdout.is_empty(), "{expression}: {daemon:?}");
+        assert!(
+            String::from_utf8_lossy(&daemon.stderr)
+                .contains("invalid Slug regex: unsupported or malformed syntax")
         );
     }
 }

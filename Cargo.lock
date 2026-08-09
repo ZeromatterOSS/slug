@@ -3502,6 +3502,7 @@ dependencies = [
  "dupe",
  "futures 0.3.33",
  "nom 8.0.0",
+ "regex",
  "slug_bzlmod_v2",
  "slug_identity_v2",
  "slug_loading_v2",

@@ -17,6 +17,7 @@ use async_trait::async_trait;
 use compact_str::CompactString;
 use dice::DiceComputations;
 use dupe::Dupe;
+use regex::Regex;
 use slug_bzlmod_v2::HostRootPackageBoundaryKey;
 use slug_bzlmod_v2::HostRootPackageBoundaryKind;
 use slug_bzlmod_v2::RootRepositoryRoute;
@@ -1096,6 +1097,57 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         Ok(result)
     }
 
+    async fn filter(
+        &mut self,
+        regex: &Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        let mut result = QueryCandidateBatches::empty();
+        for batch in targets.batches() {
+            let delivered = batch
+                .ids()
+                .iter()
+                .copied()
+                .filter(|id| {
+                    regex
+                        .find(
+                            self.candidates
+                                .get(*id)
+                                .printed_label()
+                                .output_label()
+                                .as_str(),
+                        )
+                        .is_some()
+                })
+                .collect();
+            result = result.union(QueryCandidateBatches::from_delivery_ids(delivered));
+        }
+        Ok(result)
+    }
+
+    async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        let mut result = QueryCandidateBatches::empty();
+        for batch in targets.batches() {
+            let ids = batch.ids().to_vec();
+            let mut delivered = Vec::with_capacity(ids.len());
+            for id in ids {
+                let candidate = self.candidates.get(id).clone();
+                let kind = match candidate.evaluation_graph_label().cloned() {
+                    None => CompactString::const_new("source file"),
+                    Some(label) => {
+                        let node = self.lookup_single(label).await?;
+                        selected_node_kind(&node)
+                    }
+                };
+                if regex.find(kind.as_str()).is_some() {
+                    delivered.push(id);
+                }
+            }
+            result = result.union(QueryCandidateBatches::from_delivery_ids(delivered));
+        }
+        Ok(result)
+    }
+
     async fn visible(
         &mut self,
         callers: &TargetSet<Self::Target>,
@@ -1190,8 +1242,11 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use dice::DetectCycles;
     use dice::Dice;
+    use regex::Regex;
     use slug_bzlmod_v2 as bzlmod;
     use slug_identity_v2 as identity;
     use slug_workspace_v2::PathDirectoryEntries as DirectoryEntries;
@@ -1397,5 +1452,80 @@ mod tests {
         assert_eq!(streamed.batches()[0].ids(), &[same]);
         assert_eq!(streamed.batches()[1].ids(), &[other]);
         assert_eq!(streamed.batches()[2].ids(), &[third]);
+    }
+
+    #[tokio::test]
+    async fn regex_filters_preserve_fake_delivery_boundaries_and_owners() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let updater = dice.updater();
+        let mut transaction = updater.commit().await;
+        let mut environment = LoadingQueryEnvironment::new(
+            &mut transaction,
+            PathBuf::from("/workspace"),
+            QueryPolicy::default(),
+        );
+        let owner_a = QueryPackageIdentity::root(PackagePath::parse("consumer_a").unwrap());
+        let owner_b = QueryPackageIdentity::root(PackagePath::parse("consumer_b").unwrap());
+        let fake = |label: &str, owner: QueryPackageIdentity| {
+            QueryCandidate::fake(QueryLabel::parse_root(label).unwrap(), owner)
+        };
+        let first = environment
+            .candidates
+            .intern(fake("//loads:keep_first.bzl", owner_a.clone()));
+        let second = environment
+            .candidates
+            .intern(fake("//loads:keep_second.bzl", owner_a.clone()));
+        let first_dropped = environment
+            .candidates
+            .intern(fake("//loads:drop_first.bzl", owner_a.clone()));
+        let emptied = environment
+            .candidates
+            .intern(fake("//loads:drop_all.bzl", owner_b.clone()));
+        let third = environment
+            .candidates
+            .intern(fake("//loads:keep_third.bzl", owner_b.clone()));
+        let third_dropped = environment
+            .candidates
+            .intern(fake("//loads:drop_third.bzl", owner_b.clone()));
+        let streamed = QueryCandidateBatches::from_delivery_ids(vec![first, second, first_dropped])
+            .union(QueryCandidateBatches::from_delivery_ids(vec![emptied]))
+            .union(QueryCandidateBatches::from_delivery_ids(vec![
+                third,
+                third_dropped,
+            ]));
+
+        let filtered = environment
+            .filter(&Regex::new("keep").unwrap(), &streamed)
+            .await
+            .unwrap();
+        assert_eq!(filtered.batches().len(), 2);
+        assert_eq!(filtered.batches()[0].ids(), &[first, second]);
+        assert_eq!(filtered.batches()[1].ids(), &[third]);
+        for (id, owner) in [(first, &owner_a), (second, &owner_a), (third, &owner_b)] {
+            let QueryCandidate::Fake {
+                consuming_owner, ..
+            } = environment.candidates.get(id)
+            else {
+                panic!("regex filter must retain fake candidate provenance");
+            };
+            assert_eq!(consuming_owner, owner);
+        }
+
+        let kinds = environment
+            .kind(&Regex::new("^source file$").unwrap(), &streamed)
+            .await
+            .unwrap();
+        assert_eq!(kinds.batches().len(), 3);
+        assert_eq!(kinds.batches()[0].ids(), &[first, second, first_dropped]);
+        assert_eq!(kinds.batches()[1].ids(), &[emptied]);
+        assert_eq!(kinds.batches()[2].ids(), &[third, third_dropped]);
+        assert!(
+            environment
+                .kind(&Regex::new("^generated file$").unwrap(), &streamed)
+                .await
+                .unwrap()
+                .batches()
+                .is_empty()
+        );
     }
 }

@@ -1675,6 +1675,85 @@ async fn label_kind_formats_retained_structural_kinds_in_text_order() {
     }
 }
 
+// Bazel 9.2's FilterFunction and KindFunction compile once, use find-style
+// matching, and filter callback deliveries. The regex dialect and limits here
+// are the accepted Rust-native valid-Unicode contract.
+#[tokio::test]
+async fn rust_native_filter_and_kind_preserve_label_kind_and_delivery_semantics() {
+    let workspace = scratch();
+    write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\ncustom = rule(implementation = _impl, attrs = {\"out\": attr.output(mandatory = True)})\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"custom\")\nexports_files([\"source.txt\"])\npackage_group(name = \"group\", packages = [\"//...\"])\nfilegroup(name = \"native\", srcs = [\":source.txt\"])\ncustom(name = \"starlark\", out = \"generated.out\")\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut transaction = transaction(&dice, &workspace).await;
+
+    for (expression, expected) in [
+        ("filter(native, //pkg:native)", "//pkg:native\n"),
+        ("filter('^//pkg:native$', //pkg:native)", "//pkg:native\n"),
+        (
+            "filter('source\\.txt', //pkg:source.txt)",
+            "//pkg:source.txt\n",
+        ),
+        ("filter('(?i)NATIVE', //pkg:native)", "//pkg:native\n"),
+        (
+            "kind('^source file$', //pkg:source.txt)",
+            "//pkg:source.txt\n",
+        ),
+        (
+            "kind('^generated file$', //pkg:generated.out)",
+            "//pkg:generated.out\n",
+        ),
+        ("kind('^package group$', //pkg:group)", "//pkg:group\n"),
+        ("kind('^filegroup rule$', //pkg:native)", "//pkg:native\n"),
+        ("kind('^custom rule$', //pkg:starlark)", "//pkg:starlark\n"),
+        ("filter(defs, loadfiles(//pkg:native))", "//pkg:defs.bzl\n"),
+        (
+            "kind('^source file$', loadfiles(//pkg:native))",
+            "//pkg:defs.bzl\n",
+        ),
+        (
+            "filter(native, kind(rule, set(//pkg:native //pkg:starlark)))",
+            "//pkg:native\n",
+        ),
+    ] {
+        let output = evaluate_loading_query(
+            &mut transaction,
+            workspace.clone(),
+            expression,
+            QueryOrder::Auto,
+        )
+        .await
+        .unwrap();
+        assert_eq!(output.stdout(), expected, "{expression}");
+    }
+
+    for order in [QueryOrder::Auto, QueryOrder::Full] {
+        let output = evaluate_loading_query_with_policy_and_output_completion(
+            &mut transaction,
+            workspace.clone(),
+            "kind(rule, set(//pkg:native //pkg:starlark))",
+            order,
+            QueryPolicy::default(),
+            QueryOutputCompletion::LabelKind,
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            output.label_kind_stdout(),
+            match order {
+                QueryOrder::Auto => "filegroup rule //pkg:native\ncustom rule //pkg:starlark\n",
+                QueryOrder::Full => "custom rule //pkg:starlark\nfilegroup rule //pkg:native\n",
+            }
+        );
+    }
+}
+
 #[tokio::test]
 async fn package_output_sorts_deduplicates_and_keeps_main_root_empty() {
     let workspace = scratch();
@@ -4595,8 +4674,28 @@ async fn external_macro_loading_files_preserve_owner_fake_consumers_and_output_s
     for (source, expected) in [
         ("@dep//macro:macro_files", &["@dep//macro:macro_files"][..]),
         (
+            "filter('@dep//macro:macro_files', @dep//macro:macro_files)",
+            &["@dep//macro:macro_files"][..],
+        ),
+        (
+            "kind('^filegroup rule$', @dep//macro:macro_files)",
+            &["@dep//macro:macro_files"][..],
+        ),
+        (
             "loadfiles(@dep//macro:macro_files)",
             &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "filter('defs\\.bzl$', loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "kind('^source file$', loadfiles(@dep//macro:macro_files))",
+            &["@dep//macro:defs.bzl"][..],
+        ),
+        (
+            "filter('BUILD|defs', buildfiles(@dep//macro:macro_files))",
+            &["@dep//macro:BUILD.bazel", "@dep//macro:defs.bzl"][..],
         ),
         (
             "buildfiles(@dep//macro:macro_files)",

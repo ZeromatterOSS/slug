@@ -52,8 +52,8 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
 // registry source of truth. Loading-file provenance activates
 // buildfiles/loadfiles, retained attribute metadata activates labels, and the
-// retained rule capability activates executables and tests; visible is the
-// accepted request-local visibility activation while three remain deferred.
+// retained rule capability activates executables and tests; filter/kind use
+// the accepted Rust-native regex contract, while attr remains deferred.
 #[test]
 fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures() {
     assert_eq!(loading_query_functions().len(), 16);
@@ -68,6 +68,8 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             "buildfiles",
             "deps",
             "executables",
+            "filter",
+            "kind",
             "labels",
             "loadfiles",
             "rdeps",
@@ -87,7 +89,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .to_string()
             .contains("unknown function 'not_a_bazel_query_function'")
     );
-    let deferred = QueryExpression::parse("kind(rule, //pkg:all)").unwrap();
+    let deferred = QueryExpression::parse("attr(srcs, x, //pkg:all)").unwrap();
     assert!(
         validate_loading_query(&deferred)
             .unwrap_err()
@@ -103,6 +105,8 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
     );
     validate_loading_query(&QueryExpression::parse("deps(//pkg:bin, 2)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("executables(//pkg:bin)").unwrap()).unwrap();
+    validate_loading_query(&QueryExpression::parse("filter(bin, //pkg:bin)").unwrap()).unwrap();
+    validate_loading_query(&QueryExpression::parse("kind(rule, //pkg:bin)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("labels(srcs, //pkg:bin)").unwrap()).unwrap();
     validate_loading_query(
         &QueryExpression::parse("rdeps(//tree/..., //tree/left:leaf, 2)").unwrap(),
@@ -134,7 +138,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .iter()
             .filter(|function| function.status == QueryFunctionStatus::Deferred)
             .count(),
-        3
+        1
     );
 }
 

@@ -133,8 +133,18 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
         argument_kinds: &[EXPR],
         status: QueryFunctionStatus::Implemented,
     },
-    deferred("filter", 2, &[WORD, EXPR]),
-    deferred("kind", 2, &[WORD, EXPR]),
+    QueryFunctionSpec {
+        name: "filter",
+        mandatory_arguments: 2,
+        argument_kinds: &[WORD, EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
+    QueryFunctionSpec {
+        name: "kind",
+        mandatory_arguments: 2,
+        argument_kinds: &[WORD, EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "labels",
         mandatory_arguments: 2,

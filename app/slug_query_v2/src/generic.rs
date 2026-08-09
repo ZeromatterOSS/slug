@@ -18,6 +18,8 @@ use async_trait::async_trait;
 use compact_str::CompactString;
 use futures::FutureExt;
 use futures::future::BoxFuture;
+use regex::Regex;
+use regex::RegexBuilder;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -132,6 +134,11 @@ pub(crate) trait QueryEnvironment {
     ) -> Result<Self::Set, QueryError>;
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
+
+    async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
+    -> Result<Self::Set, QueryError>;
+
+    async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError>;
 
     async fn visible(
         &mut self,
@@ -281,6 +288,8 @@ static LOADFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
 };
 static LABELS_FUNCTION: LabelsFunction = LabelsFunction;
 static EXECUTABLES_FUNCTION: ExecutablesFunction = ExecutablesFunction;
+static FILTER_FUNCTION: RegexFunction = RegexFunction::Filter;
+static KIND_FUNCTION: RegexFunction = RegexFunction::Kind;
 static TESTS_FUNCTION: TestsFunction = TestsFunction;
 static VISIBLE_FUNCTION: VisibleFunction = VisibleFunction;
 
@@ -298,6 +307,8 @@ where
             &BUILDFILES_FUNCTION as &dyn QueryFunction<E>,
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
             &EXECUTABLES_FUNCTION as &dyn QueryFunction<E>,
+            &FILTER_FUNCTION as &dyn QueryFunction<E>,
+            &KIND_FUNCTION as &dyn QueryFunction<E>,
             &LABELS_FUNCTION as &dyn QueryFunction<E>,
             &LOADFILES_FUNCTION as &dyn QueryFunction<E>,
             &RDEPS_FUNCTION as &dyn QueryFunction<E>,
@@ -615,6 +626,81 @@ struct LoadingFilesFunction {
 struct LabelsFunction;
 
 struct ExecutablesFunction;
+
+#[derive(Clone, Copy)]
+enum RegexFunction {
+    Filter,
+    Kind,
+}
+
+const SLUG_REGEX_PATTERN_LIMIT: usize = 4_096;
+const SLUG_REGEX_PROGRAM_LIMIT: usize = 1_048_576;
+const SLUG_REGEX_NEST_LIMIT: u32 = 128;
+
+fn compile_slug_regex(pattern: &str) -> Result<Regex, QueryError> {
+    if pattern.len() > SLUG_REGEX_PATTERN_LIMIT {
+        return Err(QueryError::syntax(
+            "Slug regex resource limit exceeded: pattern is longer than 4096 bytes",
+        ));
+    }
+
+    let mut builder = RegexBuilder::new(pattern);
+    builder
+        .size_limit(SLUG_REGEX_PROGRAM_LIMIT)
+        .dfa_size_limit(SLUG_REGEX_PROGRAM_LIMIT)
+        .nest_limit(SLUG_REGEX_NEST_LIMIT)
+        .case_insensitive(false)
+        .multi_line(false)
+        .dot_matches_new_line(false)
+        .crlf(false)
+        .line_terminator(b'\n')
+        .swap_greed(false)
+        .ignore_whitespace(false)
+        .unicode(true)
+        .octal(false);
+    builder.build().map_err(|error| match error {
+        regex::Error::CompiledTooBig(_) => QueryError::syntax(
+            "Slug regex resource limit exceeded: compiled program is larger than 1048576 bytes",
+        ),
+        _ => QueryError::syntax("invalid Slug regex: unsupported or malformed syntax"),
+    })
+}
+
+impl<E> QueryFunction<E> for RegexFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function(match self {
+            Self::Filter => "filter",
+            Self::Kind => "kind",
+        })
+        .expect("regex function is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            let pattern = match &args[0].kind {
+                QueryExpressionKind::TargetLiteral(value) => value.as_str(),
+                _ => return Err(QueryError::syntax("regex pattern must be a word")),
+            };
+            // The bounded Rust regex is compiled before operand evaluation,
+            // then reused for each candidate in every callback delivery.
+            let regex = compile_slug_regex(pattern)?;
+            let targets = eval_set_arg(evaluator, args, variables, 1).await?;
+            match self {
+                Self::Filter => evaluator.environment.filter(&regex, &targets).await,
+                Self::Kind => evaluator.environment.kind(&regex, &targets).await,
+            }
+        }
+        .boxed()
+    }
+}
 
 struct TestsFunction;
 
@@ -959,6 +1045,35 @@ mod tests {
             unreachable!()
         }
 
+        async fn filter(
+            &mut self,
+            regex: &Regex,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.events.lock().unwrap().push(format!(
+                "filter:{}",
+                targets
+                    .iter()
+                    .filter(|target| regex.find(target).is_some())
+                    .cloned()
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ));
+            Ok(targets
+                .iter()
+                .filter(|target| regex.find(target).is_some())
+                .cloned()
+                .collect())
+        }
+
+        async fn kind(
+            &mut self,
+            regex: &Regex,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.filter(regex, targets).await
+        }
+
         async fn visible(
             &mut self,
             callers: &TargetSet<Self::Target>,
@@ -1008,6 +1123,66 @@ mod tests {
                 "resolve:input",
                 "visible:predicate:[\"input\"]",
             ]
+        );
+    }
+
+    #[test]
+    fn regex_functions_compile_before_evaluating_the_operand_and_reuse_search_semantics() {
+        for pattern in ["(?=unsupported)", r"\1"] {
+            let expression =
+                QueryExpression::parse(&format!("filter('{pattern}', input)")).unwrap();
+            let mut evaluator = QueryEvaluator::new(VisibleEnvironment {
+                events: std::sync::Mutex::new(Vec::new()),
+            });
+            let error = futures::executor::block_on(evaluator.evaluate(&expression)).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "invalid Slug regex: unsupported or malformed syntax"
+            );
+            assert_eq!(error.exit_code, 2);
+            assert!(evaluator.environment.events.lock().unwrap().is_empty());
+        }
+
+        let expression = QueryExpression::parse("filter('(?i)input', input)").unwrap();
+        let mut evaluator = QueryEvaluator::new(VisibleEnvironment {
+            events: std::sync::Mutex::new(Vec::new()),
+        });
+        let result = futures::executor::block_on(evaluator.evaluate(&expression)).unwrap();
+        assert_eq!(result, ["input"]);
+        assert_eq!(
+            *evaluator.environment.events.lock().unwrap(),
+            ["resolve:input", "filter:input"]
+        );
+
+        let unicode = compile_slug_regex(r"(?i)^\p{Greek}+$").unwrap();
+        assert!(unicode.find("Συν").is_some());
+        assert!(unicode.find("latin").is_none());
+        assert!(unicode.find("συν").is_some());
+    }
+
+    #[test]
+    fn slug_regex_limits_and_error_classes_are_stable() {
+        let exact = "a".repeat(SLUG_REGEX_PATTERN_LIMIT);
+        assert!(compile_slug_regex(&exact).is_ok());
+        let oversized = "a".repeat(SLUG_REGEX_PATTERN_LIMIT + 1);
+        assert_eq!(
+            compile_slug_regex(&oversized).unwrap_err().to_string(),
+            "Slug regex resource limit exceeded: pattern is longer than 4096 bytes"
+        );
+        let nested = format!(
+            "{}a{}",
+            "(".repeat(SLUG_REGEX_NEST_LIMIT as usize + 1),
+            ")".repeat(SLUG_REGEX_NEST_LIMIT as usize + 1)
+        );
+        assert_eq!(
+            compile_slug_regex(&nested).unwrap_err().to_string(),
+            "invalid Slug regex: unsupported or malformed syntax"
+        );
+        assert_eq!(
+            compile_slug_regex("(?:a|b){100000}")
+                .unwrap_err()
+                .to_string(),
+            "Slug regex resource limit exceeded: compiled program is larger than 1048576 bytes"
         );
     }
 }

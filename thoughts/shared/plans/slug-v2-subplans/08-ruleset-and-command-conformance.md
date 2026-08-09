@@ -3103,8 +3103,10 @@ configuration/analysis state.
 
 The bounded implementation successor is
 `WP-8-m3-rust-native-filter-kind-implementation`. It may add only
-`regex.workspace = true` to `app/slug_query_v2/Cargo.toml` (the existing lock
-selection must remain unchanged), activate `filter` and `kind` in `expr.rs`,
+`regex.workspace = true` to `app/slug_query_v2/Cargo.toml` and the consequent
+single `"regex"` direct-dependency edge in `slug_query_v2`'s existing
+`Cargo.lock` package entry (every selected package/version/checksum must remain
+unchanged), activate `filter` and `kind` in `expr.rs`,
 add their shared compile-once generic dispatch in `generic.rs`, add the two
 delivery-preserving loading-environment accessors in
 `loading_environment.rs`, and add focused core/loading and existing-fixture
@@ -3123,8 +3125,9 @@ evaluation, one compile, printed-label/target-kind inputs, find semantics, and
 filtered callback delivery. Rust-dialect/resource rows use the locked crate
 source and focused Slug tests, not a Java oracle.
 
-Stop and `REPLAN` on a `Cargo.lock` change, a need for backtracking or
-unsupported syntax, silent compile/search failure as nonmatch, regex state in
+Stop and `REPLAN` on a `Cargo.lock` change beyond that one mechanical local
+dependency edge, any selected package/version/checksum change, a need for
+backtracking or unsupported syntax, silent compile/search failure as nonmatch, regex state in
 DICE/package/query identity, a new query edge or candidate representation,
 `attr`, cquery/aquery/configuration breadth, Java parity claims, UTF-16 or
 surrogate handling, or any JVM, Java source/bytecode/helper, or Bazel
@@ -3134,3 +3137,53 @@ delegation. Exact Java `Pattern` behavior remains permanently out of scope;
 Independent Sol-low public-boundary review returned `ACCEPT` without a
 correction. The contract packet is complete; schedule only
 `WP-8-m3-rust-native-filter-kind-implementation` next.
+
+The implementation preflight exposed one bounded packaging correction: Cargo
+must record a newly direct dependency even when its selected crate is already
+locked transitively. The correction above admits only the one local package
+edge and keeps `Cargo.Bazel.lock` plus every external selection/checksum
+byte-identical. No regex behavior, ownership, resource, or query boundary
+changed; obtain one focused independent correction rereview before accepting
+the implementation.
+
+The first implementation packet ends in `REPLAN`. Production, query, CLI, and
+lockfile validation was green, but the terminal Sol review found that rendered
+output plus the existing generic delivery helper test did not directly prove
+regex filtering across multiple nonempty callback batches with distinct full
+candidate provenance. This is the second material correction after the
+accepted Cargo lock-edge correction, so it may not be folded into the same
+packet.
+
+Retry only as `WP-8-m3-rust-native-filter-kind-implementation-retry`. Preserve
+the reviewed implementation draft as uncommitted retry input and add one
+focused loading-environment discriminator that invokes the regex `filter` and
+`kind` paths over at least two nonempty batches, includes distinct fake
+consuming owners, drops selected candidates, and asserts surviving candidate
+IDs, within-batch order, owners/provenance, nonempty batch boundaries, and
+empty-batch removal. No production behavior, file scope, dependency, contract,
+or acceptance gate may otherwise change. Rerun the frozen validation and
+obtain one fresh latest-diff review.
+
+The retry is accepted. `filter` and `kind` now share the locked `regex` 1.13.1
+builder and exact Slug-owned limit/diagnostic contract, compile once before
+operand evaluation, use find/search semantics, and filter the accepted
+candidate batches without changing graph or DICE identity. Label matching uses
+apparent printed output labels, including external and fake load candidates;
+kind matching uses only the retained source/generated/package-group/rule-class
+projection. The only lockfile change is the reviewed local direct-dependency
+edge.
+
+The retry-only test directly proves three streamed fake-candidate deliveries,
+two distinct consuming owners, partial first/third filtering, complete middle
+delivery removal, stable IDs/order/provenance, and `kind` all-preserve/all-drop
+behavior. Root validation passed 31 query library tests, 56 loading tests, six
+parser tests, two focused one-shot/retained-daemon CLI tests, the
+`slug_cli_v2` build, formatting/diff checks, and stale-daemon cleanup. Fresh
+Sol-low latest-diff review returned `ACCEPT`. M3 now implements 15 of Bazel's
+16 default loading-query functions; `attr` remains deferred behind its typed
+attribute-string representation.
+
+Run next only `WP-4-8-m3-attr-typed-attribute-string-design`, a Stage 4/Stage 8
+documentation and pinned-source audit. It must close the complete currently
+admitted coerced-value formatting, selector/default/provenance, equality, and
+invalidation boundary before any representation Rust or `attr` activation.
