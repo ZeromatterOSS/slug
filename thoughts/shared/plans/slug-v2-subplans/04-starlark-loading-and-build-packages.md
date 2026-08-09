@@ -1262,6 +1262,62 @@ ledger, and recalculate directory/entry/line caps. Edit only Stage 4 and Stage
 8 owner plans; add no fixture, payload, Rust, Cargo, graph, DICE, JVM/Java
 artifact, or Bazel delegation.
 
+## Two-package `attr` oracle design (2026-08-09)
+
+`WP-4-8-m3-attr-two-package-observable-candidate-oracle-design` retains the
+five-file isolated layout by using the existing external leaf package as the
+baseline package. Its `BUILD.bazel` loads the public main definition with the
+canonical-main spelling `load("@@//attr:defs.bzl", ...)`; apparent `@//` is not
+used because a nonroot module mapping does not map the main repository. Pinned
+Bazel external-repository tests use this canonical-main load form, and an
+unannotated `.bzl` remains publicly loadable.
+
+The leaf keeps `filegroup(name="label")` unchanged for lane 6's exact
+`@@ext+//leaf:label`. It additionally instantiates the same main-defined normal
+Starlark rule without a package deprecation default. Lane 2's deprecation atom
+therefore becomes:
+
+```text
+attr(deprecation, "^deprecated$",
+     set(//attr:l02_a007_yes @@ext+//leaf:l02_a007_no))
+```
+
+The positive retains package-derived `deprecation="deprecated"`; the external
+negative has the identical rule schema but a null computed package default and
+must remain absent from stdout. Only that negative operand moves. The other 164
+pairs, lane 6 external leaf, and exact expected positives remain unchanged.
+No removal-only class, explicit `None`, sixth source, or second schema is used.
+
+The corrected vector remains
+`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` = 165 pairs. The projection
+remains five files/five directories/ten encoded entries, taking payload
+entries/directories from `(275, 112)` to `(285, 117)` and regular files from
+163 to 168. Body bytes and hashes are generated. Including fixture TOML and
+expected JSON, growth from reset `51540963` remains +7 regular files, +5
+directories, zero links, 18 rows, and at most 2,400 lines; the absolute review
+ceilings are 1,368 regular files, 24 links, 44,920 lines, and 882 rows. A sixth
+`plain/BUILD.bazel` would add a redundant file/directory and is rejected.
+
+Generation allowlist and isolation are unchanged: new fixture TOML/expected,
+the five-file payload projection, Python global/projection integrity, and Rust
+global SHA plus 275-to-285 count only. Do not add a Rust projection or semantic
+consumer. Update plus clean distinct-root replay must pass all 18 rows, freeze
+`@@ext+//leaf:label`, preserve fourteen projection hashes, and pass payload
+metadata/integrity, the protected 29 CLI and two generated-kind CLI/server
+cases, lane 9 provenance, lane 12 allowlist, and diff checks.
+
+Independent design review is required before retrying generation. Stop on an
+added source, restricted main `.bzl` visibility, repository mapping/registry/
+lockfile need, changed 165-atom ledger, nonexact external token, Rust projection
+or semantic consumer, configured analysis, cap/protected drift, production
+Rust/graph/DICE/regex, JVM/Java, or Bazel delegation.
+
+Independent Sol review returned `ACCEPT`: pinned Bazel tests establish the
+public canonical-main `@@//` load from the external module, and the computed
+deprecation default remains package-local. Residual risk is limited to the
+isolated update/replay confirming the canonical load and null result. Run next
+only `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

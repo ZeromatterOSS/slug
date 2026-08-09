@@ -3407,3 +3407,24 @@ incomplete fixture draft was removed. Run next only
 smallest isolated positive-default/baseline package layout, remap the corrected
 165 atoms, and recalculate caps. No fixture, payload, production Rust, Cargo,
 graph/DICE, JVM/Java artifact, or Bazel delegation is authorized.
+
+The two-package design retains five files by using
+`modules/ext/leaf/BUILD.bazel` as the baseline package. It canonically loads the
+public main definition with `@@//attr:defs.bzl`, keeps
+`filegroup(name="label")`, and adds only the same-schema null-deprecation
+control. Lane 2 moves its negative operand to
+`@@ext+//leaf:l02_a007_no`; its positive and all other 164 pairs are unchanged.
+This exactly contrasts package-derived deprecation with a null package default
+without a removal class, explicit `None`, or sixth source.
+
+The corrected 165-pair vector, 18 rows, five files/five directories, `(285,
+117)` payload totals, +7-file/+5-directory/zero-link/+2,400-line caps, absent
+Rust projection, and protected validations remain. A sixth plain package is
+redundant. Independent review must accept canonical-main load visibility and
+mapping before generation retry; all Rust-native/no-JVM and loading-only
+toolchain/external boundaries remain.
+
+Independent Sol review returned `ACCEPT` for the canonical-main load,
+package-local null default, unchanged 165-pair ledger, five-file arithmetic,
+and isolation. Run next only
+`WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`.
