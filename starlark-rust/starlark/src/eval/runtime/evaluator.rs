@@ -117,6 +117,20 @@ const INFREQUENT_INSTRUCTION_CHECK_PERIOD: u32 = 1000;
 /// Default value for max starlark stack size
 pub(crate) const DEFAULT_STACK_SIZE: usize = 50;
 
+/// Owned Starlark caller metadata available to a directly invoked native function.
+///
+/// This deliberately copies only the requested string local and does not expose
+/// evaluator frames, slots, values, or compiler metadata.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NativeCallContext {
+    /// Name of the calling Starlark `def`.
+    pub function_name: String,
+    /// Location where that `def` was called.
+    pub call_location: FileSpan,
+    /// Copied value of the requested local when it exists and is a string.
+    pub local_value: Option<String>,
+}
+
 /// Holds everything about an ongoing evaluation (local variables, globals, module resolution etc).
 pub struct Evaluator<'v, 'a, 'e> {
     // The module that is being used for this evaluation
@@ -481,6 +495,51 @@ impl<'v, 'a, 'e: 'a> Evaluator<'v, 'a, 'e> {
     /// stack is not that deep. n=0 is the top of the stack.
     pub fn call_stack_nth_location(&self, n: usize) -> Option<FileSpan> {
         self.call_stack.nth_location(n)
+    }
+
+    /// Obtain narrow owned context for the Starlark `def` directly calling the
+    /// current native function.
+    ///
+    /// Returns [`None`] for a direct native call from module scope, or when the
+    /// caller is not an ordinary Starlark `def` with a source call location.
+    pub fn native_call_context(&self, local_name: &str) -> Option<NativeCallContext> {
+        let caller = self.call_stack.top_nth_function_opt(1)?;
+        let def_info = if let Some(caller) = caller.downcast_ref::<Def>() {
+            caller.def_info
+        } else if let Some(caller) = caller.downcast_ref::<FrozenDef>() {
+            caller.def_info
+        } else {
+            return None;
+        };
+        let call_location = self.call_stack.nth_location(1)?;
+
+        let local_value = def_info
+            .used
+            .iter()
+            .position(|name| name.as_str() == local_name)
+            .and_then(|slot| {
+                if !self.current_frame.is_inititalized() {
+                    return None;
+                }
+                self.current_frame
+                    .get_slot(LocalSlotId(slot as u32).to_captured_or_not())
+            })
+            .and_then(|value| {
+                if value.downcast_ref::<ValueCaptured>().is_some()
+                    || value.downcast_ref::<FrozenValueCaptured>().is_some()
+                {
+                    value_captured_get(value)
+                } else {
+                    Some(value)
+                }
+            })
+            .and_then(|value| value.unpack_str().map(ToOwned::to_owned));
+
+        Some(NativeCallContext {
+            function_name: def_info.name.as_str().to_owned(),
+            call_location,
+            local_value,
+        })
     }
 
     pub(crate) fn before_stmt_fn(
@@ -1070,4 +1129,62 @@ pub(crate) fn before_stmt(
         "`before_stmt` cannot be modified during evaluation"
     );
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Evaluator;
+    use crate as starlark;
+    use crate::environment::GlobalsBuilder;
+    use crate::environment::Module;
+    use crate::starlark_module;
+    use crate::syntax::AstModule;
+    use crate::syntax::Dialect;
+
+    #[starlark_module]
+    fn native_call_context_globals(builder: &mut GlobalsBuilder) {
+        fn capture_native_context(eval: &mut Evaluator) -> anyhow::Result<String> {
+            Ok(match eval.native_call_context("name") {
+                Some(context) => format!(
+                    "{}|{}|{}",
+                    context.function_name,
+                    context.local_value.as_deref().unwrap_or("<none>"),
+                    context.call_location
+                ),
+                None => "<none>".to_owned(),
+            })
+        }
+    }
+
+    #[test]
+    fn native_call_context_copies_def_metadata_but_rejects_module_scope() {
+        let module = Module::new();
+        let globals = GlobalsBuilder::new()
+            .with(native_call_context_globals)
+            .build();
+        let ast = AstModule::parse(
+            "native_call_context.star",
+            concat!(
+                "def legacy_macro(name):\n",
+                "    context = capture_native_context()\n",
+                "    return context\n",
+                "\n",
+                "inside = legacy_macro(\"target\")\n",
+                "direct = capture_native_context()\n",
+            )
+            .to_owned(),
+            &Dialect::Standard,
+        )
+        .unwrap();
+
+        Evaluator::new(&module).eval_module(ast, &globals).unwrap();
+
+        let inside = module.get("inside").unwrap();
+        let inside = inside.unpack_str().unwrap();
+        assert!(
+            inside.starts_with("legacy_macro|target|native_call_context.star:5:"),
+            "{inside}"
+        );
+        assert_eq!(module.get("direct").unwrap().unpack_str(), Some("<none>"));
+    }
 }

@@ -34,6 +34,7 @@ pub use runtime::arguments::Arguments;
 pub use runtime::before_stmt::BeforeStmtFuncDyn;
 pub use runtime::evaluator::CallStackCheckpoint;
 pub use runtime::evaluator::Evaluator;
+pub use runtime::evaluator::NativeCallContext;
 pub use runtime::file_loader::FileLoader;
 pub use runtime::file_loader::ReturnFileLoader;
 pub use runtime::params::parser::ParametersParser;
