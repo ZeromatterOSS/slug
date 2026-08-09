@@ -2079,3 +2079,25 @@ metadata constructions in one executable source before any mechanical candidate
 rendering. Preserve the five-file/two-package, hidden-construction,
 single-backslash, two-root, 18-lane, nine-control, focused-probe, Rust-native,
 and no-JVM/code/configured/toolchain boundaries.
+
+### `attr` five-source executable reconstruction retry terminal REPLAN (2026-08-09)
+
+The allowed correction closed the five prior source-contract blockers and two
+independent Bazel 9.2 roots replayed all 18 primary lanes, nine literal-empty
+controls, and focused probes. Correction rereview nevertheless found a second
+material producer-identity divergence: the accepted generated-file owner is
+`output_rule(name = "l01_generated_owner", nullable_output =
+"l01_generated_nonrule")`, while the candidate declared
+`l01_generated_nonrule_owner`. The empty generated-file control could not
+observe that mismatch. The complete unaccepted candidate and every temporary
+script, root, output base, log, and process are removed; no fixture, code,
+JVM/Java, configured-analysis, or toolchain material is retained.
+
+Run next only `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-2`.
+It preserves the immutable 165-row vector and SHA, exact five-file/two-package
+layout, all accepted loading/source and six-row constructions, original nine
+literal-empty controls, focused probes, sibling two-root replay, and mechanical
+candidate/pending rendering. Its one executable representation must contain
+the exact `output_rule(name = "l01_generated_owner", nullable_output =
+"l01_generated_nonrule")` declaration and a focused producer-identity/source
+assertion before any replay. Stop on any further material contract miss.

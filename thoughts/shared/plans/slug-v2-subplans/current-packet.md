@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-retry`
+Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-2`
 Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: fresh full reconstruction retry after focused Bazel 9.2 evidence
-accepted all six disputed rows without a manifest correction.
+Result: fresh full reconstruction after terminal correction-rereview REPLAN;
+the accepted generated-file producer identity must be asserted before replay.
 
 ## Immutable semantic boundary
 
@@ -17,7 +17,8 @@ unchanged. The five-file/two-package layout is exactly `MODULE.bazel`,
 `modules/ext/leaf/BUILD.bazel`, with no root BUILD. Pair-specific lane-1
 supports, package-derived notice construction, medium/small computed timeout,
 Starlark/native `legacy_macro`, suite/manual closure, separate test/exec
-schemas, transition allowlist, and external baseline remain viable.
+schemas, transition allowlist, external baseline, and all six accepted
+source-construction fixes remain viable.
 
 ## Required reconstruction retry
 
@@ -31,10 +32,15 @@ schemas, transition allowlist, and external baseline remain viable.
   `licenses=[none]` beside package notice; and `l16_a007_yes`,
   `l16_a013_yes`, and `l17_a012_yes` are explicit
   `filegroup(package_metadata=[])` declarations.
+- The generated file must have exactly this producer declaration in the sole
+  executable representation:
+  `output_rule(name = "l01_generated_owner", nullable_output =
+  "l01_generated_nonrule")`. Assert that literal source identity before any
+  Bazel replay; the similarly named producer is not accepted.
 - Use two independent `mktemp -d` parents with direct sibling `workspace` and
   `out` paths. Run all 18 lanes in both roots, compare exact stdout, record all
-  nine literal-empty controls, and run the lane-1, license, timeout, macro,
-  tag-closure, and corrected-six-row probes.
+  original nine literal-empty controls, and run the lane-1, license, timeout,
+  macro, tag-closure, and corrected-six-row focused probes.
 - Preserve actual single-backslash OI `^\[z, a, z\]$` and generator
   `^attr/BUILD\.bazel:[0-9]+:[0-9]+$` argv bytes. Render candidate/pending
   documents mechanically only after strict 165-label ownership passes.
@@ -47,5 +53,6 @@ add no fixture, payload, expected record, generated source, Python, Rust,
 Cargo/lockfile, graph/DICE/regex state, configured analysis, toolchain
 resolution, JVM/Java artifact, or production Bazel delegation. Use ordinary RC
 discovery without inspecting or copying the private RC. Stop and `REPLAN` on a
-manifest semantic change, any ownership/probe/root mismatch, a need beyond the
-five files/two packages, or any excluded work.
+manifest semantic change, any ownership/probe/root mismatch, producer-identity
+miss, a need beyond the five files/two packages, or any excluded work. This
+second retry permits no further material correction.

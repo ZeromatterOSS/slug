@@ -3642,3 +3642,19 @@ accepted construction corrections, one executable representation, two sibling
 `mktemp` roots, all 18 lanes twice, nine controls, focused probes, mechanical
 pending rendering, and the retained Rust-native/no-JVM/code/configured/toolchain
 boundary.
+
+## `attr` five-source executable reconstruction retry terminal REPLAN (2026-08-09)
+
+The allowed correction made all prior source constructions replay, but
+correction rereview found a second material source-contract miss: the generated
+file must be produced by `output_rule(name = "l01_generated_owner",
+nullable_output = "l01_generated_nonrule")`; the unaccepted candidate used
+`l01_generated_nonrule_owner`, which its empty control did not distinguish.
+The candidate and all temporary material were removed. No fixture, payload,
+Rust, JVM/Java, configured-analysis, or toolchain work remains.
+
+Run next only `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-2`.
+Preserve the immutable 165-row semantics, five files/two packages, all accepted
+source/load and six-row fixes, original nine controls/probes, two-root replay,
+and mechanical pending rendering; assert the exact producer declaration and
+producer identity before replay. A further material issue is terminal.
