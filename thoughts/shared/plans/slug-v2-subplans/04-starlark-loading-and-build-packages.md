@@ -1966,3 +1966,25 @@ deletes and recreates the included package-group definition while its BUILD
 package remains, so it exercises the pinned missing-target error. No loading
 representation, graph/provenance representation, DICE key, formatter, command
 policy, repository mapping, V1 code, or Cargo manifest is authorized.
+
+## `attr` five-source template retry-2 REPLAN (2026-08-09)
+
+The five exact bodies, reviewed semantic constructions, and the 165-record
+vector/SHA-256 `99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`
+remain viable. The first review corrected the 450-line accounting, separately
+counted the nine controls, required distinct scratch parents with sibling
+`workspace`/`out` paths, and changed the result to pending review. Correction
+rereview then found a second material evidence defect: the tag/feature OI
+control argv used `^\\[z, a, z\\]$` instead of the discriminating single-backslash
+regex, while the recorded generator probe used `BUILD\\.bazel` although the
+passing primary used `BUILD\.bazel`. Retry-2 has consumed its one correction,
+so its entire unaccepted source-template text was discarded.
+
+No fixture, payload, code, JVM/Java, configured-analysis, toolchain, or
+production-Bazel change remains; all temporary material was removed. Run next
+only `WP-4-8-m3-attr-five-source-template-oracle-design-retry-3`, design-only:
+freeze the exact argv in one machine-readable/executable representation and
+execute those exact bytes before rendering documentation; recreate the five
+exact bodies; use two independent `mktemp` parents with sibling `workspace` and
+`out`; run all 18 lanes twice, all nine controls, and focused probes; then
+obtain terminal independent review. Do not add a second transcription layer.

@@ -3559,3 +3559,15 @@ Independent review returned `ACCEPT`: BUILD `licenses()` remains active despite
 the Starlark `attr.license` disable flag, native package-license injection is
 separate from metadata, and the six-filegroup construction preserves the
 165-record SHA. The retry-2 packet owns full two-root hidden-probe review.
+
+Retry-2 is `REPLAN`, not accepted. Its five bodies, semantic constructions,
+and corrected 165-record SHA/vector remain viable, but its first review used
+the allowed correction for 450-line accounting, nine-control separation,
+distinct sibling `workspace`/`out` scratch layout, and pending wording. The
+correction rereview found two literal-argv defects: double-backslashed
+tag/feature OI controls and a generator probe whose `BUILD\\.bazel` spelling
+did not match the primary's `BUILD\.bazel`. The full candidate text was
+discarded; no fixture/code/JVM/configured/toolchain work remains. Run next only
+`WP-4-8-m3-attr-five-source-template-oracle-design-retry-3` with executable
+exact argv before documentation, two independent scratch parents, all 18 lanes
+twice, all nine controls, focused probes, and terminal review.
