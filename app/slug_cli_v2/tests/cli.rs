@@ -998,6 +998,64 @@ fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
 }
 
 #[test]
+fn cquery_set_expression_matches_between_one_shot_and_daemon() {
+    let workspace = scratch("cquery-set-expression-workspace");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"sets\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"lib\")\n",
+    );
+    let expression = "set(//pkg:bin //pkg:lib //pkg:bin)";
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .args(["cquery", expression])
+        .output()
+        .unwrap();
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert!(one_shot.stderr.is_empty());
+    let labels = |stdout: &[u8]| {
+        std::str::from_utf8(stdout)
+            .unwrap()
+            .lines()
+            .map(|line| line.split_once(" (").unwrap().0.to_owned())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(labels(&one_shot.stdout), ["//pkg:bin", "//pkg:lib"]);
+    let empty_one_shot = slug()
+        .current_dir(&workspace)
+        .args(["cquery", "set()"])
+        .output()
+        .unwrap();
+    assert!(empty_one_shot.status.success(), "{empty_one_shot:?}");
+    assert!(empty_one_shot.stdout.is_empty());
+    assert!(empty_one_shot.stderr.is_empty());
+
+    let output_base = scratch("cquery-set-expression-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base = format!("--output_base={}", output_base.display());
+    let daemon = slug()
+        .current_dir(&workspace)
+        .args([output_base.as_str(), "cquery", expression])
+        .output()
+        .unwrap();
+    assert!(daemon.status.success(), "{daemon:?}");
+    assert!(daemon.stderr.is_empty());
+    assert_eq!(daemon.stdout, one_shot.stdout);
+    let empty_daemon = slug()
+        .current_dir(&workspace)
+        .args([output_base.as_str(), "cquery", "set()"])
+        .output()
+        .unwrap();
+    assert!(empty_daemon.status.success(), "{empty_daemon:?}");
+    assert!(empty_daemon.stdout.is_empty());
+    assert!(empty_daemon.stderr.is_empty());
+}
+
+#[test]
 fn cquery_starlark_label_daemon_recovers_after_missing() {
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
     let output_base = scratch("cquery-starlark-output-base");

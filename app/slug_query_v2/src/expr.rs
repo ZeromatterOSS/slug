@@ -18,6 +18,7 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use starlark_map::small_set::SmallSet;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
 pub struct SourceSpan {
@@ -220,6 +221,113 @@ pub fn parse_query_expression(source: &str) -> Result<QueryExpression, QueryPars
 
 pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
     validate_expression(expression)
+}
+
+/// Validates the intentionally function-free expression subset used by cquery.
+pub fn validate_function_free_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
+    let mut bindings = SmallSet::new();
+    validate_function_free_query_inner(expression, &mut bindings)
+}
+
+fn validate_function_free_query_inner(
+    expression: &QueryExpression,
+    bindings: &mut SmallSet<CompactString>,
+) -> Result<(), QueryParseError> {
+    match &expression.kind {
+        QueryExpressionKind::TargetLiteral(literal) => match literal.strip_prefix('$') {
+            Some(name) if bindings.contains(name) => Ok(()),
+            Some(_) => Err(QueryParseError::new(
+                format!("undefined query variable '{literal}'"),
+                expression.span,
+            )),
+            None => Ok(()),
+        },
+        QueryExpressionKind::Set(literals) => {
+            for literal in literals.iter() {
+                if literal.value.starts_with('$') {
+                    return Err(QueryParseError::new(
+                        "set() accepts only concrete target literals",
+                        literal.span,
+                    ));
+                }
+            }
+            Ok(())
+        }
+        QueryExpressionKind::Let { name, value, body } => {
+            validate_function_free_query_inner(value, bindings)?;
+            let shadows_existing = bindings.contains(name.value.as_str());
+            bindings.insert(name.value.clone());
+            let result = validate_function_free_query_inner(body, bindings);
+            if !shadows_existing {
+                bindings.shift_remove(name.value.as_str());
+            }
+            result
+        }
+        QueryExpressionKind::BinaryOpSequence { left, operations } => {
+            validate_function_free_query_inner(left, bindings)?;
+            for (_, right) in operations.iter() {
+                validate_function_free_query_inner(right, bindings)?;
+            }
+            Ok(())
+        }
+        QueryExpressionKind::Integer(_) => Err(QueryParseError::new(
+            "integer literals are not supported by this cquery",
+            expression.span,
+        )),
+        QueryExpressionKind::Function { name, .. } => Err(QueryParseError::new(
+            format!(
+                "query function '{}' is not supported by this cquery",
+                name.value
+            ),
+            name.span,
+        )),
+    }
+}
+
+/// Returns concrete literals in lexical resolution order. Variables are
+/// intentionally absent: they are resolved by the shared evaluator.
+pub fn function_free_literals(expression: &QueryExpression) -> Vec<&str> {
+    let mut literals = Vec::new();
+    collect_function_free_literals(expression, &mut literals);
+    literals
+}
+
+fn collect_function_free_literals<'a>(
+    expression: &'a QueryExpression,
+    literals: &mut Vec<&'a str>,
+) {
+    match &expression.kind {
+        QueryExpressionKind::TargetLiteral(literal) if !literal.starts_with('$') => {
+            literals.push(literal)
+        }
+        QueryExpressionKind::Set(values) => {
+            literals.extend(values.iter().map(|value| value.value.as_str()));
+        }
+        QueryExpressionKind::Let { value, body, .. } => {
+            collect_function_free_literals(value, literals);
+            collect_function_free_literals(body, literals);
+        }
+        QueryExpressionKind::BinaryOpSequence { left, operations } => {
+            collect_function_free_literals(left, literals);
+            for (_, right) in operations.iter() {
+                collect_function_free_literals(right, literals);
+            }
+        }
+        QueryExpressionKind::TargetLiteral(_)
+        | QueryExpressionKind::Integer(_)
+        | QueryExpressionKind::Function { .. } => {}
+    }
+}
+
+impl QueryExpression {
+    pub fn single_literal(&self) -> Option<&str> {
+        match &self.kind {
+            QueryExpressionKind::TargetLiteral(literal) if !literal.starts_with('$') => {
+                Some(literal)
+            }
+            _ => None,
+        }
+    }
 }
 
 impl QueryExpression {

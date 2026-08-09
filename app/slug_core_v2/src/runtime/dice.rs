@@ -104,13 +104,19 @@ use slug_loading_v2::keys::WorkspaceDirectoryKey;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
 use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
 use slug_loading_v2::keys::WorkspaceDirectoryValue;
+use slug_query_v2::FunctionFreeQueryEnvironment;
 use slug_query_v2::QueryError;
+use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutput;
 use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
 use slug_query_v2::RootQueryCommandKey;
+use slug_query_v2::TargetSet;
+use slug_query_v2::evaluate_function_free_query;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
+use slug_query_v2::function_free_literals;
+use slug_query_v2::validate_function_free_query;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -869,6 +875,10 @@ type SyntheticCommandResult = DrivenCommand<Result<SyntheticCommandValue, Synthe
 trait NativeCommandRoot: Clone {
     type Terminal: Clone;
 
+    fn allows_empty_terminal(&self) -> bool {
+        false
+    }
+
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
@@ -1239,40 +1249,77 @@ impl NativeCommandRoot for BuildCommandRootKey {
 impl NativeCommandRoot for CqueryCommandRoot {
     type Terminal = Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>;
 
+    fn allows_empty_terminal(&self) -> bool {
+        true
+    }
+
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
     ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>
     {
-        let outcome = transaction
-            .compute(&self.analysis_key)
+        let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
+        let mut results = Vec::with_capacity(self.roots.len());
+        for root in self.roots.iter() {
+            match transaction
+                .compute(&root.analysis_key)
+                .await
+                .map_err(|error| {
+                    NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}"))
+                })? {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(next) => {
+                    needs = Some(match needs {
+                        Some(current) => current.try_union(&next).map_err(|error| {
+                            NativeDemandSessionError::Computation(anyhow::anyhow!(
+                                "incompatible cquery preparation needs: {error:?}"
+                            ))
+                        })?,
+                        None => next,
+                    });
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(result) => results.push(result),
+            }
+        }
+        if let Some(needs) = needs {
+            return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(needs));
+        }
+
+        let mut targets = Vec::with_capacity(self.roots.len());
+        for (root, result) in self.roots.iter().zip(results) {
+            let analysis = match result.as_ref() {
+                Ok(analysis) => analysis,
+                Err(error) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                        Arc::new(Err(root.map_analysis_error(error))),
+                    ));
+                }
+            };
+            let Some(configuration) = analysis.key().configuration().slug_configuration() else {
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                    Arc::new(Err(CqueryCommandError::infrastructure(
+                        "production cquery analysis returned an opaque configuration",
+                    ))),
+                ));
+            };
+            targets.push(CqueryResultTarget {
+                key: analysis.key().clone(),
+                analysis: analysis.clone(),
+                display_label: root.requested.clone(),
+                projection: configuration.projection(),
+            });
+        }
+        let mut environment = CquerySetEnvironment::new(&self.literal_roots, &targets);
+        let terminal = evaluate_function_free_query(&mut environment, &self.expression)
             .await
-            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))?;
-        Ok(match outcome {
-            slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
-                slug_bzlmod_v2::SourcePreparationOutcome::Need(needs)
-            }
-            slug_bzlmod_v2::SourcePreparationOutcome::Complete(result) => {
-                let terminal = match result.as_ref() {
-                    Ok(analysis) => match analysis.key().configuration().slug_configuration() {
-                        Some(configuration) => Ok(CqueryCommandEvaluation {
-                            analysis: analysis.clone(),
-                            display_label: self.requested.clone(),
-                            projection: configuration.projection(),
-                        }),
-                        None => Err(CqueryCommandError::infrastructure(
-                            "production cquery analysis returned an opaque configuration",
-                        )),
-                    },
-                    Err(error) => Err(self.map_analysis_error(error)),
-                };
-                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Arc::new(terminal))
-            }
-        })
+            .map(|targets| CqueryCommandEvaluation { targets })
+            .map_err(|error| CqueryCommandError::request(error.to_string()));
+        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+            Arc::new(terminal),
+        ))
     }
 }
 
-impl CqueryCommandRoot {
+impl CqueryRootTarget {
     fn map_analysis_error(&self, error: &AnalysisError) -> CqueryCommandError {
         match error.kind() {
             AnalysisErrorKind::TargetNotFound { label, build_file } if label == &self.canonical => {
@@ -1547,16 +1594,107 @@ struct BuildCommandRootKey {
 
 #[derive(Clone)]
 struct CqueryCommandRoot {
+    expression: QueryExpression,
+    roots: Arc<[CqueryRootTarget]>,
+    literal_roots: Arc<[(Arc<str>, usize)]>,
+}
+
+#[derive(Clone)]
+struct CqueryRootTarget {
     requested: Arc<str>,
     canonical: CanonicalLabel,
     analysis_key: RootConfiguredTargetAnalysisKey,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+#[derive(Debug, Clone, Allocative)]
 pub struct CqueryCommandEvaluation {
+    targets: TargetSet<CqueryResultTarget>,
+}
+
+#[derive(Debug, Clone, Allocative)]
+struct CqueryResultTarget {
+    key: ConfiguredTargetKey,
     analysis: Arc<AnalysisResult>,
     display_label: Arc<str>,
     projection: SlugConfigurationProjection,
+}
+
+impl PartialEq for CqueryResultTarget {
+    fn eq(&self, other: &Self) -> bool {
+        self.key == other.key
+    }
+}
+
+impl Eq for CqueryResultTarget {}
+
+impl Hash for CqueryResultTarget {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.key.hash(state);
+    }
+}
+
+struct CquerySetEnvironment {
+    targets: SmallMap<Arc<str>, TargetSet<CqueryResultTarget>>,
+}
+
+impl CquerySetEnvironment {
+    fn new(literal_roots: &[(Arc<str>, usize)], roots: &[CqueryResultTarget]) -> Self {
+        let mut targets = SmallMap::new();
+        for (literal, root) in literal_roots {
+            targets.insert(literal.clone(), TargetSet::singleton(roots[*root].clone()));
+        }
+        Self { targets }
+    }
+
+    fn union_all(sets: &[TargetSet<CqueryResultTarget>]) -> TargetSet<CqueryResultTarget> {
+        let mut result = TargetSet::default();
+        for set in sets {
+            for target in set.iter() {
+                result.insert(target.clone());
+            }
+        }
+        result
+    }
+}
+
+#[async_trait]
+impl FunctionFreeQueryEnvironment for CquerySetEnvironment {
+    type Set = TargetSet<CqueryResultTarget>;
+
+    fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
+        Self::union_all(sets)
+    }
+
+    fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set {
+        Self::union_all(&[left, right])
+    }
+
+    fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        let mut result = TargetSet::default();
+        for target in left.iter() {
+            if right.contains(target) {
+                result.insert(target.clone());
+            }
+        }
+        result
+    }
+
+    fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        let mut result = TargetSet::default();
+        for target in left.iter() {
+            if !right.contains(target) {
+                result.insert(target.clone());
+            }
+        }
+        result
+    }
+
+    async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
+        self.targets
+            .get(literal)
+            .cloned()
+            .ok_or_else(|| QueryError::evaluation(format!("unresolved cquery literal '{literal}'")))
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -1736,11 +1874,23 @@ impl BuildCommandEvaluation {
 
 impl CqueryCommandEvaluation {
     pub fn label_stdout(&self) -> String {
-        format!("{} ({})\n", self.display_label, self.projection)
+        self.targets
+            .iter()
+            .map(|target| format!("{} ({})\n", target.display_label, target.projection))
+            .collect()
     }
 
-    pub fn starlark_label_stdout(&self) -> String {
-        format!("{}\n", self.analysis.key().label())
+    pub fn singleton_starlark_label_stdout(&self) -> Option<String> {
+        let mut targets = self.targets.iter();
+        let target = targets.next()?;
+        targets
+            .next()
+            .is_none()
+            .then(|| format!("{}\n", target.analysis.key().label()))
+    }
+
+    pub fn analyses(&self) -> impl Iterator<Item = &AnalysisResult> {
+        self.targets.iter().map(|target| target.analysis.as_ref())
     }
 }
 
@@ -1749,7 +1899,7 @@ impl CqueryCommandError {
         Self::Request(Arc::from(message.into()))
     }
 
-    pub(super) fn infrastructure(error: impl fmt::Display) -> Self {
+    pub fn infrastructure(error: impl fmt::Display) -> Self {
         Self::Infrastructure(Arc::from(error.to_string()))
     }
 
@@ -2808,6 +2958,7 @@ impl WorkspaceRuntime {
     {
         let preflight = self.begin_native_demand_command_with_inputs(request)?;
         let mut guard = NativeDemandAbortGuard::new(preflight.into_command());
+        let allows_empty_terminal = root.allows_empty_terminal();
         let mut attempts = 0usize;
         loop {
             attempts += 1;
@@ -2832,7 +2983,11 @@ impl WorkspaceRuntime {
                     }
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
                         let terminal = terminal.clone();
-                        let sealed = guard.seal_terminal()?;
+                        let sealed = if allows_empty_terminal {
+                            guard.seal_terminal_allowing_empty_roots()?
+                        } else {
+                            guard.seal_terminal()?
+                        };
                         let terminal_root_count = sealed.root_count();
                         let selected = sealed.select(&transaction).await?;
                         let prepared = guard.prepare_accept(selected, &transaction).await;
@@ -2994,7 +3149,7 @@ impl WorkspaceRuntime {
 
     pub fn cquery_command_with_bzlmod_inputs(
         &self,
-        target: &TargetPattern,
+        expression: &str,
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
@@ -3004,16 +3159,10 @@ impl WorkspaceRuntime {
         AcceptedCommand<Arc<Result<CqueryCommandEvaluation, CqueryCommandError>>>,
         CqueryCommandError,
     > {
-        let TargetPattern::Single(label) = target else {
-            return Err(CqueryCommandError::request(
-                "cquery accepts exactly one literal target label",
-            ));
-        };
-        if !label.repo().is_root() {
-            return Err(CqueryCommandError::request(
-                "external repository cquery targets are not supported",
-            ));
-        }
+        let expression = QueryExpression::parse(expression)
+            .map_err(|error| CqueryCommandError::request(error.to_string()))?;
+        validate_function_free_query(&expression)
+            .map_err(|error| CqueryCommandError::request(error.to_string()))?;
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(CqueryCommandError::infrastructure)?;
         let host = self
@@ -3030,30 +3179,64 @@ impl WorkspaceRuntime {
         self.configured_output
             .claim(&configuration)
             .map_err(CqueryCommandError::infrastructure)?;
-        let canonical =
-            CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
-                .map_err(CqueryCommandError::infrastructure)?;
         let workspace = NormalizedAbsolutePath::new(self.workspace.clone())
             .map_err(CqueryCommandError::infrastructure)?;
-        let analysis_key = match explicit_root_string_setting {
-            Some(explicit) => RootConfiguredTargetAnalysisKey::root_string_setting_request(
-                workspace,
-                canonical.clone(),
-                ConfigurationKey::from_slug(base_configuration),
-                Some(explicit),
-            ),
-            None => RootConfiguredTargetAnalysisKey::new(
-                workspace,
-                ConfiguredTargetKey::new(
-                    canonical.clone(),
-                    ConfigurationKey::from_slug(configuration),
-                ),
-            ),
-        };
+        let mut roots = Vec::new();
+        let mut root_indices = SmallMap::new();
+        let mut literal_roots = Vec::new();
+        for literal in function_free_literals(&expression) {
+            let target = TargetPattern::parse(literal)
+                .map_err(|error| CqueryCommandError::request(error))?;
+            let TargetPattern::Single(ref label) = target else {
+                return Err(CqueryCommandError::request(
+                    "target patterns are not supported by this cquery",
+                ));
+            };
+            if !label.repo().is_root() {
+                return Err(CqueryCommandError::request(
+                    "external repository labels are not supported by this cquery",
+                ));
+            }
+            let canonical =
+                CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
+                    .map_err(CqueryCommandError::infrastructure)?;
+            let requested: Arc<str> = Arc::from(target.to_string());
+            let index = match root_indices.get(&canonical) {
+                Some(index) => *index,
+                None => {
+                    let analysis_key = match explicit_root_string_setting.as_ref() {
+                        Some(explicit) => {
+                            RootConfiguredTargetAnalysisKey::root_string_setting_request(
+                                workspace.clone(),
+                                canonical.clone(),
+                                ConfigurationKey::from_slug(base_configuration.clone()),
+                                Some(explicit.clone()),
+                            )
+                        }
+                        None => RootConfiguredTargetAnalysisKey::new(
+                            workspace.clone(),
+                            ConfiguredTargetKey::new(
+                                canonical.clone(),
+                                ConfigurationKey::from_slug(configuration.clone()),
+                            ),
+                        ),
+                    };
+                    let index = roots.len();
+                    roots.push(CqueryRootTarget {
+                        requested,
+                        canonical: canonical.clone(),
+                        analysis_key,
+                    });
+                    root_indices.insert(canonical, index);
+                    index
+                }
+            };
+            literal_roots.push((Arc::from(literal), index));
+        }
         let root = CqueryCommandRoot {
-            requested: Arc::from(target.to_string()),
-            canonical,
-            analysis_key,
+            expression,
+            roots: roots.into(),
+            literal_roots: literal_roots.into(),
         };
         let request = NativeDemandRequestInputBundle {
             command_policy,
@@ -3065,19 +3248,20 @@ impl WorkspaceRuntime {
             CqueryCommandError::infrastructure(format!("typed cquery command failed: {error}"))
         })?;
         if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
-            let configuration = evaluation
-                .analysis
-                .key()
-                .configuration()
-                .slug_configuration()
-                .ok_or_else(|| {
-                    CqueryCommandError::infrastructure(
-                        "production cquery analysis returned an opaque configuration",
-                    )
-                })?;
-            self.configured_output
-                .claim(configuration)
-                .map_err(CqueryCommandError::infrastructure)?;
+            for analysis in evaluation.analyses() {
+                let configuration = analysis
+                    .key()
+                    .configuration()
+                    .slug_configuration()
+                    .ok_or_else(|| {
+                        CqueryCommandError::infrastructure(
+                            "production cquery analysis returned an opaque configuration",
+                        )
+                    })?;
+                self.configured_output
+                    .claim(configuration)
+                    .map_err(CqueryCommandError::infrastructure)?;
+            }
         }
         Ok(driven.accepted)
     }
@@ -3985,11 +4169,23 @@ impl<'a> NativeDemandAbortGuard<'a> {
     }
 
     fn seal_terminal(&mut self) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
+        let attempt = self
+            .attempt
+            .as_ref()
+            .expect("native-demand terminal attempt is live");
+        let sealed = attempt.seal_terminal()?;
+        self.attempt = None;
+        Ok(sealed)
+    }
+
+    fn seal_terminal_allowing_empty_roots(
+        &mut self,
+    ) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
         let sealed = self
             .attempt
             .as_ref()
             .expect("native-demand terminal attempt is live")
-            .seal_terminal()?;
+            .seal_terminal_allowing_empty_roots()?;
         self.attempt = None;
         Ok(sealed)
     }
@@ -4220,6 +4416,19 @@ impl NativeDemandAttempt {
         let sealed = self
             .tracker
             .seal_terminal()
+            .map_err(NativeDemandSessionError::Effect)?;
+        Ok(NativeDemandSealedAttempt {
+            effects: self.effects.clone(),
+            sealed,
+        })
+    }
+
+    fn seal_terminal_allowing_empty_roots(
+        &self,
+    ) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
+        let sealed = self
+            .tracker
+            .seal_terminal_allowing_empty_roots()
             .map_err(NativeDemandSessionError::Effect)?;
         Ok(NativeDemandSealedAttempt {
             effects: self.effects.clone(),
@@ -5805,7 +6014,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let runtime = test_runtime(workspace.path())
             .unwrap()
             .with_activation_audit(activation_audit.clone());
-        let run = |target: &TargetPattern| {
+        let run = |target: &str| {
             runtime.cquery_command_with_bzlmod_inputs(
                 target,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
@@ -5828,21 +6037,31 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 assert!(serialized.ends_with(']'));
             }
         };
-        let target = TargetPattern::parse("//pkg:probe").unwrap();
-        let cold = run(&target).unwrap();
+        let target = "//pkg:probe";
+        let cold = run(target).unwrap();
         let cold_evaluation = cold.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(cold_evaluation.starlark_label_stdout(), "@@//pkg:probe\n");
-        assert!(cold_evaluation.analysis.actions().is_empty());
+        assert_eq!(
+            cold_evaluation.singleton_starlark_label_stdout().as_deref(),
+            Some("@@//pkg:probe\n")
+        );
+        assert!(
+            cold_evaluation
+                .analyses()
+                .next()
+                .unwrap()
+                .actions()
+                .is_empty()
+        );
         assert!(accepted_output_text(&cold).is_empty());
         assert_roots("@@//pkg:probe", 13);
 
-        let warm = run(&target).unwrap();
+        let warm = run(target).unwrap();
         assert!(warm.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&warm).is_empty());
         assert_roots("@@//pkg:probe", 1);
 
-        let missing = TargetPattern::parse("//pkg:missing").unwrap();
-        let missing_result = run(&missing).unwrap();
+        let missing = "//pkg:missing";
+        let missing_result = run(missing).unwrap();
         let error = missing_result
             .terminal_for_test()
             .as_ref()
@@ -5852,15 +6071,16 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert!(accepted_output_text(&missing_result).is_empty());
         assert_roots("@@//pkg:missing", 1);
 
-        let recovered = run(&target).unwrap();
+        let recovered = run(target).unwrap();
         assert_eq!(
             recovered
                 .terminal_for_test()
                 .as_ref()
                 .as_ref()
                 .unwrap()
-                .starlark_label_stdout(),
-            "@@//pkg:probe\n"
+                .singleton_starlark_label_stdout()
+                .as_deref(),
+            Some("@@//pkg:probe\n")
         );
         assert!(accepted_output_text(&recovered).is_empty());
         assert_roots("@@//pkg:probe", 1);
@@ -5870,7 +6090,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n# cquery edit\n",
         )
         .unwrap();
-        let build_edit = run(&target).unwrap();
+        let build_edit = run(target).unwrap();
         assert!(build_edit.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&build_edit).is_empty());
         assert_roots("@@//pkg:probe", 1);
@@ -5880,10 +6100,105 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n# cquery edit\n",
         )
         .unwrap();
-        let bzl_edit = run(&target).unwrap();
+        let bzl_edit = run(target).unwrap();
         assert!(bzl_edit.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&bzl_edit).is_empty());
         assert_roots("@@//pkg:probe", 1);
+    }
+
+    #[test]
+    fn cquery_evaluates_ordered_function_free_set_expressions_over_shared_roots() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"sets\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"lib\")\n",
+        )
+        .unwrap();
+        let activation_audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(activation_audit.clone());
+        let empty = |expression: &str| {
+            runtime
+                .cquery_command_with_bzlmod_inputs(
+                    expression,
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    None,
+                )
+                .unwrap()
+        };
+        for expression in ["set()", "let x = set() in $x"] {
+            let accepted = empty(expression);
+            let evaluation = accepted.terminal_for_test().as_ref().as_ref().unwrap();
+            assert!(evaluation.label_stdout().is_empty());
+            assert_eq!(evaluation.analyses().count(), 0);
+            assert!(evaluation.singleton_starlark_label_stdout().is_none());
+            assert!(activation_audit.take_configured_roots().is_empty());
+        }
+        let run = |expression: &str| {
+            runtime
+                .cquery_command_with_bzlmod_inputs(
+                    expression,
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    None,
+                )
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_stdout()
+        };
+        let labels = |output: String| {
+            output
+                .lines()
+                .map(|line| line.split_once(" (").unwrap().0.to_owned())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            labels(run("//pkg:bin union //pkg:lib")),
+            ["//pkg:bin", "//pkg:lib"]
+        );
+        assert_eq!(
+            labels(run("set(//pkg:bin //pkg:lib //pkg:bin)")),
+            ["//pkg:bin", "//pkg:lib"]
+        );
+        assert_eq!(
+            labels(run("let x = //pkg:bin in $x union //pkg:lib")),
+            ["//pkg:bin", "//pkg:lib"]
+        );
+        assert!(run("//pkg:bin intersect //pkg:lib").is_empty());
+        assert_eq!(labels(run("//pkg:bin except //pkg:lib")), ["//pkg:bin"]);
+
+        let missing = runtime
+            .cquery_command_with_bzlmod_inputs(
+                "//pkg:missing union //pkg:also_missing",
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert!(error.missing_stderr().unwrap().contains("//pkg:missing"));
     }
 
     #[test]
@@ -5919,8 +6234,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         )
         .unwrap();
 
-        let target = TargetPattern::parse("//:consumer").unwrap();
-        let run = |runtime: &WorkspaceRuntime, target: &TargetPattern, setting: Option<&str>| {
+        let target = "//:consumer";
+        let run = |runtime: &WorkspaceRuntime, target: &str, setting: Option<&str>| {
             runtime.cquery_command_with_bzlmod_inputs(
                 target,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
@@ -5941,18 +6256,17 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .clone()
         };
         let topology = |evaluation: &CqueryCommandEvaluation| {
+            let analysis = evaluation.analyses().next().unwrap();
             (
-                evaluation.analysis.key().label().to_string(),
-                evaluation
-                    .analysis
+                analysis.key().label().to_string(),
+                analysis
                     .providers()
                     .names()
                     .map(|name| name.to_string())
                     .collect::<Vec<_>>(),
-                evaluation.analysis.declared_outputs().to_vec(),
-                evaluation.analysis.actions().len(),
-                evaluation
-                    .analysis
+                analysis.declared_outputs().to_vec(),
+                analysis.actions().len(),
+                analysis
                     .direct_dependencies()
                     .iter()
                     .map(|dependency| dependency.label().to_string())
@@ -5961,10 +6275,11 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         };
 
         let retained = test_runtime(workspace.path()).unwrap();
-        let c0_command = run(&retained, &target, None).unwrap();
+        let c0_command = run(&retained, target, None).unwrap();
         let c0 = evaluation(&c0_command);
+        let c0_analysis = c0.analyses().next().unwrap();
         assert_eq!(
-            c0.analysis
+            c0_analysis
                 .key()
                 .configuration()
                 .root_string_setting()
@@ -5976,15 +6291,19 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             c0.label_stdout().len(),
             "//:consumer (slugcfg-v1:)\n".len() + 64
         );
-        assert_eq!(c0.starlark_label_stdout(), "@@//:consumer\n");
+        assert_eq!(
+            c0.singleton_starlark_label_stdout().as_deref(),
+            Some("@@//:consumer\n")
+        );
         assert_eq!(accepted_output_text(&c0_command), ["CONSUMER_ANALYSIS"]);
         let c0_stdout = c0.label_stdout();
         let c0_topology = topology(&c0);
 
-        let c1_command = run(&retained, &target, Some("command")).unwrap();
+        let c1_command = run(&retained, target, Some("command")).unwrap();
         let c1 = evaluation(&c1_command);
+        let c1_analysis = c1.analyses().next().unwrap();
         assert_eq!(
-            c1.analysis
+            c1_analysis
                 .key()
                 .configuration()
                 .root_string_setting()
@@ -5992,18 +6311,21 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             Some("command")
         );
         assert_ne!(c0_stdout, c1.label_stdout());
-        assert_eq!(c1.starlark_label_stdout(), "@@//:consumer\n");
+        assert_eq!(
+            c1.singleton_starlark_label_stdout().as_deref(),
+            Some("@@//:consumer\n")
+        );
         assert_eq!(c0_topology, topology(&c1));
         assert_eq!(accepted_output_text(&c1_command), ["CONSUMER_ANALYSIS"]);
 
-        let restored_command = run(&retained, &target, None).unwrap();
+        let restored_command = run(&retained, target, None).unwrap();
         let restored = evaluation(&restored_command);
         assert_eq!(c0_stdout, restored.label_stdout());
         assert_eq!(c0_topology, topology(&restored));
         assert!(accepted_output_text(&restored_command).is_empty());
 
-        let missing = TargetPattern::parse("//:missing").unwrap();
-        let missing_command = run(&retained, &missing, Some("command")).unwrap();
+        let missing = "//:missing";
+        let missing_command = run(&retained, missing, Some("command")).unwrap();
         let missing_error = missing_command
             .terminal_for_test()
             .as_ref()
@@ -6012,14 +6334,16 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         assert_eq!(missing_error.missing_stderr().unwrap().lines().count(), 3);
 
         let fresh = test_runtime(workspace.path()).unwrap();
-        let one_shot = run(&fresh, &target, None).unwrap();
+        let one_shot = run(&fresh, target, None).unwrap();
         assert_eq!(c0_stdout, evaluation(&one_shot).label_stdout());
 
-        let setting = TargetPattern::parse("//:setting").unwrap();
-        let setting_command = run(&retained, &setting, None).unwrap();
+        let setting = "//:setting";
+        let setting_command = run(&retained, setting, None).unwrap();
         assert_eq!(
             evaluation(&setting_command)
-                .analysis
+                .analyses()
+                .next()
+                .unwrap()
                 .key()
                 .configuration()
                 .root_string_setting()
@@ -6027,10 +6351,16 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             Some("default")
         );
 
-        let parent = TargetPattern::parse("//:parent").unwrap();
-        let parent_command = run(&retained, &parent, None).unwrap();
+        let parent = "//:parent";
+        let parent_command = run(&retained, parent, None).unwrap();
         let parent = evaluation(&parent_command);
-        let child = parent.analysis.direct_dependencies().first().unwrap();
+        let child = parent
+            .analyses()
+            .next()
+            .unwrap()
+            .direct_dependencies()
+            .first()
+            .unwrap();
         assert_eq!(child.label().to_string(), "@@//:consumer");
         assert_eq!(
             child

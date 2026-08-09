@@ -46,7 +46,7 @@ pub fn run(argv: Vec<String>) -> i32 {
     let output_mode = request.output_mode;
     let accepted = match evaluate_workspace_cquery_command_with_bzlmod_inputs(
         &workspace,
-        &request.target,
+        &request.expression,
         request.bzlmod_policy,
         environment_policy,
         request.lockfile_mode,
@@ -68,7 +68,17 @@ pub fn run(argv: Vec<String>) -> i32 {
             Ok(evaluation) => {
                 let stdout = match output_mode {
                     CqueryOutputMode::Label => evaluation.label_stdout(),
-                    CqueryOutputMode::StarlarkLabel => evaluation.starlark_label_stdout(),
+                    CqueryOutputMode::StarlarkLabel => {
+                        let Some(stdout) = evaluation.singleton_starlark_label_stdout() else {
+                            return terminal_error(
+                                &CqueryCommandError::infrastructure(
+                                    "validated Starlark cquery did not produce one target",
+                                ),
+                                "one-shot",
+                            );
+                        };
+                        stdout
+                    }
                 };
                 TerminalOutput::new(0, stdout, String::new())
             }
@@ -99,7 +109,7 @@ fn run_daemon(
     match slug_server_v2::send_cquery_request(
         &socket,
         &slug_server_v2::CqueryRequest {
-            target: request.target.to_string(),
+            expression: request.expression,
             output: match request.output_mode {
                 CqueryOutputMode::Label => slug_server_v2::CqueryOutput::Label,
                 CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,

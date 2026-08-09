@@ -61,7 +61,7 @@ pub struct QueryRequest {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CqueryRequest {
-    pub target: String,
+    pub expression: String,
     pub output: CqueryOutput,
     pub root_string_setting: Option<String>,
     #[serde(default)]
@@ -331,30 +331,19 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
-            let target = match TargetPattern::parse(&request.target) {
-                Ok(target) => target,
-                Err(error) => {
-                    return DaemonResponse {
-                        exit_code: 2,
-                        stdout: String::new(),
-                        stderr: format!(
-                            "{{\"error\":\"cquery_request_error\",\"message\":\"{}\"}}",
-                            slug_core_v2::error::json_escape(&error)
-                        ),
-                        invalidated_files: 0,
-                    };
-                }
-            };
-            if !matches!(&target, TargetPattern::Single(label) if label.repo().is_root()) {
+            if let Err(error) = validate_cquery_expression(&request.expression, request.output) {
                 return DaemonResponse {
                     exit_code: 2,
                     stdout: String::new(),
-                    stderr: "{\"error\":\"cquery_request_error\",\"message\":\"cquery accepts exactly one root literal target\"}".to_owned(),
+                    stderr: format!(
+                        "{{\"error\":\"cquery_request_error\",\"message\":\"{}\"}}",
+                        slug_core_v2::error::json_escape(&error)
+                    ),
                     invalidated_files: 0,
                 };
             }
             let result = daemon.cquery_with_bzlmod_inputs(
-                &target,
+                &request.expression,
                 request.output,
                 command_policy,
                 environment_policy,
@@ -370,6 +359,22 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
             }
         }
     }
+}
+
+fn validate_cquery_expression(expression: &str, output: CqueryOutput) -> Result<(), String> {
+    let expression =
+        slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
+    slug_query_v2::validate_function_free_query(&expression).map_err(|error| error.to_string())?;
+    for literal in slug_query_v2::function_free_literals(&expression) {
+        let target = TargetPattern::parse(literal)?;
+        if !matches!(target, TargetPattern::Single(ref label) if label.repo().is_root()) {
+            return Err("cquery accepts only root literal target labels".to_owned());
+        }
+    }
+    if output == CqueryOutput::StarlarkLabel && expression.single_literal().is_none() {
+        return Err("--output=starlark requires one literal target label".to_owned());
+    }
+    Ok(())
 }
 
 fn malformed_bzlmod_response(error: String) -> DaemonResponse {
@@ -464,7 +469,7 @@ pub fn send_cquery_request(
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
     let json = serde_json::to_string(&DaemonRequest::Cquery(CqueryRequest {
-        target: request.target.clone(),
+        expression: request.expression.clone(),
         output: request.output,
         root_string_setting: request.root_string_setting.clone(),
         bzlmod: request.bzlmod.clone(),

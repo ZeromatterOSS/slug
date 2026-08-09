@@ -1,65 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-3`
-Milestone: M3 query / Stage 4 executable oracle design
-Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
+Packet: `WP-6-m4-configured-query-successor-audit`
+Milestone: M4 configured query
+Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: fresh reconstruction after a terminal package-load REPLAN; source bytes
-must reject the invented `allow_none` keyword before package-load preflight.
+Result: read-only selection audit after accepted configured set algebra.
 
-## Immutable semantic boundary
+## Observable slice
 
-The 165-row vector
-`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` and SHA-256
-`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d` remain
-unchanged. The five-file/two-package layout is exactly `MODULE.bazel`,
-`attr/defs.bzl`, `attr/BUILD.bazel`, `modules/ext/MODULE.bazel`, and
-`modules/ext/leaf/BUILD.bazel`, with no root BUILD. Pair-specific lane-1
-supports, package-derived notice construction, medium/small computed timeout,
-Starlark/native `legacy_macro`, suite/manual closure, separate test/exec
-schemas, transition allowlist, external baseline, and all six accepted
-source-construction fixes remain viable.
+Select the smallest exact next M4 behavior after accepted configured set
+algebra. Audit the retained `AnalysisResult` graph/providers, current public
+cquery modes, existing Bazel 9.2 evidence, and the Buck2-derived generic query
+evaluator. Prefer direct reuse of retained parser/evaluator code and semantic
+state already owned by analysis.
 
-## Required reconstruction retry
+## Ownership and stops
 
-- Reconstruct the five LF-exact bodies, all 18 primary argv, nine controls,
-  focused probes, execution, and mechanical Stage 4/Stage 8 rendering in one
-  disposable machine-readable/executable representation. No second manual
-  representation or post-render transcription is admitted.
-- Apply the accepted source corrections exactly: `l05_a003` uses
-  `attr.string_list_dict()` with accepted `a`/`z` order; `l13_a011_no` is an
-  alias with absent `:action_listener`; `l13_a017_no` is a native explicit
-  `licenses=[none]` beside package notice; and `l16_a007_yes`,
-  `l16_a013_yes`, and `l17_a012_yes` are explicit
-  `filegroup(package_metadata=[])` declarations.
-- The generated file must have exactly this producer declaration in the sole
-  executable representation:
-  `output_rule(name = "l01_generated_owner", nullable_output =
-  "l01_generated_nonrule")`. Assert that literal source identity before any
-  Bazel replay; the similarly named producer is not accepted.
-- Assert `allow_none` occurs nowhere in the five source bodies. The nullable
-  label is exactly `attr.label(default = None, allow_single_file = True)` or an
-  accepted equivalent without an invented keyword.
-- Before the full replay, write the five bodies to one disposable default
-  `mktemp -d` sibling `workspace`/`out` root and require Bazel package load to
-  pass. Do not render candidate text on a preflight failure.
-- Use two independent `mktemp -d` parents with direct sibling `workspace` and
-  `out` paths. Run all 18 lanes in both roots, compare exact stdout, record all
-  original nine literal-empty controls, and run the lane-1, license, timeout,
-  macro, tag-closure, and corrected-six-row focused probes.
-- Preserve actual single-backslash OI `^\[z, a, z\]$` and generator
-  `^attr/BUILD\.bazel:[0-9]+:[0-9]+$` argv bytes. Render candidate/pending
-  documents mechanically only after strict 165-label ownership passes.
-- Obtain terminal independent review before any generation scheduling.
+Do not select `deps` unless the packet first accounts for Bazel-observable host
+platform and constraint nodes; the current direct-dependency surface is known
+incomplete. Do not invent state or add a second graph/parser/evaluator. Exact
+configuration hashes, target patterns, external repositories, JVM/Java, CI,
+and compatibility shims remain excluded.
 
-## Boundary and stops
+## Validation
 
-Edit only Stage 4 and Stage 8. Temporary material stays outside the checkout;
-add no fixture, payload, expected record, generated source, Python, Rust,
-Cargo/lockfile, graph/DICE/regex state, configured analysis, toolchain
-resolution, JVM/Java artifact, or production Bazel delegation. Use ordinary RC
-discovery without inspecting or copying the private RC. Stop and `REPLAN` on a
-manifest semantic change, any ownership/probe/root mismatch, producer-identity
-miss, an `allow_none` byte, package-load failure, a need beyond the five
-files/two packages, or any excluded work. This third retry permits no material
-correction.
+Return one bounded implementation packet with an exact observable, owner,
+allowlist, tests, and stop conditions. Reuse accepted evidence where it
+discriminates; obtain fresh Bazel 9.2 evidence only for a demonstrated gap.
+Do not commit this audit as documentation-only work: carry its bookkeeping with
+the selected functional implementation.

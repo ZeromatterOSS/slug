@@ -34,7 +34,7 @@ use crate::traversal::some_path;
 use crate::traversal::transitive_closure;
 
 #[derive(Debug, Clone, Allocative)]
-pub(crate) struct TargetSet<T>(SmallSet<T>);
+pub struct TargetSet<T>(SmallSet<T>);
 
 impl<T> Default for TargetSet<T> {
     fn default() -> Self {
@@ -46,21 +46,21 @@ impl<T> TargetSet<T>
 where
     T: Clone + Eq + Hash,
 {
-    pub(crate) fn singleton(value: T) -> Self {
+    pub fn singleton(value: T) -> Self {
         let mut values = SmallSet::new();
         values.insert(value);
         Self(values)
     }
 
-    pub(crate) fn insert(&mut self, value: T) {
+    pub fn insert(&mut self, value: T) {
         self.0.insert(value);
     }
 
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &T> {
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
         self.0.iter()
     }
 
-    pub(crate) fn contains(&self, value: &T) -> bool {
+    pub fn contains(&self, value: &T) -> bool {
         self.0.contains(value)
     }
 }
@@ -96,6 +96,153 @@ impl TestSuiteAttribute {
 }
 
 #[async_trait]
+pub trait FunctionFreeQueryEnvironment {
+    type Set: Clone + Send + Sync;
+
+    fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set;
+    fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set;
+    fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
+    fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
+    async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
+}
+
+/// Evaluates the query forms shared by loading and configured query without
+/// admitting query functions or graph traversal.
+pub async fn evaluate_function_free_query<E>(
+    environment: &mut E,
+    expression: &QueryExpression,
+) -> Result<E::Set, QueryError>
+where
+    E: FunctionFreeQueryEnvironment + Send,
+{
+    let mut variables = SmallMap::new();
+    let mut context = FunctionFreeContext(environment);
+    evaluate_query_expression_inner(&mut context, expression, &mut variables).await
+}
+
+struct FunctionFreeContext<'a, E>(&'a mut E);
+
+#[async_trait]
+impl<E> FunctionFreeQueryEnvironment for FunctionFreeContext<'_, E>
+where
+    E: FunctionFreeQueryEnvironment + Send,
+{
+    type Set = E::Set;
+
+    fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
+        self.0.one_delivery(sets)
+    }
+
+    fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set {
+        self.0.union(left, right)
+    }
+
+    fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        self.0.intersection(left, right)
+    }
+
+    fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        self.0.except(left, right)
+    }
+
+    async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
+        self.0.resolve_literal(literal).await
+    }
+}
+
+trait QueryExpressionContext: FunctionFreeQueryEnvironment {
+    fn evaluate_integer<'a>(
+        &'a mut self,
+        value: u64,
+    ) -> BoxFuture<'a, Result<Self::Set, QueryError>>;
+
+    fn evaluate_function<'a>(
+        &'a mut self,
+        name: &'a crate::Spanned<CompactString>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, Self::Set>,
+    ) -> BoxFuture<'a, Result<Self::Set, QueryError>>;
+}
+
+impl<E> QueryExpressionContext for FunctionFreeContext<'_, E>
+where
+    E: FunctionFreeQueryEnvironment + Send,
+{
+    fn evaluate_integer<'a>(
+        &'a mut self,
+        _value: u64,
+    ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
+        async move { Err(QueryError::syntax("integer literals are not supported")) }.boxed()
+    }
+
+    fn evaluate_function<'a>(
+        &'a mut self,
+        _name: &'a crate::Spanned<CompactString>,
+        _args: &'a [QueryExpression],
+        _variables: &'a mut SmallMap<CompactString, Self::Set>,
+    ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
+        async move { Err(QueryError::syntax("query functions are not supported")) }.boxed()
+    }
+}
+
+fn evaluate_query_expression_inner<'a, C>(
+    context: &'a mut C,
+    expression: &'a QueryExpression,
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        match &expression.kind {
+            QueryExpressionKind::TargetLiteral(literal) => {
+                if let Some(name) = literal.strip_prefix('$') {
+                    return variables.get(name).cloned().ok_or_else(|| {
+                        QueryError::evaluation(format!("undefined query variable '${name}'"))
+                    });
+                }
+                context.resolve_literal(literal).await
+            }
+            QueryExpressionKind::Integer(value) => context.evaluate_integer(*value).await,
+            QueryExpressionKind::Set(literals) => {
+                let mut resolved = Vec::with_capacity(literals.len());
+                for literal in literals.iter() {
+                    resolved.push(context.resolve_literal(&literal.value).await?);
+                }
+                Ok(context.one_delivery(&resolved))
+            }
+            QueryExpressionKind::Let { name, value, body } => {
+                let value = evaluate_query_expression_inner(context, value, variables).await?;
+                let previous = variables.insert(name.value.clone(), value);
+                let result = evaluate_query_expression_inner(context, body, variables).await;
+                if let Some(previous) = previous {
+                    variables.insert(name.value.clone(), previous);
+                } else {
+                    variables.shift_remove(name.value.as_str());
+                }
+                result
+            }
+            QueryExpressionKind::BinaryOpSequence { left, operations } => {
+                let mut result = evaluate_query_expression_inner(context, left, variables).await?;
+                for (operator, right) in operations.iter() {
+                    let right = evaluate_query_expression_inner(context, right, variables).await?;
+                    result = match operator {
+                        BinaryOperator::Union => context.union(result, right),
+                        BinaryOperator::Except => context.except(&result, &right),
+                        BinaryOperator::Intersect => context.intersection(&result, &right),
+                    };
+                }
+                Ok(result)
+            }
+            QueryExpressionKind::Function { name, args } => {
+                context.evaluate_function(name, args, variables).await
+            }
+        }
+    }
+    .boxed()
+}
+
+#[async_trait]
 pub(crate) trait QueryEnvironment {
     type Target: Clone + Eq + Hash + Send + Sync;
     type Set: Clone + Send + Sync;
@@ -104,6 +251,7 @@ pub(crate) trait QueryEnvironment {
     fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set;
     fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
+
     fn eval_all(&self, set: &Self::Set) -> TargetSet<Self::Target>;
     fn lift_one_delivery(&self, targets: TargetSet<Self::Target>) -> Self::Set;
 
@@ -196,64 +344,66 @@ where
         expression: &'a QueryExpression,
         variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        evaluate_query_expression_inner(self, expression, variables)
+    }
+}
+
+#[async_trait]
+impl<E> FunctionFreeQueryEnvironment for QueryEvaluator<E>
+where
+    E: QueryEnvironment + Send,
+{
+    type Set = E::Set;
+
+    fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
+        self.environment.one_delivery(sets)
+    }
+
+    fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set {
+        self.environment.union(left, right)
+    }
+
+    fn intersection(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        self.environment.intersection(left, right)
+    }
+
+    fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set {
+        self.environment.except(left, right)
+    }
+
+    async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
+        self.environment.resolve_literal(literal).await
+    }
+}
+
+impl<E> QueryExpressionContext for QueryEvaluator<E>
+where
+    E: QueryEnvironment + Send,
+{
+    fn evaluate_integer<'a>(
+        &'a mut self,
+        value: u64,
+    ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
         async move {
-            match &expression.kind {
-                QueryExpressionKind::TargetLiteral(literal) => {
-                    if let Some(name) = literal.strip_prefix('$') {
-                        return variables.get(name).cloned().ok_or_else(|| {
-                            QueryError::evaluation(format!("undefined query variable '${name}'"))
-                        });
-                    }
-                    self.environment.resolve_literal(literal).await
-                }
-                QueryExpressionKind::Integer(value) => {
-                    self.environment
-                        .resolve_literal(&format!("//:{value}"))
-                        .await
-                }
-                QueryExpressionKind::Set(literals) => {
-                    let mut resolved = Vec::with_capacity(literals.len());
-                    for literal in literals.iter() {
-                        resolved.push(self.environment.resolve_literal(&literal.value).await?);
-                    }
-                    Ok(self.environment.one_delivery(&resolved))
-                }
-                QueryExpressionKind::Let { name, value, body } => {
-                    let value = self.evaluate_inner(value, variables).await?;
-                    let previous = variables.insert(name.value.clone(), value);
-                    let result = self.evaluate_inner(body, variables).await;
-                    if let Some(previous) = previous {
-                        variables.insert(name.value.clone(), previous);
-                    } else {
-                        variables.shift_remove(name.value.as_str());
-                    }
-                    result
-                }
-                QueryExpressionKind::BinaryOpSequence { left, operations } => {
-                    let mut result = self.evaluate_inner(left, variables).await?;
-                    for (operator, right) in operations.iter() {
-                        let right = self.evaluate_inner(right, variables).await?;
-                        result = match operator {
-                            BinaryOperator::Union => self.environment.union(result, right),
-                            BinaryOperator::Except => self.environment.except(&result, &right),
-                            BinaryOperator::Intersect => {
-                                self.environment.intersection(&result, &right)
-                            }
-                        };
-                    }
-                    Ok(result)
-                }
-                QueryExpressionKind::Function { name, args } => {
-                    let functions = self.functions;
-                    let function = functions.get(&name.value).ok_or_else(|| {
-                        QueryError::syntax(format!(
-                            "query function '{}' was not validated",
-                            name.value
-                        ))
-                    })?;
-                    function.invoke(self, args, variables).await
-                }
-            }
+            self.environment
+                .resolve_literal(&format!("//:{value}"))
+                .await
+        }
+        .boxed()
+    }
+
+    fn evaluate_function<'a>(
+        &'a mut self,
+        name: &'a crate::Spanned<CompactString>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, Self::Set>,
+    ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
+        async move {
+            let functions = self.functions;
+            let function = functions.get(&name.value).ok_or_else(|| {
+                QueryError::syntax(format!("query function '{}' was not validated", name.value))
+            })?;
+            function.invoke(self, args, variables).await
         }
         .boxed()
     }

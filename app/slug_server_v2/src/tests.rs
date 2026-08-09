@@ -812,19 +812,20 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
 #[test]
 fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     let request = DaemonRequest::Cquery(CqueryRequest {
-        target: "//pkg:probe".to_owned(),
+        expression: "//pkg:probe".to_owned(),
         output: CqueryOutput::Label,
         root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
         bzlmod: BzlmodRequestInputs::default(),
     });
     let json = serde_json::to_string(&request).unwrap();
     assert!(!json.contains("order_output"));
-    assert!(!json.contains("expression"));
+    assert!(json.contains("expression"));
+    assert!(!json.contains("target"));
     let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
     let DaemonRequest::Cquery(request) = round_trip else {
         panic!("expected tagged cquery request");
     };
-    assert_eq!(request.target, "//pkg:probe");
+    assert_eq!(request.expression, "//pkg:probe");
     assert_eq!(request.output, CqueryOutput::Label);
     assert_eq!(
         request.root_string_setting.as_deref(),
@@ -836,15 +837,20 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
 #[test]
 fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     let missing = serde_json::from_str::<DaemonRequest>(
-        r#"{"kind":"cquery","request":{"target":"//pkg:probe"}}"#,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe"}}"#,
     )
     .unwrap_err();
     assert!(missing.to_string().contains("missing field `output`"));
     let unknown = serde_json::from_str::<DaemonRequest>(
-        r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"graph"}}"#,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,
     )
     .unwrap_err();
     assert!(unknown.to_string().contains("unknown variant `graph`"));
+    let old_shape = serde_json::from_str::<DaemonRequest>(
+        r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"label"}}"#,
+    )
+    .unwrap_err();
+    assert!(old_shape.to_string().contains("missing field `expression`"));
 
     let workspace = scratch("cquery-malformed-mode");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
@@ -853,9 +859,37 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         "filegroup(name = \"probe\")\n",
     );
     let mut daemon = Daemon::new(&workspace).unwrap();
+    let undefined = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"expression":"$late","output":"label"}}"#,
+    );
+    assert_eq!(undefined.exit_code, 2, "{undefined:?}");
+    assert!(undefined.stdout.is_empty());
+    assert!(undefined.stderr.contains("cquery_request_error"));
+    assert!(
+        undefined
+            .stderr
+            .contains("undefined query variable '$late'")
+    );
+    assert_eq!(undefined.invalidated_files, 0);
+    let non_singleton_starlark = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"expression":"set()","output":"starlark_label"}}"#,
+    );
+    assert_eq!(
+        non_singleton_starlark.exit_code, 2,
+        "{non_singleton_starlark:?}"
+    );
+    assert!(non_singleton_starlark.stdout.is_empty());
+    assert!(
+        non_singleton_starlark
+            .stderr
+            .contains("cquery_request_error")
+    );
+    assert_eq!(non_singleton_starlark.invalidated_files, 0);
     let malformed = handle_request(
         &mut daemon,
-        r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"graph"}}"#,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,
     );
     assert_eq!(malformed.exit_code, 2, "{malformed:?}");
     assert!(malformed.stdout.is_empty(), "{malformed:?}");
@@ -884,7 +918,7 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let run = |daemon: &mut Daemon, value: &str| {
         daemon.cquery_with_bzlmod_inputs(
-            &target(value),
+            value,
             CqueryOutput::StarlarkLabel,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -930,7 +964,7 @@ fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let run = |daemon: &mut Daemon, output, setting| {
         daemon.cquery_with_bzlmod_inputs(
-            &target("//pkg:probe"),
+            "//pkg:probe",
             output,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),

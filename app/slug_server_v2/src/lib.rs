@@ -342,7 +342,7 @@ impl Daemon {
 
     pub fn cquery_with_bzlmod_inputs(
         &mut self,
-        target: &TargetPattern,
+        expression: &str,
         output: crate::server::CqueryOutput,
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
@@ -364,7 +364,7 @@ impl Daemon {
             ),
         );
         let accepted = match self.runtime.cquery_command_with_bzlmod_inputs(
-            target,
+            expression,
             command_policy,
             environment_policy,
             lockfile_mode,
@@ -380,7 +380,19 @@ impl Daemon {
                     let stdout = match output {
                         crate::server::CqueryOutput::Label => evaluation.label_stdout(),
                         crate::server::CqueryOutput::StarlarkLabel => {
-                            evaluation.starlark_label_stdout()
+                            let Some(stdout) = evaluation.singleton_starlark_label_stdout() else {
+                                return TerminalOutput::new(
+                                    2,
+                                    String::new(),
+                                    cquery_error_json(
+                                        &slug_core_v2::runtime::CqueryCommandError::infrastructure(
+                                            "validated Starlark cquery did not produce one target",
+                                        ),
+                                        invalidated,
+                                    ),
+                                );
+                            };
+                            stdout
                         }
                     };
                     TerminalOutput::new(0, stdout, String::new())

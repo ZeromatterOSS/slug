@@ -91,7 +91,7 @@ pub(super) struct SealedCommandAttempt {
     owner: Arc<CommandEffectOwner>,
     demands: Weak<WorkspaceDemandOwner>,
     id: CommandAttemptId,
-    version: VersionNumber,
+    version: Option<VersionNumber>,
     roots: Arc<[DiceNodeId]>,
 }
 
@@ -533,6 +533,7 @@ impl CommandEffectOwner {
     fn seal_terminal(
         self: &Arc<Self>,
         id: CommandAttemptId,
+        allow_empty_roots: bool,
     ) -> Result<SealedCommandAttempt, CommandEffectError> {
         let mut state = self
             .state
@@ -546,7 +547,7 @@ impl CommandEffectOwner {
         }
         let mut roots = active.roots.clone();
         roots.sort_by_key(|root| root.ordinal);
-        if roots.is_empty() {
+        if roots.is_empty() && !allow_empty_roots {
             return Err(CommandEffectError::NoTerminalRoots);
         }
         for (expected, root) in roots.iter().enumerate() {
@@ -559,8 +560,10 @@ impl CommandEffectOwner {
                 });
             }
         }
-        let version = roots[0].version;
-        if roots.iter().any(|root| root.version != version) {
+        let version = roots.first().map(|root| root.version);
+        if let Some(version) = version
+            && roots.iter().any(|root| root.version != version)
+        {
             return Err(CommandEffectError::MixedRootVersions);
         }
         let nodes = roots.into_iter().map(|root| root.node).collect();
@@ -600,9 +603,11 @@ impl CommandEffectOwner {
         sealed: &SealedCommandAttempt,
         closure: &ActivationClosure,
     ) -> Result<SelectedEventBatches, CommandEffectError> {
-        if closure.version() != sealed.version {
+        if let Some(version) = sealed.version
+            && closure.version() != version
+        {
             return Err(CommandEffectError::ClosureVersion {
-                expected: sealed.version,
+                expected: version,
                 actual: closure.version(),
             });
         }
@@ -657,7 +662,13 @@ impl AttemptEffectTracker {
     }
 
     pub(super) fn seal_terminal(&self) -> Result<SealedCommandAttempt, CommandEffectError> {
-        self.owner.seal_terminal(self.id)
+        self.owner.seal_terminal(self.id, false)
+    }
+
+    pub(super) fn seal_terminal_allowing_empty_roots(
+        &self,
+    ) -> Result<SealedCommandAttempt, CommandEffectError> {
+        self.owner.seal_terminal(self.id, true)
     }
 
     pub(super) fn finish_suppressed(&self) -> Result<(), CommandEffectError> {

@@ -5447,3 +5447,66 @@ shared structural analysis graph, including default, explicit, and transitioned
 configuration ownership. Configured query expressions, dependency-graph
 traversal, provider projection, and broader functions/formats remain separate
 M4 work after the canonical M3 query gate advances.
+
+### Function-free configured set algebra packet (2026-08-09)
+
+M3 is accepted by the retained 18-lane Bazel 9.2 `attr()` oracle and runtime
+activation. Reserved architecture review accepted
+`WP-6-m4-root-cquery-set-algebra-implementation` as the next M4 packet. It
+admits only root literal `set`, `let`, `union`, `intersect`, and `except` in
+label mode, reusing the existing parser and one minimal generic ordered-set
+evaluator. One `CqueryCommandRoot` computes ordered distinct roots through
+`RootConfiguredTargetAnalysisKey`, unions compatible Needs, selects the first
+lexical terminal error after preparation completes, and deduplicates by full
+`ConfiguredTargetKey`.
+
+The prototype wire field becomes `expression` with no compatibility alias.
+Existing single-literal label/Starlark output, missing diagnostics, and
+C0/C1/C0 ownership remain unchanged. `deps` is not admitted because fresh
+Bazel 9.2 evidence exposes host-platform and constraint nodes outside the
+current retained dependency graph. Functions, patterns, external repositories,
+providers, new formats, exact Bazel configuration hashes, new graph/DICE keys,
+and JVM/Java work remain excluded.
+
+Implementation reached terminal `REPLAN` after its one allowed correction.
+The correction removed a duplicated recursive evaluator and all focused tests
+passed, but independent review plus a fresh Bazel 9.2 command proved `set()`
+must succeed with empty stdout. The draft instead required a first analysis and
+returned a request error; `let x = set() in $x` failed for the same reason.
+Review also found undefined variables escaped request validation and failed
+only after workspace observation. Run next only
+`WP-6-m4-root-cquery-set-algebra-empty-retry`: retain the shared evaluator and
+all accepted ordering/DICE/wire work, support honest zero-root results, and
+validate undefined variables before observation. No other breadth changes.
+
+### Function-free configured set algebra retry ACCEPT (2026-08-09)
+
+`WP-6-m4-root-cquery-set-algebra-empty-retry` is **ACCEPT**. Configured query
+now reuses one Buck2-derived recursive expression fold for root-repository
+literal `set`, `let`, `union`, `intersect`, and `except` expressions. Ordered
+results deduplicate by complete `ConfiguredTargetKey`; every distinct root is
+resolved through the existing `RootConfiguredTargetAnalysisKey` in one command
+transaction. No configured graph, DICE key, parser, or evaluator was added.
+
+The retry makes `set()` and `let x = set() in $x` successful zero-target
+commands with empty output. Only cquery may seal an empty terminal activation
+closure; every other native command remains fail-closed. Function-free request
+validation now enforces lexical binding, RHS visibility, and shadow restoration
+before workspace observation. Single-literal Starlark output remains an honest
+singleton-only boundary, and the daemon wire uses required `expression` with no
+compatibility alias.
+
+Focused validation passed 99 query tests, 18 command tests, three core cquery
+tests, four server cquery tests, four rebuilt-CLI cquery tests, archive status,
+formatting, and diff checks. Stale `slugd` processes were cleaned before and
+after CLI validation. Independent retry review returned `ACCEPT`. Fresh Bazel
+9.2 evidence pins the admitted ordering and empty-result semantics; `deps`
+remains excluded because Bazel also exposes host-platform and constraint nodes
+not retained by the current analysis dependency surface.
+
+Run next only `WP-6-m4-configured-query-successor-audit`: inspect the retained
+configured graph/provider surfaces and the Buck2-derived query evaluator to
+select one exact, bounded M4 behavior that can be implemented without a second
+graph, invented platform nodes, new parser/evaluator, exact-hash approximation,
+or JVM/Java work. The audit must end in a functional implementation packet; do
+not commit documentation by itself.

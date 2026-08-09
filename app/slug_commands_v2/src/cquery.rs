@@ -10,6 +10,9 @@
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
+use slug_query_v2::QueryExpression;
+use slug_query_v2::function_free_literals;
+use slug_query_v2::validate_function_free_query;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
@@ -28,7 +31,7 @@ pub enum CqueryOutputMode {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CqueryRequest {
-    pub target: TargetPattern,
+    pub expression: String,
     pub output_mode: CqueryOutputMode,
     pub output_base: Option<String>,
     /// The one admitted root build setting transition. Configuration owns its
@@ -54,31 +57,38 @@ impl CqueryRequest {
                 unsupported("cquery accepts exactly one literal target label")
             });
         }
-        let target = TargetPattern::parse(&parsed.positionals[0]).map_err(|message| {
-            CommandParseError::InvalidTargetPattern {
-                value: parsed.positionals[0].clone(),
-                message,
+        let cquery_expression = parsed.positionals[0].clone();
+        let parsed_expression = QueryExpression::parse(&cquery_expression)
+            .map_err(|error| unsupported(&error.to_string()))?;
+        validate_function_free_query(&parsed_expression)
+            .map_err(|error| unsupported(&error.to_string()))?;
+        for literal in function_free_literals(&parsed_expression) {
+            let target = TargetPattern::parse(literal).map_err(|message| {
+                CommandParseError::InvalidTargetPattern {
+                    value: literal.to_owned(),
+                    message,
+                }
+            })?;
+            let TargetPattern::Single(label) = target else {
+                return Err(unsupported(
+                    "target patterns are not supported by this cquery",
+                ));
+            };
+            if !label.repo().is_root() {
+                return Err(unsupported(
+                    "external repository labels are not supported by this cquery",
+                ));
             }
-        })?;
-        let TargetPattern::Single(label) = &target else {
-            return Err(unsupported(
-                "target patterns are not supported by this cquery",
-            ));
-        };
-        if !label.repo().is_root() {
-            return Err(unsupported(
-                "external repository labels are not supported by this cquery",
-            ));
         }
 
         let mut output = None;
-        let mut expression = None;
+        let mut starlark_expression = None;
         let mut output_base = None;
         let mut root_string_setting = None;
         for flag in &parsed.flags {
             match flag.name.as_str() {
                 "output" => set_once(&mut output, flag, "--output")?,
-                "starlark:expr" => set_once(&mut expression, flag, "--starlark:expr")?,
+                "starlark:expr" => set_once(&mut starlark_expression, flag, "--starlark:expr")?,
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
                 "//:setting" => {
                     let value =
@@ -103,9 +113,18 @@ impl CqueryRequest {
                 }
             }
         }
-        let output_mode = match (output.as_deref(), expression.as_deref()) {
+        let output_mode = match (output.as_deref(), starlark_expression.as_deref()) {
             (None | Some("label"), None) => CqueryOutputMode::Label,
-            (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
+            (Some("starlark"), Some(LABEL_EXPRESSION))
+                if parsed_expression.single_literal().is_some() =>
+            {
+                CqueryOutputMode::StarlarkLabel
+            }
+            (Some("starlark"), Some(LABEL_EXPRESSION)) => {
+                return Err(unsupported(
+                    "set expressions are not supported by --output=starlark",
+                ));
+            }
             _ => {
                 return Err(unsupported(
                     "expected default output, --output=label, or --output=starlark \
@@ -117,7 +136,7 @@ impl CqueryRequest {
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
         Ok(Self {
-            target,
+            expression: cquery_expression,
             output_mode,
             output_base,
             root_string_setting,

@@ -74,7 +74,7 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
 
 pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
     workspace: &std::path::Path,
-    target: &slug_identity_v2::TargetPattern,
+    expression: &str,
     command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
     environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
     lockfile_mode: slug_bzlmod_v2::LockfileMode,
@@ -87,7 +87,7 @@ pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
     let runtime = WorkspaceRuntime::new(workspace.to_path_buf(), ProcessHostOwner::native())
         .map_err(CqueryCommandError::infrastructure)?;
     runtime.cquery_command_with_bzlmod_inputs(
-        target,
+        expression,
         command_policy,
         environment_policy,
         lockfile_mode,

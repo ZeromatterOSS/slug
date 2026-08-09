@@ -14,6 +14,7 @@ use slug_query_v2::QueryExpressionKind;
 use slug_query_v2::QueryFunctionStatus;
 use slug_query_v2::SourceSpan;
 use slug_query_v2::loading_query_functions;
+use slug_query_v2::validate_function_free_query;
 use slug_query_v2::validate_loading_query;
 
 // Bazel 9.2 QueryParser.java: all binary operators have equal precedence and
@@ -47,6 +48,33 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
     };
     assert_eq!(name.value, "unknown");
     assert_eq!(args.len(), 2);
+}
+
+#[test]
+fn function_free_validator_tracks_lexical_let_bindings() {
+    for source in [
+        "let x = set() in $x",
+        "let x = //pkg:bin in let x = $x in $x",
+        "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
+    ] {
+        validate_function_free_query(&QueryExpression::parse(source).unwrap()).unwrap();
+    }
+
+    for source in [
+        "$x",
+        "let x = set() in $y",
+        "let x = $x in //pkg:bin",
+        "set($x)",
+    ] {
+        let error = validate_function_free_query(&QueryExpression::parse(source).unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("undefined query variable")
+                || error.contains("concrete target literals"),
+            "{source}: {error}"
+        );
+    }
 }
 
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
