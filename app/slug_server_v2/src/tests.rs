@@ -872,21 +872,14 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             .contains("undefined query variable '$late'")
     );
     assert_eq!(undefined.invalidated_files, 0);
-    let non_singleton_starlark = handle_request(
+    let empty_starlark = handle_request(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"set()","output":"starlark_label"}}"#,
     );
-    assert_eq!(
-        non_singleton_starlark.exit_code, 2,
-        "{non_singleton_starlark:?}"
-    );
-    assert!(non_singleton_starlark.stdout.is_empty());
-    assert!(
-        non_singleton_starlark
-            .stderr
-            .contains("cquery_request_error")
-    );
-    assert_eq!(non_singleton_starlark.invalidated_files, 0);
+    assert_eq!(empty_starlark.exit_code, 0, "{empty_starlark:?}");
+    assert!(empty_starlark.stdout.is_empty());
+    assert!(empty_starlark.stderr.is_empty());
+    assert_eq!(empty_starlark.invalidated_files, 0);
     let malformed = handle_request(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,
@@ -939,6 +932,34 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
     assert_eq!(recovery.exit_code, 0, "{recovery:?}");
     assert_eq!(recovery.stdout, "@@//pkg:probe\n");
     assert_eq!(recovery.invalidated_files, 0);
+}
+
+#[test]
+fn retained_cquery_starlark_formats_ordered_sets() {
+    let workspace = scratch("cquery-starlark-sets");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"bin\")\nprobe(name = \"lib\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let result = daemon.cquery_with_bzlmod_inputs(
+        "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
+        CqueryOutput::StarlarkLabel,
+        BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+        Vec::new(),
+        None,
+    );
+    assert_eq!(result.exit_code, 0, "{result:?}");
+    assert_eq!(result.stdout, "@@//pkg:bin\n@@//pkg:lib\n");
+    assert!(result.stderr.is_empty());
+    assert_eq!(result.invalidated_files, 0);
 }
 
 #[test]

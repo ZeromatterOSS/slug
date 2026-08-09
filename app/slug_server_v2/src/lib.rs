@@ -380,19 +380,7 @@ impl Daemon {
                     let stdout = match output {
                         crate::server::CqueryOutput::Label => evaluation.label_stdout(),
                         crate::server::CqueryOutput::StarlarkLabel => {
-                            let Some(stdout) = evaluation.singleton_starlark_label_stdout() else {
-                                return TerminalOutput::new(
-                                    2,
-                                    String::new(),
-                                    cquery_error_json(
-                                        &slug_core_v2::runtime::CqueryCommandError::infrastructure(
-                                            "validated Starlark cquery did not produce one target",
-                                        ),
-                                        invalidated,
-                                    ),
-                                );
-                            };
-                            stdout
+                            evaluation.starlark_label_stdout()
                         }
                     };
                     TerminalOutput::new(0, stdout, String::new())

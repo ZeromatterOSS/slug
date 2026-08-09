@@ -1025,9 +1025,27 @@ fn cquery_set_expression_matches_between_one_shot_and_daemon() {
             .collect::<Vec<_>>()
     };
     assert_eq!(labels(&one_shot.stdout), ["//pkg:bin", "//pkg:lib"]);
+    let starlark_one_shot = slug()
+        .current_dir(&workspace)
+        .args([
+            "cquery",
+            expression,
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
+        .output()
+        .unwrap();
+    assert!(starlark_one_shot.status.success(), "{starlark_one_shot:?}");
+    assert_eq!(starlark_one_shot.stdout, b"@@//pkg:bin\n@@//pkg:lib\n");
+    assert!(starlark_one_shot.stderr.is_empty());
     let empty_one_shot = slug()
         .current_dir(&workspace)
-        .args(["cquery", "set()"])
+        .args([
+            "cquery",
+            "set()",
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
         .output()
         .unwrap();
     assert!(empty_one_shot.status.success(), "{empty_one_shot:?}");
@@ -1045,9 +1063,29 @@ fn cquery_set_expression_matches_between_one_shot_and_daemon() {
     assert!(daemon.status.success(), "{daemon:?}");
     assert!(daemon.stderr.is_empty());
     assert_eq!(daemon.stdout, one_shot.stdout);
+    let starlark_daemon = slug()
+        .current_dir(&workspace)
+        .args([
+            output_base.as_str(),
+            "cquery",
+            expression,
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
+        .output()
+        .unwrap();
+    assert!(starlark_daemon.status.success(), "{starlark_daemon:?}");
+    assert_eq!(starlark_daemon.stdout, starlark_one_shot.stdout);
+    assert!(starlark_daemon.stderr.is_empty());
     let empty_daemon = slug()
         .current_dir(&workspace)
-        .args([output_base.as_str(), "cquery", "set()"])
+        .args([
+            output_base.as_str(),
+            "cquery",
+            "set()",
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+        ])
         .output()
         .unwrap();
     assert!(empty_daemon.status.success(), "{empty_daemon:?}");

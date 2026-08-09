@@ -5510,3 +5510,55 @@ select one exact, bounded M4 behavior that can be implemented without a second
 graph, invented platform nodes, new parser/evaluator, exact-hash approximation,
 or JVM/Java work. The audit must end in a functional implementation packet; do
 not commit documentation by itself.
+
+### Configured-query successor audit ACCEPT (2026-08-09)
+
+`WP-6-m4-configured-query-successor-audit` selected
+`WP-6-m4-cquery-starlark-label-set-output-implementation`. Extend only the
+already accepted exact `--output=starlark
+--starlark:expr=str(target.label)` formatter from one configured target to the
+ordered result of the accepted function-free set evaluator. Fresh Bazel 9.2
+commands prove a deduplicated two-target `set` and a `let`/binary expression
+emit `@@//pkg:bin\n@@//pkg:lib\n`, while `set()` exits zero with empty stdout.
+
+This removes a singleton-only formatter gate; it needs no new Starlark
+expression/file/provider runtime, configured state, graph, key, parser, or
+evaluator. Provider projection is not selected because the retained collection
+does not yet close Bazel's qualified provider dictionary and builtin value
+semantics. Configured `kind`/`attr` lack retained configured metadata, and
+`deps` remains blocked by observable host-platform and constraint nodes.
+
+Production edits are limited to cquery command parsing, its core evaluation
+formatter, CLI routing only if required, and the cquery server mode validation.
+Tests are limited to the corresponding command/core/server/CLI cquery suites.
+Stop on any new Starlark expression, `--starlark:file`, provider projection,
+target pattern/external repository, dependency traversal, output/wire mode,
+graph/key/parser/evaluator, configuration-hash, JVM, or Java requirement.
+
+### Configured-query Starlark-label set output ACCEPT (2026-08-09)
+
+`WP-6-m4-cquery-starlark-label-set-output-implementation` is **ACCEPT**. The
+exact existing `str(target.label)` formatter now maps across the accepted
+ordered configured-target set. Multi-root `set` and `let`/binary expressions
+emit canonical labels in first-insertion order with full configured-key
+deduplication; `set()` succeeds with empty stdout. Existing single-target bytes,
+label mode, missing-target terminals, and C0/C1/C0 ownership are unchanged.
+
+The implementation removes only singleton admission/formatting checks and the
+retired `QueryExpression::single_literal()` helper. It adds no Starlark
+expression/file/provider runtime, output or wire mode, graph, DICE key, parser,
+evaluator, dependency traversal, exact hash, JVM, or Java surface. Fresh Bazel
+9.2 evidence pins the two-target and empty bytes.
+
+Validation passed 99 query tests, 18 command tests, three core cquery tests,
+five server cquery tests, four rebuilt-CLI cquery tests, formatting, archive
+status, and diff checks. Stale `slugd` processes were absent before and after
+CLI validation. Independent review requested only removal of the unused
+singleton helper; correction rereview returned `ACCEPT`.
+
+Run next only `WP-6-m4-configured-query-successor-audit-2`, again selecting one
+semantically closed functional slice from retained configured analysis state
+and the Buck2-derived evaluator. Do not select provider projection without a
+complete qualified-provider/builtin-value boundary, configured `kind`/`attr`
+without retained configured metadata, or `deps` without observable platform
+and constraint nodes. Carry the audit record with its functional successor.

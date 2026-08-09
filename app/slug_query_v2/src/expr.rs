@@ -320,17 +320,6 @@ fn collect_function_free_literals<'a>(
 }
 
 impl QueryExpression {
-    pub fn single_literal(&self) -> Option<&str> {
-        match &self.kind {
-            QueryExpressionKind::TargetLiteral(literal) if !literal.starts_with('$') => {
-                Some(literal)
-            }
-            _ => None,
-        }
-    }
-}
-
-impl QueryExpression {
     pub fn parse(source: &str) -> Result<Self, QueryParseError> {
         parse_query_expression(source)
     }

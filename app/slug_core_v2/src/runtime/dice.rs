@@ -1880,13 +1880,11 @@ impl CqueryCommandEvaluation {
             .collect()
     }
 
-    pub fn singleton_starlark_label_stdout(&self) -> Option<String> {
-        let mut targets = self.targets.iter();
-        let target = targets.next()?;
-        targets
-            .next()
-            .is_none()
-            .then(|| format!("{}\n", target.analysis.key().label()))
+    pub fn starlark_label_stdout(&self) -> String {
+        self.targets
+            .iter()
+            .map(|target| format!("{}\n", target.analysis.key().label()))
+            .collect()
     }
 
     pub fn analyses(&self) -> impl Iterator<Item = &AnalysisResult> {
@@ -6040,10 +6038,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let target = "//pkg:probe";
         let cold = run(target).unwrap();
         let cold_evaluation = cold.terminal_for_test().as_ref().as_ref().unwrap();
-        assert_eq!(
-            cold_evaluation.singleton_starlark_label_stdout().as_deref(),
-            Some("@@//pkg:probe\n")
-        );
+        assert_eq!(cold_evaluation.starlark_label_stdout(), "@@//pkg:probe\n");
         assert!(
             cold_evaluation
                 .analyses()
@@ -6078,9 +6073,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .as_ref()
                 .as_ref()
                 .unwrap()
-                .singleton_starlark_label_stdout()
-                .as_deref(),
-            Some("@@//pkg:probe\n")
+                .starlark_label_stdout(),
+            "@@//pkg:probe\n"
         );
         assert!(accepted_output_text(&recovered).is_empty());
         assert_roots("@@//pkg:probe", 1);
@@ -6146,7 +6140,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             let evaluation = accepted.terminal_for_test().as_ref().as_ref().unwrap();
             assert!(evaluation.label_stdout().is_empty());
             assert_eq!(evaluation.analyses().count(), 0);
-            assert!(evaluation.singleton_starlark_label_stdout().is_none());
+            assert!(evaluation.starlark_label_stdout().is_empty());
             assert!(activation_audit.take_configured_roots().is_empty());
         }
         let run = |expression: &str| {
@@ -6186,6 +6180,25 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         );
         assert!(run("//pkg:bin intersect //pkg:lib").is_empty());
         assert_eq!(labels(run("//pkg:bin except //pkg:lib")), ["//pkg:bin"]);
+        let starlark = runtime
+            .cquery_command_with_bzlmod_inputs(
+                "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            starlark
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .starlark_label_stdout(),
+            "@@//pkg:bin\n@@//pkg:lib\n"
+        );
 
         let missing = runtime
             .cquery_command_with_bzlmod_inputs(
@@ -6291,10 +6304,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             c0.label_stdout().len(),
             "//:consumer (slugcfg-v1:)\n".len() + 64
         );
-        assert_eq!(
-            c0.singleton_starlark_label_stdout().as_deref(),
-            Some("@@//:consumer\n")
-        );
+        assert_eq!(c0.starlark_label_stdout(), "@@//:consumer\n");
         assert_eq!(accepted_output_text(&c0_command), ["CONSUMER_ANALYSIS"]);
         let c0_stdout = c0.label_stdout();
         let c0_topology = topology(&c0);
@@ -6311,10 +6321,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             Some("command")
         );
         assert_ne!(c0_stdout, c1.label_stdout());
-        assert_eq!(
-            c1.singleton_starlark_label_stdout().as_deref(),
-            Some("@@//:consumer\n")
-        );
+        assert_eq!(c1.starlark_label_stdout(), "@@//:consumer\n");
         assert_eq!(c0_topology, topology(&c1));
         assert_eq!(accepted_output_text(&c1_command), ["CONSUMER_ANALYSIS"]);
 

@@ -481,6 +481,21 @@ fn cquery_accepts_only_the_label_output_matrix() {
     assert_eq!(set.expression, "set(//pkg:bin //pkg:lib) union //pkg:bin");
     assert!(CqueryRequest::parse(&["let x = set() in $x"]).is_ok());
 
+    for expression in [
+        "set(//pkg:bin //pkg:lib //pkg:bin)",
+        "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
+        "set()",
+    ] {
+        let starlark = CqueryRequest::parse(&[
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            expression,
+        ])
+        .unwrap();
+        assert_eq!(starlark.output_mode, CqueryOutputMode::StarlarkLabel);
+        assert_eq!(starlark.expression, expression);
+    }
+
     for args in [
         vec![
             "--output=label",
@@ -543,11 +558,6 @@ fn cquery_accepts_only_the_label_output_matrix() {
         vec!["let x = $x in //pkg:bin"],
         vec!["//pkg:all"],
         vec!["@dep//pkg:bin"],
-        vec![
-            "--output=starlark",
-            "--starlark:expr=str(target.label)",
-            "set(//pkg:bin //pkg:lib)",
-        ],
     ] {
         assert!(CqueryRequest::parse(&args).is_err(), "{args:?}");
     }

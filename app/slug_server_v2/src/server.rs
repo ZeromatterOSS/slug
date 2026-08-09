@@ -331,7 +331,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
-            if let Err(error) = validate_cquery_expression(&request.expression, request.output) {
+            if let Err(error) = validate_cquery_expression(&request.expression) {
                 return DaemonResponse {
                     exit_code: 2,
                     stdout: String::new(),
@@ -361,7 +361,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     }
 }
 
-fn validate_cquery_expression(expression: &str, output: CqueryOutput) -> Result<(), String> {
+fn validate_cquery_expression(expression: &str) -> Result<(), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
     slug_query_v2::validate_function_free_query(&expression).map_err(|error| error.to_string())?;
@@ -370,9 +370,6 @@ fn validate_cquery_expression(expression: &str, output: CqueryOutput) -> Result<
         if !matches!(target, TargetPattern::Single(ref label) if label.repo().is_root()) {
             return Err("cquery accepts only root literal target labels".to_owned());
         }
-    }
-    if output == CqueryOutput::StarlarkLabel && expression.single_literal().is_none() {
-        return Err("--output=starlark requires one literal target label".to_owned());
     }
     Ok(())
 }

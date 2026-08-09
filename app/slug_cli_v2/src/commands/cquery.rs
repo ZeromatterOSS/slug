@@ -68,17 +68,7 @@ pub fn run(argv: Vec<String>) -> i32 {
             Ok(evaluation) => {
                 let stdout = match output_mode {
                     CqueryOutputMode::Label => evaluation.label_stdout(),
-                    CqueryOutputMode::StarlarkLabel => {
-                        let Some(stdout) = evaluation.singleton_starlark_label_stdout() else {
-                            return terminal_error(
-                                &CqueryCommandError::infrastructure(
-                                    "validated Starlark cquery did not produce one target",
-                                ),
-                                "one-shot",
-                            );
-                        };
-                        stdout
-                    }
+                    CqueryOutputMode::StarlarkLabel => evaluation.starlark_label_stdout(),
                 };
                 TerminalOutput::new(0, stdout, String::new())
             }

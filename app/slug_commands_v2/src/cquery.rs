@@ -115,16 +115,7 @@ impl CqueryRequest {
         }
         let output_mode = match (output.as_deref(), starlark_expression.as_deref()) {
             (None | Some("label"), None) => CqueryOutputMode::Label,
-            (Some("starlark"), Some(LABEL_EXPRESSION))
-                if parsed_expression.single_literal().is_some() =>
-            {
-                CqueryOutputMode::StarlarkLabel
-            }
-            (Some("starlark"), Some(LABEL_EXPRESSION)) => {
-                return Err(unsupported(
-                    "set expressions are not supported by --output=starlark",
-                ));
-            }
+            (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
             _ => {
                 return Err(unsupported(
                     "expected default output, --output=label, or --output=starlark \
