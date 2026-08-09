@@ -5269,9 +5269,136 @@ works without exposing the private user RC; the full Bazel developer target is
 still stopped by the known missing `rules_rust` toolchain.
 
 M2 structural identity is accepted. Run next only
-`WP-6-m4-root-cquery-label-slug-projection-design`, a docs-only public-format
-design. It must admit or reject default/explicit `label` output using the full
-Slug projection, preserve the accepted `str(target.label)` bytes, keep the
-Bazel seven-hex checksum and exact identity in M9, and freeze one-shot/daemon
-wire, errors, comparison normalization, and downstream test ownership before
-Rust changes.
+`WP-6-m4-root-cquery-label-slug-projection-implementation`, the bounded Rust
+implementation of the independently accepted public-format contract below.
+Keep the Bazel seven-hex checksum and exact identity in M9, preserve the
+accepted `str(target.label)` bytes, and do not broaden cquery beyond the frozen
+one-root grammar.
+
+### Root cquery Slug-projection public-format design result (2026-08-09)
+
+`WP-6-m4-root-cquery-label-slug-projection-design` is **ACCEPTED**. The required
+independent public-format/identity review returned `ACCEPT` with no blockers:
+the grammar and public bytes are bounded, structural configuration remains the
+DICE identity while its full-width projection is presentation only, one-shot
+and daemon semantics agree, and comparison normalization is confined to the
+opaque payload. The changed surface is explicitly **Slug-native** only where
+the configuration token bytes diverge; the root apparent-label spelling and
+already accepted terminal/error behavior remain exact for their named slices.
+Exact Bazel checksum/short-ID bytes remain M9, and every other cquery form
+remains unsupported.
+
+#### Accepted command grammar and exact output
+
+The successor admits exactly these formatter forms for one parsed root literal
+target:
+
+1. `slug cquery //pkg:target`
+2. `slug cquery //pkg:target --output=label`
+3. `slug cquery //pkg:target --output=starlark
+   --starlark:expr=str(target.label)`
+
+The first two forms select one `Label` mode and are byte-identical. Success is
+exactly
+`//pkg:target (slugcfg-v1:<64-lowercase-hex-bytes>)\n`, using the normalized
+root apparent label retained from the parsed request, the literal parentheses
+and space shown, the exact `slugcfg-v1:` namespace/version prefix, and the full
+64-character projection payload. It never prints internal `@@` spelling in
+this mode. The payload comes only from the returned `AnalysisResult`'s
+structural `SlugConfiguration`; it is never caller input, parsed back,
+truncated, or used as DICE/cache/action identity.
+
+The third form remains a separate `StarlarkLabel` mode and preserves the
+already accepted stdout byte-for-byte: `@@//pkg:target\n`. It never gains a
+configuration suffix. `--starlark:expr` is legal only with
+`--output=starlark` and only for the exact existing expression. Explicit
+`--output=label` rejects every Starlark expression; omitted output plus a
+Starlark expression is also rejected. Any other output, expression, duplicate
+output/expression, passthrough, target cardinality/pattern/repository form, or
+unknown flag fails during command parsing before one-shot/daemon selection.
+
+Both modes additionally admit exactly `--//:setting=<Unicode>`, including the
+empty string after `=`, with ordinary last-occurrence-wins flag semantics. The
+form without `=` fails with the same `expected --//:setting=<Unicode>`
+diagnostic as build. No other configuration flag is admitted. Existing
+Bzlmod and `--output_base` controls retain their current nonconfiguration
+owners and allowlist.
+
+#### Structural and incremental ownership
+
+No new evaluator or DICE key is introduced. The existing `CqueryCommandRoot`
+continues to consume `RootConfiguredTargetAnalysisKey`. It constructs one
+native base configuration, clones it with the optional command-line root
+setting, and uses the existing root-setting request route whenever the flag is
+present. Default resolution for a setting/consumer/transition continues
+through the accepted DICE-owned self-routing path. The root retains the
+canonical requested label separately so missing-target translation never calls
+`configured_target()` on an unresolved setting request.
+
+`CqueryCommandEvaluation` retains the successful analysis plus the normalized
+root apparent display label and the full `SlugConfigurationProjection` derived
+from the returned analysis key. Construction fails as infrastructure if a
+production result contains an opaque/legacy configuration. Request-known
+configurations are collision-claimed before DICE; any default or transition
+configuration returned by DICE is claimed before publication. Formatting is a
+pure choice over the accepted terminal and does not recompute analysis.
+
+In one retained daemon, C0 -> explicit C1 -> C0 for the same target must show
+distinct then exactly restored full label-mode bytes and structural projection,
+zero source invalidations, cold C0/C1 analysis followed by warm restored-C0
+reuse, and unchanged label/provider/action topology. The same typed C0 inputs
+must produce byte-identical one-shot and daemon label output. Across C0/C1/C0,
+Starlark-label stdout remains byte-identical because its contract observes only
+the canonical label.
+
+#### Wire, terminals, and comparison
+
+The daemon request gains a required, serde-validated two-case discriminator
+`label | starlark_label` and `root_string_setting: Option<String>`. The CLI
+always sends the selected discriminator explicitly; default and explicit
+`--output=label` both send `label`. There is no compatibility shim for the old
+prototype request shape. Unknown discriminator values and malformed targets
+fail before workspace observation or analysis with the existing structured
+cquery request/transport exit-2 convention. The server never reparses a raw
+formatter string after the enum is decoded.
+
+Missing targets in either mode preserve exit 1, empty stdout, and the exact
+accepted three diagnostic lines. Unsupported CLI forms remain the existing
+`command_parse_error` exit 2 before mode routing. Non-missing analysis and
+infrastructure failures retain the existing one-shot/daemon cquery JSON
+families and runtime-mode/invalidated-file ownership; adding a formatter does
+not translate or normalize those errors.
+
+A graph comparator may replace only the 64 lowercase payload following an
+exact `slugcfg-v1:` prefix with graph-local equality-class names. The prefix,
+label, punctuation, graph, providers, actions, platforms, paths, content,
+ordering, exit status, diagnostics, and all other fields remain literal. Equal
+structural configurations must map to one class; unequal structures must never
+be normalized together.
+
+#### Bounded successor
+
+The accepted design schedules only
+`WP-6-m4-root-cquery-label-slug-projection-implementation`. Production edits
+are limited to:
+
+- `app/slug_commands_v2/src/cquery.rs`;
+- `app/slug_core_v2/src/runtime/dice.rs` and `runtime/mod.rs`;
+- `app/slug_cli_v2/src/commands/cquery.rs`;
+- `app/slug_server_v2/src/lib.rs` and `src/server.rs`.
+
+Tests are limited to `app/slug_commands_v2/tests/commands.rs`, focused runtime
+tests in `app/slug_core_v2/src/runtime/dice.rs`,
+`app/slug_cli_v2/tests/cli.rs`, and `app/slug_server_v2/src/tests.rs`. Reuse the
+accepted Bazel 9.2 label-layout/missing/warm evidence; no new oracle fixture or
+command is needed. Validate parser matrices, exact mode bytes, malformed wire,
+direct setting/default/transition resolution, retained-daemon C0/C1/C0 and
+recomputation, one-shot/daemon equality, and unchanged Starlark/missing
+terminals. Build `slug_cli_v2` before daemon-sensitive CLI tests and clean stale
+`slugd` processes before and after them.
+
+The successor must stop and `REPLAN` on a second graph/key, any Bazel-looking
+short-ID approximation, truncated/caller-supplied/projection-as-identity use,
+changed Starlark bytes, general Starlark evaluation, aquery/ActionKey/platform
+breadth, normalization outside the payload, or any JVM/Java artifact,
+execution, helper, or delegation.
