@@ -3454,7 +3454,7 @@ checksum scope.
 The checksum scope is exactly the semicolon-delimited records between the
 Stage 4 `attr-manifest-records:start` and `:end` markers, joined with LF and
 terminated by one LF. SHA-256 is
-`3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`.
+`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
 Generation must reproduce this count, vector, and digest before transcribing
 any fixture row. The lane-5 source support token is `//attr:BUILD.bazel`, the
 isolated five-file layout's exported source nonrule; it supersedes the stale
@@ -3493,3 +3493,15 @@ that exact regex/value/support label, recompute and review the 165-row digest,
 then resume `WP-4-8-m3-attr-five-source-template-oracle-design`. Add no fixture,
 payload, source template, Rust, Cargo, configured analysis, JVM/Java artifact,
 or production Bazel delegation during the correction.
+
+The correction changes only `l12_a003`'s regex/rendered/support label to
+`@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`.
+The observed anchored query selects the positive target and the superseded
+shorter anchored query selects nothing. Count 165 and vector
+`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` are unchanged; the corrected
+LF record stream SHA-256 is
+`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
+Independent latest-diff review returned `ACCEPT` for the one-row correction and
+unchanged architecture. Resume only
+`WP-4-8-m3-attr-five-source-template-oracle-design`, using the corrected digest
+as its immutable semantic preflight.

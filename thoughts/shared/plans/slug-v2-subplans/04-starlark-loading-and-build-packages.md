@@ -1476,7 +1476,7 @@ l11_a015;:coverage_support;^@@bazel_tools//tools/test:coverage_support$;//attr:l
 l11_a016;:coverage_report_generator;^@@bazel_tools//tools/test:coverage_report_generator$;//attr:l11_a016_yes,test,:coverage_report_generator=@@bazel_tools//tools/test:coverage_report_generator;//attr:l11_a016_no,normal,:coverage_report_generator=absent;yes/no;@@bazel_tools//tools/test:coverage_report_generator
 l12_a001;tests;^\\[//attr:explicit_member_test\\]$;//attr:l12_a001_yes,test_suite,tests=[//attr:explicit_member_test],tags=[suite];//attr:l12_a001_no,test_suite,tests=[],tags=[suite];yes/no;//attr:explicit_member_test
 l12_a002;$implicit_tests;^\\[//attr:implicit_member_test\\]$;//attr:l12_a002_yes,test_suite,tests=[],tags=[suite],implicit_tests=[//attr:implicit_member_test];//attr:l12_a002_no,test_suite,tests=[//attr:explicit_member_test],tags=[suite],implicit_tests=[];yes/no;//attr:implicit_member_test,//attr:explicit_member_test
-l12_a003;$allowlist_function_transition;^@@bazel_tools//tools/allowlists:function_transition_allowlist$;//attr:l12_a003_yes,normal,identity_transition,outputs=[//attr:base_string_setting],allowlist=@@bazel_tools//tools/allowlists:function_transition_allowlist;//attr:l12_a003_no,normal,no_transition,allowlist=absent;yes/no;//attr:base_string_setting,@@bazel_tools//tools/allowlists:function_transition_allowlist
+l12_a003;$allowlist_function_transition;^@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist$;//attr:l12_a003_yes,normal,identity_transition,outputs=[//attr:base_string_setting],allowlist=@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist;//attr:l12_a003_no,normal,no_transition,allowlist=absent;yes/no;//attr:base_string_setting,@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist
 l13_a001;name;^l13_a001_yes$;//attr:l13_a001_yes,filegroup,name;//attr:l13_a001_no,filegroup,name;yes/no;-
 l13_a002;visibility;^\\[//visibility:public\\]$;//attr:l13_a002_yes,filegroup,visibility=[//visibility:public];//attr:l13_a002_no,filegroup,visibility=[//visibility:private];yes/no;-
 l13_a003;transitive_configs;^\\[\\]$;//attr:l13_a003_yes,filegroup,transitive_configs=[];//attr:l13_a003_no,filegroup,transitive_configs=[//attr:cfg_a];yes/no;//attr:cfg_a
@@ -1602,7 +1602,7 @@ Correction-only independent rereview returned `ACCEPT` for the complete
 five-file/two-package boundary. Run next only
 `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`; generation
 must reproduce SHA-256
-`3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`
+`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`
 before transcribing any row.
 
 Generation preflight then returned `REPLAN` before any fixture, payload, Bazel,
@@ -1634,6 +1634,19 @@ Run next only `WP-4-8-m3-attr-transition-allowlist-manifest-correction`. Change
 only `l12_a003`'s regex/rendered/support label, recompute the unchanged 165-row
 vector's digest, and obtain latest-diff review before returning to
 `WP-4-8-m3-attr-five-source-template-oracle-design`.
+
+The focused correction changes only `l12_a003` to the Bazel 9.2-observed
+canonical label
+`@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`.
+The new anchored regex selects `//attr:l12_a003_yes`; the superseded shorter
+regex selects nothing. The 165 IDs and vector remain unchanged, and the exact
+LF record stream now has SHA-256
+`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
+Independent latest-diff review returned `ACCEPT`: only that row changed, the
+count/vector and five-file/two-package boundary are intact, and no fixture,
+code, JVM, or configured-analysis work entered the correction. Resume only
+`WP-4-8-m3-attr-five-source-template-oracle-design`, bound to the corrected
+digest above.
 
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 

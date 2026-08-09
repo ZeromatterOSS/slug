@@ -1,49 +1,62 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-transition-allowlist-manifest-correction`
-Milestone: M3 query / Stage 4 exact manifest correction
+Packet: `WP-4-8-m3-attr-five-source-template-oracle-design`
+Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: correct only the disproved `l12_a003` transition-allowlist label,
-recompute the authoritative manifest digest, and return to exact source-template
-design without changing the 165-row semantic family.
+Result: freeze and independently validate the exact five source bodies and 18
+query argv/stdout bindings needed to generate the reviewed ordinary-`attr()`
+oracle without source-level inference.
 
 ## Background and boundary
 
-The Stage 4 record stream has 165 rows with vector
+The corrected Stage 4 record stream freezes all 165 semantic bindings,
+constructor fills, supports, negative-only controls, and discriminators. It has
+vector
 `13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` and SHA-256
-`3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`.
-Disposable five-source synthesis proved the Starlark loads and then exposed one
-manifest error: ordinary Bazel 9.2 query renders the admitted transition's
-`$allowlist_function_transition` as
-`@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist`.
-The frozen shorter label `@@bazel_tools//tools/allowlists:function_transition_allowlist`
-selects nothing under its anchored regex. The source-template packet stopped
-and removed all temporary material before checkout edits.
+`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
+The focused transition-allowlist correction is independently accepted.
+Generation remains blocked because semantic shorthand such as
+`select(same_keys=...)` does not freeze complete rule definitions, support
+declarations, selector dictionaries, macro bodies/locations, or source bytes.
 
-## Required correction
+## Required design
 
-- Change only `l12_a003`'s anchored regex, positive rendered value, and support
-  label to the exact observed canonical label above. Preserve its ID, attr
-  spelling, rule classes, transition output, negative operand, and expectation.
-- Re-extract all 165 LF-terminated records, prove the vector and unique IDs are
-  unchanged, calculate the new SHA-256, and update every current Stage 4/8
-  checksum reference. Do not alter another record.
-- Record the exact Bazel 9.2 positive query evidence and the old-regex empty
-  result. No new oracle is needed; reuse the accepted disposable-root evidence.
-- Obtain one independent latest-diff review that the correction is exactly one
-  row and preserves the five-file/two-package/source-template boundary.
+- Add to the Stage 4 owner one authoritative LF-exact source-template manifest
+  for `MODULE.bazel`, `attr/defs.bzl`, `attr/BUILD.bazel`,
+  `modules/ext/MODULE.bazel`, and `modules/ext/leaf/BUILD.bazel`. Freeze each
+  complete body, byte count, SHA-256, and role; retain no root `BUILD.bazel`.
+- Freeze every callable signature and attr declaration, mandatory support,
+  selector dictionary/default, identity transition, legacy macro body/call
+  placement, native declaration, package default, and negative-only producer.
+  Test and executable rule attr dictionaries remain separate because Bazel's
+  test base already owns `args`. Map every exact source declaration back to the
+  unchanged semantic manifest.
+- Freeze literal 18 Bazel argv expressions and normalized stdout records, with
+  every `_yes` exactly once and no `_no`; audit every record ID and each of the
+  nine controls to one declaration and command.
+- Materialize the proposed bodies only in temporary directories and run pinned
+  Bazel 9.2 with ordinary RC discovery. All 18 commands must pass in two
+  distinct roots, reproduce `@@ext+//leaf:label`, and yield byte-identical
+  normalized records before acceptance.
+- Recalculate the eventual fixture/TOML/expected logical-line cap from the
+  exact templates. Preserve five files/five directories, no links/mutations,
+  the isolated fixture name, and absence from every Slug projection/consumer.
 
 ## Boundary and review
 
-Edit only the Stage 4 and Stage 8 owner plans. Add no fixture, payload, expected
-record, generated source, Python, Rust, Cargo/lockfile, BUILD, source-template
-body, graph/DICE/regex state, configured analysis, toolchain resolution, JVM,
-Java source/bytecode/helper, or production Bazel delegation.
+Edit only the Stage 4 and Stage 8 owner plans. Temporary source material and
+Bazel outputs remain outside the checkout and are removed after validation.
+Add no fixture, payload, expected record, generated source, Python, Rust,
+Cargo/lockfile, BUILD, graph/DICE/regex state, configured analysis, toolchain
+resolution, JVM, Java source/bytecode/helper, or production Bazel delegation.
+Use pinned Bazel only as the external oracle and obtain independent review of
+the complete templates and ID/declaration/command audit.
 
 ## Stops
 
-Stop and `REPLAN` if any record other than `l12_a003` must change, if the vector
-or two-package/five-file boundary changes, if the evidence does not distinguish
-the old and new anchored labels, or if the correction needs fixture/code/JVM/
-configured-analysis work.
+Stop and `REPLAN` if the corrected semantic manifest must change, exact bodies
+cannot stay within five files/two packages, a mapping is not bijective or a
+command is nondiscriminating, temp-oracle output varies across roots, or any row
+needs configured analysis, an unbounded registry, JVM/Java, or production Bazel
+delegation.
