@@ -2101,3 +2101,22 @@ candidate/pending rendering. Its one executable representation must contain
 the exact `output_rule(name = "l01_generated_owner", nullable_output =
 "l01_generated_nonrule")` declaration and a focused producer-identity/source
 assertion before any replay. Stop on any further material contract miss.
+
+### `attr` five-source executable reconstruction retry-2 terminal REPLAN (2026-08-09)
+
+The sole fresh emitter passed its 165-record checksum, five-body ownership,
+source-fix, and exact generated-owner assertions. Before any primary query or
+candidate rendering, Bazel 9.2 rejected its package load because it used
+`attr.label(..., allow_none = True)`: `label()` reports that `allow_none` is
+unexpected and suggests `allow_files`. Retry-2 has no correction budget, so no
+body was repaired. The emitter, scratch root, output base, and process were
+removed, leaving clean `1b1f5936`; no candidate, hash, fixture, code,
+JVM/Java, configured-analysis, or toolchain material is retained.
+
+Run next only `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-3`.
+Preserve every accepted retry-2 obligation, including the exact generated owner
+and all prior source/load and six-row fixes. The sole source must assert that
+`allow_none` occurs nowhere; its nullable label is exactly
+`attr.label(default = None, allow_single_file = True)` or an accepted equivalent
+without that invented keyword. A disposable Bazel package-load preflight must
+pass before full two-root replay, with no correction budget.

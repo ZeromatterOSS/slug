@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-2`
+Packet: `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-3`
 Milestone: M3 query / Stage 4 executable oracle design
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: fresh full reconstruction after terminal correction-rereview REPLAN;
-the accepted generated-file producer identity must be asserted before replay.
+Result: fresh reconstruction after a terminal package-load REPLAN; source bytes
+must reject the invented `allow_none` keyword before package-load preflight.
 
 ## Immutable semantic boundary
 
@@ -37,6 +37,12 @@ source-construction fixes remain viable.
   `output_rule(name = "l01_generated_owner", nullable_output =
   "l01_generated_nonrule")`. Assert that literal source identity before any
   Bazel replay; the similarly named producer is not accepted.
+- Assert `allow_none` occurs nowhere in the five source bodies. The nullable
+  label is exactly `attr.label(default = None, allow_single_file = True)` or an
+  accepted equivalent without an invented keyword.
+- Before the full replay, write the five bodies to one disposable default
+  `mktemp -d` sibling `workspace`/`out` root and require Bazel package load to
+  pass. Do not render candidate text on a preflight failure.
 - Use two independent `mktemp -d` parents with direct sibling `workspace` and
   `out` paths. Run all 18 lanes in both roots, compare exact stdout, record all
   original nine literal-empty controls, and run the lane-1, license, timeout,
@@ -54,5 +60,6 @@ Cargo/lockfile, graph/DICE/regex state, configured analysis, toolchain
 resolution, JVM/Java artifact, or production Bazel delegation. Use ordinary RC
 discovery without inspecting or copying the private RC. Stop and `REPLAN` on a
 manifest semantic change, any ownership/probe/root mismatch, producer-identity
-miss, a need beyond the five files/two packages, or any excluded work. This
-second retry permits no further material correction.
+miss, an `allow_none` byte, package-load failure, a need beyond the five
+files/two packages, or any excluded work. This third retry permits no material
+correction.

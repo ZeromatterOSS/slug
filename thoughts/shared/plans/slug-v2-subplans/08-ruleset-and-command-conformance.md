@@ -3658,3 +3658,19 @@ Preserve the immutable 165-row semantics, five files/two packages, all accepted
 source/load and six-row fixes, original nine controls/probes, two-root replay,
 and mechanical pending rendering; assert the exact producer declaration and
 producer identity before replay. A further material issue is terminal.
+
+## `attr` five-source executable reconstruction retry-2 terminal REPLAN (2026-08-09)
+
+Static ownership and producer assertions passed, but the first Bazel 9.2 package
+load rejected the emitter's invented `attr.label(..., allow_none = True)`
+keyword. No primary query or candidate rendering occurred. The emitter and all
+temporary process/root/output material were removed at clean `1b1f5936`; no
+fixture, payload, Rust, JVM/Java, configured-analysis, or toolchain work
+remains.
+
+Run next only `WP-4-8-m3-attr-five-source-executable-reconstruction-retry-3`.
+Retain all prior source/load, generated-owner, control/probe, two-root, and
+mechanical-rendering obligations. Assert no `allow_none` source bytes and use
+`attr.label(default = None, allow_single_file = True)` or an accepted
+keyword-free equivalent; pass a disposable package-load preflight before full
+replay. No correction budget is available.
