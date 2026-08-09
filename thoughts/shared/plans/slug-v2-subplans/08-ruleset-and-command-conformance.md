@@ -3454,7 +3454,7 @@ checksum scope.
 The checksum scope is exactly the semicolon-delimited records between the
 Stage 4 `attr-manifest-records:start` and `:end` markers, joined with LF and
 terminated by one LF. SHA-256 is
-`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`.
 Generation must reproduce this count, vector, and digest before transcribing
 any fixture row. The lane-5 source support token is `//attr:BUILD.bazel`, the
 isolated five-file layout's exported source nonrule; it supersedes the stale
@@ -3500,7 +3500,7 @@ The observed anchored query selects the positive target and the superseded
 shorter anchored query selects nothing. Count 165 and vector
 `13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` are unchanged; the corrected
 LF record stream SHA-256 is
-`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`.
 Independent latest-diff review returned `ACCEPT` for the one-row correction and
 unchanged architecture. Resume only
 `WP-4-8-m3-attr-five-source-template-oracle-design`, using the corrected digest
@@ -3521,3 +3521,13 @@ notice licenses, lane-13 `legacy_macro` provenance, and suite/manual tag
 closure. The unaccepted docs diff and every temporary artifact were removed;
 no fixture, payload, source template, code, JVM artifact, configured analysis,
 or production Bazel delegation remains.
+
+The correction changes only `l11_a003_no` to valid `size=small`; Bazel derives
+its `timeout=short`, while the unchanged positive's `size=medium` derives
+`timeout=moderate`. Count/vector/IDs are unchanged and the corrected LF stream
+SHA-256 is
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`.
+Independent review returned `ACCEPT` for the one-row timeout correction. Run
+next only `WP-4-8-m3-attr-five-source-template-oracle-design-retry`, applying
+all four retained source-template corrections and hidden focused probes before
+the full-diff rereview.

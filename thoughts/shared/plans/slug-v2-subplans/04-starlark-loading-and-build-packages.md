@@ -1460,7 +1460,7 @@ l10_a011;build_setting_default;^base$;//attr:l10_a011_yes,string_setting,build_s
 l10_a012;help;^$;//attr:l10_a012_yes,string_setting,help=;//attr:l10_a012_no,string_setting,help=describe;yes/no;-
 l11_a001;testonly;^1$;//attr:l11_a001_yes,test,testonly=1;//attr:l11_a001_no,normal,testonly=0;yes/no;-
 l11_a002;size;^medium$;//attr:l11_a002_yes,test,size=medium;//attr:l11_a002_no,test,size=large;yes/no;-
-l11_a003;timeout;^moderate$;//attr:l11_a003_yes,test,size=medium,timeout=moderate;//attr:l11_a003_no,test,size=short,timeout=short;yes/no;-
+l11_a003;timeout;^moderate$;//attr:l11_a003_yes,test,size=medium,timeout=moderate;//attr:l11_a003_no,test,size=small,timeout=short;yes/no;-
 l11_a004;flaky;^0$;//attr:l11_a004_yes,test,flaky=0;//attr:l11_a004_no,test,flaky=1;yes/no;-
 l11_a005;shard_count;^-1$;//attr:l11_a005_yes,test,shard_count=-1;//attr:l11_a005_no,test,shard_count=0;yes/no;-
 l11_a006;local;^0$;//attr:l11_a006_yes,test,local=0;//attr:l11_a006_no,test,local=1;yes/no;-
@@ -1602,7 +1602,7 @@ Correction-only independent rereview returned `ACCEPT` for the complete
 five-file/two-package boundary. Run next only
 `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`; generation
 must reproduce SHA-256
-`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`
 before transcribing any row.
 
 Generation preflight then returned `REPLAN` before any fixture, payload, Bazel,
@@ -1641,7 +1641,7 @@ canonical label
 The new anchored regex selects `//attr:l12_a003_yes`; the superseded shorter
 regex selects nothing. The 165 IDs and vector remain unchanged, and the exact
 LF record stream now has SHA-256
-`8ae8899e0debb42369bc6453e4f1aad7b3cbca9940aa563993a3db35eca1ff9e`.
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`.
 Independent latest-diff review returned `ACCEPT`: only that row changed, the
 count/vector and five-file/two-package boundary are intact, and no fixture,
 code, JVM, or configured-analysis work entered the correction. Resume only
@@ -1665,6 +1665,19 @@ review blockers for the subsequent `WP-4-8-m3-attr-five-source-template-oracle-d
 retry. The entire unaccepted 1,901-line Stage 4/8 diff, all temporary roots,
 outputs, lockfiles, and helpers were removed; no fixture, payload, Rust, Cargo,
 JVM artifact, or generated source remains.
+
+The focused correction changes only `l11_a003_no` from invalid `size=short` to
+valid `size=small`; its `timeout=short` remains the Bazel computed default, not
+an explicit declaration. The positive remains `size=medium` with computed
+`timeout=moderate`. Count 165, unique IDs, and vector
+`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10` are unchanged; the corrected LF
+record stream SHA-256 is
+`99b772e6a8a19540ad379792fe5db7c8683d50d6e8af282ba55766585242300d`.
+Independent latest-diff review returned `ACCEPT`: exactly one semantic row
+changed, the vector/architecture are unchanged, and no fixture, template, code,
+JVM, or configured-analysis work entered the correction. Run next only
+`WP-4-8-m3-attr-five-source-template-oracle-design-retry`, retaining the four
+source-template blockers above and binding all source work to this digest.
 
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
