@@ -782,6 +782,37 @@ fn selected_node_kind(node: &QueryNode) -> CompactString {
     }
 }
 
+fn attr_matches_node(
+    node: &QueryNode,
+    attribute_name: &str,
+    regex: &Regex,
+) -> Result<bool, QueryError> {
+    if !node.kind.is_rule() {
+        return Ok(false);
+    }
+    let Some(attribute) = node
+        .attributes
+        .iter()
+        .find(|attribute| attribute.name == attribute_name)
+    else {
+        return Ok(false);
+    };
+    let Some(value) = attribute.value.as_ref() else {
+        return Ok(false);
+    };
+    let candidates = value
+        .attr_visible_candidates(|label| QueryLabel::from_canonical(label.clone()).output_label())
+        .map_err(|error| {
+            QueryError::evaluation(format!(
+                "in '{}' of rule {}: {error}",
+                attribute.name, node.label
+            ))
+        })?;
+    Ok(candidates
+        .iter()
+        .any(|candidate| regex.find(candidate.as_str()).is_some()))
+}
+
 #[async_trait]
 impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
     type Target = QueryCandidateId;
@@ -1075,6 +1106,31 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
         Ok(self.real_delivery(labels))
     }
 
+    async fn attr(
+        &mut self,
+        attribute: &str,
+        regex: &Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        let mut result = QueryCandidateBatches::empty();
+        for batch in targets.batches() {
+            let ids = batch.ids().to_vec();
+            let mut delivered = Vec::with_capacity(ids.len());
+            for id in ids {
+                let candidate = self.candidates.get(id).clone();
+                let Some(label) = candidate.evaluation_graph_label().cloned() else {
+                    continue;
+                };
+                let node = self.resolve_single(label).await?;
+                if attr_matches_node(&node, attribute, regex)? {
+                    delivered.push(id);
+                }
+            }
+            result = result.union(QueryCandidateBatches::from_delivery_ids(delivered));
+        }
+        Ok(result)
+    }
+
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         let mut result = QueryCandidateBatches::empty();
         for batch in targets.batches() {
@@ -1242,13 +1298,35 @@ impl QueryEnvironment for LoadingQueryEnvironment<'_, '_> {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::path::Path;
     use std::path::PathBuf;
+    use std::sync::atomic::AtomicU64;
+    use std::sync::atomic::Ordering;
+    use std::time::SystemTime;
 
     use dice::DetectCycles;
     use dice::Dice;
     use regex::Regex;
     use slug_bzlmod_v2 as bzlmod;
+    use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+    use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+    use slug_bzlmod_v2::LockfileMode;
+    use slug_bzlmod_v2::inject_root_module_request_inputs;
     use slug_identity_v2 as identity;
+    use slug_loading_v2::AttributeKind;
+    use slug_loading_v2::AttributeProvenance;
+    use slug_loading_v2::AttributeQueryValue;
+    use slug_loading_v2::CoercedAttributeValue;
+    use slug_loading_v2::VisibilitySource;
+    use slug_loading_v2::keys::WorkspaceDirectoryEntry;
+    use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
+    use slug_loading_v2::keys::WorkspaceDirectorySnapshot;
+    use slug_loading_v2::keys::WorkspaceDirectorySnapshotKey;
+    use slug_loading_v2::keys::WorkspaceDirectoryValue;
+    use slug_loading_v2::keys::WorkspaceFileValue;
+    use slug_loading_v2::keys::WorkspaceSnapshot;
+    use slug_loading_v2::keys::WorkspaceSnapshotKey;
     use slug_workspace_v2::PathDirectoryEntries as DirectoryEntries;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathObservationDemand as Demand;
@@ -1257,8 +1335,325 @@ mod tests {
     use slug_workspace_v2::PathObservationOperation as Operation;
     use slug_workspace_v2::PathObservationResult as Observation;
     use slug_workspace_v2::PathOperationResult as OperationResult;
+    use slug_workspace_v2::WorkspaceRawFileValue;
+    use slug_workspace_v2::WorkspaceRawSnapshot;
+    use slug_workspace_v2::WorkspaceRawSnapshotKey;
 
     use super::*;
+
+    struct AttrScratch(PathBuf);
+
+    impl Drop for AttrScratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn attr_scratch() -> AttrScratch {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let nanos = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let serial = NEXT.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!(
+            "slug-query-attr-{}-{nanos}-{serial}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&path).unwrap();
+        AttrScratch(path)
+    }
+
+    fn attr_write(path: impl AsRef<Path>, content: &str) {
+        let path = path.as_ref();
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(path, content).unwrap();
+    }
+
+    fn attr_observations(root: &Path) -> (WorkspaceSnapshot, WorkspaceDirectorySnapshot) {
+        let mut pending = vec![root.to_path_buf()];
+        let mut files = Vec::new();
+        let mut directories = Vec::new();
+        while let Some(directory) = pending.pop() {
+            let mut entries = Vec::new();
+            for entry in fs::read_dir(&directory).unwrap() {
+                let entry = entry.unwrap();
+                let path = entry.path();
+                let file_type = entry.file_type().unwrap();
+                let kind = if file_type.is_file() {
+                    files.push((
+                        path,
+                        WorkspaceFileValue::Present(Arc::new(
+                            fs::read_to_string(entry.path()).unwrap(),
+                        )),
+                    ));
+                    WorkspaceDirectoryEntryKind::RegularFile
+                } else if file_type.is_dir() {
+                    pending.push(path);
+                    WorkspaceDirectoryEntryKind::Directory
+                } else if file_type.is_symlink() {
+                    WorkspaceDirectoryEntryKind::Symlink
+                } else {
+                    WorkspaceDirectoryEntryKind::Other
+                };
+                entries.push(WorkspaceDirectoryEntry {
+                    name: entry.file_name().to_str().unwrap().into(),
+                    kind,
+                });
+            }
+            directories.push((directory, WorkspaceDirectoryValue::present(entries)));
+        }
+        (
+            WorkspaceSnapshot {
+                files: Arc::new(files.into_iter().collect()),
+            },
+            WorkspaceDirectorySnapshot {
+                directories: Arc::new(directories.into_iter().collect()),
+            },
+        )
+    }
+
+    async fn attr_transaction(dice: &Arc<Dice>, workspace: &Path) -> dice::DiceTransaction {
+        let (files, directories) = attr_observations(workspace);
+        let raw_files = Arc::new(WorkspaceRawSnapshot {
+            files: Arc::new(
+                files
+                    .files
+                    .iter()
+                    .map(|(path, value)| {
+                        let value = match value {
+                            WorkspaceFileValue::Present(source) => {
+                                WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                            }
+                            WorkspaceFileValue::Absent => WorkspaceRawFileValue::Absent,
+                            WorkspaceFileValue::ReadError(error) => {
+                                WorkspaceRawFileValue::ReadError(error.clone())
+                            }
+                        };
+                        (path.clone(), value)
+                    })
+                    .collect(),
+            ),
+        });
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.to_path_buf(),
+                },
+                Arc::new(files),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: workspace.to_path_buf(),
+                },
+                raw_files,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceDirectorySnapshotKey {
+                    workspace: workspace.to_path_buf(),
+                },
+                Arc::new(directories),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        updater.commit().await
+    }
+
+    fn attr_test_node(kind: crate::QueryNodeKind, value: Option<AttributeQueryValue>) -> QueryNode {
+        QueryNode {
+            label: QueryLabel::parse_root("//pkg:probe").unwrap(),
+            kind,
+            rule_capability: None,
+            test_metadata: None,
+            build_file: "pkg/BUILD.bazel".into(),
+            effective_visibility: RuleVisibility::Public,
+            visibility_source: VisibilitySource::AlwaysPublic,
+            package_group_contents: None,
+            edges: Arc::from([]),
+            attributes: Arc::from([crate::QueryAttribute {
+                name: "candidate".into(),
+                labels: Arc::from([]),
+                explicit: true,
+                value,
+            }]),
+        }
+    }
+
+    fn attr_query_value(kind: AttributeKind, value: CoercedAttributeValue) -> AttributeQueryValue {
+        AttributeQueryValue {
+            kind,
+            provenance: AttributeProvenance::Explicit,
+            value: Arc::new(value),
+        }
+    }
+
+    #[test]
+    fn inactive_attr_matcher_renders_repository_labels_and_requires_typed_rule_values() {
+        let labels = CoercedAttributeValue::LabelList(Arc::from([
+            CanonicalLabel::parse("@@//pkg:main").unwrap(),
+            CanonicalLabel::parse("@@ext+//leaf:external").unwrap(),
+            CanonicalLabel::parse("@@bazel_tools//tools/test:test_wrapper").unwrap(),
+        ]));
+        let rule = attr_test_node(
+            crate::QueryNodeKind::Rule("probe rule".into()),
+            Some(attr_query_value(AttributeKind::LabelList, labels)),
+        );
+
+        for pattern in [
+            r"^\[//pkg:main, @@ext\+//leaf:external, @@bazel_tools//tools/test:test_wrapper\]$",
+            r"@@ext\+//leaf:external",
+            r"@@bazel_tools//tools/test:test_wrapper",
+        ] {
+            assert!(attr_matches_node(&rule, "candidate", &Regex::new(pattern).unwrap()).unwrap());
+        }
+        assert!(!attr_matches_node(&rule, "missing", &Regex::new(".*").unwrap()).unwrap());
+
+        let untyped_rule = attr_test_node(crate::QueryNodeKind::Rule("probe rule".into()), None);
+        assert!(
+            !attr_matches_node(&untyped_rule, "candidate", &Regex::new(".*").unwrap()).unwrap()
+        );
+        for kind in [
+            crate::QueryNodeKind::SourceFile,
+            crate::QueryNodeKind::GeneratedFile,
+            crate::QueryNodeKind::PackageGroup,
+        ] {
+            let non_rule = attr_test_node(
+                kind,
+                Some(attr_query_value(
+                    AttributeKind::String,
+                    CoercedAttributeValue::String("visible".into()),
+                )),
+            );
+            assert!(
+                !attr_matches_node(&non_rule, "candidate", &Regex::new("visible").unwrap())
+                    .unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn inactive_attr_matcher_surfaces_contextual_typed_candidate_errors() {
+        let invalid = CoercedAttributeValue::Concatenation(
+            Arc::new(CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//pkg:left").unwrap(),
+            )),
+            Arc::new(CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@//pkg:right").unwrap(),
+            )),
+        );
+        let node = attr_test_node(
+            crate::QueryNodeKind::Rule("probe rule".into()),
+            Some(attr_query_value(AttributeKind::Label, invalid)),
+        );
+
+        assert_eq!(
+            attr_matches_node(&node, "candidate", &Regex::new(".*").unwrap())
+                .unwrap_err()
+                .to_string(),
+            "in 'candidate' of rule //pkg:probe: cannot concatenate attribute candidate types label and label"
+        );
+    }
+
+    #[tokio::test]
+    async fn inactive_attr_filter_preserves_streamed_ids_and_skips_fake_candidates() {
+        let scratch = attr_scratch();
+        attr_write(scratch.0.join("MODULE.bazel"), "module(name = \"root\")\n");
+        attr_write(
+            scratch.0.join("pkg/defs.bzl"),
+            "def _impl(ctx):\n    return [DefaultInfo()]\nstring_probe = rule(implementation = _impl, attrs = {\"candidate\": attr.string()})\nlabel_probe = rule(implementation = _impl, attrs = {\"candidate\": attr.label()})\n",
+        );
+        attr_write(
+            scratch.0.join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"label_probe\", \"string_probe\")\nconfig_setting(name = \"cfg_a\", values = {\"cpu\": \"a\"})\nconfig_setting(name = \"cfg_b\", values = {\"cpu\": \"b\"})\nfilegroup(name = \"dep\")\nstring_probe(name = \"match_first\", candidate = \"hit-first\")\nstring_probe(name = \"drop_first\", candidate = \"miss\")\nstring_probe(name = \"drop_all\", candidate = \"miss\")\nstring_probe(name = \"same\", candidate = \"hit-same\")\nstring_probe(name = \"match_last\", candidate = \"hit-last\")\nlabel_probe(name = \"bad\", candidate = select({\":cfg_a\": \":dep\"}) + select({\":cfg_b\": \":dep\"}))\n",
+        );
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut transaction = attr_transaction(&dice, &scratch.0).await;
+        let mut environment = LoadingQueryEnvironment::new(
+            &mut transaction,
+            scratch.0.clone(),
+            QueryPolicy::default(),
+        );
+        let first_match = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::parse_root("//pkg:match_first").unwrap(),
+        ));
+        let first_drop = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::parse_root("//pkg:drop_first").unwrap(),
+        ));
+        let empty_drop = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::parse_root("//pkg:drop_all").unwrap(),
+        ));
+        let fake_owner = QueryPackageIdentity::root(PackagePath::parse("consumer").unwrap());
+        let fake_same = environment.candidates.intern(QueryCandidate::fake(
+            QueryLabel::parse_root("//pkg:same").unwrap(),
+            fake_owner.clone(),
+        ));
+        let real_same = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::parse_root("//pkg:same").unwrap(),
+        ));
+        let last_match = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::parse_root("//pkg:match_last").unwrap(),
+        ));
+        let streamed = QueryCandidateBatches::from_delivery_ids(vec![first_match, first_drop])
+            .union(QueryCandidateBatches::from_delivery_ids(vec![empty_drop]))
+            .union(QueryCandidateBatches::from_delivery_ids(vec![
+                fake_same, real_same, last_match,
+            ]));
+
+        let filtered = environment
+            .attr("candidate", &Regex::new("hit").unwrap(), &streamed)
+            .await
+            .unwrap();
+
+        assert_eq!(filtered.batches().len(), 2);
+        assert_eq!(filtered.batches()[0].ids(), &[first_match]);
+        assert_eq!(filtered.batches()[1].ids(), &[real_same, last_match]);
+        assert_eq!(
+            environment
+                .candidates
+                .get(fake_same)
+                .owner_identity()
+                .unwrap(),
+            fake_owner
+        );
+        assert_eq!(
+            environment
+                .candidates
+                .get(real_same)
+                .owner_identity()
+                .unwrap()
+                .package()
+                .as_str(),
+            "pkg"
+        );
+
+        let bad = environment.candidates.intern(QueryCandidate::real(
+            QueryLabel::parse_root("//pkg:bad").unwrap(),
+        ));
+        let later_error = QueryCandidateBatches::from_delivery_ids(vec![first_match])
+            .union(QueryCandidateBatches::from_delivery_ids(vec![bad]));
+        assert_eq!(
+            environment
+                .attr("candidate", &Regex::new("hit").unwrap(), &later_error)
+                .await
+                .unwrap_err()
+                .to_string(),
+            "in 'candidate' of rule //pkg:bad: cannot concatenate attribute candidate types label and label"
+        );
+    }
 
     #[tokio::test]
     async fn external_restricted_visible_uses_canonical_fake_caller_without_a_second_route() {

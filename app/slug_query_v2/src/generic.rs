@@ -133,6 +133,13 @@ pub(crate) trait QueryEnvironment {
         targets: &Self::Set,
     ) -> Result<Self::Set, QueryError>;
 
+    async fn attr(
+        &mut self,
+        attribute: &str,
+        regex: &Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError>;
+
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
 
     async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
@@ -278,6 +285,7 @@ static RDEPS_FUNCTION: RdepsFunction = RdepsFunction;
 static SAME_PKG_DIRECT_RDEPS_FUNCTION: SamePkgDirectRdepsFunction = SamePkgDirectRdepsFunction;
 static SIBLINGS_FUNCTION: SiblingsFunction = SiblingsFunction;
 static ALLPATHS_FUNCTION: AllPathsFunction = AllPathsFunction;
+static ATTR_FUNCTION: AttrFunction = AttrFunction;
 static SOME_FUNCTION: SomeFunction = SomeFunction;
 static SOMEPATH_FUNCTION: SomePathFunction = SomePathFunction;
 static BUILDFILES_FUNCTION: LoadingFilesFunction = LoadingFilesFunction {
@@ -304,6 +312,7 @@ where
         }
         [
             &ALLPATHS_FUNCTION as &dyn QueryFunction<E>,
+            &ATTR_FUNCTION as &dyn QueryFunction<E>,
             &BUILDFILES_FUNCTION as &dyn QueryFunction<E>,
             &DEPS_FUNCTION as &dyn QueryFunction<E>,
             &EXECUTABLES_FUNCTION as &dyn QueryFunction<E>,
@@ -623,6 +632,8 @@ struct LoadingFilesFunction {
     include_buildfiles: bool,
 }
 
+struct AttrFunction;
+
 struct LabelsFunction;
 
 struct ExecutablesFunction;
@@ -664,6 +675,42 @@ fn compile_slug_regex(pattern: &str) -> Result<Regex, QueryError> {
         ),
         _ => QueryError::syntax("invalid Slug regex: unsupported or malformed syntax"),
     })
+}
+
+impl<E> QueryFunction<E> for AttrFunction
+where
+    E: QueryEnvironment + Send,
+{
+    fn spec(&self) -> &'static crate::QueryFunctionSpec {
+        loading_query_function("attr").expect("attr is in the static Bazel registry")
+    }
+
+    fn invoke<'a>(
+        &'a self,
+        evaluator: &'a mut QueryEvaluator<E>,
+        args: &'a [QueryExpression],
+        variables: &'a mut SmallMap<CompactString, E::Set>,
+    ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
+        async move {
+            let attribute = match &args[0].kind {
+                QueryExpressionKind::TargetLiteral(value) => value.as_str(),
+                _ => return Err(QueryError::syntax("attr attribute must be a word")),
+            };
+            let pattern = match &args[1].kind {
+                QueryExpressionKind::TargetLiteral(value) => value.as_str(),
+                _ => return Err(QueryError::syntax("attr regex pattern must be a word")),
+            };
+            // Match the active Rust-native regex functions' error precedence:
+            // compile once before evaluating the operand.
+            let regex = compile_slug_regex(pattern)?;
+            let targets = eval_set_arg(evaluator, args, variables, 2).await?;
+            evaluator
+                .environment
+                .attr(attribute, &regex, &targets)
+                .await
+        }
+        .boxed()
+    }
 }
 
 impl<E> QueryFunction<E> for RegexFunction
@@ -1041,6 +1088,23 @@ mod tests {
             unreachable!()
         }
 
+        async fn attr(
+            &mut self,
+            attribute: &str,
+            regex: &Regex,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.events
+                .lock()
+                .unwrap()
+                .push(format!("attr:{attribute}"));
+            Ok(targets
+                .iter()
+                .filter(|target| regex.find(target).is_some())
+                .cloned()
+                .collect())
+        }
+
         async fn executables(&mut self, _: &Self::Set) -> Result<Self::Set, QueryError> {
             unreachable!()
         }
@@ -1158,6 +1222,58 @@ mod tests {
         assert!(unicode.find("Συν").is_some());
         assert!(unicode.find("latin").is_none());
         assert!(unicode.find("συν").is_some());
+    }
+
+    #[test]
+    fn inactive_attr_function_compiles_before_operand_and_preserves_argument_order() {
+        let functions = LoadingQueryFunctions;
+        let inactive: Option<&dyn QueryFunction<VisibleEnvironment>> = functions.get("attr");
+        assert!(inactive.is_none());
+        assert_eq!(
+            loading_query_function("attr").unwrap().status,
+            crate::QueryFunctionStatus::Deferred
+        );
+
+        for pattern in ["(?=unsupported)", r"\1"] {
+            let expression =
+                QueryExpression::parse(&format!("attr(name, '{pattern}', missing)")).unwrap();
+            let QueryExpressionKind::Function { args, .. } = expression.kind else {
+                panic!("expected attr call");
+            };
+            let mut evaluator = QueryEvaluator::new(VisibleEnvironment {
+                events: std::sync::Mutex::new(Vec::new()),
+            });
+            let error = futures::executor::block_on(ATTR_FUNCTION.invoke(
+                &mut evaluator,
+                &args,
+                &mut SmallMap::new(),
+            ))
+            .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "invalid Slug regex: unsupported or malformed syntax"
+            );
+            assert!(evaluator.environment.events.lock().unwrap().is_empty());
+        }
+
+        let expression = QueryExpression::parse("attr(name, put, input)").unwrap();
+        let QueryExpressionKind::Function { args, .. } = expression.kind else {
+            panic!("expected attr call");
+        };
+        let mut evaluator = QueryEvaluator::new(VisibleEnvironment {
+            events: std::sync::Mutex::new(Vec::new()),
+        });
+        let result = futures::executor::block_on(ATTR_FUNCTION.invoke(
+            &mut evaluator,
+            &args,
+            &mut SmallMap::new(),
+        ))
+        .unwrap();
+        assert_eq!(result, ["input"]);
+        assert_eq!(
+            *evaluator.environment.events.lock().unwrap(),
+            ["resolve:input", "attr:name"]
+        );
     }
 
     #[test]
