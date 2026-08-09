@@ -1,4 +1,5 @@
 mod cache_grammar;
+mod configuration;
 mod convert;
 mod defaults;
 pub mod host;
@@ -11,5 +12,10 @@ mod tests;
 
 pub use cache_grammar::CacheFieldValue;
 pub use cache_grammar::format_cache_field;
+pub use configuration::RootStringSettingValue;
+pub use configuration::SlugConfiguration;
+pub use configuration::SlugConfigurationError;
+pub use configuration::SlugConfigurationKind;
+pub use configuration::SlugConfigurationProjection;
 pub use registry::NATIVE_OPTION_DESCRIPTORS;
 pub use registry::NativeOptionDescriptor;

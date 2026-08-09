@@ -3332,6 +3332,7 @@ dependencies = [
  "futures 0.3.33",
  "slug_build_api_v2",
  "slug_bzlmod_v2",
+ "slug_configuration_v2",
  "slug_events_v2",
  "slug_identity_v2",
  "slug_loading_v2",
@@ -3409,9 +3410,12 @@ name = "slug_configuration_v2"
 version = "0.1.0"
 dependencies = [
  "allocative",
+ "blake3",
  "compact_str",
  "dupe",
+ "hex",
  "slug_identity_v2",
+ "strong_hash",
 ]
 
 [[package]]
@@ -3430,10 +3434,12 @@ dependencies = [
  "hyper",
  "hyper-rustls",
  "hyper-util",
+ "libc",
  "nix 0.30.1",
  "sha2",
  "slug_analysis_v2",
  "slug_bzlmod_v2",
+ "slug_configuration_v2",
  "slug_events_v2",
  "slug_identity_v2",
  "slug_loading_v2",
@@ -3529,6 +3535,7 @@ dependencies = [
  "slug_analysis_v2",
  "slug_build_api_v2",
  "slug_bzlmod_v2",
+ "slug_configuration_v2",
  "slug_core_v2",
  "slug_identity_v2",
  "slug_loading_v2",

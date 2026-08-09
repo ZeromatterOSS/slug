@@ -82,6 +82,8 @@ use slug_bzlmod_v2::RootRepositoryRouteKey;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_configuration_v2::RootStringSettingValue;
+use slug_configuration_v2::SlugConfiguration;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
@@ -257,7 +259,7 @@ pub fn observe_workspace(workspace: &Path) -> anyhow::Result<WorkspaceObservatio
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
     let mut observation = WorkspaceObservation::from_files([]);
-    collect_workspace_observations(&workspace, &mut observation);
+    collect_workspace_observations(&workspace, &workspace, &mut observation);
     Ok(observation)
 }
 
@@ -267,7 +269,11 @@ pub fn observe_workspace_files(workspace: &Path) -> anyhow::Result<Vec<Workspace
     Ok(observe_workspace(workspace)?.files)
 }
 
-fn collect_workspace_observations(directory: &Path, observation: &mut WorkspaceObservation) {
+fn collect_workspace_observations(
+    workspace: &Path,
+    directory: &Path,
+    observation: &mut WorkspaceObservation,
+) {
     let entries = match std::fs::read_dir(directory) {
         Ok(entries) => entries,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -328,6 +334,13 @@ fn collect_workspace_observations(directory: &Path, observation: &mut WorkspaceO
             });
             return;
         };
+        // Configured outputs and collision sidecars are build products, never
+        // source inputs. Excluding the root-owned tree also prevents its
+        // creation from fabricating a workspace invalidation in a retained
+        // daemon.
+        if directory == workspace && name == "bazel-out" {
+            continue;
+        }
         direct_entries.push(WorkspaceDirectoryEntry {
             name: name.into(),
             kind,
@@ -349,7 +362,7 @@ fn collect_workspace_observations(directory: &Path, observation: &mut WorkspaceO
     for child in children {
         // 'file_type()' identified a directory. Symlinks were already recorded
         // above and deliberately never arrive here.
-        collect_workspace_observations(&child, observation);
+        collect_workspace_observations(workspace, &child, observation);
     }
 }
 
@@ -391,6 +404,7 @@ pub struct WorkspaceRuntime {
     // a second process owner at observation time.
     #[allow(dead_code)]
     process_host: Arc<super::ProcessHostOwner>,
+    configured_output: Arc<super::configured_output::ConfiguredOutputOwner>,
     dice: Arc<Dice>,
     demand_owner: Arc<WorkspaceDemandOwner>,
     loader: BzlModuleEvaluator,
@@ -1521,6 +1535,8 @@ struct BuildCommandRootKey {
     workspace: NormalizedAbsolutePath,
     targets: Arc<[Arc<str>]>,
     configuration: ConfigurationKey,
+    base_configuration: ConfigurationKey,
+    explicit_root_string_setting: Option<RootStringSettingValue>,
 }
 
 #[derive(Clone)]
@@ -1653,8 +1669,26 @@ impl BuildCommandRootKey {
         Ok(Self {
             workspace,
             targets: canonical.into(),
+            base_configuration: configuration.clone(),
             configuration,
+            explicit_root_string_setting: None,
         })
+    }
+
+    fn new_with_root_string_setting(
+        workspace: NormalizedAbsolutePath,
+        targets: &[TargetPattern],
+        base_configuration: ConfigurationKey,
+        explicit: Option<RootStringSettingValue>,
+    ) -> Result<Self, BuildCommandRequestError> {
+        let configuration = explicit.as_ref().map_or_else(
+            || base_configuration.clone(),
+            |value| base_configuration.with_root_string_setting(value.clone()),
+        );
+        let mut key = Self::new(workspace, targets, configuration)?;
+        key.base_configuration = base_configuration;
+        key.explicit_root_string_setting = explicit;
+        Ok(key)
     }
 }
 
@@ -2059,6 +2093,8 @@ async fn compute_build_branch(
     workspace: NormalizedAbsolutePath,
     pattern: Arc<str>,
     configuration: ConfigurationKey,
+    base_configuration: ConfigurationKey,
+    explicit_root_string_setting: Option<RootStringSettingValue>,
 ) -> BuildBranchResult {
     let parsed = TargetPattern::parse(&pattern)
         .expect("BuildCommandRootKey stores validated canonical target patterns");
@@ -2155,21 +2191,43 @@ async fn compute_build_branch(
                         }
                     },
                 }
-            } else if matches!(
-                target.kind,
-                slug_loading_v2::PackageTargetKind::StarlarkRule(_)
-            ) {
+            } else if let slug_loading_v2::PackageTargetKind::StarlarkRule(rule) = &target.kind {
                 let canonical =
                     CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
                         .expect("validated root apparent label has a canonical projection");
-                let configured_target = ConfiguredTargetKey::new(canonical, configuration);
-                match ctx
-                    .compute(&RootConfiguredTargetAnalysisKey::new(
-                        workspace,
-                        configured_target,
-                    ))
-                    .await
-                {
+                let has_root_setting_transition = rule
+                    .schema()
+                    .iter()
+                    .any(|attribute| attribute.transition().is_some());
+                let root_setting = CanonicalLabel::parse("@@//:setting")
+                    .expect("packet-fixed setting label is valid");
+                let directly_uses_root_setting = rule.is_root_string_build_setting()
+                    || rule
+                        .dependencies()
+                        .iter()
+                        .any(|dependency| dependency == &root_setting);
+                let analysis_key =
+                    if explicit_root_string_setting.is_some() || has_root_setting_transition {
+                        RootConfiguredTargetAnalysisKey::root_string_setting_request(
+                            workspace,
+                            canonical,
+                            base_configuration,
+                            explicit_root_string_setting,
+                        )
+                    } else if directly_uses_root_setting {
+                        RootConfiguredTargetAnalysisKey::root_string_setting_request(
+                            workspace,
+                            canonical,
+                            base_configuration,
+                            None,
+                        )
+                    } else {
+                        RootConfiguredTargetAnalysisKey::new(
+                            workspace,
+                            ConfiguredTargetKey::new(canonical, configuration),
+                        )
+                    };
+                match ctx.compute(&analysis_key).await {
                     Err(error) => {
                         return BuildBranchResult::Infrastructure(Arc::from(error.to_string()));
                     }
@@ -2369,6 +2427,8 @@ impl Key for BuildCommandRootKey {
                     workspace.clone(),
                     pattern,
                     configuration.clone(),
+                    self.base_configuration.clone(),
+                    self.explicit_root_string_setting.clone(),
                 ))
             })
             .await;
@@ -2575,6 +2635,9 @@ impl WorkspaceRuntime {
         let repository_materializer = Arc::new(super::repository_io::RepositoryMaterializer::new(
             normalized_workspace.clone(),
         ));
+        let configured_output = Arc::new(super::configured_output::ConfiguredOutputOwner::new(
+            workspace.clone(),
+        ));
         let loader = BzlModuleEvaluator::new(&workspace)?;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
@@ -2589,6 +2652,7 @@ impl WorkspaceRuntime {
         Ok(Self {
             workspace,
             process_host,
+            configured_output,
             dice,
             demand_owner,
             loader,
@@ -2858,19 +2922,33 @@ impl WorkspaceRuntime {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: &[String],
+        root_string_setting: Option<&str>,
     ) -> Result<
         AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
         BuildCommandError,
     > {
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(BuildCommandError::infrastructure)?;
-        let configuration =
-            ConfigurationKey::target("first-build").map_err(BuildCommandError::infrastructure)?;
-        let root = BuildCommandRootKey::new(
+        let host = self
+            .process_host
+            .default_configuration_inputs()
+            .map_err(BuildCommandError::infrastructure)?;
+        let base_configuration =
+            SlugConfiguration::default_target(&host).map_err(BuildCommandError::infrastructure)?;
+        let explicit_root_string_setting = root_string_setting.map(RootStringSettingValue::new);
+        let configuration = explicit_root_string_setting.as_ref().map_or_else(
+            || base_configuration.clone(),
+            |value| base_configuration.with_root_string_setting(value.clone()),
+        );
+        self.configured_output
+            .claim(&configuration)
+            .map_err(BuildCommandError::infrastructure)?;
+        let root = BuildCommandRootKey::new_with_root_string_setting(
             NormalizedAbsolutePath::new(self.workspace.clone())
                 .map_err(BuildCommandError::infrastructure)?,
             targets,
-            configuration,
+            ConfigurationKey::from_slug(base_configuration),
+            explicit_root_string_setting,
         )
         .map_err(BuildCommandError::request)?;
         let request = NativeDemandRequestInputBundle {
@@ -2879,11 +2957,26 @@ impl WorkspaceRuntime {
             lockfile_mode,
             registry_urls,
         };
-        self.drive_command(request, root)
-            .map(|result| result.accepted)
-            .map_err(|error| {
-                BuildCommandError::infrastructure(format!("typed build command failed: {error}"))
-            })
+        let driven = self.drive_command(request, root).map_err(|error| {
+            BuildCommandError::infrastructure(format!("typed build command failed: {error}"))
+        })?;
+        if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
+            for analysis in evaluation.analyses() {
+                let configuration = analysis
+                    .key()
+                    .configuration()
+                    .slug_configuration()
+                    .ok_or_else(|| {
+                        BuildCommandError::infrastructure(
+                            "production analysis returned an opaque configuration",
+                        )
+                    })?;
+                self.configured_output
+                    .claim(configuration)
+                    .map_err(BuildCommandError::infrastructure)?;
+            }
+        }
+        Ok(driven.accepted)
     }
 
     pub fn cquery_starlark_label_command_with_bzlmod_inputs(
@@ -2909,8 +3002,16 @@ impl WorkspaceRuntime {
         }
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(CqueryCommandError::infrastructure)?;
+        let host = self
+            .process_host
+            .default_configuration_inputs()
+            .map_err(CqueryCommandError::infrastructure)?;
         let configuration =
-            ConfigurationKey::target("first-build").map_err(CqueryCommandError::infrastructure)?;
+            SlugConfiguration::default_target(&host).map_err(CqueryCommandError::infrastructure)?;
+        self.configured_output
+            .claim(&configuration)
+            .map_err(CqueryCommandError::infrastructure)?;
+        let configuration = ConfigurationKey::from_slug(configuration);
         let canonical =
             CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
                 .map_err(CqueryCommandError::infrastructure)?;
@@ -3259,6 +3360,16 @@ impl WorkspaceRuntime {
         let directory_snapshot = Arc::new(WorkspaceDirectorySnapshot {
             directories: Arc::new(directories.into_iter().collect()),
         });
+        let host = self
+            .process_host
+            .default_configuration_inputs()
+            .map_err(anyhow::Error::msg)?;
+        let structural_configuration =
+            SlugConfiguration::default_target(&host).map_err(anyhow::Error::msg)?;
+        self.configured_output
+            .claim(&structural_configuration)
+            .map_err(anyhow::Error::msg)?;
+        let configuration = ConfigurationKey::from_slug(structural_configuration);
         let revision = WorkspaceRevision(self.next_revision.fetch_add(1, Ordering::Relaxed));
         self.runtime.block_on(async {
             let data = self
@@ -3361,11 +3472,8 @@ impl WorkspaceRuntime {
                                 label.target().as_str()
                             ))
                             .map_err(anyhow::Error::msg)?;
-                            let configured_target = ConfiguredTargetKey::new(
-                                canonical,
-                                ConfigurationKey::target("first-build")
-                                    .map_err(anyhow::Error::msg)?,
-                            );
+                            let configured_target =
+                                ConfiguredTargetKey::new(canonical, configuration.clone());
                             let value = transaction
                                 .compute(&ConfiguredTargetAnalysisKey {
                                     workspace: self.workspace.clone(),
@@ -4217,7 +4325,7 @@ pub fn evaluate_workspace(workspace: impl Into<PathBuf>) -> anyhow::Result<Works
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-    let runtime = WorkspaceRuntime::new(&workspace, super::ProcessHostOwner::unsupported())?;
+    let runtime = WorkspaceRuntime::new(&workspace, super::ProcessHostOwner::native())?;
     let evaluation = runtime.evaluate_observations(observe_workspace(&workspace)?, &[])?;
     Ok(evaluation.workspace)
 }
@@ -4256,7 +4364,7 @@ pub fn evaluate_workspace_targets_with_bzlmod_inputs(
     let workspace = workspace
         .canonicalize()
         .with_context(|| format!("canonicalizing workspace {}", workspace.display()))?;
-    let runtime = WorkspaceRuntime::new(&workspace, super::ProcessHostOwner::unsupported())?;
+    let runtime = WorkspaceRuntime::new(&workspace, super::ProcessHostOwner::native())?;
     runtime.evaluate_observations_with_bzlmod_inputs(
         observe_workspace(&workspace)?,
         targets,
@@ -4320,7 +4428,7 @@ mod tests {
     use crate::runtime::events::CommandEffectOwner;
 
     fn test_runtime(workspace: impl Into<PathBuf>) -> anyhow::Result<WorkspaceRuntime> {
-        WorkspaceRuntime::new(workspace, ProcessHostOwner::unsupported())
+        WorkspaceRuntime::new(workspace, ProcessHostOwner::native())
     }
 
     #[test]
@@ -5312,10 +5420,15 @@ mod tests {
             "print(\"MODULE_EVENT\")\nmodule(name = \"driver\")\n",
         )
         .unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "load(\"//pkg:defs.bzl\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\n",
+        )
+        .unwrap();
         fs::create_dir(workspace.path().join("pkg")).unwrap();
         fs::write(
             workspace.path().join("pkg/defs.bzl"),
-            "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+            "print(\"BZL_EVENT\")\ndef _impl(ctx):\n    print(\"ANALYSIS_EVENT\")\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\ndef _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
         )
         .unwrap();
         fs::write(
@@ -5325,17 +5438,19 @@ mod tests {
         .unwrap();
         let runtime = test_runtime(workspace.path()).unwrap();
         let target = TargetPattern::parse("//pkg:probe").unwrap();
-        let build = |runtime: &WorkspaceRuntime, targets: &[TargetPattern]| {
-            runtime.build_command_with_bzlmod_inputs(
-                targets,
-                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
-                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-                LockfileMode::Update,
-                &[],
-            )
-        };
+        let build =
+            |runtime: &WorkspaceRuntime, targets: &[TargetPattern], setting: Option<&str>| {
+                runtime.build_command_with_bzlmod_inputs(
+                    targets,
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    setting,
+                )
+            };
 
-        let accepted = build(&runtime, std::slice::from_ref(&target)).unwrap();
+        let accepted = build(&runtime, std::slice::from_ref(&target), None).unwrap();
         let evaluation = accepted.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(evaluation.loaded_package_count(), 1);
         assert_eq!(evaluation.analyzed_target_count(), 1);
@@ -5344,19 +5459,70 @@ mod tests {
             accepted_output_text(&accepted),
             ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT", "ANALYSIS_EVENT"]
         );
+        let c0 = evaluation
+            .analyses()
+            .next()
+            .unwrap()
+            .key()
+            .configuration()
+            .clone();
 
-        let warm = build(&runtime, std::slice::from_ref(&target)).unwrap();
+        let warm = build(&runtime, std::slice::from_ref(&target), None).unwrap();
         assert!(warm.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&warm).is_empty());
 
-        let empty = build(&runtime, &[]).unwrap();
+        let transitioned = build(
+            &runtime,
+            std::slice::from_ref(&target),
+            Some("transitioned"),
+        )
+        .unwrap();
+        let c1 = transitioned
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .analyses()
+            .next()
+            .unwrap()
+            .key()
+            .configuration()
+            .clone();
+        assert_ne!(c0, c1);
+        assert_eq!(accepted_output_text(&transitioned), ["ANALYSIS_EVENT"]);
+        assert_ne!(
+            crate::runtime::configured_output_root(
+                workspace.path(),
+                c0.slug_configuration().unwrap()
+            ),
+            crate::runtime::configured_output_root(
+                workspace.path(),
+                c1.slug_configuration().unwrap()
+            )
+        );
+
+        let restored = build(&runtime, std::slice::from_ref(&target), None).unwrap();
+        let restored_configuration = restored
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .analyses()
+            .next()
+            .unwrap()
+            .key()
+            .configuration();
+        assert_eq!(&c0, restored_configuration);
+        assert!(accepted_output_text(&restored).is_empty());
+
+        let empty = build(&runtime, &[], None).unwrap();
         let evaluation = empty.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(evaluation.loaded_package_count(), 0);
         assert_eq!(evaluation.analyzed_target_count(), 0);
 
         let missing_runtime = test_runtime(workspace.path()).unwrap();
         let missing_target = TargetPattern::parse("//pkg:missing").unwrap();
-        let missing = build(&missing_runtime, &[missing_target]).unwrap();
+        let missing = build(&missing_runtime, &[missing_target], None).unwrap();
         let error = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
         assert!(matches!(
             error.kind,
@@ -5372,6 +5538,201 @@ mod tests {
         assert_eq!(
             accepted_output_text(&missing),
             ["MODULE_EVENT", "BZL_EVENT", "BUILD_EVENT"]
+        );
+    }
+
+    #[test]
+    fn retained_runtime_restores_default_transition_configuration_after_explicit_override() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print(\"MODULE_EVENT\")\nmodule(name = \"configuration_driver\")\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("defs.bzl"),
+            r#"SettingInfo = provider(fields = {"value": "value"})
+def _setting(ctx):
+    return [SettingInfo(value = ctx.build_setting_value)]
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _consumer(ctx):
+    print("CONSUMER_ANALYSIS")
+    out = ctx.actions.declare_file("consumer.txt")
+    ctx.actions.write(out, ctx.attr._setting[SettingInfo].value + "\n")
+    return [DefaultInfo(files = depset([out]))]
+consumer = rule(implementation = _consumer, attrs = {"_setting": attr.label(default = "//:setting")})
+def _left(settings, attr):
+    return {"//:setting": "left"}
+left = transition(implementation = _left, inputs = [], outputs = ["//:setting"])
+def _parent(ctx):
+    print("PARENT_ANALYSIS")
+    out = ctx.actions.declare_file("parent.txt")
+    ctx.actions.write(out, "parent\n")
+    return [DefaultInfo(files = depset([out]))]
+parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)})
+def _top(ctx):
+    print("TOP_ANALYSIS")
+    out = ctx.actions.declare_file("top.txt")
+    ctx.actions.write(out, "top\n")
+    return [DefaultInfo(files = depset([out]))]
+top = rule(implementation = _top, attrs = {"child": attr.label()})
+"#,
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\", \"top\")\nprint(\"BUILD_EVENT\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", child = \":consumer\")\ntop(name = \"top\", child = \":parent\")\n",
+        )
+        .unwrap();
+
+        let target = TargetPattern::parse("//:parent").unwrap();
+        let build = |runtime: &WorkspaceRuntime, setting: Option<&str>| {
+            runtime.build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&target),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                setting,
+            )
+        };
+        let configuration_for =
+            |accepted: &AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>,
+             label: &str| {
+                accepted
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .analyses()
+                    .find(|analysis| analysis.key().label().to_string() == label)
+                    .unwrap()
+                    .key()
+                    .configuration()
+                    .clone()
+            };
+        let topology_for =
+            |accepted: &AcceptedCommand<Arc<Result<BuildCommandEvaluation, BuildCommandError>>>| {
+                accepted
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .analyses()
+                    .map(|analysis| {
+                        (
+                            analysis.key().label().to_string(),
+                            analysis
+                                .providers()
+                                .names()
+                                .map(|name| name.to_string())
+                                .collect::<Vec<_>>(),
+                            analysis.declared_outputs().to_vec(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+        let retained = test_runtime(workspace.path()).unwrap();
+        let c0_build = build(&retained, None).unwrap();
+        let c0 = configuration_for(&c0_build, "@@//:parent");
+        assert_eq!(
+            c0.root_string_setting().map(|value| value.as_str()),
+            Some("default")
+        );
+        assert!(accepted_output_text(&c0_build).contains(&"PARENT_ANALYSIS"));
+        assert!(accepted_output_text(&c0_build).contains(&"CONSUMER_ANALYSIS"));
+        let c0_topology = topology_for(&c0_build);
+
+        let c1_build = build(&retained, Some("command")).unwrap();
+        let c1 = configuration_for(&c1_build, "@@//:parent");
+        assert_eq!(
+            c1.root_string_setting().map(|value| value.as_str()),
+            Some("command")
+        );
+        assert_ne!(c0, c1);
+        assert!(accepted_output_text(&c1_build).contains(&"PARENT_ANALYSIS"));
+        assert!(!accepted_output_text(&c1_build).contains(&"CONSUMER_ANALYSIS"));
+        assert_eq!(c0_topology, topology_for(&c1_build));
+        assert_ne!(
+            crate::runtime::configured_output_root(
+                workspace.path(),
+                c0.slug_configuration().unwrap()
+            ),
+            crate::runtime::configured_output_root(
+                workspace.path(),
+                c1.slug_configuration().unwrap()
+            )
+        );
+
+        let restored_build = build(&retained, None).unwrap();
+        let restored = configuration_for(&restored_build, "@@//:parent");
+        assert_eq!(c0, restored);
+        assert_eq!(c0_topology, topology_for(&restored_build));
+        assert!(accepted_output_text(&restored_build).is_empty());
+
+        let fresh = test_runtime(workspace.path()).unwrap();
+        let one_shot_build = build(&fresh, None).unwrap();
+        let one_shot = configuration_for(&one_shot_build, "@@//:parent");
+        assert_eq!(c0, one_shot);
+        assert_eq!(
+            c0.slug_configuration().unwrap().projection(),
+            one_shot.slug_configuration().unwrap().projection()
+        );
+
+        let transitive_runtime = test_runtime(workspace.path()).unwrap();
+        let top = TargetPattern::parse("//:top").unwrap();
+        let transitive_c0 = transitive_runtime
+            .build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&top),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        let transitive_parent = configuration_for(&transitive_c0, "@@//:parent");
+        let transitive_consumer = configuration_for(&transitive_c0, "@@//:consumer");
+        assert_eq!(transitive_parent, c0);
+        assert_eq!(
+            transitive_consumer
+                .root_string_setting()
+                .map(|value| value.as_str()),
+            Some("left")
+        );
+
+        let transitive_c1 = transitive_runtime
+            .build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&top),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                Some("command"),
+            )
+            .unwrap();
+        assert!(accepted_output_text(&transitive_c1).contains(&"TOP_ANALYSIS"));
+        assert!(accepted_output_text(&transitive_c1).contains(&"PARENT_ANALYSIS"));
+        assert!(!accepted_output_text(&transitive_c1).contains(&"CONSUMER_ANALYSIS"));
+
+        let setting_runtime = test_runtime(workspace.path()).unwrap();
+        let setting_target = TargetPattern::parse("//:setting").unwrap();
+        let setting_build = setting_runtime
+            .build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&setting_target),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        assert_eq!(
+            configuration_for(&setting_build, "@@//:setting")
+                .root_string_setting()
+                .map(|value| value.as_str()),
+            Some("default")
         );
     }
 
@@ -5415,10 +5776,9 @@ mod tests {
                 "cquery analysis root activation count"
             );
             for root in roots {
-                assert_eq!(
-                    root.stable_serialize(),
-                    format!("{label} [target:first-build]")
-                );
+                let serialized = root.stable_serialize();
+                assert!(serialized.starts_with(&format!("{label} [target:slugcfg-v1:")));
+                assert!(serialized.ends_with(']'));
             }
         };
         let target = TargetPattern::parse("//pkg:probe").unwrap();
@@ -7303,14 +7663,17 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
         epoch.package("", "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n", 1);
         let mut transaction = build_root_transaction(&dice, epoch.build()).await;
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let base_configuration = ConfigurationKey::target("root-request-base").unwrap();
         let parent = RootConfiguredTargetAnalysisKey::root_string_setting_request(
             workspace.clone(),
             CanonicalLabel::parse("@@//:parent").unwrap(),
+            base_configuration.clone(),
             None,
         );
         let consumer = RootConfiguredTargetAnalysisKey::root_string_setting_request(
             workspace,
             CanonicalLabel::parse("@@//:consumer").unwrap(),
+            base_configuration,
             Some(RootStringSettingValue::new("command")),
         );
         let parent = transaction.compute(&parent).await.unwrap();

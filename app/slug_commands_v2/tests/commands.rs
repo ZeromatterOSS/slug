@@ -88,6 +88,45 @@ fn build_request_parses_target_patterns_and_classifies_flags() {
 }
 
 #[test]
+fn build_admits_only_operational_flags_and_the_root_string_setting() {
+    let request = BuildRequest::parse(&[
+        "--//:setting=Gr\u{00fc}\u{00df}e",
+        "--output_base=/tmp/slug",
+        "--build_event_json_file=events.json",
+        "--build_event_text_file=events.txt",
+        "--bes_backend=grpcs://remote.buildbuddy.io",
+        "--bes_results_url=https://app.buildbuddy.io/invocation/",
+        "--remote_cache=grpcs://remote.buildbuddy.io",
+        "--remote_executor=grpcs://remote.buildbuddy.io",
+        "--remote_header=x-build=slug",
+        "--remote_instance_name=main",
+        "--remote_timeout=600",
+        "--remote_retries=3",
+        "--remote_default_exec_properties=cpu=x86_64",
+        "--keep_going",
+        "//pkg:bin",
+    ])
+    .unwrap();
+    assert_eq!(
+        request.root_string_setting.as_deref(),
+        Some("Gr\u{00fc}\u{00df}e")
+    );
+
+    for flag in [
+        "--config=dbg",
+        "--unknown_configuration=value",
+        "--//:setting",
+    ] {
+        let error = BuildRequest::parse(&[flag, "//pkg:bin"])
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("not supported by build") || error.contains("expected --//:setting")
+        );
+    }
+}
+
+#[test]
 fn command_requests_extract_bzlmod_policy_flags() {
     let query = QueryRequest::parse(&["--output=label", "deps(//pkg:bin)"]).unwrap();
     let cquery = CqueryRequest::parse(&[

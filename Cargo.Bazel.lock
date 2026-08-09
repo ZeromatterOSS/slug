@@ -1,5 +1,5 @@
 {
-  "checksum": "e855b61cef06b8234b69e4f061200ee75fe4302c46cb6242233e14a664d198ab",
+  "checksum": "c9ade1b314485cd6014651f9a2dbc709d5965f49e5331fbdd006f8f8db29d6aa",
   "crates": {
     "Inflector 0.11.4": {
       "name": "Inflector",
@@ -21377,8 +21377,16 @@
         "deps": {
           "common": [
             {
+              "id": "blake3 1.8.5",
+              "target": "blake3"
+            },
+            {
               "id": "compact_str 0.8.2",
               "target": "compact_str"
+            },
+            {
+              "id": "hex 0.4.3",
+              "target": "hex"
             }
           ],
           "selects": {}
@@ -21462,6 +21470,10 @@
           ],
           "selects": {
             "cfg(unix)": [
+              {
+                "id": "libc 0.2.189",
+                "target": "libc"
+              },
               {
                 "id": "nix 0.30.1",
                 "target": "nix"
@@ -30659,6 +30671,7 @@
     "itertools 0.13.0",
     "lalrpop 0.19.12",
     "lalrpop-util 0.19.12",
+    "libc 0.2.189",
     "logos 0.15.1",
     "lsp-server 0.7.9",
     "lsp-types 0.94.1",

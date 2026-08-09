@@ -64,6 +64,7 @@ pub fn run(argv: Vec<String>) -> i32 {
         environment_policy,
         request.lockfile_mode.clone(),
         &request.registry_urls,
+        request.root_string_setting.as_deref(),
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
@@ -180,7 +181,6 @@ fn run_reapi_build(
             );
         }
     };
-    let output_root = workspace.join("bazel-bin");
     let execution = runtime.block_on(async {
         let mut reapi_actions = 0_u64;
         let mut direct_local_actions = 0_u64;
@@ -196,6 +196,13 @@ fn run_reapi_build(
             .collect();
         platform_properties.sort();
         for analysis in evaluation.analyses() {
+            let configuration = analysis
+                .key()
+                .configuration()
+                .slug_configuration()
+                .ok_or_else(|| "production analysis returned an opaque configuration".to_owned())?;
+            let output_root =
+                slug_core_v2::runtime::configured_output_root(workspace, configuration);
             for action in analysis.actions() {
                 let result = slug_reapi_v2::execute_action(remote, action)
                     .await
@@ -351,6 +358,7 @@ fn run_daemon_build(
 
     let daemon_request = slug_server_v2::BuildRequest {
         targets: request.targets.iter().map(|t| t.to_string()).collect(),
+        root_string_setting: request.root_string_setting,
         executor: remote.executor.clone(),
         default_exec_properties: remote
             .default_exec_properties

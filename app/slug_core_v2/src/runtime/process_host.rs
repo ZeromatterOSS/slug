@@ -3,6 +3,9 @@
 #![allow(dead_code)]
 
 use std::panic::AssertUnwindSafe;
+use std::path::Path;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Condvar;
 use std::sync::Mutex;
@@ -42,8 +45,10 @@ trait ProcessHostSource: Send + Sync {
     fn after_resource(&self) -> Result<(), SourceError>;
 }
 
+#[cfg(test)]
 struct UnsupportedSource;
 
+#[cfg(test)]
 impl ProcessHostSource for UnsupportedSource {
     fn property(&self, _: Property) -> PropertyRead {
         PropertyRead::ReadError(SourceError::Unsupported)
@@ -60,6 +65,410 @@ impl ProcessHostSource for UnsupportedSource {
     fn after_resource(&self) -> Result<(), SourceError> {
         Err(SourceError::Unsupported)
     }
+}
+
+/// Rust-native process observations for production runtimes.
+///
+/// The source deliberately performs no observation at construction time. The
+/// owner above decides when each fact is demanded and latches only the facts
+/// whose Bazel-compatible conversion has class-initialization timing. Home is
+/// kept fresh because eligible conversions read it per use.
+struct NativeSource;
+
+impl ProcessHostSource for NativeSource {
+    fn property(&self, property: Property) -> PropertyRead {
+        match property {
+            // There is no Rust-native equivalent of a caller-supplied
+            // `blaze.os` override. Let the existing fallback consult OsName.
+            Property::BlazeOs => PropertyRead::Absent,
+            Property::OsName => native_os_name()
+                .map(utf16_property)
+                .unwrap_or(PropertyRead::Absent),
+            Property::OsArch => native_os_arch()
+                .map(utf16_property)
+                .unwrap_or(PropertyRead::Absent),
+            // std::env::var admits only valid Unicode. A non-Unicode or
+            // absent value is intentionally not projected into configuration.
+            Property::UserHome => native_home()
+                .as_deref()
+                .map(utf16_property)
+                .unwrap_or(PropertyRead::Absent),
+        }
+    }
+
+    fn memory_bytes(&self) -> Result<i64, SourceError> {
+        native_memory_bytes()
+    }
+
+    fn processors(&self) -> Result<i32, SourceError> {
+        native_processors()
+    }
+
+    fn after_resource(&self) -> Result<(), SourceError> {
+        Ok(())
+    }
+}
+
+fn utf16_property(value: &str) -> PropertyRead {
+    PropertyRead::Present(Arc::from(value.encode_utf16().collect::<Vec<_>>()))
+}
+
+fn native_os_name() -> Option<&'static str> {
+    match std::env::consts::OS {
+        "linux" => Some("Linux"),
+        "windows" => Some("Windows"),
+        "macos" => Some("Mac OS X"),
+        "freebsd" => Some("FreeBSD"),
+        "openbsd" => Some("OpenBSD"),
+        _ => None,
+    }
+}
+
+fn native_os_arch() -> Option<&'static str> {
+    match std::env::consts::ARCH {
+        "x86" => Some("x86"),
+        "x86_64" => Some("x86_64"),
+        "powerpc" | "powerpc64" | "powerpc64le" => Some("ppc"),
+        "arm" => Some("arm"),
+        "aarch64" => Some("aarch64"),
+        "s390x" => Some("s390x"),
+        "mips64" | "mips64el" => Some("mips64"),
+        "riscv64" => Some("riscv64"),
+        _ => None,
+    }
+}
+
+fn native_home() -> Option<String> {
+    #[cfg(windows)]
+    {
+        std::env::var("USERPROFILE").ok()
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var("HOME").ok()
+    }
+}
+
+fn native_processors() -> Result<i32, SourceError> {
+    let mut processors = i32::try_from(
+        std::thread::available_parallelism()
+            .map_err(|_| SourceError::ReadError)?
+            .get(),
+    )
+    .map_err(|_| SourceError::ReadError)?;
+
+    #[cfg(target_os = "linux")]
+    for limit in [linux_cgroup_cpu_quota()?, linux_cgroup_cpuset()?]
+        .into_iter()
+        .flatten()
+    {
+        processors = processors.min(limit);
+    }
+
+    if processors > 0 {
+        Ok(processors)
+    } else {
+        Err(SourceError::ReadError)
+    }
+}
+
+fn native_memory_bytes() -> Result<i64, SourceError> {
+    #[cfg(target_os = "linux")]
+    {
+        let physical = linux_physical_memory_bytes()?;
+        let limit = linux_cgroup_memory_limit()?;
+        return Ok(limit.map_or(physical, |limit| physical.min(limit)));
+    }
+
+    #[cfg(all(unix, not(target_os = "linux")))]
+    {
+        let pages = i64::try_from(unsafe { libc::sysconf(libc::_SC_PHYS_PAGES) })
+            .map_err(|_| SourceError::ReadError)?;
+        let page_size = i64::try_from(unsafe { libc::sysconf(libc::_SC_PAGESIZE) })
+            .map_err(|_| SourceError::ReadError)?;
+        return checked_physical_memory_bytes(pages, page_size);
+    }
+
+    #[cfg(windows)]
+    {
+        return windows_physical_memory_bytes();
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    Err(SourceError::Unsupported)
+}
+
+fn checked_physical_memory_bytes(pages: i64, page_size: i64) -> Result<i64, SourceError> {
+    if pages <= 0 || page_size <= 0 {
+        return Err(SourceError::ReadError);
+    }
+    pages.checked_mul(page_size).ok_or(SourceError::ReadError)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_physical_memory_bytes() -> Result<i64, SourceError> {
+    let meminfo = std::fs::read_to_string("/proc/meminfo").map_err(|_| SourceError::ReadError)?;
+    let kib = meminfo
+        .lines()
+        .find_map(|line| line.strip_prefix("MemTotal:")?.split_whitespace().next())
+        .ok_or(SourceError::ReadError)?
+        .parse::<i64>()
+        .map_err(|_| SourceError::ReadError)?;
+    kib.checked_mul(1024).ok_or(SourceError::ReadError)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_cgroup_cpu_quota() -> Result<Option<i32>, SourceError> {
+    if let Some(paths) = linux_cgroup_v2_ancestors()? {
+        let mut limit = None;
+        for path in paths {
+            if let Some(value) = read_optional(&path.join("cpu.max"))? {
+                let mut fields = value.split_whitespace();
+                let quota = fields.next().ok_or(SourceError::ReadError)?;
+                let period = fields
+                    .next()
+                    .ok_or(SourceError::ReadError)?
+                    .parse::<i64>()
+                    .map_err(|_| SourceError::ReadError)?;
+                if quota != "max" {
+                    limit = minimum_limit(
+                        limit,
+                        cgroup_cpu_count(
+                            quota.parse::<i64>().map_err(|_| SourceError::ReadError)?,
+                            period,
+                        )?,
+                    );
+                }
+            }
+        }
+        return Ok(limit);
+    }
+
+    let mut limit = None;
+    for path in linux_cgroup_v1_ancestors("cpu")?.unwrap_or_default() {
+        let quota = read_optional(&path.join("cpu.cfs_quota_us"))?;
+        let period = read_optional(&path.join("cpu.cfs_period_us"))?;
+        match (quota, period) {
+            (Some(quota), Some(period)) => {
+                limit = minimum_limit(
+                    limit,
+                    cgroup_cpu_count(
+                        quota.trim().parse().map_err(|_| SourceError::ReadError)?,
+                        period.trim().parse().map_err(|_| SourceError::ReadError)?,
+                    )?,
+                );
+            }
+            (None, None) => {}
+            _ => return Err(SourceError::ReadError),
+        }
+    }
+    Ok(limit)
+}
+
+#[cfg(target_os = "linux")]
+fn cgroup_cpu_count(quota: i64, period: i64) -> Result<Option<i32>, SourceError> {
+    if quota < 0 {
+        return Ok(None);
+    }
+    if quota == 0 || period <= 0 {
+        return Err(SourceError::ReadError);
+    }
+    i32::try_from((quota + period - 1) / period)
+        .map(Some)
+        .map_err(|_| SourceError::ReadError)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_cgroup_cpuset() -> Result<Option<i32>, SourceError> {
+    if let Some(paths) = linux_cgroup_v2_ancestors()? {
+        for path in paths {
+            if let Some(value) = read_optional(&path.join("cpuset.cpus.effective"))? {
+                return parse_cpuset(&value).map(Some);
+            }
+        }
+        return Ok(None);
+    }
+    for path in linux_cgroup_v1_ancestors("cpuset")?.unwrap_or_default() {
+        if let Some(value) = read_optional(&path.join("cpuset.cpus"))? {
+            return parse_cpuset(&value).map(Some);
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_cgroup_memory_limit() -> Result<Option<i64>, SourceError> {
+    if let Some(paths) = linux_cgroup_v2_ancestors()? {
+        let mut limit = None;
+        for path in paths {
+            if let Some(value) = read_optional(&path.join("memory.max"))? {
+                limit = minimum_limit(limit, parse_memory_limit(&value)?);
+            }
+        }
+        return Ok(limit);
+    }
+    let mut limit = None;
+    for path in linux_cgroup_v1_ancestors("memory")?.unwrap_or_default() {
+        if let Some(value) = read_optional(&path.join("memory.limit_in_bytes"))? {
+            // v1 signals an unlimited cgroup using a near-i64-max sentinel.
+            let value = parse_memory_limit(&value)?.filter(|limit| *limit < i64::MAX / 2);
+            limit = minimum_limit(limit, value);
+        }
+    }
+    Ok(limit)
+}
+
+#[cfg(target_os = "linux")]
+fn minimum_limit<T: Ord>(current: Option<T>, next: Option<T>) -> Option<T> {
+    match (current, next) {
+        (Some(current), Some(next)) => Some(current.min(next)),
+        (Some(current), None) => Some(current),
+        (None, Some(next)) => Some(next),
+        (None, None) => None,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn parse_memory_limit(value: &str) -> Result<Option<i64>, SourceError> {
+    let value = value.trim();
+    if value == "max" {
+        Ok(None)
+    } else {
+        let bytes = value.parse::<i64>().map_err(|_| SourceError::ReadError)?;
+        (bytes > 0)
+            .then_some(bytes)
+            .ok_or(SourceError::ReadError)
+            .map(Some)
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn parse_cpuset(value: &str) -> Result<i32, SourceError> {
+    let mut count = 0_i32;
+    for entry in value.trim().split(',') {
+        let (first, last) = match entry.split_once('-') {
+            Some((first, last)) => (first, last),
+            None => (entry, entry),
+        };
+        let first = first.parse::<i32>().map_err(|_| SourceError::ReadError)?;
+        let last = last.parse::<i32>().map_err(|_| SourceError::ReadError)?;
+        if first < 0 || last < first {
+            return Err(SourceError::ReadError);
+        }
+        count = count
+            .checked_add(last - first + 1)
+            .ok_or(SourceError::ReadError)?;
+    }
+    (count > 0).then_some(count).ok_or(SourceError::ReadError)
+}
+
+#[cfg(target_os = "linux")]
+fn read_optional(path: &Path) -> Result<Option<String>, SourceError> {
+    match std::fs::read_to_string(path) {
+        Ok(value) => Ok(Some(value)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(_) => Err(SourceError::ReadError),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn linux_cgroup_v2_ancestors() -> Result<Option<Vec<PathBuf>>, SourceError> {
+    let cgroups =
+        std::fs::read_to_string("/proc/self/cgroup").map_err(|_| SourceError::ReadError)?;
+    let Some(relative) = cgroups.lines().find_map(|line| line.strip_prefix("0::")) else {
+        return Ok(None);
+    };
+    cgroup_ancestors(Path::new("/sys/fs/cgroup"), relative).map(Some)
+}
+
+#[cfg(target_os = "linux")]
+fn linux_cgroup_v1_ancestors(controller: &str) -> Result<Option<Vec<PathBuf>>, SourceError> {
+    let cgroups =
+        std::fs::read_to_string("/proc/self/cgroup").map_err(|_| SourceError::ReadError)?;
+    let Some(relative) = cgroups.lines().find_map(|line| {
+        let mut fields = line.splitn(3, ':');
+        let _hierarchy = fields.next()?;
+        let controllers = fields.next()?;
+        let path = fields.next()?;
+        controllers
+            .split(',')
+            .any(|candidate| candidate == controller)
+            .then_some(path)
+    }) else {
+        return Ok(None);
+    };
+    let roots: &[&str] = match controller {
+        "cpu" => &["/sys/fs/cgroup/cpu", "/sys/fs/cgroup/cpu,cpuacct"],
+        "cpuset" => &["/sys/fs/cgroup/cpuset"],
+        "memory" => &["/sys/fs/cgroup/memory"],
+        _ => return Err(SourceError::ReadError),
+    };
+    for root in roots {
+        if Path::new(root).is_dir() {
+            return cgroup_ancestors(Path::new(root), relative).map(Some);
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(target_os = "linux")]
+fn cgroup_ancestors(root: &Path, relative: &str) -> Result<Vec<PathBuf>, SourceError> {
+    let relative = relative.trim_start_matches('/');
+    let mut current = root.to_path_buf();
+    for component in Path::new(relative).components() {
+        match component {
+            std::path::Component::Normal(component) => current.push(component),
+            std::path::Component::CurDir => {}
+            _ => return Err(SourceError::ReadError),
+        }
+    }
+    let mut ancestors = Vec::new();
+    loop {
+        ancestors.push(current.clone());
+        if current == root {
+            break;
+        }
+        if !current.pop() {
+            return Err(SourceError::ReadError);
+        }
+    }
+    Ok(ancestors)
+}
+
+#[cfg(windows)]
+fn windows_physical_memory_bytes() -> Result<i64, SourceError> {
+    #[repr(C)]
+    struct MemoryStatusEx {
+        length: u32,
+        memory_load: u32,
+        total_physical: u64,
+        available_physical: u64,
+        total_page_file: u64,
+        available_page_file: u64,
+        total_virtual: u64,
+        available_virtual: u64,
+        available_extended_virtual: u64,
+    }
+
+    unsafe extern "system" {
+        fn GlobalMemoryStatusEx(buffer: *mut MemoryStatusEx) -> i32;
+    }
+
+    let mut memory = MemoryStatusEx {
+        length: std::mem::size_of::<MemoryStatusEx>() as u32,
+        memory_load: 0,
+        total_physical: 0,
+        available_physical: 0,
+        total_page_file: 0,
+        available_page_file: 0,
+        total_virtual: 0,
+        available_virtual: 0,
+        available_extended_virtual: 0,
+    };
+    if unsafe { GlobalMemoryStatusEx(&mut memory) } == 0 {
+        return Err(SourceError::ReadError);
+    }
+    i64::try_from(memory.total_physical).map_err(|_| SourceError::ReadError)
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -351,6 +760,16 @@ pub struct ProcessHostOwner {
 }
 
 impl ProcessHostOwner {
+    /// Creates a fresh process-latched Rust-native Host owner for a production
+    /// runtime. Each retained runtime gets its own latch set, matching the
+    /// owner boundary rather than using mutable process-global configuration.
+    pub fn native() -> Arc<Self> {
+        Self::with_source(Arc::new(NativeSource))
+    }
+
+    /// Test-only source boundary used to prove failures are explicit. Production
+    /// constructors must use [`Self::native`].
+    #[cfg(test)]
     pub fn unsupported() -> Arc<Self> {
         Self::with_source(Arc::new(UnsupportedSource))
     }
@@ -455,6 +874,54 @@ impl ProcessHostOwner {
             host_cpus: java_double_to_int((sample.processors as f64).ceil()),
             host_ram_mib: java_double_to_int(sample.memory_mib.ceil()),
         })
+    }
+
+    /// Supplies precisely the Host facts needed for the admitted default
+    /// configuration. This deliberately does not observe capacity or home:
+    /// neither default conversion requests them.
+    pub(super) fn default_configuration_inputs(
+        &self,
+    ) -> Result<slug_configuration_v2::native::host::HostConversionInputs, String> {
+        self.default_configuration_inputs_inner()
+            .map_err(|error| format!("reading Rust-native Host configuration inputs: {error:?}"))
+    }
+
+    fn default_configuration_inputs_inner(
+        &self,
+    ) -> Result<slug_configuration_v2::native::host::HostConversionInputs, ProcessHostError> {
+        use slug_configuration_v2::native::host::AutoCpuToken as ConfigurationAutoCpu;
+        use slug_configuration_v2::native::host::HostConversionInputs;
+        use slug_configuration_v2::native::host::HostPathFlavor as ConfigurationPathFlavor;
+
+        let auto_cpu = match self.auto_cpu()? {
+            AutoCpuToken::DarwinX86_64 => ConfigurationAutoCpu::DarwinX86_64,
+            AutoCpuToken::DarwinArm64 => ConfigurationAutoCpu::DarwinArm64,
+            AutoCpuToken::Freebsd => ConfigurationAutoCpu::Freebsd,
+            AutoCpuToken::Openbsd => ConfigurationAutoCpu::Openbsd,
+            AutoCpuToken::X64Windows => ConfigurationAutoCpu::X64Windows,
+            AutoCpuToken::Arm64Windows => ConfigurationAutoCpu::Arm64Windows,
+            AutoCpuToken::Piii => ConfigurationAutoCpu::Piii,
+            AutoCpuToken::K8 => ConfigurationAutoCpu::K8,
+            AutoCpuToken::Ppc => ConfigurationAutoCpu::Ppc,
+            AutoCpuToken::Arm => ConfigurationAutoCpu::Arm,
+            AutoCpuToken::Aarch64 => ConfigurationAutoCpu::Aarch64,
+            AutoCpuToken::S390x => ConfigurationAutoCpu::S390x,
+            AutoCpuToken::Mips64 => ConfigurationAutoCpu::Mips64,
+            AutoCpuToken::Riscv64 => ConfigurationAutoCpu::Riscv64,
+            AutoCpuToken::Unknown => ConfigurationAutoCpu::Unknown,
+        };
+        let path_flavor = match self.path_flavor()? {
+            HostPathFlavor::Unix => ConfigurationPathFlavor::Unix,
+            HostPathFlavor::Windows => ConfigurationPathFlavor::Windows,
+        };
+        Ok(HostConversionInputs::new(
+            Some(auto_cpu),
+            Some(path_flavor),
+            None,
+            Arc::from([]),
+            Arc::from([]),
+        )
+        .expect("empty default configuration Host facts are ordered"))
     }
 }
 
@@ -563,6 +1030,27 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
+
+    #[test]
+    fn physical_memory_inputs_fail_closed_before_checked_multiplication() {
+        assert_eq!(
+            checked_physical_memory_bytes(-1, -1),
+            Err(SourceError::ReadError)
+        );
+        assert_eq!(
+            checked_physical_memory_bytes(0, 4096),
+            Err(SourceError::ReadError)
+        );
+        assert_eq!(
+            checked_physical_memory_bytes(1, 0),
+            Err(SourceError::ReadError)
+        );
+        assert_eq!(
+            checked_physical_memory_bytes(i64::MAX, 2),
+            Err(SourceError::ReadError)
+        );
+        assert_eq!(checked_physical_memory_bytes(3, 4096), Ok(12_288));
+    }
 
     #[derive(Default)]
     struct FakeState {
@@ -903,5 +1391,84 @@ mod tests {
             first.home(),
             Err(ProcessHostError::Source(SourceError::Unsupported))
         ));
+    }
+
+    #[test]
+    fn native_source_uses_explicit_bazel_spelling_and_unicode_home() {
+        assert_eq!(
+            NativeSource.property(Property::BlazeOs),
+            PropertyRead::Absent
+        );
+        let expected_os = match std::env::consts::OS {
+            "linux" => Some("Linux"),
+            "windows" => Some("Windows"),
+            "macos" => Some("Mac OS X"),
+            "freebsd" => Some("FreeBSD"),
+            "openbsd" => Some("OpenBSD"),
+            _ => None,
+        };
+        assert_eq!(native_os_name(), expected_os);
+        assert_eq!(
+            NativeSource.property(Property::OsName),
+            expected_os
+                .map(utf16_property)
+                .unwrap_or(PropertyRead::Absent)
+        );
+        assert!(matches!(
+            NativeSource.property(Property::OsArch),
+            PropertyRead::Present(_) | PropertyRead::Absent
+        ));
+    }
+
+    #[test]
+    fn default_configuration_inputs_demand_only_auto_cpu_and_path_flavor() {
+        let (source, owner) = FakeSource::owner(FakeState {
+            properties: VecDeque::from([
+                PropertyRead::Absent,
+                property("Linux"),
+                property("x86_64"),
+            ]),
+            ..Default::default()
+        });
+        let inputs = owner.default_configuration_inputs().unwrap();
+        assert_eq!(
+            inputs.auto_cpu(),
+            Some(slug_configuration_v2::native::host::AutoCpuToken::K8)
+        );
+        assert_eq!(
+            inputs.path_flavor(),
+            Some(slug_configuration_v2::native::host::HostPathFlavor::Unix)
+        );
+        assert_eq!(inputs.capacity(), None);
+        assert!(inputs.home_facts().is_empty());
+        assert!(inputs.windows_option_path_facts().is_empty());
+        assert_eq!(
+            source.calls(),
+            vec![Property::BlazeOs, Property::OsName, Property::OsArch]
+        );
+        assert!(source.0.lock().unwrap().resource_calls.is_empty());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn container_limit_parsers_are_bounded_and_fail_closed() {
+        assert_eq!(cgroup_cpu_count(-1, 100_000), Ok(None));
+        assert_eq!(cgroup_cpu_count(100_001, 100_000), Ok(Some(2)));
+        assert_eq!(cgroup_cpu_count(1, 0), Err(SourceError::ReadError));
+        assert_eq!(parse_cpuset("0-3,8,10-11"), Ok(7));
+        assert_eq!(parse_cpuset("3-0"), Err(SourceError::ReadError));
+        assert_eq!(parse_memory_limit("max\n"), Ok(None));
+        assert_eq!(parse_memory_limit("1073741824"), Ok(Some(1_073_741_824)));
+        assert_eq!(parse_memory_limit("0"), Err(SourceError::ReadError));
+        assert_eq!(minimum_limit(Some(4), Some(2)), Some(2));
+        assert_eq!(minimum_limit(Some(4), None), Some(4));
+        assert_eq!(
+            cgroup_ancestors(Path::new("/cgroup"), "/user.slice/worker"),
+            Ok(vec![
+                PathBuf::from("/cgroup/user.slice/worker"),
+                PathBuf::from("/cgroup/user.slice"),
+                PathBuf::from("/cgroup"),
+            ])
+        );
     }
 }

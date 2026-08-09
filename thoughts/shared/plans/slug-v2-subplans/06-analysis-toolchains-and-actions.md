@@ -5247,3 +5247,31 @@ new opaque-checksum caller, source/Host IO inside configuration conversion,
 digest-only DICE identity, shortened or Bazel-looking token, configured-path
 alias, ActionKey/aquery invention, REAPI digest normalization, Java/JVM artifact
 or execution, or an implementation that leaves any production `first-build`.
+
+### Slug-native default configuration vertical acceptance (2026-08-09)
+
+`WP-6-m2-slug-native-default-configuration-vertical` is **ACCEPT**. The
+implementation replaces production placeholder identity with the complete
+341-option Rust-native structural target configuration, a frozen full-width
+namespaced projection, Rust Host inputs, root string-setting defaults and the
+admitted one-output transition. Structural keys remain authoritative; atomic
+sidecars and an in-memory registry protect configured output spelling; REAPI
+digest construction remains independent. Both native-demand and retained
+snapshot analysis routes resolve and propagate the actual structural child
+configuration. Build flags fail closed before mode routing.
+
+Independent identity and semantic reviews accepted the final diff. Focused
+configuration, analysis, command, server, CLI, Host, transition, collision, and
+materialization tests pass, and `slug_cli_v2` rebuilds locally. The two broad
+suite failures recorded in the packet manifest are independently reproduced
+pre-existing failures outside this slice. BuildBuddy RC discovery/authentication
+works without exposing the private user RC; the full Bazel developer target is
+still stopped by the known missing `rules_rust` toolchain.
+
+M2 structural identity is accepted. Run next only
+`WP-6-m4-root-cquery-label-slug-projection-design`, a docs-only public-format
+design. It must admit or reject default/explicit `label` output using the full
+Slug projection, preserve the accepted `str(target.label)` bytes, keep the
+Bazel seven-hex checksum and exact identity in M9, and freeze one-shot/daemon
+wire, errors, comparison normalization, and downstream test ownership before
+Rust changes.

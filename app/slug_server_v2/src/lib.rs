@@ -54,7 +54,7 @@ impl Daemon {
     /// an empty digest cache, so every file is treated as new (no invalidation
     /// needed on the first build).
     pub fn new(workspace: impl AsRef<Path>) -> anyhow::Result<Self> {
-        let process_host = ProcessHostOwner::unsupported();
+        let process_host = ProcessHostOwner::native();
         let runtime =
             WorkspaceRuntime::new(workspace.as_ref().to_path_buf(), process_host.clone())?;
         let workspace = runtime.workspace().to_path_buf();
@@ -87,6 +87,7 @@ impl Daemon {
                 .expect("default bzlmod environment policy"),
             LockfileMode::Update,
             Vec::new(),
+            None,
         )
     }
 
@@ -99,6 +100,7 @@ impl Daemon {
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
+        root_string_setting: Option<&str>,
     ) -> BuildResult {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
@@ -121,6 +123,7 @@ impl Daemon {
             environment_policy,
             lockfile_mode,
             &registry_urls,
+            root_string_setting,
         ) {
             Ok(accepted) => accepted,
             Err(error) => {

@@ -131,6 +131,7 @@ enum RootConfiguredTargetAnalysisInput {
     Resolved(ConfiguredTargetKey),
     RootStringSettingRequest {
         requested: CanonicalLabel,
+        base_configuration: ConfigurationKey,
         explicit: Option<RootStringSettingValue>,
     },
 }
@@ -165,25 +166,32 @@ impl RootConfiguredTargetAnalysisKey {
 
     pub fn root_string_setting_request_parts(
         &self,
-    ) -> Option<(&CanonicalLabel, Option<&RootStringSettingValue>)> {
+    ) -> Option<(
+        &CanonicalLabel,
+        &ConfigurationKey,
+        Option<&RootStringSettingValue>,
+    )> {
         match &self.input {
             RootConfiguredTargetAnalysisInput::Resolved(_) => None,
             RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
                 requested,
+                base_configuration,
                 explicit,
-            } => Some((requested, explicit.as_ref())),
+            } => Some((requested, base_configuration, explicit.as_ref())),
         }
     }
 
     pub fn root_string_setting_request(
         workspace: NormalizedAbsolutePath,
         requested: CanonicalLabel,
+        base_configuration: ConfigurationKey,
         explicit: Option<RootStringSettingValue>,
     ) -> Self {
         Self {
             workspace,
             input: RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
                 requested,
+                base_configuration,
                 explicit,
             },
         }
@@ -199,9 +207,10 @@ impl fmt::Display for RootConfiguredTargetAnalysisKey {
                 RootConfiguredTargetAnalysisInput::Resolved(key) => key.to_string(),
                 RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
                     requested,
+                    base_configuration,
                     explicit,
                 } => format!(
-                    "request:{requested}={}",
+                    "request:{requested}[{base_configuration}]={}",
                     explicit
                         .as_ref()
                         .map_or("<default>", RootStringSettingValue::as_str)
@@ -383,7 +392,7 @@ where
                 ))
             })?;
             Ok(PreparedDependency {
-                key: dependency.key.clone(),
+                key: result.result().key().clone(),
                 providers: result.result().providers().clone(),
                 attribute: dependency.attribute.clone(),
                 sequence: dependency.sequence,
@@ -466,12 +475,96 @@ impl ConfiguredTargetAnalysisKey {
             .map_err(|error| {
                 AnalysisError::new(format!("loading package through DICE: {error}"))
             })?;
+        let needs_root_string_setting = {
+            let package = package_value
+                .as_ref()
+                .as_ref()
+                .map_err(|error| AnalysisError::new(error.to_string()))?;
+            let rule = starlark_rule_implementation(package, &self.configured_target)?;
+            let setting =
+                CanonicalLabel::parse("@@//:setting").expect("packet-fixed setting label is valid");
+            rule.is_root_string_build_setting()
+                || rule
+                    .schema()
+                    .iter()
+                    .any(|attribute| attribute.transition().is_some())
+                || rule
+                    .dependencies()
+                    .iter()
+                    .any(|dependency| dependency == &setting)
+        };
+        if self
+            .configured_target
+            .configuration()
+            .root_string_setting()
+            .is_none()
+            && needs_root_string_setting
+        {
+            let root_package = ctx
+                .compute(&PackageLoadKey {
+                    workspace: self.workspace.clone(),
+                    package: self.workspace.clone(),
+                })
+                .await
+                .map_err(|error| {
+                    AnalysisError::new(format!(
+                        "loading legacy setting package through DICE: {error}"
+                    ))
+                })?;
+            let root_package = root_package
+                .as_ref()
+                .as_ref()
+                .map_err(|error| AnalysisError::new(error.to_string()))?;
+            let default = root_package
+                .targets
+                .iter()
+                .find(|target| target.name == "setting")
+                .and_then(|target| match &target.kind {
+                    PackageTargetKind::StarlarkRule(rule)
+                        if rule.is_root_string_build_setting() =>
+                    {
+                        rule.root_string_build_setting_default()
+                    }
+                    _ => None,
+                })
+                .ok_or_else(|| {
+                    AnalysisError::new("root string build setting @@//:setting is missing")
+                })?;
+            let configured_target = ConfiguredTargetKey::new(
+                self.configured_target.label().clone(),
+                self.configured_target
+                    .configuration()
+                    .with_root_string_setting(RootStringSettingValue::new(default)),
+            );
+            let value = ctx
+                .compute(&ConfiguredTargetAnalysisKey {
+                    workspace: self.workspace.clone(),
+                    configured_target,
+                })
+                .await
+                .map_err(|error| {
+                    AnalysisError::new(format!(
+                        "resolving legacy root string setting through DICE: {error}"
+                    ))
+                })?;
+            return value.as_ref().as_ref().map_err(Clone::clone).cloned();
+        }
         let declared_dependency_keys = {
             let package = package_value
                 .as_ref()
                 .as_ref()
                 .map_err(|error| AnalysisError::new(error.to_string()))?;
-            legacy_declared_dependency_keys(package, &self.configured_target)?
+            if self
+                .configured_target
+                .configuration()
+                .root_string_setting()
+                .is_some()
+                || needs_root_string_setting
+            {
+                root_declared_dependency_keys(package, &self.configured_target)?
+            } else {
+                legacy_declared_dependency_keys(package, &self.configured_target)?
+            }
         };
         let mut unique = SmallSet::with_capacity(declared_dependency_keys.len());
         for dependency in &declared_dependency_keys {
@@ -1050,6 +1143,7 @@ impl RootConfiguredTargetAnalysisKey {
     ) -> RootAnalysisKeyValue {
         if let RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
             requested,
+            base_configuration,
             explicit,
         } = &self.input
         {
@@ -1097,9 +1191,7 @@ impl RootConfiguredTargetAnalysisKey {
             let value = explicit
                 .clone()
                 .unwrap_or_else(|| RootStringSettingValue::new(default));
-            let configuration = ConfigurationKey::target("first-build")
-                .expect("existing opaque base config is valid")
-                .with_root_string_setting(value);
+            let configuration = base_configuration.with_root_string_setting(value);
             return ctx
                 .compute(&Self::new(
                     self.workspace.dupe(),
@@ -1140,6 +1232,49 @@ impl RootConfiguredTargetAnalysisKey {
                 ))));
             }
         };
+        let needs_root_string_setting = {
+            let package = match package_value.as_ref() {
+                Ok(package) => package,
+                Err(error) => {
+                    return root_analysis_complete(Err(AnalysisError::new(error.to_string())));
+                }
+            };
+            let rule = match starlark_rule_implementation(package, configured_target) {
+                Ok(rule) => rule,
+                Err(error) => return root_analysis_complete(Err(error)),
+            };
+            let setting =
+                CanonicalLabel::parse("@@//:setting").expect("packet-fixed setting label is valid");
+            rule.is_root_string_build_setting()
+                || rule
+                    .schema()
+                    .iter()
+                    .any(|attribute| attribute.transition().is_some())
+                || rule
+                    .dependencies()
+                    .iter()
+                    .any(|dependency| dependency == &setting)
+        };
+        if configured_target
+            .configuration()
+            .root_string_setting()
+            .is_none()
+            && needs_root_string_setting
+        {
+            return ctx
+                .compute(&Self::root_string_setting_request(
+                    self.workspace.dupe(),
+                    configured_target.label().clone(),
+                    configured_target.configuration().clone(),
+                    None,
+                ))
+                .await
+                .unwrap_or_else(|error| {
+                    root_analysis_complete(Err(AnalysisError::new(format!(
+                        "resolving inherited root string setting through DICE: {error}"
+                    ))))
+                });
+        }
         let (requirement, marker) = {
             let package = match package_value.as_ref() {
                 Ok(package) => package,
@@ -1193,10 +1328,17 @@ impl RootConfiguredTargetAnalysisKey {
                     return root_analysis_complete(Err(AnalysisError::new(error.to_string())));
                 }
             };
+            let has_root_setting_transition =
+                starlark_rule_implementation(package, configured_target).is_ok_and(|rule| {
+                    rule.schema()
+                        .iter()
+                        .any(|attribute| attribute.transition().is_some())
+                });
             let dependencies = if configured_target
                 .configuration()
                 .root_string_setting()
                 .is_some()
+                || has_root_setting_transition
             {
                 root_declared_dependency_keys(package, configured_target)
             } else {

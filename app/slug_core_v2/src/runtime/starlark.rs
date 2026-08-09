@@ -44,7 +44,7 @@ fn module_file_globals(globals: &mut GlobalsBuilder) {
 ///
 /// Full Bazel globals, `load()` resolution, and file dependency keys belong to
 /// Stages 4 and 5; this function only establishes the actual starlark-rust
-/// parse/evaluation boundary required by the first-build chain.
+/// parse/evaluation boundary required by the configured-build chain.
 pub(crate) fn evaluate_file(path: &Path, source: &str, is_module: bool) -> anyhow::Result<()> {
     let ast = AstModule::parse(
         &path.display().to_string(),

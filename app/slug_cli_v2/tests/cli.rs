@@ -710,7 +710,7 @@ fn help_is_bazel_v2_specific() {
 }
 
 #[test]
-fn simple_rule_fixture_enters_the_dice_starlark_runtime_before_analysis() {
+fn build_rejects_unknown_configuration_flags_before_analysis() {
     let workspace = fixture_workspace("simple-rule-action");
 
     let output = slug()
@@ -720,15 +720,10 @@ fn simple_rule_fixture_enters_the_dice_starlark_runtime_before_analysis() {
         .unwrap();
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("\"error\":\"analysis_not_implemented\""));
+    assert!(stderr.contains("\"error\":\"command_parse_error\""));
     assert!(stderr.contains("\"command\":\"build\""));
-    assert!(stderr.contains("\"target_count\":1"));
-    assert!(stderr.contains("//pkg:write_file"));
     assert!(stderr.contains("--unknown_flag"));
-    assert!(stderr.contains("\"loaded_package_count\":1"));
-    assert!(stderr.contains("\"analyzed_target_count\":1"));
-    assert!(stderr.contains("\"declared_action_count\":1"));
-    assert!(stderr.contains("\"completed_boundary\":\"dice_starlark_rule_analysis\""));
+    assert!(!stderr.contains("\"loaded_package_count\""));
 }
 
 #[test]
@@ -743,6 +738,7 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
         environment,
         request.lockfile_mode,
         &request.registry_urls,
+        None,
     )
     .unwrap();
     let mut outputs = Vec::new();
@@ -775,9 +771,7 @@ fn recursive_action_fixture_reports_all_three_actions_without_execution() {
     assert_eq!(output.status.code(), Some(2), "{output:?}");
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8(output.stderr).unwrap();
-    assert!(stderr.contains("\"analyzed_target_count\":1"), "{stderr}");
-    assert!(stderr.contains("\"declared_action_count\":3"), "{stderr}");
-    assert!(stderr.contains("\"completed_boundary\":\"dice_starlark_rule_analysis\""));
+    assert!(stderr.contains("\"error\":\"command_parse_error\""));
     assert!(stderr.contains("--unknown_flag"));
 }
 

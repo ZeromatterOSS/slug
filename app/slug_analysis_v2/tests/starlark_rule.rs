@@ -401,7 +401,7 @@ fn root_activation_identity(key: &RootConfiguredTargetAnalysisKey) -> String {
                 .map_or("<default>", RootStringSettingValue::as_str)
         );
     }
-    let (requested, explicit) = key.root_string_setting_request_parts().unwrap();
+    let (requested, _, explicit) = key.root_string_setting_request_parts().unwrap();
     format!(
         "request/{requested}={}",
         explicit.map_or("<default>", RootStringSettingValue::as_str)
@@ -528,6 +528,7 @@ async fn root_string_request_result(
             &RootConfiguredTargetAnalysisKey::root_string_setting_request(
                 NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
                 CanonicalLabel::parse(target).unwrap(),
+                ConfigurationKey::target("root-request-base").unwrap(),
                 explicit.map(RootStringSettingValue::new),
             ),
         )
@@ -1131,6 +1132,31 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     let tracker = Arc::new(RootActivationTracker::default());
     let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
     let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
+    let legacy_base = ConfigurationKey::target("legacy-root-setting-base").unwrap();
+    let legacy_setting = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:setting").unwrap(),
+            legacy_base.clone(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(root_setting_value(legacy_setting.key()), "default");
+    let legacy_parent = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(CanonicalLabel::parse("@@//:parent").unwrap(), legacy_base),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(provider_value(&legacy_parent, &parent), "left,right");
+    assert_eq!(root_setting_value(legacy_parent.key()), "default");
     let default =
         root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
     assert_eq!(provider_value(&default, &consumer), "default");

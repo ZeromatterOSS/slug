@@ -19,6 +19,11 @@ use fixture_support::FixtureWorkspace;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_configuration_v2::RootStringSettingValue;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::AutoCpuToken;
+use slug_configuration_v2::native::host::HostConversionInputs;
+use slug_configuration_v2::native::host::HostPathFlavor;
 use slug_identity_v2::TargetPattern;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryPolicy;
@@ -126,6 +131,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
             inputs.1,
             inputs.2,
             inputs.3,
+            None,
         );
         assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
     }
@@ -177,6 +183,104 @@ fn first_build_invalidates_zero_files() {
     let result = daemon.build(&[target("//pkg:probe")], &remote_disabled(), &[]);
     assert_eq!(result.invalidated_files, 0);
     assert!(result.stderr.contains("\"invalidated_files\":0"));
+}
+
+#[test]
+fn retained_daemon_restores_c0_after_root_setting_c1_without_source_invalidation() {
+    let workspace = scratch("configuration-c0-c1-c0");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("settings.bzl"),
+        "def _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
+    );
+    write(
+        &workspace.join("BUILD.bazel"),
+        "load(\":settings.bzl\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\n",
+    );
+    write(&workspace.join("pkg/message.bzl"), "MESSAGE = \"hello\"\n");
+    write(&workspace.join("pkg/defs.bzl"), DEFS_BZL);
+    write(&workspace.join("pkg/BUILD.bazel"), BUILD_BAZEL);
+
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, setting: Option<&str>| {
+        daemon.build_with_bzlmod_inputs(
+            &[target("//pkg:message")],
+            &remote_disabled(),
+            &[],
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            setting,
+        )
+    };
+
+    let c0 = run(&mut daemon, None);
+    let c1 = run(&mut daemon, Some("transitioned"));
+    let restored = run(&mut daemon, None);
+    for result in [&c0, &c1, &restored] {
+        assert_eq!(result.invalidated_files, 0, "{result:?}");
+        assert!(!result.stderr.contains("build_runtime_error"), "{result:?}");
+    }
+
+    let mut markers = fs::read_dir(workspace.join("bazel-out/.slug-configurations"))
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name())
+        .collect::<Vec<_>>();
+    markers.sort();
+    markers.dedup();
+    assert_eq!(
+        markers.len(),
+        2,
+        "C0 and C1 must own two stable projections"
+    );
+}
+
+#[test]
+fn reapi_materialization_uses_distinct_and_restored_structural_configuration_roots() {
+    let workspace = scratch("configuration-materialization-roots");
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        std::sync::Arc::from([]),
+        std::sync::Arc::from([]),
+    )
+    .unwrap();
+    let c0 = SlugConfiguration::default_target(&host).unwrap();
+    let c1 = c0.with_root_string_setting(RootStringSettingValue::new("transitioned"));
+    let c0_root = slug_core_v2::runtime::configured_output_root(&workspace, &c0);
+    let c1_root = slug_core_v2::runtime::configured_output_root(&workspace, &c1);
+    assert_ne!(c0_root, c1_root);
+
+    let output = slug_reapi_v2::GeneratedOutput::new(
+        "pkg/out.txt",
+        slug_reapi_v2::ReapiDigest::of_bytes(b"materialized"),
+    );
+    let execution = slug_reapi_v2::RemoteExecutionResult {
+        action_digest: slug_reapi_v2::ReapiDigest::of_bytes(b"action"),
+        result: slug_reapi_v2::ActionResult::new(vec![output]),
+        output_blobs: [("pkg/out.txt".to_owned(), b"materialized".to_vec())]
+            .into_iter()
+            .collect(),
+        evidence: slug_reapi_v2::ExecutionEvidence::reapi("test"),
+    };
+
+    slug_reapi_v2::materialize_outputs(&c0_root, &execution).unwrap();
+    slug_reapi_v2::materialize_outputs(&c1_root, &execution).unwrap();
+    slug_reapi_v2::materialize_outputs(
+        &slug_core_v2::runtime::configured_output_root(&workspace, &c0),
+        &execution,
+    )
+    .unwrap();
+    assert_eq!(
+        fs::read(c0_root.join("pkg/out.txt")).unwrap(),
+        b"materialized"
+    );
+    assert_eq!(
+        fs::read(c1_root.join("pkg/out.txt")).unwrap(),
+        b"materialized"
+    );
 }
 
 /// Editing a loaded `.bzl` file between builds causes the daemon to invalidate
@@ -663,6 +767,7 @@ fn label_kind_completes_cross_package_depth_boundaries_without_changing_standard
 fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     let request = DaemonRequest::Build(BuildRequest {
         targets: vec!["//pkg:one".to_owned(), "//pkg:two".to_owned()],
+        root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
         executor: Some("grpc://executor".to_owned()),
         default_exec_properties: vec![
             ("cpu".to_owned(), "x86_64".to_owned()),
@@ -676,6 +781,10 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
         panic!("expected tagged build request");
     };
     assert_eq!(build.targets, ["//pkg:one", "//pkg:two"]);
+    assert_eq!(
+        build.root_string_setting.as_deref(),
+        Some("Gr\u{00fc}\u{00df}e")
+    );
     assert_eq!(build.executor.as_deref(), Some("grpc://executor"));
     assert_eq!(
         build.default_exec_properties,
@@ -796,6 +905,7 @@ fn bzlmod_protocol_is_primitive_canonical_and_backward_compatible() {
         panic!("expected old build request");
     };
     assert_eq!(old.bzlmod, BzlmodRequestInputs::default());
+    assert_eq!(old.root_string_setting, None);
 }
 
 #[test]

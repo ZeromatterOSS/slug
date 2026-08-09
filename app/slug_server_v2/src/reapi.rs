@@ -36,7 +36,6 @@ pub fn run_reapi_build(
             return ReapiBuildOutcome::error(runtime_mode, invalidated_files, &error.to_string());
         }
     };
-    let output_root = workspace.join("bazel-bin");
     let execution = runtime.block_on(async {
         let mut reapi_actions = 0_u64;
         let mut direct_local_actions = 0_u64;
@@ -52,6 +51,13 @@ pub fn run_reapi_build(
             .collect();
         platform_properties.sort();
         for analysis in evaluation.analyses() {
+            let configuration = analysis
+                .key()
+                .configuration()
+                .slug_configuration()
+                .ok_or_else(|| "production analysis returned an opaque configuration".to_owned())?;
+            let output_root =
+                slug_core_v2::runtime::configured_output_root(workspace, configuration);
             for action in analysis.actions() {
                 let result = slug_reapi_v2::execute_action(remote, action)
                     .await

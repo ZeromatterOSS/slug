@@ -11,32 +11,11 @@
 use std::fmt;
 
 use allocative::Allocative;
-use compact_str::CompactString;
+pub use slug_configuration_v2::RootStringSettingValue;
+use slug_configuration_v2::SlugConfiguration;
+pub use slug_configuration_v2::SlugConfigurationKind as ConfigurationKind;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::serialization::StableSerialize;
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub enum ConfigurationKind {
-    Target,
-    Exec,
-    HostLike,
-}
-
-impl ConfigurationKind {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Target => "target",
-            Self::Exec => "exec",
-            Self::HostLike => "host-like",
-        }
-    }
-}
-
-impl fmt::Display for ConfigurationKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct ConfigurationChecksum(String);
@@ -68,30 +47,38 @@ impl fmt::Display for ConfigurationChecksum {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub struct RootStringSettingValue(CompactString);
-
-impl RootStringSettingValue {
-    pub fn new(value: impl Into<CompactString>) -> Self {
-        Self(value.into())
-    }
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
+pub struct ConfigurationKey {
+    identity: ConfigurationIdentity,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub struct ConfigurationKey {
-    kind: ConfigurationKind,
-    checksum: ConfigurationChecksum,
-    root_string_setting: Option<RootStringSettingValue>,
+enum ConfigurationIdentity {
+    /// Production identity: the complete typed structure participates in Eq
+    /// and Hash. The projection is derived spelling only.
+    Slug(SlugConfiguration),
+    /// Bounded compatibility for existing unit fixtures. Production command
+    /// roots must never construct this variant.
+    Legacy {
+        kind: ConfigurationKind,
+        checksum: ConfigurationChecksum,
+        root_string_setting: Option<RootStringSettingValue>,
+    },
 }
 
 impl ConfigurationKey {
     pub fn new(kind: ConfigurationKind, checksum: ConfigurationChecksum) -> Self {
         Self {
-            kind,
-            checksum,
-            root_string_setting: None,
+            identity: ConfigurationIdentity::Legacy {
+                kind,
+                checksum,
+                root_string_setting: None,
+            },
+        }
+    }
+
+    pub fn from_slug(configuration: SlugConfiguration) -> Self {
+        Self {
+            identity: ConfigurationIdentity::Slug(configuration),
         }
     }
 
@@ -117,26 +104,60 @@ impl ConfigurationKey {
     }
 
     pub fn kind(&self) -> ConfigurationKind {
-        self.kind
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => configuration.kind(),
+            ConfigurationIdentity::Legacy { kind, .. } => *kind,
+        }
     }
 
-    pub fn checksum(&self) -> &ConfigurationChecksum {
-        &self.checksum
+    pub fn checksum(&self) -> Option<&ConfigurationChecksum> {
+        match &self.identity {
+            ConfigurationIdentity::Slug(_) => None,
+            ConfigurationIdentity::Legacy { checksum, .. } => Some(checksum),
+        }
+    }
+
+    pub fn slug_configuration(&self) -> Option<&SlugConfiguration> {
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => Some(configuration),
+            ConfigurationIdentity::Legacy { .. } => None,
+        }
     }
 
     pub fn with_root_string_setting(&self, value: RootStringSettingValue) -> Self {
-        Self {
-            kind: self.kind,
-            checksum: self.checksum.clone(),
-            root_string_setting: Some(value),
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => {
+                Self::from_slug(configuration.with_root_string_setting(value))
+            }
+            ConfigurationIdentity::Legacy { kind, checksum, .. } => Self {
+                identity: ConfigurationIdentity::Legacy {
+                    kind: *kind,
+                    checksum: checksum.clone(),
+                    root_string_setting: Some(value),
+                },
+            },
         }
     }
+
     pub fn root_string_setting(&self) -> Option<&RootStringSettingValue> {
-        self.root_string_setting.as_ref()
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => configuration.root_string_setting(),
+            ConfigurationIdentity::Legacy {
+                root_string_setting,
+                ..
+            } => root_string_setting.as_ref(),
+        }
     }
 
     pub fn stable_serialize(&self) -> String {
-        format!("{}:{}", self.kind, self.checksum)
+        match &self.identity {
+            ConfigurationIdentity::Slug(configuration) => {
+                format!("{}:{}", configuration.kind(), configuration.projection())
+            }
+            ConfigurationIdentity::Legacy { kind, checksum, .. } => {
+                format!("{kind}:{checksum}")
+            }
+        }
     }
 }
 

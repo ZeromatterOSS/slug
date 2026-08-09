@@ -34,6 +34,10 @@ use crate::Daemon;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BuildRequest {
     pub targets: Vec<String>,
+    /// Raw command-boundary input. The retained runtime will turn this into a
+    /// structural configuration key once configuration construction is wired.
+    #[serde(default)]
+    pub root_string_setting: Option<String>,
     pub executor: Option<String>,
     pub default_exec_properties: Vec<(String, String)>,
     #[serde(default)]
@@ -265,6 +269,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                request.root_string_setting.as_deref(),
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -406,6 +411,7 @@ pub fn send_build_request(
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
     let json = serde_json::to_string(&DaemonRequest::Build(BuildRequest {
         targets: request.targets.clone(),
+        root_string_setting: request.root_string_setting.clone(),
         executor: request.executor.clone(),
         default_exec_properties: request.default_exec_properties.clone(),
         bzlmod: request.bzlmod.clone(),

@@ -1,71 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-slug-native-default-configuration-vertical`
-Milestone: M2 analysis graph
+Packet: `WP-6-m4-root-cquery-label-slug-projection-design`
+Milestone: M4 cquery
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: one observable Rust-native default configuration and configured path.
+Result: freeze the public Slug-native default/`label` cquery format before code.
 
-## Required pre-edit review
+## Boundary
 
-Before Rust, a reserved independent identity/cache review must accept the
-concrete tagged, length-delimited projection serialization, full collision-
-resistant encoding, unequal-structure collision failure, dependency direction,
-and proof that configuration spelling never replaces structural DICE equality
-or exact REAPI/CAS digests. Record the review; stop before code on `REVISE`.
+This is docs/source design only. Reuse the accepted Bazel 9.2 evidence at the
+owner plan's “Root cquery label-output evidence” section: default and explicit
+`label` have identical `label (seven-hex-short-id)` layout, warm replay is
+stable, and missing-target diagnostics are already pinned. Do not run a new
+oracle unless a concrete source/evidence gap appears.
 
-## Implementation boundary
+Exact Bazel configuration checksum and short-ID bytes are intentionally M9.
+The current structural configuration and full `slugcfg-v1:<opaque>` projection
+are accepted; this packet decides how the public formatter uses that projection
+without calling it a Bazel checksum, truncating it, parsing it as semantics, or
+changing structural DICE identity.
 
-Replace every production `target:first-build` and `UnsupportedSource` path for
-the admitted default target configuration. Public structural configuration and
-projection types belong in `slug_configuration_v2`; analysis embeds the full
-structure, and core supplies one Rust-native Host owner plus complete request
-inputs. No configuration dependency on core, commands, workspace IO, or DICE.
+## Required design
 
-Admit only the complete typed native default set and the accepted root string
-setting/one-output transition. Preserve Bzlmod, UI, output-base, BEP, and remote
-controls as their existing nonconfiguration domains. Build must explicitly
-reject `--config` and every unknown/unmodeled configuration-affecting flag
-before root construction; cquery retains its existing explicit allowlist.
+Freeze:
 
-Structural equality/hash/DICE invalidation owns semantics. A derived display
-token is `slugcfg-v1:<opaque>` and its filesystem segment is
-`slugcfg-v1-<opaque>`; neither is caller input or a semantic/cache/action key.
-Route one-shot and daemon materialization through one configured
-`bazel-out/slugcfg-v1-<opaque>/bin` owner. Preserve relative artifact names,
-content, modes, symlinks, action topology, and exact REAPI protobuf/blob digests.
+- accepted CLI forms for default output and `--output=label` while retaining
+  the existing one-label root cquery allowlist;
+- exact success stdout spelling around the canonical label and full
+  `slugcfg-v1:<opaque>` display token;
+- preservation of the existing
+  `--output=starlark --starlark:expr=str(target.label)` bytes;
+- missing-target, unsupported-flag, one-shot, daemon JSON/wire, warm replay,
+  and changed/restored configuration behavior;
+- graph-local comparison normalization that may replace only the opaque
+  projection token and never label, graph, provider, action, platform,
+  ordering, content, or failure fields; and
+- exact implementation/test files for the successor, with no aquery,
+  ActionKey, platform/toolchain breadth, general Starlark expressions, or
+  configuration parsing.
 
-Install the Rust Host source in every production one-shot, daemon, and legacy
-runtime constructor. Process-latch OS, architecture, container-aware available
-processors, and memory limits; read home only for each eligible conversion.
-Project only demanded typed results into structural configuration. Host failure
-is explicit before analysis; no Host IO occurs in pure conversion or DICE and
-no lock crosses a DICE compute.
-
-The accepted `str(target.label)` cquery output remains byte-for-byte unchanged.
-Projection evidence uses internal/display assertions or a separately admitted
-surface. Do not activate aquery, selected-platform retention, Bazel/Slug
-ActionKey, or AC-key changes.
-
-## Required evidence
-
-Prove C0 -> C1 -> C0 in one retained daemon and equivalent one-shot commands:
-structural C0 restoration, C1 inequality, correct DICE recomputation/pruning,
-distinct/restored configured directories, identical one-shot/daemon projection,
-and unchanged labels/providers/action topology. REAPI bytes may change only
-when an actual action field or configured path changes. Prove process Host reuse
-and per-eligible home reads, stable pre-analysis rejection of `--config` and one
-unknown configuration flag, and no production `first-build`, unsupported Host
-constructor, new opaque-checksum caller, or bare workspace `bazel-bin` owner.
-
-Run focused crate tests serially, then `cargo build -p slug_cli_v2` before any
-`SLUG_V2_BIN` oracle/smoke. Clean stale `slugd` before and after daemon-sensitive
-tests. Use Bazel 9.2 only for an already-required discriminating semantic check;
-ordinary local validation needs no CI. Bazel may discover the private user RC,
-which must never be inspected, printed, copied, or committed.
+Obtain an independent public-format/identity review. Record `ACCEPT` or
+`REPLAN` in the owner plan and schedule one bounded implementation successor
+only after acceptance.
 
 ## Stops
 
-Stop and `REPLAN` on a dependency cycle, partial default descriptor set, silent
-flag omission, digest-only identity, `DefaultHasher`, shortened/Bazel-looking
-token, configured-path alias, Java/JVM/helper/bytecode use, ActionKey/aquery
-expansion, REAPI normalization, or any remaining production placeholder.
+Stop and `REPLAN` on any JVM/Java helper or delegation, seven-hex or otherwise
+Bazel-looking approximation, truncated projection, caller-supplied projection,
+projection-as-DICE/cache identity, changed Starlark-label bytes, new evaluator
+graph, aquery/ActionKey activation, or normalization outside the opaque display
+token.

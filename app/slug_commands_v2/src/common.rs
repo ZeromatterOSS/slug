@@ -408,7 +408,10 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "remote_retries"
         | "test_output"
         | "test_env"
-        | "runs_per_test" => FlagDisposition::Planned,
+        | "runs_per_test"
+        | "remote_default_exec_properties"
+        | "bes_backend"
+        | "bes_results_url" => FlagDisposition::Planned,
         _ => FlagDisposition::Planned,
     }
 }

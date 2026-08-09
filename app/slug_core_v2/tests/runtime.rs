@@ -55,7 +55,7 @@ fn query_policy_defaults_and_primary_runtime_path_toggle_without_semantic_state(
         "The label '//pkg:plain' in the test_suite '//pkg:suite' does not refer to a test or test_suite rule!"
     ));
 
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let observe = || observe_workspace(workspace.path()).unwrap();
     let default = runtime
         .query_observations(observe(), expression, QueryOrder::Auto)
@@ -107,7 +107,7 @@ fn retained_runtime_exposes_typed_root_graph_for_a_b_a_request_inputs() {
     )
     .unwrap();
     fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let observe = || observe_workspace(workspace.path()).unwrap();
     let command_a = BzlmodCommandPolicyKey::from_flags(None, false).unwrap();
     let environment_a =
@@ -180,7 +180,7 @@ fn explicit_query_bzlmod_inputs_initialize_fresh_runtime_and_do_not_leak() {
         "filegroup(name = \"probe\")\n",
     )
     .unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let observe = || observe_workspace(workspace.path()).unwrap();
     let query = runtime
         .query_observations_with_policy_and_bzlmod_inputs(
@@ -223,7 +223,7 @@ fn retained_runtime_uses_root_graph_for_supported_module_directives() {
     .unwrap();
     fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
 
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let result = runtime
         .evaluate_observations(observe_workspace(workspace.path()).unwrap(), &[])
         .unwrap();
@@ -341,7 +341,7 @@ fn root_and_package_share_one_committed_revision_across_module_edit_and_delete()
         "filegroup(name = \"probe\", srcs = [])\n",
     )
     .unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let target = TargetPattern::parse("//pkg:probe").unwrap();
     let observe = || observe_workspace(workspace.path()).unwrap();
 
@@ -379,7 +379,7 @@ fn retained_runtime_uses_root_build_when_build_bazel_is_deleted() {
     let fallback = workspace.path().join("BUILD");
     fs::write(&module, "module(name = \"root\")\n").unwrap();
     fs::write(&primary, "primary = True\n").unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let observe = || {
         [&module, &primary, &fallback]
             .into_iter()
@@ -405,7 +405,7 @@ fn read_error_observation_is_not_treated_as_file_absence() {
     )
     .unwrap();
     fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let error = runtime
         .evaluate(
             [
@@ -487,7 +487,7 @@ fn directory_observation_paths_must_be_normalized_and_contained() {
     )
     .unwrap();
     fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let error = runtime
         .evaluate_observations(
             WorkspaceObservation {
@@ -520,7 +520,7 @@ fn directory_observation_paths_must_not_alias_through_symlinks() {
     fs::write(workspace.path().join("BUILD.bazel"), "").unwrap();
     fs::create_dir(workspace.path().join("actual")).unwrap();
     std::os::unix::fs::symlink("actual", workspace.path().join("alias")).unwrap();
-    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::unsupported()).unwrap();
+    let runtime = WorkspaceRuntime::new(workspace.path(), ProcessHostOwner::native()).unwrap();
     let error = runtime
         .evaluate_observations(
             WorkspaceObservation {

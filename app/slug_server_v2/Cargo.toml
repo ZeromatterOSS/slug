@@ -21,6 +21,7 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+slug_configuration_v2 = { path = "../slug_configuration_v2" }
 tempfile = { workspace = true }
 
 [lints.rust]

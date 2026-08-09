@@ -299,6 +299,7 @@ strong_hash_derive = { path = "gazebo/strong_hash_derive" }
 three_billion_instructions = { path = "shed/three_billion_instructions" }
 
 slug_analysis_v2 = { path = "app/slug_analysis_v2" }
+slug_configuration_v2 = { path = "app/slug_configuration_v2" }
 slug_build_api_v2 = { path = "app/slug_build_api_v2" }
 slug_bep_v2 = { path = "app/slug_bep_v2" }
 slug_bzlmod_v2 = { path = "app/slug_bzlmod_v2" }

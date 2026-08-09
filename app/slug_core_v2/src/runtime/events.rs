@@ -233,6 +233,10 @@ impl<T> AcceptedCommand<T> {
         }
     }
 
+    pub(super) fn terminal(&self) -> &T {
+        &self.terminal
+    }
+
     #[cfg(test)]
     pub(super) fn terminal_for_test(&self) -> &T {
         &self.terminal
