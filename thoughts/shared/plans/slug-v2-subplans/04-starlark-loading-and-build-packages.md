@@ -624,6 +624,39 @@ Stage 8 `8fec2696` consumes this substrate through compact immutable
 not keys, and only output→own-generator generated edges. Same-DICE semantic/
 reuse and same-daemon metadata transitions passed; no loading scope expands.
 
+## `attr` typed attribute-string design replanned (2026-08-09)
+
+`WP-4-8-m3-attr-typed-attribute-string-design` ends in `REPLAN` without Rust,
+Cargo, fixture, or oracle changes. Pinned Bazel 9.2 source closes leaf
+formatting, but current V2 has already discarded observable ordering and value
+facts needed by the complete function.
+
+`TargetUtils.getAttrAsString` visits every possible effective value and
+stringifies the whole typed result: strings are unquoted; null is suppressed;
+lists use `[a, b]`; dicts use `{key=value}`; labels use `//pkg:t` in the main
+repository and `@@canonical//pkg:t` externally. Selector concatenation is
+typed before formatting. Equal key sets are correlated, distinct sets form
+cross-products, candidate duplicates remain, and entry/default position affects
+observable order. Boolean/tristate integer compatibility is source-exact but
+not currently admitted by V2 and must not be synthesized.
+
+Current `CoercedAttributeValue` detaches the default branch from its original
+ordered selector entry, while some string/native lists and maps are normalized
+before any attr projection. `QueryAttribute` then drops all non-label values,
+empty typed containers, dict keys/value shape, schema defaults, and
+concatenation. Native/synthetic rules and the universal `name` attribute also
+lack a total typed projection. A Starlark-only activation would therefore be
+false default-function coverage.
+
+Run next only `WP-4-8-m3-attr-candidate-order-oracle-design`. It must design a
+focused Bazel 9.2 fixture for default-first/middle/last order, equal versus
+distinct selector key sets, typed string/list concatenation with duplicates,
+all admitted dict orientations, effective default/implicit values, universal
+`name`, and every currently admitted native rule attribute. It must also freeze
+the pre-normalization capture point and canonical label renderer. No production
+representation or query activation is authorized until that evidence is
+accepted.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

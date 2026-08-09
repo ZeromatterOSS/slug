@@ -3187,3 +3187,13 @@ Run next only `WP-4-8-m3-attr-typed-attribute-string-design`, a Stage 4/Stage 8
 documentation and pinned-source audit. It must close the complete currently
 admitted coerced-value formatting, selector/default/provenance, equality, and
 invalidation boundary before any representation Rust or `attr` activation.
+
+That design packet ends in `REPLAN`. Bazel matches every non-null whole typed
+candidate after selector combination and preserves observable candidate order
+and multiplicity. V2 has already detached selector-default position, normalized
+some ordered values, omitted native/universal attributes, and reduced
+`QueryAttribute` to labels plus explicitness. No exact Stage 8 formatter can
+recover those facts. Leaf strings are source-closed; the remaining evidence gap
+is ordering/correlation and complete native-rule inventory. Run next only the
+focused `WP-4-8-m3-attr-candidate-order-oracle-design`; `attr` remains deferred
+and the accepted Rust-native regex boundary is unchanged.
