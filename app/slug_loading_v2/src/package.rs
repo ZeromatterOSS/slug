@@ -11,6 +11,7 @@
 use std::cell::OnceCell;
 use std::cell::RefCell;
 use std::fmt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -55,6 +56,12 @@ use crate::attrs::AttributeProvenance;
 use crate::attrs::AttributeSchema;
 use crate::attrs::AttributeValue;
 use crate::attrs::CoercedAttributeValue;
+use crate::attrs::NativeAttributeOrder;
+use crate::attrs::NativeAttributePolicy;
+use crate::attrs::NativeAttributeSchema;
+use crate::attrs::NativeAttributeValue;
+use crate::attrs::NativeRuleAttributes;
+use crate::attrs::NativeRuleClass;
 use crate::attrs::TransitionDefinition as LoadingTransitionDefinition;
 use crate::bzl_module::BzlModuleIdentity;
 use crate::bzl_module::FrozenBzlLifetimeEntry;
@@ -89,6 +96,8 @@ pub struct LoadedPackage {
     pub build_file: PathBuf,
     pub default_visibility: RuleVisibility,
     pub targets: Vec<PackageTarget>,
+    /// Sparse RuleClass values keyed by their stable position in `targets`.
+    pub native_attributes: Arc<[NativeTargetAttributes]>,
     pub used_globs: Vec<GlobSpec>,
     /// Ordered label-first direct `.bzl` roots for this BUILD evaluation.
     pub direct_load_roots: Arc<[BzlModuleIdentity]>,
@@ -106,6 +115,7 @@ impl PartialEq for LoadedPackage {
             && self.build_file == other.build_file
             && self.default_visibility == other.default_visibility
             && self.targets == other.targets
+            && self.native_attributes == other.native_attributes
             && self.used_globs == other.used_globs
             && self.direct_load_roots == other.direct_load_roots
             && self.reachable_loads == other.reachable_loads
@@ -116,6 +126,21 @@ impl PartialEq for LoadedPackage {
 impl Eq for LoadedPackage {}
 
 impl LoadedPackage {
+    pub fn native_attributes(&self, target: &str) -> Option<&NativeRuleAttributes> {
+        let target_index = self
+            .targets
+            .iter()
+            .position(|candidate| candidate.name == target)?;
+        self.native_attributes_at(target_index)
+    }
+
+    pub fn native_attributes_at(&self, target_index: usize) -> Option<&NativeRuleAttributes> {
+        let target_index = u32::try_from(target_index).ok()?;
+        self.native_attributes
+            .binary_search_by_key(&target_index, |entry| entry.target_index)
+            .ok()
+            .map(|index| &self.native_attributes[index].attributes)
+    }
     #[cfg(test)]
     #[allow(dead_code)] // Unix-only Host owner test coverage.
     pub(crate) fn retained_bzl_module_count(&self) -> usize {
@@ -142,6 +167,12 @@ impl LoadedPackage {
             }
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct NativeTargetAttributes {
+    pub target_index: u32,
+    pub attributes: NativeRuleAttributes,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -485,6 +516,10 @@ impl StarlarkRuleImplementation {
 #[derive(Debug)]
 struct PackageState {
     default_visibility: RuleVisibility,
+    default_deprecation: Option<CompactString>,
+    default_testonly: bool,
+    default_package_metadata: Arc<[CanonicalLabel]>,
+    licenses: Arc<[CompactString]>,
     targets: SmallMap<String, RecordedTarget>,
     used_globs: Vec<GlobSpec>,
 }
@@ -493,6 +528,10 @@ impl Default for PackageState {
     fn default() -> Self {
         Self {
             default_visibility: RuleVisibility::Private,
+            default_deprecation: None,
+            default_testonly: false,
+            default_package_metadata: Arc::from([]),
+            licenses: Arc::from([]),
             targets: SmallMap::new(),
             used_globs: Vec::new(),
         }
@@ -503,6 +542,13 @@ impl Default for PackageState {
 struct RecordedTarget {
     kind: PackageTargetKind,
     visibility: VisibilitySource,
+    native_overrides: Vec<NativeAttributeOverride>,
+}
+
+#[derive(Debug)]
+struct NativeAttributeOverride {
+    slot: usize,
+    value: NativeAttributeValue,
 }
 
 #[derive(Debug)]
@@ -605,6 +651,41 @@ impl PackageRecorder {
         Ok(())
     }
 
+    fn set_package_defaults(
+        &self,
+        visibility: Option<Vec<String>>,
+        deprecation: Option<String>,
+        testonly: Option<bool>,
+        package_metadata: Option<Vec<String>>,
+    ) -> anyhow::Result<()> {
+        let mut state = self.state.borrow_mut();
+        if let Some(visibility) = visibility {
+            state.default_visibility = self.parse_visibility(visibility)?;
+        }
+        if let Some(deprecation) = deprecation {
+            state.default_deprecation = Some(deprecation.into());
+        }
+        if let Some(testonly) = testonly {
+            state.default_testonly = testonly;
+        }
+        if let Some(package_metadata) = package_metadata {
+            state.default_package_metadata = package_metadata
+                .iter()
+                .map(|label| self.dependency_label(label))
+                .collect::<anyhow::Result<Vec<_>>>()?
+                .into();
+        }
+        Ok(())
+    }
+
+    fn set_licenses(&self, licenses: Vec<String>) {
+        self.state.borrow_mut().licenses = licenses
+            .into_iter()
+            .map(CompactString::from)
+            .collect::<Vec<_>>()
+            .into();
+    }
+
     fn exports_files(
         &self,
         srcs: Vec<String>,
@@ -620,25 +701,54 @@ impl PackageRecorder {
     fn filegroup(
         &self,
         name: String,
-        srcs: Option<Vec<String>>,
+        srcs: Option<CoercedAttributeValue>,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
         let srcs_explicit = srcs.is_some();
-        let srcs = srcs
-            .unwrap_or_default()
-            .iter()
-            .map(|src| self.dependency_label(src))
-            .collect::<anyhow::Result<Vec<_>>>()?;
-        reject_duplicate_canonical_labels(&srcs, "srcs", &name)?;
+        let srcs_value = srcs.unwrap_or_else(empty_labels);
+        let mut srcs = Vec::new();
+        srcs_value.labels(&mut srcs);
+        // A configurable `srcs` keeps each branch for query candidates while
+        // the loading topology remains the flattened branch-value labels.
+        // Keep the historical duplicate diagnostic for a literal list only;
+        // labels may legitimately recur across mutually exclusive branches.
+        if matches!(&srcs_value, CoercedAttributeValue::LabelList(_)) {
+            reject_duplicate_canonical_labels(&srcs, "srcs", &name)?;
+        }
         let srcs = srcs.into();
+        let class = NativeRuleClass::Filegroup;
+        let mut native_overrides = Vec::new();
+        if srcs_explicit {
+            native_overrides.push(NativeAttributeOverride {
+                slot: class.slot("srcs").expect("filegroup schema").0,
+                value: NativeAttributeValue {
+                    provenance: AttributeProvenance::Explicit,
+                    value: srcs_value.clone(),
+                },
+            });
+        }
+        let config_dependencies = selector_key_labels(&srcs_value);
+        if !config_dependencies.is_empty() {
+            native_overrides.push(NativeAttributeOverride {
+                slot: class
+                    .slot("$config_dependencies")
+                    .expect("filegroup schema")
+                    .0,
+                value: NativeAttributeValue {
+                    provenance: AttributeProvenance::Explicit,
+                    value: CoercedAttributeValue::LabelList(config_dependencies.into()),
+                },
+            });
+        }
         self.record_target(
-            name,
+            name.clone(),
             PackageTargetKind::Filegroup {
                 srcs,
                 srcs_explicit,
             },
             self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
-        )
+        )?;
+        self.merge_native_overrides(&name, native_overrides)
     }
 
     fn test_suite(
@@ -701,11 +811,10 @@ impl PackageRecorder {
         values: SmallMap<String, String>,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
-        let mut values = values
+        let values = values
             .into_iter()
             .map(|(key, value)| (CompactString::from(key), CompactString::from(value)))
             .collect::<Vec<_>>();
-        values.sort_unstable();
         self.record_target(
             name,
             PackageTargetKind::ConfigSetting {
@@ -720,10 +829,19 @@ impl PackageRecorder {
         name: String,
         target: NativeToolchainTarget,
     ) -> anyhow::Result<()> {
+        self.native_toolchain_target_with_visibility(name, target, None)
+    }
+
+    fn native_toolchain_target_with_visibility(
+        &self,
+        name: String,
+        target: NativeToolchainTarget,
+        visibility: Option<Vec<String>>,
+    ) -> anyhow::Result<()> {
         self.record_target(
             name,
             PackageTargetKind::NativeToolchain(target),
-            VisibilitySource::PackageDefault,
+            self.visibility_source(visibility, VisibilitySource::PackageDefault)?,
         )
     }
 
@@ -845,9 +963,129 @@ impl PackageRecorder {
         if state.targets.get(&name).is_some() {
             anyhow::bail!("target '{name}' declared more than once");
         }
-        state
+        state.targets.insert(
+            name,
+            RecordedTarget {
+                kind,
+                visibility,
+                native_overrides: Vec::new(),
+            },
+        );
+        Ok(())
+    }
+
+    fn set_native_overrides<'v>(
+        &self,
+        name: &str,
+        kwargs: SmallMap<String, Value<'v>>,
+    ) -> anyhow::Result<()> {
+        let (class, rule_class) = {
+            let state = self.state.borrow();
+            let target = state
+                .targets
+                .get(name)
+                .ok_or_else(|| anyhow::anyhow!("native rule '{name}' was not recorded"))?;
+            let class = native_rule_class(&target.kind)
+                .ok_or_else(|| anyhow::anyhow!("target '{name}' is not a native rule"))?;
+            let rule_class = target
+                .kind
+                .rule_capability()
+                .expect("native rule")
+                .rule_class
+                .clone();
+            (class, rule_class)
+        };
+        let overrides = coerce_native_overrides(self, class, kwargs, &rule_class)?;
+        self.merge_native_overrides(name, overrides)
+    }
+
+    fn merge_native_overrides(
+        &self,
+        name: &str,
+        overrides: Vec<NativeAttributeOverride>,
+    ) -> anyhow::Result<()> {
+        let mut state = self.state.borrow_mut();
+        let existing = &mut state
             .targets
-            .insert(name, RecordedTarget { kind, visibility });
+            .get_mut(name)
+            .expect("target was checked above")
+            .native_overrides;
+        for override_value in overrides {
+            if let Some(existing_value) = existing
+                .iter_mut()
+                .find(|value| value.slot == override_value.slot)
+            {
+                *existing_value = override_value;
+            } else {
+                existing.push(override_value);
+            }
+        }
+        Ok(())
+    }
+
+    fn set_native_generator_from_evaluator(
+        &self,
+        name: &str,
+        eval: &Evaluator<'_, '_, '_>,
+    ) -> anyhow::Result<()> {
+        let Some(context) = eval.native_call_context("name") else {
+            return Ok(());
+        };
+        let position = context.call_location.resolve_span_for_reporting().begin;
+        let build_file = Path::new(context.call_location.filename())
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("BUILD.bazel");
+        let build_file = if self.package.is_empty() {
+            build_file.to_owned()
+        } else {
+            format!("{}/{build_file}", self.package)
+        };
+        let generator_location =
+            format!("{build_file}:{}:{}", position.line + 1, position.column + 1);
+        let mut state = self.state.borrow_mut();
+        let target = state
+            .targets
+            .get_mut(name)
+            .ok_or_else(|| anyhow::anyhow!("native rule '{name}' was not recorded"))?;
+        let class = native_rule_class(&target.kind)
+            .ok_or_else(|| anyhow::anyhow!("target '{name}' is not a native rule"))?;
+        let overrides = [
+            (
+                "generator_name",
+                CoercedAttributeValue::String(context.local_value.unwrap_or_default().into()),
+            ),
+            (
+                "generator_function",
+                CoercedAttributeValue::String(context.function_name.into()),
+            ),
+            (
+                "generator_location",
+                CoercedAttributeValue::String(generator_location.into()),
+            ),
+        ];
+        for (attribute, value) in overrides {
+            let (slot, schema) = class
+                .slot(attribute)
+                .expect("all native RuleClasses retain generator metadata");
+            debug_assert_eq!(schema.policy(), NativeAttributePolicy::Callable);
+            let override_value = NativeAttributeOverride {
+                slot,
+                value: NativeAttributeValue {
+                    provenance: AttributeProvenance::Implicit,
+                    value,
+                },
+            };
+            if let Some(existing) = target
+                .native_overrides
+                .iter_mut()
+                .find(|value| value.slot == slot)
+            {
+                *existing = override_value;
+            } else {
+                target.native_overrides.push(override_value);
+            }
+        }
         Ok(())
     }
 
@@ -1017,6 +1255,27 @@ impl PackageRecorder {
                     .into();
             }
         }
+        let native_attributes = state
+            .targets
+            .iter()
+            .enumerate()
+            .filter_map(|(target_index, (name, target))| {
+                native_rule_attributes(name, &target.kind, &target.visibility, &state).map(
+                    |mut attributes| {
+                        for override_value in &target.native_overrides {
+                            attributes.values_mut()[override_value.slot] =
+                                override_value.value.clone();
+                        }
+                        NativeTargetAttributes {
+                            target_index: u32::try_from(target_index)
+                                .expect("package target count exceeds u32"),
+                            attributes,
+                        }
+                    },
+                )
+            })
+            .collect::<Vec<_>>()
+            .into();
         LoadedPackage {
             package_dir,
             build_file,
@@ -1030,6 +1289,7 @@ impl PackageRecorder {
                     visibility: target.visibility,
                 })
                 .collect(),
+            native_attributes,
             used_globs: state.used_globs,
             direct_load_roots,
             reachable_loads,
@@ -1039,6 +1299,328 @@ impl PackageRecorder {
     }
 }
 
+fn native_rule_class(kind: &PackageTargetKind) -> Option<NativeRuleClass> {
+    Some(match kind {
+        PackageTargetKind::Filegroup { .. } => NativeRuleClass::Filegroup,
+        PackageTargetKind::Alias { .. } => NativeRuleClass::Alias,
+        PackageTargetKind::ConfigSetting { .. } => NativeRuleClass::ConfigSetting,
+        PackageTargetKind::TestSuite { .. } => NativeRuleClass::TestSuite,
+        PackageTargetKind::NativeToolchain(native) => match native {
+            NativeToolchainTarget::ConstraintSetting => NativeRuleClass::ConstraintSetting,
+            NativeToolchainTarget::ConstraintValue { .. } => NativeRuleClass::ConstraintValue,
+            NativeToolchainTarget::Platform { .. } => NativeRuleClass::Platform,
+            NativeToolchainTarget::ToolchainType => NativeRuleClass::ToolchainType,
+            NativeToolchainTarget::Toolchain { .. } => NativeRuleClass::Toolchain,
+        },
+        _ => return None,
+    })
+}
+
+fn empty_labels() -> CoercedAttributeValue {
+    CoercedAttributeValue::LabelList(Arc::from([]))
+}
+
+fn empty_strings() -> CoercedAttributeValue {
+    CoercedAttributeValue::StringList(Arc::from([]))
+}
+
+fn visibility_value(visibility: &RuleVisibility) -> CoercedAttributeValue {
+    let labels: Arc<[CanonicalLabel]> = match visibility {
+        RuleVisibility::Public => {
+            Arc::from([CanonicalLabel::parse("@@//visibility:public").unwrap()])
+        }
+        RuleVisibility::Private => {
+            Arc::from([CanonicalLabel::parse("@@//visibility:private").unwrap()])
+        }
+        RuleVisibility::Restricted(value) => Arc::from(value.declared_labels()),
+    };
+    CoercedAttributeValue::LabelList(labels)
+}
+
+fn native_default(schema: NativeAttributeSchema) -> NativeAttributeValue {
+    let provenance = match schema.policy() {
+        NativeAttributePolicy::Callable => AttributeProvenance::Default,
+        NativeAttributePolicy::Implicit | NativeAttributePolicy::Forced => {
+            AttributeProvenance::Implicit
+        }
+    };
+    let value = match schema.kind() {
+        AttributeKind::Label | AttributeKind::Output => CoercedAttributeValue::None,
+        AttributeKind::LabelList => empty_labels(),
+        AttributeKind::String => CoercedAttributeValue::String(CompactString::default()),
+        AttributeKind::StringList => empty_strings(),
+        AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
+        AttributeKind::Integer => CoercedAttributeValue::Integer(0),
+        AttributeKind::StringDict => CoercedAttributeValue::StringDict(Arc::from([])),
+        AttributeKind::StringKeyedLabelDict => {
+            CoercedAttributeValue::StringKeyedLabelDict(Arc::from([]))
+        }
+        AttributeKind::LabelKeyedStringDict => {
+            CoercedAttributeValue::LabelKeyedStringDict(Arc::from([]))
+        }
+        AttributeKind::LabelListDict => CoercedAttributeValue::LabelListDict(Arc::from([])),
+        AttributeKind::OutputList => CoercedAttributeValue::OutputList(Arc::from([])),
+    };
+    NativeAttributeValue { provenance, value }
+}
+
+fn set_native_value(
+    class: NativeRuleClass,
+    values: &mut [NativeAttributeValue],
+    name: &str,
+    provenance: AttributeProvenance,
+    value: CoercedAttributeValue,
+) {
+    let (slot, _) = class
+        .slot(name)
+        .unwrap_or_else(|| panic!("{class:?} does not declare native attribute '{name}'"));
+    values[slot] = NativeAttributeValue { provenance, value };
+}
+
+fn set_native_value_if_present(
+    class: NativeRuleClass,
+    values: &mut [NativeAttributeValue],
+    name: &str,
+    provenance: AttributeProvenance,
+    value: CoercedAttributeValue,
+) {
+    if let Some((slot, _)) = class.slot(name) {
+        values[slot] = NativeAttributeValue { provenance, value };
+    }
+}
+
+/// Native values are stored in their class's static Bazel RuleClass order.
+/// They do not affect the aggregate dependency list used by traversal.
+fn native_rule_attributes(
+    target_name: &str,
+    kind: &PackageTargetKind,
+    visibility_source: &VisibilitySource,
+    package: &PackageState,
+) -> Option<NativeRuleAttributes> {
+    let class = native_rule_class(kind)?;
+    let mut values = class
+        .schema()
+        .iter()
+        .copied()
+        .map(native_default)
+        .collect::<Vec<_>>();
+    let class_visibility = match visibility_source {
+        VisibilitySource::Declared(value) => value,
+        VisibilitySource::PackageDefault => &package.default_visibility,
+        VisibilitySource::AlwaysPublic | VisibilitySource::GeneratingRule => {
+            &RuleVisibility::Public
+        }
+    };
+    let visibility_provenance = if matches!(visibility_source, VisibilitySource::Declared(_)) {
+        AttributeProvenance::Explicit
+    } else {
+        AttributeProvenance::Default
+    };
+
+    set_native_value(
+        class,
+        &mut values,
+        "name",
+        AttributeProvenance::Explicit,
+        CoercedAttributeValue::String(target_name.into()),
+    );
+    set_native_value(
+        class,
+        &mut values,
+        "visibility",
+        visibility_provenance,
+        visibility_value(class_visibility),
+    );
+    set_native_value(
+        class,
+        &mut values,
+        "deprecation",
+        AttributeProvenance::Default,
+        package
+            .default_deprecation
+            .clone()
+            .map(CoercedAttributeValue::String)
+            .unwrap_or(CoercedAttributeValue::None),
+    );
+    set_native_value(
+        class,
+        &mut values,
+        "testonly",
+        AttributeProvenance::Default,
+        CoercedAttributeValue::Boolean(package.default_testonly),
+    );
+    set_native_value_if_present(
+        class,
+        &mut values,
+        "package_metadata",
+        AttributeProvenance::Default,
+        CoercedAttributeValue::LabelList(package.default_package_metadata.clone()),
+    );
+    set_native_value_if_present(
+        class,
+        &mut values,
+        "licenses",
+        AttributeProvenance::Default,
+        CoercedAttributeValue::StringList(package.licenses.clone()),
+    );
+
+    match kind {
+        PackageTargetKind::Filegroup {
+            srcs,
+            srcs_explicit,
+        } => set_native_value(
+            class,
+            &mut values,
+            "srcs",
+            if *srcs_explicit {
+                AttributeProvenance::Explicit
+            } else {
+                AttributeProvenance::Default
+            },
+            CoercedAttributeValue::LabelList(srcs.clone()),
+        ),
+        PackageTargetKind::Alias { actual } => set_native_value(
+            class,
+            &mut values,
+            "actual",
+            AttributeProvenance::Explicit,
+            CoercedAttributeValue::Label(actual.clone()),
+        ),
+        PackageTargetKind::ConfigSetting {
+            values: setting_values,
+        } => {
+            set_native_value(
+                class,
+                &mut values,
+                "tags",
+                AttributeProvenance::Implicit,
+                CoercedAttributeValue::StringList(Arc::from([CompactString::const_new("manual")])),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "licenses",
+                AttributeProvenance::Implicit,
+                CoercedAttributeValue::StringList(Arc::from([CompactString::const_new("none")])),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "values",
+                AttributeProvenance::Explicit,
+                CoercedAttributeValue::StringDict(setting_values.clone()),
+            );
+        }
+        PackageTargetKind::TestSuite { membership, tags } => {
+            set_native_value(
+                class,
+                &mut values,
+                "tags",
+                AttributeProvenance::Explicit,
+                CoercedAttributeValue::StringList(tags.clone()),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "testonly",
+                AttributeProvenance::Implicit,
+                CoercedAttributeValue::Boolean(true),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "tests",
+                if membership.tests_explicit() {
+                    AttributeProvenance::Explicit
+                } else {
+                    AttributeProvenance::Default
+                },
+                CoercedAttributeValue::LabelList(Arc::from(membership.tests())),
+            );
+            set_native_value(
+                class,
+                &mut values,
+                "$implicit_tests",
+                AttributeProvenance::Implicit,
+                CoercedAttributeValue::LabelList(Arc::from(membership.implicit_tests())),
+            );
+        }
+        PackageTargetKind::NativeToolchain(native) => {
+            if !matches!(native, NativeToolchainTarget::ToolchainType) {
+                set_native_value(
+                    class,
+                    &mut values,
+                    "tags",
+                    AttributeProvenance::Implicit,
+                    CoercedAttributeValue::StringList(Arc::from([CompactString::const_new(
+                        "manual",
+                    )])),
+                );
+            }
+            match native {
+                NativeToolchainTarget::ConstraintSetting => {}
+                NativeToolchainTarget::ConstraintValue { constraint_setting } => {
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "constraint_setting",
+                        AttributeProvenance::Explicit,
+                        CoercedAttributeValue::Label(constraint_setting.clone()),
+                    );
+                }
+                NativeToolchainTarget::Platform { constraint_values } => {
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "constraint_values",
+                        AttributeProvenance::Explicit,
+                        CoercedAttributeValue::LabelList(constraint_values.clone()),
+                    );
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "missing_toolchain_error",
+                        AttributeProvenance::Default,
+                        CoercedAttributeValue::String(CompactString::new(
+                            "For more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro.",
+                        )),
+                    );
+                }
+                NativeToolchainTarget::ToolchainType => {}
+                NativeToolchainTarget::Toolchain {
+                    toolchain_type,
+                    implementation,
+                    exec_compatible_with,
+                } => {
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "toolchain_type",
+                        AttributeProvenance::Explicit,
+                        CoercedAttributeValue::Label(toolchain_type.clone()),
+                    );
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "toolchain",
+                        AttributeProvenance::Explicit,
+                        CoercedAttributeValue::Label(implementation.clone()),
+                    );
+                    set_native_value(
+                        class,
+                        &mut values,
+                        "exec_compatible_with",
+                        AttributeProvenance::Explicit,
+                        CoercedAttributeValue::LabelList(exec_compatible_with.clone()),
+                    );
+                }
+            }
+        }
+        _ => unreachable!("native class was selected above"),
+    }
+
+    Some(NativeRuleAttributes::new(class, values))
+}
 fn implicit_test_matches_suite(metadata: &TestMetadata, suite_tags: &[CompactString]) -> bool {
     if metadata.manual {
         return false;
@@ -1158,11 +1740,25 @@ fn rule_toolchain_requirement(
 
 fn package_global(
     default_visibility: Option<UnpackListOrTuple<&str>>,
+    default_deprecation: Option<&str>,
+    default_testonly: Option<bool>,
+    default_package_metadata: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    if let Some(default_visibility) = default_visibility {
-        PackageRecorder::from_evaluator(eval)?.set_default_visibility(list(default_visibility))?;
-    }
+    PackageRecorder::from_evaluator(eval)?.set_package_defaults(
+        default_visibility.map(list),
+        default_deprecation.map(ToOwned::to_owned),
+        default_testonly,
+        default_package_metadata.map(list),
+    )?;
+    Ok(NoneType)
+}
+
+fn licenses_global(
+    licenses: UnpackListOrTuple<&str>,
+    eval: &mut Evaluator,
+) -> anyhow::Result<NoneType> {
+    PackageRecorder::from_evaluator(eval)?.set_licenses(list(licenses));
     Ok(NoneType)
 }
 
@@ -1175,17 +1771,18 @@ fn exports_files_global(
     Ok(NoneType)
 }
 
-fn filegroup_global(
+fn filegroup_global<'v>(
     name: &str,
-    srcs: Option<UnpackListOrTuple<&str>>,
+    srcs: Option<Value<'v>>,
     visibility: Option<UnpackListOrTuple<&str>>,
-    eval: &mut Evaluator,
+    eval: &mut Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.filegroup(
-        name.to_owned(),
-        srcs.map(list),
-        visibility.map(list),
-    )?;
+    let recorder = PackageRecorder::from_evaluator(eval)?;
+    let srcs = srcs
+        .map(|srcs| coerce_starlark_value(recorder, AttributeKind::LabelList, "srcs", true, srcs))
+        .transpose()?;
+    recorder.filegroup(name.to_owned(), srcs, visibility.map(list))?;
+    recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }
 
@@ -1196,12 +1793,14 @@ fn test_suite_global(
     visibility: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.test_suite(
+    let recorder = PackageRecorder::from_evaluator(eval)?;
+    recorder.test_suite(
         name.to_owned(),
         tests.map(list),
         list(tags),
         visibility.map(list),
     )?;
+    recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }
 
@@ -1211,11 +1810,9 @@ fn alias_global(
     visibility: Option<UnpackListOrTuple<&str>>,
     eval: &mut Evaluator,
 ) -> anyhow::Result<NoneType> {
-    PackageRecorder::from_evaluator(eval)?.alias(
-        name.to_owned(),
-        actual.to_owned(),
-        visibility.map(list),
-    )?;
+    let recorder = PackageRecorder::from_evaluator(eval)?;
+    recorder.alias(name.to_owned(), actual.to_owned(), visibility.map(list))?;
+    recorder.set_native_generator_from_evaluator(name, eval)?;
     Ok(NoneType)
 }
 
@@ -1289,6 +1886,131 @@ fn raw_output(
     package_output_label(base_package, &raw)
 }
 
+fn coerce_native_overrides<'v>(
+    recorder: &PackageRecorder,
+    class: NativeRuleClass,
+    kwargs: SmallMap<String, Value<'v>>,
+    rule_class: &str,
+) -> anyhow::Result<Vec<NativeAttributeOverride>> {
+    kwargs
+        .into_iter()
+        .map(|(name, value)| {
+            let (slot, schema) = class.slot(&name).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "native attribute `{name}` is not declared by rule '{rule_class}'"
+                )
+            })?;
+            match schema.policy() {
+                NativeAttributePolicy::Callable => {}
+                NativeAttributePolicy::Implicit => {
+                    anyhow::bail!("native attribute `{name}` is implicit and cannot be set")
+                }
+                NativeAttributePolicy::Forced => {
+                    anyhow::bail!(
+                        "native attribute `{name}` is fixed by rule '{rule_class}' and cannot be set"
+                    )
+                }
+            }
+            let mut value = match schema.kind() {
+                AttributeKind::Boolean => value
+                    .unpack_bool()
+                    .map(CoercedAttributeValue::Boolean)
+                    .ok_or_else(|| anyhow::anyhow!("native attribute `{name}` must be a bool"))?,
+                AttributeKind::Integer => value
+                    .unpack_i32()
+                    .map(CoercedAttributeValue::Integer)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("native attribute `{name}` must be an integer")
+                    })?,
+                AttributeKind::StringDict => {
+                    let raw = raw_attribute_value(value)?;
+                    let RawAttributeValue::Dict(entries) = raw else {
+                        anyhow::bail!("native attribute `{name}` must be a string dictionary")
+                    };
+                    CoercedAttributeValue::StringDict(
+                        entries
+                            .iter()
+                            .map(|(key, value)| {
+                                Ok((
+                                    raw_string(key, "dictionary key")?,
+                                    raw_string(value, "dictionary value")?,
+                                ))
+                            })
+                            .collect::<anyhow::Result<Vec<_>>>()?
+                            .into(),
+                    )
+                }
+                AttributeKind::StringList => {
+                    let raw = raw_attribute_value(value)?;
+                    let RawAttributeValue::List(values) = raw else {
+                        anyhow::bail!("native attribute `{name}` must be a list of strings")
+                    };
+                    CoercedAttributeValue::StringList(
+                        values
+                            .iter()
+                            .map(|value| raw_string(value, "string list"))
+                            .collect::<anyhow::Result<Vec<_>>>()?
+                            .into(),
+                    )
+                }
+                kind => coerce_raw_value(
+                    &recorder.package,
+                    kind,
+                    &raw_attribute_value(value)?,
+                )?,
+            };
+            if schema.order() == NativeAttributeOrder::OrderIndependent {
+                match &mut value {
+                    CoercedAttributeValue::StringList(values) => {
+                        let mut sorted = values.to_vec();
+                        sorted.sort_unstable();
+                        *values = sorted.into();
+                    }
+                    CoercedAttributeValue::LabelList(values) => {
+                        let mut sorted = values.to_vec();
+                        sorted.sort_by(CanonicalLabel::bazel_natural_cmp);
+                        *values = sorted.into();
+                    }
+                    _ => {}
+                }
+            }
+            Ok(NativeAttributeOverride {
+                slot,
+                value: NativeAttributeValue {
+                    provenance: AttributeProvenance::Explicit,
+                    value,
+                },
+            })
+        })
+        .collect()
+}
+fn selector_key_labels(value: &CoercedAttributeValue) -> Vec<CanonicalLabel> {
+    fn collect(value: &CoercedAttributeValue, labels: &mut Vec<CanonicalLabel>) {
+        match value {
+            CoercedAttributeValue::Selector { branches, default } => {
+                for (condition, branch) in branches.iter() {
+                    if !labels.contains(condition) {
+                        labels.push(condition.clone());
+                    }
+                    collect(branch, labels);
+                }
+                if let Some(default) = default {
+                    collect(default, labels);
+                }
+            }
+            CoercedAttributeValue::Concatenation(left, right) => {
+                collect(left, labels);
+                collect(right, labels);
+            }
+            _ => {}
+        }
+    }
+
+    let mut labels = Vec::new();
+    collect(value, &mut labels);
+    labels
+}
+
 // Bazel 9.2 source: Attribute.Builder documents type defaults as label=null,
 // list=[], and string="". StarlarkAttrModule applies the corresponding empty
 // defaults to the public label dictionaries and output_list.
@@ -1298,6 +2020,9 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
         AttributeKind::LabelList => CoercedAttributeValue::LabelList(Arc::from([])),
         AttributeKind::String => CoercedAttributeValue::String(CompactString::default()),
         AttributeKind::StringList => CoercedAttributeValue::StringList(Arc::from([])),
+        AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
+        AttributeKind::Integer => CoercedAttributeValue::Integer(0),
+        AttributeKind::StringDict => CoercedAttributeValue::StringDict(Arc::from([])),
         AttributeKind::StringKeyedLabelDict => {
             CoercedAttributeValue::StringKeyedLabelDict(Arc::from([]))
         }
@@ -1332,6 +2057,9 @@ fn coerce_raw_value(
             "output",
         )?)),
         AttributeKind::String => Ok(CoercedAttributeValue::String(raw_string(raw, "string")?)),
+        AttributeKind::Boolean | AttributeKind::Integer | AttributeKind::StringDict => {
+            anyhow::bail!("attribute kind is native-only")
+        }
         AttributeKind::StringList => {
             let RawAttributeValue::List(values) = raw else {
                 anyhow::bail!("attribute must be a list of strings");
@@ -2280,9 +3008,22 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
 pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     fn package(
         default_visibility: Option<UnpackListOrTuple<&str>>,
+        default_deprecation: Option<&str>,
+        default_testonly: Option<bool>,
+        default_package_metadata: Option<UnpackListOrTuple<&str>>,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        package_global(default_visibility, eval)
+        package_global(
+            default_visibility,
+            default_deprecation,
+            default_testonly,
+            default_package_metadata,
+            eval,
+        )
+    }
+
+    fn licenses(values: UnpackListOrTuple<&str>, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
+        licenses_global(values, eval)
     }
 
     fn exports_files(
@@ -2293,103 +3034,150 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         exports_files_global(srcs, visibility, eval)
     }
 
-    fn filegroup(
+    fn filegroup<'v>(
         name: &str,
-        srcs: Option<UnpackListOrTuple<&str>>,
+        srcs: Option<Value<'v>>,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        filegroup_global(name, srcs, visibility, eval)
+        filegroup_global(name, srcs, visibility, eval)?;
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
     }
 
-    fn test_suite(
+    fn test_suite<'v>(
         name: &str,
         tests: Option<UnpackListOrTuple<&str>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        test_suite_global(name, tests, tags, visibility, eval)
+        test_suite_global(name, tests, tags, visibility, eval)?;
+        PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
     }
 
-    fn alias(
+    fn alias<'v>(
         name: &str,
         actual: &str,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        alias_global(name, actual, visibility, eval)
+        alias_global(name, actual, visibility, eval)?;
+        PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
     }
 
     // Bazel 9.2 `ConfigRuleClasses.ConfigSettingRule` declares `values` as
-    // the nonconfigurable string dictionary that records flag bindings. This
-    // loading slice retains only that immutable declaration and rejects every
-    // other config_setting argument rather than pretending to evaluate it.
-    fn config_setting(
+    // the nonconfigurable string dictionary that records flag bindings.
+    // Configuration matching remains owned by the configured-analysis stage.
+    fn config_setting<'v>(
         name: &str,
-        #[starlark(require = named)] values: SmallMap<String, String>,
+        #[starlark(require = named)] values: Option<SmallMap<String, String>>,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
-    ) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?.config_setting(
-            name.to_owned(),
-            values,
-            visibility.map(list),
-        )?;
-        Ok(NoneType)
-    }
-
-    fn constraint_setting(name: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?
-            .native_toolchain_target(name.to_owned(), NativeToolchainTarget::ConstraintSetting)?;
-        Ok(NoneType)
-    }
-
-    fn constraint_value(
-        name: &str,
-        constraint_setting: &str,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
-        recorder.native_toolchain_target(
+        recorder.config_setting(
+            name.to_owned(),
+            values.unwrap_or_default(),
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn constraint_setting<'v>(
+        name: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::ConstraintSetting,
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn constraint_value<'v>(
+        name: &str,
+        constraint_setting: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::ConstraintValue {
                 constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
             },
+            visibility.map(list),
         )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
     }
 
-    fn platform(
+    fn platform<'v>(
         name: &str,
-        constraint_values: UnpackList<&str>,
-        eval: &mut Evaluator,
+        #[starlark(default = UnpackList::default())] constraint_values: UnpackList<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
-        recorder.native_toolchain_target(
+        recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::Platform {
                 constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
             },
+            visibility.map(list),
         )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
     }
 
-    fn toolchain_type(name: &str, eval: &mut Evaluator) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?
-            .native_toolchain_target(name.to_owned(), NativeToolchainTarget::ToolchainType)?;
-        Ok(NoneType)
-    }
-
-    fn toolchain(
+    fn toolchain_type<'v>(
         name: &str,
-        exec_compatible_with: UnpackList<&str>,
-        toolchain: &str,
-        toolchain_type: &str,
-        eval: &mut Evaluator,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
         let recorder = PackageRecorder::from_evaluator(eval)?;
-        recorder.native_toolchain_target(
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::ToolchainType,
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn toolchain<'v>(
+        name: &str,
+        toolchain: &str,
+        toolchain_type: &str,
+        #[starlark(default = UnpackList::default())] exec_compatible_with: UnpackList<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
             name.to_owned(),
             NativeToolchainTarget::Toolchain {
                 toolchain_type: recorder.native_toolchain_label(toolchain_type)?,
@@ -2397,7 +3185,10 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                 exec_compatible_with: recorder
                     .native_toolchain_labels(&exec_compatible_with.items)?,
             },
+            visibility.map(list),
         )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
     }
 
@@ -2566,49 +3357,167 @@ fn native_methods(builder: &mut MethodsBuilder) {
         exports_files_global(srcs, visibility, eval)
     }
 
-    fn filegroup(
-        #[starlark(this)] _native: Value,
+    fn filegroup<'v>(
+        #[starlark(this)] _native: Value<'v>,
         name: &str,
-        srcs: Option<UnpackListOrTuple<&str>>,
+        srcs: Option<Value<'v>>,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        filegroup_global(name, srcs, visibility, eval)
+        filegroup_global(name, srcs, visibility, eval)?;
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
     }
 
-    fn test_suite(
-        #[starlark(this)] _native: Value,
+    fn test_suite<'v>(
+        #[starlark(this)] _native: Value<'v>,
         name: &str,
         tests: Option<UnpackListOrTuple<&str>>,
         #[starlark(default=UnpackListOrTuple::default())] tags: UnpackListOrTuple<&str>,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        test_suite_global(name, tests, tags, visibility, eval)
+        test_suite_global(name, tests, tags, visibility, eval)?;
+        PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
     }
 
-    fn alias(
-        #[starlark(this)] _native: Value,
+    fn alias<'v>(
+        #[starlark(this)] _native: Value<'v>,
         name: &str,
         actual: &str,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        alias_global(name, actual, visibility, eval)
+        alias_global(name, actual, visibility, eval)?;
+        PackageRecorder::from_evaluator(eval)?.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
     }
 
-    fn config_setting(
-        #[starlark(this)] _native: Value,
+    fn config_setting<'v>(
+        #[starlark(this)] _native: Value<'v>,
         name: &str,
-        #[starlark(require = named)] values: SmallMap<String, String>,
+        #[starlark(require = named)] values: Option<SmallMap<String, String>>,
         visibility: Option<UnpackListOrTuple<&str>>,
-        eval: &mut Evaluator,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        PackageRecorder::from_evaluator(eval)?.config_setting(
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.config_setting(
             name.to_owned(),
-            values,
+            values.unwrap_or_default(),
             visibility.map(list),
         )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn constraint_setting<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::ConstraintSetting,
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn constraint_value<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        constraint_setting: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::ConstraintValue {
+                constraint_setting: recorder.native_toolchain_label(constraint_setting)?,
+            },
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn platform<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        #[starlark(default = UnpackList::default())] constraint_values: UnpackList<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::Platform {
+                constraint_values: recorder.native_toolchain_labels(&constraint_values.items)?,
+            },
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn toolchain_type<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::ToolchainType,
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
+        Ok(NoneType)
+    }
+
+    fn toolchain<'v>(
+        #[starlark(this)] _native: Value<'v>,
+        name: &str,
+        toolchain: &str,
+        toolchain_type: &str,
+        #[starlark(default = UnpackList::default())] exec_compatible_with: UnpackList<&str>,
+        visibility: Option<UnpackListOrTuple<&str>>,
+        #[starlark(kwargs)] kwargs: SmallMap<String, Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        let recorder = PackageRecorder::from_evaluator(eval)?;
+        recorder.native_toolchain_target_with_visibility(
+            name.to_owned(),
+            NativeToolchainTarget::Toolchain {
+                toolchain_type: recorder.native_toolchain_label(toolchain_type)?,
+                implementation: recorder.native_toolchain_label(toolchain)?,
+                exec_compatible_with: recorder
+                    .native_toolchain_labels(&exec_compatible_with.items)?,
+            },
+            visibility.map(list),
+        )?;
+        recorder.set_native_generator_from_evaluator(name, eval)?;
+        recorder.set_native_overrides(name, kwargs)?;
         Ok(NoneType)
     }
 

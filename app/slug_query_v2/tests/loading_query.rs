@@ -1047,6 +1047,8 @@ package_group(name = "included", packages = ["//other"])
 exports_files(["public.txt"])
 filegroup(name = "omitted", srcs = ["implicit.txt"])
 filegroup(name = "declared", srcs = [":default_group"], visibility = [":default_group", "//viewer:__pkg__"])
+filegroup(name = "explicit_public", visibility = ["//visibility:public"])
+filegroup(name = "explicit_private", visibility = ["//visibility:private"])
 filegroup(name = "ordinary_missing", srcs = [":missing_ordinary"])
 filegroup(name = "visibility_missing", visibility = [":missing_visibility"])
 config_setting(name = "config_public", values = {"define": "visibility_probe=1"})
@@ -1089,6 +1091,19 @@ emit(name = "generator", out = "generated.txt", visibility = [":default_group"])
         node("omitted").visibility_source,
         VisibilitySource::PackageDefault
     );
+    for (name, expected) in [
+        ("explicit_public", "@@//visibility:public"),
+        ("explicit_private", "@@//visibility:private"),
+    ] {
+        let visibility = visibility(name);
+        assert!(visibility.explicit);
+        assert!(visibility.labels.is_empty());
+        assert!(matches!(
+            &visibility.value.as_ref().unwrap().value,
+            CoercedAttributeValue::LabelList(values)
+                if values.as_ref() == [CanonicalLabel::parse(expected).unwrap()]
+        ));
+    }
     assert!(visibility("declared").explicit);
     assert_eq!(
         visibility("declared")
@@ -1911,7 +1926,7 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     assert_eq!(note.kind, AttributeKind::String);
     assert_eq!(note.provenance, AttributeProvenance::Explicit);
     assert!(matches!(
-        note.value.as_ref(),
+        &note.value,
         CoercedAttributeValue::String(value) if value == "literal"
     ));
     assert!(attribute("attrs", "note").labels.is_empty());
@@ -1919,7 +1934,7 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     assert_eq!(mapping.kind, AttributeKind::StringKeyedLabelDict);
     assert_eq!(mapping.provenance, AttributeProvenance::Explicit);
     assert!(matches!(
-        mapping.value.as_ref(),
+        &mapping.value,
         CoercedAttributeValue::StringKeyedLabelDict(values)
             if values.as_ref()
                 == [
@@ -1942,7 +1957,7 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
         ("explicit_suite", true),
     ] {
         assert_eq!(attribute(suite, "tests").explicit, tests_explicit);
-        assert!(attribute(suite, "$implicit_tests").explicit);
+        assert!(!attribute(suite, "$implicit_tests").explicit);
     }
     assert_eq!(
         attribute("implicit", "$implicit_tests")
@@ -2189,7 +2204,11 @@ async fn native_label_canonicalization_reuses_rejects_duplicates_and_recovers() 
         .find(|node| node.label.to_string() == "//pkg:group")
         .unwrap();
     assert_eq!(
-        group.attributes[0]
+        group
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name == "srcs")
+            .unwrap()
             .labels
             .iter()
             .map(ToString::to_string)
@@ -4269,7 +4288,7 @@ async fn external_owner_dispatches_siblings_rdeps_and_loading_files_without_root
 }
 
 #[tokio::test]
-async fn native_toolchain_targets_defer_root_and_external_query_graphs_without_projection() {
+async fn native_toolchain_targets_project_root_and_external_declaration_graphs() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
 
     let mut root_epoch = RootQueryEpochBuilder::base(80);
@@ -4278,6 +4297,8 @@ async fn native_toolchain_targets_defer_root_and_external_query_graphs_without_p
         concat!(
             "filegroup(name = \"ordinary_before\")\n",
             "toolchain_type(name = \"type\")\n",
+            "constraint_setting(name = \"setting\")\n",
+            "constraint_value(name = \"value\", constraint_setting = \":setting\")\n",
             "filegroup(name = \"ordinary_after\")\n",
         ),
         80,
@@ -4288,15 +4309,22 @@ async fn native_toolchain_targets_defer_root_and_external_query_graphs_without_p
         Arc::new(RootAnchorTracker::default()),
     )
     .await;
-    let value = root.compute(&root_query_key("//native:*")).await.unwrap();
+    let value = root
+        .compute(&root_query_key(
+            "//native:ordinary_before + //native:type + //native:ordinary_after",
+        ))
+        .await
+        .unwrap();
     let QueryPreparationOutcome::Complete(result) = value else {
         panic!("root native query requested preparation: {value:?}")
     };
-    let error = result.as_ref().as_ref().unwrap_err();
-    assert_eq!(error.error_kind(), "unsupported_feature");
     assert_eq!(
-        error.to_string(),
-        "Slug does not support query graph projection for native toolchain_type target '//native:type'"
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        [
+            "//native:ordinary_after",
+            "//native:ordinary_before",
+            "//native:type"
+        ]
     );
 
     let mut external_epoch = RootQueryEpochBuilder::external_package(81);
@@ -4305,6 +4333,8 @@ async fn native_toolchain_targets_defer_root_and_external_query_graphs_without_p
         concat!(
             "filegroup(name = \"ordinary_before\")\n",
             "toolchain_type(name = \"type\")\n",
+            "constraint_setting(name = \"setting\")\n",
+            "constraint_value(name = \"value\", constraint_setting = \":setting\")\n",
             "filegroup(name = \"ordinary_after\")\n",
         ),
         81,
@@ -4316,17 +4346,28 @@ async fn native_toolchain_targets_defer_root_and_external_query_graphs_without_p
     )
     .await;
     let value = external
-        .compute(&root_query_key("@dep//:ordinary_before"))
+        .compute(&root_query_key("@dep//:type"))
         .await
         .unwrap();
     let QueryPreparationOutcome::Complete(result) = value else {
         panic!("external native query requested preparation: {value:?}")
     };
-    let error = result.as_ref().as_ref().unwrap_err();
-    assert_eq!(error.error_kind(), "query_error");
     assert_eq!(
-        error.to_string(),
-        "loaded external package @@dep+// produced unsupported target `type` of kind toolchain_type"
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:type"]
+    );
+    let value = external
+        .compute(&root_query_key(
+            "labels(\"constraint_setting\", @dep//:value)",
+        ))
+        .await
+        .unwrap();
+    let QueryPreparationOutcome::Complete(result) = value else {
+        panic!("external native label query requested preparation: {value:?}")
+    };
+    assert_eq!(
+        result.as_ref().as_ref().unwrap().labels.as_ref(),
+        ["@dep//:setting"]
     );
 }
 

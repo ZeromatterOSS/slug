@@ -1810,7 +1810,13 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
     let mut native = transaction(
         &dice,
         EpochBuilder::external_sources(
-            &[("BUILD.bazel", b"toolchain_type(name = \"type\")\n")],
+            &[
+                (
+                    "BUILD.bazel",
+                    b"load(\":defs.bzl\", \"IGNORED\")\ntoolchain_type(name = \"type\")\n",
+                ),
+                ("defs.bzl", b"IGNORED = True\n"),
+            ],
             721,
         )
         .build(),
@@ -1826,10 +1832,16 @@ async fn repository_package_load_prevalidates_all_loads_and_gates_loaded_target_
         ))
         .await
         .unwrap();
-    assert!(
-        repository_package_error(&native)
-            .contains("produced unsupported target `type` of kind toolchain_type")
+    let native = repository_package_terminal(&native);
+    assert_eq!(
+        native
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["type"]
     );
+    assert!(native.native_attributes("type").is_some());
 
     let mut unloaded = transaction(
         &dice,

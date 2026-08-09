@@ -20,6 +20,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use starlark::values::FrozenValue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
@@ -33,11 +34,17 @@ pub enum AttributeKind {
     OutputList,
     String,
     StringList,
+    Boolean,
+    Integer,
+    StringDict,
 }
 
 impl AttributeKind {
     pub(crate) fn reaches_labels(self) -> bool {
-        !matches!(self, Self::String | Self::StringList)
+        !matches!(
+            self,
+            Self::String | Self::StringList | Self::Boolean | Self::Integer | Self::StringDict
+        )
     }
 
     pub(crate) fn contributes_ordinary_dependencies(self) -> bool {
@@ -157,6 +164,335 @@ pub struct AttributeValue {
     pub value: Arc<CoercedAttributeValue>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeAttributeOrder {
+    Ordered,
+    OrderIndependent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NativeAttributePolicy {
+    Callable,
+    Implicit,
+    Forced,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NativeAttributeSchema {
+    query_name: &'static str,
+    kind: AttributeKind,
+    order: NativeAttributeOrder,
+    policy: NativeAttributePolicy,
+}
+
+impl NativeAttributeSchema {
+    pub const fn query_name(self) -> &'static str {
+        self.query_name
+    }
+
+    pub const fn kind(self) -> AttributeKind {
+        self.kind
+    }
+
+    pub const fn order(self) -> NativeAttributeOrder {
+        self.order
+    }
+
+    pub const fn policy(self) -> NativeAttributePolicy {
+        self.policy
+    }
+}
+
+macro_rules! native_schema {
+    ($name:ident = [$($query_name:literal : $kind:ident, $order:ident, $policy:ident;)+]) => {
+        static $name: &[NativeAttributeSchema] = &[
+            $(NativeAttributeSchema {
+                query_name: $query_name,
+                kind: AttributeKind::$kind,
+                order: NativeAttributeOrder::$order,
+                policy: NativeAttributePolicy::$policy,
+            },)+
+        ];
+    };
+}
+
+native_schema!(FILEGROUP_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    ":action_listener": LabelList, Ordered, Implicit;
+    "compatible_with": LabelList, Ordered, Callable;
+    "restricted_to": LabelList, Ordered, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    "srcs": LabelList, Ordered, Callable;
+    "output_group": String, Ordered, Callable;
+    "data": LabelList, Ordered, Callable;
+    "output_licenses": StringList, Ordered, Callable;
+]);
+
+native_schema!(ALIAS_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "compatible_with": LabelList, Ordered, Callable;
+    "restricted_to": LabelList, Ordered, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    "actual": Label, Ordered, Callable;
+]);
+
+native_schema!(CONFIG_SETTING_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    ":action_listener": LabelList, Ordered, Implicit;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Forced;
+    "distribs": StringList, Ordered, Callable;
+    "values": StringDict, Ordered, Callable;
+    "define_values": StringDict, Ordered, Callable;
+    "flag_values": LabelKeyedStringDict, Ordered, Callable;
+    "constraint_values": LabelList, Ordered, Callable;
+    ":flag_alias_settings": LabelList, Ordered, Implicit;
+]);
+
+native_schema!(TEST_SUITE_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    ":action_listener": LabelList, Ordered, Implicit;
+    "compatible_with": LabelList, Ordered, Callable;
+    "restricted_to": LabelList, Ordered, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    "tests": LabelList, OrderIndependent, Callable;
+    "$implicit_tests": LabelList, OrderIndependent, Implicit;
+]);
+
+native_schema!(CONSTRAINT_SETTING_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "default_constraint_value": Label, Ordered, Callable;
+    "refines_constraint_value": Label, Ordered, Callable;
+]);
+
+native_schema!(CONSTRAINT_VALUE_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "constraint_setting": Label, Ordered, Callable;
+]);
+
+native_schema!(PLATFORM_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "constraint_values": LabelList, Ordered, Callable;
+    "parents": LabelList, Ordered, Callable;
+    "remote_execution_properties": String, Ordered, Callable;
+    "exec_properties": StringDict, Ordered, Callable;
+    "flags": StringList, Ordered, Callable;
+    "missing_toolchain_error": String, Ordered, Callable;
+    "required_settings": LabelList, Ordered, Callable;
+    "check_toolchain_types": Boolean, Ordered, Callable;
+    "allowed_toolchain_types": LabelList, Ordered, Callable;
+]);
+
+native_schema!(TOOLCHAIN_TYPE_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "compatible_with": LabelList, Ordered, Callable;
+    "restricted_to": LabelList, Ordered, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    "no_match_error": String, Ordered, Callable;
+]);
+
+native_schema!(TOOLCHAIN_SCHEMA = [
+    "name": String, Ordered, Callable;
+    "visibility": LabelList, OrderIndependent, Callable;
+    "transitive_configs": LabelList, OrderIndependent, Callable;
+    "deprecation": String, Ordered, Callable;
+    "tags": StringList, OrderIndependent, Callable;
+    "generator_name": String, Ordered, Callable;
+    "generator_function": String, Ordered, Callable;
+    "generator_location": String, Ordered, Callable;
+    "testonly": Boolean, Ordered, Callable;
+    "features": StringList, OrderIndependent, Callable;
+    "$config_dependencies": LabelList, Ordered, Implicit;
+    "package_metadata": LabelList, Ordered, Callable;
+    "aspect_hints": LabelList, Ordered, Callable;
+    "licenses": StringList, Ordered, Callable;
+    "distribs": StringList, Ordered, Callable;
+    "target_compatible_with": LabelList, Ordered, Callable;
+    "toolchain_type": Label, Ordered, Callable;
+    "toolchain": Label, Ordered, Callable;
+    "exec_compatible_with": LabelList, Ordered, Callable;
+    "use_target_platform_constraints": Boolean, Ordered, Callable;
+    "target_settings": LabelList, Ordered, Callable;
+]);
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative)]
+pub enum NativeRuleClass {
+    Filegroup,
+    Alias,
+    ConfigSetting,
+    TestSuite,
+    ConstraintSetting,
+    ConstraintValue,
+    Platform,
+    ToolchainType,
+    Toolchain,
+}
+
+impl NativeRuleClass {
+    pub const fn schema(self) -> &'static [NativeAttributeSchema] {
+        match self {
+            Self::Filegroup => FILEGROUP_SCHEMA,
+            Self::Alias => ALIAS_SCHEMA,
+            Self::ConfigSetting => CONFIG_SETTING_SCHEMA,
+            Self::TestSuite => TEST_SUITE_SCHEMA,
+            Self::ConstraintSetting => CONSTRAINT_SETTING_SCHEMA,
+            Self::ConstraintValue => CONSTRAINT_VALUE_SCHEMA,
+            Self::Platform => PLATFORM_SCHEMA,
+            Self::ToolchainType => TOOLCHAIN_TYPE_SCHEMA,
+            Self::Toolchain => TOOLCHAIN_SCHEMA,
+        }
+    }
+
+    pub fn slot(self, name: &str) -> Option<(usize, NativeAttributeSchema)> {
+        self.schema()
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, schema)| schema.query_name == name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct NativeAttributeValue {
+    pub provenance: AttributeProvenance,
+    pub value: CoercedAttributeValue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct NativeRuleAttributes {
+    pub class: NativeRuleClass,
+    values: Arc<[NativeAttributeValue]>,
+}
+
+impl NativeRuleAttributes {
+    pub fn new(class: NativeRuleClass, values: Vec<NativeAttributeValue>) -> Self {
+        assert_eq!(class.schema().len(), values.len());
+        Self {
+            class,
+            values: values.into(),
+        }
+    }
+
+    pub fn iter(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (NativeAttributeSchema, &NativeAttributeValue)> {
+        self.class.schema().iter().copied().zip(self.values.iter())
+    }
+
+    pub fn get(&self, name: &str) -> Option<(NativeAttributeSchema, &NativeAttributeValue)> {
+        self.class
+            .slot(name)
+            .map(|(slot, schema)| (schema, &self.values[slot]))
+    }
+
+    pub(crate) fn values_mut(&mut self) -> &mut [NativeAttributeValue] {
+        Arc::make_mut(&mut self.values)
+    }
+}
+
 /// Immutable attribute data that an unconfigured query may inspect.
 ///
 /// This stays owned by loading: query projections retain the already-coerced
@@ -165,7 +501,7 @@ pub struct AttributeValue {
 pub struct AttributeQueryValue {
     pub kind: AttributeKind,
     pub provenance: AttributeProvenance,
-    pub value: Arc<CoercedAttributeValue>,
+    pub value: CoercedAttributeValue,
 }
 
 impl AttributeValue {
@@ -174,7 +510,7 @@ impl AttributeValue {
         AttributeQueryValue {
             kind: schema.kind(),
             provenance: self.provenance,
-            value: self.value.clone(),
+            value: self.value.as_ref().clone(),
         }
     }
 }
@@ -187,6 +523,9 @@ pub enum CoercedAttributeValue {
     LabelList(Arc<[CanonicalLabel]>),
     String(CompactString),
     StringList(Arc<[CompactString]>),
+    Boolean(bool),
+    Integer(i32),
+    StringDict(Arc<[(CompactString, CompactString)]>),
     StringKeyedLabelDict(Arc<[(CompactString, CanonicalLabel)]>),
     LabelKeyedStringDict(Arc<[(CanonicalLabel, CompactString)]>),
     LabelListDict(Arc<[(CompactString, Arc<[CanonicalLabel]>)]>),
@@ -220,6 +559,98 @@ impl fmt::Display for AttrCandidateError {
 impl std::error::Error for AttrCandidateError {}
 
 impl CoercedAttributeValue {
+    /// Rebind labels parsed in a repository package's provisional root context.
+    pub fn rebind_provisional_root_labels(
+        &self,
+        destination: &CanonicalRepoName,
+    ) -> Result<Self, String> {
+        let label = |value: &CanonicalLabel| {
+            if value.package().repo().is_root() {
+                value.rebind_provisional_root_repository(destination)
+            } else {
+                Ok(value.clone())
+            }
+        };
+        Ok(match self {
+            Self::None => Self::None,
+            Self::Label(value) => Self::Label(label(value)?),
+            Self::Output(value) => Self::Output(label(value)?),
+            Self::LabelList(values) => Self::LabelList(
+                values
+                    .iter()
+                    .map(label)
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into(),
+            ),
+            Self::OutputList(values) => Self::OutputList(
+                values
+                    .iter()
+                    .map(label)
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into(),
+            ),
+            Self::StringKeyedLabelDict(values) => Self::StringKeyedLabelDict(
+                values
+                    .iter()
+                    .map(|(key, value)| Ok((key.clone(), label(value)?)))
+                    .collect::<Result<Vec<_>, String>>()?
+                    .into(),
+            ),
+            Self::LabelKeyedStringDict(values) => Self::LabelKeyedStringDict(
+                values
+                    .iter()
+                    .map(|(key, value)| Ok((label(key)?, value.clone())))
+                    .collect::<Result<Vec<_>, String>>()?
+                    .into(),
+            ),
+            Self::LabelListDict(values) => Self::LabelListDict(
+                values
+                    .iter()
+                    .map(|(key, labels)| {
+                        Ok((
+                            key.clone(),
+                            labels
+                                .iter()
+                                .map(label)
+                                .collect::<Result<Vec<_>, _>>()?
+                                .into(),
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?
+                    .into(),
+            ),
+            Self::Selector { branches, default } => Self::Selector {
+                branches: branches
+                    .iter()
+                    .map(|(condition, value)| {
+                        Ok((
+                            label(condition)?,
+                            Arc::new(value.rebind_provisional_root_labels(destination)?),
+                        ))
+                    })
+                    .collect::<Result<Vec<_>, String>>()?
+                    .into(),
+                default: default
+                    .as_ref()
+                    .map(|value| {
+                        value
+                            .rebind_provisional_root_labels(destination)
+                            .map(Arc::new)
+                    })
+                    .transpose()?,
+            },
+            Self::Concatenation(left, right) => Self::Concatenation(
+                Arc::new(left.rebind_provisional_root_labels(destination)?),
+                Arc::new(right.rebind_provisional_root_labels(destination)?),
+            ),
+            Self::String(value) => Self::String(value.clone()),
+            Self::StringList(values) => Self::StringList(values.clone()),
+            Self::Boolean(value) => Self::Boolean(*value),
+            Self::Integer(value) => Self::Integer(*value),
+            Self::StringDict(values) => Self::StringDict(values.clone()),
+        })
+    }
+
     /// Returns every Bazel-visible string candidate for an unconfigured `attr()` query.
     ///
     /// The strings are rendered only for this request. Loading continues to retain the
@@ -263,7 +694,12 @@ impl CoercedAttributeValue {
                 left.labels(labels);
                 right.labels(labels);
             }
-            Self::String(_) | Self::StringList(_) | Self::None => {}
+            Self::String(_)
+            | Self::StringList(_)
+            | Self::Boolean(_)
+            | Self::Integer(_)
+            | Self::StringDict(_)
+            | Self::None => {}
         }
     }
 }
@@ -422,11 +858,25 @@ fn expand_attr_candidates(
             scalar_label_candidate(label)
         }
         CoercedAttributeValue::String(value) => scalar_string_candidate(value.clone()),
+        CoercedAttributeValue::Boolean(value) => {
+            scalar_string_candidate(CompactString::new(if *value { "1" } else { "0" }))
+        }
+        CoercedAttributeValue::Integer(value) => {
+            scalar_string_candidate(CompactString::new(value.to_string()))
+        }
         CoercedAttributeValue::LabelList(values) | CoercedAttributeValue::OutputList(values) => {
             list_candidate(values.iter().map(AttrCandidateAtom::Label))
         }
         CoercedAttributeValue::StringList(values) => {
             list_candidate(values.iter().cloned().map(AttrCandidateAtom::String))
+        }
+        CoercedAttributeValue::StringDict(values) => {
+            dict_candidate(values.iter().map(|(key, value)| {
+                (
+                    AttrCandidateAtom::String(key.clone()),
+                    AttrCandidateValue::Scalar(AttrCandidateAtom::String(value.clone())),
+                )
+            }))
         }
         CoercedAttributeValue::StringKeyedLabelDict(values) => {
             dict_candidate(values.iter().map(|(key, value)| {
@@ -572,6 +1022,7 @@ mod tests {
 
     use compact_str::CompactString;
     use slug_identity_v2::CanonicalLabel;
+    use slug_identity_v2::CanonicalRepoName;
 
     use super::AttributeKind;
     use super::AttributeProvenance;
@@ -579,6 +1030,87 @@ mod tests {
     use super::AttributeSchema;
     use super::AttributeValue;
     use super::CoercedAttributeValue;
+    use super::NativeAttributePolicy;
+    use super::NativeRuleClass;
+
+    #[test]
+    fn native_rule_schemas_have_exact_unique_bazel_slots() {
+        let classes = [
+            (NativeRuleClass::Filegroup, 23),
+            (NativeRuleClass::Alias, 17),
+            (NativeRuleClass::ConfigSetting, 21),
+            (NativeRuleClass::TestSuite, 21),
+            (NativeRuleClass::ConstraintSetting, 16),
+            (NativeRuleClass::ConstraintValue, 15),
+            (NativeRuleClass::Platform, 23),
+            (NativeRuleClass::ToolchainType, 17),
+            (NativeRuleClass::Toolchain, 21),
+        ];
+        for (class, expected) in classes {
+            let schema = class.schema();
+            assert_eq!(schema.len(), expected, "{class:?}");
+            for (index, attribute) in schema.iter().enumerate() {
+                assert!(
+                    schema[..index]
+                        .iter()
+                        .all(|prior| prior.query_name() != attribute.query_name()),
+                    "duplicate {} in {class:?}",
+                    attribute.query_name()
+                );
+            }
+            for generator in ["generator_name", "generator_function", "generator_location"] {
+                assert_eq!(
+                    class.slot(generator).unwrap().1.policy(),
+                    NativeAttributePolicy::Callable,
+                    "{class:?}.{generator}"
+                );
+            }
+        }
+        assert_eq!(
+            NativeRuleClass::ConfigSetting
+                .slot("licenses")
+                .unwrap()
+                .1
+                .policy(),
+            NativeAttributePolicy::Forced
+        );
+    }
+
+    #[test]
+    fn external_rebinding_reaches_selector_keys_values_and_foreign_labels() {
+        let foreign = label("@@bazel_tools//tools:test");
+        let value = CoercedAttributeValue::Selector {
+            branches: Arc::from([(
+                label("@@//pkg:condition"),
+                Arc::new(CoercedAttributeValue::LabelKeyedStringDict(Arc::from([
+                    (label("@@//pkg:key"), "local".into()),
+                    (foreign.clone(), "foreign".into()),
+                ]))),
+            )]),
+            default: Some(Arc::new(CoercedAttributeValue::LabelListDict(Arc::from([
+                (
+                    "values".into(),
+                    Arc::from([label("@@//pkg:value"), foreign.clone()]),
+                ),
+            ])))),
+        };
+        let repo = CanonicalRepoName::new("dep+").unwrap();
+        let rebound = value.rebind_provisional_root_labels(&repo).unwrap();
+        let CoercedAttributeValue::Selector { branches, default } = rebound else {
+            panic!("selector shape changed")
+        };
+        assert_eq!(branches[0].0.to_string(), "@@dep+//pkg:condition");
+        let CoercedAttributeValue::LabelKeyedStringDict(entries) = branches[0].1.as_ref() else {
+            panic!("branch dictionary shape changed")
+        };
+        assert_eq!(entries[0].0.to_string(), "@@dep+//pkg:key");
+        assert_eq!(entries[1].0, foreign);
+        let Some(CoercedAttributeValue::LabelListDict(entries)) = default.as_deref() else {
+            panic!("default dictionary shape changed")
+        };
+        assert_eq!(entries[0].1[0].to_string(), "@@dep+//pkg:value");
+        assert_eq!(entries[0].1[1].to_string(), "@@bazel_tools//tools:test");
+    }
 
     fn label(value: &str) -> CanonicalLabel {
         CanonicalLabel::parse(value).unwrap()
@@ -649,7 +1181,7 @@ mod tests {
 
         assert_eq!(query_value.kind, AttributeKind::LabelList);
         assert_eq!(query_value.provenance, AttributeProvenance::Explicit);
-        assert!(Arc::ptr_eq(&query_value.value, &retained));
+        assert_eq!(&query_value.value, retained.as_ref());
         let mut labels = Vec::new();
         query_value.value.labels(&mut labels);
         assert_eq!(labels, [before, selected, fallback]);
@@ -837,7 +1369,7 @@ mod tests {
         let value = AttributeQueryValue {
             kind: AttributeKind::Label,
             provenance: AttributeProvenance::Default,
-            value: Arc::new(CoercedAttributeValue::None),
+            value: CoercedAttributeValue::None,
         };
 
         assert!(

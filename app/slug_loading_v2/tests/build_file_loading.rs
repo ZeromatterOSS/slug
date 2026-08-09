@@ -558,8 +558,8 @@ fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
             name: "linux".to_owned(),
             kind: PackageTargetKind::ConfigSetting {
                 values: vec![
-                    ("compilation_mode".into(), "opt".into()),
                     ("cpu".into(), "k8".into()),
+                    ("compilation_mode".into(), "opt".into()),
                 ]
                 .into(),
             },
@@ -572,10 +572,14 @@ fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
         "config_setting(name = \"unsupported\", values = {}, define_values = {\"mode\": \"fast\"})\n",
     )
     .unwrap();
-    let error = try_load_package(&workspace, &package)
-        .unwrap_err()
-        .to_string();
-    assert!(error.contains("define_values"), "{error}");
+    let loaded = load_package(&workspace, &package);
+    assert!(
+        loaded
+            .native_attributes("unsupported")
+            .unwrap()
+            .get("define_values")
+            .is_some()
+    );
 }
 
 #[test]
@@ -684,6 +688,122 @@ toolchain(
 }
 
 #[test]
+fn native_module_toolchain_rules_retain_kwargs_and_macro_generator_metadata() {
+    let workspace = scratch("native-module-toolchain-rules");
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def legacy_native_toolchains(name):
+    native.config_setting(
+        name = name + "_config",
+        values = {"cpu": "k8"},
+        define_values = {"mode": "fast"},
+        tags = ["z", "a"],
+    )
+    native.constraint_setting(
+        name = name + "_constraint",
+        default_constraint_value = ":" + name + "_value",
+    )
+    native.constraint_value(
+        name = name + "_value",
+        constraint_setting = ":" + name + "_constraint",
+        tags = ["z", "a"],
+    )
+    native.platform(
+        name = name + "_platform",
+        constraint_values = [":" + name + "_value"],
+        exec_properties = {"key": "value"},
+    )
+    native.toolchain_type(
+        name = name + "_type",
+        no_match_error = "missing toolchain",
+    )
+    native.toolchain(
+        name = name + "_toolchain",
+        toolchain_type = ":" + name + "_type",
+        toolchain = ":" + name + "_impl",
+        exec_compatible_with = [":" + name + "_value"],
+    )
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"legacy_native_toolchains\")\nlegacy_native_toolchains(name = \"macro_case\")\n",
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let attrs = |name: &str| loaded.native_attributes(name).unwrap();
+    assert!(matches!(
+        &attrs("macro_case_config").get("define_values").unwrap().1.value,
+        CoercedAttributeValue::StringDict(values)
+            if values.as_ref() == [("mode".into(), "fast".into())]
+    ));
+    assert!(matches!(
+        &attrs("macro_case_config").get("tags").unwrap().1.value,
+        CoercedAttributeValue::StringList(values) if values.as_ref() == ["a", "z"]
+    ));
+    assert!(matches!(
+        &attrs("macro_case_constraint")
+            .get("default_constraint_value")
+            .unwrap()
+            .1
+            .value,
+        CoercedAttributeValue::Label(value)
+            if value == &CanonicalLabel::parse("@@//pkg:macro_case_value").unwrap()
+    ));
+    assert!(matches!(
+        &attrs("macro_case_value").get("constraint_setting").unwrap().1.value,
+        CoercedAttributeValue::Label(value)
+            if value == &CanonicalLabel::parse("@@//pkg:macro_case_constraint").unwrap()
+    ));
+    assert!(matches!(
+        &attrs("macro_case_platform").get("exec_properties").unwrap().1.value,
+        CoercedAttributeValue::StringDict(values)
+            if values.as_ref() == [("key".into(), "value".into())]
+    ));
+    assert!(matches!(
+        &attrs("macro_case_type").get("no_match_error").unwrap().1.value,
+        CoercedAttributeValue::String(value) if value == "missing toolchain"
+    ));
+    assert!(matches!(
+        &attrs("macro_case_toolchain")
+            .get("exec_compatible_with")
+            .unwrap()
+            .1
+            .value,
+        CoercedAttributeValue::LabelList(values)
+            if values.as_ref() == [CanonicalLabel::parse("@@//pkg:macro_case_value").unwrap()]
+    ));
+    for name in [
+        "macro_case_config",
+        "macro_case_constraint",
+        "macro_case_value",
+        "macro_case_platform",
+        "macro_case_type",
+        "macro_case_toolchain",
+    ] {
+        assert!(matches!(
+            &attrs(name).get("generator_name").unwrap().1.value,
+            CoercedAttributeValue::String(value) if value == "macro_case"
+        ));
+        assert!(matches!(
+            &attrs(name).get("generator_function").unwrap().1.value,
+            CoercedAttributeValue::String(value) if value == "legacy_native_toolchains"
+        ));
+        assert!(matches!(
+            &attrs(name).get("generator_location").unwrap().1.value,
+            CoercedAttributeValue::String(value)
+                if value.starts_with("pkg/BUILD.bazel:") && !value.ends_with(":0")
+        ));
+    }
+}
+
+#[test]
 fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
     let cases = [
         (
@@ -711,8 +831,8 @@ fn native_toolchain_targets_fail_closed_for_wrong_shapes_and_name_collisions() {
             "external repository dependency labels are not supported",
         ),
         (
-            "toolchain_type(name = 'bad', visibility = ['//visibility:public'])",
-            "visibility",
+            "toolchain_type(name = 'bad', data = [':leaf'])",
+            "not declared by rule 'toolchain_type'",
         ),
         (
             "constraint_setting(name = 'same')\nplatform(name = 'same', constraint_values = [])",
@@ -2252,5 +2372,165 @@ fn rule_toolchains_and_toolchain_info_fail_closed_outside_the_fixture_subset() {
     assert!(
         error.contains("unsupported analysis builtin ToolchainInfo"),
         "{error}"
+    );
+}
+
+#[test]
+fn native_rule_attributes_keep_ruleclass_order_overrides_and_removals() {
+    let workspace = scratch("native-rule-attributes");
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let package = workspace.join("pkg");
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        concat!(
+            "def legacy_macro(name, target_name):\n",
+            "    native.filegroup(name = target_name)\n",
+        ),
+    )
+    .unwrap();
+    fs::write(
+        package.join("BUILD.bazel"),
+        concat!(
+            "load(\":defs.bzl\", \"legacy_macro\")\n",
+            "package(default_deprecation = \"deprecated\", default_testonly = True)\n",
+            "licenses([\"notice\"])\n",
+            "filegroup(name = \"leaf\")\n",
+            "filegroup(name = \"files\", data = [\":leaf\"], output_group = \"group\", output_licenses = [\"z\", \"a\"], tags = [\"z\", \"a\"])\n",
+            "filegroup(name = \"selected\", srcs = select({\":condition\": [\":leaf\"], \"//conditions:default\": []}))\n",
+            "alias(name = \"redirect\", actual = \":leaf\")\n",
+            "config_setting(name = \"setting\", values = {\"mode\": \"fast\"}, define_values = {\"feature\": \"on\"})\n",
+            "config_setting(name = \"define_only\", define_values = {\"feature\": \"on\"})\n",
+            "platform(name = \"platform\")\n",
+            "toolchain_type(name = \"type\")\n",
+            "toolchain(name = \"chain\", toolchain_type = \":type\", toolchain = \":leaf\")\n",
+            "legacy_macro(name = \"macro_case\", target_name = \"macro_files\")\n",
+        ),
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let names = |target: &str| {
+        loaded
+            .native_attributes(target)
+            .unwrap()
+            .iter()
+            .map(|(schema, _)| schema.query_name())
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        names("files"),
+        [
+            "name",
+            "visibility",
+            "transitive_configs",
+            "deprecation",
+            "tags",
+            "generator_name",
+            "generator_function",
+            "generator_location",
+            "testonly",
+            "features",
+            ":action_listener",
+            "compatible_with",
+            "restricted_to",
+            "$config_dependencies",
+            "package_metadata",
+            "aspect_hints",
+            "licenses",
+            "distribs",
+            "target_compatible_with",
+            "srcs",
+            "output_group",
+            "data",
+            "output_licenses",
+        ]
+    );
+    let files = loaded.native_attributes("files").unwrap();
+    assert!(
+        matches!(&files.get("deprecation").unwrap().1.value, CoercedAttributeValue::String(value) if value == "deprecated")
+    );
+    assert!(
+        matches!(&files.get("tags").unwrap().1.value, CoercedAttributeValue::StringList(values) if values.as_ref() == ["a", "z"])
+    );
+    assert!(
+        matches!(&files.get("output_group").unwrap().1.value, CoercedAttributeValue::String(value) if value == "group")
+    );
+    assert!(
+        matches!(&files.get("data").unwrap().1.value, CoercedAttributeValue::LabelList(values) if values.as_ref() == [CanonicalLabel::parse("@@//pkg:leaf").unwrap()])
+    );
+    assert!(
+        matches!(&files.get("output_licenses").unwrap().1.value, CoercedAttributeValue::StringList(values) if values.as_ref() == ["z", "a"])
+    );
+    let alias_names = names("redirect");
+    assert!(!alias_names.contains(&"licenses"));
+    assert!(!alias_names.contains(&"distribs"));
+    assert!(!alias_names.contains(&":action_listener"));
+    let setting = loaded.native_attributes("setting").unwrap();
+    assert_eq!(setting.iter().len(), 21);
+    assert_eq!(
+        setting
+            .iter()
+            .filter(|(schema, _)| schema.query_name() == "licenses")
+            .count(),
+        1
+    );
+    assert!(
+        matches!(&setting.get("define_values").unwrap().1.value, CoercedAttributeValue::StringDict(values) if values.as_ref() == [("feature".into(), "on".into())])
+    );
+    assert!(setting.get("compatible_with").is_none());
+    assert!(
+        matches!(&loaded.native_attributes("define_only").unwrap().get("values").unwrap().1.value, CoercedAttributeValue::StringDict(values) if values.is_empty())
+    );
+    let selected = loaded.native_attributes("selected").unwrap();
+    let selected_srcs = selected.get("srcs").unwrap().1;
+    let CoercedAttributeValue::Selector { branches, default } = &selected_srcs.value else {
+        panic!("selected srcs should retain its selector");
+    };
+    assert_eq!(branches.len(), 1);
+    assert_eq!(
+        branches[0].0,
+        CanonicalLabel::parse("@@//pkg:condition").unwrap()
+    );
+    assert!(
+        matches!(branches[0].1.as_ref(), CoercedAttributeValue::LabelList(values) if values.as_ref() == [CanonicalLabel::parse("@@//pkg:leaf").unwrap()])
+    );
+    assert!(
+        matches!(default.as_deref(), Some(CoercedAttributeValue::LabelList(values)) if values.is_empty())
+    );
+    assert!(
+        matches!(&selected.get("$config_dependencies").unwrap().1.value, CoercedAttributeValue::LabelList(values) if values.as_ref() == [CanonicalLabel::parse("@@//pkg:condition").unwrap()])
+    );
+    let PackageTargetKind::Filegroup { srcs, .. } = &loaded
+        .targets
+        .iter()
+        .find(|target| target.name == "selected")
+        .unwrap()
+        .kind
+    else {
+        panic!("selected should be a filegroup");
+    };
+    assert_eq!(
+        srcs.as_ref(),
+        [CanonicalLabel::parse("@@//pkg:leaf").unwrap()]
+    );
+    assert!(
+        matches!(&loaded.native_attributes("platform").unwrap().get("constraint_values").unwrap().1.value, CoercedAttributeValue::LabelList(values) if values.is_empty())
+    );
+    assert!(
+        matches!(&loaded.native_attributes("chain").unwrap().get("exec_compatible_with").unwrap().1.value, CoercedAttributeValue::LabelList(values) if values.is_empty())
+    );
+    let direct = loaded.native_attributes("files").unwrap();
+    assert!(
+        matches!(&direct.get("generator_name").unwrap().1.value, CoercedAttributeValue::String(value) if value.is_empty())
+    );
+    let generated = loaded.native_attributes("macro_files").unwrap();
+    assert!(
+        matches!(&generated.get("generator_name").unwrap().1.value, CoercedAttributeValue::String(value) if value == "macro_case")
+    );
+    assert!(
+        matches!(&generated.get("generator_function").unwrap().1.value, CoercedAttributeValue::String(value) if value == "legacy_macro")
+    );
+    assert!(
+        matches!(&generated.get("generator_location").unwrap().1.value, CoercedAttributeValue::String(value) if value.starts_with("pkg/BUILD.bazel:") && !value.ends_with(":0"))
     );
 }

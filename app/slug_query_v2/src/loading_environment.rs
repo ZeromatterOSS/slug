@@ -801,7 +801,7 @@ fn attr_matches_node(
         return Ok(false);
     };
     let candidates = value
-        .attr_visible_candidates(|label| QueryLabel::from_canonical(label.clone()).output_label())
+        .attr_visible_candidates(|label| node.label.output_attribute_label(label))
         .map_err(|error| {
             QueryError::evaluation(format!(
                 "in '{}' of rule {}: {error}",
@@ -1497,7 +1497,7 @@ mod tests {
         AttributeQueryValue {
             kind,
             provenance: AttributeProvenance::Explicit,
-            value: Arc::new(value),
+            value,
         }
     }
 

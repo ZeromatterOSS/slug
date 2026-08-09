@@ -2264,7 +2264,10 @@ fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str>
         PackageTargetKind::ExportedFile | PackageTargetKind::Filegroup { .. } => None,
         PackageTargetKind::Alias { .. } => Some("alias"),
         PackageTargetKind::ConfigSetting { .. } => Some("config_setting"),
-        PackageTargetKind::NativeToolchain(target) => Some(target.rule_class()),
+        // Native toolchain targets are retained as typed native targets even
+        // when the external BUILD uses `load()`. The load gate only protects
+        // target kinds whose loaded form is not yet represented.
+        PackageTargetKind::NativeToolchain(_) => None,
         PackageTargetKind::TestSuite { .. } => Some("test_suite"),
         PackageTargetKind::PackageGroup { .. } => Some("package_group"),
         PackageTargetKind::GeneratedFile { .. } => Some("generated file"),
@@ -2517,23 +2520,6 @@ impl Key for RepositoryPackageLoadKey {
                         ))
                     });
                     let result = result.and_then(|loaded| {
-                        if let Some((target, kind)) =
-                            loaded.targets.iter().find_map(|target| match &target.kind {
-                                PackageTargetKind::NativeToolchain(native) => {
-                                    Some((target.name.as_str(), native.rule_class()))
-                                }
-                                _ => None,
-                            })
-                        {
-                            return Err(RepositoryPackageLoadError::new(
-                                RepositoryPackageLoadErrorInner::LoadedTargetKind {
-                                    canonical_repo,
-                                    package: self.package.clone(),
-                                    target: Arc::from(target),
-                                    kind: Arc::from(kind),
-                                },
-                            ));
-                        }
                         if loads.is_empty() {
                             return Ok(loaded);
                         }

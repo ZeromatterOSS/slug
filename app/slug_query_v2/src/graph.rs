@@ -122,6 +122,18 @@ impl QueryLabel {
         }
     }
 
+    fn from_canonical_for_external_owner(
+        label: CanonicalLabel,
+        canonical_repo: &CanonicalRepoName,
+        apparent_repo: &ApparentRepoName,
+    ) -> Self {
+        let same_owner_repo = label.package().repo() == canonical_repo;
+        Self {
+            canonical: Arc::new(label),
+            apparent_repo: same_owner_repo.then(|| Arc::new(apparent_repo.clone())),
+        }
+    }
+
     pub(crate) fn from_apparent_route(
         label: &ApparentLabel,
         canonical_repo: &CanonicalRepoName,
@@ -232,6 +244,17 @@ impl QueryLabel {
             None => CompactString::new(self.to_string()),
         }
     }
+
+    pub(crate) fn output_attribute_label(&self, label: &CanonicalLabel) -> CompactString {
+        let same_owner_repo = label.package().repo() == self.canonical.package().repo();
+        Self {
+            canonical: Arc::new(label.clone()),
+            apparent_repo: same_owner_repo
+                .then(|| self.apparent_repo.clone())
+                .flatten(),
+        }
+        .output_label()
+    }
 }
 
 impl fmt::Display for QueryLabel {
@@ -294,8 +317,7 @@ pub struct QueryAttribute {
     pub name: CompactString,
     pub labels: Arc<[QueryLabel]>,
     pub explicit: bool,
-    /// Present only for Starlark attributes supported by loading. Native
-    /// projections retain their historical labels-only representation.
+    /// Loading-owned typed value used by request-time attribute matching.
     pub value: Option<AttributeQueryValue>,
 }
 
@@ -657,17 +679,6 @@ fn package_graph_from_loaded(
     loaded: &LoadedPackage,
 ) -> Result<UnconfiguredPackageGraph, QueryError> {
     let package_name = path_to_package(package)?;
-    if let Some((target, native)) = loaded.targets.iter().find_map(|target| match &target.kind {
-        PackageTargetKind::NativeToolchain(native) => Some((target, native)),
-        _ => None,
-    }) {
-        return Err(QueryError::unsupported_feature(format!(
-            "Slug does not support query graph projection for native {} target '//{}:{}'",
-            native.rule_class(),
-            package_name,
-            target.name
-        )));
-    }
     let build_basename = loaded
         .build_file
         .file_name()
@@ -681,7 +692,8 @@ fn package_graph_from_loaded(
     let build_file = CompactString::new(&build_file);
     let mut nodes = SmallMap::with_capacity(loaded.targets.len() + 1);
 
-    for target in &loaded.targets {
+    for (target_index, target) in loaded.targets.iter().enumerate() {
+        let native_attributes = loaded.native_attributes_at(target_index);
         // Borrow once from the loading target and retain an owned compact
         // projection in the immutable package graph. Query-time filters must
         // not classify targets or clone rule-class names repeatedly.
@@ -770,9 +782,11 @@ fn package_graph_from_loaded(
                 visibility_edges,
                 Vec::new(),
             ),
-            PackageTargetKind::NativeToolchain(_) => {
-                unreachable!("native toolchain targets are rejected before graph projection")
-            }
+            PackageTargetKind::NativeToolchain(native) => (
+                QueryNodeKind::Rule(CompactString::new(format!("{} rule", native.rule_class()))),
+                visibility_edges,
+                Vec::new(),
+            ),
             PackageTargetKind::TestSuite { membership, .. } => {
                 let tests = membership
                     .tests()
@@ -858,7 +872,11 @@ fn package_graph_from_loaded(
                 Vec::new(),
             ),
         };
-        if kind.is_rule() {
+        if let Some(native_attributes) = native_attributes {
+            attributes =
+                project_native_attributes(native_attributes, target.raw_visibility_labels(), None)?
+                    .to_vec();
+        } else if kind.is_rule() {
             attributes.push(project_visibility_attribute(target));
         }
         if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
@@ -953,6 +971,7 @@ fn external_package_graph_from_loaded(
         &loaded.build_file,
         &loaded.default_visibility,
         &loaded.targets,
+        Some(&loaded.native_attributes),
     )
 }
 
@@ -963,6 +982,7 @@ fn external_package_graph_from_targets(
     build_path: &Path,
     default_visibility: &RuleVisibility,
     targets: &[slug_loading_v2::PackageTarget],
+    native_attributes: Option<&[slug_loading_v2::NativeTargetAttributes]>,
 ) -> Result<UnconfiguredPackageGraph, QueryError> {
     let build_basename = build_path
         .file_name()
@@ -985,7 +1005,14 @@ fn external_package_graph_from_targets(
     validate_external_package_group_includes(package, targets)?;
     validate_external_restricted_visibility(package, default_visibility, targets)?;
 
-    for target in targets {
+    for (target_index, target) in targets.iter().enumerate() {
+        let native_attributes = native_attributes.and_then(|attributes| {
+            let target_index = u32::try_from(target_index).ok()?;
+            attributes
+                .binary_search_by_key(&target_index, |entry| entry.target_index)
+                .ok()
+                .map(|index| &attributes[index].attributes)
+        });
         let target_effective_visibility = match &target.visibility {
             VisibilitySource::Declared(visibility) => visibility.clone(),
             VisibilitySource::PackageDefault => default_visibility.clone(),
@@ -1118,6 +1145,11 @@ fn external_package_graph_from_targets(
                 Arc::from([]),
                 Arc::from([]),
             ),
+            PackageTargetKind::NativeToolchain(native) => (
+                QueryNodeKind::Rule(CompactString::new(format!("{} rule", native.rule_class()))),
+                Arc::from([]),
+                Arc::from([]),
+            ),
             PackageTargetKind::TestSuite { membership, .. } => {
                 let tests = membership
                     .tests()
@@ -1214,6 +1246,19 @@ fn external_package_graph_from_targets(
                     canonical_repo, package, target.name
                 )));
             }
+        };
+        let attributes = if let Some(native) = native_attributes {
+            let raw_visibility = match &visibility_source {
+                VisibilitySource::Declared(visibility) => visibility.raw_declared_labels(),
+                _ => &[],
+            };
+            project_native_attributes(
+                native,
+                raw_visibility,
+                Some((canonical_repo, apparent_repo)),
+            )?
+        } else {
+            attributes
         };
         if target.name == build_basename && !matches!(kind, QueryNodeKind::BuildFile) {
             return Err(QueryError::evaluation(format!(
@@ -1722,6 +1767,55 @@ fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[Query
         .into()
 }
 
+fn project_native_attributes(
+    attributes: &slug_loading_v2::NativeRuleAttributes,
+    raw_visibility: &[CanonicalLabel],
+    external_route: Option<(&CanonicalRepoName, &ApparentRepoName)>,
+) -> Result<Arc<[QueryAttribute]>, QueryError> {
+    let projected = attributes
+        .iter()
+        .map(|(schema, attribute)| {
+            let value = match external_route {
+                Some((canonical_repo, _)) => attribute
+                    .value
+                    .rebind_provisional_root_labels(canonical_repo)
+                    .map_err(QueryError::evaluation)?,
+                None => attribute.value.clone(),
+            };
+            let mut labels = Vec::new();
+            if schema.query_name() == "visibility" {
+                labels.extend_from_slice(raw_visibility);
+            } else {
+                value.labels(&mut labels);
+            }
+            let labels = labels
+                .into_iter()
+                .map(|label| match external_route {
+                    Some((canonical_repo, apparent_repo)) => {
+                        Ok(QueryLabel::from_canonical_for_external_owner(
+                            label,
+                            canonical_repo,
+                            apparent_repo,
+                        ))
+                    }
+                    None => Ok(QueryLabel::from_canonical(label)),
+                })
+                .collect::<Result<Vec<_>, QueryError>>()?;
+            Ok(QueryAttribute {
+                name: CompactString::new(schema.query_name()),
+                labels: labels.into(),
+                explicit: attribute.provenance == AttributeProvenance::Explicit,
+                value: Some(AttributeQueryValue {
+                    kind: schema.kind(),
+                    provenance: attribute.provenance,
+                    value,
+                }),
+            })
+        })
+        .collect::<Result<Vec<_>, QueryError>>()?;
+    Ok(projected.into())
+}
+
 #[async_trait]
 impl Key for SubtreePackageSetKey {
     type Value = PackageSetValue;
@@ -2157,10 +2251,10 @@ mod graph_tests {
     #[test]
     fn query_attribute_retains_the_typed_loading_candidate_without_a_string_cache() {
         let label = CanonicalLabel::parse("@@//pkg:dep").unwrap();
-        let retained = Arc::new(CoercedAttributeValue::StringKeyedLabelDict(Arc::from([(
+        let retained = CoercedAttributeValue::StringKeyedLabelDict(Arc::from([(
             "first".into(),
             label.clone(),
-        )])));
+        )]));
         let attribute = super::QueryAttribute {
             name: "mapping".into(),
             labels: Arc::from([QueryLabel::from_canonical(label)]),
@@ -2183,9 +2277,8 @@ mod graph_tests {
         let candidate = attribute.value.as_ref().unwrap();
         assert_eq!(candidate.kind, AttributeKind::StringKeyedLabelDict);
         assert_eq!(candidate.provenance, AttributeProvenance::Explicit);
-        assert!(Arc::ptr_eq(&candidate.value, &retained));
         assert!(matches!(
-            candidate.value.as_ref(),
+            &candidate.value,
             CoercedAttributeValue::StringKeyedLabelDict(values)
                 if values.as_ref() == [("first".into(), CanonicalLabel::parse("@@//pkg:dep").unwrap())]
         ));
@@ -2252,6 +2345,7 @@ mod graph_tests {
             Path::new("/external/dep+/BUILD.bazel"),
             &RuleVisibility::Private,
             &targets,
+            None,
         )
         .unwrap();
         let label = |target| {
@@ -2444,6 +2538,7 @@ mod graph_tests {
             Path::new("/external/dep+/BUILD.bazel"),
             &RuleVisibility::Private,
             &targets,
+            None,
         )
         .unwrap();
         let label = |target| {
@@ -2547,6 +2642,7 @@ mod graph_tests {
                         visibility: VisibilitySource::PackageDefault,
                     },
                 ],
+                None,
             )
         };
         let non_suite =
@@ -2594,6 +2690,7 @@ mod graph_tests {
                 },
                 visibility: VisibilitySource::PackageDefault,
             }],
+            None,
         )
         .unwrap_err();
         assert!(
@@ -2634,6 +2731,7 @@ mod graph_tests {
                 group("cycle_a", vec![source("cycle_b")]),
                 group("cycle_b", vec![source("cycle_a")]),
             ],
+            None,
         )
         .unwrap();
         let label = |target| {
@@ -2720,6 +2818,7 @@ mod graph_tests {
                         visibility: VisibilitySource::PackageDefault,
                     },
                 ],
+                None,
             )
         };
         let missing = project(source("@@//:missing"), PackageTargetKind::ExportedFile).unwrap_err();
@@ -2775,6 +2874,7 @@ mod graph_tests {
                 },
                 visibility: VisibilitySource::PackageDefault,
             }],
+            None,
         )
         .unwrap_err();
         assert!(
@@ -2903,6 +3003,7 @@ mod graph_tests {
             &loaded.build_file,
             &loaded.default_visibility,
             &loaded.targets,
+            Some(&loaded.native_attributes),
         )
         .unwrap();
         let label = |target| {
@@ -2956,6 +3057,7 @@ mod graph_tests {
                 Path::new("/external/dep+/BUILD.bazel"),
                 &RuleVisibility::Private,
                 &targets,
+                None,
             )
         };
 
