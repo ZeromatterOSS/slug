@@ -13,6 +13,7 @@ use std::sync::Arc;
 use allocative::Allocative;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ProviderCollection;
+use slug_loading_v2::RuleCapability;
 
 use crate::key::ConfiguredTargetKey;
 
@@ -54,10 +55,15 @@ pub struct AnalysisResult {
     declared_outputs: Vec<String>,
     direct_dependencies: Arc<[ConfiguredTargetKey]>,
     diagnostics: Vec<AnalysisDiagnostic>,
+    rule_capability: Option<RuleCapability>,
 }
 
 impl AnalysisResult {
-    pub fn new(key: ConfiguredTargetKey, providers: ProviderCollection) -> Self {
+    pub fn new(
+        key: ConfiguredTargetKey,
+        providers: ProviderCollection,
+        rule_capability: Option<RuleCapability>,
+    ) -> Self {
         Self {
             key,
             providers,
@@ -65,6 +71,7 @@ impl AnalysisResult {
             declared_outputs: Vec::new(),
             direct_dependencies: Arc::from([]),
             diagnostics: Vec::new(),
+            rule_capability,
         }
     }
 
@@ -90,6 +97,10 @@ impl AnalysisResult {
 
     pub fn diagnostics(&self) -> &[AnalysisDiagnostic] {
         &self.diagnostics
+    }
+
+    pub fn rule_capability(&self) -> Option<&RuleCapability> {
+        self.rule_capability.as_ref()
     }
 
     pub fn with_actions(mut self, actions: Vec<ActionSpec>) -> Self {

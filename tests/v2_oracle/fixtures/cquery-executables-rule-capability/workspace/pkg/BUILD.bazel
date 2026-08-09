@@ -1,0 +1,6 @@
+load(":defs.bzl", "exec_arbitrary", "missing_exec", "plain_rule")
+
+exec_arbitrary(name = "arbitrary_target")
+exec_arbitrary(name = "target_test")
+plain_rule(name = "plain")
+missing_exec(name = "missing_exec")

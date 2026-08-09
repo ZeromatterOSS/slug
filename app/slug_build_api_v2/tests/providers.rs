@@ -98,6 +98,31 @@ fn provider_collection_exposes_bazel_native_and_user_providers() {
 }
 
 #[test]
+fn executable_default_info_uses_the_executable_for_implicit_files_and_runfiles() {
+    let info = DefaultInfo::from_executable("pkg/tool".to_owned(), None);
+
+    assert_eq!(info.files.to_list(), ["pkg/tool"]);
+    assert_eq!(info.executable.as_deref(), Some("pkg/tool"));
+    assert_eq!(info.files_to_run.executable.as_deref(), Some("pkg/tool"));
+    assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
+    assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
+    assert!(info.files_to_run.runfiles_manifest.is_none());
+    assert!(info.files_to_run.repo_mapping_manifest.is_none());
+    assert!(info.default_runfiles.symlinks.is_empty());
+    assert!(info.data_runfiles.symlinks.is_empty());
+}
+
+#[test]
+fn executable_default_info_preserves_an_explicit_files_override() {
+    let info =
+        DefaultInfo::from_executable("pkg/tool".to_owned(), Some(files(&["pkg/explicit.txt"])));
+
+    assert_eq!(info.files.to_list(), ["pkg/explicit.txt"]);
+    assert_eq!(info.default_runfiles.files.to_list(), ["pkg/tool"]);
+    assert_eq!(info.data_runfiles.files.to_list(), ["pkg/tool"]);
+}
+
+#[test]
 fn provider_collection_looks_up_user_providers_by_structural_export_identity() {
     let constructor_id = ProviderId::new("//rules:defs.bzl", "MyInfo").unwrap();
     let independently_reconstructed_id = ProviderId::new("//rules:defs.bzl", "MyInfo").unwrap();

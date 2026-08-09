@@ -1,25 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m4-configured-query-successor-audit-4`
+Packet: `WP-6-m4-cquery-executables-nontest-successor-audit`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: read-only selection audit after accepted configured `some` and typed evaluation terminal.
+Result: read-only activation audit after accepted non-test executable analysis.
 
 ## Observable slice
 
-Select one exact next M4 behavior supported by retained configured analysis
-state and the shared Buck2-derived evaluator. Prefer direct reuse over new
-command-specific machinery.
+Freeze the smallest exact configured `executables(expr)` activation over the
+now-analyzable non-test rule surface. Resolve the known cquery analysis-failure
+exit-2 versus Bazel exit-1 classification without broadening protocol state.
 
 ## Ownership and stops
 
-Do not select traversal without observable platform/constraint nodes,
-configured `kind`/`attr`/`executables` without retained Rule metadata, or
-providers without a complete dictionary/value runtime. Add no second graph/
-parser/evaluator, patterns/externals, exact hashes, JVM/Java, CI, or shim.
+Reuse retained `AnalysisResult.rule_capability` and the sole recursive query
+fold. Do not reload packages, create metadata caches/keys, use `test_kind` as
+the predicate, or activate configured test-rule success. Test-rule runfiles,
+general providers, traversal, attrs, patterns/externals, exact hashes,
+JVM/Java, CI, and shims remain outside the packet.
 
 ## Validation
 
-Return one bounded implementation packet with exact observable, ownership,
-allowlist, evidence, validation, and stops. Do not commit the audit alone.
+Return one bounded implementation contract covering the shared evaluator,
+configured filter, exact non-test oracle rows, typed analysis-error mapping,
+lifecycle/equality evidence, allowlist, validation, and hard stops. Do not
+commit the audit alone.

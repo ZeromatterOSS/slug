@@ -1565,6 +1565,169 @@ async fn custom_only_starlark_rule_gets_implicit_empty_default_info() {
 }
 
 #[tokio::test]
+async fn default_info_executable_is_narrow_and_requires_an_executable_for_executable_rules() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _implicit(ctx):
+    out = ctx.actions.declare_file(ctx.label.name)
+    ctx.actions.write(out, "tool\n")
+    return [DefaultInfo(executable = out)]
+
+def _explicit(ctx):
+    out = ctx.actions.declare_file(ctx.label.name)
+    extra = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, "tool\n")
+    ctx.actions.write(extra, "extra\n")
+    return [DefaultInfo(files = depset([extra]), executable = out)]
+
+def _omitted(ctx):
+    return [DefaultInfo()]
+
+def _none(ctx):
+    return [DefaultInfo(files = None, executable = None)]
+
+def _wrong_files(ctx):
+    out = ctx.actions.declare_file("wrong-files")
+    return [DefaultInfo(files = out)]
+
+def _wrong_executable(ctx):
+    return [DefaultInfo(executable = "not-a-file")]
+
+def _missing(ctx):
+    return [DefaultInfo()]
+
+implicit = rule(implementation = _implicit, executable = True)
+explicit = rule(implementation = _explicit, executable = True)
+omitted = rule(implementation = _omitted)
+none = rule(implementation = _none)
+wrong_files = rule(implementation = _wrong_files)
+wrong_executable = rule(implementation = _wrong_executable)
+missing = rule(implementation = _missing, executable = True)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"explicit\", \"implicit\", \"missing\", \"none\", \"omitted\", \"wrong_executable\", \"wrong_files\")\nimplicit(name = \"implicit\")\nexplicit(name = \"explicit\")\nomitted(name = \"omitted\")\nnone(name = \"none\")\nwrong_files(name = \"wrong_files\")\nwrong_executable(name = \"wrong_executable\")\nmissing(name = \"missing\")\n",
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = |name: &str| {
+        ConfiguredTargetKey::new(
+            CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
+            ConfigurationKey::target(format!("default-info-{name}")).unwrap(),
+        )
+    };
+
+    let implicit = analyze_request(&dice, &workspace, &key("implicit"), None, false)
+        .await
+        .unwrap();
+    let implicit = implicit.providers().default_info().unwrap();
+    assert_eq!(implicit.files.to_list(), ["implicit"]);
+    assert_eq!(implicit.executable.as_deref(), Some("implicit"));
+    assert_eq!(
+        implicit.files_to_run.executable.as_deref(),
+        Some("implicit")
+    );
+    assert_eq!(implicit.default_runfiles.files.to_list(), ["implicit"]);
+    assert_eq!(implicit.data_runfiles.files.to_list(), ["implicit"]);
+
+    let explicit = analyze_request(&dice, &workspace, &key("explicit"), None, false)
+        .await
+        .unwrap();
+    let explicit = explicit.providers().default_info().unwrap();
+    assert_eq!(explicit.files.to_list(), ["explicit.txt"]);
+    assert_eq!(explicit.executable.as_deref(), Some("explicit"));
+    assert_eq!(explicit.default_runfiles.files.to_list(), ["explicit"]);
+    assert_eq!(explicit.data_runfiles.files.to_list(), ["explicit"]);
+
+    let omitted = analyze_request(&dice, &workspace, &key("omitted"), None, false)
+        .await
+        .unwrap();
+    let none = analyze_request(&dice, &workspace, &key("none"), None, false)
+        .await
+        .unwrap();
+    assert_eq!(
+        omitted.providers().default_info(),
+        none.providers().default_info()
+    );
+
+    for (target, expected) in [
+        (
+            "wrong_files",
+            "DefaultInfo.files must be the result of depset([...])",
+        ),
+        (
+            "wrong_executable",
+            "DefaultInfo.executable must be a declared file",
+        ),
+        (
+            "missing",
+            "The rule 'missing' is executable. It needs to create an executable File",
+        ),
+    ] {
+        let error = analyze_request(&dice, &workspace, &key(target), None, false)
+            .await
+            .unwrap_err();
+        assert!(error.contains(expected), "{target}: {error}");
+    }
+}
+
+#[tokio::test]
+async fn executable_default_info_recomputes_and_restores_structural_results() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    let definitions = |explicit_files: bool| {
+        let files = explicit_files
+            .then_some(
+                "    extra = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    ctx.actions.write(extra, \"extra\\n\")\n    return [DefaultInfo(files = depset([extra]), executable = out)]",
+            )
+            .unwrap_or("    return [DefaultInfo(executable = out)]");
+        format!(
+            "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n{files}\n\nprobe = rule(implementation = _impl, executable = True)\n"
+        )
+    };
+    let defs = workspace.join("defs.bzl");
+    fs::write(&defs, definitions(false)).unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    )
+    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = ConfiguredTargetKey::new(
+        CanonicalLabel::parse("@@//:probe").unwrap(),
+        ConfigurationKey::target("default-info-restoration").unwrap(),
+    );
+
+    let initial = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    fs::write(&defs, definitions(true)).unwrap();
+    let changed = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+    fs::write(&defs, definitions(false)).unwrap();
+    let restored = analyze_request(&dice, &workspace, &key, None, false)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        initial.providers().default_info().unwrap().files.to_list(),
+        ["probe"]
+    );
+    assert_eq!(
+        changed.providers().default_info().unwrap().files.to_list(),
+        ["probe.txt"]
+    );
+    assert_ne!(initial, changed);
+    assert_eq!(initial, restored);
+}
+
+#[tokio::test]
 async fn recursive_custom_rules_preserve_provider_identity_dependency_order_and_local_actions() {
     let workspace = scratch();
     for package in ["rules", "leaf", "parent"] {

@@ -389,6 +389,7 @@ pub(crate) fn evaluate_loaded_rule(
         .iter()
         .find(|target| target.name == target_name)
         .ok_or_else(|| format!("target `{target_name}` was not found in loaded package"))?;
+    let rule_capability = target.rule_capability().cloned();
     let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
         return Err(format!("target `{target_name}` is not a Starlark rule"));
     };
@@ -432,28 +433,46 @@ pub(crate) fn evaluate_loaded_rule(
         .ok_or_else(|| "rule implementation must return a list of providers".to_owned())?;
     let mut provider_values = Vec::with_capacity(returned.len());
     for value in returned.iter() {
-        if let Some(files) = StarlarkDefaultInfo::files_from_value(value) {
-            let files = StarlarkDepset::direct_from_value(files).ok_or_else(|| {
-                "DefaultInfo.files must be the result of depset([...])".to_owned()
-            })?;
-            let declared_outputs = files
-                .iter()
-                .map(|value| {
-                    DeclaredFile::from_value(*value)
-                        .map(|file| file.output.path().to_owned())
-                        .ok_or_else(|| {
-                            "DefaultInfo.files depset must contain declared files".to_owned()
+        if let Some((files, executable)) = StarlarkDefaultInfo::fields_from_value(value) {
+            let files = files
+                .map(|files| {
+                    let files = StarlarkDepset::direct_from_value(files).ok_or_else(|| {
+                        "DefaultInfo.files must be the result of depset([...])".to_owned()
+                    })?;
+                    let declared_outputs = files
+                        .iter()
+                        .map(|value| {
+                            DeclaredFile::from_value(*value)
+                                .map(|file| file.output.path().to_owned())
+                                .ok_or_else(|| {
+                                    "DefaultInfo.files depset must contain declared files"
+                                        .to_owned()
+                                })
                         })
+                        .collect::<Result<Vec<_>, _>>()?;
+                    slug_build_api_v2::Depset::from_direct(
+                        slug_build_api_v2::DepsetOrder::Default,
+                        declared_outputs,
+                    )
+                    .map_err(|error| error.to_string())
                 })
-                .collect::<Result<Vec<_>, _>>()?;
-            let files = slug_build_api_v2::Depset::from_direct(
-                slug_build_api_v2::DepsetOrder::Default,
-                declared_outputs,
-            )
-            .map_err(|error| error.to_string())?;
-            provider_values.push(ProviderValue::DefaultInfo(
-                slug_build_api_v2::DefaultInfo::from_files(files),
-            ));
+                .transpose()?;
+            let executable = executable
+                .map(|executable| {
+                    DeclaredFile::from_value(executable)
+                        .map(|file| file.output.path().to_owned())
+                        .ok_or_else(|| "DefaultInfo.executable must be a declared file".to_owned())
+                })
+                .transpose()?;
+            let default_info = match executable {
+                Some(executable) => {
+                    slug_build_api_v2::DefaultInfo::from_executable(executable, files)
+                }
+                None => slug_build_api_v2::DefaultInfo::from_files(
+                    files.unwrap_or_else(slug_build_api_v2::Depset::empty),
+                ),
+            };
+            provider_values.push(ProviderValue::DefaultInfo(default_info));
         } else if let Some(provider) = StarlarkUserProvider::from_value(value) {
             provider_values.push(ProviderValue::User(
                 UserProvider::with_id(
@@ -485,6 +504,21 @@ pub(crate) fn evaluate_loaded_rule(
         ));
     }
     let providers = ProviderCollection::new(provider_values).map_err(|error| error.to_string())?;
+    if rule_capability
+        .as_ref()
+        .is_some_and(|capability| capability.executable)
+        && providers
+            .default_info()
+            .is_some_and(|default_info| default_info.executable.is_none())
+    {
+        return Err(format!(
+            "The rule '{}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns.",
+            rule_capability
+                .as_ref()
+                .expect("executable rule has a capability")
+                .rule_class
+        ));
+    }
     let declared_outputs = providers
         .default_info()
         .expect("ProviderCollection validated DefaultInfo")
@@ -496,7 +530,7 @@ pub(crate) fn evaluate_loaded_rule(
         .registry()
         .actions()
         .to_vec();
-    Ok(AnalysisResult::new(key, providers)
+    Ok(AnalysisResult::new(key, providers, rule_capability)
         .with_direct_dependencies(direct_dependencies)
         .with_actions(actions)
         .with_declared_outputs(declared_outputs))

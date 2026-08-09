@@ -1,0 +1,356 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "cquery",
+        "executables(//pkg:arbitrary_target)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(//pkg:arbitrary_target)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "executable_non_test_rule",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:arbitrary_target (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:arbitrary_target (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:arbitrary_target",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143000-876666-bazel/workspace\n  - Only in new server: --workspace_directory=/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143157-880961-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:arbitrary_target (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:arbitrary_target (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.737s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:arbitrary_target\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(//pkg:plain)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(//pkg:plain)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "executable_false_is_excluded",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:plain (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:plain (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Empty query results\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:plain (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //pkg:plain (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nINFO: Empty query results\nINFO: Elapsed time: 0.103s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(//pkg:target_test)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(//pkg:target_test)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "build_target_test_suffix_is_not_classification",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:target_test (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:target_test (0 packages loaded, 1 target configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:target_test",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:target_test (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:target_test (0 packages loaded, 1 target configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:target_test\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(set(//pkg:target_test //pkg:plain //pkg:arbitrary_target //pkg:target_test))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(set(//pkg:target_test //pkg:plain //pkg:arbitrary_target //pkg:target_test))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "ordered_deduplicated_set",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 1 target configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:target_test\n@@//pkg:arbitrary_target",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 1 target configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 0.025s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:target_test\n@@//pkg:arbitrary_target\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(executables(//pkg:arbitrary_target))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(executables(//pkg:arbitrary_target))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "nested_executables",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:arbitrary_target (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:arbitrary_target (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:arbitrary_target",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:arbitrary_target (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:arbitrary_target (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.021s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:arbitrary_target\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "some(filter('^//pkg:', executables(set(//pkg:target_test //pkg:plain //pkg:arbitrary_target))), 2)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "some(filter('^//pkg:', executables(set(//pkg:target_test //pkg:plain //pkg:arbitrary_target))), 2)",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "filter_and_some_composition",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "@@//pkg:target_test\n@@//pkg:arbitrary_target",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 3 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 3 targets (0 packages loaded, 0 targets configured).\nINFO: Found 3 targets...\nINFO: Elapsed time: 0.024s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "@@//pkg:target_test\n@@//pkg:arbitrary_target\n"
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(set())",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(set())",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_operand",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 0 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 0 targets (0 packages loaded, 0 targets configured).\nINFO: Found 0 targets...\nINFO: Empty query results\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: 0 targets (0 packages loaded, 0 targets configured)\nINFO: Analyzed 0 targets (0 packages loaded, 0 targets configured).\nINFO: Found 0 targets...\nINFO: Empty query results\nINFO: Elapsed time: 0.020s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "filter('^//missing:', executables(//pkg:arbitrary_target))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "filter('^//missing:', executables(//pkg:arbitrary_target))",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "empty_result",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:arbitrary_target (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:arbitrary_target (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Empty query results\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:arbitrary_target (0 packages loaded, 0 targets configured)\nINFO: Analyzed target //pkg:arbitrary_target (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nINFO: Empty query results\nINFO: Elapsed time: 0.020s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(//pkg:not_found union //pkg:arbitrary_target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(//pkg:not_found union //pkg:arbitrary_target)"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "missing_literal_is_eager",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//pkg:not_found': no such target '//pkg:not_found': target 'not_found' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel\nERROR: no such target '//pkg:not_found': target 'not_found' not declared in package 'pkg' defined by <workspace>/pkg/BUILD.bazel\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nWARNING: Target pattern parsing failed.\nERROR: Skipping '//pkg:not_found': no such target '//pkg:not_found': target 'not_found' not declared in package 'pkg' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143157-880961-bazel/workspace/pkg/BUILD.bazel\nERROR: no such target '//pkg:not_found': target 'not_found' not declared in package 'pkg' defined by /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143157-880961-bazel/workspace/pkg/BUILD.bazel\nINFO: Elapsed time: 0.022s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "//pkg:missing_exec"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "//pkg:missing_exec"
+      ],
+      "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "executable_rule_requires_default_info_executable",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:missing_exec (0 packages loaded, 0 targets configured)\nERROR: <workspace>/pkg/BUILD.bazel:6:13: in missing_exec rule //pkg:missing_exec: \n<workspace>/pkg/defs.bzl:16:46: The rule 'missing_exec' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns.\nERROR: <workspace>/pkg/BUILD.bazel:6:13: Analysis of target '//pkg:missing_exec' (config: a7a71fd) failed\nERROR: Analysis of target '//pkg:missing_exec' failed; build aborted\nINFO: Elapsed time: <duration>\nINFO: 0 processes.\nERROR: Build did NOT complete successfully",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:missing_exec (0 packages loaded, 0 targets configured)\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143157-880961-bazel/workspace/pkg/BUILD.bazel:6:13: in missing_exec rule //pkg:missing_exec: \n/run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143157-880961-bazel/workspace/pkg/defs.bzl:16:46: The rule 'missing_exec' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns.\nERROR: /run/media/system/Colossus/dev/slug/target/v2o/runs/cquery-executables-rule-capability/20260809-143157-880961-bazel/workspace/pkg/BUILD.bazel:6:13: Analysis of target '//pkg:missing_exec' (config: a7a71fd) failed\nERROR: Analysis of target '//pkg:missing_exec' failed; build aborted\nINFO: Elapsed time: 0.024s\nINFO: 0 processes.\nERROR: Build did NOT complete successfully\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables()"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables()"
+      ],
+      "exit_code": 2,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "too_few_arguments",
+      "normalized_stderr": "Computing main repo mapping: \nERROR: Error while parsing 'executables()': too few arguments to function 'executables' at ')'",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nERROR: Error while parsing 'executables()': too few arguments to function 'executables' at ')'\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "cquery",
+        "executables(//pkg:plain, //pkg:arbitrary_target)"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "cquery",
+        "executables(//pkg:plain, //pkg:arbitrary_target)"
+      ],
+      "exit_code": 2,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "too_many_arguments",
+      "normalized_stderr": "Computing main repo mapping: \nERROR: Error while parsing 'executables(//pkg:plain, //pkg:arbitrary_target)': too many arguments to function 'executables' at ', //pkg:arbitrary_target )'",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nERROR: Error while parsing 'executables(//pkg:plain, //pkg:arbitrary_target)': too many arguments to function 'executables' at ', //pkg:arbitrary_target )'\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "cquery-executables-rule-capability",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

@@ -22,6 +22,7 @@ use starlark_map::Equivalent;
 use starlark_map::small_map::SmallMap;
 
 use crate::depset::Depset;
+use crate::depset::DepsetOrder;
 
 pub type FileDepset = Depset<String>;
 
@@ -184,6 +185,28 @@ impl DefaultInfo {
         Self {
             files,
             ..Self::empty()
+        }
+    }
+
+    /// Creates the bounded analysis representation of an executable
+    /// `DefaultInfo`. Explicit files retain the rule's declared file set;
+    /// otherwise the executable is its sole default file and runfile.
+    pub fn from_executable(executable: String, files: Option<FileDepset>) -> Self {
+        let executable_files = Depset::from_direct(DepsetOrder::Default, vec![executable.clone()])
+            .expect("a singleton executable depset is valid");
+        let runfiles = Runfiles {
+            files: executable_files.clone(),
+            ..Runfiles::empty()
+        };
+        Self {
+            files: files.unwrap_or_else(|| executable_files.clone()),
+            default_runfiles: runfiles.clone(),
+            data_runfiles: runfiles,
+            executable: Some(executable.clone()),
+            files_to_run: FilesToRunProvider {
+                executable: Some(executable),
+                ..FilesToRunProvider::empty()
+            },
         }
     }
 }

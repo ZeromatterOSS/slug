@@ -5727,3 +5727,118 @@ semantically closed behavior from retained configured state. Keep traversal,
 configured metadata/provider projection, patterns/externals, exact hashes,
 JVM, and Java behind their existing boundaries; bundle audit bookkeeping with
 its functional successor.
+
+### Configured-query successor audit 4 REPLAN (2026-08-09)
+
+`WP-6-m4-configured-query-successor-audit-4` is **REPLAN**: no additional exact
+function is closed over the current `CqueryResultTarget`/`AnalysisResult`
+surface. Traversal lacks observable platform/constraint nodes; `kind` and
+`attr` lack configured target metadata; provider projection lacks a complete
+qualified dictionary/value runtime. A smaller substitute would preserve the
+wrong end state.
+
+The first truthful prerequisite is configured rule capability for
+`executables(expr)`. Bazel uses the underlying Rule's executable/non-test
+predicate, not `DefaultInfo`. Loading already owns the accepted immutable
+`RuleCapability { rule_class: CompactString, executable, test_kind }` with
+export identity and invalidation coverage. Attach `Option<RuleCapability>` to
+`AnalysisResult` during analysis; cquery must borrow it from the retained result
+and never reload packages or store a command-local duplicate. The complete
+value participates in `AnalysisResult` equality and therefore existing DICE
+reuse/invalidation. Use the existing compact Allocative value; add no interner,
+owned string clone, map, graph, key, cache, or lock.
+
+Run next only `WP-6-m4-configured-rule-capability-attachment-design` with
+reserved review. Freeze construction ownership for every currently analyzable
+rule/non-rule path, equality/restoration evidence, and the immediately following
+complete `executables(expr)` implementation. `kind` remains later because its
+target-kind domain includes non-rule/generated forms; `attr`, traversal, and
+providers remain deferred.
+
+### Configured rule-capability attachment design ACCEPT (2026-08-09)
+
+Reserved review accepted retaining `slug_loading_v2::RuleCapability` in its
+current owner; analysis already depends on loading, so no cycle or type move is
+needed. Add `Option<RuleCapability>` directly to `AnalysisResult` and require it
+in `AnalysisResult::new`, preventing production omission. Expose a borrowed
+accessor. Existing derived Clone/Eq/Allocative covers the full compact
+rule-class/executable/test-kind value; clone it once from the already located
+`PackageTarget`, with no Arc, interner, owned string, or command-local copy.
+
+`evaluate_loaded_rule` is the sole production construction boundary and passes
+`target.rule_capability().cloned()`. Existing package dependencies invalidate
+analysis on capability changes; full `AnalysisResult` equality owns reuse and
+restoration without a new key. Unsupported non-rules remain unsupported;
+constructor/unit paths may pass `None`.
+
+Activate the complete existing `executables(expr)` signature through the sole
+recursive fold. Share one invocation between loading and configured contexts;
+configured filtering borrows `target.analysis.rule_capability()` and applies
+exactly `executable && !rule_class.ends_with("_test")`. Do not substitute
+`test_kind`; it remains equality state. Add a focused cquery fixture covering
+positive/negative/executable `_test`/target-name `_test`, order/dedupe,
+composition, empty, both outputs, missing, and arity. Same-daemon tests cover
+false -> true -> exported `_test` -> restored false with recomputation/reuse.
+
+Run next `WP-6-m4-cquery-executables-rule-capability-implementation`. Stop on a
+dependency cycle/type relocation, optional production omission, package reload
+or command-local metadata, test-kind predicate, native-analysis widening, new
+graph/key/cache, patterns/externals, or failed equality/restoration evidence.
+
+### Configured executables oracle REPLAN (2026-08-09)
+
+**Status: REPLAN to a bounded analysis prerequisite.** Bazel 9.2 rejects a
+positive executable Starlark rule unless it returns
+`DefaultInfo(executable = <File>)`; Slug analysis currently admits only the
+`files` field. The retained capability/query implementation passed focused
+analysis, query, core, server, and CLI tests, but the required positive oracle
+could not succeed without crossing the packet's provider-surface stop. No
+query behavior is accepted from that draft.
+
+Review accepted a serial non-test prerequisite using the existing build-api
+`DefaultInfo` representation. Extend the analysis-only Starlark value with
+optional `files` and `executable`; reject other fields and require executable
+to be a declared file owned by the current evaluation. Explicit files override
+the implicit singleton executable files set. Populate existing executable,
+files-to-run executable, and default/data runfiles fields, and reject an
+executable/test-capability rule that returns no executable. Retain the already
+reviewed `RuleCapability` attachment because it overlaps this sole production
+constructor and is independently exact.
+
+Do not add general runfiles, `ctx.runfiles`, predeclared executables, foreign or
+dependency files, execution/materialization, provider dictionary breadth, or a
+new key/cache. Exact configured test-rule success remains deferred because
+Bazel additionally requires test runfiles; the accepted loading-query oracle
+continues to pin the exported `_test` predicate without claiming configured
+test analysis.
+
+Run next `WP-6-m4-default-info-executable-analysis-prerequisite`. Keep the
+query/core activation draft out of its commit. After acceptance, resume the
+non-test configured `executables(expr)` slice and decide separately whether a
+runfiles prerequisite is warranted for live configured test-rule coverage.
+
+### DefaultInfo executable analysis prerequisite ACCEPT (2026-08-09)
+
+The bounded prerequisite is **ACCEPTED**. Analysis-only `DefaultInfo` now
+accepts only optional `files` and `executable`, normalizes omitted/`None`, and
+decodes only current-evaluation declared files. The existing build-api value
+owns Bazel's implicit executable singleton, explicit-files override,
+files-to-run executable, and default/data runfiles projection. Executable rule
+capability without a returned executable fails with the pinned Bazel 9.2
+diagnostic. General runfiles/provider fields remain unavailable.
+
+`AnalysisResult` now requires and structurally retains the complete loading-
+owned `Option<RuleCapability>` at its sole production rule-analysis boundary.
+No new DICE key/cache, graph, interner, or query-time package lookup was added.
+Direct equality and same-DICE edit/restoration tests cover capability and
+provider changes. The corrected 12-row Bazel fixture update/replay, focused and
+full build-api/loading/analysis suites, payload integrity, format, archive, and
+diff checks pass. Independent review returned `ACCEPT`.
+
+The fixture's missing-executable diagnostic is exact, but the existing cquery
+publisher maps that analysis failure to exit 2 instead of Bazel's exit 1. This
+was not widened into the prerequisite. Configured test-rule success also stays
+deferred because Bazel requires test runfiles. Audit next only
+`WP-6-m4-cquery-executables-nontest-successor-audit`, then implement the exact
+non-test projection and bounded typed error mapping without claiming either
+deferred surface.

@@ -305,7 +305,8 @@ where
 
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 pub struct StarlarkDefaultInfoGen<V> {
-    files: V,
+    files: Option<V>,
+    executable: Option<V>,
 }
 
 pub type StarlarkDefaultInfo<'v> = StarlarkDefaultInfoGen<Value<'v>>;
@@ -313,14 +314,13 @@ type FrozenStarlarkDefaultInfo = StarlarkDefaultInfoGen<FrozenValue>;
 starlark::starlark_complex_values!(StarlarkDefaultInfo);
 
 impl<'v> StarlarkDefaultInfo<'v> {
-    pub fn files(&self) -> Value<'v> {
-        self.files
-    }
-
-    pub fn files_from_value(value: Value<'v>) -> Option<Value<'v>> {
+    pub fn fields_from_value(value: Value<'v>) -> Option<(Option<Value<'v>>, Option<Value<'v>>)> {
         match Self::from_value(value)? {
-            starlark::__macro_refs::Either::Left(value) => Some(value.files),
-            starlark::__macro_refs::Either::Right(value) => Some(value.files.to_value()),
+            starlark::__macro_refs::Either::Left(value) => Some((value.files, value.executable)),
+            starlark::__macro_refs::Either::Right(value) => Some((
+                value.files.map(|value| value.to_value()),
+                value.executable.map(|value| value.to_value()),
+            )),
         }
     }
 }
@@ -413,17 +413,20 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
             "DefaultInfo" => {
                 args.no_positional_args(eval.heap())?;
                 let names = args.names_map()?;
-                let files = *names.get("files").ok_or_else(|| {
-                    starlark::Error::new_other(anyhow::anyhow!(
-                        "DefaultInfo requires named argument `files`"
-                    ))
-                })?;
-                if names.len() != 1 {
+                if names.len() > 2
+                    || names
+                        .keys()
+                        .any(|name| name.as_str() != "files" && name.as_str() != "executable")
+                {
                     return Err(starlark::Error::new_other(anyhow::anyhow!(
-                        "DefaultInfo only supports `files` in this analysis packet"
+                        "DefaultInfo only supports optional named arguments `files` and `executable` in this analysis packet"
                     )));
                 }
-                Ok(eval.heap().alloc(StarlarkDefaultInfo { files }))
+                let optional = |name| names.get(name).copied().filter(|value| !value.is_none());
+                Ok(eval.heap().alloc(StarlarkDefaultInfo {
+                    files: optional("files"),
+                    executable: optional("executable"),
+                }))
             }
             "ToolchainInfo" => {
                 if eval
@@ -461,5 +464,49 @@ impl<'v> StarlarkValue<'v> for AnalysisBuiltinCallable {
                 self.name
             ))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use starlark::environment::Module;
+    use starlark::eval::Evaluator;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    use super::StarlarkDefaultInfo;
+    use crate::package::loading_globals;
+
+    fn evaluate(source: &str) -> Result<(bool, bool), String> {
+        let ast = AstModule::parse("provider_test.bzl", source.to_owned(), &Dialect::Standard)
+            .map_err(|error| error.to_string())?;
+        let module = Module::new();
+        Evaluator::new(&module)
+            .eval_module(ast, &loading_globals())
+            .map_err(|error| error.to_string())?;
+        let value = module
+            .get("result")
+            .ok_or_else(|| "result was not defined".to_owned())?;
+        let (files, executable) = StarlarkDefaultInfo::fields_from_value(value)
+            .ok_or_else(|| "not DefaultInfo".to_owned())?;
+        Ok((files.is_some(), executable.is_some()))
+    }
+
+    #[test]
+    fn default_info_omitted_and_none_arguments_are_equivalent() {
+        assert_eq!(evaluate("result = DefaultInfo()").unwrap(), (false, false));
+        assert_eq!(
+            evaluate("result = DefaultInfo(files = None, executable = None)").unwrap(),
+            (false, false)
+        );
+    }
+
+    #[test]
+    fn default_info_rejects_non_admitted_arguments() {
+        let error = evaluate("result = DefaultInfo(runfiles = None)").unwrap_err();
+        assert!(
+            error.contains("only supports optional named arguments"),
+            "{error}"
+        );
     }
 }
