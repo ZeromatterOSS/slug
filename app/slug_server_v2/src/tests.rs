@@ -1245,6 +1245,121 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
 }
 
 #[test]
+fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
+    let workspace = scratch("cquery-visible-vacuous-post-analysis");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let definitions = workspace.join("pkg/defs.bzl");
+    let nonexecutable = "def _impl(ctx):\n    return [DefaultInfo()]\ncaller = rule(implementation = _impl)\ntarget = rule(implementation = _impl)\n";
+    let executable = "def _impl(ctx):\n    return [DefaultInfo()]\ndef _caller_impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n    return [DefaultInfo(executable = out)]\ncaller = rule(implementation = _caller_impl, executable = True)\ntarget = rule(implementation = _impl)\n";
+    write(&definitions, nonexecutable);
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"caller\", \"target\")\ncaller(name = \"caller\")\ntarget(name = \"target_a\")\ntarget(name = \"target_b\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, expression: &str, output| {
+        daemon.cquery_with_bzlmod_inputs(
+            expression,
+            output,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+    let expression =
+        "visible(executables(//pkg:caller), set(//pkg:target_b //pkg:target_a //pkg:target_b))";
+
+    let initial_label = run(&mut daemon, expression, CqueryOutput::Label);
+    assert_eq!(initial_label.exit_code, 0, "{initial_label:?}");
+    assert!(initial_label.stdout.starts_with("//pkg:target_b ("));
+    assert!(initial_label.stdout.contains("\n//pkg:target_a ("));
+    assert!(initial_label.stderr.is_empty());
+    assert_eq!(initial_label.invalidated_files, 0);
+
+    let initial_starlark = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
+    assert_eq!(initial_starlark.exit_code, 0, "{initial_starlark:?}");
+    assert_eq!(
+        initial_starlark.stdout,
+        "@@//pkg:target_b\n@@//pkg:target_a\n"
+    );
+    assert!(initial_starlark.stderr.is_empty());
+    assert_eq!(initial_starlark.invalidated_files, 0);
+
+    let filtered_empty = run(
+        &mut daemon,
+        "visible(filter('^//missing:', //pkg:caller), set(//pkg:target_b //pkg:target_a))",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(filtered_empty.exit_code, 0, "{filtered_empty:?}");
+    assert_eq!(
+        filtered_empty.stdout,
+        "@@//pkg:target_b\n@@//pkg:target_a\n"
+    );
+    assert!(filtered_empty.stderr.is_empty());
+
+    let empty_targets = run(
+        &mut daemon,
+        "visible(//pkg:caller, set())",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(empty_targets.exit_code, 0, "{empty_targets:?}");
+    assert!(empty_targets.stdout.is_empty());
+    assert!(empty_targets.stderr.is_empty());
+
+    let arity = run(
+        &mut daemon,
+        "visible(//pkg:caller)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(arity.exit_code, 2, "{arity:?}");
+    assert!(arity.stdout.is_empty());
+    assert!(
+        arity
+            .stderr
+            .contains("too few arguments to function 'visible'")
+    );
+
+    let missing = run(
+        &mut daemon,
+        "visible(//pkg:missing, //pkg:target_a)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(missing.exit_code, 1, "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    assert!(missing.stderr.contains("//pkg:missing"));
+    assert!(!missing.stderr.contains("visible() is not supported"));
+
+    write(&definitions, executable);
+    let nonvacuous = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
+    assert_eq!(nonvacuous.exit_code, 1, "{nonvacuous:?}");
+    assert!(nonvacuous.stdout.is_empty());
+    assert!(
+        nonvacuous
+            .stderr
+            .contains("\"message\":\"visible() is not supported on configured targets\"")
+    );
+    assert_eq!(nonvacuous.invalidated_files, 1);
+
+    let warm = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
+    assert_eq!(warm.exit_code, 1, "{warm:?}");
+    assert!(warm.stdout.is_empty());
+    assert!(
+        warm.stderr
+            .contains("\"message\":\"visible() is not supported on configured targets\"")
+    );
+    assert_eq!(warm.invalidated_files, 0);
+
+    write(&definitions, nonexecutable);
+    let restored = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
+    assert_eq!(restored.exit_code, 0, "{restored:?}");
+    assert_eq!(restored.stdout, initial_starlark.stdout);
+    assert!(restored.stderr.is_empty());
+    assert_eq!(restored.invalidated_files, 1);
+}
+
+#[test]
 fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     let workspace = scratch("cquery-missing-executable-recovery");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

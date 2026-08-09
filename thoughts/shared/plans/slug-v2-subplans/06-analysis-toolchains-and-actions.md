@@ -5980,3 +5980,41 @@ remain unchanged.
 No package enumeration/read, graph/key/cache, retained value, protocol, or
 fixture was added. Audit next only
 `WP-6-m4-configured-query-successor-audit-7`.
+
+### Configured-query successor audit 7 ACCEPT (2026-08-09)
+
+The audit selected exact vacuous post-analysis `visible(callers, targets)`.
+Bazel evaluates callers then targets, each once. Empty callers make the
+universal visibility predicate vacuously true and return targets unchanged;
+empty targets return empty. Only two nonempty sets reach configured visibility
+and fail with `visible() is not supported on configured targets`, empty stdout,
+and evaluation exit 1.
+
+This requires set emptiness only. Share one invocation through the sole fold;
+preserve operand errors, eager root preparation, order, full configured-key
+identity, and both outputs. Do not read packages/package groups, add visibility
+metadata, or widen configured analysis.
+
+Traversal/attrs/labels/providers/tests/config/file functions retain their
+existing prerequisites. Implement next only
+`WP-6-m4-cquery-visible-vacuous-post-analysis-implementation`.
+
+### Configured visible implementation ACCEPT (2026-08-09)
+
+Configured `visible(callers, targets)` is **ACCEPTED** over the vacuous
+post-analysis domain. The shared invocation evaluates/materializes callers once
+then evaluates targets once, preserving loading-query behavior. Cquery checks
+only set emptiness: empty callers return the ordered target set, empty targets
+return empty, and two nonempty sets produce the exact configured-target
+evaluation diagnostic, exit 1, and empty stdout.
+
+Tests cover operand order, identity/order/dedupe, filtered-empty callers, empty
+targets, nested errors, both outputs, one-shot/daemon parity, and vacuous success
+-> failure/warm -> restored lifecycle. Query (42+56+9), core cquery (9),
+commands (18), server cquery (11)/full (47), CLI cquery (7), integrity, format,
+archive, and diff checks pass. Independent review returned `ACCEPT`; known
+unrelated core/CLI full failures remain unchanged.
+
+No package/visibility metadata, graph/key/cache, retained value, protocol, or
+fixture was added. Audit next only
+`WP-6-m4-configured-query-successor-audit-8`.

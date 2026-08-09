@@ -1711,9 +1711,26 @@ where
     }
 }
 
+fn cquery_post_analysis_visible<T>(
+    callers: &TargetSet<T>,
+    targets: &TargetSet<T>,
+) -> Result<TargetSet<T>, QueryError>
+where
+    T: Clone + Eq + Hash,
+{
+    if callers.iter().next().is_none() || targets.iter().next().is_none() {
+        Ok(targets.clone())
+    } else {
+        Err(QueryError::evaluation(
+            "visible() is not supported on configured targets",
+        ))
+    }
+}
+
 #[async_trait]
 impl CqueryQueryEnvironment for CquerySetEnvironment {
     type Set = TargetSet<CqueryResultTarget>;
+    type VisibleCallers = TargetSet<CqueryResultTarget>;
 
     fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
         Self::union_all(sets)
@@ -1766,6 +1783,18 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         cquery_post_analysis_siblings(targets)
+    }
+
+    fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers {
+        callers.clone()
+    }
+
+    async fn visible(
+        &mut self,
+        callers: &Self::VisibleCallers,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        cquery_post_analysis_visible(callers, targets)
     }
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -4858,6 +4887,33 @@ mod tests {
             terminal.to_string(),
             "siblings() not supported for post analysis queries"
         );
+    }
+
+    #[test]
+    fn cquery_visible_post_analysis_terminal_preserves_vacuous_target_sets() {
+        let empty = TargetSet::<&str>::default();
+        let mut targets = TargetSet::default();
+        targets.insert("target-b");
+        targets.insert("target-a");
+        targets.insert("target-b");
+        let vacuous = cquery_post_analysis_visible(&empty, &targets).unwrap();
+        assert_eq!(
+            vacuous.iter().copied().collect::<Vec<_>>(),
+            ["target-b", "target-a"]
+        );
+
+        let mut callers = TargetSet::default();
+        callers.insert("caller");
+        let empty_targets = cquery_post_analysis_visible(&callers, &empty).unwrap();
+        assert!(empty_targets.iter().next().is_none());
+
+        let error = cquery_post_analysis_visible(&callers, &targets).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "visible() is not supported on configured targets"
+        );
+        let terminal = CqueryCommandError::from_evaluator_error(error);
+        assert_eq!(terminal.exit_code(), 1);
     }
 
     #[test]

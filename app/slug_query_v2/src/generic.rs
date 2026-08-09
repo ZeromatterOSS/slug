@@ -98,6 +98,7 @@ impl TestSuiteAttribute {
 #[async_trait]
 pub trait CqueryQueryEnvironment {
     type Set: Clone + Send + Sync;
+    type VisibleCallers: Send + Sync;
 
     fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set;
     fn union(&self, left: Self::Set, right: Self::Set) -> Self::Set;
@@ -106,6 +107,12 @@ pub trait CqueryQueryEnvironment {
     fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError>;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
+    fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers;
+    async fn visible(
+        &mut self,
+        callers: &Self::VisibleCallers,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError>;
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
@@ -134,6 +141,7 @@ where
     E: CqueryQueryEnvironment + Send,
 {
     type Set = E::Set;
+    type VisibleCallers = E::VisibleCallers;
 
     fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
         self.0.one_delivery(sets)
@@ -161,6 +169,18 @@ where
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         self.0.siblings(targets).await
+    }
+
+    fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers {
+        self.0.materialize_visible_callers(callers)
+    }
+
+    async fn visible(
+        &mut self,
+        callers: &Self::VisibleCallers,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        self.0.visible(callers, targets).await
     }
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -213,6 +233,7 @@ where
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
         async move {
             match name.value.as_str() {
+                "visible" => invoke_visible(self, args, variables).await,
                 "siblings" => invoke_siblings(self, args, variables).await,
                 "executables" => invoke_executables(self, args, variables).await,
                 "kind" => invoke_kind(self, args, variables).await,
@@ -394,6 +415,7 @@ where
     E: QueryEnvironment + Send,
 {
     type Set = E::Set;
+    type VisibleCallers = TargetSet<E::Target>;
 
     fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
         self.environment.one_delivery(sets)
@@ -432,6 +454,18 @@ where
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         self.environment.siblings(targets).await
+    }
+
+    fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers {
+        self.environment.eval_all(callers)
+    }
+
+    async fn visible(
+        &mut self,
+        callers: &Self::VisibleCallers,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        self.environment.visible(callers, targets).await
     }
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -1020,16 +1054,7 @@ where
         args: &'a [QueryExpression],
         variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
-        async move {
-            // QueryUtil.evalAll materializes the predicate by its printed-label
-            // key. The streamed input deliberately remains unmaterialized: a
-            // later fake candidate with the same label can still pass.
-            let callers = eval_set_arg(evaluator, args, variables, 0).await?;
-            let callers = evaluator.environment.eval_all(&callers);
-            let targets = eval_set_arg(evaluator, args, variables, 1).await?;
-            evaluator.environment.visible(&callers, &targets).await
-        }
-        .boxed()
+        invoke_visible(evaluator, args, variables)
     }
 }
 
@@ -1236,6 +1261,32 @@ where
     .boxed()
 }
 
+fn invoke_visible<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        // QueryUtil evaluates and materializes callers first. The target set
+        // remains streamed so loading-query visibility preserves its existing
+        // fake-candidate behavior, while cquery can use the same fold.
+        let callers = args
+            .first()
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        let targets = args
+            .get(1)
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        let callers = evaluate_query_expression_inner(context, callers, variables).await?;
+        let callers = context.materialize_visible_callers(&callers);
+        let targets = evaluate_query_expression_inner(context, targets, variables).await?;
+        context.visible(&callers, &targets).await
+    }
+    .boxed()
+}
+
 fn invoke_kind<'a, C>(
     context: &'a mut C,
     args: &'a [QueryExpression],
@@ -1329,6 +1380,7 @@ mod tests {
     #[async_trait]
     impl CqueryQueryEnvironment for CqueryEnvironment {
         type Set = Vec<String>;
+        type VisibleCallers = Vec<String>;
 
         fn one_delivery(&self, sets: &[Self::Set]) -> Self::Set {
             let mut result = Vec::new();
@@ -1385,6 +1437,29 @@ mod tests {
             } else {
                 Err(QueryError::evaluation(
                     "siblings() not supported for post analysis queries",
+                ))
+            }
+        }
+
+        fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers {
+            callers.clone()
+        }
+
+        async fn visible(
+            &mut self,
+            callers: &Self::VisibleCallers,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.events.push(format!(
+                "visible:{}:{}",
+                callers.join(","),
+                targets.join(",")
+            ));
+            if callers.is_empty() || targets.is_empty() {
+                Ok(targets.clone())
+            } else {
+                Err(QueryError::evaluation(
+                    "visible() is not supported on configured targets",
                 ))
             }
         }
@@ -1466,6 +1541,32 @@ mod tests {
                 "resolve://pkg:lib",
                 "filter://pkg:lib,//pkg:bin",
                 "siblings:",
+            ]
+        );
+    }
+
+    #[test]
+    fn cquery_visible_reuses_the_shared_fold_in_caller_then_target_order() {
+        let expression = QueryExpression::parse(
+            "visible(set(//pkg:caller //pkg:caller), set(//pkg:target //pkg:target))",
+        )
+        .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let error =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "visible() is not supported on configured targets"
+        );
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:caller",
+                "resolve://pkg:caller",
+                "resolve://pkg:target",
+                "resolve://pkg:target",
+                "visible://pkg:caller://pkg:target",
             ]
         );
     }

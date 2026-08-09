@@ -291,6 +291,12 @@ fn validate_cquery_query_inner(
             validate_function_arguments(expression, args, spec)?;
             validate_cquery_query_inner(&args[0], bindings)
         }
+        QueryExpressionKind::Function { name, args } if name.value == "visible" => {
+            let spec = cquery_function("visible");
+            validate_function_arguments(expression, args, spec)?;
+            validate_cquery_query_inner(&args[0], bindings)?;
+            validate_cquery_query_inner(&args[1], bindings)
+        }
         QueryExpressionKind::Function { name, args } if name.value == "executables" => {
             let spec = cquery_function("executables");
             validate_function_arguments(expression, args, spec)?;
@@ -347,6 +353,10 @@ fn collect_cquery_literals<'a>(expression: &'a QueryExpression, literals: &mut V
         }
         QueryExpressionKind::Function { name, args } if name.value == "siblings" => {
             collect_cquery_literals(&args[0], literals);
+        }
+        QueryExpressionKind::Function { name, args } if name.value == "visible" => {
+            collect_cquery_literals(&args[0], literals);
+            collect_cquery_literals(&args[1], literals);
         }
         QueryExpressionKind::Function { name, args } if name.value == "executables" => {
             collect_cquery_literals(&args[0], literals);
