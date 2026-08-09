@@ -46,6 +46,9 @@ use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
+use slug_loading_v2::AttributeKind;
+use slug_loading_v2::AttributeProvenance;
+use slug_loading_v2::CoercedAttributeValue;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::VisibilitySource;
 use slug_loading_v2::bzl_load_cycle_detector;
@@ -1824,7 +1827,7 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n");
     write(
         workspace.join("pkg/defs.bzl"),
-        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"explicit\": attr.label(), \"defaulted\": attr.label(default = \":default.txt\"), \"_implicit\": attr.label(default = \":implicit.txt\"), \"many\": attr.label_list()})\nprobe_test = rule(implementation = _impl, test = True)\n",
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"explicit\": attr.label(), \"defaulted\": attr.label(default = \":default.txt\"), \"_implicit\": attr.label(default = \":implicit.txt\"), \"many\": attr.label_list(), \"note\": attr.string(default = \"fallback\"), \"mapping\": attr.string_keyed_label_dict()})\nprobe_test = rule(implementation = _impl, test = True)\n",
     );
     let build = workspace.join("pkg/BUILD.bazel");
     write(
@@ -1836,7 +1839,7 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
          test_suite(name = \"implicit\")\n\
          test_suite(name = \"empty_suite\", tests = [])\n\
          test_suite(name = \"explicit_suite\", tests = [\":auto\", \":manual_test\"], tags = [\"suite\", \"manual\"])\n\
-         probe(name = \"attrs\", explicit = \":explicit.txt\", many = select({\":condition\": [\":dupe.txt\"]}) + [\":dupe.txt\"])\n\
+         probe(name = \"attrs\", explicit = \":explicit.txt\", many = select({\":condition\": [\":dupe.txt\"]}) + [\":dupe.txt\"], note = \"literal\", mapping = {\"first\": \":one.txt\", \"second\": \":two.txt\"})\n\
          probe_test(name = \"auto\", tags = [\"z\", \"a\", \"z\"])\n\
          probe_test(name = \"manual_test\", tags = [\"manual\", \"-+tag\"], size = \"large\")\n",
     );
@@ -1872,6 +1875,23 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
     assert!(!attribute("attrs", "defaulted").explicit);
     assert!(!attribute("attrs", "$implicit").explicit);
     assert_eq!(
+        node("attrs")
+            .attributes
+            .iter()
+            .map(|attribute| attribute.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "explicit",
+            "defaulted",
+            "$implicit",
+            "many",
+            "note",
+            "mapping",
+            "tags",
+            "visibility",
+        ]
+    );
+    assert_eq!(
         attribute("attrs", "many")
             .labels
             .iter()
@@ -1886,6 +1906,34 @@ async fn graph_projects_test_suite_membership_scalars_edges_and_total_explicitne
             .filter(|edge| edge.target.to_string() == "//pkg:dupe.txt")
             .count(),
         1
+    );
+    let note = attribute("attrs", "note").value.as_ref().unwrap();
+    assert_eq!(note.kind, AttributeKind::String);
+    assert_eq!(note.provenance, AttributeProvenance::Explicit);
+    assert!(matches!(
+        note.value.as_ref(),
+        CoercedAttributeValue::String(value) if value == "literal"
+    ));
+    assert!(attribute("attrs", "note").labels.is_empty());
+    let mapping = attribute("attrs", "mapping").value.as_ref().unwrap();
+    assert_eq!(mapping.kind, AttributeKind::StringKeyedLabelDict);
+    assert_eq!(mapping.provenance, AttributeProvenance::Explicit);
+    assert!(matches!(
+        mapping.value.as_ref(),
+        CoercedAttributeValue::StringKeyedLabelDict(values)
+            if values.as_ref()
+                == [
+                    ("first".into(), CanonicalLabel::parse("@@//pkg:one.txt").unwrap()),
+                    ("second".into(), CanonicalLabel::parse("@@//pkg:two.txt").unwrap()),
+                ]
+    ));
+    assert_eq!(
+        attribute("attrs", "mapping")
+            .labels
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>(),
+        ["//pkg:one.txt", "//pkg:two.txt"]
     );
 
     for (suite, tests_explicit) in [

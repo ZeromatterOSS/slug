@@ -37,6 +37,7 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackagePath;
 use slug_loading_v2::AttributeProvenance;
+use slug_loading_v2::AttributeQueryValue;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageGroupContents;
@@ -293,6 +294,9 @@ pub struct QueryAttribute {
     pub name: CompactString,
     pub labels: Arc<[QueryLabel]>,
     pub explicit: bool,
+    /// Present only for Starlark attributes supported by loading. Native
+    /// projections retain their historical labels-only representation.
+    pub value: Option<AttributeQueryValue>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -730,6 +734,7 @@ fn package_graph_from_loaded(
                     name: CompactString::new("srcs"),
                     labels: labels.into(),
                     explicit: *srcs_explicit,
+                    value: None,
                 }];
                 let mut edges = visibility_edges;
                 edges.extend(ordinary.into_iter().map(|target| QueryEdge {
@@ -756,6 +761,7 @@ fn package_graph_from_loaded(
                         name: CompactString::new("actual"),
                         labels: Arc::from([actual]),
                         explicit: true,
+                        value: None,
                     }],
                 )
             }
@@ -800,11 +806,13 @@ fn package_graph_from_loaded(
                             name: CompactString::new("tests"),
                             labels: tests.into(),
                             explicit: membership.tests_explicit(),
+                            value: None,
                         },
                         QueryAttribute {
                             name: CompactString::new("$implicit_tests"),
                             labels: implicit_tests.into(),
                             explicit: true,
+                            value: None,
                         },
                     ],
                 )
@@ -1069,6 +1077,7 @@ fn external_package_graph_from_targets(
                     name: CompactString::new("srcs"),
                     labels: labels.into(),
                     explicit: *srcs_explicit,
+                    value: None,
                 }];
                 if matches!(
                     &visibility_source,
@@ -1078,6 +1087,7 @@ fn external_package_graph_from_targets(
                         name: CompactString::new("visibility"),
                         labels: visibility_labels.into(),
                         explicit: true,
+                        value: None,
                     });
                 }
                 (
@@ -1099,6 +1109,7 @@ fn external_package_graph_from_targets(
                         name: CompactString::new("actual"),
                         labels: Arc::from([actual]),
                         explicit: true,
+                        value: None,
                     }]),
                 )
             }
@@ -1151,11 +1162,13 @@ fn external_package_graph_from_targets(
                             name: CompactString::new("tests"),
                             labels: tests.into(),
                             explicit: membership.tests_explicit(),
+                            value: None,
                         },
                         QueryAttribute {
                             name: CompactString::new("$implicit_tests"),
                             labels: implicit_tests.into(),
                             explicit: true,
+                            value: None,
                         },
                     ]
                     .into(),
@@ -1681,6 +1694,7 @@ fn project_visibility_attribute(target: &slug_loading_v2::PackageTarget) -> Quer
         name: CompactString::new("visibility"),
         labels: labels.into(),
         explicit,
+        value: None,
     }
 }
 
@@ -1689,14 +1703,11 @@ fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[Query
         .schema()
         .iter()
         .zip(implementation.values())
-        .filter_map(|(schema, value)| {
+        .map(|(schema, value)| {
             debug_assert_eq!(value.declaration_name, schema.declaration_name());
-            if !schema.dependency_reachable() {
-                return None;
-            }
             let mut labels = Vec::new();
             value.value.labels(&mut labels);
-            Some(QueryAttribute {
+            QueryAttribute {
                 name: CompactString::new(schema.query_name()),
                 labels: labels
                     .into_iter()
@@ -1704,7 +1715,8 @@ fn project_attributes(implementation: &StarlarkRuleImplementation) -> Arc<[Query
                     .collect::<Vec<_>>()
                     .into(),
                 explicit: value.provenance == AttributeProvenance::Explicit,
-            })
+                value: Some(value.query_value(schema)),
+            }
         })
         .collect::<Vec<_>>()
         .into()
@@ -2057,7 +2069,11 @@ mod graph_tests {
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_identity_v2::PackagePath;
+    use slug_loading_v2::AttributeKind;
+    use slug_loading_v2::AttributeProvenance;
+    use slug_loading_v2::AttributeQueryValue;
     use slug_loading_v2::BzlModuleEvaluator;
+    use slug_loading_v2::CoercedAttributeValue;
     use slug_loading_v2::PackageTarget;
     use slug_loading_v2::PackageTargetKind;
     use slug_loading_v2::RuleVisibility;
@@ -2135,6 +2151,44 @@ mod graph_tests {
         assert_eq!(attribute.name, "visibility");
         assert!(attribute.explicit);
         assert!(attribute.labels.is_empty());
+        assert!(attribute.value.is_none());
+    }
+
+    #[test]
+    fn query_attribute_retains_the_typed_loading_candidate_without_a_string_cache() {
+        let label = CanonicalLabel::parse("@@//pkg:dep").unwrap();
+        let retained = Arc::new(CoercedAttributeValue::StringKeyedLabelDict(Arc::from([(
+            "first".into(),
+            label.clone(),
+        )])));
+        let attribute = super::QueryAttribute {
+            name: "mapping".into(),
+            labels: Arc::from([QueryLabel::from_canonical(label)]),
+            explicit: true,
+            value: Some(AttributeQueryValue {
+                kind: AttributeKind::StringKeyedLabelDict,
+                provenance: AttributeProvenance::Explicit,
+                value: retained.clone(),
+            }),
+        };
+
+        assert_eq!(
+            attribute
+                .labels
+                .iter()
+                .map(QueryLabel::output_label)
+                .collect::<Vec<_>>(),
+            ["//pkg:dep"]
+        );
+        let candidate = attribute.value.as_ref().unwrap();
+        assert_eq!(candidate.kind, AttributeKind::StringKeyedLabelDict);
+        assert_eq!(candidate.provenance, AttributeProvenance::Explicit);
+        assert!(Arc::ptr_eq(&candidate.value, &retained));
+        assert!(matches!(
+            candidate.value.as_ref(),
+            CoercedAttributeValue::StringKeyedLabelDict(values)
+                if values.as_ref() == [("first".into(), CanonicalLabel::parse("@@//pkg:dep").unwrap())]
+        ));
     }
 
     #[test]

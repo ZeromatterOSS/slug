@@ -156,6 +156,28 @@ pub struct AttributeValue {
     pub value: Arc<CoercedAttributeValue>,
 }
 
+/// Immutable attribute data that an unconfigured query may inspect.
+///
+/// This stays owned by loading: query projections retain the already-coerced
+/// value rather than creating a string rendering or a second attribute model.
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct AttributeQueryValue {
+    pub kind: AttributeKind,
+    pub provenance: AttributeProvenance,
+    pub value: Arc<CoercedAttributeValue>,
+}
+
+impl AttributeValue {
+    pub fn query_value(&self, schema: &AttributeSchema) -> AttributeQueryValue {
+        debug_assert_eq!(self.declaration_name, schema.declaration_name());
+        AttributeQueryValue {
+            kind: schema.kind(),
+            provenance: self.provenance,
+            value: self.value.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum CoercedAttributeValue {
     /// Bazel's optional scalar-label default is null; it is not a label.
@@ -208,5 +230,57 @@ impl CoercedAttributeValue {
             }
             Self::String(_) | Self::StringList(_) | Self::None => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use slug_identity_v2::CanonicalLabel;
+
+    use super::AttributeKind;
+    use super::AttributeProvenance;
+    use super::AttributeSchema;
+    use super::AttributeValue;
+    use super::CoercedAttributeValue;
+
+    #[test]
+    fn query_value_keeps_the_loading_value_structure_order_and_provenance() {
+        let schema =
+            AttributeSchema::new("chosen", AttributeKind::LabelList, false, true, None, None);
+        let before = CanonicalLabel::parse("@@//pkg:before").unwrap();
+        let selected = CanonicalLabel::parse("@@//pkg:selected").unwrap();
+        let fallback = CanonicalLabel::parse("@@//pkg:fallback").unwrap();
+        let retained = Arc::new(CoercedAttributeValue::Concatenation(
+            Arc::new(CoercedAttributeValue::LabelList(Arc::from(
+                [before.clone()],
+            ))),
+            Arc::new(CoercedAttributeValue::Selector {
+                branches: Arc::from([(
+                    CanonicalLabel::parse("@@//conditions:enabled").unwrap(),
+                    Arc::new(CoercedAttributeValue::LabelList(Arc::from([
+                        selected.clone()
+                    ]))),
+                )]),
+                default: Some(Arc::new(CoercedAttributeValue::LabelList(Arc::from([
+                    fallback.clone(),
+                ])))),
+            }),
+        ));
+        let value = AttributeValue {
+            declaration_name: "chosen".into(),
+            provenance: AttributeProvenance::Explicit,
+            value: retained.clone(),
+        };
+
+        let query_value = value.query_value(&schema);
+
+        assert_eq!(query_value.kind, AttributeKind::LabelList);
+        assert_eq!(query_value.provenance, AttributeProvenance::Explicit);
+        assert!(Arc::ptr_eq(&query_value.value, &retained));
+        let mut labels = Vec::new();
+        query_value.value.labels(&mut labels);
+        assert_eq!(labels, [before, selected, fallback]);
     }
 }

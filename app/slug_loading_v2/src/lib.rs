@@ -24,6 +24,7 @@ pub mod visibility;
 
 pub use attrs::AttributeKind;
 pub use attrs::AttributeProvenance;
+pub use attrs::AttributeQueryValue;
 pub use attrs::AttributeSchema;
 pub use attrs::AttributeValue;
 pub use attrs::CoercedAttributeValue;
