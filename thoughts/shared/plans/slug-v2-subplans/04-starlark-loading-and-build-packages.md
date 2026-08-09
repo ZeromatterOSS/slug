@@ -753,6 +753,187 @@ later prerequisite. No fixture, oracle record, representation, query
 activation, `@bazel_tools` content, JVM/Java artifact, or Rust change is
 authorized.
 
+## `attr` total RuleClass schema source ledger (2026-08-09)
+
+`WP-4-8-m3-attr-total-ruleclass-schema-source-ledger-design` closes the finite
+loading schema without fixture, oracle, Rust, Cargo, graph, DICE, JVM, Java
+artifact, or production Bazel work. All facts below come from immutable Bazel
+9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`; the neighboring
+checkout's different HEAD is not evidence.
+
+### Accessor and renderer closure
+
+`RuleClass.Builder` installs mandatory nonconfigurable
+`name: STRING_NO_INTERN` at index zero. `TargetUtils.getAttrAsString` finds the
+final RuleClass definition, visits every possible whole typed loading value
+through `AggregatingAttributeMapper`, and applies
+`TargetUtils.convertAttributeValue`. BOOLEAN becomes `0` or `1`; null
+contributes no candidate; everything else uses typed `toString()`. Strings are
+unquoted, integers are decimal, lists are `[a, b]`, maps are `{k=v}`, the
+no-license value is `[none]`, main labels are `//pkg:t`, and external labels,
+including tools labels, use canonical `@@repo//pkg:t` spelling.
+
+`BuildType.convertFromBuildLangType` sorts order-independent lists once. Other
+list and map order remains inside the formatted whole value. That interior
+order and duplicate elements remain observable; candidate traversal order and
+multiplicity of equal whole candidates remain unobservable through the
+existential filter and are not a Slug contract.
+
+Computed values here are loading inputs. `deprecation`, `testonly`, and
+`package_metadata` read package arguments; absent deprecation is null and is
+suppressed. Test `timeout` reads `size` and maps recognized sizes to `short`,
+`moderate`, `long`, or `eternal`, otherwise `illegal`. `Rule` derives the three
+`generator_*` strings from legacy-macro call-stack state, or `""` outside a
+macro. `visibility` is the declared list or effective package default through
+a dedicated mapper path. Native `licenses` uses the package license unless the
+class ignores licenses. `test_suite.$implicit_tests` is populated during
+package finalization when `tests` is absent or empty.
+
+Late-bound does not imply configured-query input. The ordinary loading mapper
+calls `LateBoundDefault.getDefault(rule)`, never its configuration resolver.
+Thus `:action_listener` and `config_setting.:flag_alias_settings` have loading
+fallback `[]`; test coverage attrs use fixed tools-repository fallbacks; and
+the two test `:run_under_*` attrs have null loading fallbacks and disappear.
+No configured analysis or host JVM state is needed.
+
+### Shared schema algebra
+
+`N` means nonconfigurable, `C` configurable, and `OI` order-independent. The
+common core `K` has these exact 16 attrs, including `name`:
+
+| Query spelling | Type / flags | Loading default or source |
+| --- | --- | --- |
+| `name` | `STRING_NO_INTERN`, N | mandatory target name |
+| `visibility` | `NODEP_LABEL_LIST`, N/OI | declared list or package default (normally private) |
+| `transitive_configs` | `NODEP_LABEL_LIST`, N/OI | `[]` |
+| `deprecation` | `STRING`, N | package default; null-suppressed when absent |
+| `tags` | `STRING_LIST`, N/OI | `[]` unless overridden below |
+| `generator_name` | `STRING`, N | legacy-macro generator name or `""` |
+| `generator_function` | `STRING`, N | interior macro function or `""` |
+| `generator_location` | `STRING`, N | relative macro location or `""` |
+| `testonly` | `BOOLEAN`, N | package default, normally false |
+| `features` | `STRING_LIST`, C/OI | `[]` |
+| `:action_listener` | `LABEL_LIST`, C/late-bound | loading fallback `[]` |
+| `compatible_with` | `LABEL_LIST`, N | `[]` |
+| `restricted_to` | `LABEL_LIST`, N | `[]` |
+| `$config_dependencies` | `LABEL_LIST`, N | selector-key labels, otherwise `[]` |
+| `package_metadata` | `LABEL_LIST`, N | package default, normally `[]` |
+| `aspect_hints` | `LABEL_LIST`, C | `[]` |
+
+The native baseline is
+`NATIVE = K + {licenses: LICENSE N, distribs: STRING_LIST N,
+target_compatible_with: LABEL_LIST C}`. `licenses` is the package license and
+the lists default to `[]`. `exemptFromConstraintChecking()` removes exactly
+`compatible_with`, `restricted_to`, and `target_compatible_with`.
+
+The Starlark base is
+`STARLARK = K + {expect_failure: STRING C, toolchains: LABEL_LIST C,
+exec_properties: STRING_DICT C, exec_compatible_with: LABEL_LIST N,
+exec_group_compatible_with: LABEL_LIST_DICT N,
+target_compatible_with: LABEL_LIST C}` with defaults `""`, `[]`, `{}`, `[]`,
+`{}`, and `[]`. It does not inherit native `licenses` or `distribs`.
+
+| Current Starlark shape | Built-in count | Delta from `STARLARK` |
+| --- | ---: | --- |
+| normal | 22 | none |
+| executable | 25 | C `args: STRING_LIST=[]`, C `output_licenses: STRING_LIST=[]`, N `$is_executable: BOOLEAN=true` |
+| test | 39 | override `testonly=true`; add N `size: STRING="medium"`, N computed `timeout: STRING="moderate"`, N `flaky: BOOLEAN=false`, C `shard_count: INTEGER=-1`, N `local: BOOLEAN=false`, C `args: STRING_LIST=[]`, the ten hidden entries below, and N `$is_executable: BOOLEAN=true` |
+| root string build setting | 24 | mandatory N `build_setting_default: STRING`; N `help: STRING=""` |
+
+The pinned OSS provider never calls `setNetworkAllowlistForTests`, so its
+conditional test `$whitelist_external_network` attr is absent. The test hidden entries are
+`$test_wrapper=@@bazel_tools//tools/test:test_wrapper`,
+`$xml_writer=@@bazel_tools//tools/test:xml_writer`,
+`$test_runtime=[@@bazel_tools//tools/test:runtime]`,
+`$test_setup_script=@@bazel_tools//tools/test:test_setup`,
+`$xml_generator_script=@@bazel_tools//tools/test:test_xml_generator`,
+`$collect_coverage_script=@@bazel_tools//tools/test:collect_coverage`,
+`:coverage_support=@@bazel_tools//tools/test:coverage_support`,
+`:coverage_report_generator=@@bazel_tools//tools/test:coverage_report_generator`,
+and null-suppressed `:run_under_exec_config` and
+`:run_under_target_config`. A rule with a Starlark-defined transition also
+gains configurable
+`$allowlist_function_transition: LABEL=@@bazel_tools//tools/allowlists:function_transition_allowlist`.
+
+User declarations extend these sets. Current V2 exposes `attr.label`,
+`label_list`, `string_keyed_label_dict`, `label_keyed_string_dict`,
+`label_list_dict`, `output`, `output_list`, and `string`; private `_x` is queried
+as `$x`. Intrinsic defaults are null for scalar label/output, `""` for string,
+and typed empty containers. Output types are nonconfigurable; the others are
+configurable in Bazel 9.2. V2 currently accepts a `configurable=` descriptor
+argument that pinned Bazel rejects, so that syntax is a parity gap, not an
+additional Bazel schema family. Mandatory state, explicit defaults,
+explicit/default/implicit provenance, selector correlation, and typed
+concatenation remain part of the whole-value contract.
+
+### Final native RuleClass sets
+
+Counts include `name`; each row is the exact delta from `NATIVE`.
+
+| Rule class | Count | Final delta |
+| --- | ---: | --- |
+| `filegroup` | 23 | add C `srcs: LABEL_LIST=[]`, `output_group: STRING=""`, `data: LABEL_LIST=[]`, `output_licenses: STRING_LIST=[]` |
+| `alias` | 17 | remove `licenses`, `distribs`, `:action_listener`; add mandatory C `actual: LABEL` |
+| `config_setting` | 21 | remove the three constraint attrs; override `tags=[manual]`; force `licenses=[none]`; add N `values: STRING_DICT={}`, `define_values: STRING_DICT={}`, `flag_values: LABEL_KEYED_STRING_DICT={}`, `constraint_values: LABEL_LIST=[]`, late-bound `:flag_alias_settings: LABEL_LIST=[]` |
+| `test_suite` | 21 | override `testonly=true`; add N/OI `tests: LABEL_LIST=[]` and automatic N/OI `$implicit_tests: LABEL_LIST=[]` |
+| `constraint_setting` | 16 | remove the three constraint attrs, `:action_listener`, `package_metadata`; override `tags=[manual]`; add nullable N `default_constraint_value: NODEP_LABEL` and `refines_constraint_value: LABEL` |
+| `constraint_value` | 15 | same five removals and manual tag; add mandatory N `constraint_setting: LABEL` |
+| `platform` | 23 | same five removals and manual tag; add N `constraint_values: LABEL_LIST=[]`, `parents: LABEL_LIST=[]`, `remote_execution_properties: STRING=""`, `exec_properties: STRING_DICT={}`, `flags: STRING_LIST=[]`, `missing_toolchain_error: STRING="For more information on platforms or toolchains see https://bazel.build/concepts/platforms-intro."`; add C `required_settings: LABEL_LIST=[]`, `check_toolchain_types: BOOLEAN=false`, `allowed_toolchain_types: NODEP_LABEL_LIST=[]` |
+| `toolchain_type` | 17 | remove `licenses`, `distribs`, `:action_listener`; add N `no_match_error: STRING=""` |
+| `toolchain` | 21 | remove the three constraint attrs and `:action_listener`; override `tags=[manual]`; re-add N `target_compatible_with: LABEL_LIST=[]`; add mandatory N `toolchain_type: LABEL`, N `exec_compatible_with: LABEL_LIST=[]`, N `use_target_platform_constraints: BOOLEAN=false`, C `target_settings: LABEL_LIST=[]`, mandatory C `toolchain: NODEP_LABEL` |
+
+Exported/source/BUILD/generated files and package groups are not rules and have
+no attr-visible RuleClass.
+
+### V2 losses and finite oracle classes
+
+The first loss is native call recording. It retains only `filegroup.srcs`,
+`alias.actual`, sorted `config_setting.values`, sorted
+`test_suite.tests`/`tags` plus implicit members, narrow constraint/platform
+fields, and selected toolchain labels. It drops nearly every common, package,
+macro, fixed-default, and class-specific field. Starlark recording retains user
+schema/value structure but only `tags`, test `size`, and root
+`build_setting_default` among built-ins. The
+later `QueryAttribute {name, labels, explicit}` projection discards every
+non-label value, typed empty container, map orientation, universal `name`, and
+most native fields. Root graph construction rejects `NativeToolchainTarget`
+before projection.
+
+Capture is bounded at rule-call/package-finalization time before normalization
+or reduction to `PackageTargetKind`. Package state must retain default
+visibility/deprecation/testonly/metadata/license; macro state must retain the
+three generator values; and automatic implicit tests remain package-finalized.
+These are loading inputs, not configured analysis.
+
+The next oracle design must assign paired membership/nonmembership rows to:
+
+1. string/decimal/BOOLEAN `0` and `1`/license renderers, empty versus nonempty
+   containers, and null suppression;
+2. ordered list/map interiors versus OI sorting, duplicates inside one value,
+   every admitted dict orientation, and canonical main/external/tools labels;
+3. equal-key selector correlation, distinct-key cross-product, string/list
+   concatenation before rendering, effective defaults, and `$implicit` names;
+4. universal `name`, package defaults, legacy macro generator provenance, test
+   timeout, fixed/late-bound test labels, and automatic `$implicit_tests`;
+5. the five native inheritance families: full baseline, alias/toolchain-type
+   removals, constraint-exempt config setting, constraint-defining removals,
+   and toolchain's reintroduced `target_compatible_with`.
+
+Pinned anchors are `RuleClass.java`, `BaseRuleClasses.java`,
+`StarlarkRuleClassFunctions.java`, `AttributeProvider.java`, `Rule.java`,
+`AggregatingAttributeMapper.java`, `AbstractAttributeMapper.java`,
+`BuildType.java`, `TargetUtils.java`, and the nine native RuleDefinition files,
+all at commit `8220c619...`.
+
+Run next only
+`WP-4-8-m3-attr-observable-candidate-oracle-design-retry`, a Stage 4/Stage 8
+documentation and fixture-design packet derived from this ledger. It must pick
+the smallest fixture arrangement, cover every equivalence class and native
+exception, and isolate native-toolchain graph projection as a later
+prerequisite. It must not generate fixtures, activate `attr`, freeze a
+production representation, broaden the graph, or add Rust, Cargo, DICE, JVM,
+Java source/bytecode/helper, or production Bazel delegation.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

@@ -3250,3 +3250,42 @@ empty default. Candidate position and equal-candidate multiplicity remain
 unobservable and excluded. No fixture generation, graph broadening,
 representation, query activation, DICE work, regex change, JVM/Java artifact,
 or production Bazel delegation is authorized.
+
+The total RuleClass ledger is now source-closed at pinned Bazel 9.2 commit
+`8220c619...`. Ordinary `attr()` consumes loading RuleClass values, including
+package-computed, macro-derived, automatic, and late-bound declaration
+fallbacks; it does not require configured analysis. Configuration-resolved
+action listeners, flag aliases, coverage overrides, and run-under values are
+not ordinary-query inputs.
+
+The closed Starlark families have 22 built-ins for normal rules, 25 for
+executables, 39 for tests, and 24 for root string build settings, plus user
+attrs and the conditional Starlark-transition allowlist attr. The nine native
+final counts are filegroup 23, alias 17, config_setting 21, test_suite 21,
+constraint_setting 16, constraint_value 15, platform 23, toolchain_type 17, and
+toolchain 21. Stage 4 owns their exact schema algebra, defaults, spellings,
+removals, overrides, renderers, and pinned source anchors.
+
+Stage 8 must not mistake V2-retained fields for this surface. Loading currently
+drops most common/default/native values; `QueryAttribute` keeps only labels and
+explicitness; universal `name` is absent; and native toolchain variants are
+rejected before graph projection. Total activation therefore needs a typed
+loading projection and a separately reviewed native-toolchain graph
+prerequisite.
+
+The future oracle families are scalar/BOOLEAN/integer/license rendering;
+empty/null behavior; ordered versus order-independent list/map interiors;
+every admitted dict orientation; selector correlation and cross-product; typed
+concatenation; implicit query names; canonical main/external/`@@bazel_tools`
+labels; package and macro defaults; test computed/fixed/automatic values; and
+each native inheritance/removal exception. Candidate position and multiplicity
+of equal whole candidates remain excluded because existential `attr()` cannot
+expose them.
+
+Run next only
+`WP-4-8-m3-attr-observable-candidate-oracle-design-retry`. It remains a
+documentation and fixture-design packet: choose the smallest fixture shape and
+map paired positive/negative rows to every ledger class before fixture
+generation or representation work. No graph broadening, query activation,
+Rust, Cargo, DICE, regex change, JVM, Java artifact, or production Bazel
+delegation is authorized.
