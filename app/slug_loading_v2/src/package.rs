@@ -48,9 +48,11 @@ use starlark::values::list::UnpackList;
 use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
+use starlark::values::tuple::TupleRef;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::attrs::AllowSingleFile;
 use crate::attrs::AttributeKind;
 use crate::attrs::AttributeProvenance;
 use crate::attrs::AttributeSchema;
@@ -811,10 +813,11 @@ impl PackageRecorder {
         values: SmallMap<String, String>,
         visibility: Option<Vec<String>>,
     ) -> anyhow::Result<()> {
-        let values = values
+        let mut values = values
             .into_iter()
             .map(|(key, value)| (CompactString::from(key), CompactString::from(value)))
             .collect::<Vec<_>>();
+        values.sort_unstable();
         self.record_target(
             name,
             PackageTargetKind::ConfigSetting {
@@ -1349,6 +1352,7 @@ fn native_default(schema: NativeAttributeSchema) -> NativeAttributeValue {
         AttributeKind::LabelList => empty_labels(),
         AttributeKind::String => CoercedAttributeValue::String(CompactString::default()),
         AttributeKind::StringList => empty_strings(),
+        AttributeKind::StringListDict => CoercedAttributeValue::StringListDict(Arc::from([])),
         AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
         AttributeKind::Integer => CoercedAttributeValue::Integer(0),
         AttributeKind::StringDict => CoercedAttributeValue::StringDict(Arc::from([])),
@@ -1855,6 +1859,13 @@ fn raw_attribute_value(value: Value) -> anyhow::Result<RawAttributeValue> {
             .collect::<anyhow::Result<Vec<_>>>()
             .map(|values| RawAttributeValue::List(values.into()));
     }
+    if let Some(values) = TupleRef::from_value(value) {
+        return values
+            .iter()
+            .map(raw_attribute_value)
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map(|values| RawAttributeValue::List(values.into()));
+    }
     if let Some(values) = DictRef::from_value(value) {
         return values
             .iter()
@@ -2025,6 +2036,7 @@ fn intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
         AttributeKind::LabelList => CoercedAttributeValue::LabelList(Arc::from([])),
         AttributeKind::String => CoercedAttributeValue::String(CompactString::default()),
         AttributeKind::StringList => CoercedAttributeValue::StringList(Arc::from([])),
+        AttributeKind::StringListDict => CoercedAttributeValue::StringListDict(Arc::from([])),
         AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
         AttributeKind::Integer => CoercedAttributeValue::Integer(0),
         AttributeKind::StringDict => CoercedAttributeValue::StringDict(Arc::from([])),
@@ -2096,6 +2108,30 @@ fn coerce_raw_value(
                 .map(|value| raw_string(value, "string list"))
                 .collect::<anyhow::Result<Vec<_>>>()?;
             Ok(CoercedAttributeValue::StringList(values.into()))
+        }
+        AttributeKind::StringListDict => {
+            let RawAttributeValue::Dict(values) = raw else {
+                anyhow::bail!("attribute must be a dictionary");
+            };
+            Ok(CoercedAttributeValue::StringListDict(
+                values
+                    .iter()
+                    .map(|(key, value)| {
+                        let RawAttributeValue::List(values) = value else {
+                            anyhow::bail!("attribute dictionary values must be lists");
+                        };
+                        Ok((
+                            raw_string(key, "dictionary key")?,
+                            values
+                                .iter()
+                                .map(|value| raw_string(value, "dictionary list"))
+                                .collect::<anyhow::Result<Vec<_>>>()?
+                                .into(),
+                        ))
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?
+                    .into(),
+            ))
         }
         AttributeKind::LabelList | AttributeKind::OutputList => {
             let RawAttributeValue::List(values) = raw else {
@@ -2263,10 +2299,14 @@ fn coerce_starlark_value(
         }
         return result.ok_or_else(|| anyhow::anyhow!("select() requires at least one branch"));
     }
+    if kind == AttributeKind::Label && value.is_none() {
+        return Ok(CoercedAttributeValue::None);
+    }
     if matches!(
         kind,
         AttributeKind::LabelList | AttributeKind::OutputList | AttributeKind::StringList
     ) && ListRef::from_value(value).is_none()
+        && TupleRef::from_value(value).is_none()
     {
         if kind == AttributeKind::StringList {
             anyhow::bail!("attribute `{attribute_name}` must be a list of strings");
@@ -2408,6 +2448,10 @@ struct RuleAttributeSchemaGen<V> {
     transition: Option<TransitionDefinitionGen<V>>,
     #[trace(unsafe_ignore)]
     builtin: bool,
+    #[trace(unsafe_ignore)]
+    configurable_set: bool,
+    #[trace(unsafe_ignore)]
+    allow_single_file: Option<AllowSingleFile>,
 }
 type RuleAttributeSchema<'v> = RuleAttributeSchemaGen<Value<'v>>;
 type FrozenRuleAttributeSchema = RuleAttributeSchemaGen<FrozenValue>;
@@ -2432,6 +2476,8 @@ fn starlark_builtin_schema<V>(
             default: None,
             transition: None,
             builtin: true,
+            configurable_set: false,
+            allow_single_file: None,
         });
     };
     push("name", AttributeKind::String, true, false);
@@ -2798,6 +2844,10 @@ struct AttributeDefinitionGen<V> {
     #[trace(unsafe_ignore)]
     configurable: bool,
     #[trace(unsafe_ignore)]
+    configurable_set: bool,
+    #[trace(unsafe_ignore)]
+    allow_single_file: Option<AllowSingleFile>,
+    #[trace(unsafe_ignore)]
     default: Option<CoercedAttributeValue>,
     transition: Option<TransitionDefinitionGen<V>>,
 }
@@ -2824,6 +2874,8 @@ impl<'v> Freeze for AttributeDefinition<'v> {
             kind: self.kind,
             mandatory: self.mandatory,
             configurable: self.configurable,
+            configurable_set: self.configurable_set,
+            allow_single_file: self.allow_single_file,
             default: self.default,
             transition: self
                 .transition
@@ -2840,6 +2892,8 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
             kind: self.kind,
             mandatory: self.mandatory,
             configurable: self.configurable,
+            configurable_set: self.configurable_set,
+            allow_single_file: self.allow_single_file,
             default: self.default,
             transition: self
                 .transition
@@ -3002,13 +3056,17 @@ impl fmt::Display for AttrModule {
 fn attribute_definition<'v>(
     kind: AttributeKind,
     mandatory: bool,
-    configurable: bool,
+    configurable: Option<bool>,
+    allow_single_file: Option<AllowSingleFile>,
     default: Option<Value<'v>>,
     cfg: Option<Value<'v>>,
     eval: &Evaluator<'v, '_, '_>,
 ) -> anyhow::Result<AttributeDefinition<'v>> {
     let default = default
         .map(|value| {
+            if value.is_none() && kind == AttributeKind::Label {
+                return Ok(CoercedAttributeValue::None);
+            }
             let raw = raw_attribute_value(value)?;
             let context = BzlEvaluationContext::from_evaluator(eval)?;
             let source = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
@@ -3019,7 +3077,12 @@ fn attribute_definition<'v>(
     Ok(AttributeDefinition {
         kind,
         mandatory,
-        configurable,
+        configurable: configurable.unwrap_or(!matches!(
+            kind,
+            AttributeKind::Output | AttributeKind::OutputList
+        )),
+        configurable_set: configurable.is_some(),
+        allow_single_file,
         default,
         transition: cfg
             .map(|value| {
@@ -3035,20 +3098,55 @@ fn attribute_definition<'v>(
     })
 }
 
+fn unpack_allow_single_file(value: Option<Value>) -> anyhow::Result<Option<AllowSingleFile>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    if value.is_none() {
+        return Ok(None);
+    }
+    if let Some(value) = value.unpack_bool() {
+        return Ok(Some(if value {
+            AllowSingleFile::True
+        } else {
+            AllowSingleFile::False
+        }));
+    }
+    let values = if let Some(values) = ListRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else if let Some(values) = TupleRef::from_value(value) {
+        values.iter().collect::<Vec<_>>()
+    } else {
+        anyhow::bail!("allow_single_file must be a bool or a sequence of file extensions")
+    };
+    let extensions = values
+        .into_iter()
+        .map(|value| {
+            value
+                .unpack_str()
+                .map(CompactString::new)
+                .ok_or_else(|| anyhow::anyhow!("allow_single_file extensions must be strings"))
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(Some(AllowSingleFile::Extensions(extensions.into())))
+}
+
 #[starlark_module]
 fn attr_methods(builder: &mut MethodsBuilder) {
     fn label<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
-        #[starlark(default = true)] configurable: bool,
-        default: Option<Value<'v>>,
-        cfg: Option<Value<'v>>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        #[starlark(require = named)] cfg: Option<Value<'v>>,
+        #[starlark(require = named)] allow_single_file: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::Label,
             mandatory.unwrap_or(false),
             configurable,
+            unpack_allow_single_file(allow_single_file)?,
             default,
             cfg,
             eval,
@@ -3056,15 +3154,16 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn label_list<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
-        #[starlark(default = true)] configurable: bool,
-        default: Option<Value<'v>>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::LabelList,
             mandatory.unwrap_or(false),
             configurable,
+            None,
             default,
             None,
             eval,
@@ -3072,15 +3171,16 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn string_keyed_label_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
-        #[starlark(default = true)] configurable: bool,
-        default: Option<Value<'v>>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::StringKeyedLabelDict,
             mandatory.unwrap_or(false),
             configurable,
+            None,
             default,
             None,
             eval,
@@ -3088,15 +3188,50 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn label_keyed_string_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
-        #[starlark(default = true)] configurable: bool,
-        default: Option<Value<'v>>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::LabelKeyedStringDict,
             mandatory.unwrap_or(false),
             configurable,
+            None,
+            default,
+            None,
+            eval,
+        )
+    }
+    fn bool<'v>(
+        #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
+        attribute_definition(
+            AttributeKind::Boolean,
+            mandatory.unwrap_or(false),
+            configurable,
+            None,
+            default,
+            None,
+            eval,
+        )
+    }
+    fn int<'v>(
+        #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
+        attribute_definition(
+            AttributeKind::Integer,
+            mandatory.unwrap_or(false),
+            configurable,
+            None,
             default,
             None,
             eval,
@@ -3104,15 +3239,16 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn label_list_dict<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
-        #[starlark(default = true)] configurable: bool,
-        default: Option<Value<'v>>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::LabelListDict,
             mandatory.unwrap_or(false),
             configurable,
+            None,
             default,
             None,
             eval,
@@ -3120,13 +3256,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn output<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
+        #[starlark(require = named)] mandatory: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::Output,
             mandatory.unwrap_or(false),
-            false,
+            None,
+            None,
             None,
             None,
             eval,
@@ -3134,13 +3271,14 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn output_list<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
+        #[starlark(require = named)] mandatory: Option<bool>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::OutputList,
             mandatory.unwrap_or(false),
-            false,
+            None,
+            None,
             None,
             None,
             eval,
@@ -3148,15 +3286,67 @@ fn attr_methods(builder: &mut MethodsBuilder) {
     }
     fn string<'v>(
         #[starlark(this)] _attr: Value<'v>,
-        mandatory: Option<bool>,
-        #[starlark(default = true)] configurable: bool,
-        default: Option<Value<'v>>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<AttributeDefinition<'v>> {
         attribute_definition(
             AttributeKind::String,
             mandatory.unwrap_or(false),
             configurable,
+            None,
+            default,
+            None,
+            eval,
+        )
+    }
+    fn string_list<'v>(
+        #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
+        attribute_definition(
+            AttributeKind::StringList,
+            mandatory.unwrap_or(false),
+            configurable,
+            None,
+            default,
+            None,
+            eval,
+        )
+    }
+    fn string_dict<'v>(
+        #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
+        attribute_definition(
+            AttributeKind::StringDict,
+            mandatory.unwrap_or(false),
+            configurable,
+            None,
+            default,
+            None,
+            eval,
+        )
+    }
+    fn string_list_dict<'v>(
+        #[starlark(this)] _attr: Value<'v>,
+        #[starlark(require = named)] mandatory: Option<bool>,
+        #[starlark(require = named)] configurable: Option<bool>,
+        #[starlark(require = named)] default: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<AttributeDefinition<'v>> {
+        attribute_definition(
+            AttributeKind::StringListDict,
+            mandatory.unwrap_or(false),
+            configurable,
+            None,
             default,
             None,
             eval,
@@ -3343,6 +3533,7 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
                                 )
                             }),
                         )
+                        .with_allow_single_file(declaration.allow_single_file.clone())
                     };
                     // Keep the full declaration schema even for an omitted
                     // optional value. Stage 8 must distinguish absent-looking
@@ -3715,6 +3906,11 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                         starlark::__macro_refs::Either::Right(_) => None,
                     })
                     .ok_or_else(|| anyhow::anyhow!("rule attribute `{name}` must use attr.*()"))?;
+                if definition.configurable_set {
+                    anyhow::bail!(
+                        "attribute '{name}' has the 'configurable' argument set, which is not allowed in rule definitions"
+                    );
+                }
                 user_schema.push(RuleAttributeSchema {
                     name: CompactString::new(name),
                     kind: definition.kind,
@@ -3723,6 +3919,8 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
                     default: definition.default.clone(),
                     transition: definition.transition.clone(),
                     builtin: false,
+                    configurable_set: false,
+                    allow_single_file: definition.allow_single_file.clone(),
                 });
             }
         }
@@ -3748,18 +3946,42 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
         UserProviderCallable::from_evaluator(fields, eval)
     }
     fn transition<'v>(
-        implementation: Value<'v>,
-        outputs: UnpackListOrTuple<&str>,
-        #[starlark(default = UnpackListOrTuple::default())] inputs: UnpackListOrTuple<&str>,
+        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named)] inputs: UnpackListOrTuple<&str>,
+        #[starlark(require = named)] outputs: UnpackListOrTuple<&str>,
     ) -> anyhow::Result<TransitionDefinition<'v>> {
-        if !list(inputs).is_empty() || list(outputs) != ["//:setting"] {
-            anyhow::bail!("only transition(inputs = [], outputs = [\"//:setting\"]) is supported")
+        let inputs = list(inputs);
+        let outputs = list(outputs);
+        let [output] = outputs.as_slice() else {
+            anyhow::bail!(
+                "only transition(inputs = [], outputs = [one main-repository target label]) is supported"
+            )
+        };
+        if !inputs.is_empty()
+            || !output.starts_with("//")
+            || transition_output_has_recursive_package_segment(output)
+        {
+            anyhow::bail!(
+                "only transition(inputs = [], outputs = [one main-repository target label]) is supported"
+            )
+        }
+        let label = CanonicalLabel::parse(&format!("@@{output}")).map_err(anyhow::Error::msg)?;
+        if !label.package().repo().is_root() {
+            anyhow::bail!("transition output must be a direct main-repository target label")
         }
         Ok(TransitionDefinitionGen {
             implementation,
-            output: CompactString::const_new("//:setting"),
+            output: output.into(),
         })
     }
+}
+
+fn transition_output_has_recursive_package_segment(output: &str) -> bool {
+    let Some(label) = output.strip_prefix("//") else {
+        return false;
+    };
+    let package = label.split_once(':').map_or(label, |(package, _)| package);
+    package.split('/').any(|segment| segment == "...")
 }
 
 #[starlark_module]

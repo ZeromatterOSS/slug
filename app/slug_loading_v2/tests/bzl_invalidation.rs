@@ -1486,7 +1486,8 @@ declare()
 
     write(&build, &format!("# formatting only\n{build_v1}"));
     let formatted = load_package(&dice, &runtime, &workspace, &package, &[defs.clone()]).unwrap();
-    assert_eq!(initial, formatted);
+    // The added line changes the observable macro generator_location.
+    assert_ne!(initial, formatted);
 
     let schema_v2 = schema_v1.replace(":friends", ":other");
     write(&defs, &schema_v2);

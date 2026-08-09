@@ -66,17 +66,31 @@ impl fmt::Display for SlugConfigurationKind {
     }
 }
 
-/// The packet-fixed root string build setting, `@@//:setting`.
+/// The one string build setting currently carried by a Slug configuration.
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
-pub struct RootStringSettingValue(CompactString);
+pub struct RootStringSettingValue {
+    label: CompactString,
+    value: CompactString,
+}
 
 impl RootStringSettingValue {
     pub fn new(value: impl Into<CompactString>) -> Self {
-        Self(value.into())
+        Self::new_for_label("@@//:setting", value)
+    }
+
+    pub fn new_for_label(label: impl Into<CompactString>, value: impl Into<CompactString>) -> Self {
+        Self {
+            label: label.into(),
+            value: value.into(),
+        }
+    }
+
+    pub fn label(&self) -> &str {
+        &self.label
     }
 
     pub fn as_str(&self) -> &str {
-        &self.0
+        &self.value
     }
 }
 
@@ -414,7 +428,7 @@ fn canonical_bytes(data: &SlugConfigurationData) -> Vec<u8> {
         root.field(0x0012, |setting| match &data.root_string_setting {
             None => setting.field(0x0600, |_| {}),
             Some(value) => setting.field(0x0601, |some| {
-                some.field(0x0610, |label| label.raw_text("@@//:setting"));
+                some.field(0x0610, |label| label.raw_text(value.label()));
                 some.field(0x0611, |value_field| value_field.raw_text(value.as_str()));
             }),
         });
@@ -772,8 +786,17 @@ mod tests {
             SlugConfiguration::default_target(&host(AutoCpuToken::Aarch64, HostPathFlavor::Unix))
                 .unwrap();
         let setting = base.with_root_string_setting(RootStringSettingValue::new("command"));
+        let other_setting = base.with_root_string_setting(RootStringSettingValue::new_for_label(
+            "@@//attr:base_string_setting",
+            "command",
+        ));
         assert_ne!(base.projection(), cpu_changed.projection());
         assert_ne!(base.projection(), setting.projection());
+        assert_ne!(setting.projection(), other_setting.projection());
+        assert_eq!(
+            other_setting.root_string_setting().unwrap().label(),
+            "@@//attr:base_string_setting"
+        );
         assert_ne!(
             base.projection(),
             SlugConfiguration::default_exec(&host(AutoCpuToken::K8, HostPathFlavor::Unix))

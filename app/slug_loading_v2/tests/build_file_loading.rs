@@ -22,6 +22,7 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::AllowSingleFile;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::BzlModuleEvaluator;
@@ -451,7 +452,7 @@ implicit_test_test = rule(implementation = _impl, test = True)
 explicit_test_test = rule(implementation = _impl, test = True, executable = False)
 output_rule = rule(implementation = _impl, attrs = {"outs": attr.output_list()})
 string_flag = rule(implementation = _impl, build_setting = config.string(flag = True))
-transition_rule = rule(implementation = _impl, attrs = {"dep": attr.label(cfg = transition(implementation = _transition_impl, outputs = ["//:setting"]))})
+transition_rule = rule(implementation = _impl, attrs = {"dep": attr.label(cfg = transition(implementation = _transition_impl, inputs = [], outputs = ["//attr:base_string_setting"]))})
 "#,
     )
     .unwrap();
@@ -767,6 +768,17 @@ config_setting(name = "setting", values = {"cpu": "k8"})
         )
         .unwrap()
     ));
+    assert_eq!(
+        transition_rule
+            .schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == "dep")
+            .unwrap()
+            .transition()
+            .unwrap()
+            .output(),
+        "//attr:base_string_setting"
+    );
 }
 
 #[test]
@@ -819,8 +831,8 @@ fn config_setting_retains_values_and_rejects_unmodeled_arguments() {
             name: "linux".to_owned(),
             kind: PackageTargetKind::ConfigSetting {
                 values: vec![
-                    ("cpu".into(), "k8".into()),
                     ("compilation_mode".into(), "opt".into()),
+                    ("cpu".into(), "k8".into()),
                 ]
                 .into(),
             },
@@ -1832,7 +1844,7 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
     .unwrap();
     fs::write(
         package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = [\"//leaf:second\", \"bare\", \"dir/name\", \":local\", \"//leaf:first\"], visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
+        "load(\":defs.bzl\", \"with_deps\")\nwith_deps(name = \"ordered\", deps = (\"//leaf:second\", \"bare\", \"dir/name\", \":local\", \"//leaf:first\"), visibility = [\"//visibility:public\"])\nwith_deps(name = \"omitted\")\n",
     )
     .unwrap();
 
@@ -1877,10 +1889,6 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
         (
             "without_deps(name = \"bad\", deps = [])\n",
             "unknown attribute `deps`",
-        ),
-        (
-            "with_deps(name = \"bad\", deps = (\":one\",))\n",
-            "attribute `deps` must be a list of labels",
         ),
         (
             "with_deps(name = \"bad\", deps = [1])\n",
@@ -1934,6 +1942,286 @@ fn rule_deps_schema_retains_exact_normalized_order_and_rejects_other_shapes() {
             .to_string();
         assert!(error.contains(expected), "error: {error}");
     }
+}
+
+#[test]
+fn scalar_and_string_attr_descriptors_retain_typed_values() {
+    let workspace = scratch("scalar-string-descriptors");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        r#"
+def _impl(ctx):
+    return [DefaultInfo()]
+
+probe = rule(
+    implementation = _impl,
+    attrs = {
+        "flag": attr.bool(default = True),
+        "count": attr.int(default = -2),
+        "words": attr.string_list(default = ("z", "z", "a")),
+        "properties": attr.string_dict(default = {"z": "1", "a": "2"}),
+        "word_map": attr.string_list_dict(default = {"z": ("p", "p", "a"), "a": ("x",)}),
+        "label_map": attr.label_list_dict(default = {"z": (":leaf", ":leaf")}),
+        "optional": attr.label(default = None, allow_single_file = True),
+        "no_files": attr.label(allow_single_file = False),
+        "extensions": attr.label(allow_single_file = (".txt", ".md")),
+        "omitted_files": attr.label(),
+        "explicit_none_files": attr.label(allow_single_file = None),
+    },
+)
+"#,
+    )
+    .unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        r#"
+load(":defs.bzl", "probe")
+probe(
+    name = "subject",
+    flag = False,
+    count = 7,
+    words = ("x", "x", "y"),
+    properties = {"b": "2", "a": "1"},
+    word_map = {"first": ("m", "m"), "second": ("n",)},
+    optional = None,
+)
+"#,
+    )
+    .unwrap();
+
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    let schema = |name: &str| {
+        rule.schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == name)
+            .unwrap()
+    };
+    assert_eq!(schema("flag").kind(), AttributeKind::Boolean);
+    assert_eq!(schema("count").kind(), AttributeKind::Integer);
+    assert_eq!(schema("words").kind(), AttributeKind::StringList);
+    assert_eq!(schema("properties").kind(), AttributeKind::StringDict);
+    assert_eq!(schema("word_map").kind(), AttributeKind::StringListDict);
+    assert_eq!(schema("label_map").kind(), AttributeKind::LabelListDict);
+    assert!(matches!(
+        schema("optional").allow_single_file(),
+        Some(AllowSingleFile::True)
+    ));
+    assert!(matches!(
+        schema("no_files").allow_single_file(),
+        Some(AllowSingleFile::False)
+    ));
+    assert!(matches!(
+        schema("extensions").allow_single_file(),
+        Some(AllowSingleFile::Extensions(extensions))
+            if extensions.as_ref() == [".txt", ".md"]
+    ));
+    assert_eq!(schema("omitted_files").allow_single_file(), None);
+    assert_eq!(schema("explicit_none_files").allow_single_file(), None);
+    assert!(schema("flag").configurable());
+    assert!(matches!(
+        schema("optional").default(),
+        Some(CoercedAttributeValue::None)
+    ));
+    assert!(matches!(
+        schema("word_map").default(),
+        Some(CoercedAttributeValue::StringListDict(values))
+            if values.as_ref()
+                == [
+                    ("z".into(), Arc::from(["p".into(), "p".into(), "a".into()])),
+                    ("a".into(), Arc::from(["x".into()])),
+                ]
+    ));
+
+    let value = |name: &str| {
+        rule.values()
+            .iter()
+            .find(|value| value.declaration_name == name)
+            .unwrap()
+            .value
+            .as_ref()
+    };
+    assert!(matches!(
+        value("flag"),
+        CoercedAttributeValue::Boolean(false)
+    ));
+    assert!(matches!(value("count"), CoercedAttributeValue::Integer(7)));
+    assert!(matches!(value("optional"), CoercedAttributeValue::None));
+    assert_eq!(
+        rule.values()
+            .iter()
+            .find(|value| value.declaration_name == "optional")
+            .unwrap()
+            .provenance,
+        AttributeProvenance::Explicit
+    );
+    assert!(matches!(
+        value("words"),
+        CoercedAttributeValue::StringList(values)
+            if values.as_ref() == ["x", "x", "y"]
+    ));
+    assert!(matches!(
+        value("properties"),
+        CoercedAttributeValue::StringDict(values)
+            if values.as_ref() == [("b".into(), "2".into()), ("a".into(), "1".into())]
+    ));
+    assert!(matches!(
+        value("word_map"),
+        CoercedAttributeValue::StringListDict(values)
+            if values.as_ref()
+                == [
+                    ("first".into(), Arc::from(["m".into(), "m".into()])),
+                    ("second".into(), Arc::from(["n".into()])),
+                ]
+    ));
+    let mut labels = Vec::new();
+    value("word_map").labels(&mut labels);
+    assert!(labels.is_empty());
+    schema("label_map").default().unwrap().labels(&mut labels);
+    assert_eq!(
+        labels,
+        [
+            CanonicalLabel::parse("@@//pkg:leaf").unwrap(),
+            CanonicalLabel::parse("@@//pkg:leaf").unwrap(),
+        ]
+    );
+}
+
+#[test]
+fn rule_rejects_explicit_configurable_descriptor_arguments() {
+    let workspace = scratch("explicit-configurable");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    )
+    .unwrap();
+    for value in ["True", "False"] {
+        fs::write(
+            package.join("defs.bzl"),
+            format!(
+                "def _impl(ctx):\n    return [DefaultInfo()]\n\nprobe = rule(implementation = _impl, attrs = {{\"x\": attr.bool(configurable = {value})}})\n"
+            ),
+        )
+        .unwrap();
+        let error = try_load_package(&workspace, &package)
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(
+                "attribute 'x' has the 'configurable' argument set, which is not allowed in rule definitions"
+            ),
+            "error: {error}"
+        );
+    }
+}
+
+#[test]
+fn non_label_descriptors_reject_none_defaults() {
+    let workspace = scratch("non-label-none-default");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    )
+    .unwrap();
+    fs::write(
+        package.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\n\nprobe = rule(implementation = _impl, attrs = {\"x\": attr.bool(default = None)})\n",
+    )
+    .unwrap();
+
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains(
+            "attribute values must contain strings, booleans, integers, lists, or dictionaries"
+        ),
+        "error: {error}"
+    );
+}
+
+#[test]
+fn attr_and_transition_parameters_are_named_only_and_transition_inputs_are_required() {
+    let workspace = scratch("named-only-schema-parameters");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    )
+    .unwrap();
+
+    let invalid_definitions = [
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, attrs = {\"x\": attr.bool(True)})\n",
+        "def _impl(ctx):\n    return [DefaultInfo()]\ndef _transition_impl(settings, attr):\n    return {}\nprobe = rule(implementation = _impl, attrs = {\"x\": attr.label(cfg = transition(_transition_impl, inputs = [], outputs = [\"//pkg:setting\"]))})\n",
+        "def _impl(ctx):\n    return [DefaultInfo()]\ndef _transition_impl(settings, attr):\n    return {}\nprobe = rule(implementation = _impl, attrs = {\"x\": attr.label(cfg = transition(implementation = _transition_impl, outputs = [\"//pkg:setting\"]))})\n",
+    ];
+    for definitions in invalid_definitions {
+        fs::write(package.join("defs.bzl"), definitions).unwrap();
+        assert!(
+            try_load_package(&workspace, &package).is_err(),
+            "definition unexpectedly accepted: {definitions}"
+        );
+    }
+}
+
+#[test]
+fn transition_rejects_recursive_package_patterns_but_allows_ellipsis_in_target_names() {
+    let workspace = scratch("transition-recursive-package-pattern");
+    let package = workspace.join("pkg");
+    fs::write(workspace.join(MODULE_FILE), "module(name = \"root\")\n").unwrap();
+    fs::create_dir_all(&package).unwrap();
+    fs::write(
+        package.join(BUILD_FILE_PRIMARY),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"subject\")\n",
+    )
+    .unwrap();
+    let definitions = |output: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\ndef _transition_impl(settings, attr):\n    return {{}}\nprobe = rule(implementation = _impl, attrs = {{\"x\": attr.label(cfg = transition(implementation = _transition_impl, inputs = [], outputs = [\"{output}\"]))}})\n"
+        )
+    };
+
+    fs::write(
+        package.join("defs.bzl"),
+        definitions("//pkg:setting...variant"),
+    )
+    .unwrap();
+    let loaded = load_package(&workspace, &package);
+    let PackageTargetKind::StarlarkRule(rule) = &loaded.targets[0].kind else {
+        panic!("expected Starlark rule")
+    };
+    assert_eq!(
+        rule.schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == "x")
+            .unwrap()
+            .transition()
+            .unwrap()
+            .output(),
+        "//pkg:setting...variant"
+    );
+
+    fs::write(package.join("defs.bzl"), definitions("//pkg/...:setting")).unwrap();
+    let error = try_load_package(&workspace, &package)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("one main-repository target label"),
+        "error: {error}"
+    );
 }
 
 #[test]
@@ -2057,7 +2345,6 @@ probe = rule(
         "out": attr.output(mandatory = True),
         "outs": attr.output_list(mandatory = True),
         "trailing": attr.label_list(),
-        "locked": attr.label(configurable = False),
         "chained": attr.label_list(),
         "nested_prefix": attr.label_list(),
     },
@@ -2107,7 +2394,6 @@ probe(
             AttributeKind::Output,
             AttributeKind::OutputList,
             AttributeKind::LabelList,
-            AttributeKind::Label,
             AttributeKind::LabelList,
             AttributeKind::LabelList,
         ]
@@ -2120,7 +2406,6 @@ probe(
     assert!(schema[0].configurable());
     assert!(!schema[8].configurable());
     assert!(!schema[9].configurable());
-    assert!(!schema[11].configurable());
     assert!(schema[2].dependency_reachable() == false);
     assert!(matches!(
         schema[0].default(),
@@ -2303,17 +2588,6 @@ probe(
             .unwrap_err()
             .to_string()
             .contains("target 'one.out' declared more than once")
-    );
-    fs::write(
-        package.join(BUILD_FILE_PRIMARY),
-        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"locked_select\", locked = select({\":condition\": \":source\"}), out = \"one.out\", outs = [])\n",
-    )
-    .unwrap();
-    assert!(
-        try_load_package(&workspace, &package)
-            .unwrap_err()
-            .to_string()
-            .contains("attribute `locked` is not configurable")
     );
     fs::write(
         package.join(BUILD_FILE_PRIMARY),

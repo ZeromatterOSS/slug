@@ -929,6 +929,7 @@ async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_es
         ("transition leaf", first_module.clone(), transition_defs, TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", dep = \":type\")", 1), "marker leaf"),
         ("build-setting leaf", first_module.clone(), TOOLCHAIN_DEFS.replacen("attrs = {\"marker\": attr.string(mandatory = True)})", "attrs = {\"marker\": attr.string(mandatory = True)}, build_setting = config.string(flag = True))", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", build_setting_default = \"bad\")", 1), "marker leaf"),
         ("explicit tags", first_module.clone(), TOOLCHAIN_DEFS.to_owned(), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", tags = [])", 1), "marker leaf"),
+        ("nonempty builtin", first_module.clone(), TOOLCHAIN_DEFS.to_owned(), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", features = [\"bad\"])", 1), "marker leaf"),
         ("omitted optional marker", first_module.clone(), TOOLCHAIN_DEFS.replacen("attr.string(mandatory = True)", "attr.string()", 1), TOOLCHAIN_BUILD.replacen("first_impl(name = \"first_impl\", marker = \"first\")", "first_impl(name = \"first_impl\")", 1), "marker leaf"),
         ("extra scalar", first_module.clone(), TOOLCHAIN_DEFS.replacen("{\"marker\": attr.string(mandatory = True)}", "{\"marker\": attr.string(mandatory = True), \"extra\": attr.string()}", 1), TOOLCHAIN_BUILD.replacen("marker = \"first\")", "marker = \"first\", extra = \"bad\")", 1), "marker leaf"),
         ("executable capability", first_module.clone(), TOOLCHAIN_DEFS.replacen("first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)})", "first_impl = rule(implementation = _first, attrs = {\"marker\": attr.string(mandatory = True)}, executable = True)", 1), TOOLCHAIN_BUILD.to_owned(), "marker leaf"),
@@ -1268,6 +1269,63 @@ resolved/@@//:setting=right:E resolved/@@//:setting=right:E resolved/@@//:settin
         )
         .await
         .is_err()
+    );
+}
+
+#[tokio::test]
+async fn transition_output_label_selects_the_carried_string_setting() {
+    let workspace = scratch();
+    fs::create_dir(workspace.join("settings")).unwrap();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"SettingInfo = provider(fields = {"value": "value"})
+ParentInfo = provider(fields = {"value": "value"})
+def _setting(ctx): return [SettingInfo(value = ctx.build_setting_value)]
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _consumer(ctx): return [SettingInfo(value = ctx.attr._setting[SettingInfo].value)]
+consumer = rule(implementation = _consumer, attrs = {"_setting": attr.label(default = "//settings")})
+def _transition(settings, attr): return {"//settings": "transitioned"}
+setting_transition = transition(implementation = _transition, inputs = [], outputs = ["//settings"])
+def _parent(ctx): return [ParentInfo(value = ctx.attr.dep[0][SettingInfo].value)]
+parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting_transition)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"consumer\", \"parent\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", dep = \":consumer\")\n",
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("settings/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"string_setting\")\nstring_setting(name = \"settings\", build_setting_default = \"default\")\n",
+    )
+    .unwrap();
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let result = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:parent").unwrap(),
+            ConfigurationKey::target("dynamic-setting-base").unwrap(),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
+    assert_eq!(provider_value(&result, &parent), "transitioned");
+    assert_eq!(
+        result
+            .key()
+            .configuration()
+            .root_string_setting()
+            .unwrap()
+            .label(),
+        "@@//settings:settings"
     );
 }
 

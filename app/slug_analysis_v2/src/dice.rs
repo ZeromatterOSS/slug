@@ -131,6 +131,7 @@ enum RootConfiguredTargetAnalysisInput {
     Resolved(ConfiguredTargetKey),
     RootStringSettingRequest {
         requested: CanonicalLabel,
+        setting: CanonicalLabel,
         base_configuration: ConfigurationKey,
         explicit: Option<RootStringSettingValue>,
     },
@@ -177,6 +178,7 @@ impl RootConfiguredTargetAnalysisKey {
                 requested,
                 base_configuration,
                 explicit,
+                ..
             } => Some((requested, base_configuration, explicit.as_ref())),
         }
     }
@@ -187,10 +189,27 @@ impl RootConfiguredTargetAnalysisKey {
         base_configuration: ConfigurationKey,
         explicit: Option<RootStringSettingValue>,
     ) -> Self {
+        Self::root_string_setting_request_for_label(
+            workspace,
+            requested,
+            CanonicalLabel::parse("@@//:setting").expect("fixed setting label is valid"),
+            base_configuration,
+            explicit,
+        )
+    }
+
+    fn root_string_setting_request_for_label(
+        workspace: NormalizedAbsolutePath,
+        requested: CanonicalLabel,
+        setting: CanonicalLabel,
+        base_configuration: ConfigurationKey,
+        explicit: Option<RootStringSettingValue>,
+    ) -> Self {
         Self {
             workspace,
             input: RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
                 requested,
+                setting,
                 base_configuration,
                 explicit,
             },
@@ -207,10 +226,11 @@ impl fmt::Display for RootConfiguredTargetAnalysisKey {
                 RootConfiguredTargetAnalysisInput::Resolved(key) => key.to_string(),
                 RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
                     requested,
+                    setting,
                     base_configuration,
                     explicit,
                 } => format!(
-                    "request:{requested}[{base_configuration}]={}",
+                    "request:{requested}[{base_configuration}]/{setting}={}",
                     explicit
                         .as_ref()
                         .map_or("<default>", RootStringSettingValue::as_str)
@@ -267,6 +287,59 @@ fn starlark_rule_implementation<'a>(
     Ok(implementation)
 }
 
+fn required_root_string_setting(
+    implementation: &StarlarkRuleImplementation,
+    target: &CanonicalLabel,
+) -> Result<Option<CanonicalLabel>, AnalysisError> {
+    let mut required = implementation
+        .is_root_string_build_setting()
+        .then(|| target.clone());
+    let mut insert = |candidate: CanonicalLabel| -> Result<(), AnalysisError> {
+        if let Some(existing) = &required
+            && existing != &candidate
+        {
+            return Err(AnalysisError::new(format!(
+                "multiple string build settings are not supported: {existing} and {candidate}"
+            )));
+        }
+        required = Some(candidate);
+        Ok(())
+    };
+    for schema in implementation.schema() {
+        if let Some(transition) = schema.transition() {
+            insert(
+                CanonicalLabel::parse(&format!("@@{}", transition.output()))
+                    .map_err(AnalysisError::new)?,
+            )?;
+        }
+    }
+    let fixed = CanonicalLabel::parse("@@//:setting").expect("fixed setting label is valid");
+    if implementation
+        .dependencies()
+        .iter()
+        .any(|dependency| dependency == &fixed)
+    {
+        insert(fixed)?;
+    }
+    Ok(required)
+}
+
+fn validate_carried_root_string_setting(
+    configuration: &ConfigurationKey,
+    required: Option<&CanonicalLabel>,
+) -> Result<(), AnalysisError> {
+    let (Some(carried), Some(required)) = (configuration.root_string_setting(), required) else {
+        return Ok(());
+    };
+    if carried.label() != required.to_string() {
+        return Err(AnalysisError::new(format!(
+            "multiple string build settings are not supported: {} and {required}",
+            carried.label()
+        )));
+    }
+    Ok(())
+}
+
 fn root_declared_dependency_keys(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
@@ -281,6 +354,15 @@ fn root_declared_dependency_keys(
         else {
             continue;
         };
+        if !schema.ordinary_dependency() {
+            continue;
+        }
+        // Retain the Bazel tools allowlist in loading/query topology, but the
+        // current Rust-native analysis subset has no permission-check action
+        // and cannot configure external repositories yet.
+        if schema.declaration_name() == "$allowlist_function_transition" {
+            continue;
+        }
         let labels: Vec<&CanonicalLabel> = match value.value.as_ref() {
             CoercedAttributeValue::Label(label) => vec![label],
             CoercedAttributeValue::LabelList(labels) => labels.iter().collect(),
@@ -301,20 +383,26 @@ fn root_declared_dependency_keys(
                 .collect::<Vec<_>>();
             let [(output, setting)] = entries.as_slice() else {
                 return Err(AnalysisError::new(
-                    "transition must return exactly one //:setting output",
+                    "transition must return exactly one declared output",
                 ));
             };
             if output.unpack_str() != Some(transition.output()) {
-                return Err(AnalysisError::new(
-                    "transition output must be exactly //:setting",
-                ));
+                return Err(AnalysisError::new(format!(
+                    "transition output must be exactly {}",
+                    transition.output()
+                )));
             }
             let setting = setting.unpack_str().ok_or_else(|| {
-                AnalysisError::new("transition //:setting output must be a string")
+                AnalysisError::new(format!(
+                    "transition {} output must be a string",
+                    transition.output()
+                ))
             })?;
-            configured_target
-                .configuration()
-                .with_root_string_setting(RootStringSettingValue::new(setting))
+            let output_label = CanonicalLabel::parse(&format!("@@{}", transition.output()))
+                .map_err(AnalysisError::new)?;
+            configured_target.configuration().with_root_string_setting(
+                RootStringSettingValue::new_for_label(output_label.to_string(), setting),
+            )
         } else {
             configured_target.configuration().clone()
         };
@@ -475,50 +563,44 @@ impl ConfiguredTargetAnalysisKey {
             .map_err(|error| {
                 AnalysisError::new(format!("loading package through DICE: {error}"))
             })?;
-        let needs_root_string_setting = {
+        let required_root_string_setting = {
             let package = package_value
                 .as_ref()
                 .as_ref()
                 .map_err(|error| AnalysisError::new(error.to_string()))?;
             let rule = starlark_rule_implementation(package, &self.configured_target)?;
-            let setting =
-                CanonicalLabel::parse("@@//:setting").expect("packet-fixed setting label is valid");
-            rule.is_root_string_build_setting()
-                || rule
-                    .schema()
-                    .iter()
-                    .any(|attribute| attribute.transition().is_some())
-                || rule
-                    .dependencies()
-                    .iter()
-                    .any(|dependency| dependency == &setting)
+            required_root_string_setting(rule, label)?
         };
+        validate_carried_root_string_setting(
+            self.configured_target.configuration(),
+            required_root_string_setting.as_ref(),
+        )?;
         if self
             .configured_target
             .configuration()
             .root_string_setting()
             .is_none()
-            && needs_root_string_setting
+            && let Some(setting) = &required_root_string_setting
         {
-            let root_package = ctx
+            let setting_package = ctx
                 .compute(&PackageLoadKey {
                     workspace: self.workspace.clone(),
-                    package: self.workspace.clone(),
+                    package: self.workspace.join(setting.package().package().as_str()),
                 })
                 .await
                 .map_err(|error| {
                     AnalysisError::new(format!(
-                        "loading legacy setting package through DICE: {error}"
+                        "loading string setting package through DICE: {error}"
                     ))
                 })?;
-            let root_package = root_package
+            let setting_package = setting_package
                 .as_ref()
                 .as_ref()
                 .map_err(|error| AnalysisError::new(error.to_string()))?;
-            let default = root_package
+            let default = setting_package
                 .targets
                 .iter()
-                .find(|target| target.name == "setting")
+                .find(|target| target.name == setting.target().as_str())
                 .and_then(|target| match &target.kind {
                     PackageTargetKind::StarlarkRule(rule)
                         if rule.is_root_string_build_setting() =>
@@ -528,13 +610,16 @@ impl ConfiguredTargetAnalysisKey {
                     _ => None,
                 })
                 .ok_or_else(|| {
-                    AnalysisError::new("root string build setting @@//:setting is missing")
+                    AnalysisError::new(format!("root string build setting {setting} is missing"))
                 })?;
             let configured_target = ConfiguredTargetKey::new(
                 self.configured_target.label().clone(),
                 self.configured_target
                     .configuration()
-                    .with_root_string_setting(RootStringSettingValue::new(default)),
+                    .with_root_string_setting(RootStringSettingValue::new_for_label(
+                        setting.to_string(),
+                        default,
+                    )),
             );
             let value = ctx
                 .compute(&ConfiguredTargetAnalysisKey {
@@ -559,7 +644,7 @@ impl ConfiguredTargetAnalysisKey {
                 .configuration()
                 .root_string_setting()
                 .is_some()
-                || needs_root_string_setting
+                || required_root_string_setting.is_some()
             {
                 root_declared_dependency_keys(package, &self.configured_target)?
             } else {
@@ -985,19 +1070,63 @@ async fn resolve_root_toolchain(
                 && value.provenance == AttributeProvenance::Default
                 && matches!(value.value.as_ref(), CoercedAttributeValue::StringList(tags) if tags.is_empty())
         });
+        let user_schema = rule
+            .schema()
+            .iter()
+            .filter(|schema| !schema.is_builtin())
+            .collect::<Vec<_>>();
+        let builtin_values_are_marker_defaults = rule.values().iter().all(|value| {
+            let Some(schema) = rule
+                .schema()
+                .iter()
+                .find(|schema| schema.declaration_name() == value.declaration_name)
+            else {
+                return false;
+            };
+            if !schema.is_builtin() {
+                return true;
+            }
+            match schema.declaration_name() {
+                "name" => {
+                    value.provenance == AttributeProvenance::Explicit
+                        && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
+                }
+                "visibility" => value.provenance == AttributeProvenance::Default,
+                "generator_name" | "generator_function" | "generator_location" => {
+                    value.provenance == AttributeProvenance::Implicit
+                        && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
+                }
+                "deprecation" => {
+                    value.provenance == AttributeProvenance::Default
+                        && matches!(value.value.as_ref(), CoercedAttributeValue::None)
+                }
+                _ => {
+                    let intrinsic_empty = match value.value.as_ref() {
+                        CoercedAttributeValue::None => true,
+                        CoercedAttributeValue::String(value) => value.is_empty(),
+                        CoercedAttributeValue::LabelList(values) => values.is_empty(),
+                        CoercedAttributeValue::StringList(values) => values.is_empty(),
+                        CoercedAttributeValue::StringDict(values) => values.is_empty(),
+                        CoercedAttributeValue::LabelListDict(values) => values.is_empty(),
+                        CoercedAttributeValue::Boolean(value) => !value,
+                        CoercedAttributeValue::Integer(value) => *value == 0,
+                        _ => false,
+                    };
+                    value.provenance != AttributeProvenance::Explicit && intrinsic_empty
+                }
+            }
+        });
         if marker.is_none()
             || !rule.dependencies().is_empty()
             || !rule.required_toolchains().is_empty()
             || rule.is_root_string_build_setting()
-            || rule.schema().len() != 2
-            || rule.schema()[0].declaration_name() != "marker"
-            || !matches!(rule.schema()[0].kind(), AttributeKind::String)
-            || rule.schema()[0].transition().is_some()
-            || rule.schema()[0].dependency_reachable()
-            || rule.schema()[1].declaration_name() != "tags"
-            || rule.schema()[1].transition().is_some()
-            || rule.schema()[1].dependency_reachable()
-            || rule.values().len() != 2
+            || user_schema.len() != 1
+            || user_schema[0].declaration_name() != "marker"
+            || !matches!(user_schema[0].kind(), AttributeKind::String)
+            || user_schema[0].transition().is_some()
+            || user_schema[0].dependency_reachable()
+            || rule.values().len() != rule.schema().len()
+            || !builtin_values_are_marker_defaults
             || !empty_tags
             || capability.executable
             || capability.test_kind.is_some()
@@ -1143,12 +1272,19 @@ impl RootConfiguredTargetAnalysisKey {
     ) -> RootAnalysisKeyValue {
         if let RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
             requested,
+            setting,
             base_configuration,
             explicit,
         } = &self.input
         {
-            let setting =
-                CanonicalLabel::parse("@@//:setting").expect("packet-fixed setting label is valid");
+            if let Some(explicit) = explicit
+                && explicit.label() != setting.to_string()
+            {
+                return root_analysis_complete(Err(AnalysisError::new(format!(
+                    "root string setting request for {setting} carried {}",
+                    explicit.label()
+                ))));
+            }
             let package = match ctx
                 .compute(&RootPackageLoadKey::new(
                     self.workspace.dupe(),
@@ -1170,7 +1306,7 @@ impl RootConfiguredTargetAnalysisKey {
                 Ok(package) => package
                     .targets
                     .iter()
-                    .find(|target| target.name == "setting")
+                    .find(|target| target.name == setting.target().as_str())
                     .and_then(|target| match &target.kind {
                         PackageTargetKind::StarlarkRule(rule)
                             if rule.is_root_string_build_setting() =>
@@ -1184,13 +1320,13 @@ impl RootConfiguredTargetAnalysisKey {
                 }
             };
             let Some(default) = default else {
-                return root_analysis_complete(Err(AnalysisError::new(
-                    "root string build setting @@//:setting is missing",
-                )));
+                return root_analysis_complete(Err(AnalysisError::new(format!(
+                    "root string build setting {setting} is missing"
+                ))));
             };
-            let value = explicit
-                .clone()
-                .unwrap_or_else(|| RootStringSettingValue::new(default));
+            let value = explicit.clone().unwrap_or_else(|| {
+                RootStringSettingValue::new_for_label(setting.to_string(), default)
+            });
             let configuration = base_configuration.with_root_string_setting(value);
             return ctx
                 .compute(&Self::new(
@@ -1232,7 +1368,7 @@ impl RootConfiguredTargetAnalysisKey {
                 ))));
             }
         };
-        let needs_root_string_setting = {
+        let required_root_string_setting = {
             let package = match package_value.as_ref() {
                 Ok(package) => package,
                 Err(error) => {
@@ -1243,28 +1379,28 @@ impl RootConfiguredTargetAnalysisKey {
                 Ok(rule) => rule,
                 Err(error) => return root_analysis_complete(Err(error)),
             };
-            let setting =
-                CanonicalLabel::parse("@@//:setting").expect("packet-fixed setting label is valid");
-            rule.is_root_string_build_setting()
-                || rule
-                    .schema()
-                    .iter()
-                    .any(|attribute| attribute.transition().is_some())
-                || rule
-                    .dependencies()
-                    .iter()
-                    .any(|dependency| dependency == &setting)
+            match required_root_string_setting(rule, label) {
+                Ok(required) => required,
+                Err(error) => return root_analysis_complete(Err(error)),
+            }
         };
+        if let Err(error) = validate_carried_root_string_setting(
+            configured_target.configuration(),
+            required_root_string_setting.as_ref(),
+        ) {
+            return root_analysis_complete(Err(error));
+        }
         if configured_target
             .configuration()
             .root_string_setting()
             .is_none()
-            && needs_root_string_setting
+            && let Some(setting) = &required_root_string_setting
         {
             return ctx
-                .compute(&Self::root_string_setting_request(
+                .compute(&Self::root_string_setting_request_for_label(
                     self.workspace.dupe(),
                     configured_target.label().clone(),
+                    setting.clone(),
                     configured_target.configuration().clone(),
                     None,
                 ))
@@ -1328,17 +1464,11 @@ impl RootConfiguredTargetAnalysisKey {
                     return root_analysis_complete(Err(AnalysisError::new(error.to_string())));
                 }
             };
-            let has_root_setting_transition =
-                starlark_rule_implementation(package, configured_target).is_ok_and(|rule| {
-                    rule.schema()
-                        .iter()
-                        .any(|attribute| attribute.transition().is_some())
-                });
             let dependencies = if configured_target
                 .configuration()
                 .root_string_setting()
                 .is_some()
-                || has_root_setting_transition
+                || required_root_string_setting.is_some()
             {
                 root_declared_dependency_keys(package, configured_target)
             } else {

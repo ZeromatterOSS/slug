@@ -34,16 +34,29 @@ pub enum AttributeKind {
     OutputList,
     String,
     StringList,
+    StringListDict,
     Boolean,
     Integer,
     StringDict,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum AllowSingleFile {
+    False,
+    True,
+    Extensions(Arc<[CompactString]>),
 }
 
 impl AttributeKind {
     pub(crate) fn reaches_labels(self) -> bool {
         !matches!(
             self,
-            Self::String | Self::StringList | Self::Boolean | Self::Integer | Self::StringDict
+            Self::String
+                | Self::StringList
+                | Self::StringListDict
+                | Self::Boolean
+                | Self::Integer
+                | Self::StringDict
         )
     }
 
@@ -70,6 +83,7 @@ pub struct AttributeSchema {
     order_independent: bool,
     ordinary_dependency: bool,
     builtin: bool,
+    allow_single_file: Option<AllowSingleFile>,
     default: Option<Arc<CoercedAttributeValue>>,
     transition: Option<TransitionDefinition>,
 }
@@ -98,6 +112,7 @@ impl AttributeSchema {
             order_independent: false,
             ordinary_dependency: kind.contributes_ordinary_dependencies(),
             builtin: false,
+            allow_single_file: None,
             default: default.map(Arc::new),
             transition,
         }
@@ -155,6 +170,16 @@ impl AttributeSchema {
     }
     pub(crate) fn order_independent(&self) -> bool {
         self.order_independent
+    }
+    pub fn allow_single_file(&self) -> Option<&AllowSingleFile> {
+        self.allow_single_file.as_ref()
+    }
+    pub(crate) fn with_allow_single_file(
+        mut self,
+        allow_single_file: Option<AllowSingleFile>,
+    ) -> Self {
+        self.allow_single_file = allow_single_file;
+        self
     }
     pub fn default(&self) -> Option<&CoercedAttributeValue> {
         self.default.as_deref()
@@ -564,6 +589,7 @@ pub enum CoercedAttributeValue {
     LabelList(Arc<[CanonicalLabel]>),
     String(CompactString),
     StringList(Arc<[CompactString]>),
+    StringListDict(Arc<[(CompactString, Arc<[CompactString]>)]>),
     Boolean(bool),
     Integer(i32),
     StringDict(Arc<[(CompactString, CompactString)]>),
@@ -686,6 +712,7 @@ impl CoercedAttributeValue {
             ),
             Self::String(value) => Self::String(value.clone()),
             Self::StringList(values) => Self::StringList(values.clone()),
+            Self::StringListDict(values) => Self::StringListDict(values.clone()),
             Self::Boolean(value) => Self::Boolean(*value),
             Self::Integer(value) => Self::Integer(*value),
             Self::StringDict(values) => Self::StringDict(values.clone()),
@@ -737,6 +764,7 @@ impl CoercedAttributeValue {
             }
             Self::String(_)
             | Self::StringList(_)
+            | Self::StringListDict(_)
             | Self::Boolean(_)
             | Self::Integer(_)
             | Self::StringDict(_)
@@ -910,6 +938,20 @@ fn expand_attr_candidates(
         }
         CoercedAttributeValue::StringList(values) => {
             list_candidate(values.iter().cloned().map(AttrCandidateAtom::String))
+        }
+        CoercedAttributeValue::StringListDict(values) => {
+            dict_candidate(values.iter().map(|(key, values)| {
+                (
+                    AttrCandidateAtom::String(key.clone()),
+                    AttrCandidateValue::List(
+                        values
+                            .iter()
+                            .cloned()
+                            .map(AttrCandidateAtom::String)
+                            .collect(),
+                    ),
+                )
+            }))
         }
         CoercedAttributeValue::StringDict(values) => {
             dict_candidate(values.iter().map(|(key, value)| {
@@ -1368,6 +1410,10 @@ mod tests {
             CompactString::new("ordered"),
             Arc::from([label("@@//pkg:one"), label("@@//pkg:one")]),
         )]));
+        let string_lists = CoercedAttributeValue::StringListDict(Arc::from([(
+            CompactString::new("ordered"),
+            Arc::from([CompactString::new("one"), CompactString::new("one")]),
+        )]));
 
         assert_eq!(
             scalar_label
@@ -1402,6 +1448,12 @@ mod tests {
                 .attr_visible_candidates(render_bazel_label)
                 .unwrap(),
             ["{ordered=[//pkg:one, //pkg:one]}"]
+        );
+        assert_eq!(
+            string_lists
+                .attr_visible_candidates(render_bazel_label)
+                .unwrap(),
+            ["{ordered=[one, one]}"]
         );
     }
 

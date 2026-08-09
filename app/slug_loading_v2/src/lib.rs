@@ -22,6 +22,7 @@ pub mod package;
 pub mod provider;
 pub mod visibility;
 
+pub use attrs::AllowSingleFile;
 pub use attrs::AttributeKind;
 pub use attrs::AttributeProvenance;
 pub use attrs::AttributeQueryValue;
