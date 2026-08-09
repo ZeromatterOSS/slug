@@ -934,6 +934,139 @@ prerequisite. It must not generate fixtures, activate `attr`, freeze a
 production representation, broaden the graph, or add Rust, Cargo, DICE, JVM,
 Java source/bytecode/helper, or production Bazel delegation.
 
+## `attr` observable-candidate oracle design retry (2026-08-09)
+
+`WP-4-8-m3-attr-observable-candidate-oracle-design-retry` selects an extension
+of the existing `query-labels-attribute-metadata` fixture. An isolated fixture
+would duplicate its root module, Starlark rule definitions, selector keys,
+package-context labels, dictionary shapes, filegroup/alias targets, payload
+projection, and harness metadata. The accepted workspace currently has 39
+Bazel rows, eight directories, eleven regular files, 127 logical source lines,
+zero mutations, and one canonical payload projection. All 39 existing rows
+remain protected.
+
+The extension adds one isolated `attr/BUILD.bazel` package inside that same
+workspace and one local external module under `modules/ext` with only
+`MODULE.bazel` and `leaf/BUILD.bazel`. It edits the root `MODULE.bazel` to add
+`bazel_dep(name="ext", version="1.0")` plus the relative local override, and
+extends existing `pkg/defs.bzl` with the normal, executable, test, root string
+build-setting, macro, selector, dictionary, and Starlark-transition probe
+definitions. Existing `pkg` targets remain the empty/default-package controls.
+The new `attr` package owns all positive package-default state and all nine
+native representatives. No copied repository tree, action, source artifact,
+mutation, toolchain resolution, configured query, or generated `@bazel_tools`
+content is needed.
+
+### Paired command construction
+
+The later fixture adds exactly 18 ordinary-query commands, for 57 total. Each
+command is a union of independently observable atoms of the form:
+
+```text
+attr(<query spelling>, "^<escaped whole value>$",
+     set(//attr:<case>_yes //attr:<case>_no))
+```
+
+Every atom receives a distinct positive and negative rule instance, and no
+label is the positive result of two atoms in the same command. Exact stdout
+must enumerate every `_yes` label once and no `_no` label. This prevents union
+deduplication from masking a missing positive or a false match. An atom may
+instead compare a shared-schema representative with a class whose attr was
+removed; the expected set then names only the representative. All patterns are
+anchored. Literal list/map brackets and regex punctuation are escaped in TOML.
+
+| Lane | Exact observable atoms |
+| ---: | --- |
+| 1 | `name` matches each of the four Starlark shapes and nine native classes by its exact target name; `attr(name,"^.*$",...)` rejects an existing source file, generated file, and package group as nonrules. |
+| 2 | `expect_failure="boom"`, `shard_count=-1`, BOOLEAN `testonly=0/1`, native package `licenses=[notice]`, config-setting `licenses=[none]`, and package `deprecation="deprecated"`; the paired no-deprecation target is probed with `^.*$` and must remain absent because null is not an empty string. |
+| 3 | Existing empty candidates match `^$`, `^\\[\\]$`, and `^\\{\\}$`; scalar label/output null defaults match no regex; an explicit nullable-label counterpart matches its canonical label; `$private` matches while `_private` does not. |
+| 4 | Ordered `args=[z, z, a]` rejects `[a, z, z]`; OI `tags`/`features` declared as `[z, a, z]` match `[a, z, z]` and reject declaration order; ordered `STRING_DICT` matches `{z=1, a=2}` and rejects the reverse. |
+| 5 | Whole rendered user dictionaries cover string-to-label `{a=//attr:leaf, z=//pkg:source.txt}`, label-to-string `{//attr:leaf=a, //pkg:source.txt=z}`, and string-to-label-list `{a=[//attr:leaf], z=[//pkg:source.txt, //attr:leaf]}`; each has a reversed-interior nonmatch. |
+| 6 | Scalar/container leaves require main `//attr:leaf`, generic Bzlmod canonical `@@ext+//leaf:label`, and fixed `@@bazel_tools//tools/test:test_wrapper`. The update run must freeze the actual canonical token and stop rather than weakening the regex if it differs from pinned-source expectation. |
+| 7 | One string attr concatenates two selects with the same complete key set. Positive candidates are the same-branch combinations; mixed combinations are negative. Both clauses operate on duplicate rule instances with identical values, never on separate attrs. |
+| 8 | A second string attr concatenates selects with distinct key sets and must expose a cross-product-only combination. Separate string and executable/test `args` probes require formatting after concatenation, including `[p, a, p]` duplicate retention inside one list candidate. |
+| 9 | Package-derived `visibility=[//visibility:public]`, `testonly=1`, `package_metadata=[//attr:metadata]`, `deprecation`, and `licenses` contrast with existing package defaults. A legacy macro target exposes exact `generator_name` and `generator_function`; `generator_location` matches `^attr/BUILD\\.bazel:[0-9]+:[0-9]+$`, while direct targets expose empty generator strings. |
+| 10 | Normal Starlark shared fields cover a nonempty `expect_failure`, `toolchains`, `exec_properties`, execution compatibility/default dictionaries, `target_compatible_with`, and `$config_dependencies`. Executable probes cover `args`, `output_licenses`, and `$is_executable=1`; the root string setting covers its declared `build_setting_default` and empty `help`, never the command-line value. |
+| 11 | The test family covers `testonly=1`, `size=medium`, computed `timeout=moderate`, `flaky=0`, `shard_count=-1`, `local=0`, ordered `args`, `$is_executable=1`, the six fixed test labels/list, and the two fixed coverage loading fallbacks. `:run_under_exec_config` and `:run_under_target_config` use `^.*$` and must select nothing. |
+| 12 | An omitted/empty native suite proves automatic `$implicit_tests` and contrasts it with explicit nonempty `tests`. A rule with an admitted Starlark attr transition exposes `$allowlist_function_transition=@@bazel_tools//tools/allowlists:function_transition_allowlist`; the normal rule lacks that definition. |
+| 13 | One native baseline/filegroup family covers shared `K`/`NATIVE` values and nonempty `srcs`, `data`, `output_group`, and `output_licenses`; equivalent empty shared defaults are not repeated per class. |
+| 14 | `alias.actual` and `toolchain_type.no_match_error` are positive. `licenses`, `distribs`, and `:action_listener` match the baseline representative but not alias/toolchain-type, proving their removals. |
+| 15 | `config_setting` covers manual tags, forced `[none]` license, `values`, `define_values`, label-keyed `flag_values`, `constraint_values`, and loading `:flag_alias_settings=[]`; `compatible_with`, `restricted_to`, and `target_compatible_with` match the baseline but not this class. |
+| 16 | `test_suite` covers fixed `testonly=1`, `tests`, and automatic `$implicit_tests`. `constraint_setting` covers explicit and null `default_constraint_value`, explicit `refines_constraint_value`, and its five removals; `constraint_value` covers mandatory `constraint_setting` and the same removals. |
+| 17 | `platform` covers manual tags, `constraint_values`, `parents`, `remote_execution_properties`, `exec_properties`, `flags`, exact `missing_toolchain_error`, `required_settings`, `check_toolchain_types=0`, `allowed_toolchain_types`, and all five inherited removals. |
+| 18 | `toolchain` covers manual tags, reintroduced `target_compatible_with=[]`, mandatory `toolchain_type`/`toolchain`, `exec_compatible_with`, `use_target_platform_constraints=0`, `target_settings`, removal of `:action_listener`, and absence of the other two constraint attrs. |
+
+The selector conditions use two ordinary `config_setting` labels. Equal-key
+correlation and distinct-key cross-product are asserted only through candidate
+membership. No row varies default-entry position, candidate traversal order,
+or multiplicity of equal whole candidates; ordinary `attr()` cannot expose
+those facts.
+
+### Generation boundary and validation
+
+The due fixture-growth hygiene checkpoint is closed at accepted tree
+`51540963`. Compared with prior reset `8d84d336`, the logical payload-expanded
+corpus is now 1,361 regular files, 24 links, 42,520 newline-counted lines, and
+864 command rows: +36/+0/+2,888/+61 across six accepted row-bearing oracle
+packets. The `b83935ab` payload migration remains internally complete: all 14
+payload projections match their hashes, no stale physical workspace remains,
+and payload-backed fixtures contain no links. Duplicate/reachability review
+found no removable nondiscriminating asset; the only same-content external-
+visibility BUILD pair distinguishes main from external repository identity.
+This resets the checkpoint at `51540963`; generation is packet one and is
+capped at three new virtual regular files, zero links, 18 rows, and 1,000
+newline-counted lines. Review again before packet six or +100 files/+10,000
+lines.
+
+The generation packet may change only:
+
+- `tests/v2_oracle/fixtures/query-labels-attribute-metadata/{fixture.toml,expected/oracle.json}`;
+- `tests/v2_fixture_payload/fixtures.payload` for the five named virtual source
+  edits/additions above;
+- `tests/v2_oracle/test_v2_oracle.py` for derived payload counts/hash and this
+  projection hash; and
+- `tests/v2_fixture_support/src/lib.rs` for the same derived global/projection
+  hashes and entry-count assertion.
+
+The last two are mechanical test-integrity constants, not production Rust.
+Runner, BUILD, CLI, server, query, loading, Cargo/lockfile, and plan code remain
+unchanged. The fixture description/provenance must expand from `labels()` to
+ordinary `attr()` and cite `AttrFunction`, `RegexFilterExpression`,
+`TargetUtils`, the mapper/default path, base Starlark/native definitions, and
+the nine native RuleDefinitions at `8220c619...`.
+
+Generation must use ordinary Bazel RC discovery without reading or copying the
+private home RC: one update run and one clean distinct-root verification of all
+57 rows. Compare the first 39 decoded argv/exit/normalized stdout/stderr records
+with their protected evidence; raw invocation IDs and absolute run roots are
+not semantics. Run the frozen Python payload inventory/projection tests, the
+Rust payload conformance consumers, the focused existing 29-row CLI and two
+generated-kind CLI/server regressions, and `git diff --check`, serially where
+they share Cargo state. The 18 new rows remain Bazel-only evidence and do not
+authorize Slug `attr()` activation.
+
+Native `toolchain` rows close oracle evidence only. V2 still rejects
+`NativeToolchainTarget` before graph projection; a separately reviewed graph
+prerequisite remains mandatory before implementation can consume that row.
+Generic external attr rendering similarly proves loading evidence only and
+does not authorize a new graph path; later production work must reuse the
+already reviewed external-loading owners or stop.
+
+Independent Sol review returned `ACCEPT`: the 18 isolated-operand union lanes
+cover every accepted ledger class without dedup rescue, reuse the smallest
+canonical workspace, and preserve the external/toolchain and permanent
+Rust-native boundaries. Generation-time transcription density remains the
+residual risk and is owned by the frozen-token, protected-row replay, and size
+caps below.
+
+Run next only `WP-4-8-m3-attr-observable-candidate-oracle-generation` after the
+fixture-hygiene checkpoint is closed. Stop on more than 18 new commands, more
+than three new virtual regular files, more than 1,000 logical fixture/TOML/
+expected lines, any mutation or new fixture, any protected-row semantic change,
+an external canonical token other than the pinned/generated exact value, a
+need for configured analysis, or any production/Rust-semantic, graph, DICE,
+JVM, Java artifact, or Bazel-delegation change.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

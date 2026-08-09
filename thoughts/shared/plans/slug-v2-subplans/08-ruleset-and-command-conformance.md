@@ -3289,3 +3289,47 @@ map paired positive/negative rows to every ledger class before fixture
 generation or representation work. No graph broadening, query activation,
 Rust, Cargo, DICE, regex change, JVM, Java artifact, or production Bazel
 delegation is authorized.
+
+The oracle-design retry selects an 18-command extension of
+`query-labels-attribute-metadata`, for 57 Bazel rows total. Each new command
+unions uniquely labeled positive/negative atomic `attr()` clauses, anchors the
+whole-value regex, and expects every positive label exactly once with no
+negative label. This retains the existing root/module, definitions, selector,
+dictionary, package-label, filegroup/alias, canonical-payload, and harness
+scaffolding while preventing union deduplication from masking a missing case.
+
+The 18 lanes cover universal rule-only `name`; scalar/integer/BOOLEAN/license;
+empty versus null; ordered/OI list and map interiors; all three user dictionary
+orientations; main/generic-external/`@@bazel_tools` labels; equal-key selector
+correlation and distinct-key cross-product; typed string/list concatenation;
+package and macro defaults; all four Starlark families; test computed/fixed/
+late-bound/automatic values; the transition allowlist; the native baseline;
+and every class-specific addition/removal across all nine native classes.
+Candidate order/default position/equal-candidate multiplicity remain excluded.
+
+The same canonical payload workspace gains only `attr/BUILD.bazel` and a local
+external module's `MODULE.bazel` plus `leaf/BUILD.bazel`; root `MODULE.bazel`
+and `pkg/defs.bzl` are extended. The generation packet may update only the
+fixture TOML/expected JSON, canonical payload, and the Python/Rust derived
+payload count/hash/projection assertions. The latter are test-integrity
+constants only. All 39 protected rows, 29 accepted Slug CLI rows, and two
+generated-kind CLI/server rows must remain semantically unchanged.
+
+The due fixture-hygiene review closes at tree `51540963`: the payload-expanded
+corpus is 1,361 regular files, 24 links, 42,520 lines, and 864 rows, with no
+removable nondiscriminating asset or stale pre-payload workspace. The successor
+is packet one from that reset and is capped at +3 virtual files/+0 links/+18
+rows/+1,000 lines; review again before packet six or the ordinary size trigger.
+
+Run next only `WP-4-8-m3-attr-observable-candidate-oracle-generation` after
+the fixture-hygiene checkpoint is closed. It adds Bazel-only evidence, not
+Slug activation. Native-toolchain graph projection and generic-external graph
+consumption through a new path remain separately reviewed prerequisites; later
+production work must reuse existing external-loading owners. Stop on
+fixture/command/line-cap growth, protected-row drift, weakened canonical
+regexes, configured analysis, representation, production Rust, graph/DICE
+changes, JVM/Java artifacts, or Bazel delegation.
+
+Independent Sol design review returned `ACCEPT`; the residual generation risk
+is dense fixture transcription, bounded by exact canonical-token freezing,
+replay of all 39 protected rows, and the stated growth caps.
