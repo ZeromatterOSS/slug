@@ -9,7 +9,7 @@ use std::time::SystemTime;
 use std::time::UNIX_EPOCH;
 
 const PAYLOAD: &[u8] = include_bytes!("../../v2_fixture_payload/fixtures.payload");
-const PAYLOAD_SHA256: &str = "d4a5a0f05866908934725209649897fc7b3cf1dfc3f91aad2f5a9d7725bb5566";
+const PAYLOAD_SHA256: &str = "ec920183c2777faf183f6143cca131650c770067c9583952333b947ac7b21df0";
 #[rustfmt::skip]
 const PROJECTIONS: &[(&str, &str)] = &[
     ("simple-rule-action", "3b8a1425ef7ea5b92de2f363465e5d52d92ce25c2b1818450bffc9098277f5fb"),
@@ -405,7 +405,7 @@ mod tests {
 
     #[test]
     fn canonical_payload_conformance() {
-        assert_eq!(parse(PAYLOAD).unwrap().len(), 275);
+        assert_eq!(parse(PAYLOAD).unwrap().len(), 285);
         assert_eq!(hex_sha256(PAYLOAD), PAYLOAD_SHA256);
         for (workspace, digest) in PROJECTIONS {
             let prefix = format!("{workspace}/");

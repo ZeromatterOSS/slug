@@ -91,16 +91,17 @@ PROJECTION_HASHES = {
     "query-rdeps-and-subtree-patterns": "c4f5d3970fd6a3c8e04ebe277e12072311ef87dfccd372303d86dc1515260110",
     "query-path-topology": "50e86ad2c6528567aa9b106cd487e024f562b34020b84174a96e1012d24b52be",
     "query-some-selection": "9c0422b184f725508bd598d6b554f635a0f6ceeb507ac79c2bc59d2a3b1bc121",
+    "query-attr-observable-candidates": "0091158c1bae6e2d7dec1d2997ce23069da916bcf7b4a0b3cd62abce61ba85b0",
 }
 
 
 def test_canonical_fixture_payload_has_frozen_inventory_and_projections() -> None:
     payload = (ROOT / "tests" / "v2_fixture_payload" / "fixtures.payload").read_bytes()
     entries = parse_payload(payload)
-    assert (len(entries), sum(entry.directory for entry in entries)) == (275, 112)
-    assert sum(len(entry.body) for entry in entries) == 24_939
+    assert (len(entries), sum(entry.directory for entry in entries)) == (285, 117)
+    assert sum(len(entry.body) for entry in entries) == 50_078
     assert hashlib.sha256(payload).hexdigest() == (
-        "d4a5a0f05866908934725209649897fc7b3cf1dfc3f91aad2f5a9d7725bb5566"
+        "ec920183c2777faf183f6143cca131650c770067c9583952333b947ac7b21df0"
     )
     assert {
         name: hashlib.sha256(payload_projection(payload, name)).hexdigest()

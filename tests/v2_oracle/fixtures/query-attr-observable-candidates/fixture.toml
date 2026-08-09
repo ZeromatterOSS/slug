@@ -1,0 +1,121 @@
+[fixture]
+name = "query-attr-observable-candidates"
+payload_workspace = "query-attr-observable-candidates"
+initial_tree_hash = "0091158c1bae6e2d7dec1d2997ce23069da916bcf7b4a0b3cd62abce61ba85b0"
+description = "Bazel 9.2 loading-query oracle for attr() over the admitted rule and native-rule attribute surfaces."
+comparison = "message_shape"
+oracle_notes = "Bazel-only loading evidence. The 18 rows cover 165 positive discriminators and fold nine negative-only controls into their owning lane commands."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+generation_command = "python3 -B -m tools.v2_oracle run --fixture query-attr-observable-candidates --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture query-attr-observable-candidates --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "attr_lane_01"
+argv = ["query", "--output=label", "(attr(\"name\", \"^l01_a001_yes$\", (//attr:l01_a001_yes + //attr:l01_a001_no)) + attr(\"name\", \"^l01_a002_yes$\", (//attr:l01_a002_yes + //attr:l01_a002_no)) + attr(\"name\", \"^l01_a003_yes$\", (//attr:l01_a003_yes + //attr:l01_a003_no)) + attr(\"name\", \"^l01_a004_yes$\", (//attr:l01_a004_yes + //attr:l01_a004_no)) + attr(\"name\", \"^l01_a005_yes$\", (//attr:l01_a005_yes + //attr:l01_a005_no)) + attr(\"name\", \"^l01_a006_yes$\", (//attr:l01_a006_yes + //attr:l01_a006_no)) + attr(\"name\", \"^l01_a007_yes$\", (//attr:l01_a007_yes + //attr:l01_a007_no)) + attr(\"name\", \"^l01_a008_yes$\", (//attr:l01_a008_yes + //attr:l01_a008_no)) + attr(\"name\", \"^l01_a009_yes$\", (//attr:l01_a009_yes + //attr:l01_a009_no)) + attr(\"name\", \"^l01_a010_yes$\", (//attr:l01_a010_yes + //attr:l01_a010_no)) + attr(\"name\", \"^l01_a011_yes$\", (//attr:l01_a011_yes + //attr:l01_a011_no)) + attr(\"name\", \"^l01_a012_yes$\", (//attr:l01_a012_yes + //attr:l01_a012_no)) + attr(\"name\", \"^l01_a013_yes$\", (//attr:l01_a013_yes + //attr:l01_a013_no)) + attr(name, \"^.*$\", //attr:BUILD.bazel) + attr(name, \"^.*$\", //attr:l01_generated_nonrule) + attr(name, \"^.*$\", //attr:l01_package_group_nonrule))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l01_a001_yes\\\n//attr:l01_a002_yes\\\n//attr:l01_a003_yes\\\n//attr:l01_a004_yes\\\n//attr:l01_a005_yes\\\n//attr:l01_a006_yes\\\n//attr:l01_a007_yes\\\n//attr:l01_a008_yes\\\n//attr:l01_a009_yes\\\n//attr:l01_a010_yes\\\n//attr:l01_a011_yes\\\n//attr:l01_a012_yes\\\n//attr:l01_a013_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_02"
+argv = ["query", "--output=label", "(attr(\"expect_failure\", \"^boom$\", (//attr:l02_a001_yes + //attr:l02_a001_no)) + attr(\"shard_count\", \"^-1$\", (//attr:l02_a002_yes + //attr:l02_a002_no)) + attr(\"testonly\", \"^0$\", (//attr:l02_a003_yes + //attr:l02_a003_no)) + attr(\"testonly\", \"^1$\", (//attr:l02_a004_yes + //attr:l02_a004_no)) + attr(\"licenses\", \"^\\[notice\\]$\", (//attr:l02_a005_yes + //attr:l02_a005_no)) + attr(\"licenses\", \"^\\[none\\]$\", (//attr:l02_a006_yes + //attr:l02_a006_no)) + attr(\"deprecation\", \"^deprecated$\", (//attr:l02_a007_yes + @@ext+//leaf:l02_a007_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l02_a001_yes\\\n//attr:l02_a002_yes\\\n//attr:l02_a003_yes\\\n//attr:l02_a004_yes\\\n//attr:l02_a005_yes\\\n//attr:l02_a006_yes\\\n//attr:l02_a007_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_03"
+argv = ["query", "--output=label", "(attr(\"empty_string\", \"^$\", (//attr:l03_a001_yes + //attr:l03_a001_no)) + attr(\"empty_label_list\", \"^\\[\\]$\", (//attr:l03_a002_yes + //attr:l03_a002_no)) + attr(\"empty_string_keyed_label_dict\", \"^\\{\\}$\", (//attr:l03_a003_yes + //attr:l03_a003_no)) + attr(\"nullable_label\", \"^//attr:leaf$\", (//attr:l03_a004_yes + //attr:l03_a004_no)) + attr(\"$private\", \"^secret$\", (//attr:l03_a005_yes + //attr:l03_a005_no)) + attr(nullable_output, \"^.*$\", //attr:l03_null_output) + attr(_private, \"^.*$\", //attr:l03_private_spelling))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l03_a001_yes\\\n//attr:l03_a002_yes\\\n//attr:l03_a003_yes\\\n//attr:l03_a004_yes\\\n//attr:l03_a005_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_04"
+argv = ["query", "--output=label", "(attr(\"args\", \"^\\[z, z, a\\]$\", (//attr:l04_a001_yes + //attr:l04_a001_no)) + attr(\"tags\", \"^\\[a, z, z\\]$\", (//attr:l04_a002_yes + //attr:l04_a002_no)) + attr(\"features\", \"^\\[a, z, z\\]$\", (//attr:l04_a003_yes + //attr:l04_a003_no)) + attr(\"string_dict\", \"^\\{z=1, a=2\\}$\", (//attr:l04_a004_yes + //attr:l04_a004_no)) + attr(tags, \"^\\[z, a, z\\]$\", //attr:l04_a002_yes) + attr(features, \"^\\[z, a, z\\]$\", //attr:l04_a003_yes))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l04_a001_yes\\\n//attr:l04_a002_yes\\\n//attr:l04_a003_yes\\\n//attr:l04_a004_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_05"
+argv = ["query", "--output=label", "(attr(\"string_keyed_label_dict\", \"^\\{a=//attr:leaf, z=//attr:BUILD\\.bazel\\}$\", (//attr:l05_a001_yes + //attr:l05_a001_no)) + attr(\"label_keyed_string_dict\", \"^\\{//attr:leaf=a, //attr:BUILD\\.bazel=z\\}$\", (//attr:l05_a002_yes + //attr:l05_a002_no)) + attr(\"label_list_dict\", \"^\\{a=\\[//attr:leaf\\], z=\\[//attr:BUILD\\.bazel, //attr:leaf\\]\\}$\", (//attr:l05_a003_yes + //attr:l05_a003_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l05_a001_yes\\\n//attr:l05_a002_yes\\\n//attr:l05_a003_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_06"
+argv = ["query", "--output=label", "(attr(\"scalar_label\", \"^//attr:leaf$\", (//attr:l06_a001_yes + //attr:l06_a001_no)) + attr(\"scalar_label\", \"^@@ext\\+//leaf:label$\", (//attr:l06_a002_yes + //attr:l06_a002_no)) + attr(\"$test_wrapper\", \"^@@bazel_tools//tools/test:test_wrapper$\", (//attr:l06_a003_yes + //attr:l06_a003_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l06_a001_yes\\\n//attr:l06_a002_yes\\\n//attr:l06_a003_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_07"
+argv = ["query", "--output=label", "(attr(\"equal_select_string\", \"^aa$\", (//attr:l07_a001_yes + //attr:l07_a001_no)) + attr(\"equal_select_string\", \"^bb$\", (//attr:l07_a002_yes + //attr:l07_a002_no)) + attr(\"equal_select_string\", \"^dd$\", (//attr:l07_a003_yes + //attr:l07_a003_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l07_a001_yes\\\n//attr:l07_a002_yes\\\n//attr:l07_a003_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_08"
+argv = ["query", "--output=label", "(attr(\"cross_select_string\", \"^ap$\", (//attr:l08_a001_yes +  //attr:l08_a001_no)) + attr(\"cross_select_string\", \"^aq$\", (//attr:l08_a002_yes +  //attr:l08_a002_no)) + attr(\"cross_select_string\", \"^bp$\", (//attr:l08_a003_yes +  //attr:l08_a003_no)) + attr(\"string_concat\", \"^pa$\", (//attr:l08_a004_yes +  //attr:l08_a004_no)) + attr(\"args\", \"^\\[p, a, p\\]$\", (//attr:l08_a005_yes +  //attr:l08_a005_no)) + attr(\"args\", \"^\\[p, a, p\\]$\", (//attr:l08_a006_yes +  //attr:l08_a006_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l08_a001_yes\\\n//attr:l08_a002_yes\\\n//attr:l08_a003_yes\\\n//attr:l08_a004_yes\\\n//attr:l08_a005_yes\\\n//attr:l08_a006_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_09"
+argv = ["query", "--output=label", "(attr(\"visibility\", \"^\\[//visibility:public\\]$\", (//attr:l09_a001_yes + //attr:l09_a001_no)) + attr(\"testonly\", \"^1$\", (//attr:l09_a002_yes + //attr:l09_a002_no)) + attr(\"package_metadata\", \"^\\[//attr:metadata\\]$\", (//attr:l09_a003_yes + //attr:l09_a003_no)) + attr(\"deprecation\", \"^deprecated$\", (//attr:l09_a004_yes + @@ext+//leaf:l09_a004_no)) + attr(\"licenses\", \"^\\[notice\\]$\", (//attr:l09_a005_yes + //attr:l09_a005_no)) + attr(\"generator_name\", \"^macro_case$\", (//attr:l09_a006_yes + //attr:l09_a006_no)) + attr(\"generator_function\", \"^legacy_macro$\", (//attr:l09_a007_yes + //attr:l09_a007_no)) + attr(\"generator_location\", \"^.*attr/BUILD\\.bazel:[0-9]+:[0-9]+$\", (//attr:l09_a008_yes + //attr:l09_a008_no)) + attr(\"generator_name\", \"^$\", (//attr:l09_a009_yes + //attr:l09_a009_no)) + attr(\"generator_function\", \"^$\", (//attr:l09_a010_yes + //attr:l09_a010_no)) + attr(\"generator_location\", \"^$\", (//attr:l09_a011_yes + //attr:l09_a011_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l09_a001_yes\\\n//attr:l09_a002_yes\\\n//attr:l09_a003_yes\\\n//attr:l09_a004_yes\\\n//attr:l09_a005_yes\\\n//attr:l09_a006_yes\\\n//attr:l09_a007_yes\\\n//attr:l09_a008_yes\\\n//attr:l09_a009_yes\\\n//attr:l09_a010_yes\\\n//attr:l09_a011_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_10"
+argv = ["query", "--output=label", "(attr(\"expect_failure\", \"^boom$\", (//attr:l10_a001_yes + //attr:l10_a001_no)) + attr(\"toolchains\", \"^\\[//attr:toolchain_type\\]$\", (//attr:l10_a002_yes + //attr:l10_a002_no)) + attr(\"exec_properties\", \"^\\{cpu=k8\\}$\", (//attr:l10_a003_yes + //attr:l10_a003_no)) + attr(\"exec_compatible_with\", \"^\\[//attr:constraint_value\\]$\", (//attr:l10_a004_yes + //attr:l10_a004_no)) + attr(\"exec_group_compatible_with\", \"^\\{group=\\[//attr:constraint_value\\]\\}$\", (//attr:l10_a005_yes + //attr:l10_a005_no)) + attr(\"target_compatible_with\", \"^\\[//attr:constraint_value\\]$\", (//attr:l10_a006_yes + //attr:l10_a006_no)) + attr(\"$config_dependencies\", \"^\\[//attr:cfg_a\\]$\", (//attr:l10_a007_yes + //attr:l10_a007_no)) + attr(\"args\", \"^\\[a\\]$\", (//attr:l10_a008_yes + //attr:l10_a008_no)) + attr(\"output_licenses\", \"^\\[notice\\]$\", (//attr:l10_a009_yes + //attr:l10_a009_no)) + attr(\"$is_executable\", \"^1$\", (//attr:l10_a010_yes + //attr:l10_a010_no)) + attr(\"build_setting_default\", \"^base$\", (//attr:l10_a011_yes + //attr:l10_a011_no)) + attr(\"help\", \"^$\", (//attr:l10_a012_yes + //attr:l10_a012_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l10_a001_yes\\\n//attr:l10_a002_yes\\\n//attr:l10_a003_yes\\\n//attr:l10_a004_yes\\\n//attr:l10_a005_yes\\\n//attr:l10_a006_yes\\\n//attr:l10_a007_yes\\\n//attr:l10_a008_yes\\\n//attr:l10_a009_yes\\\n//attr:l10_a010_yes\\\n//attr:l10_a011_yes\\\n//attr:l10_a012_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_11"
+argv = ["query", "--output=label", "(attr(\"testonly\", \"^1$\", (//attr:l11_a001_yes + //attr:l11_a001_no)) + attr(\"size\", \"^medium$\", (//attr:l11_a002_yes + //attr:l11_a002_no)) + attr(\"timeout\", \"^moderate$\", (//attr:l11_a003_yes + //attr:l11_a003_no)) + attr(\"flaky\", \"^0$\", (//attr:l11_a004_yes + //attr:l11_a004_no)) + attr(\"shard_count\", \"^-1$\", (//attr:l11_a005_yes + //attr:l11_a005_no)) + attr(\"local\", \"^0$\", (//attr:l11_a006_yes + //attr:l11_a006_no)) + attr(\"args\", \"^\\[p, a, p\\]$\", (//attr:l11_a007_yes + //attr:l11_a007_no)) + attr(\"$is_executable\", \"^1$\", (//attr:l11_a008_yes + //attr:l11_a008_no)) + attr(\"$test_wrapper\", \"^@@bazel_tools//tools/test:test_wrapper$\", (//attr:l11_a009_yes + //attr:l11_a009_no)) + attr(\"$xml_writer\", \"^@@bazel_tools//tools/test:xml_writer$\", (//attr:l11_a010_yes + //attr:l11_a010_no)) + attr(\"$test_runtime\", \"^\\[@@bazel_tools//tools/test:runtime\\]$\", (//attr:l11_a011_yes + //attr:l11_a011_no)) + attr(\"$test_setup_script\", \"^@@bazel_tools//tools/test:test_setup$\", (//attr:l11_a012_yes + //attr:l11_a012_no)) + attr(\"$xml_generator_script\", \"^@@bazel_tools//tools/test:test_xml_generator$\", (//attr:l11_a013_yes + //attr:l11_a013_no)) + attr(\"$collect_coverage_script\", \"^@@bazel_tools//tools/test:collect_coverage$\", (//attr:l11_a014_yes + //attr:l11_a014_no)) + attr(\":coverage_support\", \"^@@bazel_tools//tools/test:coverage_support$\", (//attr:l11_a015_yes + //attr:l11_a015_no)) + attr(\":coverage_report_generator\", \"^@@bazel_tools//tools/test:coverage_report_generator$\", (//attr:l11_a016_yes + //attr:l11_a016_no)) + attr(:run_under_exec_config, \"^.*$\", //attr:l11_run_under_exec_null) + attr(:run_under_target_config, \"^.*$\", //attr:l11_run_under_target_null))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l11_a001_yes\\\n//attr:l11_a002_yes\\\n//attr:l11_a003_yes\\\n//attr:l11_a004_yes\\\n//attr:l11_a005_yes\\\n//attr:l11_a006_yes\\\n//attr:l11_a007_yes\\\n//attr:l11_a008_yes\\\n//attr:l11_a009_yes\\\n//attr:l11_a010_yes\\\n//attr:l11_a011_yes\\\n//attr:l11_a012_yes\\\n//attr:l11_a013_yes\\\n//attr:l11_a014_yes\\\n//attr:l11_a015_yes\\\n//attr:l11_a016_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_12"
+argv = ["query", "--output=label", "(attr(\"tests\", \"^\\[//attr:explicit_member_test\\]$\", (//attr:l12_a001_yes + //attr:l12_a001_no)) + attr(\"$implicit_tests\", \"^\\[//attr:implicit_member_test\\]$\", (//attr:l12_a002_yes + //attr:l12_a002_no)) + attr(\"$allowlist_function_transition\", \"^@@bazel_tools//tools/allowlists/function_transition_allowlist:function_transition_allowlist$\", (//attr:l12_a003_yes + //attr:l12_a003_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l12_a001_yes\\\n//attr:l12_a002_yes\\\n//attr:l12_a003_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_13"
+argv = ["query", "--output=label", "(attr(\"name\", \"^l13_a001_yes$\", (//attr:l13_a001_yes + //attr:l13_a001_no)) + attr(\"visibility\", \"^\\[//visibility:public\\]$\", (//attr:l13_a002_yes + //attr:l13_a002_no)) + attr(\"transitive_configs\", \"^\\[\\]$\", (//attr:l13_a003_yes + //attr:l13_a003_no)) + attr(\"deprecation\", \"^deprecated$\", (//attr:l13_a004_yes + @@ext+//leaf:l13_a004_no)) + attr(\"tags\", \"^\\[a, z\\]$\", (//attr:l13_a005_yes + //attr:l13_a005_no)) + attr(\"generator_name\", \"^$\", (//attr:l13_a006_yes + //attr:l13_a006_no)) + attr(\"generator_function\", \"^$\", (//attr:l13_a007_yes + //attr:l13_a007_no)) + attr(\"generator_location\", \"^$\", (//attr:l13_a008_yes + //attr:l13_a008_no)) + attr(\"testonly\", \"^1$\", (//attr:l13_a009_yes + //attr:l13_a009_no)) + attr(\"features\", \"^\\[a, z\\]$\", (//attr:l13_a010_yes + //attr:l13_a010_no)) + attr(\":action_listener\", \"^\\[\\]$\", (//attr:l13_a011_yes + //attr:l13_a011_no)) + attr(\"compatible_with\", \"^\\[//attr:constraint_value\\]$\", (//attr:l13_a012_yes + //attr:l13_a012_no)) + attr(\"restricted_to\", \"^\\[//attr:constraint_value\\]$\", (//attr:l13_a013_yes + //attr:l13_a013_no)) + attr(\"$config_dependencies\", \"^\\[//attr:cfg_a\\]$\", (//attr:l13_a014_yes + //attr:l13_a014_no)) + attr(\"package_metadata\", \"^\\[//attr:metadata\\]$\", (//attr:l13_a015_yes + //attr:l13_a015_no)) + attr(\"aspect_hints\", \"^\\[//attr:leaf\\]$\", (//attr:l13_a016_yes + //attr:l13_a016_no)) + attr(\"licenses\", \"^\\[notice\\]$\", (//attr:l13_a017_yes + //attr:l13_a017_no)) + attr(\"distribs\", \"^\\[internal\\]$\", (//attr:l13_a018_yes + //attr:l13_a018_no)) + attr(\"target_compatible_with\", \"^\\[//attr:constraint_value\\]$\", (//attr:l13_a019_yes + //attr:l13_a019_no)) + attr(\"srcs\", \"^\\[//attr:leaf\\]$\", (//attr:l13_a020_yes + //attr:l13_a020_no)) + attr(\"output_group\", \"^group$\", (//attr:l13_a021_yes + //attr:l13_a021_no)) + attr(\"data\", \"^\\[//attr:leaf\\]$\", (//attr:l13_a022_yes + //attr:l13_a022_no)) + attr(\"output_licenses\", \"^\\[notice\\]$\", (//attr:l13_a023_yes + //attr:l13_a023_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l13_a001_yes\\\n//attr:l13_a002_yes\\\n//attr:l13_a003_yes\\\n//attr:l13_a004_yes\\\n//attr:l13_a005_yes\\\n//attr:l13_a006_yes\\\n//attr:l13_a007_yes\\\n//attr:l13_a008_yes\\\n//attr:l13_a009_yes\\\n//attr:l13_a010_yes\\\n//attr:l13_a011_yes\\\n//attr:l13_a012_yes\\\n//attr:l13_a013_yes\\\n//attr:l13_a014_yes\\\n//attr:l13_a015_yes\\\n//attr:l13_a016_yes\\\n//attr:l13_a017_yes\\\n//attr:l13_a018_yes\\\n//attr:l13_a019_yes\\\n//attr:l13_a020_yes\\\n//attr:l13_a021_yes\\\n//attr:l13_a022_yes\\\n//attr:l13_a023_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_14"
+argv = ["query", "--output=label", "(attr(\"actual\", \"^//attr:leaf$\", (//attr:l14_a001_yes + //attr:l14_a001_no)) + attr(\"no_match_error\", \"^no match$\", (//attr:l14_a002_yes + //attr:l14_a002_no)) + attr(\"licenses\", \"^\\[notice\\]$\", (//attr:l14_a003_yes + //attr:l14_a003_no)) + attr(\"distribs\", \"^\\[internal\\]$\", (//attr:l14_a004_yes + //attr:l14_a004_no)) + attr(\":action_listener\", \"^\\[\\]$\", (//attr:l14_a005_yes + //attr:l14_a005_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l14_a001_yes\\\n//attr:l14_a002_yes\\\n//attr:l14_a003_yes\\\n//attr:l14_a004_yes\\\n//attr:l14_a005_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_15"
+argv = ["query", "--output=label", "(attr(\"tags\", \"^\\[manual\\]$\", (//attr:l15_a001_yes + //attr:l15_a001_no)) + attr(\"licenses\", \"^\\[none\\]$\", (//attr:l15_a002_yes + //attr:l15_a002_no)) + attr(\"values\", \"^\\{mode=fast\\}$\", (//attr:l15_a003_yes + //attr:l15_a003_no)) + attr(\"define_values\", \"^\\{feature=on\\}$\", (//attr:l15_a004_yes + //attr:l15_a004_no)) + attr(\"flag_values\", \"^\\{//attr:flag=on\\}$\", (//attr:l15_a005_yes + //attr:l15_a005_no)) + attr(\"constraint_values\", \"^\\[//attr:constraint_value\\]$\", (//attr:l15_a006_yes + //attr:l15_a006_no)) + attr(\":flag_alias_settings\", \"^\\[\\]$\", (//attr:l15_a007_yes + //attr:l15_a007_no)) + attr(\"compatible_with\", \"^\\[\\]$\", (//attr:l15_a008_yes + //attr:l15_a008_no)) + attr(\"restricted_to\", \"^\\[\\]$\", (//attr:l15_a009_yes + //attr:l15_a009_no)) + attr(\"target_compatible_with\", \"^\\[\\]$\", (//attr:l15_a010_yes + //attr:l15_a010_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l15_a001_yes\\\n//attr:l15_a002_yes\\\n//attr:l15_a003_yes\\\n//attr:l15_a004_yes\\\n//attr:l15_a005_yes\\\n//attr:l15_a006_yes\\\n//attr:l15_a007_yes\\\n//attr:l15_a008_yes\\\n//attr:l15_a009_yes\\\n//attr:l15_a010_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_16"
+argv = ["query", "--output=label", "(attr(\"testonly\", \"^1$\", (//attr:l16_a001_yes + //attr:l16_a001_no)) + attr(\"tests\", \"^\\[//attr:explicit_member_test\\]$\", (//attr:l16_a002_yes + //attr:l16_a002_no)) + attr(\"$implicit_tests\", \"^\\[//attr:implicit_member_test\\]$\", (//attr:l16_a003_yes + //attr:l16_a003_no)) + attr(\"default_constraint_value\", \"^//attr:constraint_value$\", (//attr:l16_a004_yes + //attr:l16_a004_no)) + attr(\"refines_constraint_value\", \"^//attr:constraint_value$\", (//attr:l16_a005_yes + //attr:l16_a005_no)) + attr(\":action_listener\", \"^\\[\\]$\", (//attr:l16_a006_yes + //attr:l16_a006_no)) + attr(\"package_metadata\", \"^\\[\\]$\", (//attr:l16_a007_yes + //attr:l16_a007_no)) + attr(\"compatible_with\", \"^\\[\\]$\", (//attr:l16_a008_yes + //attr:l16_a008_no)) + attr(\"restricted_to\", \"^\\[\\]$\", (//attr:l16_a009_yes + //attr:l16_a009_no)) + attr(\"target_compatible_with\", \"^\\[\\]$\", (//attr:l16_a010_yes + //attr:l16_a010_no)) + attr(\"constraint_setting\", \"^//attr:constraint_setting$\", (//attr:l16_a011_yes + //attr:l16_a011_no)) + attr(\":action_listener\", \"^\\[\\]$\", (//attr:l16_a012_yes + //attr:l16_a012_no)) + attr(\"package_metadata\", \"^\\[\\]$\", (//attr:l16_a013_yes + //attr:l16_a013_no)) + attr(\"compatible_with\", \"^\\[\\]$\", (//attr:l16_a014_yes + //attr:l16_a014_no)) + attr(\"restricted_to\", \"^\\[\\]$\", (//attr:l16_a015_yes + //attr:l16_a015_no)) + attr(\"target_compatible_with\", \"^\\[\\]$\", (//attr:l16_a016_yes + //attr:l16_a016_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l16_a001_yes\\\n//attr:l16_a002_yes\\\n//attr:l16_a003_yes\\\n//attr:l16_a004_yes\\\n//attr:l16_a005_yes\\\n//attr:l16_a006_yes\\\n//attr:l16_a007_yes\\\n//attr:l16_a008_yes\\\n//attr:l16_a009_yes\\\n//attr:l16_a010_yes\\\n//attr:l16_a011_yes\\\n//attr:l16_a012_yes\\\n//attr:l16_a013_yes\\\n//attr:l16_a014_yes\\\n//attr:l16_a015_yes\\\n//attr:l16_a016_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_17"
+argv = ["query", "--output=label", "(attr(\"tags\", \"^\\[manual\\]$\", (//attr:l17_a001_yes + //attr:l17_a001_no)) + attr(\"constraint_values\", \"^\\[//attr:constraint_value\\]$\", (//attr:l17_a002_yes + //attr:l17_a002_no)) + attr(\"parents\", \"^\\[//attr:parent_platform\\]$\", (//attr:l17_a003_yes + //attr:l17_a003_no)) + attr(\"remote_execution_properties\", \"^remote$\", (//attr:l17_a004_yes + //attr:l17_a004_no)) + attr(\"exec_properties\", \"^\\{cpu=k8\\}$\", (//attr:l17_a005_yes + //attr:l17_a005_no)) + attr(\"flags\", \"^\\[--cpu=k8\\]$\", (//attr:l17_a006_yes + //attr:l17_a006_no)) + attr(\"missing_toolchain_error\", \"^For more information on platforms or toolchains see https://bazel\\.build/concepts/platforms-intro\\.$\", (//attr:l17_a007_yes + //attr:l17_a007_no)) + attr(\"required_settings\", \"^\\[//attr:required_config_setting\\]$\", (//attr:l17_a008_yes + //attr:l17_a008_no)) + attr(\"check_toolchain_types\", \"^0$\", (//attr:l17_a009_yes + //attr:l17_a009_no)) + attr(\"allowed_toolchain_types\", \"^\\[//attr:toolchain_type\\]$\", (//attr:l17_a010_yes + //attr:l17_a010_no)) + attr(\":action_listener\", \"^\\[\\]$\", (//attr:l17_a011_yes + //attr:l17_a011_no)) + attr(\"package_metadata\", \"^\\[\\]$\", (//attr:l17_a012_yes + //attr:l17_a012_no)) + attr(\"compatible_with\", \"^\\[\\]$\", (//attr:l17_a013_yes + //attr:l17_a013_no)) + attr(\"restricted_to\", \"^\\[\\]$\", (//attr:l17_a014_yes + //attr:l17_a014_no)) + attr(\"target_compatible_with\", \"^\\[\\]$\", (//attr:l17_a015_yes + //attr:l17_a015_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l17_a001_yes\\\n//attr:l17_a002_yes\\\n//attr:l17_a003_yes\\\n//attr:l17_a004_yes\\\n//attr:l17_a005_yes\\\n//attr:l17_a006_yes\\\n//attr:l17_a007_yes\\\n//attr:l17_a008_yes\\\n//attr:l17_a009_yes\\\n//attr:l17_a010_yes\\\n//attr:l17_a011_yes\\\n//attr:l17_a012_yes\\\n//attr:l17_a013_yes\\\n//attr:l17_a014_yes\\\n//attr:l17_a015_yes\\Z"]
+
+[[commands]]
+name = "attr_lane_18"
+argv = ["query", "--output=label", "(attr(\"tags\", \"^\\[manual\\]$\", (//attr:l18_a001_yes + //attr:l18_a001_no)) + attr(\"target_compatible_with\", \"^\\[\\]$\", (//attr:l18_a002_yes + //attr:l18_a002_no)) + attr(\"toolchain_type\", \"^//attr:toolchain_type$\", (//attr:l18_a003_yes + //attr:l18_a003_no)) + attr(\"toolchain\", \"^//attr:leaf$\", (//attr:l18_a004_yes + //attr:l18_a004_no)) + attr(\"exec_compatible_with\", \"^\\[//attr:constraint_value\\]$\", (//attr:l18_a005_yes + //attr:l18_a005_no)) + attr(\"use_target_platform_constraints\", \"^0$\", (//attr:l18_a006_yes + //attr:l18_a006_no)) + attr(\"target_settings\", \"^\\[//attr:target_config_setting\\]$\", (//attr:l18_a007_yes + //attr:l18_a007_no)) + attr(\":action_listener\", \"^\\[\\]$\", (//attr:l18_a008_yes + //attr:l18_a008_no)) + attr(\"compatible_with\", \"^\\[\\]$\", (//attr:l18_a009_yes + //attr:l18_a009_no)) + attr(\"restricted_to\", \"^\\[\\]$\", (//attr:l18_a010_yes + //attr:l18_a010_no)))"]
+expected_exit = 0
+stdout_patterns = ["\\A//attr:l18_a001_yes\\\n//attr:l18_a002_yes\\\n//attr:l18_a003_yes\\\n//attr:l18_a004_yes\\\n//attr:l18_a005_yes\\\n//attr:l18_a006_yes\\\n//attr:l18_a007_yes\\\n//attr:l18_a008_yes\\\n//attr:l18_a009_yes\\\n//attr:l18_a010_yes\\Z"]
