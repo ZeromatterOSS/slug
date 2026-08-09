@@ -943,6 +943,106 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
 }
 
 #[test]
+fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() {
+    let workspace = scratch("cquery-executables-capability-lifecycle");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let definitions = workspace.join("pkg/defs.bzl");
+    let nonexec =
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n";
+    let executable = "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n    return [DefaultInfo(executable = out)]\nprobe = rule(implementation = _impl, executable = True)\n";
+    write(&definitions, nonexec);
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon| {
+        daemon.cquery_with_bzlmod_inputs(
+            "executables(//pkg:probe)",
+            CqueryOutput::StarlarkLabel,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+
+    let initial = run(&mut daemon);
+    assert_eq!(initial.exit_code, 0, "{initial:?}");
+    assert!(initial.stdout.is_empty());
+    assert!(initial.stderr.is_empty());
+
+    write(&definitions, executable);
+    let changed = run(&mut daemon);
+    assert_eq!(changed.exit_code, 0, "{changed:?}");
+    assert_eq!(changed.stdout, "@@//pkg:probe\n");
+    assert!(changed.stderr.is_empty());
+    assert_eq!(changed.invalidated_files, 1);
+
+    let warm = run(&mut daemon);
+    assert_eq!(warm.exit_code, 0, "{warm:?}");
+    assert_eq!(warm.stdout, changed.stdout);
+    assert!(warm.stderr.is_empty());
+    assert_eq!(warm.invalidated_files, 0);
+
+    write(&definitions, nonexec);
+    let restored = run(&mut daemon);
+    assert_eq!(restored.exit_code, 0, "{restored:?}");
+    assert!(restored.stdout.is_empty());
+    assert!(restored.stderr.is_empty());
+    assert_eq!(restored.invalidated_files, 1);
+}
+
+#[test]
+fn retained_cquery_missing_executable_recovers_after_rule_edit() {
+    let workspace = scratch("cquery-missing-executable-recovery");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let definitions = workspace.join("pkg/defs.bzl");
+    write(
+        &definitions,
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl, executable = True)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon| {
+        daemon.cquery_with_bzlmod_inputs(
+            "//pkg:probe",
+            CqueryOutput::StarlarkLabel,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+
+    let missing = run(&mut daemon);
+    assert_eq!(missing.exit_code, 1, "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    assert_eq!(missing.invalidated_files, 0);
+    assert!(missing.stderr.contains("cquery_runtime_error"));
+    assert!(
+        missing
+            .stderr
+            .contains("The rule 'probe' is executable. It needs to create an executable File")
+    );
+
+    write(
+        &definitions,
+        "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n    return [DefaultInfo(executable = out)]\nprobe = rule(implementation = _impl, executable = True)\n",
+    );
+    let recovery = run(&mut daemon);
+    assert_eq!(recovery.exit_code, 0, "{recovery:?}");
+    assert_eq!(recovery.stdout, "@@//pkg:probe\n");
+    assert!(recovery.stderr.is_empty());
+    assert_eq!(recovery.invalidated_files, 1);
+}
+
+#[test]
 fn retained_cquery_starlark_formats_ordered_sets() {
     let workspace = scratch("cquery-starlark-sets");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

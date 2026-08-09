@@ -1,28 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m4-cquery-executables-nontest-successor-audit`
+Packet: `WP-6-m4-configured-query-successor-audit-5`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: read-only activation audit after accepted non-test executable analysis.
+Result: read-only selection audit after accepted non-test configured `executables`.
 
 ## Observable slice
 
-Freeze the smallest exact configured `executables(expr)` activation over the
-now-analyzable non-test rule surface. Resolve the known cquery analysis-failure
-exit-2 versus Bazel exit-1 classification without broadening protocol state.
+Select one exact next M4 behavior supported by retained configured analysis
+state and the shared Buck2-derived evaluator. Prefer a complete observable
+vertical over metadata substrate breadth.
 
 ## Ownership and stops
 
-Reuse retained `AnalysisResult.rule_capability` and the sole recursive query
-fold. Do not reload packages, create metadata caches/keys, use `test_kind` as
-the predicate, or activate configured test-rule success. Test-rule runfiles,
-general providers, traversal, attrs, patterns/externals, exact hashes,
-JVM/Java, CI, and shims remain outside the packet.
+Do not select configured test-rule behavior without external `@bazel_tools` and
+runfiles support. Do not infer `kind`, `attr`, providers, or traversal from
+missing metadata/nodes. Add no second graph/parser/evaluator, package reload,
+metadata/key/cache, protocol change, patterns/externals, exact hashes,
+JVM/Java, CI, or shims.
 
 ## Validation
 
-Return one bounded implementation contract covering the shared evaluator,
-configured filter, exact non-test oracle rows, typed analysis-error mapping,
-lifecycle/equality evidence, allowlist, validation, and hard stops. Do not
-commit the audit alone.
+Return one bounded implementation packet with exact observable semantics,
+retained-state ownership, evidence, allowlist, validation, and hard stops. Do
+not commit the audit alone.

@@ -47,6 +47,33 @@ use starlark::values::starlark_value;
 use crate::key::ConfiguredTargetKey;
 use crate::result::AnalysisResult;
 
+/// Errors produced while synchronously evaluating a loaded rule after DICE has
+/// prepared its inputs. The executable-rule case remains distinct so command
+/// owners can classify its established terminal without inspecting text.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub(crate) enum LoadedRuleError {
+    Message(String),
+    ExecutableRuleMissingExecutable { rule_class: CompactString },
+}
+
+impl From<String> for LoadedRuleError {
+    fn from(message: String) -> Self {
+        Self::Message(message)
+    }
+}
+
+impl fmt::Display for LoadedRuleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Message(message) => f.write_str(message),
+            Self::ExecutableRuleMissingExecutable { rule_class } => write!(
+                f,
+                "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
+            ),
+        }
+    }
+}
+
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
 struct AnalysisContext {
     #[allocative(skip)]
@@ -383,7 +410,7 @@ pub(crate) fn evaluate_loaded_rule(
     marker: Option<CompactString>,
     toolchain: Option<PreparedToolchain>,
     print_handler: Option<&dyn PrintHandler>,
-) -> Result<AnalysisResult, String> {
+) -> Result<AnalysisResult, LoadedRuleError> {
     let target = package
         .targets
         .iter()
@@ -391,7 +418,7 @@ pub(crate) fn evaluate_loaded_rule(
         .ok_or_else(|| format!("target `{target_name}` was not found in loaded package"))?;
     let rule_capability = target.rule_capability().cloned();
     let PackageTargetKind::StarlarkRule(implementation) = &target.kind else {
-        return Err(format!("target `{target_name}` is not a Starlark rule"));
+        return Err(format!("target `{target_name}` is not a Starlark rule").into());
     };
 
     let actions = Arc::new(Mutex::new(CtxActions::new()));
@@ -492,7 +519,8 @@ pub(crate) fn evaluate_loaded_rule(
             return Err(format!(
                 "rule implementation returned non-provider value `{}`",
                 value.to_repr()
-            ));
+            )
+            .into());
         }
     }
     if !provider_values
@@ -511,13 +539,13 @@ pub(crate) fn evaluate_loaded_rule(
             .default_info()
             .is_some_and(|default_info| default_info.executable.is_none())
     {
-        return Err(format!(
-            "The rule '{}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns.",
-            rule_capability
+        return Err(LoadedRuleError::ExecutableRuleMissingExecutable {
+            rule_class: rule_capability
                 .as_ref()
                 .expect("executable rule has a capability")
                 .rule_class
-        ));
+                .clone(),
+        });
     }
     let declared_outputs = providers
         .default_info()

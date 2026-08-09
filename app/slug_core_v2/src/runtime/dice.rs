@@ -1329,6 +1329,9 @@ impl CqueryRootTarget {
                     build_file: build_file.clone(),
                 }
             }
+            AnalysisErrorKind::ExecutableRuleMissingExecutable { .. } => {
+                CqueryCommandError::ExecutableRuleMissingExecutable(error.clone())
+            }
             _ => CqueryCommandError::Analysis(error.clone()),
         }
     }
@@ -1657,6 +1660,28 @@ impl CquerySetEnvironment {
     }
 }
 
+fn is_cquery_executable_non_test(capability: Option<&slug_loading_v2::RuleCapability>) -> bool {
+    capability.is_some_and(|capability| {
+        capability.executable && !capability.rule_class.ends_with("_test")
+    })
+}
+
+fn filter_cquery_executable_non_tests<T>(
+    targets: &TargetSet<T>,
+    is_executable_non_test: impl Fn(&T) -> bool,
+) -> TargetSet<T>
+where
+    T: Clone + Eq + Hash,
+{
+    let mut result = TargetSet::default();
+    for target in targets.iter() {
+        if is_executable_non_test(target) {
+            result.insert(target.clone());
+        }
+    }
+    result
+}
+
 #[async_trait]
 impl CqueryQueryEnvironment for CquerySetEnvironment {
     type Set = TargetSet<CqueryResultTarget>;
@@ -1710,6 +1735,12 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
             .ok_or_else(|| QueryError::evaluation(format!("unresolved cquery literal '{literal}'")))
     }
 
+    async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        Ok(filter_cquery_executable_non_tests(targets, |target| {
+            is_cquery_executable_non_test(target.analysis.rule_capability())
+        }))
+    }
+
     async fn filter(
         &mut self,
         regex: &regex::Regex,
@@ -1733,6 +1764,7 @@ pub enum CqueryCommandError {
         build_file: PathBuf,
     },
     Evaluation(Arc<str>),
+    ExecutableRuleMissingExecutable(AnalysisError),
     Analysis(AnalysisError),
     Request(Arc<str>),
     Infrastructure(Arc<str>),
@@ -1940,7 +1972,9 @@ impl CqueryCommandError {
 
     pub fn exit_code(&self) -> i32 {
         match self {
-            Self::MissingTarget { .. } | Self::Evaluation(_) => 1,
+            Self::MissingTarget { .. }
+            | Self::Evaluation(_)
+            | Self::ExecutableRuleMissingExecutable(_) => 1,
             Self::Request(_) | Self::Analysis(_) | Self::Infrastructure(_) => 2,
         }
     }
@@ -1978,7 +2012,7 @@ impl fmt::Display for CqueryCommandError {
                     build_file.display()
                 )
             }
-            Self::Analysis(error) => error.fmt(f),
+            Self::ExecutableRuleMissingExecutable(error) | Self::Analysis(error) => error.fmt(f),
             Self::Evaluation(message) | Self::Request(message) | Self::Infrastructure(message) => {
                 f.write_str(message)
             }
@@ -4755,6 +4789,138 @@ mod tests {
             CqueryCommandError::infrastructure("infrastructure").exit_code(),
             2
         );
+    }
+
+    #[test]
+    fn cquery_executables_uses_rule_capability_order_and_full_key_dedupe() {
+        use slug_loading_v2::RuleCapability;
+
+        #[derive(Clone)]
+        struct MatrixTarget {
+            key: ConfiguredTargetKey,
+            capability: Option<RuleCapability>,
+        }
+
+        impl PartialEq for MatrixTarget {
+            fn eq(&self, other: &Self) -> bool {
+                self.key == other.key
+            }
+        }
+
+        impl Eq for MatrixTarget {}
+
+        impl Hash for MatrixTarget {
+            fn hash<H: Hasher>(&self, state: &mut H) {
+                self.key.hash(state);
+            }
+        }
+
+        let capability = |rule_class: &str, executable| RuleCapability {
+            rule_class: rule_class.into(),
+            executable,
+            test_kind: None,
+        };
+        assert!(!is_cquery_executable_non_test(None));
+        assert!(!is_cquery_executable_non_test(Some(&capability(
+            "exec_rule",
+            false
+        ))));
+        assert!(!is_cquery_executable_non_test(Some(&capability(
+            "exported_test",
+            true
+        ))));
+        assert!(is_cquery_executable_non_test(Some(&capability(
+            "exec_rule",
+            true
+        ))));
+        let target = |name: &str, capability| MatrixTarget {
+            key: ConfiguredTargetKey::new(
+                CanonicalLabel::parse(&format!("@@//pkg:{name}")).unwrap(),
+                ConfigurationKey::target("matrix").unwrap(),
+            ),
+            capability,
+        };
+        let nonexec = target("nonexec", Some(capability("exec_rule", false)));
+        let target_named_test = target("target_named_test", Some(capability("exec_rule", true)));
+        let exported_test = target(
+            "exported_test_target",
+            Some(capability("exported_test", true)),
+        );
+        let executable = target("executable_non_test", Some(capability("exec_rule", true)));
+        let no_capability = target("no_capability", None);
+        let mut operand = TargetSet::default();
+        for target in [
+            nonexec,
+            target_named_test,
+            exported_test,
+            executable.clone(),
+            executable,
+            no_capability,
+        ] {
+            operand.insert(target);
+        }
+        assert_eq!(operand.iter().count(), 5, "full configured key dedupes");
+        let result = filter_cquery_executable_non_tests(&operand, |target| {
+            is_cquery_executable_non_test(target.capability.as_ref())
+        });
+        assert_eq!(
+            result
+                .iter()
+                .map(|target| target.key.label().target().as_str())
+                .collect::<Vec<_>>(),
+            ["target_named_test", "executable_non_test"],
+        );
+    }
+
+    #[test]
+    fn cquery_only_typed_missing_executable_analysis_uses_exit_one() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"typed\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "def _missing(ctx): return [DefaultInfo()]\ndef _ordinary(ctx): return \"not a provider list\"\nmissing = rule(implementation = _missing, executable = True)\nordinary = rule(implementation = _ordinary)\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"missing\", \"ordinary\")\nmissing(name = \"missing\")\nordinary(name = \"ordinary\")\n",
+        )
+        .unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let run = |expression: &str| {
+            runtime
+                .cquery_command_with_bzlmod_inputs(
+                    expression,
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    None,
+                )
+                .unwrap()
+        };
+        let missing = run("//pkg:missing");
+        let missing = missing.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            missing,
+            CqueryCommandError::ExecutableRuleMissingExecutable(_)
+        ));
+        assert_eq!(missing.exit_code(), 1);
+        assert!(missing.missing_stderr().is_none());
+        assert_eq!(
+            missing.to_string(),
+            "The rule 'missing' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
+        );
+
+        let ordinary = run("//pkg:ordinary");
+        let ordinary = ordinary.terminal_for_test().as_ref().as_ref().unwrap_err();
+        assert!(matches!(ordinary, CqueryCommandError::Analysis(_)));
+        assert_eq!(ordinary.exit_code(), 2);
     }
 
     #[derive(Debug, Clone, Allocative)]

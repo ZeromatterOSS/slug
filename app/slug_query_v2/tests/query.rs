@@ -53,7 +53,7 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 #[test]
-fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_and_some() {
+fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_and_executables() {
     for source in [
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
@@ -62,6 +62,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_and_some()
         "filter('(', filter('^//pkg:', set(//pkg:bin //pkg:lib)))",
         "some(let x = set(//pkg:bin //pkg:lib) in filter('^//pkg:', $x))",
         "some(set(//pkg:bin //pkg:lib), '-2147483648')",
+        "executables(let x = set(//pkg:bin //pkg:lib) in some($x))",
+        "executables(executables(filter('^//pkg:', //pkg:bin)))",
     ] {
         validate_cquery_query(&QueryExpression::parse(source).unwrap()).unwrap();
     }
@@ -77,6 +79,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_and_some()
         "some()",
         "some(//pkg:bin, //pkg:lib)",
         "some(//pkg:bin, 2147483648)",
+        "executables()",
+        "executables(//pkg:bin, //pkg:lib)",
         "kind('rule', //pkg:bin)",
     ] {
         let error = validate_cquery_query(&QueryExpression::parse(source).unwrap())
@@ -87,6 +91,7 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_and_some()
                 || error.contains("concrete target literals")
                 || error.contains("arguments to function 'filter'")
                 || error.contains("arguments to function 'some'")
+                || error.contains("arguments to function 'executables'")
                 || error.contains("expected an integer literal")
                 || error.contains("must be a word")
                 || error.contains("not supported by this cquery"),
@@ -105,6 +110,18 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_and_some()
             .unwrap()
         ),
         ["//pkg:bin", "//pkg:lib"]
+    );
+}
+
+#[test]
+fn cquery_literals_traverse_executables_only_through_its_operand() {
+    let expression = QueryExpression::parse(
+        "executables(let x = set(//pkg:bin //pkg:lib) in some($x)) union //pkg:other",
+    )
+    .unwrap();
+    assert_eq!(
+        cquery_literals(&expression),
+        ["//pkg:bin", "//pkg:lib", "//pkg:other"]
     );
 }
 

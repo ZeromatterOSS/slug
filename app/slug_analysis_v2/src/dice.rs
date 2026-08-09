@@ -52,6 +52,7 @@ use crate::key::ConfigurationKey;
 use crate::key::ConfiguredTargetKey;
 use crate::key::RootStringSettingValue;
 use crate::result::AnalysisResult;
+use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
 use crate::starlark_rule::evaluate_loaded_rule;
@@ -61,6 +62,9 @@ pub enum AnalysisErrorKind {
     TargetNotFound {
         label: CanonicalLabel,
         build_file: PathBuf,
+    },
+    ExecutableRuleMissingExecutable {
+        rule_class: CompactString,
     },
     Message(String),
 }
@@ -83,6 +87,16 @@ impl AnalysisError {
         }
     }
 
+    fn from_loaded_rule_error(error: LoadedRuleError) -> Self {
+        let kind = match error {
+            LoadedRuleError::Message(message) => AnalysisErrorKind::Message(message),
+            LoadedRuleError::ExecutableRuleMissingExecutable { rule_class } => {
+                AnalysisErrorKind::ExecutableRuleMissingExecutable { rule_class }
+            }
+        };
+        Self { kind }
+    }
+
     pub fn kind(&self) -> &AnalysisErrorKind {
         &self.kind
     }
@@ -98,6 +112,10 @@ impl fmt::Display for AnalysisError {
                     build_file.display()
                 )
             }
+            AnalysisErrorKind::ExecutableRuleMissingExecutable { rule_class } => write!(
+                f,
+                "The rule '{rule_class}' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
+            ),
             AnalysisErrorKind::Message(message) => f.write_str(message),
         }
     }
@@ -502,7 +520,7 @@ where
             .map(|capture| capture as &dyn PrintHandler),
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
-    value.map_err(AnalysisError::new)
+    value.map_err(AnalysisError::from_loaded_rule_error)
 }
 
 #[async_trait]

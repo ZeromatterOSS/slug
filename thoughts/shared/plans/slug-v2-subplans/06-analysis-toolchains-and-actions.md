@@ -5842,3 +5842,58 @@ deferred because Bazel requires test runfiles. Audit next only
 `WP-6-m4-cquery-executables-nontest-successor-audit`, then implement the exact
 non-test projection and bounded typed error mapping without claiming either
 deferred surface.
+
+### Non-test configured executables activation design ACCEPT (2026-08-09)
+
+The audit accepted the existing query/core draft: it admits only
+`executables`, shares one invocation through the sole recursive fold, evaluates
+the operand once, borrows retained configured capability, and preserves ordered
+full-key sets. The predicate remains exactly
+`executable && !rule_class.ends_with("_test")`; neither target spelling nor
+`test_kind` is classification state.
+
+The remaining error correction is typed and narrow. Add a crate-private loaded-
+rule error carrying the existing compact rule class, convert it to a dedicated
+`AnalysisErrorKind`, and map only that kind to cquery exit 1. Generic analysis,
+request, and infrastructure failures remain exit 2; missing-target and query
+evaluation failures remain exit 1. Existing one-shot and daemon publishers
+already consume the terminal exit code, so protocol/CLI/server production must
+not change.
+
+The checked-in 12-row fixture plus accepted M3 exported-class evidence is
+sufficient; add no configured test-rule row. Required Rust evidence covers the
+pure retained-capability predicate/order matrix, non-executable -> executable
+-> warm -> restored daemon behavior, missing-executable recovery, and typed
+exit discrimination. Implement next only
+`WP-6-m4-cquery-executables-nontest-implementation`. Stop on message matching,
+all-analysis exit remapping, test/runfiles breadth, package reload, new state,
+protocol changes, or fixture expansion.
+
+### Non-test configured executables implementation ACCEPT (2026-08-09)
+
+The bounded activation is **ACCEPTED**. Configured validation admits the exact
+existing `executables(expr)` signature, literal collection traverses its sole
+operand, and loading/configured contexts share one invocation through the sole
+recursive fold. The configured environment borrows retained
+`AnalysisResult.rule_capability` and preserves ordered full configured-key set
+identity under `executable && !rule_class.ends_with("_test")`.
+
+Missing executable output is now a compact typed path from loaded-rule
+evaluation through `AnalysisErrorKind` to a dedicated cquery terminal. Only
+that analysis kind exits 1; generic analysis remains exit 2. No message match,
+publisher/protocol change, package reload, key/cache, or duplicate retained
+metadata was added.
+
+The unchanged 12-row Bazel 9.2 and rebuilt-Slug replays pass. Query (39+56+9),
+analysis (1+5+2+16+4), server (44), focused CLI cquery (5), payload integrity,
+format, archive, and diff checks pass. Full core and CLI each retain one
+unrelated pre-existing failure. Independent review accepted the pure suffix/
+order matrix, configured non-test false -> executable -> warm -> restored
+lifecycle, and missing-executable recovery.
+
+Live configured `_test` lifecycle remains deferred: a valid exported `_test`
+class is necessarily a test rule, which injects external `@bazel_tools` test
+dependencies and later runfiles semantics. Accepted loading-query and loading
+invalidation tests already cover that real capability transition; no fake
+configured class or test-rule claim was introduced. Audit next only
+`WP-6-m4-configured-query-successor-audit-5`.

@@ -1432,13 +1432,13 @@ same-daemon lifecycle evidence. The eight representation-only `label_kind`
 rows are now activated separately; five ordinary query functions and M3
 remain open.
 
-The M4 configured prerequisite reuses that same V2-owned compact capability
-without a new representation: `AnalysisResult` now retains the complete
-`Option<RuleCapability>` in derived equality/Allocative state. Its adjacent
-`DefaultInfo(executable)` decoder reuses existing depset, runfiles, and
-files-to-run values rather than adding query metadata. Configured projection is
-still a separate activation packet; no V1 semantics or Buck query machinery
-entered this prerequisite.
+M4 reuses that same V2-owned compact capability without a new representation:
+`AnalysisResult` retains the complete `Option<RuleCapability>` in derived
+equality/Allocative state, and configured `executables` borrows it through the
+shared evaluator. Its adjacent `DefaultInfo(executable)` decoder reuses
+existing depset, runfiles, and files-to-run values rather than adding query
+metadata. No V1 semantics, Buck query machinery, interner, or duplicate
+retained rule-class value entered the configured activation.
 
 ### WP-8-m3-query-label-kind-output — landed formatter activation
 

@@ -105,6 +105,7 @@ pub trait CqueryQueryEnvironment {
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError>;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
+    async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
     -> Result<Self::Set, QueryError>;
 }
@@ -156,6 +157,10 @@ where
         self.0.resolve_literal(literal).await
     }
 
+    async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        self.0.executables(targets).await
+    }
+
     async fn filter(
         &mut self,
         regex: &Regex,
@@ -198,6 +203,7 @@ where
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
         async move {
             match name.value.as_str() {
+                "executables" => invoke_executables(self, args, variables).await,
                 "filter" => invoke_filter(self, args, variables).await,
                 "some" => invoke_some(self, args, variables).await,
                 _ => Err(QueryError::syntax("query functions are not supported")),
@@ -410,6 +416,10 @@ where
 
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         self.environment.resolve_literal(literal).await
+    }
+
+    async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        self.environment.executables(targets).await
     }
 
     async fn filter(
@@ -1174,14 +1184,28 @@ where
         args: &'a [QueryExpression],
         variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
-        async move {
-            // Match Bazel's ExecutablesFunction: evaluate the sole operand
-            // once, then filter every callback delivery in place.
-            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
-            evaluator.environment.executables(&targets).await
-        }
-        .boxed()
+        invoke_executables(evaluator, args, variables)
     }
+}
+
+fn invoke_executables<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        // Match Bazel's ExecutablesFunction: evaluate the sole operand once,
+        // then filter every callback delivery in place.
+        let operand = args
+            .first()
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        let targets = evaluate_query_expression_inner(context, operand, variables).await?;
+        context.executables(&targets).await
+    }
+    .boxed()
 }
 
 impl<E> QueryFunction<E> for LabelsFunction
@@ -1300,6 +1324,16 @@ mod tests {
             Ok(vec![literal.to_owned()])
         }
 
+        async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+            self.events
+                .push(format!("executables:{}", targets.join(",")));
+            Ok(targets
+                .iter()
+                .filter(|target| target.ends_with(":bin"))
+                .cloned()
+                .collect())
+        }
+
         async fn filter(
             &mut self,
             regex: &Regex,
@@ -1331,6 +1365,29 @@ mod tests {
                 "resolve://pkg:bin",
                 "resolve://pkg:lib",
                 "filter://pkg:lib,//pkg:bin",
+            ]
+        );
+    }
+
+    #[test]
+    fn cquery_executables_reuses_the_shared_recursive_fold() {
+        let expression = QueryExpression::parse(
+            "executables(some(filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:bin)), 2))",
+        )
+        .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:lib",
+                "resolve://pkg:bin",
+                "resolve://pkg:bin",
+                "filter://pkg:lib,//pkg:bin",
+                "executables://pkg:lib,//pkg:bin",
             ]
         );
     }

@@ -24,6 +24,8 @@ use dice::DynKey;
 use dice::RichActivation;
 use dice::UserComputationData;
 use dupe::Dupe;
+use slug_analysis_v2::AnalysisError;
+use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
@@ -1346,6 +1348,18 @@ async fn analyze_request(
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
 ) -> Result<AnalysisResult, String> {
+    analyze_request_typed(dice, workspace, key, tracker, capture_events)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+async fn analyze_request_typed(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    key: &ConfiguredTargetKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> Result<AnalysisResult, AnalysisError> {
     let text = Arc::new(workspace_snapshot(workspace));
     let raw = raw_snapshot_from_text(&text);
     let mut user_data = UserComputationData {
@@ -1395,15 +1409,12 @@ async fn analyze_request(
             configured_target: key.clone(),
         })
         .await
-        .map_err(|error| error.to_string())
-        .and_then(|value| {
-            value
-                .as_ref()
-                .as_ref()
-                .cloned()
-                .map_err(|error| error.to_string())
-        });
+        .expect("configured target analysis DICE compute succeeds");
     result
+        .as_ref()
+        .as_ref()
+        .map(Clone::clone)
+        .map_err(Clone::clone)
 }
 
 fn assert_analysis_events(events: &[(String, EventKind)], expected: &[(&str, EventKind)]) {
@@ -1664,16 +1675,25 @@ missing = rule(implementation = _missing, executable = True)
             "wrong_executable",
             "DefaultInfo.executable must be a declared file",
         ),
-        (
-            "missing",
-            "The rule 'missing' is executable. It needs to create an executable File",
-        ),
     ] {
         let error = analyze_request(&dice, &workspace, &key(target), None, false)
             .await
             .unwrap_err();
         assert!(error.contains(expected), "{target}: {error}");
     }
+
+    let error = analyze_request_typed(&dice, &workspace, &key("missing"), None, false)
+        .await
+        .unwrap_err();
+    assert!(matches!(
+        error.kind(),
+        AnalysisErrorKind::ExecutableRuleMissingExecutable { rule_class }
+            if rule_class == "missing"
+    ));
+    assert_eq!(
+        error.to_string(),
+        "The rule 'missing' is executable. It needs to create an executable File and pass it as the 'executable' parameter to the DefaultInfo it returns."
+    );
 }
 
 #[tokio::test]
