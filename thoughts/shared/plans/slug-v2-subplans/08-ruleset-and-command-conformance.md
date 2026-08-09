@@ -3466,3 +3466,16 @@ production Bazel delegation entered the design, and residual risk is limited
 to faithful generation. Run next only
 `WP-4-8-m3-attr-two-package-observable-candidate-oracle-generation`, bound to
 the count, vector, and digest above.
+
+That generation preflight returned `REPLAN` before writes or Bazel. The record
+digest proves semantic-ID stability, but its shorthand is not an executable
+source manifest: complete rule definitions, selector dictionaries, support
+declarations, macro bodies/locations, native declarations, and exact five-file
+bytes remain underdetermined. Generation may not infer them.
+
+Run next only `WP-4-8-m3-attr-five-source-template-oracle-design`. Freeze exact
+five-file bodies and hashes plus literal 18 argv/stdout records, prove a
+bijective ID/declaration/command mapping, and validate the templates from two
+temporary Bazel 9.2 roots. Retain no fixture/payload/generated source and add no
+production Rust, configured analysis, graph/DICE/regex state, JVM/Java
+artifact, or production Bazel delegation.

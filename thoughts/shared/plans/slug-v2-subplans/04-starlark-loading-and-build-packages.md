@@ -1605,6 +1605,22 @@ must reproduce SHA-256
 `3352106d79edef976c998b5423b2ee6686c7c5bda9540d27b66fe6e61566faf2`
 before transcribing any row.
 
+Generation preflight then returned `REPLAN` before any fixture, payload, Bazel,
+Cargo, or JVM action. The accepted seven-field records freeze semantic atoms,
+but values such as `select(same_keys=...)` are not literal Starlark and do not
+freeze the complete five source bodies: rule callable definitions and attrs,
+support declarations, selector dictionaries, macro implementation/location,
+and native BUILD syntax still require author choices. Inferring those choices
+inside generation violates the packet contract.
+
+Run next only `WP-4-8-m3-attr-five-source-template-oracle-design`. Preserve the
+165-record vector and SHA above, but add exact LF source bodies with per-file
+digests, literal 18 argv/stdout bindings, and a bijective record-to-declaration
+audit. Validate the proposed bodies twice with pinned Bazel 9.2 from temporary
+roots, then remove them. Add no fixture, payload, expected record, production
+Rust, Cargo, graph/DICE/regex state, JVM/Java artifact, or production Bazel
+delegation during that design packet.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
