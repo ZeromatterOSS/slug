@@ -1360,6 +1360,111 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
 }
 
 #[test]
+fn retained_cquery_loading_files_are_post_analysis_terminals() {
+    let workspace = scratch("cquery-loading-files-post-analysis-terminal");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
+    let build = workspace.join("pkg/BUILD.bazel");
+    let build_contents =
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\nfilegroup(name = \"files\")\n";
+    write(&build, build_contents);
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, expression: &str, output| {
+        daemon.cquery_with_bzlmod_inputs(
+            expression,
+            output,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+    let expected =
+        "\"message\":\"buildfiles() doesn't make sense for the configured target graph\"";
+
+    let buildfiles = run(&mut daemon, "buildfiles(//pkg:probe)", CqueryOutput::Label);
+    assert_eq!(buildfiles.exit_code, 1, "{buildfiles:?}");
+    assert!(buildfiles.stdout.is_empty());
+    assert!(buildfiles.stderr.contains(expected));
+    assert_eq!(buildfiles.invalidated_files, 0);
+
+    let loadfiles_empty = run(&mut daemon, "loadfiles(set())", CqueryOutput::StarlarkLabel);
+    assert_eq!(loadfiles_empty.exit_code, 1, "{loadfiles_empty:?}");
+    assert!(loadfiles_empty.stdout.is_empty());
+    assert!(loadfiles_empty.stderr.contains(expected));
+    assert_eq!(loadfiles_empty.invalidated_files, 0);
+
+    for expression in [
+        "buildfiles(filter('(', //pkg:probe))",
+        "loadfiles(some(//pkg:probe, '-1'))",
+        "buildfiles(siblings(//pkg:probe))",
+        "loadfiles(visible(//pkg:probe, //pkg:probe))",
+    ] {
+        let result = run(&mut daemon, expression, CqueryOutput::StarlarkLabel);
+        assert_eq!(result.exit_code, 1, "{expression}: {result:?}");
+        assert!(result.stdout.is_empty());
+        assert!(result.stderr.contains(expected), "{expression}: {result:?}");
+        assert_eq!(result.invalidated_files, 0, "{expression}: {result:?}");
+    }
+
+    let arity = run(&mut daemon, "buildfiles()", CqueryOutput::StarlarkLabel);
+    assert_eq!(arity.exit_code, 2, "{arity:?}");
+    assert!(arity.stdout.is_empty());
+    assert!(
+        arity
+            .stderr
+            .contains("too few arguments to function 'buildfiles'")
+    );
+
+    let missing = run(
+        &mut daemon,
+        "loadfiles(//pkg:missing)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(missing.exit_code, 1, "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    assert!(missing.stderr.contains("//pkg:missing"));
+    assert!(!missing.stderr.contains(expected));
+
+    let analysis = run(
+        &mut daemon,
+        "buildfiles(//pkg:files)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(analysis.exit_code, 2, "{analysis:?}");
+    assert!(analysis.stdout.is_empty());
+    assert!(analysis.stderr.contains("not a Starlark rule"));
+    assert!(!analysis.stderr.contains(expected));
+
+    fs::remove_file(&build).unwrap();
+    let deleted = run(
+        &mut daemon,
+        "loadfiles(//pkg:probe)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(deleted.exit_code, 2, "{deleted:?}");
+    assert!(deleted.stdout.is_empty());
+    assert!(deleted.stderr.contains("pkg"));
+    assert!(!deleted.stderr.contains(expected));
+    assert_eq!(deleted.invalidated_files, 1);
+
+    write(&build, build_contents);
+    let recreated = run(
+        &mut daemon,
+        "loadfiles(//pkg:probe)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(recreated.exit_code, 1, "{recreated:?}");
+    assert!(recreated.stdout.is_empty());
+    assert!(recreated.stderr.contains(expected));
+    assert_eq!(recreated.invalidated_files, 1);
+}
+
+#[test]
 fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     let workspace = scratch("cquery-missing-executable-recovery");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

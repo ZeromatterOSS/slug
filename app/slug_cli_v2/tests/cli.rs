@@ -1347,6 +1347,61 @@ fn cquery_visible_vacuous_post_analysis_matches_one_shot_and_daemon() {
 }
 
 #[test]
+fn cquery_loading_files_post_analysis_terminals_match_one_shot_and_daemon() {
+    let workspace = scratch("cquery-loading-files-post-analysis-terminal-workspace");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"loading_files_terminal\")\n",
+    );
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let buildfiles = "buildfiles(set())";
+    let loadfiles = "loadfiles(//pkg:probe)";
+    let starlark = ["--output=starlark", "--starlark:expr=str(target.label)"];
+    let run = |output_base: Option<&str>, expression: &str, output: &[&str]| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .arg("cquery")
+            .arg(expression)
+            .args(output)
+            .output()
+            .unwrap()
+    };
+    let assert_terminal = |output: &std::process::Output| {
+        assert_eq!(output.status.code(), Some(1), "{output:?}");
+        assert!(output.stdout.is_empty());
+        assert!(std::str::from_utf8(&output.stderr).unwrap().contains(
+            "\"message\":\"buildfiles() doesn't make sense for the configured target graph\""
+        ));
+    };
+
+    let buildfiles_one_shot = run(None, buildfiles, &[]);
+    assert_terminal(&buildfiles_one_shot);
+    let loadfiles_one_shot = run(None, loadfiles, &starlark);
+    assert_terminal(&loadfiles_one_shot);
+
+    let output_base = scratch("cquery-loading-files-post-analysis-terminal-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base = format!("--output_base={}", output_base.display());
+    let buildfiles_daemon = run(Some(&output_base), buildfiles, &[]);
+    assert_terminal(&buildfiles_daemon);
+    assert_eq!(buildfiles_daemon.stdout, buildfiles_one_shot.stdout);
+    let loadfiles_daemon = run(Some(&output_base), loadfiles, &starlark);
+    assert_terminal(&loadfiles_daemon);
+    assert_eq!(loadfiles_daemon.stdout, loadfiles_one_shot.stdout);
+}
+
+#[test]
 fn cquery_starlark_label_daemon_recovers_after_missing() {
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
     let output_base = scratch("cquery-starlark-output-base");

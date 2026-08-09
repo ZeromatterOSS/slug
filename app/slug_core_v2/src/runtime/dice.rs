@@ -4869,6 +4869,18 @@ mod tests {
     }
 
     #[test]
+    fn cquery_loading_files_post_analysis_terminal_is_an_evaluation_error() {
+        let terminal = CqueryCommandError::from_evaluator_error(QueryError::evaluation(
+            "buildfiles() doesn't make sense for the configured target graph",
+        ));
+        assert_eq!(terminal.exit_code(), 1);
+        assert_eq!(
+            terminal.to_string(),
+            "buildfiles() doesn't make sense for the configured target graph"
+        );
+    }
+
+    #[test]
     fn cquery_siblings_post_analysis_terminal_only_checks_emptiness() {
         let empty = TargetSet::<&str>::default();
         let result = cquery_post_analysis_siblings(&empty).unwrap();

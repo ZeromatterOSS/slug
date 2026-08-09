@@ -233,6 +233,9 @@ where
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
         async move {
             match name.value.as_str() {
+                "buildfiles" | "loadfiles" => {
+                    invoke_cquery_loading_files_terminal(self, args, variables).await
+                }
                 "visible" => invoke_visible(self, args, variables).await,
                 "siblings" => invoke_siblings(self, args, variables).await,
                 "executables" => invoke_executables(self, args, variables).await,
@@ -1287,6 +1290,24 @@ where
     .boxed()
 }
 
+fn invoke_cquery_loading_files_terminal<'a, C>(
+    _context: &'a mut C,
+    _args: &'a [QueryExpression],
+    _variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        // Bazel's configured helper rejects before it visits the operand. The
+        // cquery command has already prepared lexical roots by this point.
+        Err(QueryError::evaluation(
+            "buildfiles() doesn't make sense for the configured target graph",
+        ))
+    }
+    .boxed()
+}
+
 fn invoke_kind<'a, C>(
     context: &'a mut C,
     args: &'a [QueryExpression],
@@ -1569,6 +1590,28 @@ mod tests {
                 "visible://pkg:caller://pkg:target",
             ]
         );
+    }
+
+    #[test]
+    fn cquery_loading_files_terminals_do_not_fold_their_operands() {
+        for expression in [
+            "buildfiles(set())",
+            "loadfiles(filter('(', //pkg:missing))",
+            "buildfiles(some(//pkg:missing, '-1'))",
+            "loadfiles(siblings(//pkg:missing))",
+            "buildfiles(visible(//pkg:caller, //pkg:target))",
+        ] {
+            let expression = QueryExpression::parse(expression).unwrap();
+            let mut environment = CqueryEnvironment { events: Vec::new() };
+            let error =
+                futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                    .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "buildfiles() doesn't make sense for the configured target graph"
+            );
+            assert!(environment.events.is_empty());
+        }
     }
 
     #[test]

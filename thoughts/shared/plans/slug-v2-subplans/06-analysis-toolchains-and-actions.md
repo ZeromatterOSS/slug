@@ -6018,3 +6018,42 @@ unrelated core/CLI full failures remain unchanged.
 No package/visibility metadata, graph/key/cache, retained value, protocol, or
 fixture was added. Audit next only
 `WP-6-m4-configured-query-successor-audit-8`.
+
+### Configured-query successor audit 8 ACCEPT (2026-08-09)
+
+The audit grouped `buildfiles(expr)` and `loadfiles(expr)` into one exact
+post-analysis family. Bazel gives both one-expression signatures and calls the
+same configured helper before operand evaluation. That helper always fails
+with `buildfiles() doesn't make sense for the configured target graph`; the
+`loadfiles` distinction is unreachable.
+
+Slug must retain lexical-root validation/collection and eager configured-root
+preparation. After successful preparation, either function emits the shared
+evaluation terminal without folding its operand. Empty operands still fail;
+nested regex/some/siblings/visible runtime work is masked; missing-target or
+analysis preparation failures still win. Arity remains exit 2.
+
+Implement only a private cquery dispatcher helper. Do not extend the query
+environment trait, call loading-file/package APIs, or add graph/state/protocol.
+Run next
+`WP-6-m4-cquery-loading-files-post-analysis-terminals-implementation`.
+
+### Configured loading-file terminals implementation ACCEPT (2026-08-09)
+
+Configured `buildfiles(expr)` and `loadfiles(expr)` are **ACCEPTED** as one
+post-analysis family. Both validate and collect lexical roots, then—after eager
+configured-root preparation—emit the exact shared `buildfiles()` evaluation
+diagnostic without folding the operand. Empty/nonempty operands, nested runtime
+errors, both outputs, missing/analysis precedence, arity, one-shot/daemon, and
+delete/recreate recovery are covered.
+
+Query (43+56), commands (18), server (48), core cquery (10), CLI cquery (8),
+integrity, format, archive, and diff checks pass. Independent review returned
+`ACCEPT`; known unrelated core/CLI full failures remain unchanged. No public
+query trait, package/loading-file API, graph/state, protocol, or fixture changed.
+
+No remaining default function is directly closed over current configured
+state. Traversal needs the complete configured node universe, including
+toolchain/platform/constraint and non-root nodes; attrs/labels/providers/tests
+retain separate metadata/runtime prerequisites. Design next only
+`WP-6-m4-configured-query-graph-ownership-design` under reserved review.
