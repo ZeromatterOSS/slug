@@ -3505,3 +3505,19 @@ Independent latest-diff review returned `ACCEPT` for the one-row correction and
 unchanged architecture. Resume only
 `WP-4-8-m3-attr-five-source-template-oracle-design`, using the corrected digest
 as its immutable semantic preflight.
+
+The complete source-template diff was not accepted. Although all five bodies
+loaded and the 18 primary lanes passed twice, independent review found hidden
+source-contract mismatches. During the one focused correction Bazel 9.2 proved
+`l11_a003_no` cannot use frozen `size="short"`: the package fails with
+`size 'short' is not a valid size` and computed `timeout 'illegal' is not a
+valid timeout`. Computed timeout `short` requires valid size `small`, so the
+semantic row must change before source-template repair.
+
+Run next only `WP-4-8-m3-attr-test-timeout-manifest-correction`. Correct that
+one negative size and digest, then retry the five-source design while retaining
+the four remaining review obligations: paired lane-1 supports, package-derived
+notice licenses, lane-13 `legacy_macro` provenance, and suite/manual tag
+closure. The unaccepted docs diff and every temporary artifact were removed;
+no fixture, payload, source template, code, JVM artifact, configured analysis,
+or production Bazel delegation remains.

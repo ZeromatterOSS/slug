@@ -1648,6 +1648,24 @@ code, JVM, or configured-analysis work entered the correction. Resume only
 `WP-4-8-m3-attr-five-source-template-oracle-design`, bound to the corrected
 digest above.
 
+The first complete source-template diff was then discarded after independent
+review and correction validation returned `REPLAN`. Its five bodies and all 18
+primary commands loaded and passed in two roots, but the review found hidden
+construction mismatches in paired lane-1 supports, package-derived licenses,
+computed timeout, lane-13 macro provenance, and suite/manual tag closure. The
+focused correction proved the semantic timeout row itself is invalid: Bazel
+rejects `l11_a003_no` with `size="short"` as `size 'short' is not a valid size`
+and derives illegal timeout. Valid size `small` is the source of computed
+timeout `short`.
+
+Run next only `WP-4-8-m3-attr-test-timeout-manifest-correction`. Change that
+one negative construction to `size=small,timeout=short`, recompute the 165-row
+digest, and review the latest diff. Retain the other four source-template
+review blockers for the subsequent `WP-4-8-m3-attr-five-source-template-oracle-design`
+retry. The entire unaccepted 1,901-line Stage 4/8 diff, all temporary roots,
+outputs, lockfiles, and helpers were removed; no fixture, payload, Rust, Cargo,
+JVM artifact, or generated source remains.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
