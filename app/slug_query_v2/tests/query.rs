@@ -53,7 +53,8 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 #[test]
-fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_executables_and_kind() {
+fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_siblings_executables_and_kind()
+ {
     for source in [
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
@@ -62,6 +63,7 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_execu
         "filter('(', filter('^//pkg:', set(//pkg:bin //pkg:lib)))",
         "some(let x = set(//pkg:bin //pkg:lib) in filter('^//pkg:', $x))",
         "some(set(//pkg:bin //pkg:lib), '-2147483648')",
+        "siblings(let x = set(//pkg:bin //pkg:lib) in filter('^//pkg:', $x))",
         "executables(let x = set(//pkg:bin //pkg:lib) in some($x))",
         "executables(executables(filter('^//pkg:', //pkg:bin)))",
         "kind('^exec_rule rule$', executables(let x = //pkg:bin in $x))",
@@ -80,6 +82,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_execu
         "some()",
         "some(//pkg:bin, //pkg:lib)",
         "some(//pkg:bin, 2147483648)",
+        "siblings()",
+        "siblings(//pkg:bin, //pkg:lib)",
         "executables()",
         "executables(//pkg:bin, //pkg:lib)",
         "kind()",
@@ -95,6 +99,7 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_execu
                 || error.contains("concrete target literals")
                 || error.contains("arguments to function 'filter'")
                 || error.contains("arguments to function 'some'")
+                || error.contains("arguments to function 'siblings'")
                 || error.contains("arguments to function 'executables'")
                 || error.contains("arguments to function 'kind'")
                 || error.contains("expected an integer literal")
@@ -119,9 +124,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_execu
 }
 
 #[test]
-fn cquery_literals_traverse_executables_and_kind_only_through_their_operands() {
+fn cquery_literals_traverse_siblings_executables_and_kind_only_through_their_operands() {
     let expression = QueryExpression::parse(
-        "kind('rule$', executables(let x = set(//pkg:bin //pkg:lib) in some($x))) union //pkg:other",
+        "siblings(kind('rule$', executables(let x = set(//pkg:bin //pkg:lib) in some($x)))) union //pkg:other",
     )
     .unwrap();
     assert_eq!(

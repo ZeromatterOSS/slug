@@ -1204,6 +1204,76 @@ fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
 }
 
 #[test]
+fn cquery_siblings_post_analysis_terminal_matches_one_shot_and_daemon() {
+    let workspace = scratch("cquery-siblings-post-analysis-terminal-workspace");
+    write(
+        &workspace.join("MODULE.bazel"),
+        "module(name = \"siblings_terminal\")\n",
+    );
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let empty = "siblings(filter('^//missing:', //pkg:probe))";
+    let nonempty = "siblings(//pkg:probe)";
+    let starlark = ["--output=starlark", "--starlark:expr=str(target.label)"];
+    let run = |output_base: Option<&str>, expression: &str, output: &[&str]| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .arg("cquery")
+            .arg(expression)
+            .args(output)
+            .output()
+            .unwrap()
+    };
+
+    let empty_one_shot = run(None, empty, &starlark);
+    assert!(empty_one_shot.status.success(), "{empty_one_shot:?}");
+    assert!(empty_one_shot.stdout.is_empty());
+    assert!(empty_one_shot.stderr.is_empty());
+    let nonempty_one_shot = run(None, nonempty, &[]);
+    assert_eq!(
+        nonempty_one_shot.status.code(),
+        Some(1),
+        "{nonempty_one_shot:?}"
+    );
+    assert!(nonempty_one_shot.stdout.is_empty());
+    assert!(
+        std::str::from_utf8(&nonempty_one_shot.stderr)
+            .unwrap()
+            .contains("\"message\":\"siblings() not supported for post analysis queries\"")
+    );
+
+    let output_base = scratch("cquery-siblings-post-analysis-terminal-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base = format!("--output_base={}", output_base.display());
+    let empty_daemon = run(Some(&output_base), empty, &starlark);
+    assert!(empty_daemon.status.success(), "{empty_daemon:?}");
+    assert_eq!(empty_daemon.stdout, empty_one_shot.stdout);
+    assert_eq!(empty_daemon.stderr, empty_one_shot.stderr);
+    let nonempty_daemon = run(Some(&output_base), nonempty, &[]);
+    assert_eq!(
+        nonempty_daemon.status.code(),
+        Some(1),
+        "{nonempty_daemon:?}"
+    );
+    assert_eq!(nonempty_daemon.stdout, nonempty_one_shot.stdout);
+    assert!(
+        std::str::from_utf8(&nonempty_daemon.stderr)
+            .unwrap()
+            .contains("\"message\":\"siblings() not supported for post analysis queries\"")
+    );
+}
+
+#[test]
 fn cquery_starlark_label_daemon_recovers_after_missing() {
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
     let output_base = scratch("cquery-starlark-output-base");

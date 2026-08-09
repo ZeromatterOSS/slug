@@ -1139,6 +1139,112 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
 }
 
 #[test]
+fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
+    let workspace = scratch("cquery-siblings-post-analysis-terminal");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let definitions = workspace.join("pkg/defs.bzl");
+    let nonexecutable =
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n";
+    let executable = "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name)\n    ctx.actions.write(out, \"tool\\n\")\n    return [DefaultInfo(executable = out)]\nprobe = rule(implementation = _impl, executable = True)\n";
+    write(&definitions, nonexecutable);
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, expression: &str, output| {
+        daemon.cquery_with_bzlmod_inputs(
+            expression,
+            output,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+
+    let initial_label = run(
+        &mut daemon,
+        "siblings(executables(//pkg:probe))",
+        CqueryOutput::Label,
+    );
+    assert_eq!(initial_label.exit_code, 0, "{initial_label:?}");
+    assert!(initial_label.stdout.is_empty());
+    assert!(initial_label.stderr.is_empty());
+    assert_eq!(initial_label.invalidated_files, 0);
+
+    let initial_starlark = run(
+        &mut daemon,
+        "siblings(filter('^//missing:', //pkg:probe))",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(initial_starlark.exit_code, 0, "{initial_starlark:?}");
+    assert!(initial_starlark.stdout.is_empty());
+    assert!(initial_starlark.stderr.is_empty());
+    assert_eq!(initial_starlark.invalidated_files, 0);
+
+    let arity = run(&mut daemon, "siblings()", CqueryOutput::StarlarkLabel);
+    assert_eq!(arity.exit_code, 2, "{arity:?}");
+    assert!(arity.stdout.is_empty());
+    assert!(
+        arity
+            .stderr
+            .contains("too few arguments to function 'siblings'")
+    );
+
+    let missing = run(
+        &mut daemon,
+        "siblings(//pkg:missing)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(missing.exit_code, 1, "{missing:?}");
+    assert!(missing.stdout.is_empty());
+    assert!(missing.stderr.contains("//pkg:missing"));
+    assert!(!missing.stderr.contains("siblings() not supported"));
+
+    write(&definitions, executable);
+    let nonempty = run(
+        &mut daemon,
+        "siblings(executables(//pkg:probe))",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(nonempty.exit_code, 1, "{nonempty:?}");
+    assert!(nonempty.stdout.is_empty());
+    assert!(
+        nonempty
+            .stderr
+            .contains("\"message\":\"siblings() not supported for post analysis queries\"")
+    );
+    assert_eq!(nonempty.invalidated_files, 1);
+
+    let nested = run(
+        &mut daemon,
+        "siblings(some(executables(//pkg:probe)))",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(nested.exit_code, 1, "{nested:?}");
+    assert!(nested.stdout.is_empty());
+    assert!(
+        nested
+            .stderr
+            .contains("\"message\":\"siblings() not supported for post analysis queries\"")
+    );
+    assert_eq!(nested.invalidated_files, 0);
+
+    write(&definitions, nonexecutable);
+    let restored = run(
+        &mut daemon,
+        "siblings(executables(//pkg:probe))",
+        CqueryOutput::Label,
+    );
+    assert_eq!(restored.exit_code, 0, "{restored:?}");
+    assert!(restored.stdout.is_empty());
+    assert!(restored.stderr.is_empty());
+    assert_eq!(restored.invalidated_files, 1);
+}
+
+#[test]
 fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     let workspace = scratch("cquery-missing-executable-recovery");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");

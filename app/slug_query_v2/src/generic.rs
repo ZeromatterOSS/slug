@@ -105,6 +105,7 @@ pub trait CqueryQueryEnvironment {
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError>;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
+    async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
@@ -158,6 +159,10 @@ where
         self.0.resolve_literal(literal).await
     }
 
+    async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        self.0.siblings(targets).await
+    }
+
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         self.0.executables(targets).await
     }
@@ -208,6 +213,7 @@ where
     ) -> BoxFuture<'a, Result<Self::Set, QueryError>> {
         async move {
             match name.value.as_str() {
+                "siblings" => invoke_siblings(self, args, variables).await,
                 "executables" => invoke_executables(self, args, variables).await,
                 "kind" => invoke_kind(self, args, variables).await,
                 "filter" => invoke_filter(self, args, variables).await,
@@ -422,6 +428,10 @@ where
 
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError> {
         self.environment.resolve_literal(literal).await
+    }
+
+    async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        self.environment.siblings(targets).await
     }
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -720,11 +730,7 @@ where
         args: &'a [QueryExpression],
         variables: &'a mut SmallMap<CompactString, E::Set>,
     ) -> BoxFuture<'a, Result<E::Set, QueryError>> {
-        async move {
-            let targets = eval_set_arg(evaluator, args, variables, 0).await?;
-            evaluator.environment.siblings(&targets).await
-        }
-        .boxed()
+        invoke_siblings(evaluator, args, variables)
     }
 }
 
@@ -1210,6 +1216,26 @@ where
     .boxed()
 }
 
+fn invoke_siblings<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        // Match Bazel's SiblingsFunction: fold the sole operand once, then
+        // let the query environment decide its supported sibling domain.
+        let operand = args
+            .first()
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        let targets = evaluate_query_expression_inner(context, operand, variables).await?;
+        context.siblings(&targets).await
+    }
+    .boxed()
+}
+
 fn invoke_kind<'a, C>(
     context: &'a mut C,
     args: &'a [QueryExpression],
@@ -1352,6 +1378,17 @@ mod tests {
             Ok(vec![literal.to_owned()])
         }
 
+        async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+            self.events.push(format!("siblings:{}", targets.join(",")));
+            if targets.is_empty() {
+                Ok(Vec::new())
+            } else {
+                Err(QueryError::evaluation(
+                    "siblings() not supported for post analysis queries",
+                ))
+            }
+        }
+
         async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
             self.events
                 .push(format!("executables:{}", targets.join(",")));
@@ -1406,6 +1443,29 @@ mod tests {
                 "resolve://pkg:bin",
                 "resolve://pkg:lib",
                 "filter://pkg:lib,//pkg:bin",
+            ]
+        );
+    }
+
+    #[test]
+    fn cquery_siblings_reuses_the_shared_recursive_fold_for_empty_operands() {
+        let expression = QueryExpression::parse(
+            "siblings(filter('^//missing:', set(//pkg:lib //pkg:bin //pkg:lib)))",
+        )
+        .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert!(result.is_empty());
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:lib",
+                "resolve://pkg:bin",
+                "resolve://pkg:lib",
+                "filter://pkg:lib,//pkg:bin",
+                "siblings:",
             ]
         );
     }

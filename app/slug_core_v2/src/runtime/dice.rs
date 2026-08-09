@@ -1698,6 +1698,19 @@ where
     Ok(result)
 }
 
+fn cquery_post_analysis_siblings<T>(targets: &TargetSet<T>) -> Result<TargetSet<T>, QueryError>
+where
+    T: Clone + Eq + Hash,
+{
+    if targets.iter().next().is_none() {
+        Ok(targets.clone())
+    } else {
+        Err(QueryError::evaluation(
+            "siblings() not supported for post analysis queries",
+        ))
+    }
+}
+
 #[async_trait]
 impl CqueryQueryEnvironment for CquerySetEnvironment {
     type Set = TargetSet<CqueryResultTarget>;
@@ -1749,6 +1762,10 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
             .get(literal)
             .cloned()
             .ok_or_else(|| QueryError::evaluation(format!("unresolved cquery literal '{literal}'")))
+    }
+
+    async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        cquery_post_analysis_siblings(targets)
     }
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -4819,6 +4836,27 @@ mod tests {
         assert_eq!(
             CqueryCommandError::infrastructure("infrastructure").exit_code(),
             2
+        );
+    }
+
+    #[test]
+    fn cquery_siblings_post_analysis_terminal_only_checks_emptiness() {
+        let empty = TargetSet::<&str>::default();
+        let result = cquery_post_analysis_siblings(&empty).unwrap();
+        assert!(result.iter().next().is_none());
+
+        let mut nonempty = TargetSet::default();
+        nonempty.insert("configured-rule");
+        let error = cquery_post_analysis_siblings(&nonempty).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "siblings() not supported for post analysis queries"
+        );
+        let terminal = CqueryCommandError::from_evaluator_error(error);
+        assert_eq!(terminal.exit_code(), 1);
+        assert_eq!(
+            terminal.to_string(),
+            "siblings() not supported for post analysis queries"
         );
     }
 

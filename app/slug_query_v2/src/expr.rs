@@ -286,6 +286,11 @@ fn validate_cquery_query_inner(
             // expression. It has already been validated above.
             validate_cquery_query_inner(&args[0], bindings)
         }
+        QueryExpressionKind::Function { name, args } if name.value == "siblings" => {
+            let spec = cquery_function("siblings");
+            validate_function_arguments(expression, args, spec)?;
+            validate_cquery_query_inner(&args[0], bindings)
+        }
         QueryExpressionKind::Function { name, args } if name.value == "executables" => {
             let spec = cquery_function("executables");
             validate_function_arguments(expression, args, spec)?;
@@ -338,6 +343,9 @@ fn collect_cquery_literals<'a>(expression: &'a QueryExpression, literals: &mut V
         QueryExpressionKind::Function { name, args } if name.value == "some" => {
             // A selection count is not a target literal and must not create a
             // configured root before the expression is evaluated.
+            collect_cquery_literals(&args[0], literals);
+        }
+        QueryExpressionKind::Function { name, args } if name.value == "siblings" => {
             collect_cquery_literals(&args[0], literals);
         }
         QueryExpressionKind::Function { name, args } if name.value == "executables" => {

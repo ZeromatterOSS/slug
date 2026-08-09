@@ -1,10 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m4-configured-query-successor-audit-6`
+Packet: `WP-6-m4-configured-query-successor-audit-7`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: read-only selection audit after accepted configured `kind`.
+Result: read-only selection audit after accepted post-analysis `siblings`.
 
 ## Observable slice
 
@@ -13,10 +13,10 @@ state and the shared Buck2-derived evaluator.
 
 ## Ownership and stops
 
-Do not infer attrs/providers/traversal from missing metadata or nodes. Test-rule
-behavior remains gated on external `@bazel_tools` and runfiles. Add no retained
-metadata, package reload, graph/key/cache, second parser/evaluator/compiler,
-protocol change, patterns/externals, exact hashes, JVM/Java, CI, or shims.
+Do not infer traversal, attrs, labels, providers, tests, or visibility from
+missing configured state. Add no package reload, retained metadata, graph/key/
+cache, parser/evaluator/compiler, protocol change, patterns/externals, exact
+hashes, JVM/Java, CI, or shims.
 
 ## Validation
 

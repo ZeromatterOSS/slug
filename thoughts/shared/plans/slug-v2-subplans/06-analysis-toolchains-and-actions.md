@@ -5939,3 +5939,44 @@ failure remains unchanged.
 No retained kind value, package read, key/cache, protocol, fixture, or analysis
 widening was added. Audit next only
 `WP-6-m4-configured-query-successor-audit-6`.
+
+### Configured-query successor audit 6 ACCEPT (2026-08-09)
+
+The audit selected exact post-analysis `siblings(expr)` terminal behavior.
+Pinned Bazel 9.2 evaluates the sole operand once and calls
+`getSiblingTargetsInPackage` only for delivered targets; its configured
+post-analysis environment throws `siblings() not supported for post analysis
+queries`. Therefore empty operands succeed empty, while every nonempty operand
+is a query-evaluation failure with empty stdout and exit 1.
+
+This slice needs only set emptiness. Share one invocation through the sole fold;
+do not enumerate packages or add graph/metadata state. Existing eager root
+preparation remains authoritative, so missing-target and analysis terminals
+precede evaluation. Arity remains a request error, and both output modes render
+the same empty success.
+
+Traversal functions remain inexact because retained direct dependencies omit
+toolchain/platform/constraint and other configured nodes. Attrs, labels,
+providers, tests, visibility, file functions, and config identity retain their
+existing prerequisites. Implement next only
+`WP-6-m4-cquery-siblings-post-analysis-terminal-implementation`.
+
+### Configured siblings terminal implementation ACCEPT (2026-08-09)
+
+Configured `siblings(expr)` is **ACCEPTED** with exact Bazel post-analysis
+behavior. The shared invocation evaluates its operand once; core only checks
+set emptiness. Empty and filtered-empty operands succeed empty in both output
+modes. Nonempty/nested operands emit the exact evaluation diagnostic, empty
+stdout, and exit 1. Eager missing-target/analysis precedence and arity exit 2
+remain unchanged.
+
+Tests cover shared-fold order, pure empty/nonempty classification, one-shot/
+daemon parity, and empty -> error -> restored-empty invalidation. Query (41+56+
+9), core cquery (8), loading siblings (6), commands (18), server cquery (10)/
+full (46), CLI cquery (6), integrity, format, archive, and diff checks pass.
+Independent review returned `ACCEPT`; known unrelated core/CLI full failures
+remain unchanged.
+
+No package enumeration/read, graph/key/cache, retained value, protocol, or
+fixture was added. Audit next only
+`WP-6-m4-configured-query-successor-audit-7`.

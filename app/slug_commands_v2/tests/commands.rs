@@ -482,8 +482,12 @@ fn cquery_accepts_only_the_label_output_matrix() {
     assert!(CqueryRequest::parse(&["let x = set() in $x"]).is_ok());
     assert!(CqueryRequest::parse(&["filter('^//pkg:', set(//pkg:bin //pkg:lib))"]).is_ok());
     assert!(CqueryRequest::parse(&["filter('(', //pkg:bin)"]).is_ok());
+    assert!(CqueryRequest::parse(&["some(//pkg:bin)"]).is_ok());
+    assert!(CqueryRequest::parse(&["executables(//pkg:bin)"]).is_ok());
+    assert!(CqueryRequest::parse(&["kind('rule', //pkg:bin)"]).is_ok());
+    assert!(CqueryRequest::parse(&["siblings(//pkg:bin)"]).is_ok());
     for expression in [
-        "kind('rule', //pkg:bin)",
+        "deps(//pkg:bin)",
         "filter()",
         "filter(set(//pkg:bin), //pkg:bin)",
     ] {
