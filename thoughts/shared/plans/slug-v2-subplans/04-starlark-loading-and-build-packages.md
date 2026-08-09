@@ -1152,8 +1152,8 @@ remain direct and its legacy-macro targets use only the named legacy macro so
 | Lane | Unique pairs | Closed family |
 | ---: | ---: | --- |
 | 1 | 13 | Four Starlark plus nine native names; source/generated/package-group nonrules remain negative-only operands. |
-| 2 | 8 | Scalars, integer, both booleans, licenses, deprecation, and null. |
-| 3 | 8 | Empty string/list/map, nullable label/output, and private spelling. |
+| 2 | 7 | Scalars, integer, both booleans, licenses, and explicit/null deprecation pair. |
+| 3 | 5 | Empty string/list/map, explicit/null label pair, and private spelling; null output and `_private` are negative-only. |
 | 4 | 4 | Ordered/OI lists and ordered dictionary interiors. |
 | 5 | 3 | Three user-dictionary orientations and their reversed interiors. |
 | 6 | 3 | Main, generic-external, and fixed tools labels. |
@@ -1161,16 +1161,16 @@ remain direct and its legacy-macro targets use only the named legacy macro so
 | 8 | 6 | Distinct-key cross-product and string/executable/test list concatenation. |
 | 9 | 11 | Package defaults and macro/direct generator fields. |
 | 10 | 12 | Normal, executable, and root-setting schema fields. |
-| 11 | 18 | Test fixed/computed/late-bound/null fields. |
+| 11 | 16 | Test fixed/computed/loading fields; the two null run-under attrs are negative-only. |
 | 12 | 3 | Suite automatic membership and transition allowlist. |
 | 13 | 23 | Sixteen shared `K`, three `NATIVE`, and four filegroup additions. |
 | 14 | 5 | Alias/toolchain-type additions and three removals. |
-| 15 | 9 | Config-setting additions and three removals. |
-| 16 | 17 | Suite and both constraint-class additions/removals. |
+| 15 | 10 | Seven config-setting additions and three removals. |
+| 16 | 16 | Suite and both constraint-class additions/removals; explicit/null default is one pair. |
 | 17 | 15 | Platform additions and five removals. |
-| 18 | 9 | Toolchain additions, reintroduction, and removals. |
+| 18 | 10 | Seven toolchain additions/reintroductions and three removals. |
 
-The total is 170 pairs/340 distinct probe rule instances plus approximately 20
+The total is 165 pairs/330 distinct probe rule instances plus approximately 20
 support targets for selector keys, leaves, metadata, constraints, toolchain
 labels, test membership, package group, and generated output. This is the
 smallest honest construction under the accepted no-pair-reuse invariant. A
@@ -1232,6 +1232,35 @@ proving the complete 18 rows within the 2,400-line cap.
 
 Run next only
 `WP-4-8-m3-attr-isolated-observable-candidate-oracle-generation`.
+
+The generation preflight found and corrected one arithmetic contract defect
+before Bazel ran. Null/nonrule negative operands had been counted as standalone
+pairs in lanes 2, 3, 11, and 16, while lanes 15 and 18 omitted named removal
+pairs. A complete no-reuse audit fixes the vector to
+`13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10`: 165 pairs/330 instances.
+The 18-row, five-file, isolation, and 2,400-line boundaries are unchanged.
+This is the generation packet's sole material contract correction; any second
+material correction is `REPLAN`.
+
+Generation then reached that second material contradiction before any Bazel
+run. Pinned `BaseRuleClasses.deprecationDefault` always returns
+`PackageArgs.defaultDeprecation`, and `AttributeProvider` ignores an explicit
+Starlark `None`, leaving the computed package default active. One `//attr`
+package therefore cannot simultaneously supply lane 9's package-derived
+`deprecation="deprecated"` and lane 2's same-schema null-deprecation control.
+Using a class that removes the attribute would test inheritance removal rather
+than null default; weakening or conflating those atoms is not accepted.
+
+The incomplete five-file/18-row draft was removed without running Bazel. No
+fixture, payload, expected record, integrity constant, Rust, or generated
+content remains. Run next only
+`WP-4-8-m3-attr-two-package-observable-candidate-oracle-design`. It must design
+the smallest isolated positive-default plus baseline-package layout, decide
+whether an existing package can honestly host the baseline or a sixth virtual
+file is necessary, remap pair labels without weakening the corrected 165-atom
+ledger, and recalculate directory/entry/line caps. Edit only Stage 4 and Stage
+8 owner plans; add no fixture, payload, Rust, Cargo, graph, DICE, JVM/Java
+artifact, or Bazel delegation.
 
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 

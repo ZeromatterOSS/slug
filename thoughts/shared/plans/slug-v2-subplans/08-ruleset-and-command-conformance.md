@@ -3368,9 +3368,9 @@ external label. No source leaf, registry, lockfile, action, copied
 `@bazel_tools`, mutation, configured analysis, or toolchain resolution is
 needed.
 
-The accepted 18 lanes become exactly 170 globally unique positive/negative
-pairs, 340 probe instances, and approximately 20 support targets. Pair counts
-by lane are 13/8/8/4/3/3/3/6/11/12/18/3/23/5/9/17/15/9. No positive label is
+The accepted 18 lanes become exactly 165 globally unique positive/negative
+pairs, 330 probe instances, and approximately 20 support targets. Pair counts
+by lane are 13/7/5/4/3/3/3/6/11/12/16/3/23/5/10/16/15/10. No positive label is
 shared by two atoms in one command; exact stdout lists every `_yes` once and no
 `_no`. Helper macros may compact ordinary declarations, but direct versus
 legacy-macro generator provenance remains isolated.
@@ -3391,3 +3391,19 @@ Independent Sol review removed a redundant root `BUILD.bazel`; corrected
 rereview accepted the five-file/five-directory, `(285, 117)`, +7-file closure
 and left only bounded generation risk. Run next only
 `WP-4-8-m3-attr-isolated-observable-candidate-oracle-generation`.
+
+Generation preflight corrected the pair arithmetic before any Bazel run: null
+and nonrule negative operands are not standalone pairs, while every named
+config-setting/toolchain removal is. The corrected 165-pair vector above is the
+packet's sole material contract correction; a second material correction is
+`REPLAN`.
+
+That second contradiction occurred before Bazel ran: Bazel's deprecation
+computed default always reads the package default and explicit Starlark `None`
+does not suppress it. One `//attr` package cannot prove both lane 9's positive
+package-derived deprecation and lane 2's same-schema null control. The entire
+incomplete fixture draft was removed. Run next only
+`WP-4-8-m3-attr-two-package-observable-candidate-oracle-design` to freeze the
+smallest isolated positive-default/baseline package layout, remap the corrected
+165 atoms, and recalculate caps. No fixture, payload, production Rust, Cargo,
+graph/DICE, JVM/Java artifact, or Bazel delegation is authorized.
