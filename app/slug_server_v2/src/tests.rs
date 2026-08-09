@@ -874,7 +874,7 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert_eq!(undefined.invalidated_files, 0);
     let unsupported = handle_request(
         &mut daemon,
-        r#"{"kind":"cquery","request":{"expression":"kind('rule', //pkg:probe)","output":"label"}}"#,
+        r#"{"kind":"cquery","request":{"expression":"deps(//pkg:probe)","output":"label"}}"#,
     );
     assert_eq!(unsupported.exit_code, 2, "{unsupported:?}");
     assert!(unsupported.stdout.is_empty());
@@ -990,6 +990,150 @@ fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() 
     let restored = run(&mut daemon);
     assert_eq!(restored.exit_code, 0, "{restored:?}");
     assert!(restored.stdout.is_empty());
+    assert!(restored.stderr.is_empty());
+    assert_eq!(restored.invalidated_files, 1);
+}
+
+#[test]
+fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() {
+    let workspace = scratch("cquery-kind-rule-class-lifecycle");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    let definitions = workspace.join("pkg/defs.bzl");
+    let definition = |probe_class: &str| {
+        format!(
+            "def _impl(ctx):\n    return [DefaultInfo()]\nalpha_rule = rule(implementation = _impl)\nbeta_rule = rule(implementation = _impl)\ndef probe(**kwargs):\n    {probe_class}(**kwargs)\n"
+        )
+    };
+    write(&definitions, &definition("alpha_rule"));
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"alpha_rule\", \"beta_rule\", \"probe\")\nalpha_rule(name = \"target_named_unrelated\")\nbeta_rule(name = \"beta_target\")\nprobe(name = \"probe\")\nfilegroup(name = \"files\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, expression: &str, output| {
+        daemon.cquery_with_bzlmod_inputs(
+            expression,
+            output,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            None,
+        )
+    };
+
+    let exact = run(
+        &mut daemon,
+        "kind('^alpha_rule rule$', //pkg:target_named_unrelated)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(exact.exit_code, 0, "{exact:?}");
+    assert_eq!(exact.stdout, "@@//pkg:target_named_unrelated\n");
+    assert!(exact.stderr.is_empty());
+
+    let substring = run(
+        &mut daemon,
+        "kind('alpha_rule', //pkg:target_named_unrelated)",
+        CqueryOutput::Label,
+    );
+    assert_eq!(substring.exit_code, 0, "{substring:?}");
+    assert!(
+        substring
+            .stdout
+            .starts_with("//pkg:target_named_unrelated (")
+    );
+    assert!(substring.stderr.is_empty());
+
+    let ordered = run(
+        &mut daemon,
+        "kind('rule$', set(//pkg:beta_target //pkg:target_named_unrelated //pkg:beta_target))",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(ordered.exit_code, 0, "{ordered:?}");
+    assert_eq!(
+        ordered.stdout,
+        "@@//pkg:beta_target\n@@//pkg:target_named_unrelated\n"
+    );
+    assert!(ordered.stderr.is_empty());
+
+    let nonmatch = run(
+        &mut daemon,
+        "kind('^missing rule$', //pkg:target_named_unrelated)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(nonmatch.exit_code, 0, "{nonmatch:?}");
+    assert!(nonmatch.stdout.is_empty());
+    assert!(nonmatch.stderr.is_empty());
+
+    let missing_before_regex = run(
+        &mut daemon,
+        "kind('(', //pkg:missing)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(
+        missing_before_regex.exit_code, 1,
+        "{missing_before_regex:?}"
+    );
+    assert!(missing_before_regex.stdout.is_empty());
+    assert!(missing_before_regex.stderr.contains("//pkg:missing"));
+
+    let malformed = run(
+        &mut daemon,
+        "kind('(', //pkg:target_named_unrelated)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(malformed.exit_code, 2, "{malformed:?}");
+    assert!(malformed.stdout.is_empty());
+    assert!(malformed.stderr.contains("invalid Slug regex"));
+
+    let unsupported = run(
+        &mut daemon,
+        "kind('rule', //pkg:files)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(unsupported.exit_code, 2, "{unsupported:?}");
+    assert!(unsupported.stdout.is_empty());
+    assert!(unsupported.stderr.contains("not a Starlark rule"));
+
+    write(&definitions, &definition("beta_rule"));
+    let changed = run(
+        &mut daemon,
+        "kind('^alpha_rule rule$', //pkg:probe)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(changed.exit_code, 0, "{changed:?}");
+    assert!(changed.stdout.is_empty());
+    assert!(changed.stderr.is_empty());
+    assert_eq!(changed.invalidated_files, 1);
+
+    let second = run(
+        &mut daemon,
+        "kind('^beta_rule rule$', //pkg:probe)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(second.exit_code, 0, "{second:?}");
+    assert_eq!(second.stdout, "@@//pkg:probe\n");
+    assert!(second.stderr.is_empty());
+    assert_eq!(second.invalidated_files, 0);
+
+    let warm = run(
+        &mut daemon,
+        "kind('^beta_rule rule$', //pkg:probe)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(warm.exit_code, 0, "{warm:?}");
+    assert_eq!(warm.stdout, second.stdout);
+    assert!(warm.stderr.is_empty());
+    assert_eq!(warm.invalidated_files, 0);
+
+    write(&definitions, &definition("alpha_rule"));
+    let restored = run(
+        &mut daemon,
+        "kind('^alpha_rule rule$', //pkg:probe)",
+        CqueryOutput::StarlarkLabel,
+    );
+    assert_eq!(restored.exit_code, 0, "{restored:?}");
+    assert_eq!(restored.stdout, "@@//pkg:probe\n");
     assert!(restored.stderr.is_empty());
     assert_eq!(restored.invalidated_files, 1);
 }

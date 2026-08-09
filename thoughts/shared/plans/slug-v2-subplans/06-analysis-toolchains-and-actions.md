@@ -5897,3 +5897,45 @@ dependencies and later runfiles semantics. Accepted loading-query and loading
 invalidation tests already cover that real capability transition; no fake
 configured class or test-rule claim was introduced. Audit next only
 `WP-6-m4-configured-query-successor-audit-5`.
+
+### Configured-query successor audit 5 ACCEPT (2026-08-09)
+
+The audit selected `kind(regex, expr)` as the only remaining default function
+closed over current configured state. Every successful cquery root is presently
+a Starlark rule, and retained `RuleCapability.rule_class` supplies the exact
+Bazel target-kind candidate `"<exported class> rule"`. Pinned Bazel 9.2
+`KindFunction`, `ConfiguredTargetAccessor`, `RuleClass#getTargetKind`, and the
+accepted M3 kind strings close the evidence without a new fixture.
+
+Share one kind invocation and the existing bounded regex compiler through the
+sole recursive fold. Compile once after existing eager root preparation and
+before operand folding; preserve unanchored find, order, and full configured-key
+identity. Candidate formatting is request-local only. Missing capability fails
+closed at exit 2.
+
+Native, alias, source/generated, package-group, test, external, pattern, and
+traversal roots remain unsupported during existing eager analysis; `kind` must
+not convert them to empty or success. Add no retained kind field, package read,
+key/cache, compiler, protocol change, or analysis widening. Implement next only
+`WP-6-m4-cquery-kind-rule-class-implementation`.
+
+### Configured kind implementation ACCEPT (2026-08-09)
+
+Configured `kind(regex, expr)` is **ACCEPTED** over the existing successful
+Starlark-rule root domain. Validation/literal traversal use only the expression
+operand; loading and configured contexts share one invocation, bounded compile,
+and recursive fold. Core borrows rule capability, forms only the request-local
+compact `"<exported class> rule"` candidate, and preserves regex find, order,
+and full configured-key identity. Missing capability fails closed at exit 2.
+
+Tests cover exact/substring/anchored/nonmatch, both outputs, order/dedupe,
+target-name independence, malformed-regex/missing-root precedence, unsupported
+filegroup analysis, and exported-class edit/warm/restoration. Query (40+56+9),
+core cquery (7), server cquery (9)/full (45), CLI cquery (5)/full (44), the
+unchanged Bazel/Slug executable fixture, integrity, format, archive, and diff
+checks pass. Independent review returned `ACCEPT`; the known unrelated core
+failure remains unchanged.
+
+No retained kind value, package read, key/cache, protocol, fixture, or analysis
+widening was added. Audit next only
+`WP-6-m4-configured-query-successor-audit-6`.

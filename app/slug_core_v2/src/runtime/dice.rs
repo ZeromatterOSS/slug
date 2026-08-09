@@ -1682,6 +1682,22 @@ where
     result
 }
 
+fn filter_cquery_kind<T>(
+    targets: &TargetSet<T>,
+    matches: impl Fn(&T) -> Result<bool, QueryError>,
+) -> Result<TargetSet<T>, QueryError>
+where
+    T: Clone + Eq + Hash,
+{
+    let mut result = TargetSet::default();
+    for target in targets.iter() {
+        if matches(target)? {
+            result.insert(target.clone());
+        }
+    }
+    Ok(result)
+}
+
 #[async_trait]
 impl CqueryQueryEnvironment for CquerySetEnvironment {
     type Set = TargetSet<CqueryResultTarget>;
@@ -1739,6 +1755,21 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
         Ok(filter_cquery_executable_non_tests(targets, |target| {
             is_cquery_executable_non_test(target.analysis.rule_capability())
         }))
+    }
+
+    async fn kind(
+        &mut self,
+        regex: &regex::Regex,
+        targets: &Self::Set,
+    ) -> Result<Self::Set, QueryError> {
+        filter_cquery_kind(targets, |target| {
+            let capability = target.analysis.rule_capability().ok_or_else(|| {
+                QueryError::syntax("cquery kind() requires a configured Starlark rule capability")
+            })?;
+            let mut candidate = capability.rule_class.clone();
+            candidate.push_str(" rule");
+            Ok(regex.find(candidate.as_str()).is_some())
+        })
     }
 
     async fn filter(
@@ -4789,6 +4820,24 @@ mod tests {
             CqueryCommandError::infrastructure("infrastructure").exit_code(),
             2
         );
+    }
+
+    #[test]
+    fn cquery_kind_missing_capability_fails_closed_as_a_request_terminal() {
+        let mut targets = TargetSet::default();
+        targets.insert("configured-rule");
+        targets.insert("missing-capability");
+        let error = filter_cquery_kind(&targets, |target| match *target {
+            "configured-rule" => Ok(true),
+            "missing-capability" => Err(QueryError::syntax(
+                "cquery kind() requires a configured Starlark rule capability",
+            )),
+            _ => unreachable!(),
+        })
+        .unwrap_err();
+        let terminal = CqueryCommandError::from_evaluator_error(error);
+        assert!(matches!(terminal, CqueryCommandError::Request(_)));
+        assert_eq!(terminal.exit_code(), 2);
     }
 
     #[test]

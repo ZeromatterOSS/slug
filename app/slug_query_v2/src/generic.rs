@@ -106,6 +106,7 @@ pub trait CqueryQueryEnvironment {
     fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError>;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
+    async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     async fn filter(&mut self, regex: &Regex, targets: &Self::Set)
     -> Result<Self::Set, QueryError>;
 }
@@ -161,6 +162,10 @@ where
         self.0.executables(targets).await
     }
 
+    async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        self.0.kind(regex, targets).await
+    }
+
     async fn filter(
         &mut self,
         regex: &Regex,
@@ -204,6 +209,7 @@ where
         async move {
             match name.value.as_str() {
                 "executables" => invoke_executables(self, args, variables).await,
+                "kind" => invoke_kind(self, args, variables).await,
                 "filter" => invoke_filter(self, args, variables).await,
                 "some" => invoke_some(self, args, variables).await,
                 _ => Err(QueryError::syntax("query functions are not supported")),
@@ -420,6 +426,10 @@ where
 
     async fn executables(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         self.environment.executables(targets).await
+    }
+
+    async fn kind(&mut self, regex: &Regex, targets: &Self::Set) -> Result<Self::Set, QueryError> {
+        self.environment.kind(regex, targets).await
     }
 
     async fn filter(
@@ -980,15 +990,7 @@ where
             if matches!(self, Self::Filter) {
                 return invoke_filter(evaluator, args, variables).await;
             }
-            let pattern = match &args[0].kind {
-                QueryExpressionKind::TargetLiteral(value) => value.as_str(),
-                _ => return Err(QueryError::syntax("regex pattern must be a word")),
-            };
-            // The bounded Rust regex is compiled before operand evaluation,
-            // then reused for each candidate in every callback delivery.
-            let regex = compile_slug_regex(pattern)?;
-            let targets = eval_set_arg(evaluator, args, variables, 1).await?;
-            evaluator.environment.kind(&regex, &targets).await
+            invoke_kind(evaluator, args, variables).await
         }
         .boxed()
     }
@@ -1208,6 +1210,32 @@ where
     .boxed()
 }
 
+fn invoke_kind<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        let pattern = match args.first().map(|argument| &argument.kind) {
+            Some(QueryExpressionKind::TargetLiteral(value)) => value.as_str(),
+            Some(_) => return Err(QueryError::syntax("regex pattern must be a word")),
+            None => return Err(QueryError::syntax("missing query function argument")),
+        };
+        let operand = args
+            .get(1)
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        // Like filter(), cquery compiles only after eager roots are prepared,
+        // but before evaluating the recursive operand.
+        let regex = compile_slug_regex(pattern)?;
+        let targets = evaluate_query_expression_inner(context, operand, variables).await?;
+        context.kind(&regex, &targets).await
+    }
+    .boxed()
+}
+
 impl<E> QueryFunction<E> for LabelsFunction
 where
     E: QueryEnvironment + Send,
@@ -1334,6 +1362,19 @@ mod tests {
                 .collect())
         }
 
+        async fn kind(
+            &mut self,
+            regex: &Regex,
+            targets: &Self::Set,
+        ) -> Result<Self::Set, QueryError> {
+            self.events.push(format!("kind:{}", targets.join(",")));
+            Ok(targets
+                .iter()
+                .filter(|target| regex.find(target).is_some())
+                .cloned()
+                .collect())
+        }
+
         async fn filter(
             &mut self,
             regex: &Regex,
@@ -1388,6 +1429,30 @@ mod tests {
                 "resolve://pkg:bin",
                 "filter://pkg:lib,//pkg:bin",
                 "executables://pkg:lib,//pkg:bin",
+            ]
+        );
+    }
+
+    #[test]
+    fn cquery_kind_reuses_the_shared_recursive_fold() {
+        let expression = QueryExpression::parse(
+            "kind('bin$', executables(some(filter('^//pkg:', set(//pkg:lib //pkg:bin //pkg:bin)), 2)))",
+        )
+        .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:lib",
+                "resolve://pkg:bin",
+                "resolve://pkg:bin",
+                "filter://pkg:lib,//pkg:bin",
+                "executables://pkg:lib,//pkg:bin",
+                "kind://pkg:bin",
             ]
         );
     }
