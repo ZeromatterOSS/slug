@@ -3011,3 +3011,126 @@ shape around the named dialect divergence. Obtain independent public-boundary
 review before scheduling Rust. `attr`, query graph/identity changes, DICE regex
 keys, cquery/aquery breadth, Cargo edits, UTF-16/lone-surrogate emulation, and
 all JVM/Java artifacts, helpers, execution, or delegation remain excluded.
+
+## Rust-native `filter`/`kind` regex contract (2026-08-09)
+
+`WP-8-m3-rust-native-regex-contract-design` selects the workspace `regex`
+crate, not `fancy-regex`. `Cargo.lock` currently selects `regex` 1.13.1 with
+crates.io checksum
+`f020237b6c8eed93db2e2cb53c00c60a8e1bc73da7d073199a1180401450218d`;
+the ordinary workspace dependency enables its default `std`, `perf`, and full
+`unicode` feature families. The only locked `fancy-regex` is unrelated
+transitive version 0.11.0, while the unused workspace declaration names 0.16.0.
+More importantly, `fancy-regex` adds a backtracking engine and runtime error
+surface for constructs this contract deliberately does not admit. The selected
+finite-automata substrate guarantees worst-case `O(m * n)` single-search time
+and provides explicit NFA compile and lazy-DFA cache bounds.
+
+This is a named Slug-native compatibility surface. It is the string syntax of
+locked `regex` 1.13.1 over Rust `&str`, with the builder settings below:
+literals and escapes; concatenation and alternation; greedy/lazy repetition;
+numbered, named, and non-capturing groups; Unicode/ASCII character classes and
+class set operations; `^`, `$`, `\A`, `\z`, and word-boundary assertions; and
+inline `i`, `m`, `s`, `R`, `U`, `u`, and `x` flags. Look-around,
+backreferences, Java character-class intersections, Java escape rules, and all
+other constructs rejected by that parser are unsupported syntax. Patterns and
+candidate strings contain only valid UTF-8/Unicode scalar values. Slug neither
+constructs nor emulates lone UTF-16 surrogates, and makes no Java dialect,
+Unicode-table, case-folding, match-offset, or diagnostic-parity claim.
+
+The implementation must construct one `regex::Regex` before evaluating the
+operand and then reuse it for every candidate. Quoted query `WORD` parsing
+continues to remove only the surrounding quote characters; it performs no
+second regex-escape pass. Matching is unanchored search through
+`Regex::find(...).is_some()`, equivalent to Bazel's surrounding `Matcher.find`
+call shape; anchors have effect only when the user writes them. Captures are
+never requested. The operand is evaluated exactly once after successful
+compile, and every existing nonempty callback delivery is filtered in place,
+preserving candidate IDs, order, provenance, and delivery boundaries and
+dropping only empty deliveries.
+
+The four limits are public Slug constants, explicitly set on every builder so
+dependency-default changes cannot silently alter the contract:
+
+- at most 4,096 UTF-8 bytes in the pattern before parsing;
+- a 1,048,576-byte approximate compiled-NFA limit through `size_limit`;
+- a 1,048,576-byte lazy-DFA transition-cache capacity through
+  `dfa_size_limit`; and
+- a parser nesting limit of 128 through `nest_limit`.
+
+The builder also sets every semantic default explicitly:
+`case_insensitive(false)`, `multi_line(false)`,
+`dot_matches_new_line(false)`, `crlf(false)`, `line_terminator(b'\n')`,
+`swap_greed(false)`, `ignore_whitespace(false)`, `unicode(true)`, and
+`octal(false)`. Inline pattern flags may locally change only the settings that
+the admitted syntax exposes.
+
+The first limit bounds the parser AST/HIR allocation that the upstream nesting
+limit does not bound. The NFA limit bounds counted-repetition expansion and
+the `m` term in search. A full lazy-DFA cache resets and ultimately falls back
+to another finite-automata engine; it is not a failed or false match. The crate
+exposes no ordinary per-search resource error from `find`, so there is no
+timeout or resource-exhaustion-as-nonmatch path. A dependency panic, allocator
+failure, cancellation, or process termination remains infrastructure failure
+and must never be caught and rewritten as nonmatch.
+
+Every admitted pattern either compiles before operand evaluation or returns a
+syntax `QueryError` with exit code 2 and no query stdout. Diagnostics are
+entirely Slug-owned and deliberately do not expose dependency prose:
+
+- length rejection is exactly
+  `Slug regex resource limit exceeded: pattern is longer than 4096 bytes`;
+- `regex::Error::CompiledTooBig(_)` is exactly
+  `Slug regex resource limit exceeded: compiled program is larger than 1048576 bytes`;
+  and
+- `regex::Error::Syntax(_)` or any future non-exhaustive build-error variant is
+  exactly `invalid Slug regex: unsupported or malformed syntax`.
+
+Nesting-limit rejection is an invalid-syntax case because the public `regex`
+error type does not separately classify it. All compile failures are
+fail-closed errors, never an empty set and never a nonmatch.
+
+The candidate representation remains the already accepted one. `filter`
+matches `QueryCandidate::printed_label().output_label()`: root labels such as
+`//pkg:t` and apparent external labels such as `@repo//pkg:t`, including fake
+load-file candidates. `kind` matches exactly the existing selected-node kind
+projection: `source file` for BUILD/source/fake load-file candidates,
+`generated file`, `package group`, or `<retained rule_class> rule`. It may
+demand-load a real candidate only through the existing package-graph path used
+by `label_kind`; this can request an ordinary typed query restart but records
+no new evaluation edge. It must not infer kind from label spelling or from
+configuration/analysis state.
+
+The bounded implementation successor is
+`WP-8-m3-rust-native-filter-kind-implementation`. It may add only
+`regex.workspace = true` to `app/slug_query_v2/Cargo.toml` (the existing lock
+selection must remain unchanged), activate `filter` and `kind` in `expr.rs`,
+add their shared compile-once generic dispatch in `generic.rs`, add the two
+delivery-preserving loading-environment accessors in
+`loading_environment.rs`, and add focused core/loading and existing-fixture
+CLI/daemon tests. No command or server production wire changes are required.
+
+The acceptance matrix must discriminate substring versus `^`/`$` anchoring;
+literal and escaped punctuation; Unicode scalar literals, `\p{...}` classes,
+case folding, and inline flags; apparent external and fake labels; all retained
+kind strings; invalid look-around/backreference syntax; 4,096 versus 4,097
+UTF-8 bytes; nesting and compiled-NFA rejection; no operand evaluation or
+stdout after compile failure; repeated use of one compiled pattern; streamed
+delivery order/provenance; AUTO/FULL/default and `label_kind` presentation; and
+one-shot versus retained-daemon equivalence. Common-dialect label/kind behavior
+must cite immutable Bazel 9.2 source commit `8220c619...` for compile-before-
+evaluation, one compile, printed-label/target-kind inputs, find semantics, and
+filtered callback delivery. Rust-dialect/resource rows use the locked crate
+source and focused Slug tests, not a Java oracle.
+
+Stop and `REPLAN` on a `Cargo.lock` change, a need for backtracking or
+unsupported syntax, silent compile/search failure as nonmatch, regex state in
+DICE/package/query identity, a new query edge or candidate representation,
+`attr`, cquery/aquery/configuration breadth, Java parity claims, UTF-16 or
+surrogate handling, or any JVM, Java source/bytecode/helper, or Bazel
+delegation. Exact Java `Pattern` behavior remains permanently out of scope;
+`attr` remains deferred behind its typed attribute-string projection.
+
+Independent Sol-low public-boundary review returned `ACCEPT` without a
+correction. The contract packet is complete; schedule only
+`WP-8-m3-rust-native-filter-kind-implementation` next.
