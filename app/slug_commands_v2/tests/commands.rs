@@ -14,6 +14,7 @@ use slug_commands_v2::HELP_SUMMARY;
 use slug_commands_v2::QueryOutputFormat;
 use slug_commands_v2::aquery::AqueryRequest;
 use slug_commands_v2::build::BuildRequest;
+use slug_commands_v2::cquery::CqueryOutputMode;
 use slug_commands_v2::cquery::CqueryRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::query::QueryRequest;
@@ -457,19 +458,25 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
 }
 
 #[test]
-fn cquery_accepts_only_the_starlark_label_boundary() {
-    let cquery = CqueryRequest::parse(&[
+fn cquery_accepts_only_the_label_output_matrix() {
+    let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
+    assert_eq!(default.output_mode, CqueryOutputMode::Label);
+
+    let label = CqueryRequest::parse(&["--output=label", "//pkg:bin"]).unwrap();
+    assert_eq!(label.output_mode, CqueryOutputMode::Label);
+
+    let starlark = CqueryRequest::parse(&[
         "--output=starlark",
         "--starlark:expr=str(target.label)",
         "--output_base=/tmp/slug-cquery",
         "//pkg:bin",
     ])
     .unwrap();
-    assert_eq!(cquery.target.to_string(), "//pkg:bin");
-    assert_eq!(cquery.output_base.as_deref(), Some("/tmp/slug-cquery"));
+    assert_eq!(starlark.output_mode, CqueryOutputMode::StarlarkLabel);
+    assert_eq!(starlark.target.to_string(), "//pkg:bin");
+    assert_eq!(starlark.output_base.as_deref(), Some("/tmp/slug-cquery"));
 
     for args in [
-        vec!["//pkg:bin"],
         vec![
             "--output=label",
             "--starlark:expr=str(target.label)",
@@ -480,6 +487,9 @@ fn cquery_accepts_only_the_starlark_label_boundary() {
             "--starlark:expr=target.label",
             "//pkg:bin",
         ],
+        vec!["--output=starlark", "//pkg:bin"],
+        vec!["--starlark:expr=str(target.label)", "//pkg:bin"],
+        vec!["--output=text", "//pkg:bin"],
         vec!["--output", "--starlark:expr=str(target.label)", "//pkg:bin"],
         vec!["--output=starlark", "--starlark:expr", "//pkg:bin"],
         vec![
@@ -526,15 +536,7 @@ fn cquery_accepts_only_the_starlark_label_boundary() {
         assert!(CqueryRequest::parse(&args).is_err(), "{args:?}");
     }
 
-    assert!(
-        CqueryRequest::parse(&[
-            "--output=starlark",
-            "--output=starlark",
-            "--starlark:expr=str(target.label)",
-            "//pkg:bin",
-        ])
-        .is_err()
-    );
+    assert!(CqueryRequest::parse(&["--output=label", "--output=label", "//pkg:bin",]).is_err());
     assert!(
         CqueryRequest::parse(&[
             "--output=starlark",
@@ -556,6 +558,27 @@ fn cquery_accepts_only_the_starlark_label_boundary() {
 
     let aquery = AqueryRequest::parse(&["--nostrict_test_suite=false", "//pkg:bin"]).unwrap();
     assert_eq!(aquery.query.policy, QueryPolicy::default());
+}
+
+#[test]
+fn cquery_root_string_setting_accepts_unicode_empty_and_last_occurrence() {
+    let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
+    assert_eq!(default.root_string_setting, None);
+
+    let unicode = CqueryRequest::parse(&["--//:setting=Grüße", "//pkg:bin"]).unwrap();
+    assert_eq!(unicode.root_string_setting.as_deref(), Some("Grüße"));
+
+    let empty = CqueryRequest::parse(&["--//:setting=", "//pkg:bin"]).unwrap();
+    assert_eq!(empty.root_string_setting.as_deref(), Some(""));
+
+    let repeated =
+        CqueryRequest::parse(&["--//:setting=first", "--//:setting=最後", "//pkg:bin"]).unwrap();
+    assert_eq!(repeated.root_string_setting.as_deref(), Some("最後"));
+
+    let error = CqueryRequest::parse(&["--//:setting", "//pkg:bin"])
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("expected --//:setting=<Unicode>"), "{error}");
 }
 
 #[test]

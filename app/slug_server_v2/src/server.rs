@@ -62,8 +62,18 @@ pub struct QueryRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CqueryRequest {
     pub target: String,
+    pub output: CqueryOutput,
+    pub root_string_setting: Option<String>,
     #[serde(default)]
     pub bzlmod: BzlmodRequestInputs,
+}
+
+/// The complete daemon-wire output surface admitted by configured query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CqueryOutput {
+    Label,
+    StarlarkLabel,
 }
 
 /// Stable primitive wire representation for one bzlmod request.
@@ -343,12 +353,14 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     invalidated_files: 0,
                 };
             }
-            let result = daemon.cquery_starlark_label_with_bzlmod_inputs(
+            let result = daemon.cquery_with_bzlmod_inputs(
                 &target,
+                request.output,
                 command_policy,
                 environment_policy,
                 lockfile_mode,
                 registry_urls,
+                request.root_string_setting.as_deref(),
             );
             DaemonResponse {
                 exit_code: result.exit_code,
@@ -453,6 +465,8 @@ pub fn send_cquery_request(
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
     let json = serde_json::to_string(&DaemonRequest::Cquery(CqueryRequest {
         target: request.target.clone(),
+        output: request.output,
+        root_string_setting: request.root_string_setting.clone(),
         bzlmod: request.bzlmod.clone(),
     }))
     .context("serializing cquery request for daemon")?;

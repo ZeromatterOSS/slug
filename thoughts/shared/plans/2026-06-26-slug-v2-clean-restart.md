@@ -26,9 +26,9 @@ and must name the same packet.
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
-| M3: `query` | partial | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output | select an explicit Rust-native valid-Unicode regex contract; `attr`, rank order, external repositories, patterns, and remaining formats still need representation | preserve accepted slices while M2 identity advances |
-| M4: `cquery` | **active (Slug-native display)** | bounded one-root `str(target.label)` success/missing/recovery is accepted in `135b0567`; the Rust-only public default/`label` format and identity contract is independently accepted | implement the accepted formatter, wire, and C0/C1/C0 contract without changing structural identity or Starlark bytes | `WP-6-m4-root-cquery-label-slug-projection-implementation` |
-| M5: `aquery` | **replan** | recursive action ownership and four-domain change/restoration evidence are retained | consume complete Slug semantic configuration/action identity and compare provisional ID bytes as opaque graph-scoped tokens without normalizing graph/content/platform differences | wait for the M2 identity chain |
+| M3: `query` | **active (Rust-native regex design)** | 13/16 default functions plus default/explicit `label`, graph, `label_kind`, and `package` output | freeze a reviewed valid-Unicode Rust regex contract before `filter`/`kind`; `attr`, rank order, external repositories, patterns, and remaining formats still need representation | `WP-8-m3-rust-native-regex-contract-design` |
+| M4: `cquery` | **partial, parked (Slug-native display)** | one-root Starlark label and default/explicit label projection share structural analysis, preserve exact accepted terminals, and prove C0/C1/C0 restoration | configured expressions, dependency traversal, providers, and broader functions/formats remain | preserve the accepted slice until M3 advances |
+| M5: `aquery` | **replan** | recursive action ownership, complete Slug configuration identity, and four-domain change/restoration evidence are retained | retain selected execution platform/action ownership, then compare provisional configuration/path/ActionKey IDs only as opaque graph-scoped tokens | wait for configured-query breadth after M3 |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | semantic `aquery` handoff and collision-safe Slug action/cache identity | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-m4-root-cquery-label-slug-projection-implementation`](./slug-v2-subplans/current-packet.md).
+[`WP-8-m3-rust-native-regex-contract-design`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

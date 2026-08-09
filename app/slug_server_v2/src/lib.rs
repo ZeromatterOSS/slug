@@ -340,13 +340,15 @@ impl Daemon {
         }
     }
 
-    pub fn cquery_starlark_label_with_bzlmod_inputs(
+    pub fn cquery_with_bzlmod_inputs(
         &mut self,
         target: &TargetPattern,
+        output: crate::server::CqueryOutput,
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
         registry_urls: Vec<String>,
+        root_string_setting: Option<&str>,
     ) -> QueryResult {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
@@ -361,22 +363,27 @@ impl Daemon {
                 &registry_urls,
             ),
         );
-        let accepted = match self
-            .runtime
-            .cquery_starlark_label_command_with_bzlmod_inputs(
-                target,
-                command_policy,
-                environment_policy,
-                lockfile_mode,
-                &registry_urls,
-            ) {
+        let accepted = match self.runtime.cquery_command_with_bzlmod_inputs(
+            target,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            &registry_urls,
+            root_string_setting,
+        ) {
             Ok(accepted) => accepted,
             Err(error) => return cquery_error_result_for_terminal(&error, invalidated),
         };
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
                 Ok(evaluation) => {
-                    TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+                    let stdout = match output {
+                        crate::server::CqueryOutput::Label => evaluation.label_stdout(),
+                        crate::server::CqueryOutput::StarlarkLabel => {
+                            evaluation.starlark_label_stdout()
+                        }
+                    };
+                    TerminalOutput::new(0, stdout, String::new())
                 }
                 Err(error) => match error.missing_stderr() {
                     Some(stderr) => TerminalOutput::new(1, String::new(), stderr),
@@ -552,6 +559,7 @@ mod server;
 pub use server::BuildRequest;
 pub use server::BuildResponse;
 pub use server::BzlmodRequestInputs;
+pub use server::CqueryOutput;
 pub use server::CqueryRequest;
 pub use server::DaemonRequest;
 pub use server::DaemonResponse;

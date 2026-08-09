@@ -31,6 +31,7 @@ use slug_reapi_v2::RemoteConfig;
 
 use crate::BuildRequest;
 use crate::BzlmodRequestInputs;
+use crate::CqueryOutput;
 use crate::CqueryRequest;
 use crate::Daemon;
 use crate::DaemonRequest;
@@ -812,6 +813,8 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
 fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     let request = DaemonRequest::Cquery(CqueryRequest {
         target: "//pkg:probe".to_owned(),
+        output: CqueryOutput::Label,
+        root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
         bzlmod: BzlmodRequestInputs::default(),
     });
     let json = serde_json::to_string(&request).unwrap();
@@ -822,7 +825,48 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
         panic!("expected tagged cquery request");
     };
     assert_eq!(request.target, "//pkg:probe");
+    assert_eq!(request.output, CqueryOutput::Label);
+    assert_eq!(
+        request.root_string_setting.as_deref(),
+        Some("Gr\u{00fc}\u{00df}e")
+    );
     assert_eq!(request.bzlmod, BzlmodRequestInputs::default());
+}
+
+#[test]
+fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
+    let missing = serde_json::from_str::<DaemonRequest>(
+        r#"{"kind":"cquery","request":{"target":"//pkg:probe"}}"#,
+    )
+    .unwrap_err();
+    assert!(missing.to_string().contains("missing field `output`"));
+    let unknown = serde_json::from_str::<DaemonRequest>(
+        r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"graph"}}"#,
+    )
+    .unwrap_err();
+    assert!(unknown.to_string().contains("unknown variant `graph`"));
+
+    let workspace = scratch("cquery-malformed-mode");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let malformed = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"graph"}}"#,
+    );
+    assert_eq!(malformed.exit_code, 2, "{malformed:?}");
+    assert!(malformed.stdout.is_empty(), "{malformed:?}");
+    assert!(
+        malformed
+            .stderr
+            .contains("\"error\":\"daemon_parse_error\"")
+            && malformed.stderr.contains("unknown variant"),
+        "{malformed:?}"
+    );
+    assert_eq!(malformed.invalidated_files, 0);
 }
 
 #[test]
@@ -839,12 +883,14 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
     );
     let mut daemon = Daemon::new(&workspace).unwrap();
     let run = |daemon: &mut Daemon, value: &str| {
-        daemon.cquery_starlark_label_with_bzlmod_inputs(
+        daemon.cquery_with_bzlmod_inputs(
             &target(value),
+            CqueryOutput::StarlarkLabel,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
             Vec::new(),
+            None,
         )
     };
     let success = run(&mut daemon, "//pkg:probe");
@@ -859,6 +905,75 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
     assert_eq!(recovery.exit_code, 0, "{recovery:?}");
     assert_eq!(recovery.stdout, "@@//pkg:probe\n");
     assert_eq!(recovery.invalidated_files, 0);
+}
+
+#[test]
+fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
+    let workspace = scratch("cquery-configuration-c0-c1-c0");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(
+        &workspace.join("settings.bzl"),
+        "def _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
+    );
+    write(
+        &workspace.join("BUILD.bazel"),
+        "load(\":settings.bzl\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\n",
+    );
+    write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let run = |daemon: &mut Daemon, output, setting| {
+        daemon.cquery_with_bzlmod_inputs(
+            &target("//pkg:probe"),
+            output,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+            Vec::new(),
+            setting,
+        )
+    };
+
+    let c0 = run(&mut daemon, CqueryOutput::Label, None);
+    let c1 = run(
+        &mut daemon,
+        CqueryOutput::Label,
+        Some("Gr\u{00fc}\u{00df}e"),
+    );
+    let restored = run(&mut daemon, CqueryOutput::Label, None);
+    for result in [&c0, &c1, &restored] {
+        assert_eq!(result.exit_code, 0, "{result:?}");
+        assert_eq!(result.invalidated_files, 0, "{result:?}");
+        let projection = result
+            .stdout
+            .strip_prefix("//pkg:probe (slugcfg-v1:")
+            .and_then(|stdout| stdout.strip_suffix(")\n"))
+            .expect("label mode must use the namespaced Slug projection");
+        assert_eq!(projection.len(), 64, "{result:?}");
+        assert!(
+            projection
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+            "{result:?}"
+        );
+    }
+    assert_ne!(c0.stdout, c1.stdout);
+    assert_eq!(c0.stdout, restored.stdout);
+
+    let starlark = run(
+        &mut daemon,
+        CqueryOutput::StarlarkLabel,
+        Some("Gr\u{00fc}\u{00df}e"),
+    );
+    assert_eq!(starlark.exit_code, 0, "{starlark:?}");
+    assert_eq!(starlark.stdout, "@@//pkg:probe\n");
+    assert_eq!(starlark.invalidated_files, 0);
 }
 
 #[test]

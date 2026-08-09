@@ -3000,3 +3000,14 @@ handling before enabling `filter` and `kind`. `attr` still requires its separate
 typed attribute-string representation, and rank/external/pattern/formatter
 representation gaps remain unchanged. No Java helper, standalone Java probe,
 bytecode, embedded/launched JVM, or production Bazel delegation is permitted.
+
+M2 structural configuration identity and the bounded M4 cquery projection are
+now accepted. Run next only `WP-8-m3-rust-native-regex-contract-design`, a
+documentation/source-audit packet. Select the existing locked Rust regex
+substrate and freeze one explicit Slug-native valid-Unicode syntax, compile,
+search, diagnostic, resource-limit, and fail-closed contract for `filter` and
+`kind`. Preserve the exact Bazel matcher inputs and compile-once/find call
+shape around the named dialect divergence. Obtain independent public-boundary
+review before scheduling Rust. `attr`, query graph/identity changes, DICE regex
+keys, cquery/aquery breadth, Cargo edits, UTF-16/lone-surrogate emulation, and
+all JVM/Java artifacts, helpers, execution, or delegation remain excluded.

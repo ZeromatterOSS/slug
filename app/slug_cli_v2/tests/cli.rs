@@ -47,6 +47,22 @@ fn write(path: impl AsRef<std::path::Path>, content: &str) {
     std::fs::write(path, content).unwrap();
 }
 
+fn assert_slug_cquery_label(stdout: &[u8], label: &str) -> String {
+    let stdout = std::str::from_utf8(stdout).unwrap();
+    let projection = stdout
+        .strip_prefix(&format!("{label} (slugcfg-v1:"))
+        .and_then(|stdout| stdout.strip_suffix(")\n"))
+        .unwrap_or_else(|| panic!("unexpected cquery label output: {stdout:?}"));
+    assert_eq!(projection.len(), 64, "{stdout:?}");
+    assert!(
+        projection
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)),
+        "{stdout:?}"
+    );
+    stdout.to_owned()
+}
+
 fn fixture_workspace(name: &str) -> FixtureWorkspace {
     FixtureWorkspace::new(name).unwrap()
 }
@@ -918,8 +934,29 @@ fn missing_build_target_is_structured_parse_error() {
 }
 
 #[test]
-fn cquery_starlark_label_matches_success_missing_and_recovery() {
+fn cquery_label_and_starlark_modes_match_success_and_missing_contracts() {
     let workspace = fixture_workspace("recursive-custom-rule-providers-actions");
+    let default = slug()
+        .current_dir(&workspace)
+        .args(["cquery", "//parent:parent"])
+        .output()
+        .unwrap();
+    assert!(default.status.success(), "{default:?}");
+    assert!(default.stderr.is_empty());
+    let default_stdout = assert_slug_cquery_label(&default.stdout, "//parent:parent");
+
+    let label = slug()
+        .current_dir(&workspace)
+        .args(["cquery", "//parent:parent", "--output=label"])
+        .output()
+        .unwrap();
+    assert!(label.status.success(), "{label:?}");
+    assert!(label.stderr.is_empty());
+    assert_eq!(
+        default_stdout,
+        assert_slug_cquery_label(&label.stdout, "//parent:parent")
+    );
+
     let args = [
         "cquery",
         "//parent:parent",
@@ -1004,6 +1041,83 @@ fn cquery_starlark_label_daemon_recovers_after_missing() {
     assert!(recovered.status.success(), "{recovered:?}");
     assert_eq!(recovered.stdout, b"@@//parent:parent\n");
     assert!(recovered.stderr.is_empty());
+}
+
+#[test]
+fn cquery_one_shot_and_retained_daemon_restore_label_projection() {
+    let workspace = scratch("cquery-label-configuration-workspace");
+    write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"cquery_label\")\n",
+    );
+    write(
+        workspace.join("settings.bzl"),
+        "def _setting(ctx): return []\nstring_setting = rule(implementation = _setting, build_setting = config.string(flag = True))\n",
+    );
+    write(
+        workspace.join("BUILD.bazel"),
+        "load(\":settings.bzl\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\n",
+    );
+    write(
+        workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx): return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
+    );
+
+    let one_shot = slug()
+        .current_dir(&workspace)
+        .args(["cquery", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert!(one_shot.stderr.is_empty());
+    let c0_one_shot = assert_slug_cquery_label(&one_shot.stdout, "//pkg:probe");
+
+    let output_base = scratch("cquery-label-configuration-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let invoke = |extra: &[&str]| {
+        slug()
+            .current_dir(&workspace)
+            .arg(&output_base_arg)
+            .arg("cquery")
+            .arg("//pkg:probe")
+            .args(extra)
+            .output()
+            .unwrap()
+    };
+
+    let c0 = invoke(&[]);
+    assert!(c0.status.success(), "{c0:?}");
+    assert!(c0.stderr.is_empty());
+    let c0_daemon = assert_slug_cquery_label(&c0.stdout, "//pkg:probe");
+    assert_eq!(c0_one_shot, c0_daemon);
+
+    let c1 = invoke(&["--//:setting=Grüße"]);
+    assert!(c1.status.success(), "{c1:?}");
+    assert!(c1.stderr.is_empty());
+    let c1_stdout = assert_slug_cquery_label(&c1.stdout, "//pkg:probe");
+    assert_ne!(c0_daemon, c1_stdout);
+
+    let restored = invoke(&["--output=label"]);
+    assert!(restored.status.success(), "{restored:?}");
+    assert!(restored.stderr.is_empty());
+    assert_eq!(
+        c0_daemon,
+        assert_slug_cquery_label(&restored.stdout, "//pkg:probe")
+    );
+
+    let starlark = invoke(&[
+        "--//:setting=Grüße",
+        "--output=starlark",
+        "--starlark:expr=str(target.label)",
+    ]);
+    assert!(starlark.status.success(), "{starlark:?}");
+    assert_eq!(starlark.stdout, b"@@//pkg:probe\n");
+    assert!(starlark.stderr.is_empty());
 }
 
 #[test]

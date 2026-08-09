@@ -5402,3 +5402,48 @@ short-ID approximation, truncated/caller-supplied/projection-as-identity use,
 changed Starlark bytes, general Starlark evaluation, aquery/ActionKey/platform
 breadth, normalization outside the payload, or any JVM/Java artifact,
 execution, helper, or delegation.
+
+### Root cquery Slug-projection implementation ACCEPT (2026-08-09)
+
+`WP-6-m4-root-cquery-label-slug-projection-implementation` is **ACCEPT**.
+Default cquery and explicit `--output=label` now publish the apparent root
+label followed by the full returned structural configuration projection as
+`slugcfg-v1:<64-lowercase-hex>`. The existing exact
+`--output=starlark --starlark:expr=str(target.label)` bytes remain unchanged.
+The command parser admits only the frozen formatter matrix and the one root
+Unicode string setting; the setting has last-occurrence-wins semantics and is
+forwarded identically through one-shot and daemon execution.
+
+The retained `RootConfiguredTargetAnalysisKey` remains the only analysis root.
+Explicit settings use its existing root-setting request form, default and
+transition resolution remain DICE-owned, and missing-target translation now
+uses a separately retained canonical label rather than resolving an unfinished
+request key. Successful evaluation derives and retains its display projection
+only from the returned `AnalysisResult`; request-known and returned structural
+configurations are collision-claimed before publication. The projection is
+never parsed, truncated, supplied by the caller, or used as semantic, DICE,
+cache, or action identity.
+
+The daemon wire has a required serde discriminator `label | starlark_label`
+and the optional root setting, with no old-request compatibility shim.
+Malformed modes fail before observation; missing and runtime terminals retain
+their prior ownership. Tests prove exact parser and wire matrices, full token
+shape, direct setting/default/transition resolution, explicit-setting missing
+translation, unchanged Starlark output, one-shot/daemon equality, and retained
+C0 -> C1 -> C0 distinct/restored bytes, topology, warm reuse, and zero source
+invalidations.
+
+Validation passed: command parser `18/18`, focused core cquery `2/2`, server
+`40/40`, focused CLI cquery `3/3`, `slug_cli_v2` build, formatting, and diff
+checks. No stale daemon remained before or after CLI validation. An independent
+final implementation review returned `ACCEPT` with no findings. All nine
+changed Rust/test files stay within the packet allowlist. Exact Bazel
+configuration/output/ActionKey bytes remain deferred to the Rust-only M9
+analysis; no JVM or Java artifact, helper, execution, or delegation was added.
+
+M4 is now **partial/parked**, not milestone-complete. This packet closes the
+bounded one-root configured-label surface and proves that it consumes the
+shared structural analysis graph, including default, explicit, and transitioned
+configuration ownership. Configured query expressions, dependency-graph
+traversal, provider projection, and broader functions/formats remain separate
+M4 work after the canonical M3 query gate advances.

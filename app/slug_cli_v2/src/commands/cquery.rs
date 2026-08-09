@@ -8,12 +8,13 @@
  */
 
 use slug_commands_v2::CommandKind;
+use slug_commands_v2::cquery::CqueryOutputMode;
 use slug_commands_v2::cquery::CqueryRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::CqueryCommandError;
 use slug_core_v2::runtime::TerminalOutput;
-use slug_core_v2::runtime::evaluate_workspace_cquery_starlark_label_command_with_bzlmod_inputs;
+use slug_core_v2::runtime::evaluate_workspace_cquery_command_with_bzlmod_inputs;
 
 pub fn run(argv: Vec<String>) -> i32 {
     let request = match CqueryRequest::parse(&argv) {
@@ -42,13 +43,15 @@ pub fn run(argv: Vec<String>) -> i32 {
         Ok(workspace) => workspace,
         Err(error) => return emit_error(&error.to_string(), "one-shot"),
     };
-    let accepted = match evaluate_workspace_cquery_starlark_label_command_with_bzlmod_inputs(
+    let output_mode = request.output_mode;
+    let accepted = match evaluate_workspace_cquery_command_with_bzlmod_inputs(
         &workspace,
         &request.target,
         request.bzlmod_policy,
         environment_policy,
         request.lockfile_mode,
         &request.registry_urls,
+        request.root_string_setting.as_deref(),
     ) {
         Ok(accepted) => accepted,
         Err(error) => {
@@ -63,7 +66,11 @@ pub fn run(argv: Vec<String>) -> i32 {
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
             Ok(evaluation) => {
-                TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+                let stdout = match output_mode {
+                    CqueryOutputMode::Label => evaluation.label_stdout(),
+                    CqueryOutputMode::StarlarkLabel => evaluation.starlark_label_stdout(),
+                };
+                TerminalOutput::new(0, stdout, String::new())
             }
             Err(error) => terminal_error(error, "one-shot"),
         })
@@ -93,6 +100,11 @@ fn run_daemon(
         &socket,
         &slug_server_v2::CqueryRequest {
             target: request.target.to_string(),
+            output: match request.output_mode {
+                CqueryOutputMode::Label => slug_server_v2::CqueryOutput::Label,
+                CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,
+            },
+            root_string_setting: request.root_string_setting,
             bzlmod,
         },
     ) {

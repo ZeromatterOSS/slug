@@ -20,10 +20,20 @@ use crate::common::split_args;
 
 const LABEL_EXPRESSION: &str = "str(target.label)";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CqueryOutputMode {
+    Label,
+    StarlarkLabel,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CqueryRequest {
     pub target: TargetPattern,
+    pub output_mode: CqueryOutputMode,
     pub output_base: Option<String>,
+    /// The one admitted root build setting transition. Configuration owns its
+    /// typed representation and semantic identity.
+    pub root_string_setting: Option<String>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
     pub registry_urls: Vec<String>,
@@ -64,11 +74,22 @@ impl CqueryRequest {
         let mut output = None;
         let mut expression = None;
         let mut output_base = None;
+        let mut root_string_setting = None;
         for flag in &parsed.flags {
             match flag.name.as_str() {
                 "output" => set_once(&mut output, flag, "--output")?,
                 "starlark:expr" => set_once(&mut expression, flag, "--starlark:expr")?,
                 "output_base" => set_once(&mut output_base, flag, "--output_base")?,
+                "//:setting" => {
+                    let value =
+                        flag.value
+                            .clone()
+                            .ok_or_else(|| CommandParseError::InvalidFlagValue {
+                                flag: flag.raw.clone(),
+                                message: "expected --//:setting=<Unicode>".to_owned(),
+                            })?;
+                    root_string_setting = Some(value);
+                }
                 "allow_yanked_versions"
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
@@ -82,20 +103,24 @@ impl CqueryRequest {
                 }
             }
         }
-        if output.as_deref() != Some("starlark") {
-            return Err(unsupported("cquery requires --output=starlark"));
-        }
-        if expression.as_deref() != Some(LABEL_EXPRESSION) {
-            return Err(unsupported(
-                "cquery requires --starlark:expr=str(target.label)",
-            ));
-        }
+        let output_mode = match (output.as_deref(), expression.as_deref()) {
+            (None | Some("label"), None) => CqueryOutputMode::Label,
+            (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
+            _ => {
+                return Err(unsupported(
+                    "expected default output, --output=label, or --output=starlark \
+                     --starlark:expr=str(target.label)",
+                ));
+            }
+        };
         let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
         Ok(Self {
             target,
+            output_mode,
             output_base,
+            root_string_setting,
             bzlmod_policy,
             lockfile_mode,
             registry_urls,
