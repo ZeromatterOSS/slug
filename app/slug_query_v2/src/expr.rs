@@ -114,7 +114,12 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
         argument_kinds: &[EXPR, EXPR],
         status: QueryFunctionStatus::Implemented,
     },
-    deferred("attr", 3, &[WORD, WORD, EXPR]),
+    QueryFunctionSpec {
+        name: "attr",
+        mandatory_arguments: 3,
+        argument_kinds: &[WORD, WORD, EXPR],
+        status: QueryFunctionStatus::Implemented,
+    },
     QueryFunctionSpec {
         name: "buildfiles",
         mandatory_arguments: 1,
@@ -200,19 +205,6 @@ const FUNCTIONS: &[QueryFunctionSpec] = &[
         status: QueryFunctionStatus::Implemented,
     },
 ];
-
-const fn deferred(
-    name: &'static str,
-    mandatory_arguments: usize,
-    argument_kinds: &'static [QueryArgumentKind],
-) -> QueryFunctionSpec {
-    QueryFunctionSpec {
-        name,
-        mandatory_arguments,
-        argument_kinds,
-        status: QueryFunctionStatus::Deferred,
-    }
-}
 
 pub fn loading_query_functions() -> &'static [QueryFunctionSpec] {
     FUNCTIONS

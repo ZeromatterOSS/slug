@@ -52,10 +52,10 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 // QueryEnvironment.DEFAULT_QUERY_FUNCTIONS at Bazel 9.2 is the loading-query
 // registry source of truth. Loading-file provenance activates
 // buildfiles/loadfiles, retained attribute metadata activates labels, and the
-// retained rule capability activates executables and tests; filter/kind use
-// the accepted Rust-native regex contract, while attr remains deferred.
+// retained rule capability activates executables and tests; attr/filter/kind
+// use the accepted Rust-native regex contract.
 #[test]
-fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures() {
+fn registry_rejects_unknown_and_validates_implemented_signatures() {
     assert_eq!(loading_query_functions().len(), 16);
     assert_eq!(
         loading_query_functions()
@@ -65,6 +65,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .collect::<Vec<_>>(),
         [
             "allpaths",
+            "attr",
             "buildfiles",
             "deps",
             "executables",
@@ -89,13 +90,6 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .to_string()
             .contains("unknown function 'not_a_bazel_query_function'")
     );
-    let deferred = QueryExpression::parse("attr(srcs, x, //pkg:all)").unwrap();
-    assert!(
-        validate_loading_query(&deferred)
-            .unwrap_err()
-            .to_string()
-            .contains("recognized by Bazel 9.2")
-    );
     let wrong = QueryExpression::parse("deps(//pkg:bin, 1, 2)").unwrap();
     assert!(
         validate_loading_query(&wrong)
@@ -105,6 +99,8 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
     );
     validate_loading_query(&QueryExpression::parse("deps(//pkg:bin, 2)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("executables(//pkg:bin)").unwrap()).unwrap();
+    validate_loading_query(&QueryExpression::parse("attr(name, pattern, //pkg:bin)").unwrap())
+        .unwrap();
     validate_loading_query(&QueryExpression::parse("filter(bin, //pkg:bin)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("kind(rule, //pkg:bin)").unwrap()).unwrap();
     validate_loading_query(&QueryExpression::parse("labels(srcs, //pkg:bin)").unwrap()).unwrap();
@@ -138,7 +134,7 @@ fn registry_distinguishes_unknown_deferred_and_validates_implemented_signatures(
             .iter()
             .filter(|function| function.status == QueryFunctionStatus::Deferred)
             .count(),
-        1
+        0
     );
 }
 

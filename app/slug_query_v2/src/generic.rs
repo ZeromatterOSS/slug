@@ -1225,13 +1225,13 @@ mod tests {
     }
 
     #[test]
-    fn inactive_attr_function_compiles_before_operand_and_preserves_argument_order() {
+    fn active_attr_function_compiles_before_operand_and_preserves_argument_order() {
         let functions = LoadingQueryFunctions;
-        let inactive: Option<&dyn QueryFunction<VisibleEnvironment>> = functions.get("attr");
-        assert!(inactive.is_none());
+        let active: Option<&dyn QueryFunction<VisibleEnvironment>> = functions.get("attr");
+        assert!(active.is_some());
         assert_eq!(
             loading_query_function("attr").unwrap().status,
-            crate::QueryFunctionStatus::Deferred
+            crate::QueryFunctionStatus::Implemented
         );
 
         for pattern in ["(?=unsupported)", r"\1"] {
@@ -1257,18 +1257,10 @@ mod tests {
         }
 
         let expression = QueryExpression::parse("attr(name, put, input)").unwrap();
-        let QueryExpressionKind::Function { args, .. } = expression.kind else {
-            panic!("expected attr call");
-        };
         let mut evaluator = QueryEvaluator::new(VisibleEnvironment {
             events: std::sync::Mutex::new(Vec::new()),
         });
-        let result = futures::executor::block_on(ATTR_FUNCTION.invoke(
-            &mut evaluator,
-            &args,
-            &mut SmallMap::new(),
-        ))
-        .unwrap();
+        let result = futures::executor::block_on(evaluator.evaluate(&expression)).unwrap();
         assert_eq!(result, ["input"]);
         assert_eq!(
             *evaluator.environment.events.lock().unwrap(),

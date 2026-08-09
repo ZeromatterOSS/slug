@@ -1502,7 +1502,7 @@ mod tests {
     }
 
     #[test]
-    fn inactive_attr_matcher_renders_repository_labels_and_requires_typed_rule_values() {
+    fn attr_matcher_renders_repository_labels_and_requires_typed_rule_values() {
         let labels = CoercedAttributeValue::LabelList(Arc::from([
             CanonicalLabel::parse("@@//pkg:main").unwrap(),
             CanonicalLabel::parse("@@ext+//leaf:external").unwrap(),
@@ -1546,7 +1546,7 @@ mod tests {
     }
 
     #[test]
-    fn inactive_attr_matcher_surfaces_contextual_typed_candidate_errors() {
+    fn attr_matcher_surfaces_contextual_typed_candidate_errors() {
         let invalid = CoercedAttributeValue::Concatenation(
             Arc::new(CoercedAttributeValue::Label(
                 CanonicalLabel::parse("@@//pkg:left").unwrap(),
@@ -1569,7 +1569,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn inactive_attr_filter_preserves_streamed_ids_and_skips_fake_candidates() {
+    async fn attr_filter_preserves_streamed_ids_and_skips_fake_candidates() {
         let scratch = attr_scratch();
         attr_write(scratch.0.join("MODULE.bazel"), "module(name = \"root\")\n");
         attr_write(

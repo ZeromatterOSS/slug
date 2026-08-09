@@ -4502,6 +4502,15 @@ async fn external_restricted_visibility_projects_every_enabled_consumer_and_call
             ],
         ),
         ("some(@dep//:restricted)", &["@dep//:restricted"]),
+        (
+            "attr(name, '^restricted$', @dep//:restricted)",
+            &["@dep//:restricted"],
+        ),
+        (
+            "attr(srcs, '@dep//:source\\.txt', @dep//:restricted)",
+            &["@dep//:restricted"],
+        ),
+        ("attr(srcs, '^absent$', @dep//:restricted)", &[]),
         ("labels(srcs, @dep//:restricted)", &["@dep//:source.txt"]),
         ("buildfiles(@dep//:restricted)", &["@dep//:BUILD.bazel"]),
         ("loadfiles(@dep//:restricted)", &[]),
@@ -5114,7 +5123,7 @@ async fn external_owner_route_lifecycle_reuses_edits_deletes_recreates_and_recov
 async fn typed_root_query_anchors_empty_results_and_preserves_lazy_need_control() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(RootAnchorTracker::default());
-    for invalid in ["deps(", "attr(name, value, //first:t)"] {
+    for invalid in ["deps(", "attr(name, value)"] {
         assert!(
             RootQueryCommandKey::new(
                 root_query_workspace(),
