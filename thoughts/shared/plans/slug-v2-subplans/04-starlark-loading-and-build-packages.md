@@ -657,6 +657,49 @@ the pre-normalization capture point and canonical label renderer. No production
 representation or query activation is authorized until that evidence is
 accepted.
 
+## `attr` candidate-order oracle design replanned (2026-08-09)
+
+`WP-4-8-m3-attr-candidate-order-oracle-design` reaches its required `REPLAN`
+stop without fixture, oracle, Rust, Cargo, or JVM work. The requested ordinary-
+query discriminator does not exist. `TargetUtils.getAttrAsString` does expose
+`AggregatingAttributeMapper.visitAttribute` candidates in an internal order,
+but `RegexFilterExpression` consumes them only through a side-effect-free
+existential test and returns the target after the first match. Query output
+contains target labels, never the matched candidate, its position, or its
+multiplicity. Reordering candidates, moving the default entry, or deduplicating
+equal candidates therefore cannot change an ordinary `attr()` result.
+
+This is an observable-semantics correction, not a relaxed Bazel-parity claim.
+Slug must still preserve order and duplicate elements *inside one formatted
+typed value*, and it must reproduce equal-key-set correlation, distinct-key-set
+cross-products, typed concatenation before formatting, null suppression,
+schema/default/implicit values, canonical label strings, and the complete
+rule-owned native attribute surface. It does not need to preserve an
+unobservable candidate traversal order or duplicate equal candidates. A
+default-first/middle/last CLI matrix can prove membership only and cannot
+authorize an order representation or request-local ordered traversal.
+
+The finite current native inventory is also wider than the earlier query
+projection: `filegroup`, `alias`, `config_setting`, `test_suite`,
+`constraint_setting`, `constraint_value`, `platform`, `toolchain_type`, and
+`toolchain` are loadable rules. `package_group`, exported/source/BUILD files,
+and generated files are not rules for `attr`; the universal `name` attribute
+must nevertheless cover every rule class. Current query graph construction
+rejects `NativeToolchainTarget`, so total-native activation requires a reviewed
+graph-projection prerequisite rather than a Starlark-only formatter patch.
+
+Run next only `WP-4-8-m3-attr-observable-candidate-oracle-design`. It must
+replace the impossible order/multiplicity rows with paired positive and
+negative rows for the observable candidate *set*: equal-key correlation versus
+cross-product, typed string/list concatenation, duplicate elements within one
+list value, list/map order before current normalization, every admitted dict
+orientation, empty/null/effective defaults, `$implicit`, universal/native
+`name`, all retained native attributes, and main/external canonical labels. It
+must decide under the ordinary fixture-growth rules whether extending
+`query-labels-attribute-metadata` or adding one isolated fixture is smaller.
+Freeze a compact typed loading representation and request-local existential
+early-exit traversal only after that evidence; authorize neither here.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight

@@ -3197,3 +3197,30 @@ recover those facts. Leaf strings are source-closed; the remaining evidence gap
 is ordering/correlation and complete native-rule inventory. Run next only the
 focused `WP-4-8-m3-attr-candidate-order-oracle-design`; `attr` remains deferred
 and the accepted Rust-native regex boundary is unchanged.
+
+The candidate-order oracle design corrects that conclusion and ends in
+`REPLAN` before fixture generation. Bazel's internal candidate order and
+multiplicity are not observable through ordinary `attr()`: the generic regex
+filter performs a pure existential search and emits only the selected target.
+No successful query row can distinguish default-first from default-last,
+candidate reordering, or duplicate-candidate suppression. Those facts must not
+drive Slug representation merely because they occur inside Bazel machinery.
+
+Observable whole-value semantics remain strict. Equal selector key sets
+correlate while different—even overlapping—sets form typed cross-products;
+string/list concatenation precedes formatting; order and duplicates inside one
+list or map candidate remain matchable; null candidates disappear; and label
+leaves use canonical rather than apparent external repository names. The
+universal `name` attribute and every loadable native rule also prevent a
+Starlark-only activation. In particular, the current graph rejects native
+toolchain target variants, so the successor must expose that prerequisite
+rather than claiming the final default function from current `QueryAttribute`.
+
+Run next only `WP-4-8-m3-attr-observable-candidate-oracle-design`, a Stage 4/
+Stage 8 documentation and fixture-design packet. It must design exact paired
+membership/nonmembership rows for every observable combination, formatting,
+default, implicit, canonical-label, and native-inventory boundary; explicitly
+exclude candidate position and equal-candidate multiplicity from the contract;
+and select the smallest fixture shape under the existing growth checkpoint.
+No `attr` activation, graph broadening, representation Rust, query-time
+loading, DICE identity, regex change, or JVM/Java artifact is authorized.
