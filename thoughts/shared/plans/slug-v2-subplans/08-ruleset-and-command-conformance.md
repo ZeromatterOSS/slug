@@ -3350,3 +3350,44 @@ from protected Slug CLI/server consumers, and assign a distinct positive and
 negative instance to every accepted atom before generation. No fixture,
 payload, oracle, production Rust, Cargo, graph/DICE, JVM/Java artifact, or Bazel
 delegation is authorized by that design packet.
+
+The isolated retry selects a new payload-backed fixture,
+`query-attr-observable-candidates`, with no Rust projection or CLI/server case.
+Fixture discovery/listing and the aggregate metadata test see its records, but
+oracle execution is explicit by name and every Slug `FixtureWorkspace` remains
+limited to the existing static projection allowlist. This proves that current
+Slug processes cannot materialize or parse the new definitions.
+
+Its minimal closure is five directories and five virtual files: root
+`MODULE.bazel`, `attr/defs.bzl`/`attr/BUILD.bazel`, and local `ext` module/leaf
+BUILD files. The base string setting and BUILD-source nonrule live in `attr`;
+the root directory is not a Bazel package. `attr` also owns positive package
+defaults, macro location, Starlark/native targets, generated output, and
+nonrule controls; the local module independently reproduces the generic
+external label. No source leaf, registry, lockfile, action, copied
+`@bazel_tools`, mutation, configured analysis, or toolchain resolution is
+needed.
+
+The accepted 18 lanes become exactly 170 globally unique positive/negative
+pairs, 340 probe instances, and approximately 20 support targets. Pair counts
+by lane are 13/8/8/4/3/3/3/6/11/12/18/3/23/5/9/17/15/9. No positive label is
+shared by two atoms in one command; exact stdout lists every `_yes` once and no
+`_no`. Helper macros may compact ordinary declarations, but direct versus
+legacy-macro generator provenance remains isolated.
+
+Generation may add only the new fixture TOML/expected, its five-file canonical
+payload projection, Python derived global/projection integrity, and Rust global
+SHA plus the 275-to-285 entry count. It must not add a Rust projection. The cap
+from `51540963` is +7 payload-expanded regular files, +5 directories, zero
+links, 18 rows, and 2,400 logical lines; perform another hygiene review before
+any subsequent fixture packet. Update plus clean replay must independently
+freeze `@@ext+//leaf:label`, retain all fourteen existing projections, and pass
+payload metadata/integrity plus the protected 29-row CLI and two generated-kind
+CLI/server cases. All 18 rows, lane 9 macro/direct provenance, and lane 12's
+transition-allowlist positive must pass. This remains Bazel-only loading
+evidence with the permanent Rust-native/no-JVM boundary.
+
+Independent Sol review removed a redundant root `BUILD.bazel`; corrected
+rereview accepted the five-file/five-directory, `(285, 117)`, +7-file closure
+and left only bounded generation risk. Run next only
+`WP-4-8-m3-attr-isolated-observable-candidate-oracle-generation`.

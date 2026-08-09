@@ -1106,6 +1106,133 @@ design packet. Stop if discovery necessarily routes the isolated workspace
 through an existing Slug semantic regression or if exact evidence would require
 production activation first.
 
+## Isolated `attr` observable-candidate oracle design (2026-08-09)
+
+`WP-4-8-m3-attr-isolated-observable-candidate-oracle-design` selects a new
+payload-backed fixture named `query-attr-observable-candidates`. The name is not
+added to `v2_fixture_support::PROJECTIONS` and appears in no CLI/server case.
+This is a semantic isolation boundary, not only a naming convention:
+`tools.v2_oracle` discovers metadata globally but runs only the explicit
+`--fixture`; packet validation likewise executes only its explicit fixture
+list. The sole discovery-wide test reads expected-record metadata. Every Rust
+`FixtureWorkspace` consumer is allowlisted by the static projection table, and
+the current 29-row CLI, two generated-kind CLI/server, and other cases name
+their workspaces literally. Therefore no current Slug process can materialize
+or parse the new workspace.
+
+### Complete standalone source closure
+
+The isolated canonical-payload projection has five directories and exactly five
+regular files:
+
+| Virtual path | Required role |
+| --- | --- |
+| `MODULE.bazel` | Root module, `bazel_dep(name="ext", version="1.0")`, and relative local override to `modules/ext`. |
+| `attr/defs.bzl` | Normal/executable/test/build-setting/output rules, all typed attrs, identity transition, compact pair macros, and the one legacy macro discriminator. |
+| `attr/BUILD.bazel` | Base string-build-setting instances, positive package defaults and license, all Starlark/native/selector/macro/output/nonrule probes, exported BUILD source, and direct generator-empty controls. |
+| `modules/ext/MODULE.bazel` | Local `ext@1.0` module declaration. |
+| `modules/ext/leaf/BUILD.bazel` | `filegroup(name="label")`, supplying the generic external leaf without a seventh file. |
+
+No root package is needed: “root string setting” names the base build-setting
+rule family, not the workspace root, and `attr/BUILD.bazel` is itself the source
+nonrule operand. The isolated workspace therefore has one main-repository
+package plus the external leaf package. No physical source/leaf, action, copied
+repository tree, registry, lockfile, mutation, or generated `@bazel_tools`
+content is needed. Bazel's built-in tools repository supplies only the fixed
+test and transition-allowlist labels.
+
+The existing 18-lane table remains the exact semantic matrix. Its implementation
+uses globally unique names `//attr:lNN_aMMM_yes` and `_no`; every atomic clause
+receives one distinct pair, and no positive label is reused inside a lane.
+Exact stdout enumerates every `_yes` exactly once and no `_no`. Helper macros
+may compact mechanically equivalent declarations, but lane 9's direct targets
+remain direct and its legacy-macro targets use only the named legacy macro so
+`generator_*` provenance is not contaminated.
+
+| Lane | Unique pairs | Closed family |
+| ---: | ---: | --- |
+| 1 | 13 | Four Starlark plus nine native names; source/generated/package-group nonrules remain negative-only operands. |
+| 2 | 8 | Scalars, integer, both booleans, licenses, deprecation, and null. |
+| 3 | 8 | Empty string/list/map, nullable label/output, and private spelling. |
+| 4 | 4 | Ordered/OI lists and ordered dictionary interiors. |
+| 5 | 3 | Three user-dictionary orientations and their reversed interiors. |
+| 6 | 3 | Main, generic-external, and fixed tools labels. |
+| 7 | 3 | Three complete equal-key selector branches plus mixed negatives. |
+| 8 | 6 | Distinct-key cross-product and string/executable/test list concatenation. |
+| 9 | 11 | Package defaults and macro/direct generator fields. |
+| 10 | 12 | Normal, executable, and root-setting schema fields. |
+| 11 | 18 | Test fixed/computed/late-bound/null fields. |
+| 12 | 3 | Suite automatic membership and transition allowlist. |
+| 13 | 23 | Sixteen shared `K`, three `NATIVE`, and four filegroup additions. |
+| 14 | 5 | Alias/toolchain-type additions and three removals. |
+| 15 | 9 | Config-setting additions and three removals. |
+| 16 | 17 | Suite and both constraint-class additions/removals. |
+| 17 | 15 | Platform additions and five removals. |
+| 18 | 9 | Toolchain additions, reintroduction, and removals. |
+
+The total is 170 pairs/340 distinct probe rule instances plus approximately 20
+support targets for selector keys, leaves, metadata, constraints, toolchain
+labels, test membership, package group, and generated output. This is the
+smallest honest construction under the accepted no-pair-reuse invariant. A
+pure identity transition is loading evidence only; its declared output names
+the real base string build setting in `//attr`. Test rule-class names end in `_test`.
+Ordinary query constructs native targets without configured analysis or
+toolchain resolution.
+
+### Generation allowlist, growth, and validation
+
+The successor generation packet may add only:
+
+- `tests/v2_oracle/fixtures/query-attr-observable-candidates/fixture.toml` and
+  `expected/oracle.json`;
+- the five-file projection in `tests/v2_fixture_payload/fixtures.payload`;
+- derived global count/body-byte/SHA plus the new projection hash in
+  `tests/v2_oracle/test_v2_oracle.py`; and
+- derived global SHA and 275-to-285 entry-count assertion in
+  `tests/v2_fixture_support/src/lib.rs`.
+
+It must not add the new name to Rust `PROJECTIONS`, CLI/server cases, or any
+production consumer. The payload grows by five directories, five virtual files,
+and ten encoded entries: the global entry/directory pair becomes `(285,
+117)`. Body bytes and hashes are generated, never predicted. Existing fourteen
+Python/Rust projection hashes remain byte-identical. Including the new fixture
+TOML/expected files, the payload-expanded corpus cap from hygiene reset
+`51540963` is +7 regular files, +5 directories, zero links, exactly 18 rows, and
+2,400 newline-counted source/TOML/expected lines. Because this one packet is
+dense, run a new hygiene review before any later fixture packet rather than
+waiting for the ordinary sixth-packet trigger.
+
+Generation uses ordinary Bazel RC discovery without inspecting, printing, or
+copying the private home RC. Run one explicit update and one clean distinct-root
+replay of exactly 18 rows. The isolated run must independently reproduce
+`@@ext+//leaf:label`; the stopped draft is guidance, not accepted evidence, and
+any different spelling is a stop rather than permission to weaken the anchored
+regex. Validate the frozen Python inventory/projection/metadata tests, Rust
+global payload conformance with no new projection, all fourteen unchanged
+projection hashes, the protected 29-row CLI and two generated-kind CLI/server
+cases, and `git diff --check`, serializing shared Cargo state. All 18 rows must
+pass; lane 9 must positively expose macro name/function/location plus direct
+empty generator fields, and lane 12 must positively expose the transition
+allowlist. The oracle remains Bazel-only loading evidence and authorizes no
+Slug `attr()`, native-toolchain graph, or new external-production path.
+
+Independent oracle-design review is required before scheduling generation.
+Stop on a sixth virtual source, any link/mutation/registry/lockfile/new tools
+content, more than 18 rows or 2,400 logical lines, a Rust projection or semantic
+consumer, protected projection/output drift, a nonexact external token, a need
+for configured analysis, or any production Rust, graph, DICE, regex, JVM/Java,
+or Bazel-delegation change.
+
+Independent Sol review first removed an unnecessary root `BUILD.bazel`; the
+focused correction moved the base setting and source nonrule into `attr` and
+retained the mandatory payload workspace-root directory. Rereview returned
+`ACCEPT`: five files plus five directory records yields ten entries, `(285,
+117)`, and a +7-file corpus delta. Residual risk is confined to generation
+proving the complete 18 rows within the 2,400-line cap.
+
+Run next only
+`WP-4-8-m3-attr-isolated-observable-candidate-oracle-generation`.
+
 ## WP-4-8-m3-executables-rule-capability: Stage 4 Gate A (2026-07-23)
 
 Oracle gate `c8e469f5` is landed and Sol-accepted: 32 semantic rows plus eight
