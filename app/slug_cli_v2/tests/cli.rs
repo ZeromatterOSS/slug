@@ -1220,6 +1220,16 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     assert_eq!(wrapped_daemon.stdout, wrapped_one_shot.stdout);
     assert!(wrapped_daemon.stderr.is_empty());
 
+    let chained_expression = "filter(':(root|child)$', executables(deps(//:root)))";
+    let chained_one_shot = run(None, chained_expression, false);
+    assert!(chained_one_shot.status.success(), "{chained_one_shot:?}");
+    assert_eq!(chained_one_shot.stdout, one_shot.stdout);
+    assert!(chained_one_shot.stderr.is_empty());
+    let chained_daemon = run(Some(&output_base), chained_expression, false);
+    assert!(chained_daemon.status.success(), "{chained_daemon:?}");
+    assert_eq!(chained_daemon.stdout, chained_one_shot.stdout);
+    assert!(chained_daemon.stderr.is_empty());
+
     let filtered_expression = "filter(':(root|child)$', deps(//:root))";
     let filtered_one_shot = run(None, filtered_expression, false);
     assert!(filtered_one_shot.status.success(), "{filtered_one_shot:?}");
@@ -1388,6 +1398,16 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(wrapped_daemon.status.success(), "{wrapped_daemon:?}");
     assert_eq!(wrapped_daemon.stdout, wrapped_one_shot.stdout);
     assert!(wrapped_daemon.stderr.is_empty());
+
+    let chained = "filter('^//:', executables(deps(//:root)))";
+    let chained_one_shot = run(None, chained);
+    assert!(chained_one_shot.status.success(), "{chained_one_shot:?}");
+    assert_eq!(chained_one_shot.stdout, one_shot.stdout);
+    assert!(chained_one_shot.stderr.is_empty());
+    let chained_daemon = run(Some(&output_base), chained);
+    assert!(chained_daemon.status.success(), "{chained_daemon:?}");
+    assert_eq!(chained_daemon.stdout, chained_one_shot.stdout);
+    assert!(chained_daemon.stderr.is_empty());
 
     let filtered_one_shot = run(None, "filter('^//:root$', deps(//:root))");
     assert!(filtered_one_shot.status.success(), "{filtered_one_shot:?}");

@@ -63,6 +63,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
         "filter('^//pkg:bin$', deps(//pkg:bin, 2))",
+        "filter('bin$', executables(deps(//pkg:bin)))",
+        "filter('bin$', executables(deps(//pkg:bin, 2147483647)))",
         "kind('rule$', deps(//pkg:bin))",
         "kind('source file', deps(//pkg:bin, 2))",
         "let x = set() in $x",
@@ -93,8 +95,10 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin, '-1')",
         "deps(//pkg:bin, 2147483648)",
         "filter('bin', deps(set(//pkg:bin)))",
-        "filter('bin', executables(deps(//pkg:bin)))",
         "filter('bin', deps(//pkg:bin), //pkg:lib)",
+        "filter('bin', kind('rule', deps(//pkg:bin)))",
+        "filter('bin', executables(executables(deps(//pkg:bin))))",
+        "executables(filter('bin', deps(//pkg:bin)))",
         "executables(deps(set(//pkg:bin)))",
         "executables(executables(deps(//pkg:bin)))",
         "executables(deps(//pkg:bin), //pkg:lib)",
@@ -203,6 +207,17 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(spec.depth(), Some(i32::MAX));
     assert_eq!(cquery_literals(&kind), ["//pkg:bin"]);
 
+    let chained =
+        QueryExpression::parse("filter('bin$', executables(deps(//pkg:bin, 2147483647)))").unwrap();
+    validate_cquery_query(&chained).unwrap();
+    assert!(chained.cquery_deps_spec().is_none());
+    let spec = chained
+        .cquery_preactivation_deps_spec()
+        .expect("validated chained deps spec");
+    assert_eq!(spec.target(), "//pkg:bin");
+    assert_eq!(spec.depth(), Some(i32::MAX));
+    assert_eq!(cquery_literals(&chained), ["//pkg:bin"]);
+
     for expression in [
         "deps(set(//pkg:bin))",
         "deps(//pkg:bin, '-1')",
@@ -250,6 +265,34 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
             .to_string()
             .starts_with("too many arguments to function 'kind'")
     );
+    for (source, expected) in [
+        (
+            "filter(set(), executables(deps()))",
+            "argument 1 to function 'filter' must be a word",
+        ),
+        (
+            "filter('bin', executables(deps()), //pkg:extra)",
+            "too many arguments to function 'filter'",
+        ),
+        (
+            "filter('bin', executables(deps(), //pkg:extra))",
+            "too many arguments to function 'executables'",
+        ),
+        (
+            "filter('bin', executables(deps()))",
+            "too few arguments to function 'deps'",
+        ),
+    ] {
+        let malformed = QueryExpression::parse(source).unwrap();
+        assert!(malformed.cquery_preactivation_deps_spec().is_none());
+        assert!(
+            validate_cquery_query(&malformed)
+                .unwrap_err()
+                .to_string()
+                .starts_with(expected),
+            "{source}"
+        );
+    }
 }
 
 #[test]

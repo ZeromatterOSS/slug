@@ -263,6 +263,18 @@ pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryPa
         ) {
             return parse_cquery_deps_spec(operand).map(|_| ());
         }
+        if name.value == "filter"
+            && let QueryExpressionKind::Function { name, args } = &operand.kind
+            && name.value == "executables"
+        {
+            validate_function_arguments(operand, args, cquery_function("executables"))?;
+            if matches!(
+                args[0].kind,
+                QueryExpressionKind::Function { ref name, .. } if name.value == "deps"
+            ) {
+                return parse_cquery_deps_spec(&args[0]).map(|_| ());
+            }
+        }
     }
     let mut bindings = SmallSet::new();
     validate_cquery_query_inner(expression, &mut bindings)
@@ -473,7 +485,20 @@ impl QueryExpression {
         };
         let operand = match (name.value.as_str(), &args[..]) {
             ("executables", [operand]) => operand,
-            ("filter" | "kind", [pattern, operand])
+            ("filter", [pattern, operand])
+                if matches!(pattern.kind, QueryExpressionKind::TargetLiteral(_)) =>
+            {
+                match &operand.kind {
+                    QueryExpressionKind::Function { name, args } if name.value == "executables" => {
+                        match &args[..] {
+                            [operand] => operand,
+                            _ => return None,
+                        }
+                    }
+                    _ => operand,
+                }
+            }
+            ("kind", [pattern, operand])
                 if matches!(pattern.kind, QueryExpressionKind::TargetLiteral(_)) =>
             {
                 operand

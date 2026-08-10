@@ -6789,3 +6789,41 @@ vendored parser/evaluator changed.
 
 Run next only `WP-6-m2x-configured-query-forward-successor-audit`. Keep general
 nested `deps`, stopped topology, exact hashes, JVM/Java, and CI excluded.
+
+### Configured-query chained-filter successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2x-configured-query-forward-successor-audit` selected exactly
+`filter(<word regex>, executables(deps(<one concrete root>[, <nonnegative i32 depth>])))`.
+Independent adjudication preferred this practical named-executable query over
+kind/filter chains and syntax-only breadth. Pinned Bazel 9.2 and accepted
+delegation, executable, and filter evidence establish complete closure followed
+by executable/non-test and original-label filtering, with full-key order and
+selected-induced edges.
+
+`some(deps(...))` remains stopped because Bazel's streaming graceful
+cancellation conflicts with complete closure preactivation and Need-before-error.
+Run next `WP-6-m2y-cquery-filter-executables-deps-forward-composition`, changing
+only fixed-shape admission/preactivation and reusing the existing shared fold.
+Every other chain, stopped topology, parser/vendor change, JVM/Java, exact
+hashes, and CI remain excluded.
+
+### Configured-query named-executable chain ACCEPT (2026-08-09)
+
+`WP-6-m2y-cquery-filter-executables-deps-forward-composition` is **ACCEPTED**.
+Configured query admits exactly
+`filter(<word regex>, executables(deps(<one concrete root>[, <nonnegative i32 depth>])))`
+under `--noimplicit_deps`. Fixed-shape admission is the only production change;
+the shared fold evaluates the complete closure, executable/non-test predicate,
+then original-label filter while preserving full-key order and selected-induced
+edges.
+
+Query passes 114 tests, commands 19, server 48, focused core topology and Need
+regressions, the V2 CLI rebuild, and two CLI one-shot/daemon regressions.
+Formatting, diff, stale-daemon, cap, and independent final review gates pass.
+The net Rust delta is 25 production and 149 test lines, 174 total, within
+70/300/370 caps. No fixture, oracle, graph, key, state, representation,
+output/wire mode, or vendored parser/evaluator changed.
+
+Run next only `WP-6-m2z-configured-query-forward-successor-audit`. Keep general
+nested `deps`, `some(deps)`, stopped topology, exact hashes, JVM/Java, and CI
+excluded.

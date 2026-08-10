@@ -975,20 +975,31 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             "depth {depth}: {graph_depth:?}"
         );
     }
-    for output in ["label", "label_kind", "starlark_label", "graph"] {
-        let request = format!(
-            r#"{{"kind":"cquery","request":{{"expression":"executables(deps(//pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
-        );
-        let wrapped = handle_request(&mut daemon, &request);
-        assert_eq!(wrapped.exit_code, 0, "{output}: {wrapped:?}");
-        assert!(wrapped.stderr.is_empty(), "{output}: {wrapped:?}");
-        if output == "graph" {
-            assert_eq!(
-                wrapped.stdout,
-                "digraph mygraph {\n  node [shape=box];\n}\n"
+    for expression in [
+        "executables(deps(//pkg:probe))",
+        "filter('probe$', executables(deps(//pkg:probe)))",
+    ] {
+        for output in ["label", "label_kind", "starlark_label", "graph"] {
+            let request = format!(
+                r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"{output}"}}}}"#,
             );
-        } else {
-            assert!(wrapped.stdout.is_empty(), "{output}: {wrapped:?}");
+            let wrapped = handle_request(&mut daemon, &request);
+            assert_eq!(wrapped.exit_code, 0, "{expression} {output}: {wrapped:?}");
+            assert!(
+                wrapped.stderr.is_empty(),
+                "{expression} {output}: {wrapped:?}"
+            );
+            if output == "graph" {
+                assert_eq!(
+                    wrapped.stdout,
+                    "digraph mygraph {\n  node [shape=box];\n}\n"
+                );
+            } else {
+                assert!(
+                    wrapped.stdout.is_empty(),
+                    "{expression} {output}: {wrapped:?}"
+                );
+            }
         }
     }
     for output in ["label", "label_kind", "starlark_label", "graph"] {

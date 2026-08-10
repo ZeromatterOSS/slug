@@ -1645,6 +1645,35 @@ mod tests {
                 "executables://pkg:bin,//pkg:bin:child",
             ]
         );
+
+        let expression =
+            QueryExpression::parse("filter('bin$', executables(deps(//pkg:bin, 2)))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:bin",
+                "deps://pkg:bin:2",
+                "executables://pkg:bin,//pkg:bin:child",
+                "filter://pkg:bin",
+            ]
+        );
+
+        let expression =
+            QueryExpression::parse("filter('missing', executables(deps(//pkg:error)))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let error =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap_err();
+        assert_eq!(error.to_string(), "configured closure failed");
+        assert_eq!(
+            environment.events,
+            ["resolve://pkg:error", "deps://pkg:error:all"]
+        );
     }
 
     #[test]

@@ -7443,6 +7443,19 @@ executable_rule(
         );
         assert!(edges.iter().all(|edge| !edge.contains("//:leaf")));
 
+        let chained_full = run("filter(':(root|direct|leaf)$', executables(deps(//:root)))");
+        let chained_full = chained_full.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(chained_full.label_stdout(), full.label_stdout());
+        assert_eq!(
+            chained_full.starlark_label_stdout(),
+            full.starlark_label_stdout()
+        );
+        assert_eq!(
+            chained_full.label_kind_stdout().unwrap(),
+            full.label_kind_stdout().unwrap()
+        );
+        assert_eq!(chained_full.graph_stdout(), full.graph_stdout());
+
         let depth_two = run("executables(deps(//:root, 2))");
         let depth_max = run("executables(deps(//:root, 2147483647))");
         assert_eq!(
@@ -7527,6 +7540,24 @@ executable_rule(
             let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
             assert_eq!(kind.graph_stdout(), full.graph_stdout(), "depth {depth}");
         }
+        for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
+            let chained = run(&format!(
+                "filter(':(root|direct|leaf)$', executables(deps(//:root, {depth})))"
+            ));
+            let chained = chained.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(
+                chained.graph_stdout(),
+                expected.graph_stdout(),
+                "depth {depth}"
+            );
+        }
+        for depth in [2, i32::MAX] {
+            let chained = run(&format!(
+                "filter(':(root|direct|leaf)$', executables(deps(//:root, {depth})))"
+            ));
+            let chained = chained.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(chained.graph_stdout(), full.graph_stdout(), "depth {depth}");
+        }
         let empty = run("filter('^//:missing$', deps(//:root))");
         let empty = empty.terminal_for_test().as_ref().as_ref().unwrap();
         assert!(empty.label_stdout().is_empty());
@@ -7534,15 +7565,19 @@ executable_rule(
             empty.graph_stdout(),
             "digraph mygraph {\n  node [shape=box];\n}\n"
         );
+        let chained_empty = run("filter('^//:missing$', executables(deps(//:root)))");
+        let chained_empty = chained_empty.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(chained_empty.label_stdout(), empty.label_stdout());
+        assert_eq!(chained_empty.graph_stdout(), empty.graph_stdout());
     }
 
     #[tokio::test]
     async fn cquery_deps_frontier_need_precedes_an_earlier_child_analysis_error() {
         let expression =
-            QueryExpression::parse("kind('ordinary_rule rule', deps(//:root, 1))").unwrap();
+            QueryExpression::parse("filter('root$', executables(deps(//:root, 1)))").unwrap();
         let deps = expression
             .cquery_preactivation_deps_spec()
-            .expect("kind closure spec");
+            .expect("chained closure spec");
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let configuration = build_test_configuration("target");
         let configured = |label: &str| {
