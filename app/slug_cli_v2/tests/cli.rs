@@ -1230,6 +1230,16 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     assert_eq!(filtered_daemon.stdout, filtered_one_shot.stdout);
     assert!(filtered_daemon.stderr.is_empty());
 
+    let kind_expression = "kind('^node rule$', deps(//:root))";
+    let kind_one_shot = run(None, kind_expression, false);
+    assert!(kind_one_shot.status.success(), "{kind_one_shot:?}");
+    assert_eq!(kind_one_shot.stdout, one_shot.stdout);
+    assert!(kind_one_shot.stderr.is_empty());
+    let kind_daemon = run(Some(&output_base), kind_expression, false);
+    assert!(kind_daemon.status.success(), "{kind_daemon:?}");
+    assert_eq!(kind_daemon.stdout, kind_one_shot.stdout);
+    assert!(kind_daemon.stderr.is_empty());
+
     let run_label = |output_base: Option<&str>| {
         let mut command = slug();
         command.current_dir(&workspace);
@@ -1298,6 +1308,17 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     );
     assert_eq!(wrapped_label_kind_daemon.stdout, wrapped_label_kind.stdout);
     assert!(wrapped_label_kind_daemon.stderr.is_empty());
+    let kind_label_kind = run_label_kind(None, kind_expression);
+    assert!(kind_label_kind.status.success(), "{kind_label_kind:?}");
+    assert_eq!(kind_label_kind.stdout, label_kind_one_shot.stdout);
+    assert!(kind_label_kind.stderr.is_empty());
+    let kind_label_kind_daemon = run_label_kind(Some(&output_base), kind_expression);
+    assert!(
+        kind_label_kind_daemon.status.success(),
+        "{kind_label_kind_daemon:?}"
+    );
+    assert_eq!(kind_label_kind_daemon.stdout, kind_label_kind.stdout);
+    assert!(kind_label_kind_daemon.stderr.is_empty());
     let label_kind_max = run_label_kind(None, "deps(//:root, 2147483647)");
     assert!(label_kind_max.status.success(), "{label_kind_max:?}");
     assert_eq!(label_kind_max.stdout, label_kind_one_shot.stdout);
@@ -1377,6 +1398,15 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(filtered_daemon.status.success(), "{filtered_daemon:?}");
     assert_eq!(filtered_daemon.stdout, filtered_one_shot.stdout);
     assert!(filtered_daemon.stderr.is_empty());
+
+    let kind_one_shot = run(None, "kind('^node rule$', deps(//:root))");
+    assert!(kind_one_shot.status.success(), "{kind_one_shot:?}");
+    assert_eq!(kind_one_shot.stdout, one_shot.stdout);
+    assert!(kind_one_shot.stderr.is_empty());
+    let kind_daemon = run(Some(&output_base), "kind('^node rule$', deps(//:root))");
+    assert!(kind_daemon.status.success(), "{kind_daemon:?}");
+    assert_eq!(kind_daemon.stdout, kind_one_shot.stdout);
+    assert!(kind_daemon.stderr.is_empty());
 
     let depth_one = run(None, "deps(//:root, 1)");
     assert!(depth_one.status.success(), "{depth_one:?}");

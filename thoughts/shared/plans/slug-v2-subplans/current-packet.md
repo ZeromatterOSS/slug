@@ -1,28 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2v-configured-query-forward-successor-audit`
+Packet: `WP-6-m2x-configured-query-forward-successor-audit`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only audit after accepted filter-deps composition.
+Result: read-only audit after accepted kind-deps composition.
 
 ## Observable slice
 
 Select the next semantically closed configured-query behavior after accepted
-single-root noimplicit arbitrary-depth `deps`, all four retained outputs,
-`executables(deps(...))`, and `filter(regex, deps(...))`. Prefer a meaningful
-consumer or bounded composition over singleton syntax normalization.
+single-root arbitrary-depth `deps` and executable, label-regex, and target-kind
+filters over that closure. Prefer meaningful semantics over syntax normalization.
 
 ## Ownership and stops
 
-Reuse the sole configured analysis key, closure, authoritative edges, full
-configured/null keys, result handles/index, retained capabilities, shared fold,
-and terminal formatters. Do not add a graph, copied adjacency, key, cache,
-parser, evaluator, representation, output family, or wire mode. The vendored
-Buck2 `starlark-rust` parser/evaluator remains unchanged.
+Reuse the sole configured analysis key, complete closure, authoritative edges,
+full configured/null keys, retained capabilities/kinds, shared fold, and all
+terminal formatters. Do not add a graph, key, cache, parser/evaluator,
+representation, output/wire mode, fixture, or oracle. The vendored Buck2
+`starlark-rust` remains unchanged.
 
-Keep general nested `deps`, factored/default-implicit/tool/external/reverse
-topology, other outputs, exact hashes, JVM/Java, and CI stopped unless one
-smaller exact owner and accepted evidence close them.
+Keep general nested `deps`, implicit/tool/external/factored/reverse topology,
+exact hashes, JVM/Java, and CI stopped unless one smaller exact owner and
+accepted evidence close them.
 
 ## Validation
 

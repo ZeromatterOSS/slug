@@ -63,6 +63,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
         "filter('^//pkg:bin$', deps(//pkg:bin, 2))",
+        "kind('rule$', deps(//pkg:bin))",
+        "kind('source file', deps(//pkg:bin, 2))",
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
@@ -96,6 +98,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "executables(deps(set(//pkg:bin)))",
         "executables(executables(deps(//pkg:bin)))",
         "executables(deps(//pkg:bin), //pkg:lib)",
+        "kind('rule', deps(set(//pkg:bin)))",
+        "kind('rule', executables(deps(//pkg:bin)))",
         "$x",
         "let x = set() in $y",
         "let x = $x in //pkg:bin",
@@ -189,6 +193,16 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(spec.depth(), Some(1));
     assert_eq!(cquery_literals(&filtered), ["//pkg:bin"]);
 
+    let kind = QueryExpression::parse("kind('rule$', deps(//pkg:bin, 2147483647))").unwrap();
+    validate_cquery_query(&kind).unwrap();
+    assert!(kind.cquery_deps_spec().is_none());
+    let spec = kind
+        .cquery_preactivation_deps_spec()
+        .expect("validated kind deps spec");
+    assert_eq!(spec.target(), "//pkg:bin");
+    assert_eq!(spec.depth(), Some(i32::MAX));
+    assert_eq!(cquery_literals(&kind), ["//pkg:bin"]);
+
     for expression in [
         "deps(set(//pkg:bin))",
         "deps(//pkg:bin, '-1')",
@@ -220,6 +234,21 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
             .unwrap_err()
             .to_string()
             .starts_with("too many arguments to function 'filter'")
+    );
+    let malformed = QueryExpression::parse("kind(set(), deps())").unwrap();
+    assert!(malformed.cquery_preactivation_deps_spec().is_none());
+    assert!(
+        validate_cquery_query(&malformed)
+            .unwrap_err()
+            .to_string()
+            .contains("argument 1 to function 'kind' must be a word")
+    );
+    let malformed = QueryExpression::parse("kind('rule', deps(), //pkg:extra)").unwrap();
+    assert!(
+        validate_cquery_query(&malformed)
+            .unwrap_err()
+            .to_string()
+            .starts_with("too many arguments to function 'kind'")
     );
 }
 

@@ -2147,11 +2147,10 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
         targets: &Self::Set,
     ) -> Result<Self::Set, QueryError> {
         filter_cquery_kind(targets, |target| {
-            let capability = target.analysis.rule_capability().ok_or_else(|| {
-                QueryError::syntax("cquery kind() requires a configured Starlark rule capability")
-            })?;
-            let mut candidate = capability.rule_class.clone();
-            candidate.push_str(" rule");
+            let candidate = cquery_target_kind_for_query(
+                target.analysis.kind(),
+                target.analysis.rule_capability(),
+            )?;
             Ok(regex.find(candidate.as_str()).is_some())
         })
     }
@@ -2431,6 +2430,13 @@ fn cquery_target_kind(
             ))),
         },
     }
+}
+
+fn cquery_target_kind_for_query(
+    kind: &ConfiguredNodeKind,
+    capability: Option<&slug_loading_v2::RuleCapability>,
+) -> Result<String, QueryError> {
+    cquery_target_kind(kind, capability).map_err(|error| QueryError::syntax(error.to_string()))
 }
 
 fn cquery_graph_label(target: &CqueryResultTarget) -> String {
@@ -5399,21 +5405,24 @@ mod tests {
     }
 
     #[test]
-    fn cquery_kind_missing_capability_fails_closed_as_a_request_terminal() {
-        let mut targets = TargetSet::default();
-        targets.insert("configured-rule");
-        targets.insert("missing-capability");
-        let error = filter_cquery_kind(&targets, |target| match *target {
-            "configured-rule" => Ok(true),
-            "missing-capability" => Err(QueryError::syntax(
-                "cquery kind() requires a configured Starlark rule capability",
-            )),
-            _ => unreachable!(),
-        })
-        .unwrap_err();
+    fn cquery_kind_maps_structural_kinds_and_fails_closed_as_a_request_terminal() {
+        assert_eq!(
+            cquery_target_kind_for_query(&ConfiguredNodeKind::SourceFile, None).unwrap(),
+            "source file"
+        );
+        assert_eq!(
+            cquery_target_kind_for_query(&ConfiguredNodeKind::GeneratedFile, None).unwrap(),
+            "generated file"
+        );
+        assert_eq!(
+            cquery_target_kind_for_query(&ConfiguredNodeKind::PackageGroup, None).unwrap(),
+            "package group"
+        );
+        let error = cquery_target_kind_for_query(&ConfiguredNodeKind::Platform, None).unwrap_err();
         let terminal = CqueryCommandError::from_evaluator_error(error);
         assert!(matches!(terminal, CqueryCommandError::Request(_)));
         assert_eq!(terminal.exit_code(), 2);
+        assert!(terminal.to_string().contains("Platform"));
     }
 
     #[test]
@@ -7176,6 +7185,41 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(ordinary.len(), 2);
         assert_ne!(ordinary[0], ordinary[1]);
 
+        let structural = run(
+            "kind('^(source file|generated file|package group)$', deps(//:root))",
+            false,
+            true,
+        )
+        .unwrap();
+        let structural = structural.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            structural.starlark_label_stdout(),
+            "@@//:source.txt\n@@//:producer.out\n@@//:vis_top\n"
+        );
+        assert!(structural.label_stdout().contains("//:source.txt (null)\n"));
+        assert!(structural.label_stdout().contains("//:vis_top (null)\n"));
+        assert_eq!(
+            structural
+                .label_kind_stdout()
+                .unwrap()
+                .lines()
+                .map(|line| line.split_once(" (").unwrap().0)
+                .collect::<Vec<_>>(),
+            [
+                "source file //:source.txt",
+                "generated file //:producer.out",
+                "package group //:vis_top",
+            ]
+        );
+        assert_eq!(
+            structural
+                .graph_stdout()
+                .lines()
+                .filter(|line| line.contains(" -> "))
+                .count(),
+            0
+        );
+
         let topology = |evaluation: &CqueryCommandEvaluation| {
             let mut graph = evaluation.graph_stdout();
             for analysis in evaluation.analyses() {
@@ -7433,6 +7477,16 @@ executable_rule(
         );
         assert_eq!(filtered.graph_stdout(), full.graph_stdout());
 
+        let kind = run("kind('^executable_rule rule$', deps(//:root))");
+        let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(kind.label_stdout(), full.label_stdout());
+        assert_eq!(kind.starlark_label_stdout(), full.starlark_label_stdout());
+        assert_eq!(
+            kind.label_kind_stdout().unwrap(),
+            full.label_kind_stdout().unwrap()
+        );
+        assert_eq!(kind.graph_stdout(), full.graph_stdout());
+
         for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
             let filtered = run(&format!(
                 "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
@@ -7455,6 +7509,24 @@ executable_rule(
                 "depth {depth}"
             );
         }
+        for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
+            let kind = run(&format!(
+                "kind('^executable_rule rule$', deps(//:root, {depth}))"
+            ));
+            let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(
+                kind.graph_stdout(),
+                expected.graph_stdout(),
+                "depth {depth}"
+            );
+        }
+        for depth in [2, i32::MAX] {
+            let kind = run(&format!(
+                "kind('^executable_rule rule$', deps(//:root, {depth}))"
+            ));
+            let kind = kind.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(kind.graph_stdout(), full.graph_stdout(), "depth {depth}");
+        }
         let empty = run("filter('^//:missing$', deps(//:root))");
         let empty = empty.terminal_for_test().as_ref().as_ref().unwrap();
         assert!(empty.label_stdout().is_empty());
@@ -7466,10 +7538,11 @@ executable_rule(
 
     #[tokio::test]
     async fn cquery_deps_frontier_need_precedes_an_earlier_child_analysis_error() {
-        let expression = QueryExpression::parse("filter('root', deps(//:root, 1))").unwrap();
+        let expression =
+            QueryExpression::parse("kind('ordinary_rule rule', deps(//:root, 1))").unwrap();
         let deps = expression
             .cquery_preactivation_deps_spec()
-            .expect("filtered closure spec");
+            .expect("kind closure spec");
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let configuration = build_test_configuration("target");
         let configured = |label: &str| {

@@ -6735,3 +6735,57 @@ parser/evaluator changed.
 Run next only `WP-6-m2v-configured-query-forward-successor-audit`. Keep general
 nested `deps`, factored/default-implicit/tool/external/reverse topology, other
 outputs, exact hashes, JVM/Java, and CI stopped.
+
+### Configured-query kind-deps successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2v-configured-query-forward-successor-audit` selected exactly
+`kind(<word regex>, deps(<one concrete root>[, <nonnegative i32 depth>]))`.
+The exact target-kind mapping added for configured label-kind output closes the
+former capability-free boundary: retained rule class yields `<class> rule`, and
+retained structural nodes yield `source file`, `generated file`, or
+`package group`. Other capability-free kinds remain unsupported and fail closed.
+
+Pinned Bazel 9.2 `KindFunction`, configured target access, target-kind owners,
+regex filtering, and `DepsFunction` establish the composition. Accepted
+kind/label-kind and delegation-topology evidence covers the required strings,
+full-key duplicates, null nodes, depths, and induced edges; no new oracle is
+required. `some(deps(...))` remains stopped because Bazel's callback-level
+arbitrary selection and cancellation conflict with complete preactivation.
+
+Run next `WP-6-m2w-cquery-kind-deps-forward-composition`. Extend only exact
+wrapper admission/preactivation and route configured kind through the existing
+request-local target-kind mapping. Keep all other nested `deps`, stopped
+topology, parser/vendor changes, JVM/Java, exact hashes, and CI excluded.
+
+The shared mapping intentionally corrects already-admitted direct configured
+`kind` for represented source, generated, and package-group targets as the same
+Bazel-exact target-kind behavior. Unsupported capability-free nodes must retain
+the current request-terminal class: convert the shared formatter failure to
+`QueryError::syntax`, never an exit-1 evaluation error. Direct structural
+success and unsupported-kind failure are required regressions.
+
+### Configured-query kind-deps composition ACCEPT (2026-08-09)
+
+`WP-6-m2w-cquery-kind-deps-forward-composition` is **ACCEPTED**. Configured
+query admits exactly
+`kind(<word regex>, deps(<one concrete root>[, <nonnegative i32 depth>]))`
+under `--noimplicit_deps`. Wrapper admission reuses the complete closure, and
+configured kind now shares the exact request-local target-kind mapping used by
+label-kind: retained rule class, source file, generated file, or package group.
+
+This also corrects the same already-admitted configured kind operation over
+represented structural sets. Other capability-free native nodes remain
+fail-closed as request errors through `QueryError::syntax`; direct structural
+source roots retain their pre-existing analysis boundary. Full configured/null
+identity, transitioned duplicates, closure order, and selected-induced graph
+edges are preserved across every depth and output.
+
+Query passes 114 tests, commands 19, server 48, four focused core regressions,
+the V2 CLI rebuild, and two focused CLI one-shot/daemon regressions. Formatting,
+diff, stale-daemon, cap, and independent final review gates pass. The net Rust
+delta is 5 production and 150 test lines, 155 total, within 70/300/370 caps. No
+fixture, oracle, graph, key, state, representation, output/wire family, or
+vendored parser/evaluator changed.
+
+Run next only `WP-6-m2x-configured-query-forward-successor-audit`. Keep general
+nested `deps`, stopped topology, exact hashes, JVM/Java, and CI excluded.

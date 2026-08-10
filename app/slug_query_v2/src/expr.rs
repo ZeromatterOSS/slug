@@ -249,10 +249,10 @@ pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryPa
         return parse_cquery_deps_spec(expression).map(|_| ());
     }
     if let QueryExpressionKind::Function { name, args } = &expression.kind
-        && matches!(name.value.as_str(), "executables" | "filter")
+        && matches!(name.value.as_str(), "executables" | "filter" | "kind")
     {
         validate_function_arguments(expression, args, cquery_function(name.value.as_str()))?;
-        let operand = if name.value == "filter" {
+        let operand = if matches!(name.value.as_str(), "filter" | "kind") {
             &args[1]
         } else {
             &args[0]
@@ -473,7 +473,7 @@ impl QueryExpression {
         };
         let operand = match (name.value.as_str(), &args[..]) {
             ("executables", [operand]) => operand,
-            ("filter", [pattern, operand])
+            ("filter" | "kind", [pattern, operand])
                 if matches!(pattern.kind, QueryExpressionKind::TargetLiteral(_)) =>
             {
                 operand
