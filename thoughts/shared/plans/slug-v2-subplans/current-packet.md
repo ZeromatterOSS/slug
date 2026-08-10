@@ -1,33 +1,35 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2z-configured-query-forward-successor-audit`
+Packet: `WP-6-m31-cquery-reverse-delegation-normalization-design`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only audit after accepted chained executable-label filter.
+Result: read-only design after forward-filter closure.
 
 ## Observable slice
 
-Select the next semantically closed configured-query behavior after accepted
-single-root closure filters and the named-executable fixed chain. Prefer
-meaningful semantics over syntax normalization or commutative spelling breadth.
+Design the exact retained semantic relation required for Bazel 9.2
+`rdeps(deps(<one concrete root>), <one concrete label>)` to unwind delegated
+configured targets. Explain why a reverse scan of authoritative forward alias
+edges incorrectly includes `alias_inner` in the accepted delegation fixture.
 
 ## Ownership and stops
 
-Reuse the sole configured analysis key, complete closure, authoritative edges,
-full configured/null keys, retained capabilities/kinds, shared fold, and all
-formatters. Do not add a graph, key, cache, parser/evaluator, representation,
-output/wire mode, fixture, or oracle. The vendored Buck2 `starlark-rust` remains
-unchanged.
+Reuse the sole configured analysis key/result, full configured/null identity,
+authoritative edges, and accepted delegation oracle. Identify whether Slug must
+retain a resolved configured-target value key, a delegation-equivalence link,
+or another smaller request-replayable fact. Do not guess from alias edge shape,
+labels, providers, or configuration tokens.
 
-Keep general nested `deps`, `some(deps)`, implicit/tool/external/factored/
-reverse topology, exact hashes, JVM/Java, and CI stopped unless one smaller
-exact owner and accepted evidence close them.
+Do not implement Rust, add a reverse adjacency/graph/key/cache, modify DICE
+ownership, or change fixtures/oracles/parser/vendor/wire/output. Keep general
+reverse/path breadth, `some(deps)`, implicit/tool/external/factored topology,
+exact hashes, JVM/Java, and CI stopped.
 
 ## Validation
 
-Cite accepted Bazel 9.2 evidence or pinned source and one live owner for every
-observable. Preserve validation-before-evaluation, Need-before-error, complete
-closure before filtering, full/null identity, arbitrary depth,
-selected-induced edges, and one-shot/daemon symmetry. Make no Rust, test,
-fixture, oracle, or standalone documentation commit in this audit. End with one
-bounded implementation packet or `REPLAN`.
+Use pinned Bazel 9.2 `RdepsFunction`, configured-target lookup, post-analysis
+reverse-deps, delegation handling/value-key owners, and the accepted delegation
+payload. Produce one bounded implementation packet with exact representation,
+invalidation, memory, and test ownership, or `REPLAN`. No standalone
+documentation commit: bundle this design bookkeeping with the next functional
+packet only after independent review accepts it.

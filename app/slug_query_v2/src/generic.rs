@@ -1573,6 +1573,12 @@ mod tests {
             targets: &Self::Set,
         ) -> Result<Self::Set, QueryError> {
             self.events.push(format!("kind:{}", targets.join(",")));
+            if targets
+                .iter()
+                .any(|target| target.ends_with(":unsupported_kind"))
+            {
+                return Err(QueryError::syntax("unsupported configured target kind"));
+            }
             Ok(targets
                 .iter()
                 .filter(|target| regex.find(target).is_some())
@@ -1702,6 +1708,58 @@ mod tests {
         assert_eq!(
             environment.events,
             ["resolve://pkg:error", "deps://pkg:error:all"]
+        );
+    }
+
+    #[test]
+    fn cquery_filter_kind_deps_composes_in_closure_kind_label_order() {
+        let expression =
+            QueryExpression::parse("filter('child$', kind('root|child', deps(//pkg:root, 2)))")
+                .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:root:child"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:root",
+                "deps://pkg:root:2",
+                "kind://pkg:root,//pkg:root:child",
+                "filter://pkg:root,//pkg:root:child",
+            ]
+        );
+
+        let expression =
+            QueryExpression::parse("filter('missing', kind('missing', deps(//pkg:error)))")
+                .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let error =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap_err();
+        assert_eq!(error.to_string(), "configured closure failed");
+        assert_eq!(
+            environment.events,
+            ["resolve://pkg:error", "deps://pkg:error:all"]
+        );
+
+        let expression = QueryExpression::parse(
+            "filter('missing', kind('missing', deps(//pkg:unsupported_kind)))",
+        )
+        .unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let error =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap_err();
+        assert_eq!(error.to_string(), "unsupported configured target kind");
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:unsupported_kind",
+                "deps://pkg:unsupported_kind:all",
+                "kind://pkg:unsupported_kind,//pkg:unsupported_kind:child",
+            ]
         );
     }
 

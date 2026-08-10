@@ -6827,3 +6827,44 @@ output/wire mode, or vendored parser/evaluator changed.
 Run next only `WP-6-m2z-configured-query-forward-successor-audit`. Keep general
 nested `deps`, `some(deps)`, stopped topology, exact hashes, JVM/Java, and CI
 excluded.
+
+### Configured-query named-kind successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2z-configured-query-forward-successor-audit` selected exactly
+`filter(<label regex>, kind(<kind regex>, deps(<one concrete root>[, <nonnegative i32 depth>])))`.
+It provides a distinct two-dimensional named-kind query while reusing accepted
+closure, target-kind, label, full-key, and induced-edge owners. Pinned source
+and accepted kind/filter/delegation evidence are sufficient; regex remains the
+approved Slug-native boundary.
+
+The audit considered `rdeps(deps(...), label)` but design review rejected
+implementation from forward edges alone. Bazel's delegation unwinding omits an
+alias node that a naïve reverse scan would include; exact reverse traversal
+needs a separate retained delegation/value-key normalization design. `some`
+also remains stopped on callback cancellation.
+
+Run next `WP-6-m30-cquery-filter-kind-deps-forward-composition`, changing only
+fixed-shape admission/preactivation. Keep all other chains, reverse traversal,
+stopped topology, parser/vendor changes, exact hashes, JVM/Java, and CI excluded.
+
+### Configured-query named-kind chain ACCEPT (2026-08-09)
+
+`WP-6-m30-cquery-filter-kind-deps-forward-composition` is **ACCEPTED**.
+Configured query admits exactly
+`filter(<label regex>, kind(<kind regex>, deps(<one concrete root>[, <nonnegative i32 depth>])))`
+under `--noimplicit_deps`. Fixed-shape admission is the only production change;
+the shared fold evaluates closure, target kind, then label while retaining
+structural/null kinds, full-key duplicates, order, and induced edges.
+
+Query passes 115 tests, commands 19, server 48, three focused core regressions,
+the V2 CLI rebuild, and two CLI one-shot/daemon regressions. Formatting, diff,
+stale-daemon, cap, and independent final review gates pass. The net Rust delta
+is 18 production and 209 test lines, 227 total, within 40/240/280 caps. No
+fixture, oracle, graph, key, state, representation, output/wire mode, or
+vendored parser/evaluator changed.
+
+The forward-filter lane is now closed. Run next only
+`WP-6-m31-cquery-reverse-delegation-normalization-design`: pin the retained
+Bazel delegation/value-key semantics required before exact `rdeps` can reverse
+the accepted configured graph. Do not infer them from alias edges or implement
+reverse traversal in the design packet.

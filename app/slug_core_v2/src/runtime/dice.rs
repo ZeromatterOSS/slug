@@ -7219,6 +7219,48 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .count(),
             0
         );
+        let structural_chain = run(
+            "filter('^(//:source\\.txt|//:producer\\.out|//:vis_top)$', kind('^(source file|generated file|package group)$', deps(//:root)))",
+            false,
+            true,
+        )
+        .unwrap();
+        let structural_chain = structural_chain
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(structural_chain.label_stdout(), structural.label_stdout());
+        assert_eq!(
+            structural_chain.starlark_label_stdout(),
+            structural.starlark_label_stdout()
+        );
+        assert_eq!(
+            structural_chain.label_kind_stdout().unwrap(),
+            structural.label_kind_stdout().unwrap()
+        );
+        assert_eq!(structural_chain.graph_stdout(), structural.graph_stdout());
+
+        let duplicates = run(
+            "filter('^//:ordinary$', kind('^ordinary_rule rule$', deps(//:root)))",
+            false,
+            true,
+        )
+        .unwrap();
+        let duplicates = duplicates.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            duplicates.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n"
+        );
+        assert_eq!(duplicates.analyses().count(), 2);
+        assert_eq!(
+            duplicates
+                .graph_stdout()
+                .lines()
+                .filter(|line| line.contains(" -> "))
+                .count(),
+            0
+        );
 
         let topology = |evaluation: &CqueryCommandEvaluation| {
             let mut graph = evaluation.graph_stdout();
@@ -7500,6 +7542,24 @@ executable_rule(
         );
         assert_eq!(kind.graph_stdout(), full.graph_stdout());
 
+        let named_kind_full =
+            run("filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root)))");
+        let named_kind_full = named_kind_full
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(named_kind_full.label_stdout(), full.label_stdout());
+        assert_eq!(
+            named_kind_full.starlark_label_stdout(),
+            full.starlark_label_stdout()
+        );
+        assert_eq!(
+            named_kind_full.label_kind_stdout().unwrap(),
+            full.label_kind_stdout().unwrap()
+        );
+        assert_eq!(named_kind_full.graph_stdout(), full.graph_stdout());
+
         for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
             let filtered = run(&format!(
                 "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
@@ -7558,6 +7618,17 @@ executable_rule(
             let chained = chained.terminal_for_test().as_ref().as_ref().unwrap();
             assert_eq!(chained.graph_stdout(), full.graph_stdout(), "depth {depth}");
         }
+        for (depth, expected) in [(0, depth_zero), (1, depth_one), (2, full), (i32::MAX, full)] {
+            let named_kind = run(&format!(
+                "filter(':(root|direct|leaf)$', kind('^executable_rule rule$', deps(//:root, {depth})))"
+            ));
+            let named_kind = named_kind.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(
+                named_kind.graph_stdout(),
+                expected.graph_stdout(),
+                "depth {depth}"
+            );
+        }
         let empty = run("filter('^//:missing$', deps(//:root))");
         let empty = empty.terminal_for_test().as_ref().as_ref().unwrap();
         assert!(empty.label_stdout().is_empty());
@@ -7569,12 +7640,21 @@ executable_rule(
         let chained_empty = chained_empty.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(chained_empty.label_stdout(), empty.label_stdout());
         assert_eq!(chained_empty.graph_stdout(), empty.graph_stdout());
+        let named_kind_empty =
+            run("filter('^//:missing$', kind('^executable_rule rule$', deps(//:root)))");
+        let named_kind_empty = named_kind_empty
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(named_kind_empty.label_stdout(), empty.label_stdout());
+        assert_eq!(named_kind_empty.graph_stdout(), empty.graph_stdout());
     }
 
     #[tokio::test]
     async fn cquery_deps_frontier_need_precedes_an_earlier_child_analysis_error() {
         let expression =
-            QueryExpression::parse("filter('root$', executables(deps(//:root, 1)))").unwrap();
+            QueryExpression::parse("filter('root$', kind('rule$', deps(//:root, 1)))").unwrap();
         let deps = expression
             .cquery_preactivation_deps_spec()
             .expect("chained closure spec");

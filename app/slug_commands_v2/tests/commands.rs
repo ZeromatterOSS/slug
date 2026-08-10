@@ -537,6 +537,12 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
             "--noimplicit_deps",
             "filter('bin$', executables(deps(//pkg:bin, 2147483647)))",
         ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "filter('bin$', kind('rule$', deps(//pkg:bin, 2147483647)))",
+        ],
     ] {
         assert!(CqueryRequest::parse(&args).is_ok(), "{args:?}");
     }
@@ -720,6 +726,7 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     for expression in [
         "executables(deps(//pkg:bin))",
         "filter('bin$', executables(deps(//pkg:bin)))",
+        "filter('bin$', kind('rule$', deps(//pkg:bin)))",
     ] {
         assert!(CqueryRequest::parse(&[expression]).is_err());
     }
@@ -747,6 +754,13 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     let kind_wrapper =
         CqueryRequest::parse(&["--noimplicit_deps", "kind('rule$', deps(//pkg:bin, 2))"]).unwrap();
     assert!(!kind_wrapper.include_implicit);
+
+    let named_kind = CqueryRequest::parse(&[
+        "--noimplicit_deps",
+        "filter('bin$', kind('rule$', deps(//pkg:bin, 2)))",
+    ])
+    .unwrap();
+    assert!(!named_kind.include_implicit);
 
     let negated_values = CqueryRequest::parse(&[
         "--noimplicit_deps=true",

@@ -67,6 +67,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "filter('bin$', executables(deps(//pkg:bin, 2147483647)))",
         "kind('rule$', deps(//pkg:bin))",
         "kind('source file', deps(//pkg:bin, 2))",
+        "filter('bin$', kind('rule$', deps(//pkg:bin)))",
+        "filter('bin$', kind('rule$', deps(//pkg:bin, 2147483647)))",
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
@@ -96,7 +98,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin, 2147483648)",
         "filter('bin', deps(set(//pkg:bin)))",
         "filter('bin', deps(//pkg:bin), //pkg:lib)",
-        "filter('bin', kind('rule', deps(//pkg:bin)))",
+        "filter('bin', kind('rule', deps(set(//pkg:bin))))",
+        "kind('rule', filter('bin', deps(//pkg:bin)))",
+        "executables(filter('bin', kind('rule', deps(//pkg:bin))))",
         "filter('bin', executables(executables(deps(//pkg:bin))))",
         "executables(filter('bin', deps(//pkg:bin)))",
         "executables(deps(set(//pkg:bin)))",
@@ -218,6 +222,17 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(spec.depth(), Some(i32::MAX));
     assert_eq!(cquery_literals(&chained), ["//pkg:bin"]);
 
+    let named_kind =
+        QueryExpression::parse("filter('bin$', kind('rule$', deps(//pkg:bin, 2147483647)))")
+            .unwrap();
+    validate_cquery_query(&named_kind).unwrap();
+    assert!(named_kind.cquery_deps_spec().is_none());
+    let spec = named_kind
+        .cquery_preactivation_deps_spec()
+        .expect("validated named-kind deps spec");
+    assert_eq!((spec.target(), spec.depth()), ("//pkg:bin", Some(i32::MAX)));
+    assert_eq!(cquery_literals(&named_kind), ["//pkg:bin"]);
+
     for expression in [
         "deps(set(//pkg:bin))",
         "deps(//pkg:bin, '-1')",
@@ -280,6 +295,18 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
         ),
         (
             "filter('bin', executables(deps()))",
+            "too few arguments to function 'deps'",
+        ),
+        (
+            "filter(set(), kind(set(), deps()))",
+            "argument 1 to function 'filter' must be a word",
+        ),
+        (
+            "filter('bin', kind(set(), deps()))",
+            "argument 1 to function 'kind' must be a word",
+        ),
+        (
+            "filter('bin', kind('rule', deps()))",
             "too few arguments to function 'deps'",
         ),
     ] {

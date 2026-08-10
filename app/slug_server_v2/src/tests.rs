@@ -1014,17 +1014,25 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             "{output}: {filtered:?}"
         );
     }
-    for output in ["label", "label_kind", "starlark_label", "graph"] {
-        let request = format!(
-            r#"{{"kind":"cquery","request":{{"expression":"kind('^probe rule$', deps(//pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
-        );
-        let filtered = handle_request(&mut daemon, &request);
-        assert_eq!(filtered.exit_code, 0, "{output}: {filtered:?}");
-        assert!(filtered.stderr.is_empty(), "{output}: {filtered:?}");
-        assert!(
-            filtered.stdout.contains("//pkg:probe"),
-            "{output}: {filtered:?}"
-        );
+    for expression in [
+        "kind('^probe rule$', deps(//pkg:probe))",
+        "filter('probe$', kind('^probe rule$', deps(//pkg:probe)))",
+    ] {
+        for output in ["label", "label_kind", "starlark_label", "graph"] {
+            let request = format!(
+                r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"{output}"}}}}"#,
+            );
+            let filtered = handle_request(&mut daemon, &request);
+            assert_eq!(filtered.exit_code, 0, "{expression} {output}: {filtered:?}");
+            assert!(
+                filtered.stderr.is_empty(),
+                "{expression} {output}: {filtered:?}"
+            );
+            assert!(
+                filtered.stdout.contains("//pkg:probe"),
+                "{expression} {output}: {filtered:?}"
+            );
+        }
     }
 }
 

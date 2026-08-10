@@ -265,14 +265,19 @@ pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryPa
         }
         if name.value == "filter"
             && let QueryExpressionKind::Function { name, args } = &operand.kind
-            && name.value == "executables"
+            && matches!(name.value.as_str(), "executables" | "kind")
         {
-            validate_function_arguments(operand, args, cquery_function("executables"))?;
+            validate_function_arguments(operand, args, cquery_function(name.value.as_str()))?;
+            let nested_operand = if name.value == "kind" {
+                &args[1]
+            } else {
+                &args[0]
+            };
             if matches!(
-                args[0].kind,
+                nested_operand.kind,
                 QueryExpressionKind::Function { ref name, .. } if name.value == "deps"
             ) {
-                return parse_cquery_deps_spec(&args[0]).map(|_| ());
+                return parse_cquery_deps_spec(nested_operand).map(|_| ());
             }
         }
     }
@@ -492,6 +497,19 @@ impl QueryExpression {
                     QueryExpressionKind::Function { name, args } if name.value == "executables" => {
                         match &args[..] {
                             [operand] => operand,
+                            _ => return None,
+                        }
+                    }
+                    QueryExpressionKind::Function { name, args } if name.value == "kind" => {
+                        match &args[..] {
+                            [pattern, operand]
+                                if matches!(
+                                    pattern.kind,
+                                    QueryExpressionKind::TargetLiteral(_)
+                                ) =>
+                            {
+                                operand
+                            }
                             _ => return None,
                         }
                     }

@@ -1250,6 +1250,17 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     assert_eq!(kind_daemon.stdout, kind_one_shot.stdout);
     assert!(kind_daemon.stderr.is_empty());
 
+    let named_kind = "filter(':(root|child)$', kind('^node rule$', deps(//:root, 2147483647)))";
+    let named_kind_one_shot = run(None, named_kind, false);
+    assert!(
+        named_kind_one_shot.status.success(),
+        "{named_kind_one_shot:?}"
+    );
+    assert_eq!(named_kind_one_shot.stdout, one_shot.stdout);
+    let named_kind_daemon = run(Some(&output_base), named_kind, false);
+    assert!(named_kind_daemon.status.success(), "{named_kind_daemon:?}");
+    assert_eq!(named_kind_daemon.stdout, named_kind_one_shot.stdout);
+
     let run_label = |output_base: Option<&str>| {
         let mut command = slug();
         command.current_dir(&workspace);
@@ -1427,6 +1438,17 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(kind_daemon.status.success(), "{kind_daemon:?}");
     assert_eq!(kind_daemon.stdout, kind_one_shot.stdout);
     assert!(kind_daemon.stderr.is_empty());
+
+    let named_kind = "filter('^//:', kind('^node rule$', deps(//:root, 2147483647)))";
+    let named_kind_one_shot = run(None, named_kind);
+    assert!(
+        named_kind_one_shot.status.success(),
+        "{named_kind_one_shot:?}"
+    );
+    assert_eq!(named_kind_one_shot.stdout, one_shot.stdout);
+    let named_kind_daemon = run(Some(&output_base), named_kind);
+    assert!(named_kind_daemon.status.success(), "{named_kind_daemon:?}");
+    assert_eq!(named_kind_daemon.stdout, named_kind_one_shot.stdout);
 
     let depth_one = run(None, "deps(//:root, 1)");
     assert!(depth_one.status.success(), "{depth_one:?}");
