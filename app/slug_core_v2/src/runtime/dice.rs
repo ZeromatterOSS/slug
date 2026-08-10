@@ -882,6 +882,10 @@ trait NativeCommandRoot: Clone {
         false
     }
 
+    fn allows_unavailable_terminal_roots(&self, _terminal: &Self::Terminal) -> bool {
+        false
+    }
+
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
@@ -1236,6 +1240,15 @@ impl NativeCommandRoot for RootQueryCommandKey {
 impl NativeCommandRoot for BuildCommandRootKey {
     type Terminal = Arc<Result<BuildCommandEvaluation, BuildCommandError>>;
 
+    fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
+        matches!(
+            terminal.as_ref(),
+            Err(BuildCommandError {
+                kind: BuildCommandErrorKind::Analysis(_)
+            })
+        )
+    }
+
     async fn compute(
         &self,
         transaction: &mut dice::DiceTransaction,
@@ -1254,6 +1267,15 @@ impl NativeCommandRoot for CqueryCommandRoot {
 
     fn allows_empty_terminal(&self) -> bool {
         true
+    }
+
+    fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
+        matches!(
+            terminal.as_ref(),
+            Err(CqueryCommandError::MissingTarget { .. }
+                | CqueryCommandError::ExecutableRuleMissingExecutable(_)
+                | CqueryCommandError::Analysis(_))
+        )
     }
 
     async fn compute(
@@ -3170,7 +3192,9 @@ impl WorkspaceRuntime {
                     }
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
                         let terminal = terminal.clone();
-                        let sealed = if allows_empty_terminal {
+                        let sealed = if attempt_root.allows_unavailable_terminal_roots(&terminal) {
+                            guard.seal_terminal_allowing_unavailable_roots()?
+                        } else if allows_empty_terminal {
                             guard.seal_terminal_allowing_empty_roots()?
                         } else {
                             guard.seal_terminal()?
@@ -4375,6 +4399,18 @@ impl<'a> NativeDemandAbortGuard<'a> {
         Ok(sealed)
     }
 
+    fn seal_terminal_allowing_unavailable_roots(
+        &mut self,
+    ) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
+        let sealed = self
+            .attempt
+            .as_ref()
+            .expect("native-demand terminal attempt is live")
+            .seal_terminal_allowing_unavailable_roots()?;
+        self.attempt = None;
+        Ok(sealed)
+    }
+
     fn progress(
         &mut self,
         needs: &slug_bzlmod_v2::SourcePreparationNeeds,
@@ -4614,6 +4650,19 @@ impl NativeDemandAttempt {
         let sealed = self
             .tracker
             .seal_terminal_allowing_empty_roots()
+            .map_err(NativeDemandSessionError::Effect)?;
+        Ok(NativeDemandSealedAttempt {
+            effects: self.effects.clone(),
+            sealed,
+        })
+    }
+
+    fn seal_terminal_allowing_unavailable_roots(
+        &self,
+    ) -> Result<NativeDemandSealedAttempt, NativeDemandSessionError> {
+        let sealed = self
+            .tracker
+            .seal_terminal_allowing_unavailable_roots()
             .map_err(NativeDemandSessionError::Effect)?;
         Ok(NativeDemandSealedAttempt {
             effects: self.effects.clone(),
@@ -6216,6 +6265,57 @@ mod tests {
     }
 
     #[test]
+    fn real_build_analysis_error_publishes_and_recovers_without_validating_the_error_node() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"driver\")\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("defs.bzl"),
+            "def _impl(ctx): return [DefaultInfo()]\nprobe_rule = rule(implementation = _impl, attrs = {\"dep\": attr.label()})\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe_rule\")\nfilegroup(name = \"native\")\nalias(name = \"broken\", actual = \":native\")\nprobe_rule(name = \"probe\", dep = \":broken\")\n",
+        )
+        .unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let target = TargetPattern::parse("//:probe").unwrap();
+        let build = |runtime: &WorkspaceRuntime| {
+            runtime.build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&target),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+        };
+
+        let failed = build(&runtime).unwrap();
+        assert!(
+            failed
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("not a Starlark rule")
+        );
+
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe_rule\")\nprobe_rule(name = \"leaf\")\nalias(name = \"broken\", actual = \":leaf\")\nprobe_rule(name = \"probe\", dep = \":broken\")\n",
+        )
+        .unwrap();
+        let recovered = build(&runtime).unwrap();
+        assert!(recovered.terminal_for_test().as_ref().is_ok());
+    }
+
+    #[test]
     fn retained_runtime_restores_default_transition_configuration_after_explicit_override() {
         let workspace = tempfile::tempdir().unwrap();
         fs::write(
@@ -6520,6 +6620,49 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert!(bzl_edit.terminal_for_test().as_ref().is_ok());
         assert!(accepted_output_text(&bzl_edit).is_empty());
         assert_roots("@@//pkg:probe", 1);
+    }
+
+    #[test]
+    fn cquery_analysis_error_retains_sidecars_from_successful_sibling_roots() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"driver\")\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/defs.bzl"),
+            "def _impl(ctx):\n    print(ctx.label.name)\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "load(\":defs.bzl\", \"probe\")\nprobe(name = \"ok\")\nfilegroup(name = \"native\")\n",
+        )
+        .unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let accepted = runtime
+            .cquery_command_with_bzlmod_inputs(
+                "//pkg:ok + //pkg:native",
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+
+        assert!(
+            accepted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("not a Starlark rule")
+        );
+        assert_eq!(accepted_output_text(&accepted), ["ok"]);
     }
 
     #[test]

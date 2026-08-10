@@ -93,6 +93,7 @@ pub(super) struct SealedCommandAttempt {
     id: CommandAttemptId,
     version: Option<VersionNumber>,
     roots: Arc<[DiceNodeId]>,
+    allow_unavailable_roots: bool,
 }
 
 /// Ordered command-local batches selected from one exact terminal closure.
@@ -534,6 +535,7 @@ impl CommandEffectOwner {
         self: &Arc<Self>,
         id: CommandAttemptId,
         allow_empty_roots: bool,
+        allow_unavailable_roots: bool,
     ) -> Result<SealedCommandAttempt, CommandEffectError> {
         let mut state = self
             .state
@@ -581,6 +583,7 @@ impl CommandEffectOwner {
             id,
             version,
             roots: nodes,
+            allow_unavailable_roots,
         })
     }
 
@@ -662,13 +665,19 @@ impl AttemptEffectTracker {
     }
 
     pub(super) fn seal_terminal(&self) -> Result<SealedCommandAttempt, CommandEffectError> {
-        self.owner.seal_terminal(self.id, false)
+        self.owner.seal_terminal(self.id, false, false)
     }
 
     pub(super) fn seal_terminal_allowing_empty_roots(
         &self,
     ) -> Result<SealedCommandAttempt, CommandEffectError> {
-        self.owner.seal_terminal(self.id, true)
+        self.owner.seal_terminal(self.id, true, false)
+    }
+
+    pub(super) fn seal_terminal_allowing_unavailable_roots(
+        &self,
+    ) -> Result<SealedCommandAttempt, CommandEffectError> {
+        self.owner.seal_terminal(self.id, true, true)
     }
 
     pub(super) fn finish_suppressed(&self) -> Result<(), CommandEffectError> {
@@ -682,17 +691,38 @@ impl SealedCommandAttempt {
     }
 
     pub(super) async fn select(
-        self,
+        mut self,
         transaction: &DiceTransaction,
     ) -> Result<SelectedCommandSidecars, CommandEffectError> {
         let demands = self
             .demands
             .upgrade()
             .ok_or(CommandEffectError::DemandOwnerExpired)?;
-        let closure = transaction
-            .activation_closure(self.roots.iter().copied())
-            .await
-            .map_err(CommandEffectError::Closure)?;
+        let closure = loop {
+            match transaction
+                .activation_closure(self.roots.iter().copied())
+                .await
+            {
+                Ok(closure) => break closure,
+                Err(ActivationClosureError::UnavailableRoot { root })
+                    if self.allow_unavailable_roots =>
+                {
+                    let retained = self
+                        .roots
+                        .iter()
+                        .copied()
+                        .filter(|candidate| candidate != &root)
+                        .collect::<Vec<_>>();
+                    if retained.len() == self.roots.len() {
+                        return Err(CommandEffectError::Closure(
+                            ActivationClosureError::UnavailableRoot { root },
+                        ));
+                    }
+                    self.roots = retained.into();
+                }
+                Err(error) => return Err(CommandEffectError::Closure(error)),
+            }
+        };
         let events = self.owner.select(&self, &closure)?;
         let selected_demands = demands
             .select(&closure)
@@ -1378,6 +1408,17 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
                 dice::ActivationClosureError::UnavailableRoot { .. }
             ))
         ));
+
+        let transient_owner = CommandEffectOwner::new();
+        let transient_attempt = transient_owner.begin_attempt()?;
+        let mut transient_transaction = transient_dice
+            .updater_with_data(user_data(&transient_dice, &transient_attempt)?)
+            .commit()
+            .await;
+        transient_transaction.compute(&TransientEventKey).await?;
+        let transient_sealed = transient_attempt.seal_terminal_allowing_unavailable_roots()?;
+        let selected = select_events(transient_sealed, &transient_transaction).await?;
+        assert!(selected.batches().is_empty());
         Ok(())
     }
 }

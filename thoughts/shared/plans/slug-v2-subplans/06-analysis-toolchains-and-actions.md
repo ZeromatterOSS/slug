@@ -6359,3 +6359,30 @@ preserve complete semantic analysis errors for command terminal publication
 without making them DICE-valid/equal or adding another analysis owner. Restore
 the three server error terminals and focused core missing-executable result
 before configured-query traversal breadth.
+
+### Analysis-error activation sidecar prerequisite ACCEPT (2026-08-09)
+
+`WP-6-m2e-analysis-error-activation-sidecar-prerequisite` is **ACCEPTED**.
+Configured analysis errors remain DICE-invalid and non-equal. The command
+sidecar selector now permits only build `Analysis` and cquery
+`MissingTarget`/`ExecutableRuleMissingExecutable`/`Analysis` terminals to prune
+exact `UnavailableRoot` nodes before selecting the surviving activation
+closure. Dirty, unverified, foreign, unavailable-dependency, and every
+non-analysis terminal remain strict failures; no second analysis key, cache,
+or graph was added.
+
+Focused evidence proves strict default rejection, opted-in transient-root
+pruning, cquery missing-executable publication, build alias-to-native analysis
+error publication and edit recovery, and preservation of a successful sibling
+cquery root's event sidecars beside an analysis error. The pruned transient
+error root's own event batch has no accepted oracle requirement in this packet
+and is not claimed. Core passes 157/158 with only the unchanged external-query
+visibility diagnostic mismatch; server passes all 48 tests; the rebuilt CLI
+passes 47/48 with only the unchanged query-cycle unavailable-root baseline.
+Formatting, diff, archive, scope, and independent review gates pass. Vendored
+Buck2 `starlark-rust` is unchanged.
+
+Run next only `WP-6-m2f-root-toolchain-platform-topology-activation-audit`:
+reconcile the accepted Bazel 9.2 topology evidence with live root owners and
+freeze the smallest non-synthetic platform/constraint/toolchain activation
+slice before configured-query traversal breadth. The audit is read-only.
