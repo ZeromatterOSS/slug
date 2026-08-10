@@ -6550,3 +6550,36 @@ Run next only `WP-6-m2n-configured-query-forward-successor-audit`. Determine
 whether a source-backed larger-depth boundary or a smaller forward consumer is
 the next closed slice. Keep factored/default-implicit/external topology,
 reverse traversal, parser replacement, JVM/Java, exact hashes, and CI stopped.
+
+### Configured-query remaining-depth audit ACCEPT (2026-08-09)
+
+`WP-6-m2n-configured-query-forward-successor-audit` proved the temporary
+depth-2 graph cap is unnecessary. Pinned Bazel 9.2 applies bounded BFS to every
+parser-valid nonnegative Java `int`, then emits the selected induced graph.
+Slug's existing closure, evaluator, and renderer already own those generic
+semantics, including `i32::MAX`; only two admission guards differ.
+
+Run next `WP-6-m2o-remove-cquery-graph-depth-cap`. Delete only the command and
+raw-server `> 2` guards and mechanically remove unused bindings. Core/query/
+renderer production, parser, vendor, fixture/oracle, JVM/Java, exact hashes,
+and CI remain stopped.
+
+### Configured-query all-depth graph admission ACCEPT (2026-08-09)
+
+`WP-6-m2o-remove-cquery-graph-depth-cap` is **ACCEPTED**. Commands and the raw
+server now admit every parser-valid nonnegative Java-`int` depth for the
+existing noimplicit unfactored configured `deps` graph path. The parser still
+rejects negative and above-`i32::MAX` values. Depth 3 proves induced-subgraph
+truncation on a deeper chain; `i32::MAX` equals unbounded topology and bytes in
+one-shot and retained-daemon execution.
+
+Production removed 10 net lines across the two admission owners; tests added
+44 net lines, for +34 total Rust. Commands passed 19, focused core passed 2,
+server passed 48, the rebuilt CLI graph regression passed, and independent
+review returned ACCEPT. `starlark-rust`, parser/evaluator/traversal/renderer,
+JVM/Java, CI, fixtures/oracles, and exact configuration hashes were untouched.
+
+Run next only `WP-6-m2p-configured-query-forward-successor-audit`. Select the
+smallest exact forward consumer that reuses the sole configured result graph;
+keep factored/default-implicit/external topology, reverse/multi-root forms,
+parser replacement, JVM/Java, exact hashes, and CI stopped.

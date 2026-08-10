@@ -7206,6 +7206,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         );
         assert_eq!(topology(depth_two), topology(full));
 
+        let depth_max = run("deps(//:root, 2147483647)", false, true).unwrap();
+        let depth_max = depth_max.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(topology(depth_max), topology(full));
+
         let without_tools = run("deps(//:root)", false, false).unwrap();
         let without_tools = without_tools.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(

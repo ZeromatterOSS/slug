@@ -938,19 +938,27 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     );
     assert!(graph_depth_zero.stderr.is_empty(), "{graph_depth_zero:?}");
     assert_eq!(graph_depth_zero.invalidated_files, 0);
-    let graph_depth_three = handle_request(
-        &mut daemon,
-        r#"{"kind":"cquery","request":{"expression":"deps(//pkg:probe, 3)","include_implicit":false,"output":"graph"}}"#,
-    );
-    assert_eq!(graph_depth_three.exit_code, 2, "{graph_depth_three:?}");
-    assert!(graph_depth_three.stdout.is_empty(), "{graph_depth_three:?}");
-    assert!(
-        graph_depth_three
-            .stderr
-            .contains("only unbounded deps() or depths 0, 1, and 2"),
-        "{graph_depth_three:?}"
-    );
-    assert_eq!(graph_depth_three.invalidated_files, 0);
+    for depth in [3, i32::MAX] {
+        let request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"deps(//pkg:probe, {depth})","include_implicit":false,"output":"graph"}}}}"#,
+        );
+        let graph_depth = handle_request(&mut daemon, &request);
+        assert_eq!(graph_depth.exit_code, 0, "depth {depth}: {graph_depth:?}");
+        assert!(
+            graph_depth
+                .stdout
+                .starts_with("digraph mygraph {\n  node [shape=box];\n"),
+            "depth {depth}: {graph_depth:?}"
+        );
+        assert!(
+            graph_depth.stderr.is_empty(),
+            "depth {depth}: {graph_depth:?}"
+        );
+        assert_eq!(
+            graph_depth.invalidated_files, 0,
+            "depth {depth}: {graph_depth:?}"
+        );
+    }
 }
 
 #[test]

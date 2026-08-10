@@ -142,16 +142,11 @@ impl CqueryRequest {
             (None | Some("label"), None) => CqueryOutputMode::Label,
             (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
             (Some("graph"), None) => {
-                let Some(deps) = parsed_expression.cquery_deps_spec() else {
+                let Some(_) = parsed_expression.cquery_deps_spec() else {
                     return Err(unsupported(
                         "--output=graph requires a top-level deps() cquery expression",
                     ));
                 };
-                if deps.depth().is_some_and(|depth| depth > 2) {
-                    return Err(unsupported(
-                        "--output=graph supports only unbounded deps() or depths 0, 1, and 2",
-                    ));
-                }
                 if !saw_noimplicit_deps || include_implicit {
                     return Err(unsupported("--output=graph requires --noimplicit_deps"));
                 }

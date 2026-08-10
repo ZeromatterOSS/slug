@@ -1221,7 +1221,7 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     );
     write(
         &workspace.join("BUILD.bazel"),
-        "load(\":defs.bzl\", \"node\")\nnode(name = \"leaf\")\nnode(name = \"child\", deps = [\":leaf\"])\nnode(name = \"root\", deps = [\":child\"])\n",
+        "load(\":defs.bzl\", \"node\")\nnode(name = \"deepest\")\nnode(name = \"depth_three\", deps = [\":deepest\"])\nnode(name = \"leaf\", deps = [\":depth_three\"])\nnode(name = \"child\", deps = [\":leaf\"])\nnode(name = \"root\", deps = [\":child\"])\n",
     );
     let graph = ["--output=graph", "--nograph:factored", "--noimplicit_deps"];
     let run = |output_base: Option<&str>, expression: &str| {
@@ -1245,6 +1245,10 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(stdout.contains("\"//:root (slugcfg-v1:"), "{stdout}");
     assert!(stdout.contains("\" -> \"//:child (slugcfg-v1:"), "{stdout}");
     assert!(stdout.contains("\" -> \"//:leaf (slugcfg-v1:"), "{stdout}");
+    assert!(
+        stdout.contains("\" -> \"//:deepest (slugcfg-v1:"),
+        "{stdout}"
+    );
     assert!(one_shot.stderr.is_empty());
 
     let output_base = scratch("cquery-graph-output-base");
@@ -1267,6 +1271,34 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(depth_one_daemon.status.success(), "{depth_one_daemon:?}");
     assert_eq!(depth_one_daemon.stdout, depth_one.stdout);
     assert!(depth_one_daemon.stderr.is_empty());
+
+    let depth_three = run(None, "deps(//:root, 3)");
+    assert!(depth_three.status.success(), "{depth_three:?}");
+    let stdout = String::from_utf8_lossy(&depth_three.stdout);
+    assert!(
+        stdout.contains("\" -> \"//:depth_three (slugcfg-v1:"),
+        "{stdout}"
+    );
+    assert!(!stdout.contains("//:deepest"), "{stdout}");
+    assert!(depth_three.stderr.is_empty());
+
+    let depth_three_daemon = run(Some(&output_base), "deps(//:root, 3)");
+    assert!(
+        depth_three_daemon.status.success(),
+        "{depth_three_daemon:?}"
+    );
+    assert_eq!(depth_three_daemon.stdout, depth_three.stdout);
+    assert!(depth_three_daemon.stderr.is_empty());
+
+    let max_depth = run(None, "deps(//:root, 2147483647)");
+    assert!(max_depth.status.success(), "{max_depth:?}");
+    assert_eq!(max_depth.stdout, one_shot.stdout);
+    assert!(max_depth.stderr.is_empty());
+
+    let max_depth_daemon = run(Some(&output_base), "deps(//:root, 2147483647)");
+    assert!(max_depth_daemon.status.success(), "{max_depth_daemon:?}");
+    assert_eq!(max_depth_daemon.stdout, max_depth.stdout);
+    assert!(max_depth_daemon.stderr.is_empty());
 }
 
 #[test]

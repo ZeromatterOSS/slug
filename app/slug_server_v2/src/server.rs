@@ -388,14 +388,9 @@ fn validate_cquery_expression(
         return Err("deps() requires --noimplicit_deps in this cquery".to_owned());
     }
     if output == CqueryOutput::Graph {
-        let Some(deps) = expression.cquery_deps_spec() else {
+        let Some(_) = expression.cquery_deps_spec() else {
             return Err("graph output requires a top-level deps() cquery expression".to_owned());
         };
-        if deps.depth().is_some_and(|depth| depth > 2) {
-            return Err(
-                "graph output supports only unbounded deps() or depths 0, 1, and 2".to_owned(),
-            );
-        }
         if include_implicit {
             return Err("graph output requires --noimplicit_deps".to_owned());
         }
