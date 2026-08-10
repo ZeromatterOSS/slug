@@ -50,6 +50,7 @@ use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeKey;
+use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::prepare_configured_node_analysis;
@@ -2359,6 +2360,19 @@ impl CqueryCommandEvaluation {
             .collect()
     }
 
+    pub fn label_kind_stdout(&self) -> Result<String, CqueryCommandError> {
+        self.targets
+            .iter()
+            .map(|target| {
+                Ok(format!(
+                    "{} {}\n",
+                    cquery_target_kind(target.analysis.kind(), target.analysis.rule_capability())?,
+                    cquery_graph_label(target)
+                ))
+            })
+            .collect()
+    }
+
     pub fn starlark_label_stdout(&self) -> String {
         self.targets
             .iter()
@@ -2399,6 +2413,23 @@ impl CqueryCommandEvaluation {
 
     pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
         self.targets.iter().map(|target| target.analysis.as_ref())
+    }
+}
+
+fn cquery_target_kind(
+    kind: &ConfiguredNodeKind,
+    capability: Option<&slug_loading_v2::RuleCapability>,
+) -> Result<String, CqueryCommandError> {
+    match capability {
+        Some(capability) => Ok(format!("{} rule", capability.rule_class)),
+        None => match kind {
+            ConfiguredNodeKind::SourceFile => Ok("source file".to_owned()),
+            ConfiguredNodeKind::GeneratedFile => Ok("generated file".to_owned()),
+            ConfiguredNodeKind::PackageGroup => Ok("package group".to_owned()),
+            kind => Err(CqueryCommandError::infrastructure(format!(
+                "cquery label_kind has no target kind for {kind:?} without a rule capability"
+            ))),
+        },
     }
 }
 
@@ -5386,6 +5417,17 @@ mod tests {
     }
 
     #[test]
+    fn cquery_label_kind_fails_closed_for_unadmitted_capability_free_nodes() {
+        assert_eq!(
+            cquery_target_kind(&ConfiguredNodeKind::SourceFile, None).unwrap(),
+            "source file"
+        );
+        let error = cquery_target_kind(&ConfiguredNodeKind::Platform, None).unwrap_err();
+        assert!(matches!(error, CqueryCommandError::Infrastructure(_)));
+        assert!(error.to_string().contains("Platform"));
+    }
+
+    #[test]
     fn cquery_executables_uses_rule_capability_order_and_full_key_dedupe() {
         use slug_loading_v2::RuleCapability;
 
@@ -7065,6 +7107,12 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let depth_zero = run("deps(//:root, 0)", false, true).unwrap();
         let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(depth_zero.starlark_label_stdout(), "@@//:root\n");
+        assert!(
+            depth_zero
+                .label_kind_stdout()
+                .unwrap()
+                .starts_with("ordinary_rule rule //:root (slugcfg-v1:")
+        );
 
         let full = run("deps(//:root)", false, true).unwrap();
         let full = full.terminal_for_test().as_ref().as_ref().unwrap();
@@ -7091,6 +7139,34 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         );
         assert!(full.label_stdout().contains("//:source.txt (null)\n"));
         assert!(full.label_stdout().contains("//:vis_top (null)\n"));
+        assert_eq!(
+            full.label_kind_stdout()
+                .unwrap()
+                .lines()
+                .map(|line| line.split_once(" (").unwrap().0)
+                .collect::<Vec<_>>(),
+            [
+                "ordinary_rule rule //:root",
+                "ordinary_rule rule //:ordinary",
+                "ordinary_rule rule //:ordinary",
+                "alias rule //:alias_outer",
+                "source file //:source.txt",
+                "generated file //:producer.out",
+                "package group //:vis_top",
+                "alias rule //:alias_inner",
+                "producer rule //:producer",
+            ]
+        );
+        assert!(
+            full.label_kind_stdout()
+                .unwrap()
+                .contains("source file //:source.txt (null)\n")
+        );
+        assert!(
+            full.label_kind_stdout()
+                .unwrap()
+                .contains("package group //:vis_top (null)\n")
+        );
         assert!(!full.starlark_label_stdout().contains("vis_leaf"));
         let ordinary = full
             .analyses()
@@ -7209,6 +7285,10 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let depth_max = run("deps(//:root, 2147483647)", false, true).unwrap();
         let depth_max = depth_max.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(topology(depth_max), topology(full));
+        assert_eq!(
+            depth_max.label_kind_stdout().unwrap(),
+            full.label_kind_stdout().unwrap()
+        );
 
         let without_tools = run("deps(//:root)", false, false).unwrap();
         let without_tools = without_tools.terminal_for_test().as_ref().as_ref().unwrap();

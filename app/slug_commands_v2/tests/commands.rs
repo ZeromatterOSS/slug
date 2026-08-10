@@ -458,7 +458,7 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
 }
 
 #[test]
-fn cquery_accepts_only_the_label_and_bounded_graph_output_matrix() {
+fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
     let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
     assert_eq!(default.output_mode, CqueryOutputMode::Label);
     assert!(default.include_implicit);
@@ -466,6 +466,9 @@ fn cquery_accepts_only_the_label_and_bounded_graph_output_matrix() {
 
     let label = CqueryRequest::parse(&["--output=label", "//pkg:bin"]).unwrap();
     assert_eq!(label.output_mode, CqueryOutputMode::Label);
+
+    let label_kind = CqueryRequest::parse(&["--output=label_kind", "//pkg:bin"]).unwrap();
+    assert_eq!(label_kind.output_mode, CqueryOutputMode::LabelKind);
 
     let starlark = CqueryRequest::parse(&[
         "--output=starlark",
@@ -557,6 +560,12 @@ fn cquery_accepts_only_the_label_and_bounded_graph_output_matrix() {
         vec!["--output=starlark", "//pkg:bin"],
         vec!["--starlark:expr=str(target.label)", "//pkg:bin"],
         vec!["--output=text", "//pkg:bin"],
+        vec!["--nograph:factored", "--output=label_kind", "//pkg:bin"],
+        vec![
+            "--output=label_kind",
+            "--starlark:expr=str(target.label)",
+            "//pkg:bin",
+        ],
         vec!["--output", "--starlark:expr=str(target.label)", "//pkg:bin"],
         vec!["--output=starlark", "--starlark:expr", "//pkg:bin"],
         vec![

@@ -811,34 +811,39 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
 
 #[test]
 fn tagged_cquery_protocol_is_narrow_and_round_trips() {
-    let request = DaemonRequest::Cquery(CqueryRequest {
-        expression: "//pkg:probe".to_owned(),
-        include_implicit: false,
-        include_tool: false,
-        output: CqueryOutput::Graph,
-        root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
-        bzlmod: BzlmodRequestInputs::default(),
-    });
-    let json = serde_json::to_string(&request).unwrap();
-    assert!(!json.contains("order_output"));
-    assert!(json.contains("expression"));
-    assert!(json.contains("\"include_implicit\":false"));
-    assert!(json.contains("\"include_tool\":false"));
-    assert!(json.contains("\"output\":\"graph\""));
-    assert!(!json.contains("target"));
-    let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
-    let DaemonRequest::Cquery(request) = round_trip else {
-        panic!("expected tagged cquery request");
-    };
-    assert_eq!(request.expression, "//pkg:probe");
-    assert!(!request.include_implicit);
-    assert!(!request.include_tool);
-    assert_eq!(request.output, CqueryOutput::Graph);
-    assert_eq!(
-        request.root_string_setting.as_deref(),
-        Some("Gr\u{00fc}\u{00df}e")
-    );
-    assert_eq!(request.bzlmod, BzlmodRequestInputs::default());
+    for (output, wire_name) in [
+        (CqueryOutput::Graph, "graph"),
+        (CqueryOutput::LabelKind, "label_kind"),
+    ] {
+        let request = DaemonRequest::Cquery(CqueryRequest {
+            expression: "//pkg:probe".to_owned(),
+            include_implicit: false,
+            include_tool: false,
+            output,
+            root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
+            bzlmod: BzlmodRequestInputs::default(),
+        });
+        let json = serde_json::to_string(&request).unwrap();
+        assert!(!json.contains("order_output"));
+        assert!(json.contains("expression"));
+        assert!(json.contains("\"include_implicit\":false"));
+        assert!(json.contains("\"include_tool\":false"));
+        assert!(json.contains(&format!("\"output\":\"{wire_name}\"")));
+        assert!(!json.contains("target"));
+        let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
+        let DaemonRequest::Cquery(request) = round_trip else {
+            panic!("expected tagged cquery request");
+        };
+        assert_eq!(request.expression, "//pkg:probe");
+        assert!(!request.include_implicit);
+        assert!(!request.include_tool);
+        assert_eq!(request.output, output);
+        assert_eq!(
+            request.root_string_setting.as_deref(),
+            Some("Gr\u{00fc}\u{00df}e")
+        );
+        assert_eq!(request.bzlmod, BzlmodRequestInputs::default());
+    }
 }
 
 #[test]
@@ -909,6 +914,17 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert!(empty_starlark.stdout.is_empty());
     assert!(empty_starlark.stderr.is_empty());
     assert_eq!(empty_starlark.invalidated_files, 0);
+    let label_kind = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label_kind"}}"#,
+    );
+    assert_eq!(label_kind.exit_code, 0, "{label_kind:?}");
+    assert!(
+        label_kind
+            .stdout
+            .starts_with("probe rule //pkg:probe (slugcfg-v1:")
+    );
+    assert!(label_kind.stderr.is_empty());
     let graph_non_deps = handle_request(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,

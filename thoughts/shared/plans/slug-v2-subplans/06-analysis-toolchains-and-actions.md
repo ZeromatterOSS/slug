@@ -6583,3 +6583,51 @@ Run next only `WP-6-m2p-configured-query-forward-successor-audit`. Select the
 smallest exact forward consumer that reuses the sole configured result graph;
 keep factored/default-implicit/external topology, reverse/multi-root forms,
 parser replacement, JVM/Java, exact hashes, and CI stopped.
+
+### Configured-query label-kind successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2p-configured-query-forward-successor-audit` selected Bazel 9.2's
+registered `label_kind` formatter. Pinned
+`LabelAndConfigurationOutputFormatterCallback` prepends
+`Target.getTargetKind()` to the same label/configuration row in the same
+callback order. Slug already retains the exact rule class or structural
+source/generated/package-group kind beside each selected configured/null node.
+No graph, adjacency, key, cache, parser, evaluator, or retained representation
+is required.
+
+The formatter applies to the entire already-admitted configured-query
+expression subset, including noimplicit top-level `deps` at every admitted
+depth; a deps-only output guard would invent an unnecessary restriction.
+Configuration tokens and configuration-sensitive order remain Slug-native.
+The public daemon-wire variant requires fallible, fail-closed formatting and
+downstream command/server/CLI coverage. Independent reserved review returned
+ACCEPT.
+
+Run next `WP-6-m2q-configured-query-label-kind-output`. Keep nested deps,
+factored/default-implicit/external/reverse graph breadth, other output modes,
+parser/evaluator/analysis/vendor/fixture/oracle changes, JVM/Java, exact hashes,
+and CI stopped.
+
+### Configured-query label-kind output ACCEPT (2026-08-09)
+
+`WP-6-m2q-configured-query-label-kind-output` is **ACCEPTED**. The complete
+already-admitted configured-query expression subset now supports
+`--output=label_kind`. Formatting preserves the selected TargetSet order and
+existing label/configuration/null bytes while prepending Bazel's exact target
+kind: retained rule class, source file, generated file, or package group.
+Capability-free rule-like nodes fail closed as infrastructure errors rather
+than guessing or panicking.
+
+The public command and serde-wire variants route identically through one-shot
+and retained-daemon presentation after semantic terminal acceptance. Existing
+graph wire round-trip coverage remains intact. Commands pass 19, focused core
+passes 14, server passes 48, the CLI rebuild and one-shot/daemon/max-depth
+regression pass, and independent final review returned ACCEPT. Production
+added 53 net Rust lines, tests 115, and total Rust 168, within 90/180/270 caps.
+
+Query parsing/evaluation, configured analysis, DICE identity, retained
+representation, vendored `starlark-rust`, fixtures/oracles, JVM/Java, CI, and
+exact configuration hashes were untouched. Run next only
+`WP-6-m2r-configured-query-forward-successor-audit`; compare a meaningful
+forward composition with exact singleton-root expression breadth before
+selecting one bounded successor.

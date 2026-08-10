@@ -67,14 +67,21 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
-            Ok(evaluation) => {
-                let stdout = match output_mode {
-                    CqueryOutputMode::Label => evaluation.label_stdout(),
-                    CqueryOutputMode::StarlarkLabel => evaluation.starlark_label_stdout(),
-                    CqueryOutputMode::Graph => evaluation.graph_stdout(),
-                };
-                TerminalOutput::new(0, stdout, String::new())
-            }
+            Ok(evaluation) => match output_mode {
+                CqueryOutputMode::Label => {
+                    TerminalOutput::new(0, evaluation.label_stdout(), String::new())
+                }
+                CqueryOutputMode::LabelKind => match evaluation.label_kind_stdout() {
+                    Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
+                    Err(error) => terminal_error(&error, "one-shot"),
+                },
+                CqueryOutputMode::StarlarkLabel => {
+                    TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+                }
+                CqueryOutputMode::Graph => {
+                    TerminalOutput::new(0, evaluation.graph_stdout(), String::new())
+                }
+            },
             Err(error) => terminal_error(error, "one-shot"),
         })
         .publish();
@@ -107,6 +114,7 @@ fn run_daemon(
             include_tool: request.include_tool,
             output: match request.output_mode {
                 CqueryOutputMode::Label => slug_server_v2::CqueryOutput::Label,
+                CqueryOutputMode::LabelKind => slug_server_v2::CqueryOutput::LabelKind,
                 CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,
                 CqueryOutputMode::Graph => slug_server_v2::CqueryOutput::Graph,
             },

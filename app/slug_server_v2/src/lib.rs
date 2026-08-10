@@ -380,16 +380,27 @@ impl Daemon {
         };
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
-                Ok(evaluation) => {
-                    let stdout = match output {
-                        crate::server::CqueryOutput::Label => evaluation.label_stdout(),
-                        crate::server::CqueryOutput::StarlarkLabel => {
-                            evaluation.starlark_label_stdout()
+                Ok(evaluation) => match output {
+                    crate::server::CqueryOutput::Label => {
+                        TerminalOutput::new(0, evaluation.label_stdout(), String::new())
+                    }
+                    crate::server::CqueryOutput::LabelKind => {
+                        match evaluation.label_kind_stdout() {
+                            Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
+                            Err(error) => TerminalOutput::new(
+                                error.exit_code(),
+                                String::new(),
+                                cquery_error_json(&error, invalidated),
+                            ),
                         }
-                        crate::server::CqueryOutput::Graph => evaluation.graph_stdout(),
-                    };
-                    TerminalOutput::new(0, stdout, String::new())
-                }
+                    }
+                    crate::server::CqueryOutput::StarlarkLabel => {
+                        TerminalOutput::new(0, evaluation.starlark_label_stdout(), String::new())
+                    }
+                    crate::server::CqueryOutput::Graph => {
+                        TerminalOutput::new(0, evaluation.graph_stdout(), String::new())
+                    }
+                },
                 Err(error) => match error.missing_stderr() {
                     Some(stderr) => TerminalOutput::new(error.exit_code(), String::new(), stderr),
                     None => TerminalOutput::new(

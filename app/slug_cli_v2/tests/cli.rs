@@ -1209,6 +1209,47 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         assert_eq!(daemon.stdout, one_shot.stdout);
         assert!(daemon.stderr.is_empty());
     }
+
+    let label_kind = ["--output=label_kind", "--noimplicit_deps"];
+    let run_label_kind = |output_base: Option<&str>, expression: &str| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .args(["cquery", expression])
+            .args(label_kind)
+            .output()
+            .unwrap()
+    };
+    let label_kind_one_shot = run_label_kind(None, expression);
+    assert!(
+        label_kind_one_shot.status.success(),
+        "{label_kind_one_shot:?}"
+    );
+    let label_kind_stdout = String::from_utf8_lossy(&label_kind_one_shot.stdout);
+    assert!(
+        label_kind_stdout.starts_with("node rule //:root (slugcfg-v1:"),
+        "{label_kind_stdout}"
+    );
+    assert!(label_kind_stdout.contains("node rule //:child (slugcfg-v1:"));
+    assert!(label_kind_one_shot.stderr.is_empty());
+    let label_kind_daemon = run_label_kind(Some(&output_base), expression);
+    assert!(label_kind_daemon.status.success(), "{label_kind_daemon:?}");
+    assert_eq!(label_kind_daemon.stdout, label_kind_one_shot.stdout);
+    assert!(label_kind_daemon.stderr.is_empty());
+    let label_kind_max = run_label_kind(None, "deps(//:root, 2147483647)");
+    assert!(label_kind_max.status.success(), "{label_kind_max:?}");
+    assert_eq!(label_kind_max.stdout, label_kind_one_shot.stdout);
+    assert!(label_kind_max.stderr.is_empty());
+    let label_kind_max_daemon = run_label_kind(Some(&output_base), "deps(//:root, 2147483647)");
+    assert!(
+        label_kind_max_daemon.status.success(),
+        "{label_kind_max_daemon:?}"
+    );
+    assert_eq!(label_kind_max_daemon.stdout, label_kind_max.stdout);
+    assert!(label_kind_max_daemon.stderr.is_empty());
 }
 
 #[test]

@@ -27,6 +27,7 @@ const LABEL_EXPRESSION: &str = "str(target.label)";
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CqueryOutputMode {
     Label,
+    LabelKind,
     StarlarkLabel,
     Graph,
 }
@@ -140,6 +141,7 @@ impl CqueryRequest {
         }
         let output_mode = match (output.as_deref(), starlark_expression.as_deref()) {
             (None | Some("label"), None) => CqueryOutputMode::Label,
+            (Some("label_kind"), None) => CqueryOutputMode::LabelKind,
             (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
             (Some("graph"), None) => {
                 let Some(_) = parsed_expression.cquery_deps_spec() else {
@@ -157,7 +159,7 @@ impl CqueryRequest {
             }
             _ => {
                 return Err(unsupported(
-                    "expected default output, --output=label, or --output=starlark \
+                    "expected default output, --output=label, --output=label_kind, or --output=starlark \
                      --starlark:expr=str(target.label)",
                 ));
             }
