@@ -20,6 +20,7 @@ use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::UserProvider;
+use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::provider::FrozenUserProviderCallable;
@@ -135,6 +136,10 @@ pub(crate) struct PreparedDependency {
 pub(crate) struct PreparedToolchain {
     pub(crate) required_type: CompactString,
     pub(crate) marker: CompactString,
+    pub(crate) declaration: CanonicalLabel,
+    pub(crate) toolchain_type: ConfiguredTargetKey,
+    pub(crate) implementation: ConfiguredTargetKey,
+    pub(crate) selected_execution_platform: ConfiguredTargetKey,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]

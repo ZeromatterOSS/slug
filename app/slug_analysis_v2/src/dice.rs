@@ -53,11 +53,14 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::key::ConfigurationKey;
+use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::key::RootStringSettingValue;
 use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
+use crate::result::ToolchainSelection;
+use crate::result::ToolchainTopology;
 use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
@@ -601,6 +604,7 @@ fn finish_analysis<T>(
     declared_dependency_keys: &[DeclaredDependencyKey],
     computed: &SmallMap<ConfiguredNodeKey, T>,
     marker: Option<CompactString>,
+    candidate_execution_platforms: Option<Vec<ConfiguredTargetKey>>,
     toolchain: Option<PreparedToolchain>,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
@@ -662,6 +666,40 @@ where
             crate::configured_target::ConfiguredEdgeKind::DeclaringVisibility,
         )
     }));
+    let selection = toolchain.as_ref().map(|toolchain| {
+        ToolchainSelection::new(
+            toolchain.selected_execution_platform.clone(),
+            toolchain.declaration.clone(),
+            toolchain.toolchain_type.clone(),
+            toolchain.implementation.clone(),
+        )
+    });
+    if let Some(toolchain) = &toolchain {
+        edges.push(crate::configured_target::ConfiguredEdge::new(
+            toolchain.toolchain_type.clone().into(),
+            crate::configured_target::ConfiguredEdgeKind::ToolchainRequirement,
+        ));
+        edges.push(crate::configured_target::ConfiguredEdge::new(
+            toolchain.implementation.clone().into(),
+            crate::configured_target::ConfiguredEdgeKind::SelectedToolchainImplementation,
+        ));
+    }
+    edges.extend(
+        candidate_execution_platforms
+            .iter()
+            .flatten()
+            .cloned()
+            .enumerate()
+            .map(|(index, platform)| {
+                crate::configured_target::ConfiguredEdge::new(
+                    platform.into(),
+                    crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform {
+                        index: u32::try_from(index)
+                            .expect("execution-platform candidate index fits u32"),
+                    },
+                )
+            }),
+    );
     let print_capture = capture_events.then(AnalysisPrintCapture::default);
     let label = configured_target.label();
     let value = evaluate_loaded_rule(
@@ -677,9 +715,19 @@ where
             .map(|capture| capture as &dyn PrintHandler),
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
+    let toolchain_topology = candidate_execution_platforms.map(|candidates| {
+        ToolchainTopology::new(candidates, selection)
+            .expect("selected execution platform came from the candidate sequence")
+    });
     value
         .map_err(AnalysisError::from_loaded_rule_error)
-        .map(|result| result.with_edges(edges))
+        .map(|result| {
+            let result = result.with_edges(edges);
+            match toolchain_topology {
+                Some(topology) => result.with_toolchain_topology(topology),
+                None => result,
+            }
+        })
 }
 
 fn root_analysis_complete(
@@ -778,6 +826,98 @@ fn toolchain_outcome(result: Result<PreparedToolchain, AnalysisError>) -> Prepar
     LoadingPreparationOutcome::Complete(result)
 }
 
+async fn root_rule_execution_platforms(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    configuration: &ConfigurationKey,
+    package: &LoadedPackage,
+    rule_label: &CanonicalLabel,
+    has_toolchain_requirement: bool,
+) -> LoadingPreparationOutcome<Result<Option<Vec<ConfiguredTargetKey>>, AnalysisError>> {
+    let local_declarations = package
+        .targets
+        .iter()
+        .filter_map(|target| match &target.kind {
+            PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                implementation,
+                ..
+            }) if implementation == rule_label => Some(
+                rule_label.with_target(
+                    TargetName::parse(&target.name)
+                        .expect("loaded native toolchain name remains a target name"),
+                ),
+            ),
+            _ => None,
+        })
+        .collect::<SmallSet<_>>();
+    if !has_toolchain_requirement && local_declarations.is_empty() {
+        return LoadingPreparationOutcome::Complete(Ok(None));
+    }
+    let anchor = match ctx
+        .compute(&RootModuleLoadingAnchorKey::new(workspace.dupe()))
+        .await
+    {
+        Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(anchor) => anchor.dupe(),
+            Err(error) => {
+                return LoadingPreparationOutcome::Complete(Err(AnalysisError::new(
+                    error.to_string(),
+                )));
+            }
+        },
+        Err(error) => {
+            return LoadingPreparationOutcome::Complete(Err(AnalysisError::new(format!(
+                "loading execution-platform registrations through DICE: {error}"
+            ))));
+        }
+    };
+    if !has_toolchain_requirement {
+        let registered = anchor.registrations().toolchains().iter().any(|apparent| {
+            apparent.repo().is_root()
+                && CanonicalLabel::parse(&format!("@@{apparent}"))
+                    .is_ok_and(|declaration| local_declarations.contains(&declaration))
+        });
+        if !registered {
+            return LoadingPreparationOutcome::Complete(Ok(None));
+        }
+        if let Some(external) = anchor
+            .registrations()
+            .execution_platforms()
+            .iter()
+            .chain(anchor.registrations().toolchains().iter())
+            .find(|label| !label.repo().is_root())
+        {
+            return LoadingPreparationOutcome::Complete(Err(AnalysisError::new(format!(
+                "external toolchain topology registration is not supported: {external}"
+            ))));
+        }
+    }
+    let Some(structural) = configuration.slug_configuration() else {
+        return LoadingPreparationOutcome::Complete(Err(AnalysisError::new(
+            "execution-platform topology requires a structural Slug configuration",
+        )));
+    };
+    let execution_configuration = match structural.to_exec() {
+        Ok(configuration) => ConfigurationKey::from_slug(configuration),
+        Err(error) => {
+            return LoadingPreparationOutcome::Complete(Err(AnalysisError::new(error.to_string())));
+        }
+    };
+    let platforms = anchor
+        .registrations()
+        .execution_platforms()
+        .iter()
+        .filter(|label| label.repo().is_root())
+        .map(|label| {
+            let label = CanonicalLabel::parse(&format!("@@{label}"))
+                .expect("accepted direct root registration label canonicalizes");
+            ConfiguredTargetKey::new(label, execution_configuration.clone())
+        })
+        .collect();
+    LoadingPreparationOutcome::Complete(Ok(Some(platforms)))
+}
+
 fn root_apparent_type(label: &CanonicalLabel) -> Result<CompactString, AnalysisError> {
     if !label.package().repo().is_root() {
         return Err(AnalysisError::new(format!(
@@ -873,6 +1013,7 @@ async fn resolve_root_toolchain(
     workspace: &NormalizedAbsolutePath,
     required: &CanonicalLabel,
     configuration: ConfigurationKey,
+    candidate_execution_platforms: &[ConfiguredTargetKey],
 ) -> PreparedToolchainOutcome {
     let required_type = match root_apparent_type(required) {
         Ok(required_type) => required_type,
@@ -1037,13 +1178,9 @@ async fn resolve_root_toolchain(
         }
         Err(error) => return toolchain_outcome(Err(error)),
     };
-    let platform_labels = registrations
-        .execution_platforms()
+    let platform_labels = candidate_execution_platforms
         .iter()
-        .filter(|label| label.repo().is_root())
-        .map(|label| {
-            CanonicalLabel::parse(&format!("@@{label}")).expect("root registration canonicalizes")
-        })
+        .map(|platform| platform.label().clone())
         .collect::<Vec<_>>();
     let toolchain_labels = registrations
         .toolchains()
@@ -1207,7 +1344,7 @@ async fn resolve_root_toolchain(
         }
     }
     let mut selected = None;
-    for platform_label in platform_labels {
+    for platform_label in &platform_labels {
         let platform = package_target(&packages, &platform_label).expect("validated platform");
         let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
             constraint_values,
@@ -1230,7 +1367,11 @@ async fn resolve_root_toolchain(
                 .iter()
                 .all(|value| constraint_values.contains(value));
             if toolchain_type == required && compatible {
-                selected = Some(implementation.clone());
+                selected = Some((
+                    platform_label.clone(),
+                    toolchain_label.clone(),
+                    implementation.clone(),
+                ));
                 break;
             }
         }
@@ -1238,7 +1379,7 @@ async fn resolve_root_toolchain(
             break;
         }
     }
-    let Some(implementation) = selected else {
+    let Some((selected_platform, declaration, implementation)) = selected else {
         return toolchain_outcome(Err(AnalysisError::new(format!(
             "no compatible toolchain was registered for {required}"
         ))));
@@ -1247,7 +1388,7 @@ async fn resolve_root_toolchain(
         .compute(
             &ConfiguredNodeAnalysisKey::new(
                 workspace.dupe(),
-                ConfiguredTargetKey::new(implementation.clone(), configuration),
+                ConfiguredTargetKey::new(implementation.clone(), configuration.clone()),
             )
             .expect("toolchain analysis inherits a structural configuration"),
         )
@@ -1264,7 +1405,30 @@ async fn resolve_root_toolchain(
             ))));
         }
     };
-    if selected_result.configured_dependencies().next().is_some()
+    let selected_topology_is_exact = if declaration.package() == implementation.package() {
+        selected_result.edges().len() == candidate_execution_platforms.len()
+            && selected_result
+                .edges()
+                .iter()
+                .zip(candidate_execution_platforms)
+                .enumerate()
+                .all(|(index, (edge, platform))| {
+                    edge.target() == &ConfiguredNodeKey::configured(platform.clone())
+                        && matches!(
+                            edge.kind(),
+                            crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform {
+                                index: edge_index
+                            } if *edge_index == u32::try_from(index).expect("candidate index fits u32")
+                        )
+                })
+            && selected_result.toolchain_topology().is_some_and(|topology| {
+                topology.candidate_execution_platforms() == candidate_execution_platforms
+                    && topology.selection().is_none()
+            })
+    } else {
+        selected_result.edges().is_empty() && selected_result.toolchain_topology().is_none()
+    };
+    if !selected_topology_is_exact
         || !selected_result.actions().is_empty()
         || !selected_result.declared_outputs().is_empty()
         || !selected_result.diagnostics().is_empty()
@@ -1284,6 +1448,14 @@ async fn resolve_root_toolchain(
             .toolchain_info()
             .expect("checked ToolchainInfo")
             .marker
+            .clone(),
+        declaration,
+        toolchain_type: ConfiguredTargetKey::new(required.clone(), configuration.clone()),
+        implementation: ConfiguredTargetKey::new(implementation, configuration),
+        selected_execution_platform: candidate_execution_platforms
+            .iter()
+            .find(|platform| platform.label() == &selected_platform)
+            .expect("selected root platform retains its configured candidate identity")
             .clone(),
     }))
 }
@@ -1495,6 +1667,149 @@ impl ConfiguredNodeAnalysisKey {
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintSetting)),
+            ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::ConstraintSetting,
+                    native_empty_providers(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                )));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::ConstraintValue {
+                    constraint_setting,
+                })),
+            ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
+                if let Err(error) = require_root_native_reference(constraint_setting) {
+                    return root_analysis_complete(Err(error));
+                }
+                let child = compute_configured_child(
+                    ctx,
+                    self.workspace.dupe(),
+                    constraint_setting.clone(),
+                    configured_target.configuration().clone(),
+                )
+                .await;
+                let child = match child {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(result) => result.dupe(),
+                        Err(error) => return root_analysis_complete(Err(error.clone())),
+                    },
+                };
+                if child.kind() != &ConfiguredNodeKind::ConstraintSetting {
+                    return root_analysis_complete(Err(AnalysisError::new(format!(
+                        "constraint value {label} references a non-constraint setting {constraint_setting}"
+                    ))));
+                }
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::ConstraintValue,
+                    native_empty_providers(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                )
+                .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
+                    child.key().clone(),
+                    crate::configured_target::ConfiguredEdgeKind::ConstraintSetting,
+                )])));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
+                    constraint_values,
+                })),
+            ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
+                let mut seen_settings = SmallSet::with_capacity(constraint_values.len());
+                let mut edges = Vec::with_capacity(constraint_values.len());
+                for (index, constraint_value) in constraint_values.iter().enumerate() {
+                    if let Err(error) = require_root_native_reference(constraint_value) {
+                        return root_analysis_complete(Err(error));
+                    }
+                    let child = compute_configured_child(
+                        ctx,
+                        self.workspace.dupe(),
+                        constraint_value.clone(),
+                        configured_target.configuration().clone(),
+                    )
+                    .await;
+                    let child = match child {
+                        LoadingPreparationOutcome::Need(need) => {
+                            return LoadingPreparationOutcome::Need(need);
+                        }
+                        LoadingPreparationOutcome::Complete(value) => match value.as_ref() {
+                            Ok(result) => result.dupe(),
+                            Err(error) => return root_analysis_complete(Err(error.clone())),
+                        },
+                    };
+                    if child.kind() != &ConfiguredNodeKind::ConstraintValue {
+                        return root_analysis_complete(Err(AnalysisError::new(format!(
+                            "platform {label} references a non-constraint value {constraint_value}"
+                        ))));
+                    }
+                    let Some(setting) = child.edges().first().map(|edge| edge.target().clone())
+                    else {
+                        return root_analysis_complete(Err(AnalysisError::new(format!(
+                            "constraint value {constraint_value} has no setting edge"
+                        ))));
+                    };
+                    if !seen_settings.insert(setting) {
+                        return root_analysis_complete(Err(AnalysisError::new(format!(
+                            "execution platform has duplicate constraint setting: {label}"
+                        ))));
+                    }
+                    edges.push(crate::configured_target::ConfiguredEdge::new(
+                        child.key().clone(),
+                        crate::configured_target::ConfiguredEdgeKind::PlatformConstraint {
+                            index: u32::try_from(index)
+                                .expect("platform constraint index fits u32"),
+                        },
+                    ));
+                }
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::Platform,
+                    native_empty_providers(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                )
+                .with_edges(edges)));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)),
+            ) if configured_target.configuration().kind() == ConfigurationKind::Target => {
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::ToolchainType,
+                    native_empty_providers(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                )));
+            }
+            (
+                ConfiguredNodeKey::Configured(_),
+                Some(PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                    ..
+                })),
+            ) => {
+                return root_analysis_complete(Err(AnalysisError::new(format!(
+                    "toolchain declaration nodes are not supported: {label}"
+                ))));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::NativeToolchain(native)),
+            ) => {
+                return root_analysis_complete(Err(AnalysisError::new(format!(
+                    "native {} target {label} is incompatible with {} configuration",
+                    native.rule_class(),
+                    configured_target.configuration().kind(),
+                ))));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
                 Some(PackageTargetKind::Alias { actual }),
             ) => {
                 let child = compute_configured_child(
@@ -1642,12 +1957,37 @@ impl ConfiguredNodeAnalysisKey {
                 });
             (rule.required_toolchains().first().cloned(), marker)
         };
+        let candidate_execution_platforms = match root_rule_execution_platforms(
+            ctx,
+            &self.workspace,
+            configured_target.configuration(),
+            package_value
+                .as_ref()
+                .as_ref()
+                .expect("validated root package value remains immutable"),
+            configured_target.label(),
+            requirement.is_some(),
+        )
+        .await
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(Ok(platforms)) => platforms,
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return root_analysis_complete(Err(error));
+            }
+        };
         let prepared_toolchain = if let Some(requirement) = requirement {
+            let candidates = candidate_execution_platforms
+                .as_ref()
+                .expect("a toolchain requirement prepares candidate execution platforms");
             match resolve_root_toolchain(
                 ctx,
                 &self.workspace,
                 &requirement,
                 configured_target.configuration().clone(),
+                candidates,
             )
             .await
             {
@@ -1796,6 +2136,7 @@ impl ConfiguredNodeAnalysisKey {
             &declared_dependency_keys,
             &computed,
             marker,
+            candidate_execution_platforms,
             prepared_toolchain,
             capture_events,
             event_batch,

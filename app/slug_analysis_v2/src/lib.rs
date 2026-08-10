@@ -30,6 +30,8 @@ pub use result::AnalysisDiagnostic;
 pub use result::ConfiguredNodeKind;
 pub use result::ConfiguredNodeResult;
 pub use result::DiagnosticSeverity;
+pub use result::ToolchainSelection;
+pub use result::ToolchainTopology;
 pub use slug_loading_v2::LoadingPreparationNeeds as AnalysisPreparationNeeds;
 pub use slug_loading_v2::LoadingPreparationOutcome as AnalysisPreparationOutcome;
 pub use toolchains::ConstraintSet;

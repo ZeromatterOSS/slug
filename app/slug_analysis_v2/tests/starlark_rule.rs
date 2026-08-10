@@ -671,6 +671,17 @@ async fn root_target_request(
     target: &str,
     tracker: Arc<RootActivationTracker>,
 ) -> Result<Arc<ConfiguredNodeResult>, String> {
+    root_target_request_with_configuration(dice, workspace, target, test_configuration(), tracker)
+        .await
+}
+
+async fn root_target_request_with_configuration(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    configuration: ConfigurationKey,
+    tracker: Arc<RootActivationTracker>,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut user_data = UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -706,7 +717,7 @@ async fn root_target_request(
         &mut transaction,
         NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
         CanonicalLabel::parse(target).unwrap(),
-        test_configuration(),
+        configuration,
         None,
     )
     .await?;
@@ -734,6 +745,16 @@ fn provider_value(result: &ConfiguredNodeResult, provider: &ProviderId) -> Strin
         .to_owned()
 }
 
+fn candidate_labels(result: &ConfiguredNodeResult) -> Vec<String> {
+    result
+        .toolchain_topology()
+        .expect("toolchain topology is retained")
+        .candidate_execution_platforms()
+        .iter()
+        .map(|platform| platform.label().to_string())
+        .collect()
+}
+
 fn root_setting_value(key: &ConfiguredTargetKey) -> &str {
     key.configuration().root_string_setting().unwrap().as_str()
 }
@@ -754,6 +775,8 @@ second_impl = rule(implementation = _second, attrs = {"marker": attr.string(mand
 request = rule(implementation = _request, toolchains = ["//:type"])
 "#;
 const TOOLCHAIN_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\nconstraint_value(name = \"other\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":linux\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\ntoolchain(name = \"first\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":linux\"])\ntoolchain(name = \"second\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":linux\"])\nrequest(name = \"request\")\n";
+const TOPOLOGY_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:first_platform\", \"//:second_platform\")\nregister_toolchains(\"//:first_toolchain\", \"//:second_toolchain\")\n";
+const TOPOLOGY_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"selection\")\nconstraint_value(name = \"first\", constraint_setting = \":selection\")\nconstraint_value(name = \"second\", constraint_setting = \":selection\")\nplatform(name = \"first_platform\", constraint_values = [\":first\"])\nplatform(name = \"second_platform\", constraint_values = [\":second\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\nfirst_impl(name = \"orphan\", marker = \"orphan\")\ntoolchain(name = \"first_toolchain\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":first\"])\ntoolchain(name = \"second_toolchain\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":second\"])\nrequest(name = \"request\")\n";
 
 async fn toolchain_case(
     module: &str,
@@ -793,7 +816,36 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
     assert!(first.actions().is_empty());
     assert!(first.declared_outputs().is_empty());
     assert!(first.diagnostics().is_empty());
-    assert!(first.configured_dependencies().next().is_none());
+    assert_eq!(candidate_labels(&first), vec!["@@//:platform"]);
+    let selection = first.toolchain_topology().unwrap().selection().unwrap();
+    assert_eq!(
+        selection.execution_platform().label().to_string(),
+        "@@//:platform"
+    );
+    assert_eq!(selection.declaration().to_string(), "@@//:second");
+    assert_eq!(selection.toolchain_type().label().to_string(), "@@//:type");
+    assert_eq!(
+        selection.implementation().label().to_string(),
+        "@@//:second_impl"
+    );
+    assert_eq!(
+        first
+            .edges()
+            .iter()
+            .map(|edge| edge.kind())
+            .collect::<Vec<_>>(),
+        vec![
+            &ConfiguredEdgeKind::ToolchainRequirement,
+            &ConfiguredEdgeKind::SelectedToolchainImplementation,
+            &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 },
+        ]
+    );
+    assert!(
+        first
+            .edges()
+            .iter()
+            .all(|edge| edge.implicit() && !edge.tool())
+    );
     let warm = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
         .await
         .unwrap();
@@ -812,6 +864,16 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         .await
         .unwrap();
     assert_eq!(provider_value(&reordered, &consumer), "first");
+    assert_eq!(
+        reordered
+            .toolchain_topology()
+            .unwrap()
+            .selection()
+            .unwrap()
+            .declaration()
+            .to_string(),
+        "@@//:first"
+    );
 
     fs::write(&module, TOOLCHAIN_MODULE).unwrap();
     let restored = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
@@ -913,6 +975,188 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
     .await
     .unwrap();
     assert_eq!(recreated, first);
+}
+
+#[tokio::test]
+async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_constraint_chain() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), TOPOLOGY_MODULE).unwrap();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), TOPOLOGY_BUILD).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = || Arc::new(RootActivationTracker::default());
+
+    let direct_impl = root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
+        .await
+        .unwrap();
+    assert_eq!(
+        candidate_labels(&direct_impl),
+        vec!["@@//:first_platform", "@@//:second_platform"]
+    );
+    assert!(
+        direct_impl
+            .toolchain_topology()
+            .unwrap()
+            .selection()
+            .is_none()
+    );
+    assert_eq!(
+        direct_impl
+            .edges()
+            .iter()
+            .map(|edge| edge.kind())
+            .collect::<Vec<_>>(),
+        vec![
+            &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 },
+            &ConfiguredEdgeKind::CandidateExecutionPlatform { index: 1 },
+        ]
+    );
+    assert!(direct_impl.edges().iter().all(|edge| {
+        edge.configured_target().is_some_and(|target| {
+            target.configuration().kind() == slug_analysis_v2::ConfigurationKind::Exec
+        })
+    }));
+
+    let first = root_target_request(&dice, &workspace, "@@//:request", tracker())
+        .await
+        .unwrap();
+    let first_selection = first.toolchain_topology().unwrap().selection().unwrap();
+    assert_eq!(
+        first_selection.declaration().to_string(),
+        "@@//:first_toolchain"
+    );
+    assert_eq!(
+        first_selection.implementation().label().to_string(),
+        "@@//:first_impl"
+    );
+    assert_eq!(
+        first_selection.execution_platform().label().to_string(),
+        "@@//:first_platform"
+    );
+    assert_eq!(
+        root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
+            .await
+            .unwrap(),
+        direct_impl
+    );
+
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        TOPOLOGY_MODULE.replace(
+            "\"//:first_platform\", \"//:second_platform\"",
+            "\"//:second_platform\", \"//:first_platform\"",
+        ),
+    )
+    .unwrap();
+    let second = root_target_request(&dice, &workspace, "@@//:request", tracker())
+        .await
+        .unwrap();
+    let second_selection = second.toolchain_topology().unwrap().selection().unwrap();
+    assert_eq!(
+        second_selection.declaration().to_string(),
+        "@@//:second_toolchain"
+    );
+    assert_eq!(
+        second_selection.execution_platform().label().to_string(),
+        "@@//:second_platform"
+    );
+    fs::write(workspace.join("MODULE.bazel"), TOPOLOGY_MODULE).unwrap();
+    assert_eq!(
+        root_target_request(&dice, &workspace, "@@//:request", tracker())
+            .await
+            .unwrap(),
+        first
+    );
+
+    let target_configuration = test_configuration();
+    let exec_configuration = ConfigurationKey::from_slug(
+        target_configuration
+            .slug_configuration()
+            .unwrap()
+            .to_exec()
+            .unwrap(),
+    );
+    let platform = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        "@@//:first_platform",
+        exec_configuration.clone(),
+        tracker(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(platform.kind(), &ConfiguredNodeKind::Platform);
+    assert_eq!(platform.edges().len(), 1);
+    assert_eq!(
+        platform.edges()[0].kind(),
+        &ConfiguredEdgeKind::PlatformConstraint { index: 0 }
+    );
+    let value = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        "@@//:first",
+        exec_configuration.clone(),
+        tracker(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(value.kind(), &ConfiguredNodeKind::ConstraintValue);
+    assert_eq!(
+        value.edges()[0].kind(),
+        &ConfiguredEdgeKind::ConstraintSetting
+    );
+    let setting = root_target_request_with_configuration(
+        &dice,
+        &workspace,
+        "@@//:selection",
+        exec_configuration,
+        tracker(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(setting.kind(), &ConfiguredNodeKind::ConstraintSetting);
+    assert!(setting.edges().is_empty());
+
+    assert!(
+        root_target_request(&dice, &workspace, "@@//:first_platform", tracker())
+            .await
+            .unwrap_err()
+            .contains("incompatible with target configuration")
+    );
+    assert!(
+        root_target_request(&dice, &workspace, "@@//:first_toolchain", tracker())
+            .await
+            .unwrap_err()
+            .contains("toolchain declaration nodes are not supported")
+    );
+    let orphan_tracker = Arc::new(RootActivationTracker::with_loading());
+    let orphan = root_target_request(&dice, &workspace, "@@//:orphan", orphan_tracker.clone())
+        .await
+        .unwrap();
+    assert!(orphan.toolchain_topology().is_none());
+    assert!(orphan.edges().is_empty());
+    assert!(
+        orphan_tracker
+            .take()
+            .0
+            .iter()
+            .all(|(identity, _)| identity != "anchor")
+    );
+
+    fs::write(
+        workspace.join("MODULE.bazel"),
+        TOPOLOGY_MODULE.replace(
+            "register_execution_platforms(",
+            "register_execution_platforms(\"@external//:platform\", ",
+        ),
+    )
+    .unwrap();
+    assert!(
+        root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
+            .await
+            .unwrap_err()
+            .contains("external toolchain topology registration")
+    );
 }
 
 #[tokio::test]

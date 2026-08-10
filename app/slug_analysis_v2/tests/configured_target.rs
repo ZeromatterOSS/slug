@@ -20,6 +20,8 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
+use slug_analysis_v2::ToolchainSelection;
+use slug_analysis_v2::ToolchainTopology;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
@@ -316,4 +318,42 @@ fn configured_node_result_capability_is_borrowed_and_participates_in_equality() 
     assert_ne!(absent, executable_result);
     assert_ne!(executable_result, renamed);
     assert_ne!(executable_result, test_result);
+}
+
+#[test]
+fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
+    let candidate = ConfiguredTargetKey::new(
+        canonical("@@//:platform"),
+        ConfigurationKey::exec("exec").unwrap(),
+    );
+    let selection = ToolchainSelection::new(
+        candidate.clone(),
+        canonical("@@//:declaration"),
+        ConfiguredTargetKey::new(canonical("@@//:type"), target_config()),
+        ConfiguredTargetKey::new(canonical("@@//:implementation"), target_config()),
+    );
+    let topology = ToolchainTopology::new(vec![candidate.clone()], Some(selection)).unwrap();
+    assert_eq!(
+        topology.selection().unwrap().execution_platform(),
+        &candidate
+    );
+    assert!(
+        ToolchainTopology::new(
+            vec![ConfiguredTargetKey::new(
+                canonical("@@//:wrong_role"),
+                target_config(),
+            )],
+            None,
+        )
+        .is_err()
+    );
+
+    let providers =
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
+    let key = ConfiguredTargetKey::new(canonical("@@//:root"), target_config());
+    let plain = ConfiguredNodeResult::new_rule(key.clone(), providers.clone(), None);
+    let retained = ConfiguredNodeResult::new_rule(key, providers, None)
+        .with_toolchain_topology(topology.clone());
+    assert_ne!(plain, retained);
+    assert_eq!(retained.toolchain_topology(), Some(&topology));
 }

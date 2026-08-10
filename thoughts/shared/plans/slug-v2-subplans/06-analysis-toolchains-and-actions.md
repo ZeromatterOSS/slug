@@ -6386,3 +6386,50 @@ Run next only `WP-6-m2f-root-toolchain-platform-topology-activation-audit`:
 reconcile the accepted Bazel 9.2 topology evidence with live root owners and
 freeze the smallest non-synthetic platform/constraint/toolchain activation
 slice before configured-query traversal breadth. The audit is read-only.
+
+### Root toolchain/platform topology activation audit ACCEPT (2026-08-09)
+
+`WP-6-m2f-root-toolchain-platform-topology-activation-audit` is **ACCEPTED**.
+The live loading owner already retains root native platform, constraint,
+toolchain-type, declaration, and implementation labels, and the analysis
+resolver already validates ordered registrations and first-compatible
+selection. Missing state was confined to a Host-free Target-to-Exec structural
+role projection, native configured-node results, ordered implicit edges, and
+compact selection facts on the sole configured result.
+
+The exact implementable subgraph is requester-to-type/selected-implementation/
+root-candidate-platforms plus same-package registered implementation-to-root-
+candidate-platforms and platform-to-constraint-value-to-setting. Toolchain
+declarations are selection facts, not nodes. Literal `@bazel_tools`,
+`@platforms`, host-platform tails, and cross-package reverse implementation
+topology remain stopped; no synthetic content or second graph is permitted.
+Run next only `WP-6-m2g-root-toolchain-platform-topology-activation`.
+
+### Root toolchain/platform topology activation ACCEPT (2026-08-09)
+
+`WP-6-m2g-root-toolchain-platform-topology-activation` is **ACCEPTED**. A
+narrow Slug-native Target-to-Exec projection reuses the complete structural
+option records and root setting without Host observation. The sole configured
+analysis key now activates root toolchain-type, platform, constraint-value,
+and constraint-setting nodes in their fixture-proven Target/Exec roles. The
+sole configured result retains one compact ordered candidate/optional-selection
+value and the accepted requirement, selected-implementation, candidate,
+platform-constraint, and setting edges with `implicit=true`, `tool=false`.
+
+Direct same-package registered implementations intrinsically retain candidate
+platform edges before or after requester analysis. Unregistered zero-toolchain
+rules do not observe the MODULE anchor. Cross-package toolchain selection still
+succeeds but retains no unproven reverse topology; direct toolchain declaration,
+wrong-role native, and admitted external-registration paths fail closed.
+Configuration passes 37 tests and analysis passes 36. Core remains 157/158 on
+the unchanged external-visibility diagnostic mismatch, server passes 48/48,
+and the rebuilt CLI remains 47/48 on the unchanged `bzl_cycle` unavailable-root
+baseline. Format, diff, archive, cap, parser-scope, and independent correction
+review gates pass.
+
+Run next only `WP-6-m2h-configured-query-root-traversal-activation-audit`:
+reconcile the retained root configured graph with the existing cquery
+expression/evaluator owners and freeze the smallest evidence-backed `deps`
+slice without inventing the stopped external host-platform tail. The audit is
+read-only; `rdeps`, label/graph formatting breadth, parser changes, JVM/Java,
+and exact Bazel hash bytes remain excluded.

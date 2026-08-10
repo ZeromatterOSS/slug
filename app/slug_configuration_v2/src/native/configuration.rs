@@ -131,6 +131,7 @@ pub enum SlugConfigurationError {
     UnexpectedDescriptorCount { actual: usize },
     DuplicateDescriptor { ordinal: u32 },
     DescriptorOrdinalOverflow,
+    ExecProjectionRequiresTarget { actual: SlugConfigurationKind },
 }
 
 impl fmt::Display for SlugConfigurationError {
@@ -169,6 +170,12 @@ impl fmt::Display for SlugConfigurationError {
             }
             Self::DescriptorOrdinalOverflow => {
                 formatter.write_str("native descriptor ordinal does not fit u32")
+            }
+            Self::ExecProjectionRequiresTarget { actual } => {
+                write!(
+                    formatter,
+                    "exec projection requires a target configuration, got {actual}"
+                )
             }
         }
     }
@@ -253,6 +260,19 @@ impl SlugConfiguration {
 
     pub fn kind(&self) -> SlugConfigurationKind {
         self.0.kind
+    }
+
+    pub fn to_exec(&self) -> Result<Self, SlugConfigurationError> {
+        if self.0.kind != SlugConfigurationKind::Target {
+            return Err(SlugConfigurationError::ExecProjectionRequiresTarget {
+                actual: self.0.kind,
+            });
+        }
+        Ok(finish_configuration(
+            SlugConfigurationKind::Exec,
+            self.0.options.dupe(),
+            self.0.root_string_setting.clone(),
+        ))
     }
 
     pub fn root_string_setting(&self) -> Option<&RootStringSettingValue> {
@@ -802,6 +822,30 @@ mod tests {
             SlugConfiguration::default_exec(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
                 .unwrap()
                 .projection()
+        );
+    }
+
+    #[test]
+    fn role_projection_preserves_structural_options_without_host_reobservation() {
+        let target =
+            SlugConfiguration::default_target(&host(AutoCpuToken::K8, HostPathFlavor::Unix))
+                .unwrap()
+                .with_root_string_setting(RootStringSettingValue::new_for_label(
+                    "@@//settings:mode",
+                    "fast",
+                ));
+        let exec = target.to_exec().unwrap();
+
+        assert_eq!(exec.kind(), SlugConfigurationKind::Exec);
+        assert_eq!(exec.option_count(), target.option_count());
+        assert_eq!(exec.root_string_setting(), target.root_string_setting(),);
+        assert_ne!(exec.projection(), target.projection());
+        assert_eq!(exec, target.to_exec().unwrap());
+        assert_eq!(
+            exec.to_exec(),
+            Err(SlugConfigurationError::ExecProjectionRequiresTarget {
+                actual: SlugConfigurationKind::Exec,
+            })
         );
     }
 
