@@ -7100,33 +7100,88 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(ordinary.len(), 2);
         assert_ne!(ordinary[0], ordinary[1]);
 
-        let mut normalized_graph = full.graph_stdout();
-        for analysis in full.analyses() {
-            let Some(configuration) = analysis
-                .configured_target_key()
-                .and_then(|key| key.configuration().slug_configuration())
-            else {
-                continue;
-            };
-            let name = if configuration
-                .root_string_setting()
-                .is_some_and(|setting| setting.as_str() == "transitioned")
-            {
-                "transition"
-            } else {
-                "base"
-            };
-            normalized_graph =
-                normalized_graph.replace(&configuration.projection().to_string(), name);
-        }
-        let mut nodes = normalized_graph
-            .lines()
-            .filter(|line| line.starts_with("  \"") && !line.contains(" -> "))
-            .collect::<Vec<_>>();
-        nodes.sort_unstable();
-        assert_eq!(
-            nodes,
-            [
+        let topology = |evaluation: &CqueryCommandEvaluation| {
+            let mut graph = evaluation.graph_stdout();
+            for analysis in evaluation.analyses() {
+                let Some(configuration) = analysis
+                    .configured_target_key()
+                    .and_then(|key| key.configuration().slug_configuration())
+                else {
+                    continue;
+                };
+                let name = if configuration
+                    .root_string_setting()
+                    .is_some_and(|setting| setting.as_str() == "transitioned")
+                {
+                    "transition"
+                } else {
+                    "base"
+                };
+                graph = graph.replace(&configuration.projection().to_string(), name);
+            }
+            let mut nodes = graph
+                .lines()
+                .filter(|line| line.starts_with("  \"") && !line.contains(" -> "))
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            nodes.sort_unstable();
+            let mut edges = graph
+                .lines()
+                .filter(|line| line.contains(" -> "))
+                .map(str::to_owned)
+                .collect::<Vec<_>>();
+            edges.sort_unstable();
+            (nodes, edges)
+        };
+        let assert_topology = |evaluation: &CqueryCommandEvaluation,
+                               expected_nodes: &[&str],
+                               expected_edges: &[&str]| {
+            let (nodes, edges) = topology(evaluation);
+            assert_eq!(
+                nodes,
+                expected_nodes
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect::<Vec<_>>()
+            );
+            assert_eq!(
+                edges,
+                expected_edges
+                    .iter()
+                    .map(|value| (*value).to_owned())
+                    .collect::<Vec<_>>()
+            );
+        };
+        assert_topology(depth_zero, &["  \"//:root (base)\""], &[]);
+
+        let depth_one = run("deps(//:root, 1)", false, true).unwrap();
+        let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_topology(
+            depth_one,
+            &[
+                "  \"//:alias_outer (base)\"",
+                "  \"//:ordinary (base)\"",
+                "  \"//:ordinary (transition)\"",
+                "  \"//:producer.out (base)\"",
+                "  \"//:root (base)\"",
+                "  \"//:source.txt (null)\"",
+                "  \"//:vis_top (null)\"",
+            ],
+            &[
+                "  \"//:root (base)\" -> \"//:alias_outer (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
+                "  \"//:root (base)\" -> \"//:producer.out (base)\"",
+                "  \"//:root (base)\" -> \"//:source.txt (null)\"",
+                "  \"//:root (base)\" -> \"//:vis_top (null)\"",
+            ],
+        );
+
+        let depth_two = run("deps(//:root, 2)", false, true).unwrap();
+        let depth_two = depth_two.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_topology(
+            depth_two,
+            &[
                 "  \"//:alias_inner (base)\"",
                 "  \"//:alias_outer (base)\"",
                 "  \"//:ordinary (base)\"",
@@ -7136,16 +7191,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:root (base)\"",
                 "  \"//:source.txt (null)\"",
                 "  \"//:vis_top (null)\"",
-            ]
-        );
-        let mut edges = normalized_graph
-            .lines()
-            .filter(|line| line.contains(" -> "))
-            .collect::<Vec<_>>();
-        edges.sort_unstable();
-        assert_eq!(
-            edges,
-            [
+            ],
+            &[
                 "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
                 "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
                 "  \"//:producer.out (base)\" -> \"//:producer (base)\"",
@@ -7155,8 +7202,9 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:root (base)\" -> \"//:producer.out (base)\"",
                 "  \"//:root (base)\" -> \"//:source.txt (null)\"",
                 "  \"//:root (base)\" -> \"//:vis_top (null)\"",
-            ]
+            ],
         );
+        assert_eq!(topology(depth_two), topology(full));
 
         let without_tools = run("deps(//:root)", false, false).unwrap();
         let without_tools = without_tools.terminal_for_test().as_ref().as_ref().unwrap();

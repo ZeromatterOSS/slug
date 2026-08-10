@@ -872,8 +872,12 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     let workspace = scratch("cquery-malformed-mode");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(
+        &workspace.join("pkg/defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nprobe = rule(implementation = _impl)\n",
+    );
+    write(
         &workspace.join("pkg/BUILD.bazel"),
-        "filegroup(name = \"probe\")\n",
+        "load(\":defs.bzl\", \"probe\")\nprobe(name = \"probe\")\n",
     );
     let mut daemon = Daemon::new(&workspace).unwrap();
     let undefined = handle_request(
@@ -921,19 +925,32 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         "{graph_non_deps:?}"
     );
     assert_eq!(graph_non_deps.invalidated_files, 0);
-    let graph_depth = handle_request(
+    let graph_depth_zero = handle_request(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"deps(//pkg:probe, 0)","include_implicit":false,"output":"graph"}}"#,
     );
-    assert_eq!(graph_depth.exit_code, 2, "{graph_depth:?}");
-    assert!(graph_depth.stdout.is_empty(), "{graph_depth:?}");
+    assert_eq!(graph_depth_zero.exit_code, 0, "{graph_depth_zero:?}");
     assert!(
-        graph_depth
-            .stderr
-            .contains("graph output supports only unbounded deps()"),
-        "{graph_depth:?}"
+        graph_depth_zero
+            .stdout
+            .starts_with("digraph mygraph {\n  node [shape=box];\n"),
+        "{graph_depth_zero:?}"
     );
-    assert_eq!(graph_depth.invalidated_files, 0);
+    assert!(graph_depth_zero.stderr.is_empty(), "{graph_depth_zero:?}");
+    assert_eq!(graph_depth_zero.invalidated_files, 0);
+    let graph_depth_three = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"expression":"deps(//pkg:probe, 3)","include_implicit":false,"output":"graph"}}"#,
+    );
+    assert_eq!(graph_depth_three.exit_code, 2, "{graph_depth_three:?}");
+    assert!(graph_depth_three.stdout.is_empty(), "{graph_depth_three:?}");
+    assert!(
+        graph_depth_three
+            .stderr
+            .contains("only unbounded deps() or depths 0, 1, and 2"),
+        "{graph_depth_three:?}"
+    );
+    assert_eq!(graph_depth_three.invalidated_files, 0);
 }
 
 #[test]

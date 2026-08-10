@@ -391,8 +391,10 @@ fn validate_cquery_expression(
         let Some(deps) = expression.cquery_deps_spec() else {
             return Err("graph output requires a top-level deps() cquery expression".to_owned());
         };
-        if deps.depth().is_some() {
-            return Err("graph output supports only unbounded deps()".to_owned());
+        if deps.depth().is_some_and(|depth| depth > 2) {
+            return Err(
+                "graph output supports only unbounded deps() or depths 0, 1, and 2".to_owned(),
+            );
         }
         if include_implicit {
             return Err("graph output requires --noimplicit_deps".to_owned());

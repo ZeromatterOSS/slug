@@ -1221,11 +1221,10 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     );
     write(
         &workspace.join("BUILD.bazel"),
-        "load(\":defs.bzl\", \"node\")\nnode(name = \"child\")\nnode(name = \"root\", deps = [\":child\"])\n",
+        "load(\":defs.bzl\", \"node\")\nnode(name = \"leaf\")\nnode(name = \"child\", deps = [\":leaf\"])\nnode(name = \"root\", deps = [\":child\"])\n",
     );
-    let expression = "deps(//:root)";
     let graph = ["--output=graph", "--nograph:factored", "--noimplicit_deps"];
-    let run = |output_base: Option<&str>| {
+    let run = |output_base: Option<&str>, expression: &str| {
         let mut command = slug();
         command.current_dir(&workspace);
         if let Some(output_base) = output_base {
@@ -1239,21 +1238,35 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
             .unwrap()
     };
 
-    let one_shot = run(None);
+    let one_shot = run(None, "deps(//:root)");
     assert!(one_shot.status.success(), "{one_shot:?}");
     let stdout = String::from_utf8_lossy(&one_shot.stdout);
     assert!(stdout.starts_with("digraph mygraph {\n  node [shape=box];\n"));
     assert!(stdout.contains("\"//:root (slugcfg-v1:"), "{stdout}");
     assert!(stdout.contains("\" -> \"//:child (slugcfg-v1:"), "{stdout}");
+    assert!(stdout.contains("\" -> \"//:leaf (slugcfg-v1:"), "{stdout}");
     assert!(one_shot.stderr.is_empty());
 
     let output_base = scratch("cquery-graph-output-base");
     let _cleanup = DaemonCleanup(output_base.clone());
     let output_base = format!("--output_base={}", output_base.display());
-    let daemon = run(Some(&output_base));
+    let daemon = run(Some(&output_base), "deps(//:root)");
     assert!(daemon.status.success(), "{daemon:?}");
     assert_eq!(daemon.stdout, one_shot.stdout);
     assert!(daemon.stderr.is_empty());
+
+    let depth_one = run(None, "deps(//:root, 1)");
+    assert!(depth_one.status.success(), "{depth_one:?}");
+    let stdout = String::from_utf8_lossy(&depth_one.stdout);
+    assert!(stdout.contains("\"//:root (slugcfg-v1:"), "{stdout}");
+    assert!(stdout.contains("\" -> \"//:child (slugcfg-v1:"), "{stdout}");
+    assert!(!stdout.contains("//:leaf"), "{stdout}");
+    assert!(depth_one.stderr.is_empty());
+
+    let depth_one_daemon = run(Some(&output_base), "deps(//:root, 1)");
+    assert!(depth_one_daemon.status.success(), "{depth_one_daemon:?}");
+    assert_eq!(depth_one_daemon.stdout, depth_one.stdout);
+    assert!(depth_one_daemon.stderr.is_empty());
 }
 
 #[test]

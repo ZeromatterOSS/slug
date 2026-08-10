@@ -6517,3 +6517,36 @@ Run next only `WP-6-m2l-configured-query-forward-successor-audit`. Prefer an
 evidence-backed depth-limited graph/output extension or a smaller forward
 consumer. Keep factored/default-implicit/external topology, reverse traversal,
 parser replacement, JVM/Java, exact hashes, and CI stopped.
+
+### Configured-query depth-graph successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2l-configured-query-forward-successor-audit` selected depths 0, 1, and
+2 for the existing noimplicit unfactored graph mode. Accepted depth label rows
+and full delegation DOT combine with pinned Bazel 9.2 `DepsFunction` bounded
+selection and `GraphOutputFormatterCallback` selected-membership edge filtering
+to prove the exact induced topology. Configuration spelling and same-label
+ordering remain Slug-native.
+
+Run next `WP-6-m2m-depth-limited-unfactored-cquery-graph-output`. Replace only
+the command and raw-server unbounded-only guards with an explicit 0-through-2
+gate. Core production, query parser/evaluator/traversal, renderer, vendor,
+fixtures, oracle, JVM/Java, exact hashes, and CI remain stopped.
+
+### Configured-query depth-limited graph output ACCEPT (2026-08-09)
+
+`WP-6-m2m-depth-limited-unfactored-cquery-graph-output` is **ACCEPTED**. The
+existing noimplicit unfactored graph mode now admits explicit depths 0, 1, and
+2. Only the command and raw-server guards changed; configured closure,
+evaluation, and rendering production code were already the exact selected
+induced-subgraph owner. Depth 3 and above remain rejected.
+
+Commands pass 19 tests, server 48, and the focused core and rebuilt CLI graph
+tests pass. Core coverage pins root-only depth 0, seven nodes/six root edges at
+depth 1, and all nine nodes/nine induced edges at depth 2, equal to the full
+fixture. Formatting and diff gates plus independent final review pass. The
+Rust delta is 4 production and 94 test lines, 98 total, within 10/180/190 caps.
+
+Run next only `WP-6-m2n-configured-query-forward-successor-audit`. Determine
+whether a source-backed larger-depth boundary or a smaller forward consumer is
+the next closed slice. Keep factored/default-implicit/external topology,
+reverse traversal, parser replacement, JVM/Java, exact hashes, and CI stopped.

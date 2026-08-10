@@ -487,6 +487,28 @@ fn cquery_accepts_only_the_label_and_bounded_graph_output_matrix() {
     .unwrap();
     assert_eq!(graph.output_mode, CqueryOutputMode::Graph);
     assert!(!graph.include_implicit);
+    for depth in 0..=2 {
+        let graph = CqueryRequest::parse(&[
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            &format!("deps(//pkg:bin, {depth})"),
+        ])
+        .unwrap();
+        assert_eq!(graph.output_mode, CqueryOutputMode::Graph, "depth {depth}");
+    }
+    let depth_error = CqueryRequest::parse(&[
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps",
+        "deps(//pkg:bin, 3)",
+    ])
+    .unwrap_err()
+    .to_string();
+    assert!(
+        depth_error.contains("only unbounded deps() or depths 0, 1, and 2"),
+        "{depth_error}"
+    );
 
     let set = CqueryRequest::parse(&["set(//pkg:bin //pkg:lib) union //pkg:bin"]).unwrap();
     assert_eq!(set.output_mode, CqueryOutputMode::Label);
@@ -557,12 +579,6 @@ fn cquery_accepts_only_the_label_and_bounded_graph_output_matrix() {
             "--nograph:factored=false",
             "--noimplicit_deps",
             "deps(//pkg:bin)",
-        ],
-        vec![
-            "--output=graph",
-            "--nograph:factored",
-            "--noimplicit_deps",
-            "deps(//pkg:bin, 0)",
         ],
         vec![
             "--output=graph",
