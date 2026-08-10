@@ -28,9 +28,9 @@ use dupe::Dupe;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
-use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::key::RootStringSettingValue;
 use slug_analysis_v2::prepare_configured_node_analysis;
@@ -559,7 +559,7 @@ async fn root_string_request_result(
     target: &str,
     explicit: Option<&str>,
     tracker: Arc<RootActivationTracker>,
-) -> Result<Arc<AnalysisResult>, String> {
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     root_string_request_result_with_explicit(
         dice,
         workspace,
@@ -576,7 +576,7 @@ async fn root_string_request_result_with_explicit(
     target: &str,
     explicit: Option<RootStringSettingValue>,
     tracker: Arc<RootActivationTracker>,
-) -> Result<Arc<AnalysisResult>, String> {
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -634,7 +634,7 @@ async fn root_string_request(
     target: &str,
     explicit: Option<&str>,
     tracker: Arc<RootActivationTracker>,
-) -> Arc<AnalysisResult> {
+) -> Arc<ConfiguredNodeResult> {
     root_string_request_result(dice, workspace, target, explicit, tracker)
         .await
         .unwrap()
@@ -645,7 +645,7 @@ async fn root_target_request(
     workspace: &std::path::Path,
     target: &str,
     tracker: Arc<RootActivationTracker>,
-) -> Result<Arc<AnalysisResult>, String> {
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let mut user_data = UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -699,7 +699,7 @@ async fn root_target_request(
         .map_err(|error| error.to_string())
 }
 
-fn provider_value(result: &AnalysisResult, provider: &ProviderId) -> String {
+fn provider_value(result: &ConfiguredNodeResult, provider: &ProviderId) -> String {
     result
         .providers()
         .user(provider)
@@ -734,7 +734,7 @@ async fn toolchain_case(
     module: &str,
     defs: &str,
     build: &str,
-) -> Result<Arc<AnalysisResult>, String> {
+) -> Result<Arc<ConfiguredNodeResult>, String> {
     let workspace = scratch();
     fs::write(workspace.join("MODULE.bazel"), module).unwrap();
     fs::write(workspace.join("defs.bzl"), defs).unwrap();
@@ -768,7 +768,7 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
     assert!(first.actions().is_empty());
     assert!(first.declared_outputs().is_empty());
     assert!(first.diagnostics().is_empty());
-    assert!(first.direct_dependencies().is_empty());
+    assert!(first.configured_dependencies().next().is_none());
     let warm = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
         .await
         .unwrap();
@@ -1067,7 +1067,7 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
         ),
         "zero"
     );
-    assert!(result.direct_dependencies().is_empty());
+    assert!(result.configured_dependencies().next().is_none());
     let (activations, _, nodes) = tracker.take();
     assert!(
         activations
@@ -1248,7 +1248,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     )
     .await
     .unwrap();
-    assert_eq!(root_setting_value(legacy_setting.key()), "default");
+    assert_eq!(
+        root_setting_value(legacy_setting.configured_target_key().unwrap()),
+        "default"
+    );
     let legacy_parent = analyze_request(
         &dice,
         &workspace,
@@ -1259,7 +1262,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     .await
     .unwrap();
     assert_eq!(provider_value(&legacy_parent, &parent), "left,right");
-    assert_eq!(root_setting_value(legacy_parent.key()), "default");
+    assert_eq!(
+        root_setting_value(legacy_parent.configured_target_key().unwrap()),
+        "default"
+    );
     let default =
         root_string_request(&dice, &workspace, "@@//:consumer", None, tracker.clone()).await;
     assert_eq!(provider_value(&default, &consumer), "default");
@@ -1292,7 +1298,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
         root_string_request(&dice, &workspace, "@@//:parent", None, tracker.clone()).await;
     assert_eq!(provider_value(&original_parent, &parent), "left,right");
     let original_parent_key = original_parent.key().clone();
-    let parent_deps = original_parent.direct_dependencies();
+    let parent_deps = original_parent
+        .configured_dependencies()
+        .cloned()
+        .collect::<Vec<_>>();
     assert_eq!(parent_deps.len(), 2);
     assert_eq!(parent_deps[0].label(), parent_deps[1].label());
     assert_ne!(
@@ -1310,7 +1319,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     let edited_parent =
         root_string_request(&dice, &workspace, "@@//:parent", None, tracker.clone()).await;
     assert_eq!(provider_value(&edited_parent, &parent), "changed,right");
-    let edited_deps = edited_parent.direct_dependencies();
+    let edited_deps = edited_parent
+        .configured_dependencies()
+        .cloned()
+        .collect::<Vec<_>>();
     assert_ne!(edited_deps[0], parent_deps[0]);
     assert_eq!(edited_deps[1], parent_deps[1]);
 
@@ -1319,7 +1331,13 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
         root_string_request(&dice, &workspace, "@@//:parent", None, tracker.clone()).await;
     assert_eq!(provider_value(&restored_parent, &parent), "left,right");
     assert_eq!(original_parent_key, *restored_parent.key());
-    assert_eq!(parent_deps, restored_parent.direct_dependencies());
+    assert_eq!(
+        parent_deps,
+        restored_parent
+            .configured_dependencies()
+            .cloned()
+            .collect::<Vec<_>>()
+    );
 
     fs::write(
         &build,
@@ -1344,7 +1362,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
         Arc::new(RootActivationTracker::default()),
     )
     .await;
-    assert_eq!(root_setting_value(unrelated.key()), "command");
+    assert_eq!(
+        root_setting_value(unrelated.configured_target_key().unwrap()),
+        "command"
+    );
 
     let (activations, _, _) = tracker.take();
     assert_eq!(
@@ -1393,6 +1414,54 @@ resolved/@@//:setting=right:E"#
         unrelated_error.contains("root string build setting @@//:setting is missing"),
         "{unrelated_error}"
     );
+}
+
+#[tokio::test]
+async fn transitioned_edges_converge_on_resolved_child_node_but_retain_origins() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _setting(ctx): return []
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _child(ctx): return []
+child = rule(implementation = _child, attrs = {"_setting": attr.label(default = "//:setting")})
+def _first(settings, attr): return {"//:setting": "same"}
+def _second(settings, attr): return {"//:setting": "same"}
+first = transition(implementation = _first, inputs = [], outputs = ["//:setting"])
+second = transition(implementation = _second, inputs = [], outputs = ["//:setting"])
+def _parent(ctx): return []
+parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = first), "right": attr.label(cfg = second)})
+"#,
+    )
+    .unwrap();
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"child\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nchild(name = \"child\")\nparent(name = \"parent\", left = \":child\", right = \":child\")\n",
+    )
+    .unwrap();
+
+    let result = root_target_request(
+        &Dice::builder().build(DetectCycles::Enabled),
+        &workspace,
+        "@@//:parent",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    assert_eq!(result.edges().len(), 2);
+    assert_eq!(result.edges()[0].target(), result.edges()[1].target());
+    assert_ne!(result.edges()[0].kind(), result.edges()[1].kind());
+    assert!(matches!(
+        result.edges()[0].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute { attribute, index: 0, .. }
+        if attribute == "left"
+    ));
+    assert!(matches!(
+        result.edges()[1].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::TransitionedAttribute { attribute, index: 0, .. }
+        if attribute == "right"
+    ));
 }
 
 #[tokio::test]
@@ -1461,7 +1530,8 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
     assert_eq!(provider_value(&result, &parent), "transitioned");
     assert_eq!(
         result
-            .key()
+            .configured_target_key()
+            .unwrap()
             .configuration()
             .root_string_setting()
             .unwrap()
@@ -1475,7 +1545,10 @@ async fn analyze_revision(
     tracker: &Arc<AnalysisTracker>,
     workspace: &std::path::Path,
     key: &ConfiguredTargetKey,
-) -> (Result<AnalysisResult, String>, Vec<AnalysisActivation>) {
+) -> (
+    Result<ConfiguredNodeResult, String>,
+    Vec<AnalysisActivation>,
+) {
     let result = analyze_request(dice, workspace, key, Some(tracker.clone()), false).await;
     (result, tracker.take())
 }
@@ -1486,7 +1559,7 @@ async fn analyze_request(
     key: &ConfiguredTargetKey,
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
-) -> Result<AnalysisResult, String> {
+) -> Result<ConfiguredNodeResult, String> {
     analyze_request_typed(dice, workspace, key, tracker, capture_events)
         .await
         .map_err(|error| error.to_string())
@@ -1498,7 +1571,7 @@ async fn analyze_request_typed(
     key: &ConfiguredTargetKey,
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
-) -> Result<AnalysisResult, AnalysisError> {
+) -> Result<ConfiguredNodeResult, AnalysisError> {
     let text = Arc::new(workspace_snapshot(workspace));
     let raw = raw_snapshot_from_text(&text);
     let mut user_data = UserComputationData {
@@ -2072,7 +2145,10 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     let result = result.as_ref().as_ref().unwrap();
 
     assert_eq!(
-        result.direct_dependencies(),
+        result
+            .configured_dependencies()
+            .cloned()
+            .collect::<Vec<_>>(),
         [
             ConfiguredTargetKey::new(
                 CanonicalLabel::parse("@@//leaf:second").unwrap(),
@@ -2084,6 +2160,20 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
             ),
         ]
     );
+    assert!(matches!(
+        result.edges()[0].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::OrdinaryAttribute {
+            attribute,
+            index: 0
+        } if attribute == "deps"
+    ));
+    assert!(matches!(
+        result.edges()[1].kind(),
+        slug_analysis_v2::ConfiguredEdgeKind::OrdinaryAttribute {
+            attribute,
+            index: 1
+        } if attribute == "deps"
+    ));
     let parent_id = ProviderId::new("//rules:defs.bzl", "ParentInfo").unwrap();
     assert_eq!(
         result.providers().user(&parent_id).unwrap().field("value"),

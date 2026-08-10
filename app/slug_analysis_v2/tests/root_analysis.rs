@@ -398,8 +398,7 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
         .as_ref()
         .as_ref()
         .unwrap()
-        .direct_dependencies()
-        .iter()
+        .configured_dependencies()
         .map(|key| key.label().to_string())
         .collect::<Vec<_>>();
     assert_eq!(dependencies, ["@@//right:right", "@@//left:left"]);

@@ -9,16 +9,17 @@
  */
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use slug_analysis_v2::AnalysisDiagnostic;
-use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
-use slug_analysis_v2::ConfiguredDependency;
+use slug_analysis_v2::ConfiguredEdge;
+use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeKey;
+use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
-use slug_analysis_v2::TransitionEdge;
-use slug_analysis_v2::TransitionKind;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
@@ -29,6 +30,10 @@ use slug_build_api_v2::DepsetOrder;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::UserProvider;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::AutoCpuToken;
+use slug_configuration_v2::native::host::HostConversionInputs;
+use slug_configuration_v2::native::host::HostPathFlavor;
 use slug_identity_v2::ApparentLabel;
 use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
@@ -41,6 +46,23 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 
 fn target_config() -> ConfigurationKey {
     ConfigurationKey::target("targetabc").unwrap()
+}
+
+fn structural_configurations() -> [ConfigurationKey; 3] {
+    let host = HostConversionInputs::new(
+        Some(AutoCpuToken::K8),
+        Some(HostPathFlavor::Unix),
+        None,
+        Arc::from([]),
+        Arc::from([]),
+    )
+    .unwrap();
+    [
+        SlugConfiguration::default_target(&host).unwrap(),
+        SlugConfiguration::default_exec(&host).unwrap(),
+        SlugConfiguration::default_host_like(&host).unwrap(),
+    ]
+    .map(ConfigurationKey::from_slug)
 }
 
 fn canonical(value: &str) -> CanonicalLabel {
@@ -79,6 +101,29 @@ fn configured_target_key_serializes_label_mapping_and_configuration() {
 }
 
 #[test]
+fn configured_node_key_distinguishes_configured_null_and_configuration_kinds() {
+    let label = canonical("@@//pkg:target");
+    let [target_configuration, exec_configuration, host_configuration] =
+        structural_configurations();
+    let target = ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+        label.clone(),
+        target_configuration,
+    ));
+    let exec =
+        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(label.clone(), exec_configuration));
+    let host_like =
+        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(label.clone(), host_configuration));
+    let null = ConfiguredNodeKey::null(label);
+
+    assert_ne!(target, exec);
+    assert_ne!(target, host_like);
+    assert_ne!(exec, host_like);
+    assert_ne!(target, null);
+    assert!(null.configured_target().is_none());
+    assert_eq!(null.label().to_string(), "@@//pkg:target");
+}
+
+#[test]
 fn configured_analysis_key_rejects_legacy_configuration_identity() {
     let target = ConfiguredTargetKey::new(canonical("@@//pkg:target"), target_config());
     let error =
@@ -91,23 +136,105 @@ fn configured_analysis_key_rejects_legacy_configuration_identity() {
 }
 
 #[test]
-fn configured_dependency_records_transition_output_configuration() {
-    let dep = ConfiguredDependency::new(
-        canonical("@@//dep:lib"),
-        TransitionEdge::new(
-            TransitionKind::Exec,
+fn configured_edge_records_transition_output_and_fixed_bits() {
+    let edge = ConfiguredEdge::new(
+        ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+            canonical("@@//dep:lib"),
             ConfigurationKey::exec("execplatform1").unwrap(),
-        ),
+        )),
+        ConfiguredEdgeKind::TransitionedAttribute {
+            attribute: "deps".into(),
+            index: 0,
+            output: canonical("@@//settings:exec"),
+        },
     );
 
-    let key = dep.configured_key();
-    assert_eq!(dep.transition().kind(), &TransitionKind::Exec);
+    let key = edge.configured_target().unwrap();
     assert_eq!(key.label().to_string(), "@@//dep:lib");
     assert_eq!(key.configuration().stable_serialize(), "exec:execplatform1");
+    assert_eq!(edge.implicit(), false);
+    assert_eq!(edge.tool(), false);
 }
 
 #[test]
-fn analysis_result_keeps_provider_collection_outputs_and_diagnostics() {
+fn configured_edges_preserve_transition_convergence_order_and_fixed_bits() {
+    let target = ConfiguredTargetKey::new(canonical("@@//dep:lib"), target_config());
+    let first = ConfiguredEdge::new(
+        target.clone().into(),
+        ConfiguredEdgeKind::TransitionedAttribute {
+            attribute: "left".into(),
+            index: 0,
+            output: canonical("@@//settings:out"),
+        },
+    );
+    let second = ConfiguredEdge::new(
+        target.clone().into(),
+        ConfiguredEdgeKind::TransitionedAttribute {
+            attribute: "right".into(),
+            index: 1,
+            output: canonical("@@//settings:out"),
+        },
+    );
+    assert_ne!(first, second);
+    assert_eq!(first.configured_target(), second.configured_target());
+
+    let kinds = vec![
+        (
+            ConfiguredEdgeKind::OrdinaryAttribute {
+                attribute: "deps".into(),
+                index: 0,
+            },
+            false,
+        ),
+        (
+            ConfiguredEdgeKind::TransitionedAttribute {
+                attribute: "deps".into(),
+                index: 1,
+                output: canonical("@@//settings:out"),
+            },
+            false,
+        ),
+        (ConfiguredEdgeKind::AliasActual, false),
+        (ConfiguredEdgeKind::GeneratedBy, false),
+        (ConfiguredEdgeKind::Source, false),
+        (ConfiguredEdgeKind::DeclaringVisibility, false),
+        (ConfiguredEdgeKind::PackageGroupInclude { index: 0 }, true),
+        (ConfiguredEdgeKind::ToolchainRequirement, true),
+        (ConfiguredEdgeKind::SelectedToolchainImplementation, true),
+        (
+            ConfiguredEdgeKind::CandidateExecutionPlatform { index: 0 },
+            true,
+        ),
+        (ConfiguredEdgeKind::HostPlatform, true),
+        (ConfiguredEdgeKind::PlatformConstraint { index: 0 }, true),
+        (ConfiguredEdgeKind::ConstraintSetting, true),
+        (ConfiguredEdgeKind::FunctionTransitionAllowlist, true),
+    ];
+    for (kind, implicit) in kinds {
+        let edge = ConfiguredEdge::new(target.clone().into(), kind);
+        assert_eq!(edge.implicit(), implicit);
+        assert!(!edge.tool());
+    }
+
+    let providers =
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
+    let ordered = ConfiguredNodeResult::new_rule(target.clone(), providers.clone(), None)
+        .with_edges(vec![first.clone(), second.clone()]);
+    let reordered =
+        ConfiguredNodeResult::new_rule(target, providers, None).with_edges(vec![second, first]);
+    assert_ne!(ordered, reordered);
+    assert_eq!(
+        ordered.edges()[0].kind(),
+        &ConfiguredEdgeKind::TransitionedAttribute {
+            attribute: "left".into(),
+            index: 0,
+            output: canonical("@@//settings:out")
+        }
+    );
+}
+
+#[test]
+fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
     let mut fields = BTreeMap::new();
     fields.insert("value".to_owned(), "custom".to_owned());
     let files = Depset::from_direct(DepsetOrder::Default, vec!["pkg/out.txt".to_owned()]).unwrap();
@@ -117,7 +244,7 @@ fn analysis_result_keeps_provider_collection_outputs_and_diagnostics() {
     ])
     .unwrap();
 
-    let result = AnalysisResult::new(
+    let result = ConfiguredNodeResult::new_rule(
         ConfiguredTargetKey::new(canonical("@@//pkg:custom"), target_config()),
         providers,
         None,
@@ -137,7 +264,7 @@ fn analysis_result_keeps_provider_collection_outputs_and_diagnostics() {
     )]);
 
     assert_eq!(
-        result.key().stable_serialize(),
+        result.configured_target_key().unwrap().stable_serialize(),
         "@@//pkg:custom [target:targetabc]"
     );
     assert_eq!(result.actions()[0].mnemonic(), "FileWrite");
@@ -157,7 +284,7 @@ fn analysis_result_keeps_provider_collection_outputs_and_diagnostics() {
 }
 
 #[test]
-fn analysis_result_capability_is_borrowed_and_participates_in_equality() {
+fn configured_node_result_capability_is_borrowed_and_participates_in_equality() {
     let key = ConfiguredTargetKey::new(canonical("@@//pkg:custom"), target_config());
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
@@ -172,10 +299,10 @@ fn analysis_result_capability_is_borrowed_and_participates_in_equality() {
         test_kind: Some(TestRuleKind::Test),
     };
 
-    let absent = AnalysisResult::new(key.clone(), providers.clone(), None);
+    let absent = ConfiguredNodeResult::new_rule(key.clone(), providers.clone(), None);
     let executable_result =
-        AnalysisResult::new(key.clone(), providers.clone(), Some(executable.clone()));
-    let renamed = AnalysisResult::new(
+        ConfiguredNodeResult::new_rule(key.clone(), providers.clone(), Some(executable.clone()));
+    let renamed = ConfiguredNodeResult::new_rule(
         key.clone(),
         providers.clone(),
         Some(RuleCapability {
@@ -183,7 +310,7 @@ fn analysis_result_capability_is_borrowed_and_participates_in_equality() {
             ..executable.clone()
         }),
     );
-    let test_result = AnalysisResult::new(key, providers, Some(test));
+    let test_result = ConfiguredNodeResult::new_rule(key, providers, Some(test));
 
     assert_eq!(executable_result.rule_capability(), Some(&executable));
     assert_ne!(absent, executable_result);

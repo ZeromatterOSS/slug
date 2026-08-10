@@ -197,7 +197,8 @@ fn run_reapi_build(
         platform_properties.sort();
         for analysis in evaluation.analyses() {
             let configuration = analysis
-                .key()
+                .configured_target_key()
+                .ok_or_else(|| "production rule analysis returned a null node".to_owned())?
                 .configuration()
                 .slug_configuration()
                 .ok_or_else(|| "production analysis returned an opaque configuration".to_owned())?;

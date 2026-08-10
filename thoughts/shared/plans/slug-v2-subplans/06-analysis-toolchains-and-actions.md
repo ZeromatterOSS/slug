@@ -6296,3 +6296,28 @@ Run next only `WP-6-m2c-configured-node-result-substrate`: introduce the
 reviewed structural/null node identity, classified immutable edges, and the
 single retained configured-node result shape before adding native/delegating
 topology or cquery traversal breadth.
+
+### Configured-node result substrate ACCEPT (2026-08-09)
+
+`WP-6-m2c-configured-node-result-substrate` is **ACCEPTED**. One structural/null
+`ConfiguredNodeKey`, one immutable `ConfiguredNodeResult`, and classified
+ordered edges replace the configured-only result/dependency substrate without a
+second DICE key, graph, cache, or retained adjacency. Transitioned edges point
+at the resolved child node while retaining attribute-local origin; equal
+transition outputs converge. Every admitted edge kind has its exact fixed
+implicit/tool bits, and only complete successes are DICE-valid or equal.
+
+Analysis passes 32 tests and server passes 48. Core passes 154/155 with only the
+unchanged external-visibility diagnostic mismatch; the rebuilt CLI passes 47/48
+with only the unchanged `bzl_cycle` unavailable-root failure. The functional
+delta is 152 net production and 216 net test lines across nine production and
+three test files; the production-file allowance expanded only for required
+core/server/CLI migration after deleting the old public result shape. Format,
+diff, archive, old-symbol, and independent correction review gates pass. The
+vendored Buck2 `starlark-rust` parser/evaluator is unchanged.
+
+Run next only `WP-6-m2d-root-delegating-native-node-activation`: activate root
+alias, exported-source/null, generated-output, filegroup, and package-group
+nodes through the same key/result and accepted edge kinds. Literal external
+`@bazel_tools` remains stopped until apparent-repository routing, external glob,
+and the `@platforms` dependency can be owned without synthetic content.

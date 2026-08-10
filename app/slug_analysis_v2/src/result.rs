@@ -11,10 +11,13 @@
 use std::sync::Arc;
 
 use allocative::Allocative;
+use compact_str::CompactString;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ProviderCollection;
 use slug_loading_v2::RuleCapability;
 
+use crate::configured_target::ConfiguredEdge;
+use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
@@ -47,36 +50,49 @@ impl AnalysisDiagnostic {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub enum ConfiguredNodeKind {
+    Rule,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub struct AnalysisResult {
-    key: ConfiguredTargetKey,
+pub struct ConfiguredNodeResult {
+    key: ConfiguredNodeKey,
+    kind: ConfiguredNodeKind,
     providers: ProviderCollection,
-    actions: Vec<ActionSpec>,
-    declared_outputs: Vec<String>,
-    direct_dependencies: Arc<[ConfiguredTargetKey]>,
-    diagnostics: Vec<AnalysisDiagnostic>,
+    actions: Arc<[ActionSpec]>,
+    declared_outputs: Arc<[CompactString]>,
+    edges: Arc<[ConfiguredEdge]>,
+    diagnostics: Arc<[AnalysisDiagnostic]>,
     rule_capability: Option<RuleCapability>,
 }
 
-impl AnalysisResult {
-    pub fn new(
+impl ConfiguredNodeResult {
+    pub fn new_rule(
         key: ConfiguredTargetKey,
         providers: ProviderCollection,
         rule_capability: Option<RuleCapability>,
     ) -> Self {
         Self {
-            key,
+            key: key.into(),
+            kind: ConfiguredNodeKind::Rule,
             providers,
-            actions: Vec::new(),
-            declared_outputs: Vec::new(),
-            direct_dependencies: Arc::from([]),
-            diagnostics: Vec::new(),
+            actions: Arc::from([]),
+            declared_outputs: Arc::from([]),
+            edges: Arc::from([]),
+            diagnostics: Arc::from([]),
             rule_capability,
         }
     }
 
-    pub fn key(&self) -> &ConfiguredTargetKey {
+    pub fn key(&self) -> &ConfiguredNodeKey {
         &self.key
+    }
+    pub fn kind(&self) -> &ConfiguredNodeKind {
+        &self.kind
+    }
+    pub fn configured_target_key(&self) -> Option<&ConfiguredTargetKey> {
+        self.key.configured_target()
     }
 
     pub fn providers(&self) -> &ProviderCollection {
@@ -87,12 +103,17 @@ impl AnalysisResult {
         &self.actions
     }
 
-    pub fn declared_outputs(&self) -> &[String] {
+    pub fn declared_outputs(&self) -> &[CompactString] {
         &self.declared_outputs
     }
 
-    pub fn direct_dependencies(&self) -> &[ConfiguredTargetKey] {
-        &self.direct_dependencies
+    pub fn edges(&self) -> &[ConfiguredEdge] {
+        &self.edges
+    }
+    pub fn configured_dependencies(&self) -> impl Iterator<Item = &ConfiguredTargetKey> {
+        self.edges
+            .iter()
+            .filter_map(ConfiguredEdge::configured_target)
     }
 
     pub fn diagnostics(&self) -> &[AnalysisDiagnostic] {
@@ -104,25 +125,26 @@ impl AnalysisResult {
     }
 
     pub fn with_actions(mut self, actions: Vec<ActionSpec>) -> Self {
-        self.actions = actions;
+        self.actions = actions.into();
         self
     }
 
     pub fn with_declared_outputs(mut self, declared_outputs: Vec<String>) -> Self {
-        self.declared_outputs = declared_outputs;
+        self.declared_outputs = declared_outputs
+            .into_iter()
+            .map(CompactString::from)
+            .collect::<Vec<_>>()
+            .into();
         self
     }
 
-    pub fn with_direct_dependencies(
-        mut self,
-        direct_dependencies: Vec<ConfiguredTargetKey>,
-    ) -> Self {
-        self.direct_dependencies = direct_dependencies.into();
+    pub fn with_edges(mut self, edges: Vec<ConfiguredEdge>) -> Self {
+        self.edges = edges.into();
         self
     }
 
     pub fn with_diagnostics(mut self, diagnostics: Vec<AnalysisDiagnostic>) -> Self {
-        self.diagnostics = diagnostics;
+        self.diagnostics = diagnostics.into();
         self
     }
 }

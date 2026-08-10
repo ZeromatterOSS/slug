@@ -203,3 +203,51 @@ impl fmt::Display for ConfiguredTargetKey {
         f.write_str(&self.stable_serialize())
     }
 }
+
+/// Canonical configured-query identity. A configured target remains the
+/// configured-only domain value; null is reserved for the later delegating
+/// topology packet and is never analyzed in this packet.
+#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
+pub enum ConfiguredNodeKey {
+    Configured(ConfiguredTargetKey),
+    Null(CanonicalLabel),
+}
+
+impl ConfiguredNodeKey {
+    pub fn configured(target: ConfiguredTargetKey) -> Self {
+        Self::Configured(target)
+    }
+
+    pub fn null(label: CanonicalLabel) -> Self {
+        Self::Null(label)
+    }
+
+    pub fn configured_target(&self) -> Option<&ConfiguredTargetKey> {
+        match self {
+            Self::Configured(target) => Some(target),
+            Self::Null(_) => None,
+        }
+    }
+
+    pub fn label(&self) -> &CanonicalLabel {
+        match self {
+            Self::Configured(target) => target.label(),
+            Self::Null(label) => label,
+        }
+    }
+}
+
+impl From<ConfiguredTargetKey> for ConfiguredNodeKey {
+    fn from(value: ConfiguredTargetKey) -> Self {
+        Self::configured(value)
+    }
+}
+
+impl fmt::Display for ConfiguredNodeKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Configured(target) => target.fmt(f),
+            Self::Null(label) => write!(f, "{label} [null]"),
+        }
+    }
+}

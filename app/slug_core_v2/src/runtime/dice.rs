@@ -47,9 +47,9 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
-use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -1319,7 +1319,10 @@ impl NativeCommandRoot for CqueryCommandRoot {
                     ));
                 }
             };
-            let Some(configuration) = analysis.key().configuration().slug_configuration() else {
+            let configured_key = analysis
+                .configured_target_key()
+                .expect("current cquery analysis only contains configured nodes");
+            let Some(configuration) = configured_key.configuration().slug_configuration() else {
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
                     Arc::new(Err(CqueryCommandError::infrastructure(
                         "production cquery analysis returned an opaque configuration",
@@ -1327,7 +1330,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
                 ));
             };
             targets.push(CqueryResultTarget {
-                key: analysis.key().clone(),
+                key: configured_key.clone(),
                 analysis: analysis.clone(),
                 display_label: root.requested.clone(),
                 projection: configuration.projection(),
@@ -1598,7 +1601,7 @@ impl NativeDemandSessionOwner {
 pub struct RequestedPackageEvaluation {
     pub target_pattern: String,
     pub package: LoadedPackage,
-    pub analysis: Option<AnalysisResult>,
+    pub analysis: Option<ConfiguredNodeResult>,
     pub revision: WorkspaceRevision,
 }
 
@@ -1644,7 +1647,7 @@ pub struct CqueryCommandEvaluation {
 #[derive(Debug, Clone, Allocative)]
 struct CqueryResultTarget {
     key: ConfiguredTargetKey,
-    analysis: Arc<AnalysisResult>,
+    analysis: Arc<ConfiguredNodeResult>,
     display_label: Arc<str>,
     projection: SlugConfigurationProjection,
 }
@@ -1884,14 +1887,14 @@ enum BuildCommandRequestError {
 pub struct BuildCommandEvaluation {
     anchor: RootModuleLoadingAnchor,
     targets: Arc<[BuildRequestedTarget]>,
-    action_closure: Arc<[Arc<AnalysisResult>]>,
+    action_closure: Arc<[Arc<ConfiguredNodeResult>]>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 struct BuildRequestedTarget {
     pattern: Arc<str>,
     package: LoadedPackage,
-    analysis: Option<Arc<AnalysisResult>>,
+    analysis: Option<Arc<ConfiguredNodeResult>>,
     completion: BuildTargetCompletion,
 }
 
@@ -1937,12 +1940,13 @@ type BuildCommandOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
     Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
 >;
 
-type BuildActionClosureOutcome =
-    slug_bzlmod_v2::SourcePreparationOutcome<Result<Arc<[Arc<AnalysisResult>]>, BuildCommandError>>;
+type BuildActionClosureOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
+    Result<Arc<[Arc<ConfiguredNodeResult>]>, BuildCommandError>,
+>;
 type BuildActionAnalysisOutcome =
-    slug_bzlmod_v2::SourcePreparationOutcome<Arc<Result<Arc<AnalysisResult>, AnalysisError>>>;
+    slug_bzlmod_v2::SourcePreparationOutcome<Arc<Result<Arc<ConfiguredNodeResult>, AnalysisError>>>;
 type BuildActionFrontierOutcome =
-    slug_bzlmod_v2::SourcePreparationOutcome<Result<Vec<Arc<AnalysisResult>>, AnalysisError>>;
+    slug_bzlmod_v2::SourcePreparationOutcome<Result<Vec<Arc<ConfiguredNodeResult>>, AnalysisError>>;
 
 enum BuildBranchResult {
     Outcome(
@@ -2022,7 +2026,7 @@ impl BuildCommandEvaluation {
             .sum()
     }
 
-    pub fn analyses(&self) -> impl Iterator<Item = &AnalysisResult> {
+    pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
         self.action_closure.iter().map(Arc::as_ref)
     }
 
@@ -2052,7 +2056,7 @@ impl CqueryCommandEvaluation {
             .collect()
     }
 
-    pub fn analyses(&self) -> impl Iterator<Item = &AnalysisResult> {
+    pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
         self.targets.iter().map(|target| target.analysis.as_ref())
     }
 }
@@ -2333,8 +2337,8 @@ fn collect_build_action_frontier(
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
                 Ok(analysis) => {
                     assert_eq!(
-                        analysis.key(),
-                        &configured_target,
+                        analysis.configured_target_key(),
+                        Some(&configured_target),
                         "root analysis returned a mismatched configured target"
                     );
                     layer.push(analysis.dupe());
@@ -2369,13 +2373,16 @@ async fn compute_build_action_closure(
     let mut frontier = Vec::new();
 
     for analysis in targets.iter().filter_map(|target| target.analysis.as_ref()) {
-        if !seen.insert(analysis.key().clone()) {
+        let configured_key = analysis
+            .configured_target_key()
+            .expect("current build analysis only contains configured nodes");
+        if !seen.insert(configured_key.clone()) {
             continue;
         }
         closure.push(analysis.dupe());
     }
     for analysis in &closure {
-        for dependency in analysis.direct_dependencies() {
+        for dependency in analysis.configured_dependencies() {
             if seen.insert(dependency.clone()) {
                 frontier.push(dependency.clone());
             }
@@ -2422,7 +2429,7 @@ async fn compute_build_action_closure(
 
         let mut next = Vec::new();
         for analysis in layer {
-            for dependency in analysis.direct_dependencies() {
+            for dependency in analysis.configured_dependencies() {
                 if seen.insert(dependency.clone()) {
                     next.push(dependency.clone());
                 }
@@ -3309,7 +3316,8 @@ impl WorkspaceRuntime {
         if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
             for analysis in evaluation.analyses() {
                 let configuration = analysis
-                    .key()
+                    .configured_target_key()
+                    .expect("production analysis only contains configured nodes")
                     .configuration()
                     .slug_configuration()
                     .ok_or_else(|| {
@@ -3413,7 +3421,8 @@ impl WorkspaceRuntime {
         if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
             for analysis in evaluation.analyses() {
                 let configuration = analysis
-                    .key()
+                    .configured_target_key()
+                    .expect("production analysis only contains configured nodes")
                     .configuration()
                     .slug_configuration()
                     .ok_or_else(|| {
@@ -6123,7 +6132,8 @@ mod tests {
             .analyses()
             .next()
             .unwrap()
-            .key()
+            .configured_target_key()
+            .expect("current build analysis only contains configured nodes")
             .configuration()
             .clone();
 
@@ -6145,7 +6155,8 @@ mod tests {
             .analyses()
             .next()
             .unwrap()
-            .key()
+            .configured_target_key()
+            .expect("current build analysis only contains configured nodes")
             .configuration()
             .clone();
         assert_ne!(c0, c1);
@@ -6170,7 +6181,8 @@ mod tests {
             .analyses()
             .next()
             .unwrap()
-            .key()
+            .configured_target_key()
+            .expect("current build analysis only contains configured nodes")
             .configuration();
         assert_eq!(&c0, restored_configuration);
         assert!(accepted_output_text(&restored).is_empty());
@@ -6267,7 +6279,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                     .analyses()
                     .find(|analysis| analysis.key().label().to_string() == label)
                     .unwrap()
-                    .key()
+                    .configured_target_key()
+                    .expect("current build analysis only contains configured nodes")
                     .configuration()
                     .clone()
             };
@@ -6773,8 +6786,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 analysis.declared_outputs().to_vec(),
                 analysis.actions().len(),
                 analysis
-                    .direct_dependencies()
-                    .iter()
+                    .configured_dependencies()
                     .map(|dependency| dependency.label().to_string())
                     .collect::<Vec<_>>(),
             )
@@ -6786,7 +6798,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         let c0_analysis = c0.analyses().next().unwrap();
         assert_eq!(
             c0_analysis
-                .key()
+                .configured_target_key()
+                .expect("current cquery analysis only contains configured nodes")
                 .configuration()
                 .root_string_setting()
                 .map(|value| value.as_str()),
@@ -6807,7 +6820,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         let c1_analysis = c1.analyses().next().unwrap();
         assert_eq!(
             c1_analysis
-                .key()
+                .configured_target_key()
+                .expect("current cquery analysis only contains configured nodes")
                 .configuration()
                 .root_string_setting()
                 .map(|value| value.as_str()),
@@ -6844,7 +6858,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 .analyses()
                 .next()
                 .unwrap()
-                .key()
+                .configured_target_key()
+                .expect("current cquery analysis only contains configured nodes")
                 .configuration()
                 .root_string_setting()
                 .map(|value| value.as_str()),
@@ -6858,8 +6873,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
             .analyses()
             .next()
             .unwrap()
-            .direct_dependencies()
-            .first()
+            .configured_dependencies()
+            .next()
             .unwrap();
         assert_eq!(child.label().to_string(), "@@//:consumer");
         assert_eq!(

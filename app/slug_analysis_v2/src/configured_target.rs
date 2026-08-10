@@ -8,88 +8,86 @@
  * above-listed licenses.
  */
 
-use std::fmt;
-
+use allocative::Allocative;
+use compact_str::CompactString;
 use slug_identity_v2::CanonicalLabel;
 
-use crate::key::ConfigurationKey;
+use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum TransitionKind {
-    Target,
-    Exec,
-    HostLike,
-    Custom { name: String },
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct ConfiguredEdge {
+    target: ConfiguredNodeKey,
+    kind: ConfiguredEdgeKind,
 }
 
-impl TransitionKind {
-    pub fn custom(name: impl Into<String>) -> Self {
-        Self::Custom { name: name.into() }
+impl ConfiguredEdge {
+    pub fn new(target: ConfiguredNodeKey, kind: ConfiguredEdgeKind) -> Self {
+        Self { target, kind }
     }
-
-    pub fn as_str(&self) -> &str {
-        match self {
-            Self::Target => "target",
-            Self::Exec => "exec",
-            Self::HostLike => "host-like",
-            Self::Custom { name } => name,
-        }
+    pub fn target(&self) -> &ConfiguredNodeKey {
+        &self.target
     }
-}
-
-impl fmt::Display for TransitionKind {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(self.as_str())
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct TransitionEdge {
-    kind: TransitionKind,
-    output_configuration: ConfigurationKey,
-}
-
-impl TransitionEdge {
-    pub fn new(kind: TransitionKind, output_configuration: ConfigurationKey) -> Self {
-        Self {
-            kind,
-            output_configuration,
-        }
-    }
-
-    pub fn kind(&self) -> &TransitionKind {
+    pub fn kind(&self) -> &ConfiguredEdgeKind {
         &self.kind
     }
-
-    pub fn output_configuration(&self) -> &ConfigurationKey {
-        &self.output_configuration
+    pub fn configured_target(&self) -> Option<&ConfiguredTargetKey> {
+        self.target.configured_target()
+    }
+    pub fn implicit(&self) -> bool {
+        self.kind.implicit()
+    }
+    pub fn tool(&self) -> bool {
+        self.kind.tool()
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ConfiguredDependency {
-    label: CanonicalLabel,
-    transition: TransitionEdge,
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub enum ConfiguredEdgeKind {
+    OrdinaryAttribute {
+        attribute: CompactString,
+        index: u32,
+    },
+    TransitionedAttribute {
+        attribute: CompactString,
+        index: u32,
+        output: CanonicalLabel,
+    },
+    AliasActual,
+    GeneratedBy,
+    Source,
+    DeclaringVisibility,
+    PackageGroupInclude {
+        index: u32,
+    },
+    ToolchainRequirement,
+    SelectedToolchainImplementation,
+    CandidateExecutionPlatform {
+        index: u32,
+    },
+    HostPlatform,
+    PlatformConstraint {
+        index: u32,
+    },
+    ConstraintSetting,
+    FunctionTransitionAllowlist,
 }
 
-impl ConfiguredDependency {
-    pub fn new(label: CanonicalLabel, transition: TransitionEdge) -> Self {
-        Self { label, transition }
-    }
-
-    pub fn label(&self) -> &CanonicalLabel {
-        &self.label
-    }
-
-    pub fn transition(&self) -> &TransitionEdge {
-        &self.transition
-    }
-
-    pub fn configured_key(&self) -> ConfiguredTargetKey {
-        ConfiguredTargetKey::new(
-            self.label.clone(),
-            self.transition.output_configuration.clone(),
+impl ConfiguredEdgeKind {
+    pub fn implicit(&self) -> bool {
+        matches!(
+            self,
+            Self::PackageGroupInclude { .. }
+                | Self::ToolchainRequirement
+                | Self::SelectedToolchainImplementation
+                | Self::CandidateExecutionPlatform { .. }
+                | Self::HostPlatform
+                | Self::PlatformConstraint { .. }
+                | Self::ConstraintSetting
+                | Self::FunctionTransitionAllowlist
         )
+    }
+    pub const fn tool(&self) -> bool {
+        false
     }
 }

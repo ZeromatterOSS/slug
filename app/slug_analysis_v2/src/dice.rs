@@ -49,7 +49,7 @@ use starlark_map::small_set::SmallSet;
 use crate::key::ConfigurationKey;
 use crate::key::ConfiguredTargetKey;
 use crate::key::RootStringSettingValue;
-use crate::result::AnalysisResult;
+use crate::result::ConfiguredNodeResult;
 use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
 use crate::starlark_rule::PreparedToolchain;
@@ -361,7 +361,7 @@ impl fmt::Display for ConfiguredNodeAnalysisKey {
 }
 
 type RootAnalysisKeyValue =
-    LoadingPreparationOutcome<Arc<Result<Arc<AnalysisResult>, AnalysisError>>>;
+    LoadingPreparationOutcome<Arc<Result<Arc<ConfiguredNodeResult>, AnalysisError>>>;
 
 #[derive(Default)]
 struct AnalysisPrintCapture {
@@ -526,12 +526,20 @@ fn root_declared_dependency_keys(
         } else {
             configured_target.configuration().clone()
         };
-        for label in labels {
+        let transition_output = schema
+            .transition()
+            .map(|transition| CanonicalLabel::parse(&format!("@@{}", transition.output())))
+            .transpose()
+            .map_err(AnalysisError::new)?;
+        for (attribute_index, label) in labels.into_iter().enumerate() {
             dependencies.push(DeclaredDependencyKey {
                 attribute: CompactString::from(value.declaration_name.as_str()),
+                attribute_index: u32::try_from(attribute_index)
+                    .expect("attribute dependency index fits u32"),
                 sequence: schema.transition().is_some()
                     || matches!(schema.kind(), slug_loading_v2::AttributeKind::LabelList),
                 key: ConfiguredTargetKey::new(label.clone(), configuration.clone()),
+                transition_output: transition_output.clone(),
             });
         }
     }
@@ -540,22 +548,24 @@ fn root_declared_dependency_keys(
 #[derive(Debug, Clone)]
 struct DeclaredDependencyKey {
     attribute: CompactString,
+    attribute_index: u32,
     sequence: bool,
     key: ConfiguredTargetKey,
+    transition_output: Option<CanonicalLabel>,
 }
 
 trait ComputedAnalysis {
-    fn result(&self) -> &AnalysisResult;
+    fn result(&self) -> &ConfiguredNodeResult;
 }
 
-impl ComputedAnalysis for AnalysisResult {
-    fn result(&self) -> &AnalysisResult {
+impl ComputedAnalysis for ConfiguredNodeResult {
+    fn result(&self) -> &ConfiguredNodeResult {
         self
     }
 }
 
-impl ComputedAnalysis for Arc<AnalysisResult> {
-    fn result(&self) -> &AnalysisResult {
+impl ComputedAnalysis for Arc<ConfiguredNodeResult> {
+    fn result(&self) -> &ConfiguredNodeResult {
         self
     }
 }
@@ -568,10 +578,14 @@ fn legacy_declared_dependency_keys(
         .dependencies()
         .iter()
         .cloned()
-        .map(|label| DeclaredDependencyKey {
+        .enumerate()
+        .map(|(attribute_index, label)| DeclaredDependencyKey {
             attribute: CompactString::const_new("deps"),
+            attribute_index: u32::try_from(attribute_index)
+                .expect("attribute dependency index fits u32"),
             sequence: true,
             key: ConfiguredTargetKey::new(label, configured_target.configuration().clone()),
+            transition_output: None,
         })
         .collect())
 }
@@ -585,12 +599,12 @@ fn finish_analysis<T>(
     toolchain: Option<PreparedToolchain>,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
-) -> Result<AnalysisResult, AnalysisError>
+) -> Result<ConfiguredNodeResult, AnalysisError>
 where
     T: ComputedAnalysis,
 {
     let _implementation = starlark_rule_implementation(package, configured_target)?;
-    let dependencies = declared_dependency_keys
+    let resolved = declared_dependency_keys
         .iter()
         .map(|dependency| {
             let result = computed.get(&dependency.key).ok_or_else(|| {
@@ -599,14 +613,36 @@ where
                     dependency.key
                 ))
             })?;
-            Ok(PreparedDependency {
-                key: result.result().key().clone(),
-                providers: result.result().providers().clone(),
-                attribute: dependency.attribute.clone(),
-                sequence: dependency.sequence,
-            })
+            let node_key = result.result().key().clone();
+            let kind = match &dependency.transition_output {
+                Some(output) => {
+                    crate::configured_target::ConfiguredEdgeKind::TransitionedAttribute {
+                        attribute: dependency.attribute.clone(),
+                        index: dependency.attribute_index,
+                        output: output.clone(),
+                    }
+                }
+                None => crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+                    attribute: dependency.attribute.clone(),
+                    index: dependency.attribute_index,
+                },
+            };
+            Ok((
+                PreparedDependency {
+                    key: result
+                        .result()
+                        .configured_target_key()
+                        .expect("current rule analysis only prepares configured nodes")
+                        .clone(),
+                    providers: result.result().providers().clone(),
+                    attribute: dependency.attribute.clone(),
+                    sequence: dependency.sequence,
+                },
+                crate::configured_target::ConfiguredEdge::new(node_key, kind),
+            ))
         })
         .collect::<Result<Vec<_>, AnalysisError>>()?;
+    let (dependencies, edges): (Vec<_>, Vec<_>) = resolved.into_iter().unzip();
     let print_capture = capture_events.then(AnalysisPrintCapture::default);
     let label = configured_target.label();
     let value = evaluate_loaded_rule(
@@ -622,11 +658,34 @@ where
             .map(|capture| capture as &dyn PrintHandler),
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
-    value.map_err(AnalysisError::from_loaded_rule_error)
+    value
+        .map_err(AnalysisError::from_loaded_rule_error)
+        .map(|result| result.with_edges(edges))
 }
 
-fn root_analysis_complete(result: Result<AnalysisResult, AnalysisError>) -> RootAnalysisKeyValue {
+fn root_analysis_complete(
+    result: Result<ConfiguredNodeResult, AnalysisError>,
+) -> RootAnalysisKeyValue {
     LoadingPreparationOutcome::Complete(Arc::new(result.map(Arc::new)))
+}
+
+fn root_analysis_success_eq(left: &RootAnalysisKeyValue, right: &RootAnalysisKeyValue) -> bool {
+    match (left, right) {
+        (LoadingPreparationOutcome::Complete(left), LoadingPreparationOutcome::Complete(right)) => {
+            match (left.as_ref(), right.as_ref()) {
+                (Ok(left), Ok(right)) => left == right,
+                _ => false,
+            }
+        }
+        _ => false,
+    }
+}
+
+fn root_analysis_is_success(value: &RootAnalysisKeyValue) -> bool {
+    matches!(
+        value,
+        LoadingPreparationOutcome::Complete(result) if result.as_ref().is_ok()
+    )
 }
 
 type PreparedToolchainOutcome = LoadingPreparationOutcome<Result<PreparedToolchain, AnalysisError>>;
@@ -1123,7 +1182,7 @@ async fn resolve_root_toolchain(
             ))));
         }
     };
-    if !selected_result.direct_dependencies().is_empty()
+    if selected_result.configured_dependencies().next().is_some()
         || !selected_result.actions().is_empty()
         || !selected_result.declared_outputs().is_empty()
         || !selected_result.diagnostics().is_empty()
@@ -1159,6 +1218,16 @@ mod tests {
         assert!(require_root_native_reference(&root).is_ok());
         assert!(require_root_native_reference(&external).is_err());
     }
+
+    #[test]
+    fn completed_analysis_error_is_invalid_and_not_equal_to_itself() {
+        let error = root_analysis_complete(Err(AnalysisError::new("analysis failed")));
+
+        assert!(!<ConfiguredNodeAnalysisKey as Key>::validity(&error));
+        assert!(!<ConfiguredNodeAnalysisKey as Key>::equality(
+            &error, &error
+        ));
+    }
 }
 
 #[async_trait]
@@ -1187,11 +1256,11 @@ impl Key for ConfiguredNodeAnalysisKey {
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        x.complete_eq(y)
+        root_analysis_success_eq(x, y)
     }
 
     fn validity(value: &Self::Value) -> bool {
-        value.is_complete()
+        root_analysis_is_success(value)
     }
 }
 

@@ -45,7 +45,7 @@ use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
 use crate::key::ConfiguredTargetKey;
-use crate::result::AnalysisResult;
+use crate::result::ConfiguredNodeResult;
 
 /// Errors produced while synchronously evaluating a loaded rule after DICE has
 /// prepared its inputs. The executable-rule case remains distinct so command
@@ -410,7 +410,7 @@ pub(crate) fn evaluate_loaded_rule(
     marker: Option<CompactString>,
     toolchain: Option<PreparedToolchain>,
     print_handler: Option<&dyn PrintHandler>,
-) -> Result<AnalysisResult, LoadedRuleError> {
+) -> Result<ConfiguredNodeResult, LoadedRuleError> {
     let target = package
         .targets
         .iter()
@@ -423,10 +423,6 @@ pub(crate) fn evaluate_loaded_rule(
 
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
-    let direct_dependencies = dependencies
-        .iter()
-        .map(|dependency| dependency.key.clone())
-        .collect();
     let context = module.heap().alloc_simple(AnalysisContext {
         actions: actions.clone(),
         target_name: target.name.clone(),
@@ -558,8 +554,9 @@ pub(crate) fn evaluate_loaded_rule(
         .registry()
         .actions()
         .to_vec();
-    Ok(AnalysisResult::new(key, providers, rule_capability)
-        .with_direct_dependencies(direct_dependencies)
-        .with_actions(actions)
-        .with_declared_outputs(declared_outputs))
+    Ok(
+        ConfiguredNodeResult::new_rule(key, providers, rule_capability)
+            .with_actions(actions)
+            .with_declared_outputs(declared_outputs),
+    )
 }

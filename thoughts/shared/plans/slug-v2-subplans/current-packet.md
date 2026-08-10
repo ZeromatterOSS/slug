@@ -1,39 +1,45 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2c-configured-node-result-substrate`
+Packet: `WP-6-m2d-root-delegating-native-node-activation`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: third functional packet from the accepted configured-node ownership
-design after single-owner consolidation and resolved-setting preparation.
+Result: fourth functional packet from the accepted configured-node ownership
+design after the structural node/result/edge substrate.
 
 ## Observable slice
 
-Introduce the reviewed `ConfiguredNodeKey` identity with structural
-configuration or `Null`, classified immutable configured edges, and the single
-retained configured-node result shape. Prove structural equality, null identity,
-transition-output convergence, edge order, and exact implicit/tool bits without
-activating new cquery traversal.
+Activate root-repository alias, exported source, generated output, filegroup,
+and package-group nodes through the sole configured-analysis key and retained
+result. Retain the exact configured/null identities and ordered alias/source/
+generated-by/ordinary/visibility/include edges already pinned by the delegation
+oracle, without activating cquery traversal or output breadth.
 
 ## Ownership and stops
 
-Keep `ConfiguredNodeAnalysisKey` as the sole configured-analysis DICE owner.
-Generalize the existing `AnalysisResult` ownership into one configured-node
-result rather than adding a peer cache or graph. A node key is canonical label
-plus structural `ConfigurationKey` or `Null`; transition origin belongs only on
-the incoming edge. Each edge owns semantic kind, target, order, and exact
-`implicit`/`tool` bits from the accepted design. Reuse `Arc<[T]>`,
-`CompactString`, `SmallMap`/`SmallSet`, `Dupe`, and `Allocative`. Do not yet add
-native/delegating/platform nodes, cquery traversal/output, a new DICE key/cache,
-exact Bazel hash bytes, filesystem bypass, JVM/Java, CI, or compatibility
-behavior. Vendored `starlark-rust` remains unchanged.
+Keep `ConfiguredNodeAnalysisKey` as the sole DICE owner and
+`ConfiguredNodeResult` as the sole retained result. Generalize that key in place
+to admit null nodes; do not add a peer key, graph, or cache. Root aliases and
+generated/filegroup nodes retain structural configuration; exported sources and
+package groups use null identity exactly where the accepted Bazel graph does.
+Reuse the existing classified edges and compact retained storage.
+
+Do not activate external `@bazel_tools` in this packet. Its host-platform alias
+crosses into `@platforms`, its function-transition allowlist package requires
+external `glob`, and canonical external node identity does not yet carry the
+apparent-repository loading route. Never synthesize those nodes or builtin
+content. Also exclude platform/toolchain retention, cquery deps/rdeps/graph
+output, a second owner, exact Bazel hash bytes, filesystem bypass, JVM/Java, CI,
+or compatibility behavior. Vendored Buck2 `starlark-rust` remains the sole
+Starlark parser/evaluator substrate and is unchanged.
 
 ## Validation
 
-Allow at most six production and six test files, 600 formatted net production
-lines, 700 formatted net test lines, and 1,300 total. Prove configured/null
-identity discrimination, target/exec/host-like structural discrimination,
-equal transition-output convergence, ordered edge equality, and every currently
-admitted edge bit. Run focused analysis and downstream compile/tests serially.
-Stop if the substrate requires a second retained result, DICE key/cache, query
-graph, guessed platform/tool edge, or changes to current observable output.
+Allow at most six production and five test files, 800 formatted net production
+lines, 900 formatted net test lines, and 1,700 total. Reuse the accepted
+delegation fixture evidence and prove exact node kind/identity, two-hop alias
+order, generated-to-producer, filegroup source order, declaring visibility, and
+package-group include order. Run focused analysis and downstream compile/tests
+serially. Stop if any root node requires synthetic content, a second retained
+result/key/cache, external repository routing, platform/toolchain topology,
+query traversal/output, or a parser change.
