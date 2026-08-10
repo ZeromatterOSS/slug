@@ -6182,3 +6182,93 @@ Toolchain and delegation topology evidence now closes the prerequisite for
 `WP-6-m2-configured-node-platform-identity-owner-design`. Freeze platform and
 node identity ownership before generalizing the existing DICE analysis result;
 exact Bazel configuration hash bytes remain deferred.
+
+### Configured-node/platform identity owner design ACCEPT (2026-08-09)
+
+Reserved correction review returned **ACCEPT** for one recursive configured-node
+DICE graph. The Need-aware production `RootConfiguredTargetAnalysisKey` is
+renamed/generalized to the sole workspace-qualified `ConfiguredNodeAnalysisKey`;
+the legacy parallel `ConfiguredTargetAnalysisKey` is migrated and deleted.
+Root string-setting/default resolution moves into the existing command-root
+preparation transaction, so the node key has no unresolved-request variant.
+
+`ConfiguredNodeKey` is canonical label plus exactly one of structural
+`ConfigurationKey` or `Null`. Production configuration identity admits only the
+full `SlugConfiguration`; target, exec, and host-like roles come from its kind.
+A transition is identified by its resulting structural configuration, never by
+its origin, so equal outputs converge. Transition origin stays on the incoming
+edge. Platform labels and toolchain selection are retained result facts unless
+already part of the structural configuration; none are ad-hoc identity bytes.
+
+The sole retained `ConfiguredNodeResult` owns node kind, ordered immutable
+edges, providers, actions, outputs, diagnostics/capability, platform identity,
+ordered candidate execution platforms, selected execution platform, and the
+selected toolchain declaration/type/implementation. DICE equality includes all
+of those facts. Need and complete error are invalid/non-equal; only complete
+success is valid and structurally equal. Events never participate. Computation
+uses existing package/module/repository/Host DICE owners and holds no lock
+across a compute.
+
+Each edge owns its target, semantic kind, and exact `implicit`/`tool` bits.
+Explicit ordinary/transitioned attributes, alias actual, generated-by, source,
+and declaring-visibility edges are `false/false`. Package-group includes,
+toolchain requirement/selected implementation, candidate execution platforms,
+host platform, platform constraints, constraint settings, and the function
+transition allowlist are `true/false` for the admitted evidence. Therefore
+`--noimplicit_deps` removes the latter edges while `--notool_deps` preserves the
+entire admitted topology; no `tool=true` edge activates without a new oracle.
+Transitioned attributes retain attribute/index/origin while convergent target
+nodes remain shared.
+
+Storage stays Buck2-derived and compact: `Arc<[T]>`, `CompactString`,
+`SmallMap`/`SmallSet`, `Dupe`, and `Allocative`; no retained standard-map graph,
+global interner, query cache, or filesystem bypass is added. BUILD, `.bzl`, and
+MODULE parsing/evaluation remains on vendored `starlark-rust` with Slug-owned
+Bazel globals and effects. Exact Bazel configuration/output/ActionKey bytes,
+JVM/Java, general transitions/aspects, multi-root label ordering, and unproven
+host/tool edges remain hard stops.
+
+The serial route is: (1) consolidate the production analysis owner and
+structural configuration boundary; (2) introduce structural/null node, edge,
+and result substrate; (3) add fixture-admitted root/external delegating/native
+nodes with verbatim `@bazel_tools`; (4) retain toolchain/platform topology; and
+(5) activate only evidence-backed `deps`, singleton-anchored `rdeps`, label,
+and unfactored graph output. Run next
+`WP-6-m2-configured-analysis-single-owner-implementation`; no documentation-only
+commit is permitted.
+
+The implementation audit split that first step without changing the accepted
+architecture. `WP-6-m2a-analysis-key-consolidation` first renames the Need-aware
+root key to `ConfiguredNodeAnalysisKey`, deletes the legacy parallel key, and
+preserves its temporary resolved/request input enum. Only then may
+`WP-6-m2b-command-root-setting-preparation` move default/explicit setting
+resolution into Build/Cquery command-root preparation, remove the request
+variant, and enforce the structural-only production configuration boundary.
+Combining both refactors would cross two command roots and conceal whether the
+single-owner invariant was independently achieved. Run M2a next.
+
+### Configured analysis key consolidation ACCEPT (2026-08-09)
+
+`WP-6-m2a-analysis-key-consolidation` is **ACCEPTED**. The legacy
+`ConfiguredTargetAnalysisKey` implementation and export are deleted, and the
+Need-aware production key is now the sole `ConfiguredNodeAnalysisKey` used by
+recursive analysis, build action closure, cquery, the retained legacy
+workspace adapter, and focused tests. The temporary resolved/root-setting
+request enum remains unchanged for M2b. The retained legacy adapter converts
+its workspace to the normalized identity and fails explicitly if its already
+committed observations cannot satisfy a Need; it does not reconstruct the old
+graph.
+
+Full analysis passes 28 tests; server passes 48; core passes 154/155 with only
+the unchanged direct-external visibility mismatch; the rebuilt CLI passes
+47/48 with only the unchanged `bzl_cycle` unavailable-root-node failure.
+Formatting, diff, archive integrity, and a zero-old-symbol grep pass. The
+functional delta is net-negative in production and uses the existing compact
+keys/results unchanged. Independent review returned `ACCEPT`; parser/evaluator,
+configuration representation, node kinds, edges, query behavior, and public
+bytes did not change.
+
+Run next only `WP-6-m2b-command-root-setting-preparation`: move root-setting
+default/explicit resolution into both command-root preparation paths, remove
+the unresolved key mode, and make opaque/legacy configuration unrepresentable
+at the production key boundary. No configured-node breadth precedes it.

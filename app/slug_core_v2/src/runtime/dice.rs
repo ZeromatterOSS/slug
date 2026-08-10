@@ -49,9 +49,8 @@ use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
-use slug_analysis_v2::ConfiguredTargetAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::RootConfiguredTargetAnalysisKey;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
@@ -498,7 +497,7 @@ impl ExternalQueryActivationAudit {
         if key.downcast_ref::<RootQueryCommandKey>().is_some() {
             self.typed_roots.fetch_add(1, Ordering::Relaxed);
         }
-        if let Some(key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() {
+        if let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() {
             self.configured_roots
                 .lock()
                 .unwrap()
@@ -1606,7 +1605,7 @@ struct CqueryCommandRoot {
 struct CqueryRootTarget {
     requested: Arc<str>,
     canonical: CanonicalLabel,
-    analysis_key: RootConfiguredTargetAnalysisKey,
+    analysis_key: ConfiguredNodeAnalysisKey,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -2360,7 +2359,7 @@ async fn compute_build_action_closure(
             .compute_join(frontier, |ctx, configured_target| {
                 Box::pin(async move {
                     let value = ctx
-                        .compute(&RootConfiguredTargetAnalysisKey::new(
+                        .compute(&ConfiguredNodeAnalysisKey::new(
                             workspace.dupe(),
                             configured_target.clone(),
                         ))
@@ -2526,21 +2525,21 @@ async fn compute_build_branch(
                         .any(|dependency| dependency == &root_setting);
                 let analysis_key =
                     if explicit_root_string_setting.is_some() || has_root_setting_transition {
-                        RootConfiguredTargetAnalysisKey::root_string_setting_request(
+                        ConfiguredNodeAnalysisKey::root_string_setting_request(
                             workspace,
                             canonical,
                             base_configuration,
                             explicit_root_string_setting,
                         )
                     } else if directly_uses_root_setting {
-                        RootConfiguredTargetAnalysisKey::root_string_setting_request(
+                        ConfiguredNodeAnalysisKey::root_string_setting_request(
                             workspace,
                             canonical,
                             base_configuration,
                             None,
                         )
                     } else {
-                        RootConfiguredTargetAnalysisKey::new(
+                        ConfiguredNodeAnalysisKey::new(
                             workspace,
                             ConfiguredTargetKey::new(canonical, configuration),
                         )
@@ -3360,15 +3359,13 @@ impl WorkspaceRuntime {
                 Some(index) => *index,
                 None => {
                     let analysis_key = match explicit_root_string_setting.as_ref() {
-                        Some(explicit) => {
-                            RootConfiguredTargetAnalysisKey::root_string_setting_request(
-                                workspace.clone(),
-                                canonical.clone(),
-                                ConfigurationKey::from_slug(base_configuration.clone()),
-                                Some(explicit.clone()),
-                            )
-                        }
-                        None => RootConfiguredTargetAnalysisKey::new(
+                        Some(explicit) => ConfiguredNodeAnalysisKey::root_string_setting_request(
+                            workspace.clone(),
+                            canonical.clone(),
+                            ConfigurationKey::from_slug(base_configuration.clone()),
+                            Some(explicit.clone()),
+                        ),
+                        None => ConfiguredNodeAnalysisKey::new(
                             workspace.clone(),
                             ConfiguredTargetKey::new(
                                 canonical.clone(),
@@ -3859,18 +3856,26 @@ impl WorkspaceRuntime {
                             .map_err(anyhow::Error::msg)?;
                             let configured_target =
                                 ConfiguredTargetKey::new(canonical, configuration.clone());
-                            let value = transaction
-                                .compute(&ConfiguredTargetAnalysisKey {
-                                    workspace: self.workspace.clone(),
+                            let outcome = transaction
+                                .compute(&ConfiguredNodeAnalysisKey::new(
+                                    NormalizedAbsolutePath::new(self.workspace.clone())
+                                        .map_err(anyhow::Error::msg)?,
                                     configured_target,
-                                })
+                                ))
                                 .await
                                 .context("computing configured-target analysis through DICE")?;
+                            let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = outcome
+                            else {
+                                anyhow::bail!(
+                                    "legacy workspace evaluation retained configured-analysis Needs"
+                                );
+                            };
                             Some(
                                 value
                                     .as_ref()
                                     .as_ref()
                                     .map_err(|error| anyhow::anyhow!(error.to_string()))?
+                                    .as_ref()
                                     .clone(),
                             )
                         } else {
@@ -8674,13 +8679,13 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
         let mut transaction = build_root_transaction(&dice, epoch.build()).await;
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         let base_configuration = ConfigurationKey::target("root-request-base").unwrap();
-        let parent = RootConfiguredTargetAnalysisKey::root_string_setting_request(
+        let parent = ConfiguredNodeAnalysisKey::root_string_setting_request(
             workspace.clone(),
             CanonicalLabel::parse("@@//:parent").unwrap(),
             base_configuration.clone(),
             None,
         );
-        let consumer = RootConfiguredTargetAnalysisKey::root_string_setting_request(
+        let consumer = ConfiguredNodeAnalysisKey::root_string_setting_request(
             workspace,
             CanonicalLabel::parse("@@//:consumer").unwrap(),
             base_configuration,
@@ -8750,7 +8755,6 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
     #[derive(Default)]
     struct ActionClosureTracker {
         roots: Mutex<Vec<(String, dice::ActivationKind, Option<EventBatch>)>>,
-        legacy: AtomicUsize,
     }
 
     impl ActionClosureTracker {
@@ -8762,13 +8766,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
     impl ActivationTracker for ActionClosureTracker {
         fn key_activated(
             &self,
-            key: &DynKey,
+            _key: &DynKey,
             _deps: &mut dyn Iterator<Item = &DynKey>,
             _activation: ActivationData,
         ) {
-            if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
-                self.legacy.fetch_add(1, Ordering::Relaxed);
-            }
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -8776,10 +8777,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
         }
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-            if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
-                self.legacy.fetch_add(1, Ordering::Relaxed);
-            }
-            let Some(key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() else {
+            let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
                 return;
             };
             self.roots.lock().unwrap().push((
@@ -8817,7 +8815,6 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
                 || key
                     .downcast_ref::<slug_loading_v2::keys::PackageLoadKey>()
                     .is_some()
-                || key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some()
                 || key
                     .downcast_ref::<slug_workspace_v2::WorkspaceSnapshotKey>()
                     .is_some()
@@ -9172,7 +9169,6 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
                 "@@//top:top",
             ]
         );
-        assert_eq!(tracker.legacy.load(Ordering::Relaxed), 0);
 
         let mut warm_data = UserComputationData {
             activation_tracker: Some(tracker.dupe()),
@@ -9238,7 +9234,7 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
         epoch.package("error", "", 6);
         let mut transaction = build_root_transaction(&dice, epoch.build()).await;
         let error = transaction
-            .compute(&RootConfiguredTargetAnalysisKey::new(
+            .compute(&ConfiguredNodeAnalysisKey::new(
                 NormalizedAbsolutePath::new("/workspace").unwrap(),
                 error_target.clone(),
             ))

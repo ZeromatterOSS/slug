@@ -7,11 +7,11 @@
  * You may select, at your option, one of the above-listed licenses.
  */
 
+use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::atomic::AtomicUsize;
 use std::time::SystemTime;
 
 use dice::ActivationData;
@@ -29,9 +29,8 @@ use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
-use slug_analysis_v2::ConfiguredTargetAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::RootConfiguredTargetAnalysisKey;
 use slug_analysis_v2::key::RootStringSettingValue;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ProviderId;
@@ -94,7 +93,10 @@ impl ActivationTracker for AnalysisTracker {
         _deps: &mut dyn Iterator<Item = &DynKey>,
         activation_data: ActivationData,
     ) {
-        let Some(key) = key.downcast_ref::<ConfiguredTargetAnalysisKey>() else {
+        let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
+            return;
+        };
+        let Some(configured_target) = key.resolved_configured_target() else {
             return;
         };
         let kind = match activation_data {
@@ -104,7 +106,7 @@ impl ActivationTracker for AnalysisTracker {
         self.events
             .lock()
             .unwrap()
-            .push((key.configured_target.label().to_string(), kind));
+            .push((configured_target.label().to_string(), kind));
     }
 }
 
@@ -141,15 +143,18 @@ impl ActivationTracker for AnalysisEventTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-        let Some(key) = key.downcast_ref::<ConfiguredTargetAnalysisKey>() else {
+        let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
+            return;
+        };
+        let Some(configured_target) = key.resolved_configured_target() else {
             return;
         };
         self.activations
             .lock()
             .unwrap()
             .push(AnalysisEventActivation {
-                workspace: key.workspace.clone(),
-                configured_target: key.configured_target.clone(),
+                workspace: key.workspace().as_path().to_path_buf(),
+                configured_target: configured_target.clone(),
                 kind: activation.kind(),
                 batch: activation
                     .evaluation_data()
@@ -280,7 +285,9 @@ fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnaps
 
 fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
     let mut entries = SmallMap::new();
-    for (path, value) in workspace_snapshot(root).files.iter() {
+    let snapshot = workspace_snapshot(root);
+    let mut directories = BTreeSet::from([root.to_path_buf()]);
+    for (path, value) in snapshot.files.iter() {
         let demand = |operation| {
             PathObservationDemand::new(
                 PathObservationNamespace::Host,
@@ -309,6 +316,7 @@ fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
         }
         let mut parent = path.parent();
         while let Some(directory) = parent.filter(|directory| directory.starts_with(root)) {
+            directories.insert(directory.to_path_buf());
             entries.insert(
                 PathObservationDemand::new(
                     PathObservationNamespace::Host,
@@ -347,14 +355,32 @@ fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
         path = directory.parent();
     }
     for name in ["REPO.bazel", ".bazelignore", "BUILD"] {
-        entries.insert(
-            PathObservationDemand::new(
-                PathObservationNamespace::Host,
-                NormalizedAbsolutePath::new(root.join(name)).unwrap(),
-                PathObservationOperation::Lstat,
-            ),
-            PathObservationResult::Lstat(PathOperationResult::Missing),
-        );
+        let path = root.join(name);
+        if snapshot.files.get(&path).is_none() {
+            entries.insert(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+            );
+        }
+    }
+    for directory in directories {
+        for name in ["BUILD", "BUILD.bazel"] {
+            let path = directory.join(name);
+            if snapshot.files.get(&path).is_none() {
+                entries.insert(
+                    PathObservationDemand::new(
+                        PathObservationNamespace::Host,
+                        NormalizedAbsolutePath::new(path).unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    PathObservationResult::Lstat(PathOperationResult::Missing),
+                );
+            }
+        }
     }
     PathObservationEpoch::new(entries).unwrap()
 }
@@ -364,7 +390,6 @@ struct RootActivationTracker {
     activations: Mutex<Vec<(String, ActivationKind)>>,
     batches: Mutex<Vec<(String, EventBatch)>>,
     nodes: Mutex<Vec<(String, DiceNodeId, Vec<DiceNodeId>)>>,
-    legacy: AtomicUsize,
     all_loading: bool,
 }
 
@@ -379,20 +404,18 @@ impl RootActivationTracker {
         &self,
     ) -> (
         Vec<(String, ActivationKind)>,
-        usize,
         Vec<(String, EventBatch)>,
         Vec<(String, DiceNodeId, Vec<DiceNodeId>)>,
     ) {
         (
             std::mem::take(&mut *self.activations.lock().unwrap()),
-            self.legacy.load(std::sync::atomic::Ordering::Relaxed),
             std::mem::take(&mut *self.batches.lock().unwrap()),
             std::mem::take(&mut *self.nodes.lock().unwrap()),
         )
     }
 }
 
-fn root_activation_identity(key: &RootConfiguredTargetAnalysisKey) -> String {
+fn root_activation_identity(key: &ConfiguredNodeAnalysisKey) -> String {
     if let Some(configured_target) = key.resolved_configured_target() {
         return format!(
             "resolved/{}={}",
@@ -430,14 +453,10 @@ fn activation_codes(activations: &[(String, ActivationKind)]) -> Vec<String> {
 impl ActivationTracker for RootActivationTracker {
     fn key_activated(
         &self,
-        key: &DynKey,
+        _key: &DynKey,
         _deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
-        if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
-            self.legacy
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
     }
 
     fn tracks_rich_activations(&self) -> bool {
@@ -445,11 +464,7 @@ impl ActivationTracker for RootActivationTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-        if key.downcast_ref::<ConfiguredTargetAnalysisKey>().is_some() {
-            self.legacy
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        }
-        if let Some(root_key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() {
+        if let Some(root_key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() {
             let identity = root_activation_identity(root_key);
             self.activations
                 .lock()
@@ -526,14 +541,12 @@ async fn root_string_request_result(
     .unwrap();
     let mut transaction = updater.commit().await;
     let outcome = transaction
-        .compute(
-            &RootConfiguredTargetAnalysisKey::root_string_setting_request(
-                NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-                CanonicalLabel::parse(target).unwrap(),
-                ConfigurationKey::target("root-request-base").unwrap(),
-                explicit.map(RootStringSettingValue::new),
-            ),
-        )
+        .compute(&ConfiguredNodeAnalysisKey::root_string_setting_request(
+            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+            CanonicalLabel::parse(target).unwrap(),
+            ConfigurationKey::target("root-request-base").unwrap(),
+            explicit.map(RootStringSettingValue::new),
+        ))
         .await
         .map_err(|error| error.to_string())?;
     let AnalysisPreparationOutcome::Complete(value) = outcome else {
@@ -596,7 +609,7 @@ async fn root_target_request(
     .unwrap();
     let mut transaction = updater.commit().await;
     let value = transaction
-        .compute(&RootConfiguredTargetAnalysisKey::new(
+        .compute(&ConfiguredNodeAnalysisKey::new(
             NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
             ConfiguredTargetKey::new(
                 CanonicalLabel::parse(target).unwrap(),
@@ -710,8 +723,7 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         .unwrap();
     assert_eq!(provider_value(&restored, &consumer), "second");
     assert_eq!(restored, first);
-    let (activations, legacy, batches, nodes) = tracker.take();
-    assert_eq!(legacy, 0, "legacy analysis activated: {activations:#?}");
+    let (activations, batches, nodes) = tracker.take();
     let identities = activations
         .iter()
         .map(|(identity, _)| identity.as_str())
@@ -985,8 +997,7 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
         "zero"
     );
     assert!(result.direct_dependencies().is_empty());
-    let (activations, legacy, _, nodes) = tracker.take();
-    assert_eq!(legacy, 0);
+    let (activations, _, nodes) = tracker.take();
     assert!(
         activations
             .iter()
@@ -1236,8 +1247,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     assert_eq!(provider_value(&restored_default, &consumer), "default");
     assert_eq!(default_key, *restored_default.key());
 
-    let (activations, legacy, _, _) = tracker.take();
-    assert_eq!(legacy, 0, "legacy analysis key activated: {activations:#?}");
+    let (activations, _, _) = tracker.take();
     assert_eq!(
         activation_codes(&activations),
         r#"request/@@//:consumer=<default>:E request/@@//:consumer=<default>:E request/@@//:consumer=<default>:E request/@@//:consumer=<default>:R
@@ -1394,6 +1404,22 @@ async fn analyze_request_typed(
             Arc::new(directory_snapshot(workspace)),
         )])
         .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, root_epoch(workspace))])
+        .unwrap();
+    let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            root.clone(),
+            [root],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
         workspace,
@@ -1403,17 +1429,20 @@ async fn analyze_request_typed(
     )
     .unwrap();
     let mut transaction = updater.commit().await;
-    let result = transaction
-        .compute(&ConfiguredTargetAnalysisKey {
-            workspace: workspace.to_path_buf(),
-            configured_target: key.clone(),
-        })
+    let outcome = transaction
+        .compute(&ConfiguredNodeAnalysisKey::new(
+            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+            key.clone(),
+        ))
         .await
         .expect("configured target analysis DICE compute succeeds");
+    let AnalysisPreparationOutcome::Complete(result) = outcome else {
+        panic!("configured target analysis retained Needs: {outcome:?}");
+    };
     result
         .as_ref()
         .as_ref()
-        .map(Clone::clone)
+        .map(|value| value.as_ref().clone())
         .map_err(Clone::clone)
 }
 
@@ -1500,6 +1529,22 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
                     Arc::new(directory_snapshot(&workspace)),
                 )])
                 .unwrap();
+            updater
+                .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
+                .unwrap();
+            let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+            inject_root_package_policy_inputs(
+                &mut updater,
+                RootPackagePolicyInputs::new(
+                    root.clone(),
+                    [root],
+                    std::iter::empty::<&str>(),
+                    None,
+                    Some("warning"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
             inject_root_module_request_inputs(
                 &mut updater,
                 &workspace,
@@ -1509,13 +1554,16 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
             )
             .unwrap();
             let mut transaction = updater.commit().await;
-            let value = transaction
-                .compute(&ConfiguredTargetAnalysisKey {
-                    workspace: workspace.clone(),
-                    configured_target: key,
-                })
+            let outcome = transaction
+                .compute(&ConfiguredNodeAnalysisKey::new(
+                    NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+                    key,
+                ))
                 .await
                 .unwrap();
+            let AnalysisPreparationOutcome::Complete(value) = outcome else {
+                panic!("configured target analysis retained Needs");
+            };
             value.as_ref().as_ref().unwrap().clone()
         });
 
@@ -1815,6 +1863,22 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
             Arc::new(directory_snapshot(&workspace)),
         )])
         .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, root_epoch(&workspace))])
+        .unwrap();
+    let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            root.clone(),
+            [root],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
     inject_root_module_request_inputs(
         &mut updater,
         &workspace,
@@ -1825,16 +1889,19 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     .unwrap();
     let mut transaction = updater.commit().await;
     let configuration = ConfigurationKey::target("recursive").unwrap();
-    let result = transaction
-        .compute(&ConfiguredTargetAnalysisKey {
-            workspace: workspace.clone(),
-            configured_target: ConfiguredTargetKey::new(
+    let outcome = transaction
+        .compute(&ConfiguredNodeAnalysisKey::new(
+            NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+            ConfiguredTargetKey::new(
                 CanonicalLabel::parse("@@//parent:parent").unwrap(),
                 configuration.clone(),
             ),
-        })
+        ))
         .await
         .unwrap();
+    let AnalysisPreparationOutcome::Complete(result) = outcome else {
+        panic!("configured target analysis retained Needs");
+    };
     let result = result.as_ref().as_ref().unwrap();
 
     assert_eq!(
@@ -1870,16 +1937,19 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
         }
     );
 
-    let leaf = transaction
-        .compute(&ConfiguredTargetAnalysisKey {
-            workspace: workspace.clone(),
-            configured_target: ConfiguredTargetKey::new(
+    let outcome = transaction
+        .compute(&ConfiguredNodeAnalysisKey::new(
+            NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+            ConfiguredTargetKey::new(
                 CanonicalLabel::parse("@@//leaf:second").unwrap(),
                 configuration,
             ),
-        })
+        ))
         .await
         .unwrap();
+    let AnalysisPreparationOutcome::Complete(leaf) = outcome else {
+        panic!("configured target analysis retained Needs");
+    };
     let leaf = leaf.as_ref().as_ref().unwrap();
     let leaf_id = ProviderId::new("//rules:defs.bzl", "LeafInfo").unwrap();
     assert_eq!(
@@ -1922,6 +1992,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         ),
     )
     .unwrap();
+    fs::write(workspace.join("rules/BUILD.bazel"), "").unwrap();
     fs::write(
         workspace.join("leaf/BUILD.bazel"),
         "load(\"//rules:defs.bzl\", \"leaf\")\nleaf(name = \"leaf\")\n",
@@ -2126,6 +2197,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         )
     };
     fs::write(workspace.join("rules/defs.bzl"), definitions("")).unwrap();
+    fs::write(workspace.join("rules/BUILD.bazel"), "").unwrap();
     let complete_leaf_build =
         "load(\"//rules:defs.bzl\", \"leaf\")\nleaf(name = \"first\")\nleaf(name = \"second\")\n";
     fs::write(workspace.join("leaf/BUILD.bazel"), complete_leaf_build).unwrap();
@@ -2250,7 +2322,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         &[
             ("@@//leaf:first", EventKind::Evaluated),
             ("@@//leaf:second", EventKind::Evaluated),
-            ("@@//parent:parent", EventKind::Reused),
+            ("@@//parent:parent", EventKind::Evaluated),
         ],
     );
 }

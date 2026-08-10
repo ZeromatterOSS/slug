@@ -27,7 +27,7 @@ and must name the same packet.
 | M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
-| M4: `cquery` | **replan (configured topology evidence accepted)** | projected label/Starlark-label output, direct retained-state functions, and exact toolchain plus delegation graph evidence | design target/exec/host platform and configured-node identity ownership | `WP-6-m2-configured-node-platform-identity-owner-design` |
+| M4: `cquery` | **partial (single configured-analysis owner accepted)** | projected label/Starlark-label output, direct retained-state functions, exact toolchain plus delegation graph evidence, reviewed configured-node ownership, and one Need-aware analysis key | move root-setting preparation before the key and enforce structural-only production configuration before node identity/traversal | `WP-6-m2b-command-root-setting-preparation` |
 | M5: `aquery` | **replan** | recursive action ownership, complete Slug configuration identity, and four-domain change/restoration evidence are retained | retain selected execution platform/action ownership, then compare provisional configuration/path/ActionKey IDs only as opaque graph-scoped tokens | wait for configured-query breadth after M3 |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | semantic `aquery` handoff and collision-safe Slug action/cache identity | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-m2-configured-node-platform-identity-owner-design`](./slug-v2-subplans/current-packet.md).
+[`WP-6-m2b-command-root-setting-preparation`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -47,6 +47,12 @@ M9. Complete structural equality/invalidation remains mandatory for admitted
 inputs, unmodeled inputs fail closed, and a namespaced display/path projection
 never becomes the semantic key. REAPI/CAS, content, repository, and lockfile
 digests remain exact and separate.
+
+Source-language parsing remains the vendored Buck2 `starlark-rust` parser and
+evaluator with Bazel-owned dialect, globals, labels, effects, and diagnostics.
+The remaining handwritten registry-snapshot MODULE directive parser is later
+replacement debt; no new Slug Starlark parser is permitted. Bazel query syntax
+is a separate language and keeps its own parser.
 
 The direct-local external exported-source build activation is accepted in
 `42f4a64b` at 259 production/186 test/445 total formatted net lines. It closes

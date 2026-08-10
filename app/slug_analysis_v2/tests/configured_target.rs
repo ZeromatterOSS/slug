@@ -14,7 +14,7 @@ use slug_analysis_v2::AnalysisDiagnostic;
 use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredDependency;
-use slug_analysis_v2::ConfiguredTargetAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
 use slug_analysis_v2::TransitionEdge;
@@ -37,6 +37,7 @@ use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
 use slug_loading_v2::RuleCapability;
 use slug_loading_v2::TestRuleKind;
+use slug_workspace_v2::NormalizedAbsolutePath;
 
 fn target_config() -> ConfigurationKey {
     ConfigurationKey::target("targetabc").unwrap()
@@ -80,18 +81,16 @@ fn configured_target_key_serializes_label_mapping_and_configuration() {
 #[test]
 fn configured_analysis_key_has_one_workspace_and_target_identity() {
     let target = ConfiguredTargetKey::new(canonical("@@//pkg:target"), target_config());
-    let first = ConfiguredTargetAnalysisKey {
-        workspace: "/workspace".into(),
-        configured_target: target.clone(),
-    };
-    let same = ConfiguredTargetAnalysisKey {
-        workspace: "/workspace".into(),
-        configured_target: target,
-    };
-    let other_workspace = ConfiguredTargetAnalysisKey {
-        workspace: "/other".into(),
-        configured_target: same.configured_target.clone(),
-    };
+    let first = ConfiguredNodeAnalysisKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        target.clone(),
+    );
+    let same = ConfiguredNodeAnalysisKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        target.clone(),
+    );
+    let other_workspace =
+        ConfiguredNodeAnalysisKey::new(NormalizedAbsolutePath::new("/other").unwrap(), target);
     assert_eq!(first, same);
     assert_ne!(first, other_workspace);
 }

@@ -1,25 +1,39 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2-configured-node-platform-identity-owner-design`
+Packet: `WP-6-m2b-command-root-setting-preparation`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: reserved ownership design after accepted configured topology evidence.
+Result: second functional packet from the accepted configured-node ownership
+design after single-owner consolidation.
 
 ## Observable slice
 
-Design target, execution, host-like, transitioned, and null configuration
-identity ownership for every oracle-admitted configured node kind.
+Resolve default and explicit root string settings in the existing Build/Cquery
+command-root DICE preparation before constructing `ConfiguredNodeAnalysisKey`.
+Remove the temporary unresolved request mode and admit only structural
+Slug-native configurations at the production key boundary.
 
 ## Ownership and stops
 
-Reuse current Rust-native configuration identity and existing DICE analysis
-keys/results. Account for platform labels and configuration assignment without
-claiming exact Bazel hash bytes. Add no second graph/cache, command-local node
-identity, filesystem bypass, JVM/Java, CI, or compatibility shim.
+Keep `ConfiguredNodeAnalysisKey` as the sole configured-analysis DICE owner.
+Move its root-setting/default package preflight into shared analysis preparation
+called from both existing command roots, unioning Needs before semantic errors.
+The key must contain only a resolved target and a `SlugConfiguration`-backed
+configuration; remove the request input enum and reject legacy/opaque
+configuration before key construction. Do not add another DICE graph, node
+kinds, cquery traversal, graph output, exact Bazel hash bytes, filesystem
+bypass, JVM/Java, CI, or compatibility behavior. BUILD, `.bzl`, and MODULE
+evaluation continues through vendored `starlark-rust`.
 
 ## Validation
 
-Return a bounded serial implementation sequence with owners, representations,
-DICE equality/invalidation, allowlists/caps, lifecycle/activation evidence, and
-hard stops. Obtain reserved review; do not edit Rust in this design packet.
+Allow at most eight production and eight test files, 700 formatted net
+production lines, 900 formatted net test lines, and 1,600 total. Prove
+default/explicit/missing/edit/restoration and convergent transition behavior,
+Need-before-error, structural-key rejection of opaque configurations, one
+configured-node activation per resolved identity, and unchanged one-shot/
+daemon output. Run focused configuration, analysis, core, server, and CLI tests
+serially; rebuild `slug_cli_v2` before CLI tests and clean `slugd` around daemon
+tests. Stop if either command root needs a second key/cache or if upstream
+preparation cannot return the final structural configuration.

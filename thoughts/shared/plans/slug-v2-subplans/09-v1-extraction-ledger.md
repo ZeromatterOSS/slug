@@ -750,6 +750,16 @@ only; repository mapping, transitions, general attrs/providers, query
 consumers, execution, and materialization remain open. The migration observer
 still scans before injecting immutable inputs.
 
+2026-08-09 single-owner follow-up: the parallel legacy analysis key was removed
+and the existing Need-aware recursive key renamed `ConfiguredNodeAnalysisKey`.
+No representation or utility import changed: the retained owner still uses
+structural `ConfiguredTargetKey`, immutable `Arc` results/slices,
+`CompactString`, `SmallMap`/`SmallSet`, `Dupe`, and `Allocative`. Full analysis,
+server, focused downstream lifecycle, archive, formatting, and independent
+review accepted the migration; the two known unrelated full-suite failures are
+unchanged. Root-setting request mode remains the named M2b residual before
+structural/null configured-node identity.
+
 ### Stage 6 first-rule analysis handoff
 
 Status: Pending reviewer decision; current worktree only

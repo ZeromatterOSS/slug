@@ -16,8 +16,8 @@ use dupe::Dupe;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::RootConfiguredTargetAnalysisKey;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
@@ -197,7 +197,7 @@ impl ActivationTracker for AnalysisTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-        let Some(key) = key.downcast_ref::<RootConfiguredTargetAnalysisKey>() else {
+        let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
             return;
         };
         self.activations.lock().unwrap().push(TrackedAnalysis {
@@ -218,8 +218,8 @@ fn configured(label: &str) -> ConfiguredTargetKey {
     )
 }
 
-fn parent_key() -> RootConfiguredTargetAnalysisKey {
-    RootConfiguredTargetAnalysisKey::new(workspace(), configured("@@//parent:parent"))
+fn parent_key() -> ConfiguredNodeAnalysisKey {
+    ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:parent"))
 }
 
 async fn transaction(
@@ -273,7 +273,7 @@ fn analysis_batch<'a>(activations: &'a [TrackedAnalysis], label: &str) -> Option
 }
 
 fn marker_value(
-    outcome: &<RootConfiguredTargetAnalysisKey as Key>::Value,
+    outcome: &<ConfiguredNodeAnalysisKey as Key>::Value,
     provider: &ProviderId,
 ) -> String {
     let AnalysisPreparationOutcome::Complete(value) = outcome else {
@@ -295,7 +295,7 @@ fn marker_value(
 async fn root_analysis_preserves_typed_direct_target_missing() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
-    let key = RootConfiguredTargetAnalysisKey::new(workspace(), configured("@@//parent:missing"));
+    let key = ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:missing"));
     let mut transaction =
         transaction(&dice, EpochBuilder::base("v1-", &[], 1).build(), tracker).await;
     let outcome = transaction.compute(&key).await.unwrap();
@@ -322,14 +322,14 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
     let key = parent_key();
     assert_ne!(
         key,
-        RootConfiguredTargetAnalysisKey::new(
+        ConfiguredNodeAnalysisKey::new(
             NormalizedAbsolutePath::new("/other").unwrap(),
             configured("@@//parent:parent"),
         )
     );
     assert_ne!(
         key,
-        RootConfiguredTargetAnalysisKey::new(workspace(), configured("@@//parent:other")),
+        ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:other")),
     );
 
     let need_epoch = EpochBuilder::base("v1-", &["//right:right", "//left:left"], 1).build();
@@ -347,8 +347,8 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
         .collect::<Vec<_>>();
     assert!(paths.contains(&Path::new("/workspace/left")));
     assert!(paths.contains(&Path::new("/workspace/right")));
-    assert!(!RootConfiguredTargetAnalysisKey::validity(&need));
-    assert!(!RootConfiguredTargetAnalysisKey::equality(&need, &need));
+    assert!(!ConfiguredNodeAnalysisKey::validity(&need));
+    assert!(!ConfiguredNodeAnalysisKey::equality(&need, &need));
     let need_events = tracker.take();
     assert!(analysis_batch(&need_events, "@@//parent:parent").is_none());
 
@@ -357,10 +357,8 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
     complete_epoch.add_leaf("right", 2);
     let mut complete_transaction = transaction(&dice, complete_epoch.build(), tracker.dupe()).await;
     let complete = complete_transaction.compute(&key).await.unwrap();
-    assert!(RootConfiguredTargetAnalysisKey::validity(&complete));
-    assert!(RootConfiguredTargetAnalysisKey::equality(
-        &complete, &complete
-    ));
+    assert!(ConfiguredNodeAnalysisKey::validity(&complete));
+    assert!(ConfiguredNodeAnalysisKey::equality(&complete, &complete));
     let warm = complete_transaction.compute(&key).await.unwrap();
     let (
         AnalysisPreparationOutcome::Complete(complete_value),

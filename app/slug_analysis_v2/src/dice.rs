@@ -20,7 +20,6 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
-use futures::FutureExt;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
@@ -35,7 +34,6 @@ use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::RootPackageLoadKey;
-use slug_loading_v2::keys::PackageLoadKey;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -123,29 +121,14 @@ impl fmt::Display for AnalysisError {
 
 impl std::error::Error for AnalysisError {}
 
-/// The single production DICE identity for configured-target analysis.
+/// The single Need-aware production DICE identity for configured-target analysis.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
-pub struct ConfiguredTargetAnalysisKey {
-    pub workspace: PathBuf,
-    pub configured_target: ConfiguredTargetKey,
-}
-
-impl fmt::Display for ConfiguredTargetAnalysisKey {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "configured-target-analysis:{}", self.configured_target)
-    }
-}
-
-type AnalysisKeyValue = Arc<Result<AnalysisResult, AnalysisError>>;
-
-/// Dormant typed analysis identity for one root-repository configured target.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
-pub struct RootConfiguredTargetAnalysisKey {
+pub struct ConfiguredNodeAnalysisKey {
     workspace: NormalizedAbsolutePath,
-    input: RootConfiguredTargetAnalysisInput,
+    input: ConfiguredNodeAnalysisInput,
 }
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
-enum RootConfiguredTargetAnalysisInput {
+enum ConfiguredNodeAnalysisInput {
     Resolved(ConfiguredTargetKey),
     RootStringSettingRequest {
         requested: CanonicalLabel,
@@ -155,11 +138,11 @@ enum RootConfiguredTargetAnalysisInput {
     },
 }
 
-impl RootConfiguredTargetAnalysisKey {
+impl ConfiguredNodeAnalysisKey {
     pub fn new(workspace: NormalizedAbsolutePath, configured_target: ConfiguredTargetKey) -> Self {
         Self {
             workspace,
-            input: RootConfiguredTargetAnalysisInput::Resolved(configured_target),
+            input: ConfiguredNodeAnalysisInput::Resolved(configured_target),
         }
     }
 
@@ -169,8 +152,8 @@ impl RootConfiguredTargetAnalysisKey {
 
     pub fn configured_target(&self) -> &ConfiguredTargetKey {
         match &self.input {
-            RootConfiguredTargetAnalysisInput::Resolved(key) => key,
-            RootConfiguredTargetAnalysisInput::RootStringSettingRequest { requested, .. } => {
+            ConfiguredNodeAnalysisInput::Resolved(key) => key,
+            ConfiguredNodeAnalysisInput::RootStringSettingRequest { requested, .. } => {
                 panic!("unresolved root string setting request: {requested}")
             }
         }
@@ -178,8 +161,8 @@ impl RootConfiguredTargetAnalysisKey {
 
     pub fn resolved_configured_target(&self) -> Option<&ConfiguredTargetKey> {
         match &self.input {
-            RootConfiguredTargetAnalysisInput::Resolved(key) => Some(key),
-            RootConfiguredTargetAnalysisInput::RootStringSettingRequest { .. } => None,
+            ConfiguredNodeAnalysisInput::Resolved(key) => Some(key),
+            ConfiguredNodeAnalysisInput::RootStringSettingRequest { .. } => None,
         }
     }
 
@@ -191,8 +174,8 @@ impl RootConfiguredTargetAnalysisKey {
         Option<&RootStringSettingValue>,
     )> {
         match &self.input {
-            RootConfiguredTargetAnalysisInput::Resolved(_) => None,
-            RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
+            ConfiguredNodeAnalysisInput::Resolved(_) => None,
+            ConfiguredNodeAnalysisInput::RootStringSettingRequest {
                 requested,
                 base_configuration,
                 explicit,
@@ -225,7 +208,7 @@ impl RootConfiguredTargetAnalysisKey {
     ) -> Self {
         Self {
             workspace,
-            input: RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
+            input: ConfiguredNodeAnalysisInput::RootStringSettingRequest {
                 requested,
                 setting,
                 base_configuration,
@@ -235,14 +218,14 @@ impl RootConfiguredTargetAnalysisKey {
     }
 }
 
-impl fmt::Display for RootConfiguredTargetAnalysisKey {
+impl fmt::Display for ConfiguredNodeAnalysisKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "root-configured-target-analysis:{}",
+            "configured-node-analysis:{}",
             match &self.input {
-                RootConfiguredTargetAnalysisInput::Resolved(key) => key.to_string(),
-                RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
+                ConfiguredNodeAnalysisInput::Resolved(key) => key.to_string(),
+                ConfiguredNodeAnalysisInput::RootStringSettingRequest {
                     requested,
                     setting,
                     base_configuration,
@@ -521,197 +504,6 @@ where
     );
     *event_batch = print_capture.map(AnalysisPrintCapture::into_batch);
     value.map_err(AnalysisError::from_loaded_rule_error)
-}
-
-#[async_trait]
-impl Key for ConfiguredTargetAnalysisKey {
-    type Value = AnalysisKeyValue;
-
-    async fn compute(
-        &self,
-        ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        let capture_events = ctx
-            .per_transaction_data()
-            .data
-            .get::<CaptureEvaluationEvents>()
-            .is_ok();
-        let mut event_batch = None;
-        let value = Arc::new(
-            self.compute_inner(ctx, capture_events, &mut event_batch)
-                .await,
-        );
-        if capture_events {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("ConfiguredTargetAnalysisKey stores exactly one local event batch");
-        }
-        value
-    }
-
-    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
-        matches!((x.as_ref(), y.as_ref()), (Ok(x), Ok(y)) if x == y)
-    }
-
-    fn validity(value: &Self::Value) -> bool {
-        value.is_ok()
-    }
-}
-
-impl ConfiguredTargetAnalysisKey {
-    async fn compute_inner(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-        capture_events: bool,
-        event_batch: &mut Option<EventBatch>,
-    ) -> Result<AnalysisResult, AnalysisError> {
-        let label = self.configured_target.label();
-        if !label.package().repo().is_root() {
-            return Err(AnalysisError::new(format!(
-                "external repository configured targets are not supported: {label}"
-            )));
-        }
-        let package_path = self.workspace.join(label.package().package().as_str());
-        let package_value = ctx
-            .compute(&PackageLoadKey {
-                workspace: self.workspace.clone(),
-                package: package_path,
-            })
-            .await
-            .map_err(|error| {
-                AnalysisError::new(format!("loading package through DICE: {error}"))
-            })?;
-        let required_root_string_setting = {
-            let package = package_value
-                .as_ref()
-                .as_ref()
-                .map_err(|error| AnalysisError::new(error.to_string()))?;
-            let rule = starlark_rule_implementation(package, &self.configured_target)?;
-            required_root_string_setting(rule, label)?
-        };
-        validate_carried_root_string_setting(
-            self.configured_target.configuration(),
-            required_root_string_setting.as_ref(),
-        )?;
-        if self
-            .configured_target
-            .configuration()
-            .root_string_setting()
-            .is_none()
-            && let Some(setting) = &required_root_string_setting
-        {
-            let setting_package = ctx
-                .compute(&PackageLoadKey {
-                    workspace: self.workspace.clone(),
-                    package: self.workspace.join(setting.package().package().as_str()),
-                })
-                .await
-                .map_err(|error| {
-                    AnalysisError::new(format!(
-                        "loading string setting package through DICE: {error}"
-                    ))
-                })?;
-            let setting_package = setting_package
-                .as_ref()
-                .as_ref()
-                .map_err(|error| AnalysisError::new(error.to_string()))?;
-            let default = setting_package
-                .targets
-                .iter()
-                .find(|target| target.name == setting.target().as_str())
-                .and_then(|target| match &target.kind {
-                    PackageTargetKind::StarlarkRule(rule)
-                        if rule.is_root_string_build_setting() =>
-                    {
-                        rule.root_string_build_setting_default()
-                    }
-                    _ => None,
-                })
-                .ok_or_else(|| {
-                    AnalysisError::new(format!("root string build setting {setting} is missing"))
-                })?;
-            let configured_target = ConfiguredTargetKey::new(
-                self.configured_target.label().clone(),
-                self.configured_target
-                    .configuration()
-                    .with_root_string_setting(RootStringSettingValue::new_for_label(
-                        setting.to_string(),
-                        default,
-                    )),
-            );
-            let value = ctx
-                .compute(&ConfiguredTargetAnalysisKey {
-                    workspace: self.workspace.clone(),
-                    configured_target,
-                })
-                .await
-                .map_err(|error| {
-                    AnalysisError::new(format!(
-                        "resolving legacy root string setting through DICE: {error}"
-                    ))
-                })?;
-            return value.as_ref().as_ref().map_err(Clone::clone).cloned();
-        }
-        let declared_dependency_keys = {
-            let package = package_value
-                .as_ref()
-                .as_ref()
-                .map_err(|error| AnalysisError::new(error.to_string()))?;
-            if self
-                .configured_target
-                .configuration()
-                .root_string_setting()
-                .is_some()
-                || required_root_string_setting.is_some()
-            {
-                root_declared_dependency_keys(package, &self.configured_target)?
-            } else {
-                legacy_declared_dependency_keys(package, &self.configured_target)?
-            }
-        };
-        let mut unique = SmallSet::with_capacity(declared_dependency_keys.len());
-        for dependency in &declared_dependency_keys {
-            unique.insert(dependency.key.clone());
-        }
-        let workspace = &self.workspace;
-        let computed = ctx
-            .try_compute_join(unique.into_iter(), |ctx, configured_target| {
-                async move {
-                    let value = ctx
-                        .compute(&ConfiguredTargetAnalysisKey {
-                            workspace: workspace.clone(),
-                            configured_target: configured_target.clone(),
-                        })
-                        .await
-                        .map_err(|error| {
-                            AnalysisError::new(format!(
-                                "computing dependency `{configured_target}` through DICE: {error}"
-                            ))
-                        })?;
-                    let result = value.as_ref().as_ref().map_err(Clone::clone)?.clone();
-                    Ok((configured_target, result))
-                }
-                .boxed()
-            })
-            .await?;
-        let computed = computed
-            .into_iter()
-            .collect::<SmallMap<ConfiguredTargetKey, AnalysisResult>>();
-        let package = package_value
-            .as_ref()
-            .as_ref()
-            .expect("validated legacy package value remains immutable");
-        finish_analysis(
-            package,
-            &self.configured_target,
-            &declared_dependency_keys,
-            &computed,
-            None,
-            None,
-            capture_events,
-            event_batch,
-        )
-    }
 }
 
 fn root_analysis_complete(result: Result<AnalysisResult, AnalysisError>) -> RootAnalysisKeyValue {
@@ -1192,7 +984,7 @@ async fn resolve_root_toolchain(
         ))));
     };
     let selected_result = match ctx
-        .compute(&RootConfiguredTargetAnalysisKey::new(
+        .compute(&ConfiguredNodeAnalysisKey::new(
             workspace.dupe(),
             ConfiguredTargetKey::new(implementation.clone(), configuration),
         ))
@@ -1248,7 +1040,7 @@ mod tests {
 }
 
 #[async_trait]
-impl Key for RootConfiguredTargetAnalysisKey {
+impl Key for ConfiguredNodeAnalysisKey {
     type Value = RootAnalysisKeyValue;
 
     async fn compute(
@@ -1267,7 +1059,7 @@ impl Key for RootConfiguredTargetAnalysisKey {
             .await;
         if capture_events && value.is_complete() {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("RootConfiguredTargetAnalysisKey stores exactly one local event batch");
+                .expect("ConfiguredNodeAnalysisKey stores exactly one local event batch");
         }
         value
     }
@@ -1281,14 +1073,14 @@ impl Key for RootConfiguredTargetAnalysisKey {
     }
 }
 
-impl RootConfiguredTargetAnalysisKey {
+impl ConfiguredNodeAnalysisKey {
     async fn compute_inner(
         &self,
         ctx: &mut DiceComputations<'_>,
         capture_events: bool,
         event_batch: &mut Option<EventBatch>,
     ) -> RootAnalysisKeyValue {
-        if let RootConfiguredTargetAnalysisInput::RootStringSettingRequest {
+        if let ConfiguredNodeAnalysisInput::RootStringSettingRequest {
             requested,
             setting,
             base_configuration,
@@ -1359,8 +1151,8 @@ impl RootConfiguredTargetAnalysisKey {
                 });
         }
         let configured_target = match &self.input {
-            RootConfiguredTargetAnalysisInput::Resolved(key) => key,
-            RootConfiguredTargetAnalysisInput::RootStringSettingRequest { .. } => unreachable!(),
+            ConfiguredNodeAnalysisInput::Resolved(key) => key,
+            ConfiguredNodeAnalysisInput::RootStringSettingRequest { .. } => unreachable!(),
         };
         if !configured_target.label().package().repo().is_root() {
             return root_analysis_complete(Err(AnalysisError::new(format!(
@@ -1507,7 +1299,7 @@ impl RootConfiguredTargetAnalysisKey {
             .compute_join(unique.into_iter(), |ctx, configured_target| {
                 Box::pin(async move {
                     let result = ctx
-                        .compute(&RootConfiguredTargetAnalysisKey::new(
+                        .compute(&ConfiguredNodeAnalysisKey::new(
                             workspace.dupe(),
                             configured_target.clone(),
                         ))
