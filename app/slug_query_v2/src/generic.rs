@@ -1508,6 +1508,9 @@ mod tests {
                 targets.join(","),
                 depth.map_or_else(|| "all".to_owned(), |depth| depth.to_string())
             ));
+            if targets.iter().any(|target| target.ends_with(":error")) {
+                return Err(QueryError::evaluation("configured closure failed"));
+            }
             let mut result = targets.clone();
             if depth != Some(0) {
                 for target in targets {
@@ -1645,6 +1648,35 @@ mod tests {
     }
 
     #[test]
+    fn cquery_filter_deps_composes_once_in_closure_then_filter_order() {
+        let expression = QueryExpression::parse("filter('child$', deps(//pkg:root, 2))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:root:child"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:root",
+                "deps://pkg:root:2",
+                "filter://pkg:root,//pkg:root:child",
+            ]
+        );
+
+        let expression = QueryExpression::parse("filter('missing', deps(//pkg:error))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let error =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap_err();
+        assert_eq!(error.to_string(), "configured closure failed");
+        assert_eq!(
+            environment.events,
+            ["resolve://pkg:error", "deps://pkg:error:all"]
+        );
+    }
+
+    #[test]
     fn cquery_deps_evaluation_rejects_non_top_level_or_invalid_forms_independently() {
         for expression in [
             "deps()",
@@ -1653,7 +1685,7 @@ mod tests {
             "deps($root)",
             "deps(//pkg:root, '-1')",
             "deps(//pkg:root, 2147483648)",
-            "filter('root', deps(//pkg:root))",
+            "filter('root', deps(set(//pkg:root)))",
         ] {
             let expression = QueryExpression::parse(expression).unwrap();
             let mut environment = CqueryEnvironment { events: Vec::new() };

@@ -61,6 +61,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin, 2147483647)",
         "executables(deps(//pkg:bin))",
         "executables(deps(//pkg:bin, 2))",
+        "filter('^//pkg:bin$', deps(//pkg:bin))",
+        "filter('^//pkg:bin$', deps(//pkg:bin, 2))",
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
@@ -88,7 +90,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin union //pkg:lib)",
         "deps(//pkg:bin, '-1')",
         "deps(//pkg:bin, 2147483648)",
-        "filter('bin', deps(//pkg:bin))",
+        "filter('bin', deps(set(//pkg:bin)))",
+        "filter('bin', executables(deps(//pkg:bin)))",
+        "filter('bin', deps(//pkg:bin), //pkg:lib)",
         "executables(deps(set(//pkg:bin)))",
         "executables(executables(deps(//pkg:bin)))",
         "executables(deps(//pkg:bin), //pkg:lib)",
@@ -175,10 +179,20 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(spec.depth(), Some(2));
     assert_eq!(cquery_literals(&wrapped), ["//pkg:bin"]);
 
+    let filtered = QueryExpression::parse("filter('bin', deps(//pkg:bin, 1))").unwrap();
+    validate_cquery_query(&filtered).unwrap();
+    assert!(filtered.cquery_deps_spec().is_none());
+    let spec = filtered
+        .cquery_preactivation_deps_spec()
+        .expect("validated filtered deps spec");
+    assert_eq!(spec.target(), "//pkg:bin");
+    assert_eq!(spec.depth(), Some(1));
+    assert_eq!(cquery_literals(&filtered), ["//pkg:bin"]);
+
     for expression in [
         "deps(set(//pkg:bin))",
         "deps(//pkg:bin, '-1')",
-        "filter('bin', deps(//pkg:bin))",
+        "filter('bin', deps(set(//pkg:bin)))",
     ] {
         let expression = QueryExpression::parse(expression).unwrap();
         assert!(expression.cquery_deps_spec().is_none());
@@ -191,6 +205,21 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
             .unwrap_err()
             .to_string()
             .starts_with("too many arguments to function 'executables'")
+    );
+    let malformed = QueryExpression::parse("filter(set(), deps())").unwrap();
+    assert!(malformed.cquery_preactivation_deps_spec().is_none());
+    assert!(
+        validate_cquery_query(&malformed)
+            .unwrap_err()
+            .to_string()
+            .contains("argument 1 to function 'filter' must be a word")
+    );
+    let malformed = QueryExpression::parse("filter('bin', deps(), //pkg:extra)").unwrap();
+    assert!(
+        validate_cquery_query(&malformed)
+            .unwrap_err()
+            .to_string()
+            .starts_with("too many arguments to function 'filter'")
     );
 }
 

@@ -1220,6 +1220,16 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     assert_eq!(wrapped_daemon.stdout, wrapped_one_shot.stdout);
     assert!(wrapped_daemon.stderr.is_empty());
 
+    let filtered_expression = "filter(':(root|child)$', deps(//:root))";
+    let filtered_one_shot = run(None, filtered_expression, false);
+    assert!(filtered_one_shot.status.success(), "{filtered_one_shot:?}");
+    assert_eq!(filtered_one_shot.stdout, one_shot.stdout);
+    assert!(filtered_one_shot.stderr.is_empty());
+    let filtered_daemon = run(Some(&output_base), filtered_expression, false);
+    assert!(filtered_daemon.status.success(), "{filtered_daemon:?}");
+    assert_eq!(filtered_daemon.stdout, filtered_one_shot.stdout);
+    assert!(filtered_daemon.stderr.is_empty());
+
     let run_label = |output_base: Option<&str>| {
         let mut command = slug();
         command.current_dir(&workspace);
@@ -1357,6 +1367,16 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(wrapped_daemon.status.success(), "{wrapped_daemon:?}");
     assert_eq!(wrapped_daemon.stdout, wrapped_one_shot.stdout);
     assert!(wrapped_daemon.stderr.is_empty());
+
+    let filtered_one_shot = run(None, "filter('^//:root$', deps(//:root))");
+    assert!(filtered_one_shot.status.success(), "{filtered_one_shot:?}");
+    let stdout = String::from_utf8_lossy(&filtered_one_shot.stdout);
+    assert!(stdout.contains("//:root"), "{stdout}");
+    assert!(!stdout.contains("//:child"), "{stdout}");
+    let filtered_daemon = run(Some(&output_base), "filter('^//:root$', deps(//:root))");
+    assert!(filtered_daemon.status.success(), "{filtered_daemon:?}");
+    assert_eq!(filtered_daemon.stdout, filtered_one_shot.stdout);
+    assert!(filtered_daemon.stderr.is_empty());
 
     let depth_one = run(None, "deps(//:root, 1)");
     assert!(depth_one.status.success(), "{depth_one:?}");

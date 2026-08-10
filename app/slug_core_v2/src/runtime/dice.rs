@@ -7419,10 +7419,57 @@ executable_rule(
                 .label_stdout(),
             full.label_stdout()
         );
+
+        let filtered = run("filter(':(root|direct|leaf)$', deps(//:root))");
+        let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(filtered.label_stdout(), full.label_stdout());
+        assert_eq!(
+            filtered.starlark_label_stdout(),
+            full.starlark_label_stdout()
+        );
+        assert_eq!(
+            filtered.label_kind_stdout().unwrap(),
+            full.label_kind_stdout().unwrap()
+        );
+        assert_eq!(filtered.graph_stdout(), full.graph_stdout());
+
+        for (depth, expected) in [(0, depth_zero), (1, depth_one)] {
+            let filtered = run(&format!(
+                "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
+            ));
+            let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(
+                filtered.graph_stdout(),
+                expected.graph_stdout(),
+                "depth {depth}"
+            );
+        }
+        for depth in [2, i32::MAX] {
+            let filtered = run(&format!(
+                "filter(':(root|direct|leaf)$', deps(//:root, {depth}))"
+            ));
+            let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(
+                filtered.graph_stdout(),
+                full.graph_stdout(),
+                "depth {depth}"
+            );
+        }
+        let empty = run("filter('^//:missing$', deps(//:root))");
+        let empty = empty.terminal_for_test().as_ref().as_ref().unwrap();
+        assert!(empty.label_stdout().is_empty());
+        assert_eq!(
+            empty.graph_stdout(),
+            "digraph mygraph {\n  node [shape=box];\n}\n"
+        );
     }
 
     #[tokio::test]
     async fn cquery_deps_frontier_need_precedes_an_earlier_child_analysis_error() {
+        let expression = QueryExpression::parse("filter('root', deps(//:root, 1))").unwrap();
+        let deps = expression
+            .cquery_preactivation_deps_spec()
+            .expect("filtered closure spec");
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let configuration = build_test_configuration("target");
         let configured = |label: &str| {
@@ -7468,7 +7515,7 @@ executable_rule(
             &mut transaction,
             &NormalizedAbsolutePath::new("/workspace").unwrap(),
             root.dupe(),
-            Some(1),
+            deps.depth(),
             true,
         )
         .await
@@ -7490,7 +7537,7 @@ executable_rule(
             &mut restored,
             &NormalizedAbsolutePath::new("/workspace").unwrap(),
             root,
-            Some(1),
+            deps.depth(),
             true,
         )
         .await

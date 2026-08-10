@@ -249,14 +249,19 @@ pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryPa
         return parse_cquery_deps_spec(expression).map(|_| ());
     }
     if let QueryExpressionKind::Function { name, args } = &expression.kind
-        && name.value == "executables"
+        && matches!(name.value.as_str(), "executables" | "filter")
     {
-        validate_function_arguments(expression, args, cquery_function("executables"))?;
+        validate_function_arguments(expression, args, cquery_function(name.value.as_str()))?;
+        let operand = if name.value == "filter" {
+            &args[1]
+        } else {
+            &args[0]
+        };
         if matches!(
-            args[0].kind,
+            operand.kind,
             QueryExpressionKind::Function { ref name, .. } if name.value == "deps"
         ) {
-            return parse_cquery_deps_spec(&args[0]).map(|_| ());
+            return parse_cquery_deps_spec(operand).map(|_| ());
         }
     }
     let mut bindings = SmallSet::new();
@@ -458,7 +463,7 @@ impl QueryExpression {
     }
 
     /// Returns the configured closure that must be activated before evaluating
-    /// either direct `deps()` or its admitted `executables(deps())` consumer.
+    /// direct `deps()` or one of its admitted forward consumers.
     pub fn cquery_preactivation_deps_spec(&self) -> Option<CqueryDepsSpec> {
         if let Some(spec) = self.cquery_deps_spec() {
             return Some(spec);
@@ -466,10 +471,16 @@ impl QueryExpression {
         let QueryExpressionKind::Function { name, args } = &self.kind else {
             return None;
         };
-        if name.value != "executables" || args.len() != 1 {
-            return None;
-        }
-        parse_cquery_deps_spec(&args[0]).ok()
+        let operand = match (name.value.as_str(), &args[..]) {
+            ("executables", [operand]) => operand,
+            ("filter", [pattern, operand])
+                if matches!(pattern.kind, QueryExpressionKind::TargetLiteral(_)) =>
+            {
+                operand
+            }
+            _ => return None,
+        };
+        parse_cquery_deps_spec(operand).ok()
     }
 }
 

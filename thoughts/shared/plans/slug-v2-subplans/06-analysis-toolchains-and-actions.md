@@ -6682,3 +6682,56 @@ independent final review gates pass. The net Rust delta is 58 production and
 Run next only `WP-6-m2t-configured-query-forward-successor-audit`. Keep general
 nested `deps`, factored/default-implicit/tool/external/reverse topology, other
 outputs, parser replacement, JVM/Java, exact hashes, and CI stopped.
+
+### Configured-query filter-deps successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2t-configured-query-forward-successor-audit` selected exactly
+`filter(<word regex>, deps(<one concrete root>[, <nonnegative i32 depth>]))`.
+This meaningfully filters the complete configured closure by original label
+while safely covering configured rules and retained null source/generated/
+package-group nodes. `kind(deps(...))` crosses a capability-free-node boundary,
+`some(deps(...))` adds cancellation and arbitrary-selection ownership, and
+`siblings(deps(...))` is only an error terminal for nonempty configured sets.
+
+Pinned Bazel 9.2 `RegexFilterExpression`, `FilterFunction`, configured-target
+label access, and `DepsFunction` sources establish unanchored label matching,
+operand-relative order, full-key retention, and closure-before-filter
+composition. Accepted filter-label and delegation-topology evidence is
+sufficient; no new fixture or oracle is required. Regex language and errors
+remain the approved Slug-native Rust Unicode boundary.
+
+Run next `WP-6-m2u-cquery-filter-deps-forward-composition`. Generalize only the
+existing wrapper validator and preactivation accessor, then reuse M2s's nested
+`deps` dispatch, complete closure, shared filter fold, authoritative edges, and
+formatters. Every other nested `deps` form, default implicit/tool/external/
+factored/reverse topology, parser replacement, JVM/Java, exact hashes, and CI
+remain stopped.
+
+### Configured-query filter-deps composition ACCEPT (2026-08-09)
+
+`WP-6-m2u-cquery-filter-deps-forward-composition` is **ACCEPTED**. Configured
+query now admits exactly
+`filter(<word regex>, deps(<one concrete root>[, <nonnegative i32 depth>]))`
+under `--noimplicit_deps`. Only expression admission and the existing
+wrapper-aware preactivation accessor changed; M2s's shared fold, complete
+closure, original-label predicate, full configured/null identity, authoritative
+edges, and terminal formatters are reused unchanged.
+
+Filtering preserves transitioned duplicates and operand-relative order. Graph
+output is selected-induced, so an admitted descendant behind a filtered bridge
+is isolated rather than connected by a synthetic edge. Empty filters succeed,
+closure Need/error precedes filtering, and all four retained outputs route
+through command/server and one-shot/daemon paths. Regex language and errors
+remain the approved Slug-native Rust Unicode boundary.
+
+Query passes 114 tests, commands 19, server 48, focused core topology and
+lifecycle regressions pass, the V2 CLI rebuild passes, and two focused CLI
+one-shot/daemon regressions pass. Formatting, diff, stale-daemon, cap, and
+independent final review gates pass. The net Rust delta is 11 production and
+145 test lines, 156 total, within 70/260/330 caps. No fixture, oracle, graph,
+key, state, representation, wire/output family, or vendored `starlark-rust`
+parser/evaluator changed.
+
+Run next only `WP-6-m2v-configured-query-forward-successor-audit`. Keep general
+nested `deps`, factored/default-implicit/tool/external/reverse topology, other
+outputs, exact hashes, JVM/Java, and CI stopped.

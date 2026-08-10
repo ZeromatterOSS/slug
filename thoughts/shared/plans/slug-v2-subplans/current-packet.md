@@ -1,29 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2t-configured-query-forward-successor-audit`
+Packet: `WP-6-m2v-configured-query-forward-successor-audit`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only audit after accepted executable-deps composition.
+Result: read-only audit after accepted filter-deps composition.
 
 ## Observable slice
 
 Select the next semantically closed configured-query behavior after accepted
-single-root noimplicit arbitrary-depth `deps`, all four retained outputs, and
-`executables(deps(...))`. Prefer a meaningful consumer or bounded expression
-composition over singleton syntax normalization.
+single-root noimplicit arbitrary-depth `deps`, all four retained outputs,
+`executables(deps(...))`, and `filter(regex, deps(...))`. Prefer a meaningful
+consumer or bounded composition over singleton syntax normalization.
 
 ## Ownership and stops
 
-Reuse the sole configured analysis key, depth-aware closure, authoritative
-ordered edges, full configured/null keys, result handles/index, retained rule
-capability, shared expression fold, and terminal formatters. Do not add a graph,
-copied adjacency, key, cache, parser, evaluator, representation, output family,
-or wire mode. The vendored Buck2 `starlark-rust` parser/evaluator remains
-unchanged.
+Reuse the sole configured analysis key, closure, authoritative edges, full
+configured/null keys, result handles/index, retained capabilities, shared fold,
+and terminal formatters. Do not add a graph, copied adjacency, key, cache,
+parser, evaluator, representation, output family, or wire mode. The vendored
+Buck2 `starlark-rust` parser/evaluator remains unchanged.
 
-Keep general nested `deps`, factored/default-implicit/tool/external topology,
-reverse traversal, external labels, other outputs, exact hashes, JVM/Java, and
-CI stopped unless one smaller exact owner and accepted evidence close them.
+Keep general nested `deps`, factored/default-implicit/tool/external/reverse
+topology, other outputs, exact hashes, JVM/Java, and CI stopped unless one
+smaller exact owner and accepted evidence close them.
 
 ## Validation
 
