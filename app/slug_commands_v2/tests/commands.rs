@@ -461,6 +461,8 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
 fn cquery_accepts_only_the_label_output_matrix() {
     let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
     assert_eq!(default.output_mode, CqueryOutputMode::Label);
+    assert!(default.include_implicit);
+    assert!(default.include_tool);
 
     let label = CqueryRequest::parse(&["--output=label", "//pkg:bin"]).unwrap();
     assert_eq!(label.output_mode, CqueryOutputMode::Label);
@@ -597,6 +599,46 @@ fn cquery_accepts_only_the_label_output_matrix() {
 
     let aquery = AqueryRequest::parse(&["--nostrict_test_suite=false", "//pkg:bin"]).unwrap();
     assert_eq!(aquery.query.policy, QueryPolicy::default());
+}
+
+#[test]
+fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
+    assert!(CqueryRequest::parse(&["deps(//pkg:bin)"]).is_err());
+    assert!(CqueryRequest::parse(&["--notool_deps", "deps(//pkg:bin)"]).is_err());
+
+    let noimplicit = CqueryRequest::parse(&["--noimplicit_deps", "deps(//pkg:bin)"]).unwrap();
+    assert!(!noimplicit.include_implicit);
+    assert!(noimplicit.include_tool);
+
+    let filtered = CqueryRequest::parse(&[
+        "--implicit_deps=false",
+        "--tool_deps=false",
+        "deps(//pkg:bin, 2)",
+    ])
+    .unwrap();
+    assert!(!filtered.include_implicit);
+    assert!(!filtered.include_tool);
+
+    let negated_values = CqueryRequest::parse(&[
+        "--noimplicit_deps=true",
+        "--notool_deps=true",
+        "deps(//pkg:bin)",
+    ])
+    .unwrap();
+    assert!(!negated_values.include_implicit);
+    assert!(!negated_values.include_tool);
+
+    let non_deps =
+        CqueryRequest::parse(&["--noimplicit_deps", "--notool_deps", "//pkg:bin"]).unwrap();
+    assert!(!non_deps.include_implicit);
+    assert!(!non_deps.include_tool);
+
+    for flag in ["--implicit_deps=maybe", "--notool_deps=maybe"] {
+        let error = CqueryRequest::parse(&[flag, "//pkg:bin"])
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("expected a boolean value"), "{error}");
+    }
 }
 
 #[test]

@@ -47,6 +47,8 @@ pub fn run(argv: Vec<String>) -> i32 {
     let accepted = match evaluate_workspace_cquery_command_with_bzlmod_inputs(
         &workspace,
         &request.expression,
+        request.include_implicit,
+        request.include_tool,
         request.bzlmod_policy,
         environment_policy,
         request.lockfile_mode,
@@ -100,6 +102,8 @@ fn run_daemon(
         &socket,
         &slug_server_v2::CqueryRequest {
             expression: request.expression,
+            include_implicit: request.include_implicit,
+            include_tool: request.include_tool,
             output: match request.output_mode {
                 CqueryOutputMode::Label => slug_server_v2::CqueryOutput::Label,
                 CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,

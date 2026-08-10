@@ -1,36 +1,34 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2h-configured-query-root-traversal-activation-audit`
+Packet: `WP-6-m2j-configured-query-forward-traversal-successor-audit`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only successor audit after root topology activation.
+Result: read-only successor audit after root `deps` activation.
 
 ## Observable slice
 
-Reconcile the accepted Bazel 9.2 delegation/toolchain `deps` evidence with the
-live cquery expression, evaluator, command-root, and configured-result owners.
-Identify the smallest root-only forward traversal that can consume the sole
-ordered configured graph without synthesizing the stopped external
-host-platform tail.
+Select the next semantically closed configured-query behavior after accepted
+single-root `deps(//label[, depth]) --noimplicit_deps`. Compare the accepted
+delegation/toolchain graph evidence with the live result-owned traversal,
+output, and command owners. Prefer exact noimplicit unfactored graph output or
+a strictly smaller forward-traversal consumer over reverse traversal.
 
 ## Ownership and stops
 
-Read the accepted topology fixtures and the live query/cquery/analysis/core
-owners. Produce an exact traversal, depth, filtering, ordering, terminal, and
-ownership table; identify whether an exact `--noimplicit_deps` root slice is
-implementable before default traversal. Do not edit Rust, tests, fixtures, or
-oracle payloads in this audit.
-
-Literal `@bazel_tools`, `@platforms`, host-platform edges, and cross-package
-reverse implementation topology remain stopped. Exclude `rdeps`, public
-label/graph formatter breadth, new parser work, exact Bazel hash bytes,
-JVM/Java, CI, and compatibility behavior. Vendored Buck2 `starlark-rust`
-remains the sole Starlark parser/evaluator substrate.
+Reuse the sole `ConfiguredNodeAnalysisKey`, `ConfiguredNodeResult::edges()`,
+full `ConfiguredNodeKey`, request-local result handles/index, shared
+Buck2-derived query evaluator, and vendored `starlark-rust`. Do not add another
+graph/key/cache or copy authoritative adjacency. Keep default implicit
+traversal, literal `@bazel_tools`, `@platforms`, host-platform tails,
+multi-root label-order claims, `rdeps`, exact configuration hashes, JVM/Java,
+CI, and parser replacement stopped unless the audit proves a smaller exact
+owner and accepted evidence.
 
 ## Validation
 
-Every proposed traversal rule must cite accepted Bazel 9.2 evidence and one
-live owner. Preserve exact depth, implicit/tool filtering, ordered structural
-identity, Need/error precedence, and result ownership. Stop with `REPLAN` if no
-bounded exact slice exists without synthetic external nodes or a second
-graph/key/result/cache.
+Cite accepted Bazel 9.2 evidence and one live owner for every proposed
+observable. Preserve Need-before-error behavior, full configured/null identity,
+per-edge filtering, and deterministic structural order. Make no Rust, test,
+fixture, oracle, or standalone documentation commit in this audit. Stop with
+`REPLAN` if the next behavior requires the stopped external tail or a second
+authoritative graph.

@@ -1142,6 +1142,76 @@ fn cquery_set_and_some_expressions_match_between_one_shot_and_daemon() {
 }
 
 #[test]
+fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
+    let workspace = scratch("cquery-deps-workspace");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"deps\")\n");
+    write(
+        &workspace.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nnode = rule(implementation = _impl, attrs = {\"deps\": attr.label_list()})\n",
+    );
+    write(
+        &workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"node\")\nnode(name = \"child\")\nnode(name = \"root\", deps = [\":child\"])\n",
+    );
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "load(\"//:defs.bzl\", \"node\")\nnode(name = \"pkg\")\n",
+    );
+    let expression = "deps(//:root)";
+    let starlark = ["--output=starlark", "--starlark:expr=str(target.label)"];
+
+    let rejected = slug()
+        .current_dir(&workspace)
+        .args(["cquery", expression])
+        .output()
+        .unwrap();
+    assert_eq!(rejected.status.code(), Some(2), "{rejected:?}");
+    assert!(rejected.stdout.is_empty());
+    assert!(
+        String::from_utf8(rejected.stderr)
+            .unwrap()
+            .contains("--noimplicit_deps")
+    );
+
+    let run = |output_base: Option<&str>, without_tools: bool| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .args(["cquery", expression, "--noimplicit_deps"])
+            .args(without_tools.then_some("--notool_deps"))
+            .args(starlark)
+            .output()
+            .unwrap()
+    };
+    let one_shot = run(None, false);
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    assert_eq!(one_shot.stdout, b"@@//:root\n@@//:child\n");
+    assert!(one_shot.stderr.is_empty());
+    let shorthand = slug()
+        .current_dir(&workspace)
+        .args(["cquery", "deps(//pkg)", "--noimplicit_deps"])
+        .args(starlark)
+        .output()
+        .unwrap();
+    assert!(shorthand.status.success(), "{shorthand:?}");
+    assert_eq!(shorthand.stdout, b"@@//pkg:pkg\n");
+    assert!(shorthand.stderr.is_empty());
+
+    let output_base = scratch("cquery-deps-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base = format!("--output_base={}", output_base.display());
+    for without_tools in [false, true] {
+        let daemon = run(Some(&output_base), without_tools);
+        assert!(daemon.status.success(), "{daemon:?}");
+        assert_eq!(daemon.stdout, one_shot.stdout);
+        assert!(daemon.stderr.is_empty());
+    }
+}
+
+#[test]
 fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
     let workspace = scratch("cquery-filter-expression-workspace");
     write(

@@ -813,6 +813,8 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
 fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     let request = DaemonRequest::Cquery(CqueryRequest {
         expression: "//pkg:probe".to_owned(),
+        include_implicit: false,
+        include_tool: false,
         output: CqueryOutput::Label,
         root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
         bzlmod: BzlmodRequestInputs::default(),
@@ -820,12 +822,16 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     let json = serde_json::to_string(&request).unwrap();
     assert!(!json.contains("order_output"));
     assert!(json.contains("expression"));
+    assert!(json.contains("\"include_implicit\":false"));
+    assert!(json.contains("\"include_tool\":false"));
     assert!(!json.contains("target"));
     let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
     let DaemonRequest::Cquery(request) = round_trip else {
         panic!("expected tagged cquery request");
     };
     assert_eq!(request.expression, "//pkg:probe");
+    assert!(!request.include_implicit);
+    assert!(!request.include_tool);
     assert_eq!(request.output, CqueryOutput::Label);
     assert_eq!(
         request.root_string_setting.as_deref(),
@@ -851,6 +857,16 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     )
     .unwrap_err();
     assert!(old_shape.to_string().contains("missing field `expression`"));
+
+    let defaults: DaemonRequest = serde_json::from_str(
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label"}}"#,
+    )
+    .unwrap();
+    let DaemonRequest::Cquery(defaults) = defaults else {
+        panic!("expected cquery request");
+    };
+    assert!(defaults.include_implicit);
+    assert!(defaults.include_tool);
 
     let workspace = scratch("cquery-malformed-mode");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
@@ -920,6 +936,8 @@ fn retained_cquery_missing_recovers_without_new_invalidations() {
     let run = |daemon: &mut Daemon, value: &str| {
         daemon.cquery_with_bzlmod_inputs(
             value,
+            true,
+            true,
             CqueryOutput::StarlarkLabel,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -959,6 +977,8 @@ fn retained_cquery_executables_observes_capability_edits_warm_and_restoration() 
     let run = |daemon: &mut Daemon| {
         daemon.cquery_with_bzlmod_inputs(
             "executables(//pkg:probe)",
+            true,
+            true,
             CqueryOutput::StarlarkLabel,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1013,6 +1033,8 @@ fn retained_cquery_kind_matches_exported_rule_classes_and_reuses_daemon_state() 
     let run = |daemon: &mut Daemon, expression: &str, output| {
         daemon.cquery_with_bzlmod_inputs(
             expression,
+            true,
+            true,
             output,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1155,6 +1177,8 @@ fn retained_cquery_siblings_is_an_exact_post_analysis_terminal() {
     let run = |daemon: &mut Daemon, expression: &str, output| {
         daemon.cquery_with_bzlmod_inputs(
             expression,
+            true,
+            true,
             output,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1260,6 +1284,8 @@ fn retained_cquery_visible_is_vacuous_until_both_operands_are_nonempty() {
     let run = |daemon: &mut Daemon, expression: &str, output| {
         daemon.cquery_with_bzlmod_inputs(
             expression,
+            true,
+            true,
             output,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1375,6 +1401,8 @@ fn retained_cquery_loading_files_are_post_analysis_terminals() {
     let run = |daemon: &mut Daemon, expression: &str, output| {
         daemon.cquery_with_bzlmod_inputs(
             expression,
+            true,
+            true,
             output,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1481,6 +1509,8 @@ fn retained_cquery_missing_executable_recovers_after_rule_edit() {
     let run = |daemon: &mut Daemon| {
         daemon.cquery_with_bzlmod_inputs(
             "//pkg:probe",
+            true,
+            true,
             CqueryOutput::StarlarkLabel,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1527,6 +1557,8 @@ fn retained_cquery_starlark_formats_ordered_sets() {
     let mut daemon = Daemon::new(&workspace).unwrap();
     let result = daemon.cquery_with_bzlmod_inputs(
         "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
+        true,
+        true,
         CqueryOutput::StarlarkLabel,
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1541,6 +1573,8 @@ fn retained_cquery_starlark_formats_ordered_sets() {
 
     let filtered = daemon.cquery_with_bzlmod_inputs(
         "filter('^//pkg:bin$', set(//pkg:lib //pkg:bin //pkg:lib))",
+        true,
+        true,
         CqueryOutput::StarlarkLabel,
         BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1573,6 +1607,8 @@ fn retained_cquery_selection_errors_use_evaluation_exit_and_preserve_invalidatio
     let run = |daemon: &mut Daemon, expression: &str| {
         daemon.cquery_with_bzlmod_inputs(
             expression,
+            true,
+            true,
             CqueryOutput::StarlarkLabel,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
@@ -1635,6 +1671,8 @@ fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
     let run = |daemon: &mut Daemon, output, setting| {
         daemon.cquery_with_bzlmod_inputs(
             "//pkg:probe",
+            true,
+            true,
             output,
             BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),

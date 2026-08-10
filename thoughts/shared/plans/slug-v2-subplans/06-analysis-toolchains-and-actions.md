@@ -6433,3 +6433,45 @@ expression/evaluator owners and freeze the smallest evidence-backed `deps`
 slice without inventing the stopped external host-platform tail. The audit is
 read-only; `rdeps`, label/graph formatting breadth, parser changes, JVM/Java,
 and exact Bazel hash bytes remain excluded.
+
+### Configured-query root traversal audit and noimplicit activation ACCEPT (2026-08-09)
+
+`WP-6-m2h-configured-query-root-traversal-activation-audit` selected and
+`WP-6-m2i-configured-query-root-noimplicit-deps-activation` **ACCEPTED** the
+smallest exact forward traversal: top-level
+`deps(//root[, nonnegative-depth]) --noimplicit_deps`. The shared
+Buck2-derived query expression fold now dispatches that one form; vendored
+`starlark-rust` and the query parser are unchanged. Set, let, variable,
+multi-root, nested, negative-depth, `rdeps`, graph-output, and external-label
+forms remain rejected.
+
+The command root activates each breadth-first frontier through the sole
+`ConfiguredNodeAnalysisKey`, unions all Needs before the first stable child
+analysis error, and retains only ordered `Arc<ConfiguredNodeResult>` handles
+plus a request-local full-`ConfiguredNodeKey` index. Evaluation reads the
+authoritative ordered `ConfiguredNodeResult::edges()` directly; no adjacency,
+DICE key, graph, or cache is copied. Depth zero does not traverse an edge.
+Null source/package-group identities survive to label output as `(null)`,
+configured-output claims skip them, and Starlark-label output remains
+canonical. The existing label projection and multi-node callback order are
+explicitly Slug-native rather than claims about deferred Bazel hash/order
+bytes.
+
+Default implicit traversal remains unsupported because Bazel adds the stopped
+`@bazel_tools`/`@platforms` host and transition-allowlist tail.
+`--noimplicit_deps --notool_deps` is accepted and identical because every
+currently admitted edge is `tool=false`; any future `tool=true` edge fails
+closed pending evidence. One-shot and daemon requests carry the two primitive
+filter booleans symmetrically.
+
+Query passes 111 tests, commands 19, server 48, and the focused core and
+rebuilt-CLI one-shot/daemon traversal regressions pass. Full core remains at
+its unchanged external-visibility diagnostic mismatch and full CLI at its
+unchanged `bzl_cycle` unavailable-root baseline. Formatting, diff, archive,
+parser-scope, stale-daemon cleanup, and independent design/final review gates
+pass.
+
+Run next only `WP-6-m2j-configured-query-forward-traversal-successor-audit`.
+Prefer exact noimplicit unfactored graph output or a smaller forward consumer;
+keep default external topology, multi-root label-order claims, reverse
+traversal, parser replacement, JVM/Java, exact hashes, and CI stopped.

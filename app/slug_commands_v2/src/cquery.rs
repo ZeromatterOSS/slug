@@ -19,6 +19,7 @@ use crate::common::CommandParseError;
 use crate::common::bzlmod_command_policy;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
+use crate::common::parse_bool_flag;
 use crate::common::split_args;
 
 const LABEL_EXPRESSION: &str = "str(target.label)";
@@ -33,6 +34,8 @@ pub enum CqueryOutputMode {
 pub struct CqueryRequest {
     pub expression: String,
     pub output_mode: CqueryOutputMode,
+    pub include_implicit: bool,
+    pub include_tool: bool,
     pub output_base: Option<String>,
     /// The one admitted root build setting transition. Configuration owns its
     /// typed representation and semantic identity.
@@ -85,6 +88,8 @@ impl CqueryRequest {
         let mut starlark_expression = None;
         let mut output_base = None;
         let mut root_string_setting = None;
+        let mut include_implicit = true;
+        let mut include_tool = true;
         for flag in &parsed.flags {
             match flag.name.as_str() {
                 "output" => set_once(&mut output, flag, "--output")?,
@@ -100,6 +105,10 @@ impl CqueryRequest {
                             })?;
                     root_string_setting = Some(value);
                 }
+                "implicit_deps" => include_implicit = parse_bool_flag(flag, false)?,
+                "noimplicit_deps" => include_implicit = parse_bool_flag(flag, true)?,
+                "tool_deps" => include_tool = parse_bool_flag(flag, false)?,
+                "notool_deps" => include_tool = parse_bool_flag(flag, true)?,
                 "allow_yanked_versions"
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
@@ -112,6 +121,11 @@ impl CqueryRequest {
                     )));
                 }
             }
+        }
+        if parsed_expression.cquery_deps_spec().is_some() && include_implicit {
+            return Err(unsupported(
+                "deps() requires --noimplicit_deps in this cquery",
+            ));
         }
         let output_mode = match (output.as_deref(), starlark_expression.as_deref()) {
             (None | Some("label"), None) => CqueryOutputMode::Label,
@@ -129,6 +143,8 @@ impl CqueryRequest {
         Ok(Self {
             expression: cquery_expression,
             output_mode,
+            include_implicit,
+            include_tool,
             output_base,
             root_string_setting,
             bzlmod_policy,

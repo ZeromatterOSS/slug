@@ -343,6 +343,8 @@ impl Daemon {
     pub fn cquery_with_bzlmod_inputs(
         &mut self,
         expression: &str,
+        include_implicit: bool,
+        include_tool: bool,
         output: crate::server::CqueryOutput,
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
@@ -365,6 +367,8 @@ impl Daemon {
         );
         let accepted = match self.runtime.cquery_command_with_bzlmod_inputs(
             expression,
+            include_implicit,
+            include_tool,
             command_policy,
             environment_policy,
             lockfile_mode,

@@ -47,6 +47,23 @@ pub struct QueryExpression {
     pub kind: QueryExpressionKind,
 }
 
+/// The one configured `deps()` form whose traversal semantics are admitted.
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct CqueryDepsSpec {
+    target: CompactString,
+    depth: Option<i32>,
+}
+
+impl CqueryDepsSpec {
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub const fn depth(&self) -> Option<i32> {
+        self.depth
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum QueryExpressionKind {
     TargetLiteral(CompactString),
@@ -225,6 +242,12 @@ pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryP
 
 /// Validates the deliberately small configured-query subset.
 pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
+    if matches!(
+        &expression.kind,
+        QueryExpressionKind::Function { name, .. } if name.value == "deps"
+    ) {
+        return parse_cquery_deps_spec(expression).map(|_| ());
+    }
     let mut bindings = SmallSet::new();
     validate_cquery_query_inner(expression, &mut bindings)
 }
@@ -314,6 +337,12 @@ fn validate_cquery_query_inner(
             validate_function_arguments(expression, args, spec)?;
             validate_cquery_query_inner(&args[1], bindings)
         }
+        QueryExpressionKind::Function { name, .. } if name.value == "deps" => {
+            Err(QueryParseError::new(
+                "deps() is supported only as a top-level cquery expression",
+                name.span,
+            ))
+        }
         QueryExpressionKind::Function { name, .. } => Err(QueryParseError::new(
             format!(
                 "query function '{}' is not supported by this cquery",
@@ -376,6 +405,11 @@ fn collect_cquery_literals<'a>(expression: &'a QueryExpression, literals: &mut V
         QueryExpressionKind::Function { name, args } if name.value == "kind" => {
             collect_cquery_literals(&args[1], literals);
         }
+        QueryExpressionKind::Function { name, args } if name.value == "deps" => {
+            if let Some(operand) = args.first() {
+                collect_cquery_literals(operand, literals);
+            }
+        }
         QueryExpressionKind::TargetLiteral(_)
         | QueryExpressionKind::Integer(_)
         | QueryExpressionKind::Function { .. } => {}
@@ -405,6 +439,59 @@ impl QueryExpression {
         };
         raw.parse::<i32>().map_err(|_| raw)
     }
+
+    /// Returns the admitted top-level configured `deps()` invocation after it
+    /// has passed [`validate_cquery_query`].
+    pub fn cquery_deps_spec(&self) -> Option<CqueryDepsSpec> {
+        parse_cquery_deps_spec(self).ok()
+    }
+}
+
+fn parse_cquery_deps_spec(expression: &QueryExpression) -> Result<CqueryDepsSpec, QueryParseError> {
+    let QueryExpressionKind::Function { name, args } = &expression.kind else {
+        return Err(QueryParseError::new(
+            "deps() is supported only as a top-level cquery expression",
+            expression.span,
+        ));
+    };
+    if name.value != "deps" {
+        return Err(QueryParseError::new(
+            "deps() is supported only as a top-level cquery expression",
+            name.span,
+        ));
+    }
+    validate_function_arguments(expression, args, cquery_function("deps"))?;
+    let target = match args.first().map(|argument| &argument.kind) {
+        Some(QueryExpressionKind::TargetLiteral(target)) if !target.starts_with('$') => {
+            target.clone()
+        }
+        Some(_) => {
+            return Err(QueryParseError::new(
+                "cquery deps() requires one concrete target literal",
+                args[0].span,
+            ));
+        }
+        None => unreachable!("the deps function arity was validated"),
+    };
+    let depth = match args.get(1) {
+        Some(argument) => {
+            let depth = argument.java_integer_literal().map_err(|raw| {
+                QueryParseError::new(
+                    format!("expected an integer literal: '{raw}'"),
+                    argument.span,
+                )
+            })?;
+            if depth < 0 {
+                return Err(QueryParseError::new(
+                    "cquery deps() depth must be nonnegative",
+                    argument.span,
+                ));
+            }
+            Some(depth)
+        }
+        None => None,
+    };
+    Ok(CqueryDepsSpec { target, depth })
 }
 
 fn cquery_function(name: &str) -> &'static QueryFunctionSpec {

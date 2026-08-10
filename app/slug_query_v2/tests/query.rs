@@ -53,9 +53,12 @@ fn parser_accepts_generic_calls_let_parentheses_and_space_separated_set() {
 }
 
 #[test]
-fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_siblings_visible_loading_files_executables_and_kind()
+fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_siblings_visible_loading_files_executables_and_kind()
  {
     for source in [
+        "deps(//pkg:bin)",
+        "deps(//pkg:bin, 0)",
+        "deps(//pkg:bin, 2147483647)",
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
@@ -75,6 +78,15 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_sibli
     }
 
     for source in [
+        "deps()",
+        "deps(//pkg:bin, 0, 1)",
+        "deps(set(//pkg:bin))",
+        "deps(let x = //pkg:bin in $x)",
+        "deps($x)",
+        "deps(//pkg:bin union //pkg:lib)",
+        "deps(//pkg:bin, '-1')",
+        "deps(//pkg:bin, 2147483648)",
+        "filter('bin', deps(//pkg:bin))",
         "$x",
         "let x = set() in $y",
         "let x = $x in //pkg:bin",
@@ -108,6 +120,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_sibli
             error.contains("undefined query variable")
                 || error.contains("concrete target literals")
                 || error.contains("arguments to function 'filter'")
+                || error.contains("arguments to function 'deps'")
+                || error.contains("cquery deps()")
+                || error.contains("top-level cquery expression")
                 || error.contains("arguments to function 'some'")
                 || error.contains("arguments to function 'siblings'")
                 || error.contains("arguments to function 'visible'")
@@ -134,6 +149,25 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_filter_some_sibli
         ),
         ["//pkg:bin", "//pkg:lib"]
     );
+}
+
+#[test]
+fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_operand() {
+    let expression = QueryExpression::parse("deps(//pkg:bin, 2)").unwrap();
+    validate_cquery_query(&expression).unwrap();
+    let spec = expression.cquery_deps_spec().expect("validated deps spec");
+    assert_eq!(spec.target(), "//pkg:bin");
+    assert_eq!(spec.depth(), Some(2));
+    assert_eq!(cquery_literals(&expression), ["//pkg:bin"]);
+
+    for expression in [
+        "deps(set(//pkg:bin))",
+        "deps(//pkg:bin, '-1')",
+        "filter('bin', deps(//pkg:bin))",
+    ] {
+        let expression = QueryExpression::parse(expression).unwrap();
+        assert!(expression.cquery_deps_spec().is_none());
+    }
 }
 
 #[test]

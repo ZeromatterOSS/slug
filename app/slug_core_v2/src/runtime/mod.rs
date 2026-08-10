@@ -75,6 +75,8 @@ pub fn evaluate_workspace_build_command_with_bzlmod_inputs(
 pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
     workspace: &std::path::Path,
     expression: &str,
+    include_implicit: bool,
+    include_tool: bool,
     command_policy: slug_bzlmod_v2::BzlmodCommandPolicyKey,
     environment_policy: slug_bzlmod_v2::BzlmodEnvironmentPolicyKey,
     lockfile_mode: slug_bzlmod_v2::LockfileMode,
@@ -88,6 +90,8 @@ pub fn evaluate_workspace_cquery_command_with_bzlmod_inputs(
         .map_err(CqueryCommandError::infrastructure)?;
     runtime.cquery_command_with_bzlmod_inputs(
         expression,
+        include_implicit,
+        include_tool,
         command_policy,
         environment_policy,
         lockfile_mode,

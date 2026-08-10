@@ -49,6 +49,7 @@ use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::prepare_configured_node_analysis;
@@ -1334,6 +1335,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
         }
 
         let mut targets = Vec::with_capacity(self.roots.len());
+        let mut analyses = Vec::with_capacity(self.roots.len());
         for (root, result) in self.roots.iter().zip(results) {
             let analysis = match result.as_ref() {
                 Ok(analysis) => analysis,
@@ -1343,24 +1345,69 @@ impl NativeCommandRoot for CqueryCommandRoot {
                     ));
                 }
             };
-            let configured_key = analysis
-                .configured_target_key()
-                .expect("current cquery analysis only contains configured nodes");
-            let Some(configuration) = configured_key.configuration().slug_configuration() else {
+            let target = match cquery_result_target(analysis.dupe(), root.requested.clone()) {
+                Ok(target) => target,
+                Err(error) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                        Arc::new(Err(error)),
+                    ));
+                }
+            };
+            targets.push(target);
+            analyses.push(analysis.dupe());
+        }
+
+        let mut node_indices = SmallMap::new();
+        for (index, analysis) in analyses.iter().enumerate() {
+            node_indices.insert(analysis.key().clone(), index);
+        }
+        if let Some(deps) = self.expression.cquery_deps_spec() {
+            if self.include_implicit {
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(CqueryCommandError::infrastructure(
-                        "production cquery analysis returned an opaque configuration",
+                    Arc::new(Err(CqueryCommandError::request(
+                        "cquery deps() currently requires --noimplicit_deps",
+                    ))),
+                ));
+            }
+            let Some(root) = self.roots.first() else {
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                    Arc::new(Err(CqueryCommandError::request(
+                        "cquery deps() requires one root target",
                     ))),
                 ));
             };
-            targets.push(CqueryResultTarget {
-                key: configured_key.clone(),
-                analysis: analysis.clone(),
-                display_label: root.requested.clone(),
-                projection: configuration.projection(),
-            });
+            if analyses.len() != 1 {
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                    Arc::new(Err(CqueryCommandError::request(
+                        "cquery deps() requires one concrete root target",
+                    ))),
+                ));
+            }
+            match compute_cquery_deps_closure(
+                transaction,
+                &root.workspace,
+                analyses.pop().expect("one cquery deps root analysis"),
+                deps.depth(),
+                self.include_tool,
+            )
+            .await?
+            {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(needs));
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                        Arc::new(Err(error)),
+                    ));
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((nodes, indices))) => {
+                    analyses = nodes;
+                    node_indices = indices;
+                }
+            }
         }
-        let mut environment = CquerySetEnvironment::new(&self.literal_roots, &targets);
+        let mut environment =
+            CquerySetEnvironment::new(&self.literal_roots, &targets, analyses.into(), node_indices);
         let terminal = evaluate_cquery_query(&mut environment, &self.expression)
             .await
             .map(|targets| CqueryCommandEvaluation { targets })
@@ -1369,6 +1416,166 @@ impl NativeCommandRoot for CqueryCommandRoot {
             Arc::new(terminal),
         ))
     }
+}
+
+type CqueryDepsClosureOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
+    Result<
+        (
+            Vec<Arc<ConfiguredNodeResult>>,
+            SmallMap<ConfiguredNodeKey, usize>,
+        ),
+        CqueryCommandError,
+    >,
+>;
+
+fn cquery_result_target(
+    analysis: Arc<ConfiguredNodeResult>,
+    display_label: Arc<str>,
+) -> Result<CqueryResultTarget, CqueryCommandError> {
+    let projection = match analysis.key().configured_target() {
+        Some(configured) => Some(
+            configured
+                .configuration()
+                .slug_configuration()
+                .ok_or_else(|| {
+                    CqueryCommandError::infrastructure(
+                        "production cquery analysis returned an opaque configuration",
+                    )
+                })?
+                .projection(),
+        ),
+        None => None,
+    };
+    Ok(CqueryResultTarget {
+        key: analysis.key().clone(),
+        analysis,
+        display_label,
+        projection,
+    })
+}
+
+fn cquery_label_mode_label(key: &ConfiguredNodeKey) -> Arc<str> {
+    let canonical = key.label().to_string();
+    Arc::from(canonical.strip_prefix("@@").unwrap_or(&canonical))
+}
+
+async fn compute_cquery_deps_closure(
+    transaction: &mut dice::DiceTransaction,
+    workspace: &NormalizedAbsolutePath,
+    root: Arc<ConfiguredNodeResult>,
+    depth: Option<i32>,
+    include_tool: bool,
+) -> Result<CqueryDepsClosureOutcome, NativeDemandSessionError> {
+    let mut nodes = vec![root];
+    let mut node_indices = SmallMap::new();
+    node_indices.insert(nodes[0].key().clone(), 0);
+    let mut frontier = vec![nodes[0].key().clone()];
+    let mut level = 0;
+
+    while !frontier.is_empty() {
+        // Bazel's deps(root, 0) returns the root without observing its edges.
+        if depth.is_some_and(|limit| level >= limit) {
+            break;
+        }
+
+        let mut next = Vec::new();
+        let mut next_seen = SmallSet::new();
+        for node in &frontier {
+            let index = *node_indices
+                .get(node)
+                .expect("cquery frontier must refer to an activated node");
+            for edge in nodes[index].edges() {
+                if edge.tool() {
+                    let request_mode = if include_tool {
+                        "requested"
+                    } else {
+                        "filtered"
+                    };
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                        CqueryCommandError::infrastructure(format!(
+                            "cquery deps() tool dependency traversal is unsupported ({request_mode})"
+                        )),
+                    )));
+                }
+                if edge.implicit() {
+                    continue;
+                }
+                let target = edge.target().clone();
+                if node_indices.contains_key(&target) || !next_seen.insert(target.clone()) {
+                    continue;
+                }
+                next.push(target);
+            }
+        }
+        if next.is_empty() {
+            break;
+        }
+
+        let outcomes = transaction
+            .compute_join(next, |ctx, node| {
+                Box::pin(async move {
+                    let key = ConfiguredNodeAnalysisKey::new(workspace.dupe(), node.clone())
+                        .map_err(|error| error.to_string());
+                    let outcome = match key {
+                        Ok(key) => ctx.compute(&key).await.map_err(|error| error.to_string()),
+                        Err(error) => Err(error),
+                    };
+                    (node, outcome)
+                })
+            })
+            .await;
+
+        let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
+        let mut first_error = None;
+        let mut completed = Vec::with_capacity(outcomes.len());
+        for (node, outcome) in outcomes {
+            let outcome = outcome.map_err(|error| {
+                NativeDemandSessionError::Computation(anyhow::anyhow!(
+                    "cquery deps analysis failed: {error}"
+                ))
+            })?;
+            match outcome {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                    needs = Some(match needs {
+                        Some(current) => current.try_union(&need).map_err(|error| {
+                            NativeDemandSessionError::Computation(anyhow::anyhow!(
+                                "incompatible cquery deps analysis needs: {error:?}"
+                            ))
+                        })?,
+                        None => need,
+                    });
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                    Ok(analysis) => completed.push((node, analysis.dupe())),
+                    Err(error) if first_error.is_none() => first_error = Some(error.clone()),
+                    Err(_) => {}
+                },
+            }
+        }
+        if let Some(needs) = needs {
+            return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(needs));
+        }
+        if let Some(error) = first_error {
+            return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                CqueryCommandError::Analysis(error),
+            )));
+        }
+
+        frontier = Vec::with_capacity(completed.len());
+        for (node, analysis) in completed {
+            assert_eq!(analysis.key(), &node, "cquery deps analysis key mismatch");
+            let index = nodes.len();
+            node_indices.insert(node.clone(), index);
+            nodes.push(analysis);
+            frontier.push(node);
+        }
+        level += 1;
+    }
+
+    Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((
+        nodes,
+        node_indices,
+    ))))
 }
 
 impl CqueryRootTarget {
@@ -1652,6 +1859,8 @@ struct CqueryCommandRoot {
     expression: QueryExpression,
     roots: Arc<[CqueryRootTarget]>,
     literal_roots: Arc<[(Arc<str>, usize)]>,
+    include_implicit: bool,
+    include_tool: bool,
 }
 
 #[derive(Clone)]
@@ -1670,10 +1879,10 @@ pub struct CqueryCommandEvaluation {
 
 #[derive(Debug, Clone, Allocative)]
 struct CqueryResultTarget {
-    key: ConfiguredTargetKey,
+    key: ConfiguredNodeKey,
     analysis: Arc<ConfiguredNodeResult>,
     display_label: Arc<str>,
-    projection: SlugConfigurationProjection,
+    projection: Option<SlugConfigurationProjection>,
 }
 
 impl PartialEq for CqueryResultTarget {
@@ -1692,15 +1901,26 @@ impl Hash for CqueryResultTarget {
 
 struct CquerySetEnvironment {
     targets: SmallMap<Arc<str>, TargetSet<CqueryResultTarget>>,
+    nodes: Arc<[Arc<ConfiguredNodeResult>]>,
+    node_indices: SmallMap<ConfiguredNodeKey, usize>,
 }
 
 impl CquerySetEnvironment {
-    fn new(literal_roots: &[(Arc<str>, usize)], roots: &[CqueryResultTarget]) -> Self {
+    fn new(
+        literal_roots: &[(Arc<str>, usize)],
+        roots: &[CqueryResultTarget],
+        nodes: Arc<[Arc<ConfiguredNodeResult>]>,
+        node_indices: SmallMap<ConfiguredNodeKey, usize>,
+    ) -> Self {
         let mut targets = SmallMap::new();
         for (literal, root) in literal_roots {
             targets.insert(literal.clone(), TargetSet::singleton(roots[*root].clone()));
         }
-        Self { targets }
+        Self {
+            targets,
+            nodes,
+            node_indices,
+        }
     }
 
     fn union_all(sets: &[TargetSet<CqueryResultTarget>]) -> TargetSet<CqueryResultTarget> {
@@ -1833,6 +2053,68 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
             .get(literal)
             .cloned()
             .ok_or_else(|| QueryError::evaluation(format!("unresolved cquery literal '{literal}'")))
+    }
+
+    async fn deps(
+        &mut self,
+        targets: &Self::Set,
+        depth: Option<i32>,
+    ) -> Result<Self::Set, QueryError> {
+        let mut result = targets.clone();
+        if depth == Some(0) {
+            return Ok(result);
+        }
+
+        let mut seen = SmallSet::new();
+        let mut frontier = Vec::new();
+        for target in targets.iter() {
+            if seen.insert(target.key.clone()) {
+                frontier.push(target.key.clone());
+            }
+        }
+        let mut level = 0;
+        while !frontier.is_empty() {
+            if depth.is_some_and(|limit| level >= limit) {
+                break;
+            }
+            let mut next = Vec::new();
+            for key in frontier {
+                let index = *self.node_indices.get(&key).ok_or_else(|| {
+                    QueryError::evaluation(format!(
+                        "cquery deps() target '{key}' was not preactivated"
+                    ))
+                })?;
+                for edge in self.nodes[index].edges() {
+                    if edge.tool() {
+                        return Err(QueryError::evaluation(
+                            "cquery deps() tool dependency traversal is unsupported",
+                        ));
+                    }
+                    if edge.implicit() {
+                        continue;
+                    }
+                    let child = edge.target().clone();
+                    if !seen.insert(child.clone()) {
+                        continue;
+                    }
+                    let child_index = *self.node_indices.get(&child).ok_or_else(|| {
+                        QueryError::evaluation(format!(
+                            "cquery deps() target '{child}' was not preactivated"
+                        ))
+                    })?;
+                    let child_target = cquery_result_target(
+                        self.nodes[child_index].dupe(),
+                        cquery_label_mode_label(&child),
+                    )
+                    .map_err(|error| QueryError::evaluation(error.to_string()))?;
+                    result.insert(child_target);
+                    next.push(child);
+                }
+            }
+            frontier = next;
+            level += 1;
+        }
+        Ok(result)
     }
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -2069,7 +2351,10 @@ impl CqueryCommandEvaluation {
     pub fn label_stdout(&self) -> String {
         self.targets
             .iter()
-            .map(|target| format!("{} ({})\n", target.display_label, target.projection))
+            .map(|target| match &target.projection {
+                Some(projection) => format!("{} ({projection})\n", target.display_label),
+                None => format!("{} (null)\n", target.display_label),
+            })
             .collect()
     }
 
@@ -3362,6 +3647,8 @@ impl WorkspaceRuntime {
     pub fn cquery_command_with_bzlmod_inputs(
         &self,
         expression: &str,
+        include_implicit: bool,
+        include_tool: bool,
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
@@ -3375,6 +3662,11 @@ impl WorkspaceRuntime {
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
         validate_cquery_query(&expression)
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
+        if expression.cquery_deps_spec().is_some() && include_implicit {
+            return Err(CqueryCommandError::request(
+                "cquery deps() currently requires --noimplicit_deps",
+            ));
+        }
         let registry_urls = RegistryUrls::from_request(&self.workspace, registry_urls)
             .map_err(CqueryCommandError::infrastructure)?;
         let host = self
@@ -3434,6 +3726,8 @@ impl WorkspaceRuntime {
             expression,
             roots: roots.into(),
             literal_roots: literal_roots.into(),
+            include_implicit,
+            include_tool,
         };
         let request = NativeDemandRequestInputBundle {
             command_policy,
@@ -3446,16 +3740,18 @@ impl WorkspaceRuntime {
         })?;
         if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
             for analysis in evaluation.analyses() {
-                let configuration = analysis
-                    .configured_target_key()
-                    .expect("production analysis only contains configured nodes")
-                    .configuration()
-                    .slug_configuration()
-                    .ok_or_else(|| {
-                        CqueryCommandError::infrastructure(
-                            "production cquery analysis returned an opaque configuration",
-                        )
-                    })?;
+                let Some(configured) = analysis.configured_target_key() else {
+                    continue;
+                };
+                let configuration =
+                    configured
+                        .configuration()
+                        .slug_configuration()
+                        .ok_or_else(|| {
+                            CqueryCommandError::infrastructure(
+                                "production cquery analysis returned an opaque configuration",
+                            )
+                        })?;
                 self.configured_output
                     .claim(configuration)
                     .map_err(CqueryCommandError::infrastructure)?;
@@ -5133,6 +5429,8 @@ mod tests {
             runtime
                 .cquery_command_with_bzlmod_inputs(
                     expression,
+                    true,
+                    true,
                     BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
@@ -6537,6 +6835,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let run = |target: &str| {
             runtime.cquery_command_with_bzlmod_inputs(
                 target,
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6645,6 +6945,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let accepted = runtime
             .cquery_command_with_bzlmod_inputs(
                 "//pkg:ok + //pkg:native",
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6663,6 +6965,170 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .contains("not a Starlark rule")
         );
         assert_eq!(accepted_output_text(&accepted), ["ok"]);
+    }
+
+    #[test]
+    fn cquery_deps_uses_the_retained_noimplicit_graph_with_null_sources() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"deps\")\n",
+        )
+        .unwrap();
+        fs::write(workspace.path().join("defs.bzl"), CQUERY_DELEGATING_DEFS).unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            CQUERY_DELEGATING_BUILD,
+        )
+        .unwrap();
+        fs::write(workspace.path().join("source.txt"), "source\n").unwrap();
+
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let run = |expression: &str, include_implicit: bool, include_tool: bool| {
+            runtime.cquery_command_with_bzlmod_inputs(
+                expression,
+                include_implicit,
+                include_tool,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+        };
+
+        let default_error = run("deps(//:root)", true, true).unwrap_err();
+        assert!(matches!(default_error, CqueryCommandError::Request(_)));
+        assert!(default_error.to_string().contains("--noimplicit_deps"));
+
+        let depth_zero = run("deps(//:root, 0)", false, true).unwrap();
+        let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(depth_zero.starlark_label_stdout(), "@@//:root\n");
+
+        let full = run("deps(//:root)", false, true).unwrap();
+        let full = full.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            full.starlark_label_stdout(),
+            "@@//:root\n@@//:ordinary\n@@//:ordinary\n@@//:alias_outer\n@@//:source.txt\n@@//:producer.out\n@@//:vis_top\n@@//:alias_inner\n@@//:producer\n"
+        );
+        assert_eq!(
+            full.label_stdout()
+                .lines()
+                .map(|line| line.split_once(" (").unwrap().0)
+                .collect::<Vec<_>>(),
+            [
+                "//:root",
+                "//:ordinary",
+                "//:ordinary",
+                "//:alias_outer",
+                "//:source.txt",
+                "//:producer.out",
+                "//:vis_top",
+                "//:alias_inner",
+                "//:producer",
+            ]
+        );
+        assert!(full.label_stdout().contains("//:source.txt (null)\n"));
+        assert!(full.label_stdout().contains("//:vis_top (null)\n"));
+        assert!(!full.starlark_label_stdout().contains("vis_leaf"));
+        let ordinary = full
+            .analyses()
+            .filter(|analysis| analysis.key().label().target().as_str() == "ordinary")
+            .map(|analysis| analysis.key().clone())
+            .collect::<Vec<_>>();
+        assert_eq!(ordinary.len(), 2);
+        assert_ne!(ordinary[0], ordinary[1]);
+
+        let without_tools = run("deps(//:root)", false, false).unwrap();
+        assert_eq!(
+            without_tools
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .starlark_label_stdout(),
+            full.starlark_label_stdout()
+        );
+    }
+
+    #[tokio::test]
+    async fn cquery_deps_frontier_need_precedes_an_earlier_child_analysis_error() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let configuration = build_test_configuration("target");
+        let configured = |label: &str| {
+            ConfiguredTargetKey::new(CanonicalLabel::parse(label).unwrap(), configuration.clone())
+        };
+        let mut transaction =
+            build_root_transaction(&dice, delegating_action_closure_epoch(1)).await;
+        let root_key = ConfiguredNodeAnalysisKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            configured("@@//:root"),
+        )
+        .unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(root) =
+            transaction.compute(&root_key).await.unwrap()
+        else {
+            panic!("observed root fixture returned Need")
+        };
+        let root = Arc::new(
+            root.as_ref()
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .clone()
+                .with_edges(vec![
+                    slug_analysis_v2::ConfiguredEdge::new(
+                        configured("@@//:missing").into(),
+                        slug_analysis_v2::ConfiguredEdgeKind::OrdinaryAttribute {
+                            attribute: "error".into(),
+                            index: 0,
+                        },
+                    ),
+                    slug_analysis_v2::ConfiguredEdge::new(
+                        ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap()),
+                        slug_analysis_v2::ConfiguredEdgeKind::Source,
+                    ),
+                ]),
+        );
+        let mut missing_source_epoch = BuildRootEpoch::base(2);
+        missing_source_epoch.file("/workspace/defs.bzl", DELEGATING_DEFS, 2);
+        missing_source_epoch.package("", DELEGATING_BUILD, 2);
+        let mut transaction = build_root_transaction(&dice, missing_source_epoch.build()).await;
+        let outcome = compute_cquery_deps_closure(
+            &mut transaction,
+            &NormalizedAbsolutePath::new("/workspace").unwrap(),
+            root.dupe(),
+            Some(1),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(
+            matches!(outcome, slug_bzlmod_v2::SourcePreparationOutcome::Need(_)),
+            "{outcome:?}"
+        );
+        let mut restored_epoch = BuildRootEpoch::base(3);
+        restored_epoch.file("/workspace/defs.bzl", DELEGATING_DEFS, 3);
+        restored_epoch.package(
+            "",
+            &format!("{DELEGATING_BUILD}\nroot_rule(name = \"missing\")\n"),
+            3,
+        );
+        restored_epoch.file("/workspace/source.txt", "source\n", 3);
+        let mut restored = build_root_transaction(&dice, restored_epoch.build()).await;
+        let restored = compute_cquery_deps_closure(
+            &mut restored,
+            &NormalizedAbsolutePath::new("/workspace").unwrap(),
+            root,
+            Some(1),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(matches!(
+            restored,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(_))
+        ));
     }
 
     #[test]
@@ -6692,6 +7158,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             runtime
                 .cquery_command_with_bzlmod_inputs(
                     expression,
+                    true,
+                    true,
                     BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
@@ -6711,6 +7179,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let invalid_count = runtime
             .cquery_command_with_bzlmod_inputs(
                 "some(//pkg:missing, 2147483648)",
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6729,6 +7199,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             runtime
                 .cquery_command_with_bzlmod_inputs(
                     expression,
+                    true,
+                    true,
                     BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
@@ -6788,6 +7260,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             let accepted = runtime
                 .cquery_command_with_bzlmod_inputs(
                     expression,
+                    true,
+                    true,
                     BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                     BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                     LockfileMode::Update,
@@ -6804,6 +7278,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let starlark = runtime
             .cquery_command_with_bzlmod_inputs(
                 "let x = set(//pkg:bin //pkg:lib //pkg:bin) in ($x except //pkg:lib) union //pkg:lib",
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6824,6 +7300,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let missing = runtime
             .cquery_command_with_bzlmod_inputs(
                 "//pkg:missing union //pkg:also_missing",
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6837,6 +7315,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let missing_before_malformed = runtime
             .cquery_command_with_bzlmod_inputs(
                 "filter('(', //pkg:missing)",
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6854,6 +7334,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let malformed = runtime
             .cquery_command_with_bzlmod_inputs(
                 "filter('(', //pkg:bin)",
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -6902,6 +7384,8 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         let run = |runtime: &WorkspaceRuntime, target: &str, setting: Option<&str>| {
             runtime.cquery_command_with_bzlmod_inputs(
                 target,
+                true,
+                true,
                 BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
                 BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
                 LockfileMode::Update,
@@ -9076,11 +9560,7 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
         epoch.build()
     }
 
-    fn delegating_action_closure_epoch(variant: i64) -> PathObservationEpoch {
-        let mut epoch = BuildRootEpoch::base(variant);
-        epoch.file(
-            "/workspace/defs.bzl",
-            r#"def _producer(ctx):
+    const DELEGATING_DEFS: &str = r#"def _producer(ctx):
     out = ctx.actions.declare_file("producer.out")
     ctx.actions.write(out, "producer\n")
     return [DefaultInfo(files = depset([out]))]
@@ -9091,12 +9571,9 @@ root_rule = rule(implementation = _root, attrs = {
     "src": attr.label(allow_single_file = True),
     "generated": attr.label(allow_single_file = True),
 })
-"#,
-            variant,
-        );
-        epoch.package(
-            "",
-            r#"load(":defs.bzl", "producer", "root_rule")
+"#;
+
+    const DELEGATING_BUILD: &str = r#"load(":defs.bzl", "producer", "root_rule")
 producer(name = "producer", out = "producer.out")
 alias(name = "alias_inner", actual = ":producer")
 alias(name = "alias_outer", actual = ":alias_inner")
@@ -9109,9 +9586,54 @@ root_rule(
     generated = ":producer.out",
     visibility = [":vis_top"],
 )
-"#,
-            variant,
-        );
+"#;
+
+    const CQUERY_DELEGATING_DEFS: &str = r#"SettingInfo = provider(fields = {"value": "value"})
+def _setting(ctx):
+    return [SettingInfo(value = ctx.build_setting_value)]
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _transition(settings, attr):
+    return {"//:setting": "transitioned"}
+to_transition = transition(implementation = _transition, inputs = [], outputs = ["//:setting"])
+def _ordinary(ctx):
+    return [DefaultInfo()]
+ordinary_rule = rule(implementation = _ordinary, attrs = {
+    "normal": attr.label(),
+    "transitioned": attr.label(cfg = to_transition),
+    "aliased": attr.label(),
+    "src": attr.label(allow_single_file = True),
+    "generated": attr.label(allow_single_file = True),
+})
+def _producer(ctx):
+    out = ctx.actions.declare_file("producer.out")
+    ctx.actions.write(out, "producer\n")
+    return [DefaultInfo(files = depset([out]))]
+producer = rule(implementation = _producer, attrs = {"out": attr.output()})
+"#;
+
+    const CQUERY_DELEGATING_BUILD: &str = r#"load(":defs.bzl", "ordinary_rule", "producer", "string_setting")
+string_setting(name = "setting", build_setting_default = "default")
+ordinary_rule(name = "ordinary")
+producer(name = "producer", out = "producer.out")
+alias(name = "alias_inner", actual = ":ordinary")
+alias(name = "alias_outer", actual = ":alias_inner")
+package_group(name = "vis_leaf", packages = ["//..."])
+package_group(name = "vis_top", includes = [":vis_leaf"])
+ordinary_rule(
+    name = "root",
+    normal = ":ordinary",
+    transitioned = ":ordinary",
+    aliased = ":alias_outer",
+    src = "source.txt",
+    generated = ":producer.out",
+    visibility = [":vis_top"],
+)
+"#;
+
+    fn delegating_action_closure_epoch(variant: i64) -> PathObservationEpoch {
+        let mut epoch = BuildRootEpoch::base(variant);
+        epoch.file("/workspace/defs.bzl", DELEGATING_DEFS, variant);
+        epoch.package("", DELEGATING_BUILD, variant);
         epoch.file("/workspace/source.txt", "source\n", variant);
         epoch.build()
     }

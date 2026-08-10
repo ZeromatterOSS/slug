@@ -62,6 +62,10 @@ pub struct QueryRequest {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CqueryRequest {
     pub expression: String,
+    #[serde(default = "default_true")]
+    pub include_implicit: bool,
+    #[serde(default = "default_true")]
+    pub include_tool: bool,
     pub output: CqueryOutput,
     pub root_string_setting: Option<String>,
     #[serde(default)]
@@ -181,6 +185,10 @@ fn default_query_output() -> String {
 }
 
 const fn default_graph_factored() -> bool {
+    true
+}
+
+const fn default_true() -> bool {
     true
 }
 
@@ -331,7 +339,9 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
-            if let Err(error) = validate_cquery_expression(&request.expression) {
+            if let Err(error) =
+                validate_cquery_expression(&request.expression, request.include_implicit)
+            {
                 return DaemonResponse {
                     exit_code: 2,
                     stdout: String::new(),
@@ -344,6 +354,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
             }
             let result = daemon.cquery_with_bzlmod_inputs(
                 &request.expression,
+                request.include_implicit,
+                request.include_tool,
                 request.output,
                 command_policy,
                 environment_policy,
@@ -361,10 +373,13 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     }
 }
 
-fn validate_cquery_expression(expression: &str) -> Result<(), String> {
+fn validate_cquery_expression(expression: &str, include_implicit: bool) -> Result<(), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
     slug_query_v2::validate_cquery_query(&expression).map_err(|error| error.to_string())?;
+    if expression.cquery_deps_spec().is_some() && include_implicit {
+        return Err("deps() requires --noimplicit_deps in this cquery".to_owned());
+    }
     for literal in slug_query_v2::cquery_literals(&expression) {
         let target = TargetPattern::parse(literal)?;
         if !matches!(target, TargetPattern::Single(ref label) if label.repo().is_root()) {
@@ -467,6 +482,8 @@ pub fn send_cquery_request(
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
     let json = serde_json::to_string(&DaemonRequest::Cquery(CqueryRequest {
         expression: request.expression.clone(),
+        include_implicit: request.include_implicit,
+        include_tool: request.include_tool,
         output: request.output,
         root_string_setting: request.root_string_setting.clone(),
         bzlmod: request.bzlmod.clone(),

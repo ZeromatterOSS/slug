@@ -32,6 +32,7 @@ use crate::loading_query_function;
 use crate::traversal::reverse_dependencies;
 use crate::traversal::some_path;
 use crate::traversal::transitive_closure;
+use crate::validate_cquery_query;
 
 #[derive(Debug, Clone, Allocative)]
 pub struct TargetSet<T>(SmallSet<T>);
@@ -106,6 +107,15 @@ pub trait CqueryQueryEnvironment {
     fn except(&self, left: &Self::Set, right: &Self::Set) -> Self::Set;
     fn select_some(&self, targets: &Self::Set, count: i32) -> Result<Self::Set, QueryError>;
     async fn resolve_literal(&mut self, literal: &str) -> Result<Self::Set, QueryError>;
+    async fn deps(
+        &mut self,
+        _targets: &Self::Set,
+        _depth: Option<i32>,
+    ) -> Result<Self::Set, QueryError> {
+        Err(QueryError::syntax(
+            "deps() is not implemented by this configured query environment",
+        ))
+    }
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers;
     async fn visible(
@@ -128,6 +138,11 @@ pub async fn evaluate_cquery_query<E>(
 where
     E: CqueryQueryEnvironment + Send,
 {
+    validate_cquery_query(expression).map_err(|error| QueryError::syntax(error.to_string()))?;
+    if let Some(deps) = expression.cquery_deps_spec() {
+        let roots = environment.resolve_literal(deps.target()).await?;
+        return environment.deps(&roots, deps.depth()).await;
+    }
     let mut variables = SmallMap::new();
     let mut context = CqueryContext(environment);
     evaluate_query_expression_inner(&mut context, expression, &mut variables).await
@@ -1451,6 +1466,28 @@ mod tests {
             Ok(vec![literal.to_owned()])
         }
 
+        async fn deps(
+            &mut self,
+            targets: &Self::Set,
+            depth: Option<i32>,
+        ) -> Result<Self::Set, QueryError> {
+            self.events.push(format!(
+                "deps:{}:{}",
+                targets.join(","),
+                depth.map_or_else(|| "all".to_owned(), |depth| depth.to_string())
+            ));
+            let mut result = targets.clone();
+            if depth != Some(0) {
+                for target in targets {
+                    let child = format!("{target}:child");
+                    if !result.contains(&child) {
+                        result.push(child);
+                    }
+                }
+            }
+            Ok(result)
+        }
+
         async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
             self.events.push(format!("siblings:{}", targets.join(",")));
             if targets.is_empty() {
@@ -1541,6 +1578,44 @@ mod tests {
                 "filter://pkg:lib,//pkg:bin",
             ]
         );
+    }
+
+    #[test]
+    fn cquery_deps_dispatches_the_single_literal_and_nonnegative_depth() {
+        let expression = QueryExpression::parse("deps(//pkg:root, 2)").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:root", "//pkg:root:child"]);
+        assert_eq!(
+            environment.events,
+            ["resolve://pkg:root", "deps://pkg:root:2"]
+        );
+    }
+
+    #[test]
+    fn cquery_deps_evaluation_rejects_non_top_level_or_invalid_forms_independently() {
+        for expression in [
+            "deps()",
+            "deps(//pkg:root, 0, 1)",
+            "deps(set(//pkg:root))",
+            "deps($root)",
+            "deps(//pkg:root, '-1')",
+            "deps(//pkg:root, 2147483648)",
+            "filter('root', deps(//pkg:root))",
+        ] {
+            let expression = QueryExpression::parse(expression).unwrap();
+            let mut environment = CqueryEnvironment { events: Vec::new() };
+            let error =
+                futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                    .unwrap_err();
+            assert!(
+                error.to_string().contains("deps") || error.to_string().contains("integer literal"),
+                "{error}"
+            );
+            assert!(environment.events.is_empty(), "{error}");
+        }
     }
 
     #[test]
