@@ -248,6 +248,17 @@ pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryPa
     ) {
         return parse_cquery_deps_spec(expression).map(|_| ());
     }
+    if let QueryExpressionKind::Function { name, args } = &expression.kind
+        && name.value == "executables"
+    {
+        validate_function_arguments(expression, args, cquery_function("executables"))?;
+        if matches!(
+            args[0].kind,
+            QueryExpressionKind::Function { ref name, .. } if name.value == "deps"
+        ) {
+            return parse_cquery_deps_spec(&args[0]).map(|_| ());
+        }
+    }
     let mut bindings = SmallSet::new();
     validate_cquery_query_inner(expression, &mut bindings)
 }
@@ -444,6 +455,21 @@ impl QueryExpression {
     /// has passed [`validate_cquery_query`].
     pub fn cquery_deps_spec(&self) -> Option<CqueryDepsSpec> {
         parse_cquery_deps_spec(self).ok()
+    }
+
+    /// Returns the configured closure that must be activated before evaluating
+    /// either direct `deps()` or its admitted `executables(deps())` consumer.
+    pub fn cquery_preactivation_deps_spec(&self) -> Option<CqueryDepsSpec> {
+        if let Some(spec) = self.cquery_deps_spec() {
+            return Some(spec);
+        }
+        let QueryExpressionKind::Function { name, args } = &self.kind else {
+            return None;
+        };
+        if name.value != "executables" || args.len() != 1 {
+            return None;
+        }
+        parse_cquery_deps_spec(&args[0]).ok()
     }
 }
 

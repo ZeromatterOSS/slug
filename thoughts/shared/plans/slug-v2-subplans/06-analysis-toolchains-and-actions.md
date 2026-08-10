@@ -6631,3 +6631,54 @@ exact configuration hashes were untouched. Run next only
 `WP-6-m2r-configured-query-forward-successor-audit`; compare a meaningful
 forward composition with exact singleton-root expression breadth before
 selecting one bounded successor.
+
+### Configured-query forward composition audit ACCEPT (2026-08-09)
+
+`WP-6-m2r-configured-query-forward-successor-audit` selected exactly
+`executables(deps(<one concrete root>[, <nonnegative i32 depth>]))`. Unlike
+singleton `deps(set(...))` syntax, this meaningfully composes the accepted
+configured closure with the retained executable/non-test rule predicate while
+requiring no new graph, key, cache, state, representation, output, or wire mode.
+
+Pinned Bazel 9.2 `DepsFunction`, aggregate evaluation, `ExecutablesFunction`,
+configured lookup-key identity, and graph callback sources establish complete
+closure before filtering, full configured-key deduplication, stable relative
+delivery order, and selected-induced graph edges without path contraction.
+Accepted delegation-topology and executable-capability evidence is sufficient;
+no new fixture or oracle is required. Configuration tokens and any ordering
+derived from them remain Slug-native.
+
+Run next `WP-6-m2s-configured-query-executables-deps-composition`. Keep the
+direct `deps` fast-path accessor distinct from a new wrapper-aware preactivation
+accessor, route the exact wrapper through the existing shared expression fold,
+and reuse the existing closure, executable predicate, and formatters. Every
+other nested `deps` form, default implicit/tool/external/factored/reverse
+topology, parser replacement, JVM/Java, exact hashes, and CI remain stopped.
+
+### Configured-query executable-deps composition ACCEPT (2026-08-09)
+
+`WP-6-m2s-configured-query-executables-deps-composition` is **ACCEPTED**.
+Configured query now admits exactly
+`executables(deps(<one concrete root>[, <nonnegative i32 depth>]))` under
+`--noimplicit_deps`. A wrapper-aware accessor preactivates the same complete
+depth-bounded closure while the existing direct-`deps` accessor preserves its
+fast path; the shared fold then applies the retained executable/non-test rule
+predicate exactly once.
+
+Full configured-key identity preserves transitioned duplicates. Text outputs
+retain filtered closure order, and unfactored graph output keeps only direct
+authoritative edges whose endpoints survive; it does not contract paths through
+filtered non-executable nodes. All four retained output modes route identically
+through one-shot and daemon execution. No graph, key, cache, DICE identity,
+representation, output/wire family, fixture, oracle, or vendored
+`starlark-rust` parser/evaluator changed.
+
+Query passes 113 tests, commands 19, server 48, focused core composition and
+Need-before-error regressions pass, the V2 CLI rebuild passes, and two focused
+CLI one-shot/daemon regressions pass. Formatting, diff, stale-daemon, cap, and
+independent final review gates pass. The net Rust delta is 58 production and
+261 test lines, 319 total, within 100/300/400 caps.
+
+Run next only `WP-6-m2t-configured-query-forward-successor-audit`. Keep general
+nested `deps`, factored/default-implicit/tool/external/reverse topology, other
+outputs, parser replacement, JVM/Java, exact hashes, and CI stopped.

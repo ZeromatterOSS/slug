@@ -385,11 +385,11 @@ fn validate_cquery_expression(
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
     slug_query_v2::validate_cquery_query(&expression).map_err(|error| error.to_string())?;
-    if expression.cquery_deps_spec().is_some() && include_implicit {
+    if expression.cquery_preactivation_deps_spec().is_some() && include_implicit {
         return Err("deps() requires --noimplicit_deps in this cquery".to_owned());
     }
     if output == CqueryOutput::Graph {
-        let Some(_) = expression.cquery_deps_spec() else {
+        let Some(_) = expression.cquery_preactivation_deps_spec() else {
             return Err("graph output requires a top-level deps() cquery expression".to_owned());
         };
         if include_implicit {

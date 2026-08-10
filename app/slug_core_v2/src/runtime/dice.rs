@@ -1363,7 +1363,7 @@ impl NativeCommandRoot for CqueryCommandRoot {
         for (index, analysis) in analyses.iter().enumerate() {
             node_indices.insert(analysis.key().clone(), index);
         }
-        if let Some(deps) = self.expression.cquery_deps_spec() {
+        if let Some(deps) = self.expression.cquery_preactivation_deps_spec() {
             if self.include_implicit {
                 return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
                     Arc::new(Err(CqueryCommandError::request(
@@ -3754,7 +3754,7 @@ impl WorkspaceRuntime {
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
         validate_cquery_query(&expression)
             .map_err(|error| CqueryCommandError::request(error.to_string()))?;
-        if expression.cquery_deps_spec().is_some() && include_implicit {
+        if expression.cquery_preactivation_deps_spec().is_some() && include_implicit {
             return Err(CqueryCommandError::request(
                 "cquery deps() currently requires --noimplicit_deps",
             ));
@@ -7297,6 +7297,128 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             full.starlark_label_stdout()
         );
         assert_eq!(without_tools.graph_stdout(), full.graph_stdout());
+    }
+
+    #[test]
+    fn cquery_executables_deps_filters_complete_closure_and_induces_edges() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = \"executable_deps\")\n",
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("defs.bzl"),
+            format!(
+                r##"{CQUERY_DELEGATING_DEFS}
+def _executable(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".sh")
+    ctx.actions.write(out, "#!/bin/sh\n")
+    return [DefaultInfo(executable = out)]
+executable_rule = rule(implementation = _executable, executable = True, attrs = {{
+    "normal": attr.label(),
+    "transitioned": attr.label(cfg = to_transition),
+    "bridge": attr.label(),
+}})
+"##
+            ),
+        )
+        .unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            r#"load(":defs.bzl", "executable_rule", "ordinary_rule", "string_setting")
+string_setting(name = "setting", build_setting_default = "default")
+executable_rule(name = "direct")
+executable_rule(name = "leaf")
+ordinary_rule(name = "bridge", normal = ":leaf")
+executable_rule(
+    name = "root",
+    normal = ":direct",
+    transitioned = ":direct",
+    bridge = ":bridge",
+)
+"#,
+        )
+        .unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let run = |expression: &str| {
+            runtime
+                .cquery_command_with_bzlmod_inputs(
+                    expression,
+                    false,
+                    true,
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    None,
+                )
+                .unwrap()
+        };
+
+        let depth_zero = run("executables(deps(//:root, 0))");
+        let depth_zero = depth_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(depth_zero.starlark_label_stdout(), "@@//:root\n");
+
+        let depth_one = run("executables(deps(//:root, 1))");
+        let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            depth_one.starlark_label_stdout(),
+            "@@//:root\n@@//:direct\n@@//:direct\n"
+        );
+
+        let full = run("executables(deps(//:root))");
+        let full = full.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            full.starlark_label_stdout(),
+            "@@//:root\n@@//:direct\n@@//:direct\n@@//:leaf\n"
+        );
+        assert_eq!(full.analyses().count(), 4);
+        assert_eq!(full.label_kind_stdout().unwrap().lines().count(), 4);
+        assert!(
+            full.label_kind_stdout()
+                .unwrap()
+                .lines()
+                .all(|line| line.starts_with("executable_rule rule "))
+        );
+        let graph = full.graph_stdout();
+        let nodes = graph
+            .lines()
+            .filter(|line| line.starts_with("  \"") && !line.contains(" -> "))
+            .count();
+        let edges = graph
+            .lines()
+            .filter(|line| line.contains(" -> "))
+            .collect::<Vec<_>>();
+        assert_eq!(nodes, 4);
+        assert_eq!(edges.len(), 2);
+        assert!(
+            edges
+                .iter()
+                .all(|edge| edge.contains("//:root") && edge.contains("//:direct"))
+        );
+        assert!(edges.iter().all(|edge| !edge.contains("//:leaf")));
+
+        let depth_two = run("executables(deps(//:root, 2))");
+        let depth_max = run("executables(deps(//:root, 2147483647))");
+        assert_eq!(
+            depth_two
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .graph_stdout(),
+            full.graph_stdout()
+        );
+        assert_eq!(
+            depth_max
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_stdout(),
+            full.label_stdout()
+        );
     }
 
     #[tokio::test]

@@ -134,7 +134,7 @@ impl CqueryRequest {
                 }
             }
         }
-        if parsed_expression.cquery_deps_spec().is_some() && include_implicit {
+        if parsed_expression.cquery_preactivation_deps_spec().is_some() && include_implicit {
             return Err(unsupported(
                 "deps() requires --noimplicit_deps in this cquery",
             ));
@@ -144,7 +144,7 @@ impl CqueryRequest {
             (Some("label_kind"), None) => CqueryOutputMode::LabelKind,
             (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
             (Some("graph"), None) => {
-                let Some(_) = parsed_expression.cquery_deps_spec() else {
+                let Some(_) = parsed_expression.cquery_preactivation_deps_spec() else {
                     return Err(unsupported(
                         "--output=graph requires a top-level deps() cquery expression",
                     ));

@@ -182,6 +182,14 @@ where
         self.0.resolve_literal(literal).await
     }
 
+    async fn deps(
+        &mut self,
+        targets: &Self::Set,
+        depth: Option<i32>,
+    ) -> Result<Self::Set, QueryError> {
+        self.0.deps(targets, depth).await
+    }
+
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
         self.0.siblings(targets).await
     }
@@ -253,6 +261,7 @@ where
                 }
                 "visible" => invoke_visible(self, args, variables).await,
                 "siblings" => invoke_siblings(self, args, variables).await,
+                "deps" => invoke_cquery_deps(self, args, variables).await,
                 "executables" => invoke_executables(self, args, variables).await,
                 "kind" => invoke_kind(self, args, variables).await,
                 "filter" => invoke_filter(self, args, variables).await,
@@ -1259,6 +1268,29 @@ where
     .boxed()
 }
 
+fn invoke_cquery_deps<'a, C>(
+    context: &'a mut C,
+    args: &'a [QueryExpression],
+    variables: &'a mut SmallMap<CompactString, C::Set>,
+) -> BoxFuture<'a, Result<C::Set, QueryError>>
+where
+    C: QueryExpressionContext + Send,
+{
+    async move {
+        let operand = args
+            .first()
+            .ok_or_else(|| QueryError::syntax("missing query function argument"))?;
+        let targets = evaluate_query_expression_inner(context, operand, variables).await?;
+        let depth = args
+            .get(1)
+            .map(QueryExpression::java_integer_literal)
+            .transpose()
+            .map_err(|raw| QueryError::syntax(format!("expected an integer literal: '{raw}'")))?;
+        context.deps(&targets, depth).await
+    }
+    .boxed()
+}
+
 fn invoke_siblings<'a, C>(
     context: &'a mut C,
     args: &'a [QueryExpression],
@@ -1591,6 +1623,24 @@ mod tests {
         assert_eq!(
             environment.events,
             ["resolve://pkg:root", "deps://pkg:root:2"]
+        );
+    }
+
+    #[test]
+    fn cquery_executables_deps_composes_once_in_closure_then_filter_order() {
+        let expression = QueryExpression::parse("executables(deps(//pkg:bin, 2))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:bin",
+                "deps://pkg:bin:2",
+                "executables://pkg:bin,//pkg:bin:child",
+            ]
         );
     }
 

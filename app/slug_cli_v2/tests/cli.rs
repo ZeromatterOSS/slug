@@ -1147,7 +1147,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     write(&workspace.join("MODULE.bazel"), "module(name = \"deps\")\n");
     write(
         &workspace.join("defs.bzl"),
-        "def _impl(ctx):\n    return [DefaultInfo()]\nnode = rule(implementation = _impl, attrs = {\"deps\": attr.label_list()})\n",
+        "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".sh\")\n    ctx.actions.write(out, \"#!/bin/sh\\n\")\n    return [DefaultInfo(executable = out)]\nnode = rule(implementation = _impl, executable = True, attrs = {\"deps\": attr.label_list()})\n",
     );
     write(
         &workspace.join("BUILD.bazel"),
@@ -1173,7 +1173,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
             .contains("--noimplicit_deps")
     );
 
-    let run = |output_base: Option<&str>, without_tools: bool| {
+    let run = |output_base: Option<&str>, expression: &str, without_tools: bool| {
         let mut command = slug();
         command.current_dir(&workspace);
         if let Some(output_base) = output_base {
@@ -1186,7 +1186,7 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
             .output()
             .unwrap()
     };
-    let one_shot = run(None, false);
+    let one_shot = run(None, expression, false);
     assert!(one_shot.status.success(), "{one_shot:?}");
     assert_eq!(one_shot.stdout, b"@@//:root\n@@//:child\n");
     assert!(one_shot.stderr.is_empty());
@@ -1204,11 +1204,46 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     let _cleanup = DaemonCleanup(output_base.clone());
     let output_base = format!("--output_base={}", output_base.display());
     for without_tools in [false, true] {
-        let daemon = run(Some(&output_base), without_tools);
+        let daemon = run(Some(&output_base), expression, without_tools);
         assert!(daemon.status.success(), "{daemon:?}");
         assert_eq!(daemon.stdout, one_shot.stdout);
         assert!(daemon.stderr.is_empty());
     }
+
+    let wrapped_expression = "executables(deps(//:root))";
+    let wrapped_one_shot = run(None, wrapped_expression, false);
+    assert!(wrapped_one_shot.status.success(), "{wrapped_one_shot:?}");
+    assert_eq!(wrapped_one_shot.stdout, one_shot.stdout);
+    assert!(wrapped_one_shot.stderr.is_empty());
+    let wrapped_daemon = run(Some(&output_base), wrapped_expression, false);
+    assert!(wrapped_daemon.status.success(), "{wrapped_daemon:?}");
+    assert_eq!(wrapped_daemon.stdout, wrapped_one_shot.stdout);
+    assert!(wrapped_daemon.stderr.is_empty());
+
+    let run_label = |output_base: Option<&str>| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .args(["cquery", wrapped_expression, "--noimplicit_deps"])
+            .output()
+            .unwrap()
+    };
+    let label_one_shot = run_label(None);
+    assert!(label_one_shot.status.success(), "{label_one_shot:?}");
+    assert_eq!(
+        String::from_utf8_lossy(&label_one_shot.stdout)
+            .lines()
+            .count(),
+        2
+    );
+    assert!(label_one_shot.stderr.is_empty());
+    let label_daemon = run_label(Some(&output_base));
+    assert!(label_daemon.status.success(), "{label_daemon:?}");
+    assert_eq!(label_daemon.stdout, label_one_shot.stdout);
+    assert!(label_daemon.stderr.is_empty());
 
     let label_kind = ["--output=label_kind", "--noimplicit_deps"];
     let run_label_kind = |output_base: Option<&str>, expression: &str| {
@@ -1239,6 +1274,20 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     assert!(label_kind_daemon.status.success(), "{label_kind_daemon:?}");
     assert_eq!(label_kind_daemon.stdout, label_kind_one_shot.stdout);
     assert!(label_kind_daemon.stderr.is_empty());
+    let wrapped_label_kind = run_label_kind(None, wrapped_expression);
+    assert!(
+        wrapped_label_kind.status.success(),
+        "{wrapped_label_kind:?}"
+    );
+    assert_eq!(wrapped_label_kind.stdout, label_kind_one_shot.stdout);
+    assert!(wrapped_label_kind.stderr.is_empty());
+    let wrapped_label_kind_daemon = run_label_kind(Some(&output_base), wrapped_expression);
+    assert!(
+        wrapped_label_kind_daemon.status.success(),
+        "{wrapped_label_kind_daemon:?}"
+    );
+    assert_eq!(wrapped_label_kind_daemon.stdout, wrapped_label_kind.stdout);
+    assert!(wrapped_label_kind_daemon.stderr.is_empty());
     let label_kind_max = run_label_kind(None, "deps(//:root, 2147483647)");
     assert!(label_kind_max.status.success(), "{label_kind_max:?}");
     assert_eq!(label_kind_max.stdout, label_kind_one_shot.stdout);
@@ -1258,7 +1307,7 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     write(&workspace.join("MODULE.bazel"), "module(name = \"deps\")\n");
     write(
         &workspace.join("defs.bzl"),
-        "def _impl(ctx):\n    return [DefaultInfo()]\nnode = rule(implementation = _impl, attrs = {\"deps\": attr.label_list()})\n",
+        "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".sh\")\n    ctx.actions.write(out, \"#!/bin/sh\\n\")\n    return [DefaultInfo(executable = out)]\nnode = rule(implementation = _impl, executable = True, attrs = {\"deps\": attr.label_list()})\n",
     );
     write(
         &workspace.join("BUILD.bazel"),
@@ -1299,6 +1348,15 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(daemon.status.success(), "{daemon:?}");
     assert_eq!(daemon.stdout, one_shot.stdout);
     assert!(daemon.stderr.is_empty());
+
+    let wrapped_one_shot = run(None, "executables(deps(//:root))");
+    assert!(wrapped_one_shot.status.success(), "{wrapped_one_shot:?}");
+    assert_eq!(wrapped_one_shot.stdout, one_shot.stdout);
+    assert!(wrapped_one_shot.stderr.is_empty());
+    let wrapped_daemon = run(Some(&output_base), "executables(deps(//:root))");
+    assert!(wrapped_daemon.status.success(), "{wrapped_daemon:?}");
+    assert_eq!(wrapped_daemon.stdout, wrapped_one_shot.stdout);
+    assert!(wrapped_daemon.stderr.is_empty());
 
     let depth_one = run(None, "deps(//:root, 1)");
     assert!(depth_one.status.success(), "{depth_one:?}");

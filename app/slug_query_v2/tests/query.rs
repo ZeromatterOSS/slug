@@ -59,6 +59,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin)",
         "deps(//pkg:bin, 0)",
         "deps(//pkg:bin, 2147483647)",
+        "executables(deps(//pkg:bin))",
+        "executables(deps(//pkg:bin, 2))",
         "let x = set() in $x",
         "let x = //pkg:bin in let x = $x in $x",
         "let x = //pkg:bin in (let x = //pkg:lib in $x) union $x",
@@ -87,6 +89,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin, '-1')",
         "deps(//pkg:bin, 2147483648)",
         "filter('bin', deps(//pkg:bin))",
+        "executables(deps(set(//pkg:bin)))",
+        "executables(executables(deps(//pkg:bin)))",
+        "executables(deps(//pkg:bin), //pkg:lib)",
         "$x",
         "let x = set() in $y",
         "let x = $x in //pkg:bin",
@@ -160,6 +165,16 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(spec.depth(), Some(2));
     assert_eq!(cquery_literals(&expression), ["//pkg:bin"]);
 
+    let wrapped = QueryExpression::parse("executables(deps(//pkg:bin, 2))").unwrap();
+    validate_cquery_query(&wrapped).unwrap();
+    assert!(wrapped.cquery_deps_spec().is_none());
+    let spec = wrapped
+        .cquery_preactivation_deps_spec()
+        .expect("validated wrapped deps spec");
+    assert_eq!(spec.target(), "//pkg:bin");
+    assert_eq!(spec.depth(), Some(2));
+    assert_eq!(cquery_literals(&wrapped), ["//pkg:bin"]);
+
     for expression in [
         "deps(set(//pkg:bin))",
         "deps(//pkg:bin, '-1')",
@@ -167,7 +182,16 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     ] {
         let expression = QueryExpression::parse(expression).unwrap();
         assert!(expression.cquery_deps_spec().is_none());
+        assert!(expression.cquery_preactivation_deps_spec().is_none());
     }
+
+    let malformed = QueryExpression::parse("executables(deps(), //pkg:extra)").unwrap();
+    assert!(
+        validate_cquery_query(&malformed)
+            .unwrap_err()
+            .to_string()
+            .starts_with("too many arguments to function 'executables'")
+    );
 }
 
 #[test]

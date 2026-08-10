@@ -500,6 +500,28 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
         .unwrap();
         assert_eq!(graph.output_mode, CqueryOutputMode::Graph, "depth {depth}");
     }
+    for args in [
+        vec!["--noimplicit_deps", "executables(deps(//pkg:bin))"],
+        vec![
+            "--output=label_kind",
+            "--noimplicit_deps",
+            "executables(deps(//pkg:bin, 2))",
+        ],
+        vec![
+            "--output=starlark",
+            "--starlark:expr=str(target.label)",
+            "--noimplicit_deps",
+            "executables(deps(//pkg:bin, 2147483647))",
+        ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "executables(deps(//pkg:bin))",
+        ],
+    ] {
+        assert!(CqueryRequest::parse(&args).is_ok(), "{args:?}");
+    }
     for expression in ["deps(//pkg:bin, -1)", "deps(//pkg:bin, 2147483648)"] {
         assert!(
             CqueryRequest::parse(&[
@@ -683,6 +705,7 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
 #[test]
 fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     assert!(CqueryRequest::parse(&["deps(//pkg:bin)"]).is_err());
+    assert!(CqueryRequest::parse(&["executables(deps(//pkg:bin))"]).is_err());
     assert!(CqueryRequest::parse(&["--notool_deps", "deps(//pkg:bin)"]).is_err());
 
     let noimplicit = CqueryRequest::parse(&["--noimplicit_deps", "deps(//pkg:bin)"]).unwrap();
