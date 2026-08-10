@@ -366,6 +366,14 @@ impl CanonicalLabel {
         &self.target
     }
 
+    pub fn with_target(&self, target: TargetName) -> Self {
+        Self {
+            package: self.package.clone(),
+            target,
+            mapping_id: self.mapping_id.clone(),
+        }
+    }
+
     pub fn mapping_id(&self) -> Option<&RepositoryMappingId> {
         self.mapping_id.as_ref()
     }
@@ -477,6 +485,7 @@ mod tests {
     use crate::CanonicalRepoName;
     use crate::RepositoryMapping;
     use crate::RepositoryMappingId;
+    use crate::TargetName;
     use crate::serialization::StableSerialize;
 
     #[test]
@@ -512,5 +521,17 @@ mod tests {
                 .unwrap_err(),
             "canonical label destination repository must be nonroot"
         );
+    }
+
+    #[test]
+    fn replacing_target_preserves_package_and_mapping_provenance() {
+        let mapping = RepositoryMapping::new(RepositoryMappingId::new("root-map").unwrap());
+        let original = ApparentLabel::parse("//pkg:generated.out")
+            .unwrap()
+            .resolve(&mapping);
+        let producer = original.with_target(TargetName::parse("producer").unwrap());
+
+        assert_eq!(producer.to_string(), "@@//pkg:producer");
+        assert_eq!(producer.mapping_id(), Some(mapping.id()));
     }
 }

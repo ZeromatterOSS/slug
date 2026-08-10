@@ -26,6 +26,7 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::TargetName;
 use slug_loading_v2::AttributeKind;
 use slug_loading_v2::AttributeProvenance;
 use slug_loading_v2::CoercedAttributeValue;
@@ -37,6 +38,11 @@ use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::package::NativeToolchainTarget;
 use slug_loading_v2::package::StarlarkRuleImplementation;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationNamespace;
+use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathState;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 use starlark::environment::Module;
@@ -47,8 +53,10 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::key::ConfigurationKey;
+use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::key::RootStringSettingValue;
+use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
 use crate::starlark_rule::LoadedRuleError;
 use crate::starlark_rule::PreparedDependency;
@@ -129,35 +137,38 @@ impl std::error::Error for AnalysisError {}
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ConfiguredNodeAnalysisKey {
     workspace: NormalizedAbsolutePath,
-    configured_target: ConfiguredTargetKey,
+    node: ConfiguredNodeKey,
 }
 
 impl ConfiguredNodeAnalysisKey {
     pub fn new(
         workspace: NormalizedAbsolutePath,
-        configured_target: ConfiguredTargetKey,
+        node: impl Into<ConfiguredNodeKey>,
     ) -> Result<Self, AnalysisError> {
-        if configured_target
-            .configuration()
-            .slug_configuration()
-            .is_none()
+        let node = node.into();
+        if let Some(configured_target) = node.configured_target()
+            && configured_target
+                .configuration()
+                .slug_configuration()
+                .is_none()
         {
             return Err(AnalysisError::message(
                 "production configured-node analysis requires a structural Slug configuration",
             ));
         }
-        Ok(Self {
-            workspace,
-            configured_target,
-        })
+        Ok(Self { workspace, node })
     }
 
     pub fn workspace(&self) -> &NormalizedAbsolutePath {
         &self.workspace
     }
 
-    pub fn configured_target(&self) -> &ConfiguredTargetKey {
-        &self.configured_target
+    pub fn node(&self) -> &ConfiguredNodeKey {
+        &self.node
+    }
+
+    pub fn configured_target(&self) -> Option<&ConfiguredTargetKey> {
+        self.node.configured_target()
     }
 }
 
@@ -356,7 +367,7 @@ async fn root_string_build_setting_default(
 
 impl fmt::Display for ConfiguredNodeAnalysisKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "configured-node-analysis:{}", self.configured_target)
+        write!(f, "configured-node-analysis:{}", self.node)
     }
 }
 
@@ -532,13 +543,27 @@ fn root_declared_dependency_keys(
             .transpose()
             .map_err(AnalysisError::new)?;
         for (attribute_index, label) in labels.into_iter().enumerate() {
+            let node = if label.package() == configured_target.label().package()
+                && package
+                    .targets
+                    .iter()
+                    .find(|target| target.name == label.target().as_str())
+                    .is_none()
+            {
+                ConfiguredNodeKey::null(label.clone())
+            } else {
+                ConfiguredNodeKey::configured(ConfiguredTargetKey::new(
+                    label.clone(),
+                    configuration.clone(),
+                ))
+            };
             dependencies.push(DeclaredDependencyKey {
                 attribute: CompactString::from(value.declaration_name.as_str()),
                 attribute_index: u32::try_from(attribute_index)
                     .expect("attribute dependency index fits u32"),
                 sequence: schema.transition().is_some()
                     || matches!(schema.kind(), slug_loading_v2::AttributeKind::LabelList),
-                key: ConfiguredTargetKey::new(label.clone(), configuration.clone()),
+                node,
                 transition_output: transition_output.clone(),
             });
         }
@@ -550,7 +575,7 @@ struct DeclaredDependencyKey {
     attribute: CompactString,
     attribute_index: u32,
     sequence: bool,
-    key: ConfiguredTargetKey,
+    node: ConfiguredNodeKey,
     transition_output: Option<CanonicalLabel>,
 }
 
@@ -570,31 +595,11 @@ impl ComputedAnalysis for Arc<ConfiguredNodeResult> {
     }
 }
 
-fn legacy_declared_dependency_keys(
-    package: &LoadedPackage,
-    configured_target: &ConfiguredTargetKey,
-) -> Result<Vec<DeclaredDependencyKey>, AnalysisError> {
-    Ok(starlark_rule_implementation(package, configured_target)?
-        .dependencies()
-        .iter()
-        .cloned()
-        .enumerate()
-        .map(|(attribute_index, label)| DeclaredDependencyKey {
-            attribute: CompactString::const_new("deps"),
-            attribute_index: u32::try_from(attribute_index)
-                .expect("attribute dependency index fits u32"),
-            sequence: true,
-            key: ConfiguredTargetKey::new(label, configured_target.configuration().clone()),
-            transition_output: None,
-        })
-        .collect())
-}
-
 fn finish_analysis<T>(
     package: &LoadedPackage,
     configured_target: &ConfiguredTargetKey,
     declared_dependency_keys: &[DeclaredDependencyKey],
-    computed: &SmallMap<ConfiguredTargetKey, T>,
+    computed: &SmallMap<ConfiguredNodeKey, T>,
     marker: Option<CompactString>,
     toolchain: Option<PreparedToolchain>,
     capture_events: bool,
@@ -603,46 +608,60 @@ fn finish_analysis<T>(
 where
     T: ComputedAnalysis,
 {
-    let _implementation = starlark_rule_implementation(package, configured_target)?;
-    let resolved = declared_dependency_keys
+    let target = package
+        .targets
         .iter()
-        .map(|dependency| {
-            let result = computed.get(&dependency.key).ok_or_else(|| {
-                AnalysisError::new(format!(
-                    "internal error: dependency result missing for `{}`",
-                    dependency.key
-                ))
-            })?;
-            let node_key = result.result().key().clone();
-            let kind = match &dependency.transition_output {
-                Some(output) => {
-                    crate::configured_target::ConfiguredEdgeKind::TransitionedAttribute {
-                        attribute: dependency.attribute.clone(),
-                        index: dependency.attribute_index,
-                        output: output.clone(),
-                    }
-                }
-                None => crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
+        .find(|target| target.name == configured_target.label().target().as_str())
+        .expect("configured Starlark rule remains present in its loaded package");
+    let visibility = package.effective_visibility(target);
+    let visibility_labels = visibility
+        .as_ref()
+        .map_or(&[][..], |visibility| visibility.dependency_labels());
+    for label in visibility_labels {
+        require_root_delegating_reference(label, "declaring visibility")?;
+    }
+    let mut dependencies = Vec::new();
+    let mut edges = Vec::with_capacity(declared_dependency_keys.len() + visibility_labels.len());
+    for dependency in declared_dependency_keys {
+        let result = computed.get(&dependency.node).ok_or_else(|| {
+            AnalysisError::new(format!(
+                "internal error: dependency result missing for `{}`",
+                dependency.node
+            ))
+        })?;
+        let kind = match (&dependency.node, &dependency.transition_output) {
+            (ConfiguredNodeKey::Null(_), _) => crate::configured_target::ConfiguredEdgeKind::Source,
+            (ConfiguredNodeKey::Configured(_), Some(output)) => {
+                crate::configured_target::ConfiguredEdgeKind::TransitionedAttribute {
                     attribute: dependency.attribute.clone(),
                     index: dependency.attribute_index,
-                },
-            };
-            Ok((
-                PreparedDependency {
-                    key: result
-                        .result()
-                        .configured_target_key()
-                        .expect("current rule analysis only prepares configured nodes")
-                        .clone(),
-                    providers: result.result().providers().clone(),
+                    output: output.clone(),
+                }
+            }
+            (ConfiguredNodeKey::Configured(_), None) => {
+                crate::configured_target::ConfiguredEdgeKind::OrdinaryAttribute {
                     attribute: dependency.attribute.clone(),
-                    sequence: dependency.sequence,
-                },
-                crate::configured_target::ConfiguredEdge::new(node_key, kind),
-            ))
-        })
-        .collect::<Result<Vec<_>, AnalysisError>>()?;
-    let (dependencies, edges): (Vec<_>, Vec<_>) = resolved.into_iter().unzip();
+                    index: dependency.attribute_index,
+                }
+            }
+        };
+        dependencies.push(PreparedDependency {
+            key: result.result().key().clone(),
+            providers: result.result().providers().clone(),
+            attribute: dependency.attribute.clone(),
+            sequence: dependency.sequence,
+        });
+        edges.push(crate::configured_target::ConfiguredEdge::new(
+            result.result().key().clone(),
+            kind,
+        ));
+    }
+    edges.extend(visibility_labels.iter().cloned().map(|label| {
+        crate::configured_target::ConfiguredEdge::new(
+            ConfiguredNodeKey::null(label),
+            crate::configured_target::ConfiguredEdgeKind::DeclaringVisibility,
+        )
+    }));
     let print_capture = capture_events.then(AnalysisPrintCapture::default);
     let label = configured_target.label();
     let value = evaluate_loaded_rule(
@@ -667,6 +686,69 @@ fn root_analysis_complete(
     result: Result<ConfiguredNodeResult, AnalysisError>,
 ) -> RootAnalysisKeyValue {
     LoadingPreparationOutcome::Complete(Arc::new(result.map(Arc::new)))
+}
+
+fn native_empty_providers() -> slug_build_api_v2::ProviderCollection {
+    slug_build_api_v2::ProviderCollection::from_values(Vec::new(), false)
+        .expect("an explicitly non-required provider collection may be empty")
+}
+
+fn package_declares_source_label(package: &LoadedPackage, label: &CanonicalLabel) -> bool {
+    package.targets.iter().any(|target| {
+        matches!(
+            &target.kind,
+            PackageTargetKind::StarlarkRule(rule) if rule.dependencies().contains(label)
+        )
+    })
+}
+
+fn require_root_delegating_reference(
+    reference: &CanonicalLabel,
+    role: &str,
+) -> Result<(), AnalysisError> {
+    if reference.package().repo().is_root() {
+        Ok(())
+    } else {
+        Err(AnalysisError::new(format!(
+            "external {role} reference is not supported: {reference}"
+        )))
+    }
+}
+
+fn source_path(
+    workspace: &NormalizedAbsolutePath,
+    label: &CanonicalLabel,
+) -> NormalizedAbsolutePath {
+    let mut path = workspace.as_path().to_path_buf();
+    let package = label.package().package().as_str();
+    if !package.is_empty() {
+        path.push(package);
+    }
+    path.push(label.target().as_str());
+    NormalizedAbsolutePath::new(path)
+        .expect("validated package and target names remain below the absolute workspace path")
+}
+
+async fn compute_configured_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    label: CanonicalLabel,
+    configuration: ConfigurationKey,
+) -> RootAnalysisKeyValue {
+    let key =
+        match prepare_configured_node_analysis(ctx, workspace, label, configuration, None).await {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Ok(key)) => key,
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return root_analysis_complete(Err(error));
+            }
+        };
+    match ctx.compute(&key).await {
+        Ok(value) => value,
+        Err(error) => root_analysis_complete(Err(AnalysisError::new(format!(
+            "computing configured child through DICE: {error}"
+        )))),
+    }
 }
 
 fn root_analysis_success_eq(left: &RootAnalysisKeyValue, right: &RootAnalysisKeyValue) -> bool {
@@ -1220,6 +1302,21 @@ mod tests {
     }
 
     #[test]
+    fn external_delegating_references_are_rejected_before_null_node_projection() {
+        let root = CanonicalLabel::parse("@@//visibility:group").unwrap();
+        let external = CanonicalLabel::parse("@@external//visibility:group").unwrap();
+
+        assert!(require_root_delegating_reference(&root, "declaring visibility").is_ok());
+        for role in ["declaring visibility", "package-group include"] {
+            let error = require_root_delegating_reference(&external, role).unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                format!("external {role} reference is not supported: {external}")
+            );
+        }
+    }
+
+    #[test]
     fn completed_analysis_error_is_invalid_and_not_equal_to_itself() {
         let error = root_analysis_complete(Err(AnalysisError::new("analysis failed")));
 
@@ -1271,14 +1368,14 @@ impl ConfiguredNodeAnalysisKey {
         capture_events: bool,
         event_batch: &mut Option<EventBatch>,
     ) -> RootAnalysisKeyValue {
-        let configured_target = &self.configured_target;
-        if !configured_target.label().package().repo().is_root() {
+        let node = &self.node;
+        if !node.label().package().repo().is_root() {
             return root_analysis_complete(Err(AnalysisError::new(format!(
                 "external repository configured targets are not supported: {}",
-                configured_target.label()
+                node.label()
             ))));
         }
-        let label = configured_target.label();
+        let label = node.label();
         let package_value = match ctx
             .compute(&RootPackageLoadKey::new(
                 self.workspace.dupe(),
@@ -1296,6 +1393,197 @@ impl ConfiguredNodeAnalysisKey {
                 ))));
             }
         };
+        let package = match package_value.as_ref() {
+            Ok(package) => package,
+            Err(error) => {
+                return root_analysis_complete(Err(AnalysisError::new(error.to_string())));
+            }
+        };
+        let target = package
+            .targets
+            .iter()
+            .find(|target| target.name == label.target().as_str());
+        match (&self.node, target.map(|target| &target.kind)) {
+            (ConfiguredNodeKey::Null(_), None) if package_declares_source_label(package, label) => {
+                let source_path = source_path(&self.workspace, label);
+                let resolved = match ctx
+                    .compute(&ResolvedPathKey::new(
+                        PathObservationNamespace::Host,
+                        source_path,
+                    ))
+                    .await
+                {
+                    Ok(PathOutcome::Need(need)) => {
+                        return LoadingPreparationOutcome::Need(LoadingPreparationNeeds::path(
+                            need,
+                        ));
+                    }
+                    Ok(PathOutcome::Complete(Ok(resolved))) => resolved,
+                    Ok(PathOutcome::Complete(Err(error))) => {
+                        return root_analysis_complete(Err(AnalysisError::new(format!(
+                            "resolving source file {label}: {error:?}"
+                        ))));
+                    }
+                    Err(error) => {
+                        return root_analysis_complete(Err(AnalysisError::new(format!(
+                            "resolving source file through DICE: {error}"
+                        ))));
+                    }
+                };
+                match resolved.state() {
+                    ResolvedPathState::Present(metadata)
+                        if metadata.kind() == PathNodeKind::RegularFile =>
+                    {
+                        return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                            self.node.clone(),
+                            ConfiguredNodeKind::SourceFile,
+                            native_empty_providers(),
+                            None,
+                        )));
+                    }
+                    ResolvedPathState::Missing => {
+                        return root_analysis_complete(Err(AnalysisError::target_not_found(
+                            label.clone(),
+                            package.build_file.clone(),
+                        )));
+                    }
+                    ResolvedPathState::Present(metadata) => {
+                        return root_analysis_complete(Err(AnalysisError::new(format!(
+                            "source file {label} has unsupported filesystem kind {:?}",
+                            metadata.kind()
+                        ))));
+                    }
+                }
+            }
+            (ConfiguredNodeKey::Null(_), None) => {
+                return root_analysis_complete(Err(AnalysisError::target_not_found(
+                    label.clone(),
+                    package.build_file.clone(),
+                )));
+            }
+            (
+                ConfiguredNodeKey::Null(_),
+                Some(PackageTargetKind::PackageGroup { includes, .. }),
+            ) => {
+                for include in includes.iter() {
+                    if let Err(error) =
+                        require_root_delegating_reference(include, "package-group include")
+                    {
+                        return root_analysis_complete(Err(error));
+                    }
+                }
+                let edges = includes
+                    .iter()
+                    .enumerate()
+                    .map(|(index, include)| {
+                        crate::configured_target::ConfiguredEdge::new(
+                            ConfiguredNodeKey::null(include.clone()),
+                            crate::configured_target::ConfiguredEdgeKind::PackageGroupInclude {
+                                index: u32::try_from(index)
+                                    .expect("package-group include index fits u32"),
+                            },
+                        )
+                    })
+                    .collect();
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::PackageGroup,
+                    native_empty_providers(),
+                    None,
+                )
+                .with_edges(edges)));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::Alias { actual }),
+            ) => {
+                let child = compute_configured_child(
+                    ctx,
+                    self.workspace.dupe(),
+                    actual.clone(),
+                    configured_target.configuration().clone(),
+                )
+                .await;
+                let child = match child {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(result) => result.dupe(),
+                        Err(error) => return root_analysis_complete(Err(error.clone())),
+                    },
+                };
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::Alias,
+                    child.providers().clone(),
+                    target.and_then(|target| target.rule_capability()).cloned(),
+                )
+                .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
+                    child.key().clone(),
+                    crate::configured_target::ConfiguredEdgeKind::AliasActual,
+                )])));
+            }
+            (
+                ConfiguredNodeKey::Configured(configured_target),
+                Some(PackageTargetKind::GeneratedFile {
+                    generating_rule, ..
+                }),
+            ) => {
+                let producer = label.with_target(
+                    TargetName::parse(generating_rule.as_str())
+                        .expect("loaded generated-file producer name remains a target name"),
+                );
+                let child = compute_configured_child(
+                    ctx,
+                    self.workspace.dupe(),
+                    producer,
+                    configured_target.configuration().clone(),
+                )
+                .await;
+                let child = match child {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return LoadingPreparationOutcome::Need(need);
+                    }
+                    LoadingPreparationOutcome::Complete(value) => match value.as_ref() {
+                        Ok(result) => result.dupe(),
+                        Err(error) => return root_analysis_complete(Err(error.clone())),
+                    },
+                };
+                return root_analysis_complete(Ok(ConfiguredNodeResult::new_native(
+                    self.node.clone(),
+                    ConfiguredNodeKind::GeneratedFile,
+                    native_empty_providers(),
+                    None,
+                )
+                .with_edges(vec![crate::configured_target::ConfiguredEdge::new(
+                    child.key().clone(),
+                    crate::configured_target::ConfiguredEdgeKind::GeneratedBy,
+                )])));
+            }
+            (ConfiguredNodeKey::Configured(_), Some(PackageTargetKind::StarlarkRule(_))) => {}
+            (ConfiguredNodeKey::Configured(_), None) => {
+                return root_analysis_complete(Err(AnalysisError::target_not_found(
+                    label.clone(),
+                    package.build_file.clone(),
+                )));
+            }
+            (ConfiguredNodeKey::Configured(configured_target), Some(_)) => {
+                let error = starlark_rule_implementation(package, configured_target)
+                    .expect_err("non-Starlark configured nodes retain the existing error");
+                return root_analysis_complete(Err(error));
+            }
+            _ => {
+                return root_analysis_complete(Err(AnalysisError::new(format!(
+                    "configured-node identity `{}` is incompatible with loaded target kind",
+                    self.node
+                ))));
+            }
+        }
+        let configured_target = self
+            .node
+            .configured_target()
+            .expect("Starlark rule nodes retain structural configuration");
         let required_root_string_setting = {
             let package = match package_value.as_ref() {
                 Ok(package) => package,
@@ -1381,17 +1669,7 @@ impl ConfiguredNodeAnalysisKey {
                     return root_analysis_complete(Err(AnalysisError::new(error.to_string())));
                 }
             };
-            let dependencies = if configured_target
-                .configuration()
-                .root_string_setting()
-                .is_some()
-                || required_root_string_setting.is_some()
-            {
-                root_declared_dependency_keys(package, configured_target)
-            } else {
-                legacy_declared_dependency_keys(package, configured_target)
-            };
-            match dependencies {
+            match root_declared_dependency_keys(package, configured_target) {
                 Ok(keys) => keys,
                 Err(error) => return root_analysis_complete(Err(error)),
             }
@@ -1399,21 +1677,28 @@ impl ConfiguredNodeAnalysisKey {
 
         let mut unique = SmallSet::with_capacity(declared_dependency_keys.len());
         for dependency in &declared_dependency_keys {
-            unique.insert(dependency.key.clone());
+            unique.insert(dependency.node.clone());
         }
         let workspace = &self.workspace;
         let preparations = ctx
-            .compute_join(unique.into_iter(), |ctx, configured_target| {
+            .compute_join(unique.into_iter(), |ctx, node| {
                 Box::pin(async move {
-                    let prepared = prepare_configured_node_analysis(
-                        ctx,
-                        workspace.dupe(),
-                        configured_target.label().clone(),
-                        configured_target.configuration().clone(),
-                        None,
-                    )
-                    .await;
-                    (configured_target, prepared)
+                    let prepared = match &node {
+                        ConfiguredNodeKey::Configured(configured_target) => {
+                            prepare_configured_node_analysis(
+                                ctx,
+                                workspace.dupe(),
+                                configured_target.label().clone(),
+                                configured_target.configuration().clone(),
+                                None,
+                            )
+                            .await
+                        }
+                        ConfiguredNodeKey::Null(_) => LoadingPreparationOutcome::Complete(
+                            ConfiguredNodeAnalysisKey::new(workspace.dupe(), node.clone()),
+                        ),
+                    };
+                    (node, prepared)
                 })
             })
             .await;
@@ -1421,7 +1706,7 @@ impl ConfiguredNodeAnalysisKey {
         let mut all_need: Option<LoadingPreparationNeeds> = None;
         let mut first_error = None;
         let mut prepared = Vec::with_capacity(preparations.len());
-        for (configured_target, outcome) in preparations {
+        for (node, outcome) in preparations {
             match outcome {
                 LoadingPreparationOutcome::Need(need) => {
                     all_need = Some(match all_need {
@@ -1435,7 +1720,7 @@ impl ConfiguredNodeAnalysisKey {
                     });
                 }
                 LoadingPreparationOutcome::Complete(value) => match value {
-                    Ok(key) => prepared.push((configured_target, key)),
+                    Ok(key) => prepared.push((node, key)),
                     Err(error) => {
                         if first_error.is_none() {
                             first_error = Some(error);
@@ -1452,22 +1737,22 @@ impl ConfiguredNodeAnalysisKey {
         }
 
         let outcomes = ctx
-            .compute_join(prepared, |ctx, (configured_target, key)| {
+            .compute_join(prepared, |ctx, (node, key)| {
                 Box::pin(async move {
                     let result = ctx.compute(&key).await;
-                    (configured_target, result)
+                    (node, result)
                 })
             })
             .await;
         let mut all_need: Option<LoadingPreparationNeeds> = None;
         let mut first_error = None;
         let mut computed = SmallMap::with_capacity(outcomes.len());
-        for (configured_target, outcome) in outcomes {
+        for (node, outcome) in outcomes {
             match outcome {
                 Err(error) => {
                     if first_error.is_none() {
                         first_error = Some(AnalysisError::new(format!(
-                            "computing dependency `{configured_target}` through DICE: {error}"
+                            "computing dependency `{node}` through DICE: {error}"
                         )));
                     }
                 }
@@ -1484,7 +1769,7 @@ impl ConfiguredNodeAnalysisKey {
                 }
                 Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
                     Ok(result) => {
-                        computed.insert(configured_target, result.dupe());
+                        computed.insert(node, result.dupe());
                     }
                     Err(error) => {
                         if first_error.is_none() {

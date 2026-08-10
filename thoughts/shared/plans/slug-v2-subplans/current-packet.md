@@ -1,45 +1,37 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2d-root-delegating-native-node-activation`
+Packet: `WP-6-m2e-analysis-error-activation-sidecar-prerequisite`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: fourth functional packet from the accepted configured-node ownership
-design after the structural node/result/edge substrate.
+Cross-owner: `app/slug_core_v2/src/runtime/dice.rs`
+Result: prerequisite correction after root delegating-node activation.
 
 ## Observable slice
 
-Activate root-repository alias, exported source, generated output, filegroup,
-and package-group nodes through the sole configured-analysis key and retained
-result. Retain the exact configured/null identities and ordered alias/source/
-generated-by/ordinary/visibility/include edges already pinned by the delegation
-oracle, without activating cquery traversal or output breadth.
+Preserve the complete analysis error selected by build/cquery command roots
+while `ConfiguredNodeAnalysisKey` remains success-only for DICE validity and
+equality. Missing-executable and unsupported-native-root requests must publish
+their existing semantic diagnostics and recover after edits instead of failing
+activation-closure selection with an unavailable root node.
 
 ## Ownership and stops
 
-Keep `ConfiguredNodeAnalysisKey` as the sole DICE owner and
-`ConfiguredNodeResult` as the sole retained result. Generalize that key in place
-to admit null nodes; do not add a peer key, graph, or cache. Root aliases and
-generated/filegroup nodes retain structural configuration; exported sources and
-package groups use null identity exactly where the accepted Bazel graph does.
-Reuse the existing classified edges and compact retained storage.
+Keep `ConfiguredNodeAnalysisKey` as the sole semantic analysis owner and keep
+complete errors invalid/non-equal. Correct the command-effect/activation
+sidecar ownership needed to select an error terminal; do not make errors valid,
+add a peer analysis key/cache, or weaken success equality. Reuse the existing
+activation and command-effect substrate.
 
-Do not activate external `@bazel_tools` in this packet. Its host-platform alias
-crosses into `@platforms`, its function-transition allowlist package requires
-external `glob`, and canonical external node identity does not yet carry the
-apparent-repository loading route. Never synthesize those nodes or builtin
-content. Also exclude platform/toolchain retention, cquery deps/rdeps/graph
-output, a second owner, exact Bazel hash bytes, filesystem bypass, JVM/Java, CI,
-or compatibility behavior. Vendored Buck2 `starlark-rust` remains the sole
-Starlark parser/evaluator substrate and is unchanged.
+Exclude configured-query traversal/output breadth, new delegating node kinds,
+external repository topology, platform/toolchain retention, parser changes,
+exact Bazel hash bytes, JVM/Java, CI, and compatibility behavior. Vendored
+Buck2 `starlark-rust` remains the sole Starlark parser/evaluator substrate.
 
 ## Validation
 
-Allow at most six production and five test files, 800 formatted net production
-lines, 900 formatted net test lines, and 1,700 total. Reuse the accepted
-delegation fixture evidence and prove exact node kind/identity, two-hop alias
-order, generated-to-producer, filegroup source order, declaring visibility, and
-package-group include order. Run focused analysis and downstream compile/tests
-serially. Stop if any root node requires synthetic content, a second retained
-result/key/cache, external repository routing, platform/toolchain topology,
-query traversal/output, or a parser change.
+First pin the clean `7eeb59db` failure in the focused core/server error cases.
+Then prove missing-executable and unsupported-native diagnostics, edit recovery,
+success warm reuse, and unchanged external-visibility/CLI-cycle baselines. Run
+focused analysis/core/server/CLI tests serially and rebuild `slug_cli_v2` before
+CLI validation. Stop if the correction requires error validity, a second
+semantic owner, parser work, or query breadth.

@@ -29,7 +29,10 @@ use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeKey;
+use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::key::RootStringSettingValue;
@@ -122,7 +125,7 @@ impl ActivationTracker for AnalysisTracker {
             ActivationKind::Reused => EventKind::Reused,
         };
         self.events.lock().unwrap().push(AnalysisActivation {
-            label: key.configured_target().label().to_string(),
+            label: key.node().label().to_string(),
             kind,
             node: activation.node(),
             dependencies: activation.dependencies().to_vec(),
@@ -166,7 +169,9 @@ impl ActivationTracker for AnalysisEventTracker {
         let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
             return;
         };
-        let configured_target = key.configured_target();
+        let Some(configured_target) = key.configured_target() else {
+            return;
+        };
         self.activations
             .lock()
             .unwrap()
@@ -302,6 +307,13 @@ fn raw_snapshot_from_text(snapshot: &WorkspaceSnapshot) -> Arc<WorkspaceRawSnaps
 }
 
 fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
+    root_epoch_with_missing(root, std::iter::empty::<PathBuf>())
+}
+
+fn root_epoch_with_missing(
+    root: &std::path::Path,
+    missing: impl IntoIterator<Item = PathBuf>,
+) -> PathObservationEpoch {
     let mut entries = SmallMap::new();
     let snapshot = workspace_snapshot(root);
     let mut directories = BTreeSet::from([root.to_path_buf()]);
@@ -400,6 +412,16 @@ fn root_epoch(root: &std::path::Path) -> PathObservationEpoch {
             }
         }
     }
+    for path in missing {
+        entries.insert(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        );
+    }
     PathObservationEpoch::new(entries).unwrap()
 }
 
@@ -436,8 +458,11 @@ impl RootActivationTracker {
 fn root_activation_identity(key: &ConfiguredNodeAnalysisKey) -> String {
     format!(
         "resolved/{}={}",
-        key.configured_target().label(),
         key.configured_target()
+            .expect("root-string analysis only activates configured targets")
+            .label(),
+        key.configured_target()
+            .expect("root-string analysis only activates configured targets")
             .configuration()
             .root_string_setting()
             .map_or("<default>", RootStringSettingValue::as_str)
@@ -1465,6 +1490,274 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = first)
 }
 
 #[tokio::test]
+async fn fixture_proven_delegating_nodes_retain_identity_edges_and_source_attribute() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
+    fs::write(
+        workspace.join("defs.bzl"),
+        r#"SeenInfo = provider(fields = {"value": "observed source label"})
+def _ordinary(ctx):
+    value = ctx.attr.src.label if ctx.label.name == "root" else ctx.label.name
+    return [DefaultInfo(), SeenInfo(value = value)]
+ordinary_rule = rule(
+    implementation = _ordinary,
+    attrs = {
+        "normal": attr.label(),
+        "aliased": attr.label(),
+        "src": attr.label(allow_single_file = True),
+        "generated": attr.label(allow_single_file = True),
+        "out": attr.output(),
+    },
+)
+"#,
+    )
+    .unwrap();
+    let build = r#"load(":defs.bzl", "ordinary_rule")
+ordinary_rule(name = "ordinary")
+ordinary_rule(name = "producer", out = "producer.out")
+alias(name = "alias_inner", actual = ":ordinary")
+alias(name = "alias_outer", actual = ":alias_inner")
+package_group(name = "vis_leaf", packages = ["//..."])
+package_group(name = "vis_top", includes = [":vis_leaf"])
+ordinary_rule(
+    name = "root",
+    normal = ":ordinary",
+    aliased = ":alias_outer",
+    src = "source.txt",
+    generated = ":producer.out",
+    visibility = [":vis_top"],
+)
+"#;
+    fs::write(workspace.join("BUILD.bazel"), build).unwrap();
+    fs::write(workspace.join("source.txt"), "source\n").unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let configuration = test_configuration();
+    let configured = |label: &str| {
+        ConfiguredTargetKey::new(CanonicalLabel::parse(label).unwrap(), configuration.clone())
+    };
+    let root = analyze_request(&dice, &workspace, &configured("@@//:root"), None, false)
+        .await
+        .unwrap();
+
+    assert_eq!(root.kind(), &ConfiguredNodeKind::Rule);
+    let seen = ProviderId::new("//:defs.bzl", "SeenInfo").unwrap();
+    assert_eq!(
+        root.providers().user(&seen).unwrap().field("value"),
+        Some("@@//:source.txt")
+    );
+    assert_eq!(root.edges().len(), 5);
+    assert!(matches!(
+        root.edges()[0].kind(),
+        ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
+        if attribute == "normal"
+    ));
+    assert_eq!(
+        root.edges()[0].target(),
+        &configured("@@//:ordinary").into()
+    );
+    assert!(matches!(
+        root.edges()[1].kind(),
+        ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
+        if attribute == "aliased"
+    ));
+    assert_eq!(
+        root.edges()[1].target(),
+        &configured("@@//:alias_outer").into()
+    );
+    assert_eq!(root.edges()[2].kind(), &ConfiguredEdgeKind::Source);
+    assert_eq!(
+        root.edges()[2].target(),
+        &ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap())
+    );
+    assert!(matches!(
+        root.edges()[3].kind(),
+        ConfiguredEdgeKind::OrdinaryAttribute { attribute, index: 0 }
+        if attribute == "generated"
+    ));
+    assert_eq!(
+        root.edges()[3].target(),
+        &configured("@@//:producer.out").into()
+    );
+    assert_eq!(
+        root.edges()[4].kind(),
+        &ConfiguredEdgeKind::DeclaringVisibility
+    );
+    assert_eq!(
+        root.edges()[4].target(),
+        &ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:vis_top").unwrap())
+    );
+
+    let outer = analyze_request(
+        &dice,
+        &workspace,
+        &configured("@@//:alias_outer"),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(outer.kind(), &ConfiguredNodeKind::Alias);
+    assert!(outer.providers().default_info().is_some());
+    assert_eq!(provider_value(&outer, &seen), "ordinary");
+    assert_eq!(outer.edges().len(), 1);
+    assert_eq!(outer.edges()[0].kind(), &ConfiguredEdgeKind::AliasActual);
+    assert_eq!(
+        outer.edges()[0].target(),
+        &configured("@@//:alias_inner").into()
+    );
+
+    let inner = analyze_request(
+        &dice,
+        &workspace,
+        &configured("@@//:alias_inner"),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(inner.kind(), &ConfiguredNodeKind::Alias);
+    assert_eq!(provider_value(&inner, &seen), "ordinary");
+    assert_eq!(
+        inner.edges()[0].target(),
+        &configured("@@//:ordinary").into()
+    );
+
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        build.replace(
+            "alias(name = \"alias_outer\", actual = \":alias_inner\")",
+            "alias(name = \"alias_outer\", actual = \":producer\")",
+        ),
+    )
+    .unwrap();
+    let edited_outer = analyze_request(
+        &dice,
+        &workspace,
+        &configured("@@//:alias_outer"),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(provider_value(&edited_outer, &seen), "producer");
+    assert_eq!(
+        edited_outer.edges()[0].target(),
+        &configured("@@//:producer").into()
+    );
+    fs::write(workspace.join("BUILD.bazel"), build).unwrap();
+    let restored_outer = analyze_request(
+        &dice,
+        &workspace,
+        &configured("@@//:alias_outer"),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(restored_outer, outer);
+
+    let generated = analyze_request(
+        &dice,
+        &workspace,
+        &configured("@@//:producer.out"),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(generated.kind(), &ConfiguredNodeKind::GeneratedFile);
+    assert_eq!(generated.edges().len(), 1);
+    assert_eq!(
+        generated.edges()[0].kind(),
+        &ConfiguredEdgeKind::GeneratedBy
+    );
+    assert_eq!(
+        generated.edges()[0].target(),
+        &configured("@@//:producer").into()
+    );
+
+    let source = analyze_node_request_typed(
+        &dice,
+        &workspace,
+        ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap()),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(source.kind(), &ConfiguredNodeKind::SourceFile);
+    assert!(source.providers().default_info().is_none());
+    assert!(source.edges().is_empty());
+
+    let source_path = workspace.join("source.txt");
+    fs::remove_file(&source_path).unwrap();
+    let missing_source = analyze_node_request_typed_with_epoch(
+        &dice,
+        &workspace,
+        ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap()),
+        None,
+        false,
+        root_epoch_with_missing(&workspace, [source_path.clone()]),
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        missing_source.kind(),
+        AnalysisErrorKind::TargetNotFound { label, .. }
+        if label.to_string() == "@@//:source.txt"
+    ));
+    fs::write(&source_path, "source\n").unwrap();
+    let restored_source = analyze_node_request_typed(
+        &dice,
+        &workspace,
+        ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:source.txt").unwrap()),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(restored_source, source);
+
+    let undeclared_source = analyze_node_request_typed(
+        &dice,
+        &workspace,
+        ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:not_declared.txt").unwrap()),
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(
+        undeclared_source.kind(),
+        AnalysisErrorKind::TargetNotFound { label, .. }
+        if label.to_string() == "@@//:not_declared.txt"
+    ));
+
+    let vis_top = analyze_node_request_typed(
+        &dice,
+        &workspace,
+        ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:vis_top").unwrap()),
+        None,
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(vis_top.kind(), &ConfiguredNodeKind::PackageGroup);
+    assert_eq!(vis_top.edges().len(), 1);
+    assert_eq!(
+        vis_top.edges()[0].kind(),
+        &ConfiguredEdgeKind::PackageGroupInclude { index: 0 }
+    );
+    assert!(vis_top.edges()[0].implicit());
+    assert!(!vis_top.edges()[0].tool());
+    assert_eq!(
+        vis_top.edges()[0].target(),
+        &ConfiguredNodeKey::null(CanonicalLabel::parse("@@//:vis_leaf").unwrap())
+    );
+}
+
+#[tokio::test]
 async fn transition_output_label_selects_the_carried_string_setting() {
     let workspace = scratch();
     fs::create_dir(workspace.join("settings")).unwrap();
@@ -1572,6 +1865,42 @@ async fn analyze_request_typed(
     tracker: Option<Arc<dyn ActivationTracker>>,
     capture_events: bool,
 ) -> Result<ConfiguredNodeResult, AnalysisError> {
+    analyze_node_request_typed(
+        dice,
+        workspace,
+        ConfiguredNodeKey::configured(key.clone()),
+        tracker,
+        capture_events,
+    )
+    .await
+}
+
+async fn analyze_node_request_typed(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    node: ConfiguredNodeKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+) -> Result<ConfiguredNodeResult, AnalysisError> {
+    analyze_node_request_typed_with_epoch(
+        dice,
+        workspace,
+        node,
+        tracker,
+        capture_events,
+        root_epoch(workspace),
+    )
+    .await
+}
+
+async fn analyze_node_request_typed_with_epoch(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    node: ConfiguredNodeKey,
+    tracker: Option<Arc<dyn ActivationTracker>>,
+    capture_events: bool,
+    epoch: PathObservationEpoch,
+) -> Result<ConfiguredNodeResult, AnalysisError> {
     let text = Arc::new(workspace_snapshot(workspace));
     let raw = raw_snapshot_from_text(&text);
     let mut user_data = UserComputationData {
@@ -1607,7 +1936,7 @@ async fn analyze_request_typed(
         )])
         .unwrap();
     updater
-        .changed_to(vec![(PathObservationEpochKey, root_epoch(workspace))])
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
         .unwrap();
     let root = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
     inject_root_package_policy_inputs(
@@ -1631,22 +1960,26 @@ async fn analyze_request_typed(
     )
     .unwrap();
     let mut transaction = updater.commit().await;
-    let analysis_key = match prepare_configured_node_analysis(
-        &mut transaction,
-        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-        key.label().clone(),
-        key.configuration().clone(),
-        None,
-    )
-    .await
-    {
-        AnalysisPreparationOutcome::Need(_) => {
-            return Err(AnalysisError::message(
-                "configured target analysis retained Needs during preparation",
-            ));
-        }
-        AnalysisPreparationOutcome::Complete(Ok(key)) => key,
-        AnalysisPreparationOutcome::Complete(Err(error)) => return Err(error),
+    let workspace_identity = NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap();
+    let analysis_key = match &node {
+        ConfiguredNodeKey::Configured(key) => match prepare_configured_node_analysis(
+            &mut transaction,
+            workspace_identity,
+            key.label().clone(),
+            key.configuration().clone(),
+            None,
+        )
+        .await
+        {
+            AnalysisPreparationOutcome::Need(_) => {
+                return Err(AnalysisError::message(
+                    "configured target analysis retained Needs during preparation",
+                ));
+            }
+            AnalysisPreparationOutcome::Complete(Ok(key)) => key,
+            AnalysisPreparationOutcome::Complete(Err(error)) => return Err(error),
+        },
+        ConfiguredNodeKey::Null(_) => ConfiguredNodeAnalysisKey::new(workspace_identity, node)?,
     };
     let outcome = transaction
         .compute(&analysis_key)

@@ -500,10 +500,12 @@ impl ExternalQueryActivationAudit {
             self.typed_roots.fetch_add(1, Ordering::Relaxed);
         }
         if let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() {
-            self.configured_roots
-                .lock()
-                .unwrap()
-                .push(key.configured_target().clone());
+            if let Some(configured_target) = key.configured_target() {
+                self.configured_roots
+                    .lock()
+                    .unwrap()
+                    .push(configured_target.clone());
+            }
         }
     }
 
@@ -8787,7 +8789,7 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
                 return;
             };
             self.roots.lock().unwrap().push((
-                key.configured_target().label().to_string(),
+                key.node().label().to_string(),
                 activation.kind(),
                 activation
                     .evaluation_data()
@@ -8928,6 +8930,46 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
         } else {
             epoch.deleted_package("shared", variant);
         }
+        epoch.build()
+    }
+
+    fn delegating_action_closure_epoch(variant: i64) -> PathObservationEpoch {
+        let mut epoch = BuildRootEpoch::base(variant);
+        epoch.file(
+            "/workspace/defs.bzl",
+            r#"def _producer(ctx):
+    out = ctx.actions.declare_file("producer.out")
+    ctx.actions.write(out, "producer\n")
+    return [DefaultInfo(files = depset([out]))]
+producer = rule(implementation = _producer, attrs = {"out": attr.output()})
+def _root(ctx): return [DefaultInfo()]
+root_rule = rule(implementation = _root, attrs = {
+    "aliased": attr.label(),
+    "src": attr.label(allow_single_file = True),
+    "generated": attr.label(allow_single_file = True),
+})
+"#,
+            variant,
+        );
+        epoch.package(
+            "",
+            r#"load(":defs.bzl", "producer", "root_rule")
+producer(name = "producer", out = "producer.out")
+alias(name = "alias_inner", actual = ":producer")
+alias(name = "alias_outer", actual = ":alias_inner")
+package_group(name = "vis_leaf", packages = ["//..."])
+package_group(name = "vis_top", includes = [":vis_leaf"])
+root_rule(
+    name = "root",
+    aliased = ":alias_outer",
+    src = "source.txt",
+    generated = ":producer.out",
+    visibility = [":vis_top"],
+)
+"#,
+            variant,
+        );
+        epoch.file("/workspace/source.txt", "source\n", variant);
         epoch.build()
     }
 
@@ -9085,6 +9127,55 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
             ["//second:all", "//first:t", "//first:t"]
         );
         assert!(targets.iter().all(|target| target.analysis.is_none()));
+    }
+
+    #[tokio::test]
+    async fn build_action_closure_traverses_alias_and_generated_nodes_but_excludes_null_nodes() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//:root").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut transaction =
+            build_root_transaction(&dice, delegating_action_closure_epoch(1)).await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let evaluation = complete_build_evaluation(&outcome);
+
+        assert_eq!(evaluation.analyzed_target_count(), 1);
+        assert_eq!(evaluation.declared_action_count(), 1);
+        assert_eq!(
+            evaluation
+                .analyses()
+                .map(|analysis| analysis.key().label().to_string())
+                .collect::<Vec<_>>(),
+            [
+                "@@//:root",
+                "@@//:alias_outer",
+                "@@//:producer.out",
+                "@@//:alias_inner",
+                "@@//:producer",
+            ]
+        );
+        assert!(
+            evaluation
+                .analyses()
+                .all(|analysis| analysis.configured_target_key().is_some())
+        );
+        let root = evaluation.analyses().next().unwrap();
+        assert_eq!(root.edges().len(), 4);
+        assert_eq!(
+            root.edges()
+                .iter()
+                .filter(|edge| edge.target().configured_target().is_none())
+                .count(),
+            2,
+            "source and declaring-visibility null nodes stay outside the build action closure"
+        );
+        let producer = evaluation.analyses().last().unwrap();
+        assert_eq!(producer.actions().len(), 1);
+        assert_eq!(producer.actions()[0].outputs()[0].path(), "producer.out");
     }
 
     #[tokio::test]

@@ -44,6 +44,7 @@ use starlark::values::list::ListRef;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 
+use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::result::ConfiguredNodeResult;
 
@@ -124,7 +125,7 @@ impl<'v> StarlarkValue<'v> for AnalysisContext {
 
 #[derive(Debug, Clone, Allocative)]
 pub(crate) struct PreparedDependency {
-    pub(crate) key: ConfiguredTargetKey,
+    pub(crate) key: ConfiguredNodeKey,
     pub(crate) providers: ProviderCollection,
     pub(crate) attribute: CompactString,
     pub(crate) sequence: bool,

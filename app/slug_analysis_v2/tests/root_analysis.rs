@@ -204,8 +204,11 @@ impl ActivationTracker for AnalysisTracker {
         let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
             return;
         };
+        let Some(configured_target) = key.configured_target() else {
+            return;
+        };
         self.activations.lock().unwrap().push(TrackedAnalysis {
-            key: key.configured_target().clone(),
+            key: configured_target.clone(),
             kind: activation.kind(),
             batch: activation
                 .evaluation_data()

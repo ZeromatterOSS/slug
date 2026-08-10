@@ -53,6 +53,10 @@ impl AnalysisDiagnostic {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ConfiguredNodeKind {
     Rule,
+    Alias,
+    SourceFile,
+    GeneratedFile,
+    PackageGroup,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -76,6 +80,29 @@ impl ConfiguredNodeResult {
         Self {
             key: key.into(),
             kind: ConfiguredNodeKind::Rule,
+            providers,
+            actions: Arc::from([]),
+            declared_outputs: Arc::from([]),
+            edges: Arc::from([]),
+            diagnostics: Arc::from([]),
+            rule_capability,
+        }
+    }
+
+    pub(crate) fn new_native(
+        key: ConfiguredNodeKey,
+        kind: ConfiguredNodeKind,
+        providers: ProviderCollection,
+        rule_capability: Option<RuleCapability>,
+    ) -> Self {
+        assert_ne!(
+            kind,
+            ConfiguredNodeKind::Rule,
+            "native nodes cannot be rules"
+        );
+        Self {
+            key,
+            kind,
             providers,
             actions: Arc::from([]),
             declared_outputs: Arc::from([]),

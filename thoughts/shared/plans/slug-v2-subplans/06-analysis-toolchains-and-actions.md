@@ -6307,9 +6307,12 @@ at the resolved child node while retaining attribute-local origin; equal
 transition outputs converge. Every admitted edge kind has its exact fixed
 implicit/tool bits, and only complete successes are DICE-valid or equal.
 
-Analysis passes 32 tests and server passes 48. Core passes 154/155 with only the
-unchanged external-visibility diagnostic mismatch; the rebuilt CLI passes 47/48
-with only the unchanged `bzl_cycle` unavailable-root failure. The functional
+Analysis passes 32 tests. A later clean detached validation corrected the
+command-side baseline after success-only error validity: core passes 153/155
+with missing-executable activation selection and the external-visibility
+diagnostic mismatch; server passes 45/48 with the same activation-selection
+owner obscuring three semantic error terminals; the rebuilt CLI passes 47/48
+with the unchanged `bzl_cycle` unavailable-root failure. The functional
 delta is 152 net production and 216 net test lines across nine production and
 three test files; the production-file allowance expanded only for required
 core/server/CLI migration after deleting the old public result shape. Format,
@@ -6317,7 +6320,42 @@ diff, archive, old-symbol, and independent correction review gates pass. The
 vendored Buck2 `starlark-rust` parser/evaluator is unchanged.
 
 Run next only `WP-6-m2d-root-delegating-native-node-activation`: activate root
-alias, exported-source/null, generated-output, filegroup, and package-group
-nodes through the same key/result and accepted edge kinds. Literal external
+alias, referenced-source/null, generated-output, and package-group nodes
+through the same key/result and accepted edge kinds. Filegroup and
+`exports_files`-specific activation remain unproven by this fixture. Literal external
 `@bazel_tools` remains stopped until apparent-repository routing, external glob,
 and the `@platforms` dependency can be owned without synthetic content.
+
+### Root delegating native-node activation ACCEPT (2026-08-09)
+
+`WP-6-m2d-root-delegating-native-node-activation` is **ACCEPTED** for exactly
+the Bazel 9.2 fixture-proven root slice: two-hop alias forwarding, generic
+referenced source/null identity, generated-output-to-producer identity, rule
+declaring visibility, and ordered package-group includes. Filegroup and
+`exports_files`-specific behavior were removed from scope because the accepted
+fixture does not exercise them. External delegating references fail closed;
+literal `@bazel_tools` remains behind its real repository route, external glob,
+and `@platforms` dependencies.
+
+The sole `ConfiguredNodeAnalysisKey` now admits configured and null nodes, and
+the sole `ConfiguredNodeResult` retains their classified ordered edges. Source
+existence uses the resolved-path DICE owner, propagates Needs, rejects missing
+or wrong-kind paths, and proves create/delete/recreate invalidation. Aliases
+forward custom providers across both layers and restore structurally after an
+actual-edge edit. The build action closure traverses alias and generated nodes
+to the producer action while filtering source and visibility null nodes from
+public analyses. Vendored Buck2 `starlark-rust` is unchanged.
+
+Analysis passes all 34 tests and identity passes all 21 tests. Core passes
+154/156: the new downstream closure regression passes, while the two clean-M2c
+baseline failures remain missing-executable activation selection and the
+external-visibility diagnostic mismatch. Server remains 45/48 on the same
+clean-M2c error-sidecar baseline; the rebuilt CLI remains 47/48 on the existing
+query-cycle activation baseline. Formatting, diff, cap, scope, source-path
+invalidation, and independent review gates pass.
+
+Run next only `WP-6-m2e-analysis-error-activation-sidecar-prerequisite`:
+preserve complete semantic analysis errors for command terminal publication
+without making them DICE-valid/equal or adding another analysis owner. Restore
+the three server error terminals and focused core missing-executable result
+before configured-query traversal breadth.

@@ -204,9 +204,9 @@ impl fmt::Display for ConfiguredTargetKey {
     }
 }
 
-/// Canonical configured-query identity. A configured target remains the
-/// configured-only domain value; null is reserved for the later delegating
-/// topology packet and is never analyzed in this packet.
+/// Canonical configured-query identity. Configured targets carry structural
+/// configuration; null nodes retain the root source and package-group forms
+/// admitted by the delegating topology packet.
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub enum ConfiguredNodeKey {
     Configured(ConfiguredTargetKey),
