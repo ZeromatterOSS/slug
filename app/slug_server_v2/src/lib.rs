@@ -386,6 +386,7 @@ impl Daemon {
                         crate::server::CqueryOutput::StarlarkLabel => {
                             evaluation.starlark_label_stdout()
                         }
+                        crate::server::CqueryOutput::Graph => evaluation.graph_stdout(),
                     };
                     TerminalOutput::new(0, stdout, String::new())
                 }

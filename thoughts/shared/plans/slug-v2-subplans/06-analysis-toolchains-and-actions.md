@@ -6475,3 +6475,45 @@ Run next only `WP-6-m2j-configured-query-forward-traversal-successor-audit`.
 Prefer exact noimplicit unfactored graph output or a smaller forward consumer;
 keep default external topology, multi-root label-order claims, reverse
 traversal, parser replacement, JVM/Java, exact hashes, and CI stopped.
+
+### Configured-query forward successor audit ACCEPT (2026-08-09)
+
+`WP-6-m2j-configured-query-forward-traversal-successor-audit` selected one
+bounded successor: top-level unbounded
+`deps(<single-root>) --output=graph --nograph:factored --noimplicit_deps`.
+Accepted Bazel 9.2 delegation evidence pins structural membership, edges, and
+unfactored node-then-edge layout. Exact Bazel seven-character configuration
+tokens remain deferred; rendered configuration spelling and any resulting
+same-label ordering are explicitly Slug-native.
+
+Run next `WP-6-m2k-configured-query-unfactored-graph-output`. Generalize only
+the existing unfactored renderer around a successor callback over selected
+`ConfiguredNodeResult::edges()`. Retain no second graph or copied adjacency.
+Reject depth, factored/default-implicit, nested, multi-root, reverse, and
+external-tail forms. Parser/evaluator/loading-query graph ownership, vendored
+`starlark-rust`, JVM/Java, exact hashes, and CI remain stopped.
+
+### Configured-query unfactored graph output ACCEPT (2026-08-09)
+
+`WP-6-m2k-configured-query-unfactored-graph-output` is **ACCEPTED**. The
+bounded graph mode admits only top-level unbounded single-root
+`deps --noimplicit_deps --output=graph --nograph:factored`. It renders the
+selected full configured/null identities by cursor-rescanning authoritative
+`ConfiguredNodeResult::edges()`; it retains no copied adjacency, second graph,
+cache, or DICE key. The shared unfactored writer now operates over that cursor
+and preserves existing loading-query bytes, duplicate suppression, and cycle
+termination. Configuration tokens and their ordering remain explicitly
+Slug-native.
+
+Query passes 112 tests, commands 19, and server 48. Focused core and rebuilt
+one-shot/daemon CLI graph regressions pass; the scoped core suite passes 159
+library and 12 integration tests with the two unrelated baselines filtered,
+and full CLI remains 49/50 on the unchanged `bzl_cycle` unavailable-root
+baseline. Formatting, diff, archive, parser-scope, stale-daemon, cap, and
+independent final review gates pass. The Rust delta is 216 production and 194
+test lines, 410 total, within 260/450/710 caps.
+
+Run next only `WP-6-m2l-configured-query-forward-successor-audit`. Prefer an
+evidence-backed depth-limited graph/output extension or a smaller forward
+consumer. Keep factored/default-implicit/external topology, reverse traversal,
+parser replacement, JVM/Java, exact hashes, and CI stopped.

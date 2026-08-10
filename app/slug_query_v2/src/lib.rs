@@ -67,5 +67,6 @@ pub use graph::SubtreePackageSet;
 pub use graph::SubtreePackageSetKey;
 pub use graph::UnconfiguredPackageGraph;
 pub use graph::UnconfiguredPackageGraphKey;
+pub use output::render_unfactored_dot;
 pub use slug_loading_v2::LoadingPreparationNeeds as QueryPreparationNeeds;
 pub use slug_loading_v2::LoadingPreparationOutcome as QueryPreparationOutcome;

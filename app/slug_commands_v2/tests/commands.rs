@@ -458,7 +458,7 @@ fn query_request_rejects_missing_values_and_every_unsupported_flag_class() {
 }
 
 #[test]
-fn cquery_accepts_only_the_label_output_matrix() {
+fn cquery_accepts_only_the_label_and_bounded_graph_output_matrix() {
     let default = CqueryRequest::parse(&["//pkg:bin"]).unwrap();
     assert_eq!(default.output_mode, CqueryOutputMode::Label);
     assert!(default.include_implicit);
@@ -477,6 +477,16 @@ fn cquery_accepts_only_the_label_output_matrix() {
     assert_eq!(starlark.output_mode, CqueryOutputMode::StarlarkLabel);
     assert_eq!(starlark.expression, "//pkg:bin");
     assert_eq!(starlark.output_base.as_deref(), Some("/tmp/slug-cquery"));
+
+    let graph = CqueryRequest::parse(&[
+        "--output=graph",
+        "--nograph:factored",
+        "--noimplicit_deps",
+        "deps(//pkg:bin)",
+    ])
+    .unwrap();
+    assert_eq!(graph.output_mode, CqueryOutputMode::Graph);
+    assert!(!graph.include_implicit);
 
     let set = CqueryRequest::parse(&["set(//pkg:bin //pkg:lib) union //pkg:bin"]).unwrap();
     assert_eq!(set.output_mode, CqueryOutputMode::Label);
@@ -534,6 +544,50 @@ fn cquery_accepts_only_the_label_output_matrix() {
         ],
         vec!["--output=starlark", "--starlark:expr=", "//pkg:bin"],
         vec!["--output=starlark", "--starlark:file=fmt.bzl", "//pkg:bin"],
+        vec!["--output=graph", "--noimplicit_deps", "deps(//pkg:bin)"],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--implicit_deps=false",
+            "deps(//pkg:bin)",
+        ],
+        vec!["--output=graph", "--nograph:factored", "deps(//pkg:bin)"],
+        vec![
+            "--output=graph",
+            "--nograph:factored=false",
+            "--noimplicit_deps",
+            "deps(//pkg:bin)",
+        ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "deps(//pkg:bin, 0)",
+        ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "filter('^//pkg:', //pkg:bin)",
+        ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "filter('^//pkg:', deps(//pkg:bin))",
+        ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "rdeps(//pkg:bin, //pkg:bin)",
+        ],
+        vec![
+            "--output=graph:nofactored",
+            "--noimplicit_deps",
+            "deps(//pkg:bin)",
+        ],
+        vec!["--nograph:factored", "//pkg:bin"],
         vec![
             "--output=starlark",
             "--starlark:expr=str(target.label)",

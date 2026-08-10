@@ -78,6 +78,7 @@ pub struct CqueryRequest {
 pub enum CqueryOutput {
     Label,
     StarlarkLabel,
+    Graph,
 }
 
 /// Stable primitive wire representation for one bzlmod request.
@@ -339,9 +340,11 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
-            if let Err(error) =
-                validate_cquery_expression(&request.expression, request.include_implicit)
-            {
+            if let Err(error) = validate_cquery_expression(
+                &request.expression,
+                request.include_implicit,
+                request.output,
+            ) {
                 return DaemonResponse {
                     exit_code: 2,
                     stdout: String::new(),
@@ -373,12 +376,27 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     }
 }
 
-fn validate_cquery_expression(expression: &str, include_implicit: bool) -> Result<(), String> {
+fn validate_cquery_expression(
+    expression: &str,
+    include_implicit: bool,
+    output: CqueryOutput,
+) -> Result<(), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
     slug_query_v2::validate_cquery_query(&expression).map_err(|error| error.to_string())?;
     if expression.cquery_deps_spec().is_some() && include_implicit {
         return Err("deps() requires --noimplicit_deps in this cquery".to_owned());
+    }
+    if output == CqueryOutput::Graph {
+        let Some(deps) = expression.cquery_deps_spec() else {
+            return Err("graph output requires a top-level deps() cquery expression".to_owned());
+        };
+        if deps.depth().is_some() {
+            return Err("graph output supports only unbounded deps()".to_owned());
+        }
+        if include_implicit {
+            return Err("graph output requires --noimplicit_deps".to_owned());
+        }
     }
     for literal in slug_query_v2::cquery_literals(&expression) {
         let target = TargetPattern::parse(literal)?;

@@ -118,6 +118,7 @@ use slug_query_v2::TargetSet;
 use slug_query_v2::cquery_literals;
 use slug_query_v2::evaluate_cquery_query;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
+use slug_query_v2::render_unfactored_dot;
 use slug_query_v2::validate_cquery_query;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathNodeKind;
@@ -2365,9 +2366,69 @@ impl CqueryCommandEvaluation {
             .collect()
     }
 
+    /// Render the selected configured targets through the shared unfactored
+    /// DOT writer. The writer asks for successors by cursor; this callback
+    /// scans the result-owned edge slice directly and retains no adjacency.
+    pub fn graph_stdout(&self) -> String {
+        let mut ordered = self
+            .targets
+            .iter()
+            .map(|target| (target, cquery_graph_label(target)))
+            .collect::<Vec<_>>();
+        ordered.sort_unstable_by(|(left_target, left_label), (right_target, right_label)| {
+            left_label
+                .cmp(right_label)
+                .then_with(|| left_target.key.cmp(&right_target.key))
+        });
+
+        let mut node_indices = SmallMap::with_capacity(ordered.len());
+        let mut targets = Vec::with_capacity(ordered.len());
+        let mut labels = Vec::with_capacity(ordered.len());
+        for (index, (target, label)) in ordered.into_iter().enumerate() {
+            node_indices.insert(
+                target.key.clone(),
+                u32::try_from(index).expect("cquery graph exceeds u32 node capacity"),
+            );
+            targets.push(target);
+            labels.push(label);
+        }
+        render_unfactored_dot(&labels, |node, cursor| {
+            cquery_graph_successor(&targets, &node_indices, node, cursor)
+        })
+    }
+
     pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
         self.targets.iter().map(|target| target.analysis.as_ref())
     }
+}
+
+fn cquery_graph_label(target: &CqueryResultTarget) -> String {
+    match &target.projection {
+        Some(projection) => format!("{} ({projection})", target.display_label),
+        None => format!("{} (null)", target.display_label),
+    }
+}
+
+fn cquery_graph_successor(
+    targets: &[&CqueryResultTarget],
+    node_indices: &SmallMap<ConfiguredNodeKey, u32>,
+    node: u32,
+    cursor: usize,
+) -> Option<u32> {
+    let target = targets.get(node as usize)?;
+    let mut previous = None;
+    for _ in 0..=cursor {
+        let next = target
+            .analysis
+            .edges()
+            .iter()
+            .filter(|edge| !edge.implicit())
+            .filter_map(|edge| node_indices.get(edge.target()).copied())
+            .filter(|candidate| previous.is_none_or(|previous| *candidate > previous))
+            .min()?;
+        previous = Some(next);
+    }
+    previous
 }
 
 impl CqueryCommandError {
@@ -7039,16 +7100,71 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         assert_eq!(ordinary.len(), 2);
         assert_ne!(ordinary[0], ordinary[1]);
 
-        let without_tools = run("deps(//:root)", false, false).unwrap();
+        let mut normalized_graph = full.graph_stdout();
+        for analysis in full.analyses() {
+            let Some(configuration) = analysis
+                .configured_target_key()
+                .and_then(|key| key.configuration().slug_configuration())
+            else {
+                continue;
+            };
+            let name = if configuration
+                .root_string_setting()
+                .is_some_and(|setting| setting.as_str() == "transitioned")
+            {
+                "transition"
+            } else {
+                "base"
+            };
+            normalized_graph =
+                normalized_graph.replace(&configuration.projection().to_string(), name);
+        }
+        let mut nodes = normalized_graph
+            .lines()
+            .filter(|line| line.starts_with("  \"") && !line.contains(" -> "))
+            .collect::<Vec<_>>();
+        nodes.sort_unstable();
         assert_eq!(
-            without_tools
-                .terminal_for_test()
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .starlark_label_stdout(),
+            nodes,
+            [
+                "  \"//:alias_inner (base)\"",
+                "  \"//:alias_outer (base)\"",
+                "  \"//:ordinary (base)\"",
+                "  \"//:ordinary (transition)\"",
+                "  \"//:producer (base)\"",
+                "  \"//:producer.out (base)\"",
+                "  \"//:root (base)\"",
+                "  \"//:source.txt (null)\"",
+                "  \"//:vis_top (null)\"",
+            ]
+        );
+        let mut edges = normalized_graph
+            .lines()
+            .filter(|line| line.contains(" -> "))
+            .collect::<Vec<_>>();
+        edges.sort_unstable();
+        assert_eq!(
+            edges,
+            [
+                "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
+                "  \"//:producer.out (base)\" -> \"//:producer (base)\"",
+                "  \"//:root (base)\" -> \"//:alias_outer (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
+                "  \"//:root (base)\" -> \"//:producer.out (base)\"",
+                "  \"//:root (base)\" -> \"//:source.txt (null)\"",
+                "  \"//:root (base)\" -> \"//:vis_top (null)\"",
+            ]
+        );
+
+        let without_tools = run("deps(//:root)", false, false).unwrap();
+        let without_tools = without_tools.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            without_tools.starlark_label_stdout(),
             full.starlark_label_stdout()
         );
+        assert_eq!(without_tools.graph_stdout(), full.graph_stdout());
     }
 
     #[tokio::test]

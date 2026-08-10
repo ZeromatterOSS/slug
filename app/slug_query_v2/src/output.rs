@@ -126,6 +126,85 @@ impl QueryOutput {
     }
 }
 
+/// Render one unfactored DOT graph from stable labels and an authoritative
+/// successor cursor. The callback must be pure and return consecutive
+/// successors starting at cursor zero; formatting retains no adjacency copy.
+pub fn render_unfactored_dot<L, F>(labels: &[L], successor: F) -> String
+where
+    L: AsRef<str>,
+    F: Fn(u32, usize) -> Option<u32>,
+{
+    let order = callback_topological_order(labels.len(), &successor);
+    let mut output = String::from("digraph mygraph {\n  node [shape=box];\n");
+    for node in order {
+        let label = labels[node as usize].as_ref();
+        output.push_str("  \"");
+        output.push_str(label);
+        output.push_str("\"\n");
+        let mut cursor = 0;
+        while let Some(child) = next_unique_successor(node, &mut cursor, labels.len(), &successor) {
+            output.push_str("  \"");
+            output.push_str(label);
+            output.push_str("\" -> \"");
+            output.push_str(labels[child as usize].as_ref());
+            output.push_str("\"\n");
+        }
+    }
+    output.push_str("}\n");
+    output
+}
+
+fn callback_topological_order<F>(node_count: usize, successor: &F) -> Vec<u32>
+where
+    F: Fn(u32, usize) -> Option<u32>,
+{
+    let mut visited = vec![false; node_count];
+    let mut postorder = Vec::with_capacity(node_count);
+    for start in 0..node_count {
+        let start: u32 = start
+            .try_into()
+            .expect("query graph exceeds u32 node capacity");
+        if visited[start as usize] {
+            continue;
+        }
+        visited[start as usize] = true;
+        let mut stack = vec![(start, 0_usize)];
+        while let Some((node, cursor)) = stack.last_mut() {
+            if let Some(child) = next_unique_successor(*node, cursor, node_count, successor) {
+                if !visited[child as usize] {
+                    visited[child as usize] = true;
+                    stack.push((child, 0));
+                }
+            } else {
+                postorder.push(stack.pop().expect("query DFS stack is non-empty").0);
+            }
+        }
+    }
+    postorder.reverse();
+    postorder
+}
+
+fn next_unique_successor<F>(
+    node: u32,
+    cursor: &mut usize,
+    node_count: usize,
+    successor: &F,
+) -> Option<u32>
+where
+    F: Fn(u32, usize) -> Option<u32>,
+{
+    while let Some(child) = successor(node, *cursor) {
+        let position = *cursor;
+        *cursor += 1;
+        assert!((child as usize) < node_count, "query successor is in range");
+        if child != node && !(0..position).any(|previous| successor(node, previous) == Some(child))
+        {
+            return Some(child);
+        }
+    }
+    None
+}
+
 /// Request-local selected graph. This is intentionally compact: labels are
 /// shared `CompactString`s and edges are checked `u32` node indexes.
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -146,26 +225,47 @@ impl SelectedQueryGraph {
     const RESERVED_LABEL_CHARS: usize = "\\n...and 9999999 more items".len();
 
     fn stdout(&self, factored: bool, sort_labels: bool) -> String {
-        let mut classes = if factored {
-            self.factored_classes(sort_labels)
-        } else {
-            (0..self.nodes.len())
-                .map(|index| {
-                    vec![
-                        index
-                            .try_into()
-                            .expect("query graph exceeds u32 node capacity"),
-                    ]
-                })
-                .collect()
-        };
-        if !factored && sort_labels {
-            classes.sort_unstable_by(|left, right| {
-                self.nodes[left[0] as usize]
-                    .label
-                    .cmp(&self.nodes[right[0] as usize].label)
+        if !factored {
+            let mut full_order = (0..self.nodes.len())
+                .map(|index| u32::try_from(index).expect("query graph exceeds u32 node capacity"))
+                .collect::<Vec<_>>();
+            if sort_labels {
+                full_order.sort_unstable_by(|left, right| {
+                    self.nodes[*left as usize]
+                        .label
+                        .cmp(&self.nodes[*right as usize].label)
+                });
+            }
+            let mut reordered = vec![0_u32; full_order.len()];
+            for (new, old) in full_order.iter().copied().enumerate() {
+                reordered[old as usize] =
+                    u32::try_from(new).expect("query graph exceeds u32 node capacity");
+            }
+            let labels = full_order
+                .iter()
+                .map(|node| self.nodes[*node as usize].label.as_str())
+                .collect::<Vec<_>>();
+            return render_unfactored_dot(&labels, |node, cursor| {
+                let old = full_order[node as usize];
+                let successors = &self.nodes[old as usize].successors;
+                if !sort_labels {
+                    return successors
+                        .get(cursor)
+                        .map(|successor| reordered[*successor as usize]);
+                }
+                let mut selected = None;
+                for _ in 0..=cursor {
+                    selected = successors
+                        .iter()
+                        .map(|successor| reordered[*successor as usize])
+                        .filter(|candidate| selected.is_none_or(|current| *candidate > current))
+                        .min();
+                    selected?;
+                }
+                selected
             });
         }
+        let classes = self.factored_classes(sort_labels);
         let mut class_for_node = vec![0_u32; self.nodes.len()];
         for (class, nodes) in classes.iter().enumerate() {
             let class: u32 = class
@@ -346,6 +446,7 @@ mod graph_output_tests {
 
     use super::SelectedQueryGraph;
     use super::SelectedQueryGraphNode;
+    use super::render_unfactored_dot;
 
     fn graph(nodes: &[(&str, &[u32])]) -> SelectedQueryGraph {
         SelectedQueryGraph {
@@ -380,7 +481,7 @@ mod graph_output_tests {
 
     #[test]
     fn unfactored_dot_keeps_equivalent_nodes_separate() {
-        let output = graph(&[("//a:root", &[1, 2]), ("//a:left", &[]), ("//a:right", &[])])
+        let output = graph(&[("//a:root", &[2, 1]), ("//a:left", &[]), ("//a:right", &[])])
             .stdout(false, true);
         assert_eq!(
             output,
@@ -392,6 +493,29 @@ mod graph_output_tests {
                 "  \"//a:root\" -> \"//a:right\"\n",
                 "  \"//a:right\"\n",
                 "  \"//a:left\"\n",
+                "}\n",
+            )
+        );
+    }
+
+    #[test]
+    fn callback_unfactored_dot_deduplicates_edges_and_orders_cycles_without_adjacency() {
+        let labels = ["//a:root", "//a:left", "//a:right"];
+        let successors: [&[u32]; 3] = [&[0, 1, 1, 2], &[0], &[]];
+        let output = render_unfactored_dot(&labels, |node, cursor| {
+            successors[node as usize].get(cursor).copied()
+        });
+        assert_eq!(
+            output,
+            concat!(
+                "digraph mygraph {\n",
+                "  node [shape=box];\n",
+                "  \"//a:root\"\n",
+                "  \"//a:root\" -> \"//a:left\"\n",
+                "  \"//a:root\" -> \"//a:right\"\n",
+                "  \"//a:right\"\n",
+                "  \"//a:left\"\n",
+                "  \"//a:left\" -> \"//a:root\"\n",
                 "}\n",
             )
         );

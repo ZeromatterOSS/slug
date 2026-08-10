@@ -71,6 +71,7 @@ pub fn run(argv: Vec<String>) -> i32 {
                 let stdout = match output_mode {
                     CqueryOutputMode::Label => evaluation.label_stdout(),
                     CqueryOutputMode::StarlarkLabel => evaluation.starlark_label_stdout(),
+                    CqueryOutputMode::Graph => evaluation.graph_stdout(),
                 };
                 TerminalOutput::new(0, stdout, String::new())
             }
@@ -107,6 +108,7 @@ fn run_daemon(
             output: match request.output_mode {
                 CqueryOutputMode::Label => slug_server_v2::CqueryOutput::Label,
                 CqueryOutputMode::StarlarkLabel => slug_server_v2::CqueryOutput::StarlarkLabel,
+                CqueryOutputMode::Graph => slug_server_v2::CqueryOutput::Graph,
             },
             root_string_setting: request.root_string_setting,
             bzlmod,

@@ -28,6 +28,7 @@ const LABEL_EXPRESSION: &str = "str(target.label)";
 pub enum CqueryOutputMode {
     Label,
     StarlarkLabel,
+    Graph,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -90,6 +91,9 @@ impl CqueryRequest {
         let mut root_string_setting = None;
         let mut include_implicit = true;
         let mut include_tool = true;
+        let mut saw_noimplicit_deps = false;
+        let mut graph_unfactored = false;
+        let mut saw_graph_unfactored = false;
         for flag in &parsed.flags {
             match flag.name.as_str() {
                 "output" => set_once(&mut output, flag, "--output")?,
@@ -106,9 +110,16 @@ impl CqueryRequest {
                     root_string_setting = Some(value);
                 }
                 "implicit_deps" => include_implicit = parse_bool_flag(flag, false)?,
-                "noimplicit_deps" => include_implicit = parse_bool_flag(flag, true)?,
+                "noimplicit_deps" => {
+                    include_implicit = parse_bool_flag(flag, true)?;
+                    saw_noimplicit_deps |= !include_implicit;
+                }
                 "tool_deps" => include_tool = parse_bool_flag(flag, false)?,
                 "notool_deps" => include_tool = parse_bool_flag(flag, true)?,
+                "nograph:factored" => {
+                    graph_unfactored = !parse_bool_flag(flag, true)?;
+                    saw_graph_unfactored = true;
+                }
                 "allow_yanked_versions"
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
@@ -130,6 +141,23 @@ impl CqueryRequest {
         let output_mode = match (output.as_deref(), starlark_expression.as_deref()) {
             (None | Some("label"), None) => CqueryOutputMode::Label,
             (Some("starlark"), Some(LABEL_EXPRESSION)) => CqueryOutputMode::StarlarkLabel,
+            (Some("graph"), None) => {
+                let Some(deps) = parsed_expression.cquery_deps_spec() else {
+                    return Err(unsupported(
+                        "--output=graph requires a top-level deps() cquery expression",
+                    ));
+                };
+                if deps.depth().is_some() {
+                    return Err(unsupported("--output=graph supports only unbounded deps()"));
+                }
+                if !saw_noimplicit_deps || include_implicit {
+                    return Err(unsupported("--output=graph requires --noimplicit_deps"));
+                }
+                if !saw_graph_unfactored || !graph_unfactored {
+                    return Err(unsupported("--output=graph requires --nograph:factored"));
+                }
+                CqueryOutputMode::Graph
+            }
             _ => {
                 return Err(unsupported(
                     "expected default output, --output=label, or --output=starlark \
@@ -137,6 +165,11 @@ impl CqueryRequest {
                 ));
             }
         };
+        if output_mode != CqueryOutputMode::Graph && saw_graph_unfactored {
+            return Err(unsupported(
+                "--nograph:factored is supported only with --output=graph",
+            ));
+        }
         let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;

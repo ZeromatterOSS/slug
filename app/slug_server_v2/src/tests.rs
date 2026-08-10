@@ -815,7 +815,7 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
         expression: "//pkg:probe".to_owned(),
         include_implicit: false,
         include_tool: false,
-        output: CqueryOutput::Label,
+        output: CqueryOutput::Graph,
         root_string_setting: Some("Gr\u{00fc}\u{00df}e".to_owned()),
         bzlmod: BzlmodRequestInputs::default(),
     });
@@ -824,6 +824,7 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     assert!(json.contains("expression"));
     assert!(json.contains("\"include_implicit\":false"));
     assert!(json.contains("\"include_tool\":false"));
+    assert!(json.contains("\"output\":\"graph\""));
     assert!(!json.contains("target"));
     let round_trip: DaemonRequest = serde_json::from_str(&json).unwrap();
     let DaemonRequest::Cquery(request) = round_trip else {
@@ -832,7 +833,7 @@ fn tagged_cquery_protocol_is_narrow_and_round_trips() {
     assert_eq!(request.expression, "//pkg:probe");
     assert!(!request.include_implicit);
     assert!(!request.include_tool);
-    assert_eq!(request.output, CqueryOutput::Label);
+    assert_eq!(request.output, CqueryOutput::Graph);
     assert_eq!(
         request.root_string_setting.as_deref(),
         Some("Gr\u{00fc}\u{00df}e")
@@ -848,10 +849,10 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     .unwrap_err();
     assert!(missing.to_string().contains("missing field `output`"));
     let unknown = serde_json::from_str::<DaemonRequest>(
-        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"unknown"}}"#,
     )
     .unwrap_err();
-    assert!(unknown.to_string().contains("unknown variant `graph`"));
+    assert!(unknown.to_string().contains("unknown variant `unknown`"));
     let old_shape = serde_json::from_str::<DaemonRequest>(
         r#"{"kind":"cquery","request":{"target":"//pkg:probe","output":"label"}}"#,
     )
@@ -904,20 +905,35 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     assert!(empty_starlark.stdout.is_empty());
     assert!(empty_starlark.stderr.is_empty());
     assert_eq!(empty_starlark.invalidated_files, 0);
-    let malformed = handle_request(
+    let graph_non_deps = handle_request(
         &mut daemon,
         r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"graph"}}"#,
     );
-    assert_eq!(malformed.exit_code, 2, "{malformed:?}");
-    assert!(malformed.stdout.is_empty(), "{malformed:?}");
+    assert_eq!(graph_non_deps.exit_code, 2, "{graph_non_deps:?}");
+    assert!(graph_non_deps.stdout.is_empty(), "{graph_non_deps:?}");
     assert!(
-        malformed
+        graph_non_deps
             .stderr
-            .contains("\"error\":\"daemon_parse_error\"")
-            && malformed.stderr.contains("unknown variant"),
-        "{malformed:?}"
+            .contains("\"error\":\"cquery_request_error\"")
+            && graph_non_deps
+                .stderr
+                .contains("graph output requires a top-level deps()"),
+        "{graph_non_deps:?}"
     );
-    assert_eq!(malformed.invalidated_files, 0);
+    assert_eq!(graph_non_deps.invalidated_files, 0);
+    let graph_depth = handle_request(
+        &mut daemon,
+        r#"{"kind":"cquery","request":{"expression":"deps(//pkg:probe, 0)","include_implicit":false,"output":"graph"}}"#,
+    );
+    assert_eq!(graph_depth.exit_code, 2, "{graph_depth:?}");
+    assert!(graph_depth.stdout.is_empty(), "{graph_depth:?}");
+    assert!(
+        graph_depth
+            .stderr
+            .contains("graph output supports only unbounded deps()"),
+        "{graph_depth:?}"
+    );
+    assert_eq!(graph_depth.invalidated_files, 0);
 }
 
 #[test]

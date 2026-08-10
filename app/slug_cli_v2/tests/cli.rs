@@ -1212,6 +1212,51 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
 }
 
 #[test]
+fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
+    let workspace = scratch("cquery-graph-workspace");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"deps\")\n");
+    write(
+        &workspace.join("defs.bzl"),
+        "def _impl(ctx):\n    return [DefaultInfo()]\nnode = rule(implementation = _impl, attrs = {\"deps\": attr.label_list()})\n",
+    );
+    write(
+        &workspace.join("BUILD.bazel"),
+        "load(\":defs.bzl\", \"node\")\nnode(name = \"child\")\nnode(name = \"root\", deps = [\":child\"])\n",
+    );
+    let expression = "deps(//:root)";
+    let graph = ["--output=graph", "--nograph:factored", "--noimplicit_deps"];
+    let run = |output_base: Option<&str>| {
+        let mut command = slug();
+        command.current_dir(&workspace);
+        if let Some(output_base) = output_base {
+            command.arg(output_base);
+        }
+        command
+            .arg("cquery")
+            .arg(expression)
+            .args(graph)
+            .output()
+            .unwrap()
+    };
+
+    let one_shot = run(None);
+    assert!(one_shot.status.success(), "{one_shot:?}");
+    let stdout = String::from_utf8_lossy(&one_shot.stdout);
+    assert!(stdout.starts_with("digraph mygraph {\n  node [shape=box];\n"));
+    assert!(stdout.contains("\"//:root (slugcfg-v1:"), "{stdout}");
+    assert!(stdout.contains("\" -> \"//:child (slugcfg-v1:"), "{stdout}");
+    assert!(one_shot.stderr.is_empty());
+
+    let output_base = scratch("cquery-graph-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base = format!("--output_base={}", output_base.display());
+    let daemon = run(Some(&output_base));
+    assert!(daemon.status.success(), "{daemon:?}");
+    assert_eq!(daemon.stdout, one_shot.stdout);
+    assert!(daemon.stderr.is_empty());
+}
+
+#[test]
 fn cquery_filter_matches_apparent_labels_in_one_shot_and_daemon() {
     let workspace = scratch("cquery-filter-expression-workspace");
     write(
