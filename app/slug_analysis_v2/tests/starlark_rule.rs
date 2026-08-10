@@ -19,6 +19,7 @@ use dice::ActivationKind;
 use dice::ActivationTracker;
 use dice::DetectCycles;
 use dice::Dice;
+use dice::DiceComputations;
 use dice::DiceNodeId;
 use dice::DynKey;
 use dice::RichActivation;
@@ -32,6 +33,7 @@ use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::key::RootStringSettingValue;
+use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -41,6 +43,10 @@ use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::AutoCpuToken;
+use slug_configuration_v2::native::host::HostConversionInputs;
+use slug_configuration_v2::native::host::HostPathFlavor;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -77,11 +83,19 @@ enum EventKind {
 
 #[derive(Default)]
 struct AnalysisTracker {
-    events: Mutex<Vec<(String, EventKind)>>,
+    events: Mutex<Vec<AnalysisActivation>>,
+}
+
+#[derive(Debug)]
+struct AnalysisActivation {
+    label: String,
+    kind: EventKind,
+    node: DiceNodeId,
+    dependencies: Vec<DiceNodeId>,
 }
 
 impl AnalysisTracker {
-    fn take(&self) -> Vec<(String, EventKind)> {
+    fn take(&self) -> Vec<AnalysisActivation> {
         std::mem::take(&mut *self.events.lock().unwrap())
     }
 }
@@ -89,24 +103,30 @@ impl AnalysisTracker {
 impl ActivationTracker for AnalysisTracker {
     fn key_activated(
         &self,
-        key: &DynKey,
+        _key: &DynKey,
         _deps: &mut dyn Iterator<Item = &DynKey>,
-        activation_data: ActivationData,
+        _activation_data: ActivationData,
     ) {
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
         let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
             return;
         };
-        let Some(configured_target) = key.resolved_configured_target() else {
-            return;
+        let kind = match activation.kind() {
+            ActivationKind::Evaluated => EventKind::Evaluated,
+            ActivationKind::Reused => EventKind::Reused,
         };
-        let kind = match activation_data {
-            ActivationData::Evaluated(_) => EventKind::Evaluated,
-            ActivationData::Reused => EventKind::Reused,
-        };
-        self.events
-            .lock()
-            .unwrap()
-            .push((configured_target.label().to_string(), kind));
+        self.events.lock().unwrap().push(AnalysisActivation {
+            label: key.configured_target().label().to_string(),
+            kind,
+            node: activation.node(),
+            dependencies: activation.dependencies().to_vec(),
+        });
     }
 }
 
@@ -146,9 +166,7 @@ impl ActivationTracker for AnalysisEventTracker {
         let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
             return;
         };
-        let Some(configured_target) = key.resolved_configured_target() else {
-            return;
-        };
+        let configured_target = key.configured_target();
         self.activations
             .lock()
             .unwrap()
@@ -416,21 +434,52 @@ impl RootActivationTracker {
 }
 
 fn root_activation_identity(key: &ConfiguredNodeAnalysisKey) -> String {
-    if let Some(configured_target) = key.resolved_configured_target() {
-        return format!(
-            "resolved/{}={}",
-            configured_target.label(),
-            configured_target
-                .configuration()
-                .root_string_setting()
-                .map_or("<default>", RootStringSettingValue::as_str)
-        );
-    }
-    let (requested, _, explicit) = key.root_string_setting_request_parts().unwrap();
     format!(
-        "request/{requested}={}",
-        explicit.map_or("<default>", RootStringSettingValue::as_str)
+        "resolved/{}={}",
+        key.configured_target().label(),
+        key.configured_target()
+            .configuration()
+            .root_string_setting()
+            .map_or("<default>", RootStringSettingValue::as_str)
     )
+}
+
+fn test_configuration() -> ConfigurationKey {
+    ConfigurationKey::from_slug(
+        SlugConfiguration::default_target(
+            &HostConversionInputs::new(
+                Some(AutoCpuToken::K8),
+                Some(HostPathFlavor::Unix),
+                None,
+                Arc::from([]),
+                Arc::from([]),
+            )
+            .unwrap(),
+        )
+        .unwrap(),
+    )
+}
+
+async fn prepared_analysis_key(
+    transaction: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    target: CanonicalLabel,
+    base_configuration: ConfigurationKey,
+    explicit: Option<RootStringSettingValue>,
+) -> Result<ConfiguredNodeAnalysisKey, String> {
+    match prepare_configured_node_analysis(
+        transaction,
+        workspace,
+        target,
+        base_configuration,
+        explicit,
+    )
+    .await
+    {
+        AnalysisPreparationOutcome::Need(_) => Err("root request returned Needs".to_owned()),
+        AnalysisPreparationOutcome::Complete(Ok(key)) => Ok(key),
+        AnalysisPreparationOutcome::Complete(Err(error)) => Err(error.to_string()),
+    }
 }
 
 fn activation_codes(activations: &[(String, ActivationKind)]) -> Vec<String> {
@@ -511,6 +560,23 @@ async fn root_string_request_result(
     explicit: Option<&str>,
     tracker: Arc<RootActivationTracker>,
 ) -> Result<Arc<AnalysisResult>, String> {
+    root_string_request_result_with_explicit(
+        dice,
+        workspace,
+        target,
+        explicit.map(RootStringSettingValue::new),
+        tracker,
+    )
+    .await
+}
+
+async fn root_string_request_result_with_explicit(
+    dice: &Arc<Dice>,
+    workspace: &std::path::Path,
+    target: &str,
+    explicit: Option<RootStringSettingValue>,
+    tracker: Arc<RootActivationTracker>,
+) -> Result<Arc<AnalysisResult>, String> {
     let mut updater = dice.updater_with_data(UserComputationData {
         activation_tracker: Some(tracker),
         ..Default::default()
@@ -540,13 +606,16 @@ async fn root_string_request_result(
     )
     .unwrap();
     let mut transaction = updater.commit().await;
+    let analysis_key = prepared_analysis_key(
+        &mut transaction,
+        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+        CanonicalLabel::parse(target).unwrap(),
+        test_configuration(),
+        explicit,
+    )
+    .await?;
     let outcome = transaction
-        .compute(&ConfiguredNodeAnalysisKey::root_string_setting_request(
-            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-            CanonicalLabel::parse(target).unwrap(),
-            ConfigurationKey::target("root-request-base").unwrap(),
-            explicit.map(RootStringSettingValue::new),
-        ))
+        .compute(&analysis_key)
         .await
         .map_err(|error| error.to_string())?;
     let AnalysisPreparationOutcome::Complete(value) = outcome else {
@@ -608,14 +677,16 @@ async fn root_target_request(
     )
     .unwrap();
     let mut transaction = updater.commit().await;
+    let analysis_key = prepared_analysis_key(
+        &mut transaction,
+        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+        CanonicalLabel::parse(target).unwrap(),
+        test_configuration(),
+        None,
+    )
+    .await?;
     let value = transaction
-        .compute(&ConfiguredNodeAnalysisKey::new(
-            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-            ConfiguredTargetKey::new(
-                CanonicalLabel::parse(target).unwrap(),
-                ConfigurationKey::target("toolchain-context").unwrap(),
-            ),
-        ))
+        .compute(&analysis_key)
         .await
         .map_err(|error| error.to_string())?;
     let AnalysisPreparationOutcome::Complete(value) = value else {
@@ -1119,7 +1190,7 @@ async fn later_reference_round_need_yields_to_root_semantic_error() {
 }
 
 #[tokio::test]
-async fn root_string_setting_requests_preserve_lifecycle_transition_and_identity() {
+async fn root_string_setting_preparation_preserves_lifecycle_transition_and_identity() {
     let workspace = scratch();
     let defs = workspace.join("defs.bzl");
     let build = workspace.join("BUILD.bazel");
@@ -1130,6 +1201,8 @@ def _setting(ctx): return [SettingInfo(value = ctx.build_setting_value)]
 string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
 def _consumer(ctx): return [ConsumerInfo(value = ctx.attr._setting[SettingInfo].value)]
 consumer = rule(implementation = _consumer, attrs = {"_setting": attr.label(default = "//:setting")})
+def _unrelated(ctx): return []
+unrelated = rule(implementation = _unrelated)
 def _left_transition(settings, attr): return {"//:setting": "left"}
 def _right_transition(settings, attr): return {"//:setting": "right"}
 left_transition = transition(implementation = _left_transition, inputs = [], outputs = ["//:setting"])
@@ -1137,7 +1210,7 @@ right_transition = transition(implementation = _right_transition, inputs = [], o
 def _parent(ctx): return [ParentInfo(value = ctx.attr.left[0][ConsumerInfo].value + "," + ctx.attr.right[0][ConsumerInfo].value)]
 parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_transition), "right": attr.label(cfg = right_transition)})
 "#;
-    let build_source = "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n";
+    let build_source = "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\", \"unrelated\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nunrelated(name = \"unrelated\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n";
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
     fs::write(&defs, defs_source).unwrap();
     fs::write(&build, build_source).unwrap();
@@ -1146,7 +1219,23 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     let tracker = Arc::new(RootActivationTracker::default());
     let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
     let parent = ProviderId::new("//:defs.bzl", "ParentInfo").unwrap();
-    let legacy_base = ConfigurationKey::target("legacy-root-setting-base").unwrap();
+    let need_before_missing = root_string_request_result_with_explicit(
+        &dice,
+        &workspace,
+        "@@//:missing",
+        Some(RootStringSettingValue::new_for_label(
+            "@@//missing_settings:setting",
+            "command",
+        )),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        need_before_missing.contains("Needs"),
+        "explicit setting Need must precede missing-target error: {need_before_missing}"
+    );
+    let legacy_base = test_configuration();
     let legacy_setting = analyze_request(
         &dice,
         &workspace,
@@ -1247,16 +1336,25 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left_t
     assert_eq!(provider_value(&restored_default, &consumer), "default");
     assert_eq!(default_key, *restored_default.key());
 
+    let unrelated = root_string_request(
+        &dice,
+        &workspace,
+        "@@//:unrelated",
+        Some("command"),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await;
+    assert_eq!(root_setting_value(unrelated.key()), "command");
+
     let (activations, _, _) = tracker.take();
     assert_eq!(
         activation_codes(&activations),
-        r#"request/@@//:consumer=<default>:E request/@@//:consumer=<default>:E request/@@//:consumer=<default>:E request/@@//:consumer=<default>:R
-request/@@//:consumer=command:E request/@@//:consumer=default:E request/@@//:parent=<default>:E request/@@//:parent=<default>:E request/@@//:parent=<default>:E
-resolved/@@//:consumer=changed:E resolved/@@//:consumer=command:E resolved/@@//:consumer=default:E resolved/@@//:consumer=default:E resolved/@@//:consumer=default:R
-resolved/@@//:consumer=edited-default:E resolved/@@//:consumer=left:E resolved/@@//:consumer=left:E resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E
-resolved/@@//:parent=default:E resolved/@@//:parent=default:E resolved/@@//:parent=default:E resolved/@@//:setting=changed:E resolved/@@//:setting=command:E
-resolved/@@//:setting=default:E resolved/@@//:setting=default:E resolved/@@//:setting=edited-default:E resolved/@@//:setting=left:E resolved/@@//:setting=left:E
-resolved/@@//:setting=right:E resolved/@@//:setting=right:E resolved/@@//:setting=right:E"#
+        r#"resolved/@@//:consumer=changed:E resolved/@@//:consumer=command:E resolved/@@//:consumer=default:E resolved/@@//:consumer=default:E
+resolved/@@//:consumer=default:R resolved/@@//:consumer=default:R resolved/@@//:consumer=edited-default:E resolved/@@//:consumer=left:E
+resolved/@@//:consumer=right:E resolved/@@//:consumer=right:E resolved/@@//:parent=default:E resolved/@@//:parent=default:E
+resolved/@@//:parent=default:R resolved/@@//:setting=changed:E resolved/@@//:setting=command:E resolved/@@//:setting=default:E
+resolved/@@//:setting=default:R resolved/@@//:setting=edited-default:E resolved/@@//:setting=left:E resolved/@@//:setting=right:E
+resolved/@@//:setting=right:E"#
             .split_whitespace()
             .map(str::to_owned)
             .collect::<Vec<_>>(),
@@ -1281,6 +1379,19 @@ resolved/@@//:setting=right:E resolved/@@//:setting=right:E resolved/@@//:settin
         )
         .await
         .is_err()
+    );
+    let unrelated_error = root_string_request_result(
+        &dice,
+        &workspace,
+        "@@//:unrelated",
+        Some("command"),
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        unrelated_error.contains("root string build setting @@//:setting is missing"),
+        "{unrelated_error}"
     );
 }
 
@@ -1316,12 +1427,30 @@ parent = rule(implementation = _parent, attrs = {"dep": attr.label(cfg = setting
     .unwrap();
 
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mismatched = analyze_request(
+        &dice,
+        &workspace,
+        &ConfiguredTargetKey::new(
+            CanonicalLabel::parse("@@//:parent").unwrap(),
+            test_configuration().with_root_string_setting(RootStringSettingValue::new("unrelated")),
+        ),
+        None,
+        false,
+    )
+    .await
+    .unwrap_err();
+    assert!(
+        mismatched.contains(
+            "multiple string build settings are not supported: @@//:setting and @@//settings:settings"
+        ),
+        "{mismatched}"
+    );
     let result = analyze_request(
         &dice,
         &workspace,
         &ConfiguredTargetKey::new(
             CanonicalLabel::parse("@@//:parent").unwrap(),
-            ConfigurationKey::target("dynamic-setting-base").unwrap(),
+            test_configuration(),
         ),
         None,
         false,
@@ -1346,7 +1475,7 @@ async fn analyze_revision(
     tracker: &Arc<AnalysisTracker>,
     workspace: &std::path::Path,
     key: &ConfiguredTargetKey,
-) -> (Result<AnalysisResult, String>, Vec<(String, EventKind)>) {
+) -> (Result<AnalysisResult, String>, Vec<AnalysisActivation>) {
     let result = analyze_request(dice, workspace, key, Some(tracker.clone()), false).await;
     (result, tracker.take())
 }
@@ -1429,11 +1558,25 @@ async fn analyze_request_typed(
     )
     .unwrap();
     let mut transaction = updater.commit().await;
+    let analysis_key = match prepare_configured_node_analysis(
+        &mut transaction,
+        NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
+        key.label().clone(),
+        key.configuration().clone(),
+        None,
+    )
+    .await
+    {
+        AnalysisPreparationOutcome::Need(_) => {
+            return Err(AnalysisError::message(
+                "configured target analysis retained Needs during preparation",
+            ));
+        }
+        AnalysisPreparationOutcome::Complete(Ok(key)) => key,
+        AnalysisPreparationOutcome::Complete(Err(error)) => return Err(error),
+    };
     let outcome = transaction
-        .compute(&ConfiguredNodeAnalysisKey::new(
-            NormalizedAbsolutePath::new(workspace.to_path_buf()).unwrap(),
-            key.clone(),
-        ))
+        .compute(&analysis_key)
         .await
         .expect("configured target analysis DICE compute succeeds");
     let AnalysisPreparationOutcome::Complete(result) = outcome else {
@@ -1446,8 +1589,11 @@ async fn analyze_request_typed(
         .map_err(Clone::clone)
 }
 
-fn assert_analysis_events(events: &[(String, EventKind)], expected: &[(&str, EventKind)]) {
-    let mut actual = events.to_vec();
+fn assert_analysis_events(events: &[AnalysisActivation], expected: &[(&str, EventKind)]) {
+    let mut actual = events
+        .iter()
+        .map(|event| (event.label.clone(), event.kind))
+        .collect::<Vec<_>>();
     actual.sort();
     let mut expected = expected
         .iter()
@@ -1455,6 +1601,21 @@ fn assert_analysis_events(events: &[(String, EventKind)], expected: &[(&str, Eve
         .collect::<Vec<_>>();
     expected.sort();
     assert_eq!(actual, expected);
+
+    let parent = events
+        .iter()
+        .find(|event| event.label == "@@//parent:parent")
+        .expect("parent analysis activation is present");
+    for child in events
+        .iter()
+        .filter(|event| event.label.starts_with("@@//leaf:"))
+    {
+        assert!(
+            parent.dependencies.contains(&child.node),
+            "parent activation did not retain child {} dependency: {events:#?}",
+            child.label
+        );
+    }
 }
 
 #[test]
@@ -1499,7 +1660,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//pkg:write_file").unwrap(),
-        ConfigurationKey::target("first-build").unwrap(),
+        test_configuration(),
     );
     let result = tokio::runtime::Runtime::new()
         .unwrap()
@@ -1555,10 +1716,13 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
             .unwrap();
             let mut transaction = updater.commit().await;
             let outcome = transaction
-                .compute(&ConfiguredNodeAnalysisKey::new(
-                    NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
-                    key,
-                ))
+                .compute(
+                    &ConfiguredNodeAnalysisKey::new(
+                        NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+                        key,
+                    )
+                    .unwrap(),
+                )
                 .await
                 .unwrap();
             let AnalysisPreparationOutcome::Complete(value) = outcome else {
@@ -1604,7 +1768,7 @@ async fn custom_only_starlark_rule_gets_implicit_empty_default_info() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//:custom").unwrap(),
-        ConfigurationKey::target("implicit-default").unwrap(),
+        test_configuration(),
     );
     let result = analyze_request(&dice, &workspace, &key, None, false)
         .await
@@ -1677,7 +1841,7 @@ missing = rule(implementation = _missing, executable = True)
     let key = |name: &str| {
         ConfiguredTargetKey::new(
             CanonicalLabel::parse(&format!("@@//:{name}")).unwrap(),
-            ConfigurationKey::target(format!("default-info-{name}")).unwrap(),
+            test_configuration(),
         )
     };
 
@@ -1768,7 +1932,7 @@ async fn executable_default_info_recomputes_and_restores_structural_results() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//:probe").unwrap(),
-        ConfigurationKey::target("default-info-restoration").unwrap(),
+        test_configuration(),
     );
 
     let initial = analyze_request(&dice, &workspace, &key, None, false)
@@ -1888,15 +2052,18 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     )
     .unwrap();
     let mut transaction = updater.commit().await;
-    let configuration = ConfigurationKey::target("recursive").unwrap();
+    let configuration = test_configuration();
     let outcome = transaction
-        .compute(&ConfiguredNodeAnalysisKey::new(
-            NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
-            ConfiguredTargetKey::new(
-                CanonicalLabel::parse("@@//parent:parent").unwrap(),
-                configuration.clone(),
-            ),
-        ))
+        .compute(
+            &ConfiguredNodeAnalysisKey::new(
+                NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+                ConfiguredTargetKey::new(
+                    CanonicalLabel::parse("@@//parent:parent").unwrap(),
+                    configuration.clone(),
+                ),
+            )
+            .unwrap(),
+        )
         .await
         .unwrap();
     let AnalysisPreparationOutcome::Complete(result) = outcome else {
@@ -1938,13 +2105,16 @@ parent_rule = rule(implementation = _parent_impl, attrs = {"deps": attr.label_li
     );
 
     let outcome = transaction
-        .compute(&ConfiguredNodeAnalysisKey::new(
-            NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
-            ConfiguredTargetKey::new(
-                CanonicalLabel::parse("@@//leaf:second").unwrap(),
-                configuration,
-            ),
-        ))
+        .compute(
+            &ConfiguredNodeAnalysisKey::new(
+                NormalizedAbsolutePath::new(workspace.clone()).unwrap(),
+                ConfiguredTargetKey::new(
+                    CanonicalLabel::parse("@@//leaf:second").unwrap(),
+                    configuration,
+                ),
+            )
+            .unwrap(),
+        )
         .await
         .unwrap();
     let AnalysisPreparationOutcome::Complete(leaf) = outcome else {
@@ -2003,7 +2173,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         "load(\"//rules:defs.bzl\", \"parent\")\nparent(name = \"parent\", deps = [\"//leaf:leaf\"])\n",
     )
     .unwrap();
-    let configuration = ConfigurationKey::target("analysis-events").unwrap();
+    let configuration = test_configuration();
     let leaf_key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//leaf:leaf").unwrap(),
         configuration.clone(),
@@ -2211,7 +2381,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
     let tracker = Arc::new(AnalysisTracker::default());
     let key = ConfiguredTargetKey::new(
         CanonicalLabel::parse("@@//parent:parent").unwrap(),
-        ConfigurationKey::target("retained").unwrap(),
+        test_configuration(),
     );
 
     let (initial, events) = analyze_revision(&dice, &tracker, &workspace, &key).await;
@@ -2244,7 +2414,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             .field("value"),
         Some("second,first")
     );
-    assert_analysis_events(&events, &[]);
+    assert_analysis_events(&events, &[("@@//parent:parent", EventKind::Reused)]);
 
     fs::write(workspace.join("unrelated/file.txt"), "unrelated\n").unwrap();
     let (unrelated, events) = analyze_revision(&dice, &tracker, &workspace, &key).await;
@@ -2297,14 +2467,7 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
         error.contains("target `@@//leaf:first` was not found"),
         "{error}"
     );
-    assert_analysis_events(
-        &events,
-        &[
-            ("@@//leaf:first", EventKind::Evaluated),
-            ("@@//leaf:second", EventKind::Evaluated),
-            ("@@//parent:parent", EventKind::Evaluated),
-        ],
-    );
+    assert_analysis_events(&events, &[("@@//parent:parent", EventKind::Evaluated)]);
 
     fs::write(workspace.join("leaf/BUILD.bazel"), complete_leaf_build).unwrap();
     let (recreated, events) = analyze_revision(&dice, &tracker, &workspace, &key).await;

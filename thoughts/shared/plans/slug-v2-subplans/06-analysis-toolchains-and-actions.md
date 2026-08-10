@@ -6272,3 +6272,27 @@ Run next only `WP-6-m2b-command-root-setting-preparation`: move root-setting
 default/explicit resolution into both command-root preparation paths, remove
 the unresolved key mode, and make opaque/legacy configuration unrepresentable
 at the production key boundary. No configured-node breadth precedes it.
+
+### Command-root setting preparation ACCEPT (2026-08-09)
+
+`WP-6-m2b-command-root-setting-preparation` is **ACCEPTED**. Build, Cquery, and
+recursive declared dependencies now call one analysis-owned Need-aware
+preparation path before constructing the sole `ConfiguredNodeAnalysisKey`.
+Default, explicit, and carried string settings resolve to the final structural
+configuration; explicit setting Needs precede target errors, mismatched carried
+labels fail closed, and equal transition outputs converge. The unresolved
+request variant is deleted and the key constructor rejects legacy/opaque
+configuration.
+
+Full analysis passes 28 tests and server passes 48. Core passes 154/155 with
+only the unchanged external-query visibility diagnostic mismatch; the rebuilt
+CLI passes 47/48 with only the unchanged `bzl_cycle` unavailable-root failure.
+Rich activation evidence retains parent-to-child DICE node provenance, format
+and diff checks pass, and independent correction review returned `ACCEPT`.
+No second key/cache/graph, parser change, JVM/Java, CI, or public hash-byte work
+landed.
+
+Run next only `WP-6-m2c-configured-node-result-substrate`: introduce the
+reviewed structural/null node identity, classified immutable edges, and the
+single retained configured-node result shape before adding native/delegating
+topology or cquery traversal breadth.

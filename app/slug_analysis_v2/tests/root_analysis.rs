@@ -25,6 +25,10 @@ use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_configuration_v2::SlugConfiguration;
+use slug_configuration_v2::native::host::AutoCpuToken;
+use slug_configuration_v2::native::host::HostConversionInputs;
+use slug_configuration_v2::native::host::HostPathFlavor;
 use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
@@ -214,12 +218,24 @@ impl ActivationTracker for AnalysisTracker {
 fn configured(label: &str) -> ConfiguredTargetKey {
     ConfiguredTargetKey::new(
         CanonicalLabel::parse(label).unwrap(),
-        ConfigurationKey::target("root-analysis").unwrap(),
+        ConfigurationKey::from_slug(
+            SlugConfiguration::default_target(
+                &HostConversionInputs::new(
+                    Some(AutoCpuToken::K8),
+                    Some(HostPathFlavor::Unix),
+                    None,
+                    Arc::from([]),
+                    Arc::from([]),
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        ),
     )
 }
 
 fn parent_key() -> ConfiguredNodeAnalysisKey {
-    ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:parent"))
+    ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:parent")).unwrap()
 }
 
 async fn transaction(
@@ -295,7 +311,8 @@ fn marker_value(
 async fn root_analysis_preserves_typed_direct_target_missing() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(AnalysisTracker::default());
-    let key = ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:missing"));
+    let key =
+        ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:missing")).unwrap();
     let mut transaction =
         transaction(&dice, EpochBuilder::base("v1-", &[], 1).build(), tracker).await;
     let outcome = transaction.compute(&key).await.unwrap();
@@ -326,10 +343,11 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
             NormalizedAbsolutePath::new("/other").unwrap(),
             configured("@@//parent:parent"),
         )
+        .unwrap()
     );
     assert_ne!(
         key,
-        ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:other")),
+        ConfiguredNodeAnalysisKey::new(workspace(), configured("@@//parent:other")).unwrap(),
     );
 
     let need_epoch = EpochBuilder::base("v1-", &["//right:right", "//left:left"], 1).build();

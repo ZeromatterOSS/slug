@@ -51,6 +51,7 @@ use slug_analysis_v2::AnalysisResult;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
@@ -92,6 +93,7 @@ use slug_identity_v2::TargetName;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
+use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::RepositoryPackageLoadError;
 use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RootPackageLoadError;
@@ -1260,12 +1262,15 @@ impl NativeCommandRoot for CqueryCommandRoot {
         let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
         let mut results = Vec::with_capacity(self.roots.len());
         for root in self.roots.iter() {
-            match transaction
-                .compute(&root.analysis_key)
-                .await
-                .map_err(|error| {
-                    NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}"))
-                })? {
+            let prepared = prepare_configured_node_analysis(
+                transaction,
+                root.workspace.dupe(),
+                root.canonical.clone(),
+                root.base_configuration.clone(),
+                root.explicit_root_string_setting.clone(),
+            )
+            .await;
+            match prepared {
                 slug_bzlmod_v2::SourcePreparationOutcome::Need(next) => {
                     needs = Some(match needs {
                         Some(current) => current.try_union(&next).map_err(|error| {
@@ -1276,7 +1281,28 @@ impl NativeCommandRoot for CqueryCommandRoot {
                         None => next,
                     });
                 }
-                slug_bzlmod_v2::SourcePreparationOutcome::Complete(result) => results.push(result),
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+                    results.push(Arc::new(Err(error)));
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(analysis_key)) => {
+                    match transaction.compute(&analysis_key).await.map_err(|error| {
+                        NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}"))
+                    })? {
+                        slug_bzlmod_v2::SourcePreparationOutcome::Need(next) => {
+                            needs = Some(match needs {
+                                Some(current) => current.try_union(&next).map_err(|error| {
+                                    NativeDemandSessionError::Computation(anyhow::anyhow!(
+                                        "incompatible cquery analysis needs: {error:?}"
+                                    ))
+                                })?,
+                                None => next,
+                            });
+                        }
+                        slug_bzlmod_v2::SourcePreparationOutcome::Complete(result) => {
+                            results.push(result)
+                        }
+                    }
+                }
             }
         }
         if let Some(needs) = needs {
@@ -1605,7 +1631,9 @@ struct CqueryCommandRoot {
 struct CqueryRootTarget {
     requested: Arc<str>,
     canonical: CanonicalLabel,
-    analysis_key: ConfiguredNodeAnalysisKey,
+    workspace: NormalizedAbsolutePath,
+    base_configuration: ConfigurationKey,
+    explicit_root_string_setting: Option<RootStringSettingValue>,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -2359,10 +2387,15 @@ async fn compute_build_action_closure(
             .compute_join(frontier, |ctx, configured_target| {
                 Box::pin(async move {
                     let value = ctx
-                        .compute(&ConfiguredNodeAnalysisKey::new(
-                            workspace.dupe(),
-                            configured_target.clone(),
-                        ))
+                        .compute(
+                            &ConfiguredNodeAnalysisKey::new(
+                                workspace.dupe(),
+                                configured_target.clone(),
+                            )
+                            .expect(
+                                "cquery traversal inherits a prepared structural configuration",
+                            ),
+                        )
                         .await;
                     (configured_target, value)
                 })
@@ -2409,7 +2442,7 @@ async fn compute_build_branch(
     ctx: &mut DiceComputations<'_>,
     workspace: NormalizedAbsolutePath,
     pattern: Arc<str>,
-    configuration: ConfigurationKey,
+    _configuration: ConfigurationKey,
     base_configuration: ConfigurationKey,
     explicit_root_string_setting: Option<RootStringSettingValue>,
 ) -> BuildBranchResult {
@@ -2508,42 +2541,33 @@ async fn compute_build_branch(
                         }
                     },
                 }
-            } else if let slug_loading_v2::PackageTargetKind::StarlarkRule(rule) = &target.kind {
+            } else if let slug_loading_v2::PackageTargetKind::StarlarkRule(_) = &target.kind {
                 let canonical =
                     CanonicalLabel::parse(&format!("@@//{}:{}", label.package(), label.target()))
                         .expect("validated root apparent label has a canonical projection");
-                let has_root_setting_transition = rule
-                    .schema()
-                    .iter()
-                    .any(|attribute| attribute.transition().is_some());
-                let root_setting = CanonicalLabel::parse("@@//:setting")
-                    .expect("packet-fixed setting label is valid");
-                let directly_uses_root_setting = rule.is_root_string_build_setting()
-                    || rule
-                        .dependencies()
-                        .iter()
-                        .any(|dependency| dependency == &root_setting);
-                let analysis_key =
-                    if explicit_root_string_setting.is_some() || has_root_setting_transition {
-                        ConfiguredNodeAnalysisKey::root_string_setting_request(
-                            workspace,
-                            canonical,
-                            base_configuration,
-                            explicit_root_string_setting,
-                        )
-                    } else if directly_uses_root_setting {
-                        ConfiguredNodeAnalysisKey::root_string_setting_request(
-                            workspace,
-                            canonical,
-                            base_configuration,
-                            None,
-                        )
-                    } else {
-                        ConfiguredNodeAnalysisKey::new(
-                            workspace,
-                            ConfiguredTargetKey::new(canonical, configuration),
-                        )
-                    };
+                let analysis_key = match prepare_configured_node_analysis(
+                    ctx,
+                    workspace,
+                    canonical,
+                    base_configuration,
+                    explicit_root_string_setting,
+                )
+                .await
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return BuildBranchResult::Outcome(
+                            slug_bzlmod_v2::SourcePreparationOutcome::Need(need),
+                        );
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(key)) => key,
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return BuildBranchResult::Outcome(
+                            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                                BuildCommandError::new(BuildCommandErrorKind::Analysis(error)),
+                            )),
+                        );
+                    }
+                };
                 match ctx.compute(&analysis_key).await {
                     Err(error) => {
                         return BuildBranchResult::Infrastructure(Arc::from(error.to_string()));
@@ -3358,26 +3382,13 @@ impl WorkspaceRuntime {
             let index = match root_indices.get(&canonical) {
                 Some(index) => *index,
                 None => {
-                    let analysis_key = match explicit_root_string_setting.as_ref() {
-                        Some(explicit) => ConfiguredNodeAnalysisKey::root_string_setting_request(
-                            workspace.clone(),
-                            canonical.clone(),
-                            ConfigurationKey::from_slug(base_configuration.clone()),
-                            Some(explicit.clone()),
-                        ),
-                        None => ConfiguredNodeAnalysisKey::new(
-                            workspace.clone(),
-                            ConfiguredTargetKey::new(
-                                canonical.clone(),
-                                ConfigurationKey::from_slug(configuration.clone()),
-                            ),
-                        ),
-                    };
                     let index = roots.len();
                     roots.push(CqueryRootTarget {
                         requested,
                         canonical: canonical.clone(),
-                        analysis_key,
+                        workspace: workspace.clone(),
+                        base_configuration: ConfigurationKey::from_slug(base_configuration.clone()),
+                        explicit_root_string_setting: explicit_root_string_setting.clone(),
                     });
                     root_indices.insert(canonical, index);
                     index
@@ -3857,11 +3868,14 @@ impl WorkspaceRuntime {
                             let configured_target =
                                 ConfiguredTargetKey::new(canonical, configuration.clone());
                             let outcome = transaction
-                                .compute(&ConfiguredNodeAnalysisKey::new(
-                                    NormalizedAbsolutePath::new(self.workspace.clone())
-                                        .map_err(anyhow::Error::msg)?,
-                                    configured_target,
-                                ))
+                                .compute(
+                                    &ConfiguredNodeAnalysisKey::new(
+                                        NormalizedAbsolutePath::new(self.workspace.clone())
+                                            .map_err(anyhow::Error::msg)?,
+                                        configured_target,
+                                    )
+                                    .map_err(|error| anyhow::anyhow!(error.to_string()))?,
+                                )
                                 .await
                                 .context("computing configured-target analysis through DICE")?;
                             let slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) = outcome
@@ -4828,6 +4842,9 @@ mod tests {
     use dice::DynKey;
     use dice::RootActivation;
     use slug_analysis_v2::key::RootStringSettingValue;
+    use slug_configuration_v2::native::host::AutoCpuToken;
+    use slug_configuration_v2::native::host::HostConversionInputs;
+    use slug_configuration_v2::native::host::HostPathFlavor;
     use slug_events_v2::CaptureEvaluationEvents;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -6438,7 +6455,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .is_empty()
         );
         assert!(accepted_output_text(&cold).is_empty());
-        assert_roots("@@//pkg:probe", 13);
+        assert_roots("@@//pkg:probe", 1);
 
         let warm = run(target).unwrap();
         assert!(warm.terminal_for_test().as_ref().is_ok());
@@ -6454,7 +6471,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             .unwrap_err();
         assert_eq!(error.missing_stderr().unwrap().lines().count(), 3);
         assert!(accepted_output_text(&missing_result).is_empty());
-        assert_roots("@@//pkg:missing", 1);
+        assert_roots("@@//pkg:missing", 0);
 
         let recovered = run(target).unwrap();
         assert_eq!(
@@ -8537,8 +8554,25 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         );
     }
 
-    fn build_test_configuration(value: &str) -> ConfigurationKey {
-        ConfigurationKey::target(value).unwrap()
+    fn build_test_configuration(_value: &str) -> ConfigurationKey {
+        ConfigurationKey::from_slug(
+            SlugConfiguration::default_target(
+                &HostConversionInputs::new(
+                    Some(AutoCpuToken::K8),
+                    Some(HostPathFlavor::Unix),
+                    None,
+                    Arc::from([]),
+                    Arc::from([]),
+                )
+                .unwrap(),
+            )
+            .unwrap(),
+        )
+    }
+
+    fn build_test_configuration_with_root_setting(value: &str) -> ConfigurationKey {
+        build_test_configuration("base")
+            .with_root_string_setting(RootStringSettingValue::new(value))
     }
 
     #[derive(Default)]
@@ -8654,7 +8688,7 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
     }
 
     #[tokio::test]
-    async fn root_string_setting_request_keeps_distinct_transitioned_children() {
+    async fn root_string_setting_preparation_keeps_distinct_transitioned_children() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let mut epoch = BuildRootEpoch::base(1);
         epoch.file(
@@ -8677,53 +8711,10 @@ parent = rule(implementation = _parent, attrs = {"left": attr.label(cfg = left),
         );
         epoch.package("", "load(\":defs.bzl\", \"consumer\", \"parent\", \"string_setting\")\nstring_setting(name = \"setting\", build_setting_default = \"default\")\nconsumer(name = \"consumer\")\nparent(name = \"parent\", left = \":consumer\", right = \":consumer\")\n", 1);
         let mut transaction = build_root_transaction(&dice, epoch.build()).await;
-        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-        let base_configuration = ConfigurationKey::target("root-request-base").unwrap();
-        let parent = ConfiguredNodeAnalysisKey::root_string_setting_request(
-            workspace.clone(),
-            CanonicalLabel::parse("@@//:parent").unwrap(),
-            base_configuration.clone(),
-            None,
-        );
-        let consumer = ConfiguredNodeAnalysisKey::root_string_setting_request(
-            workspace,
-            CanonicalLabel::parse("@@//:consumer").unwrap(),
-            base_configuration,
-            Some(RootStringSettingValue::new("command")),
-        );
-        let parent = transaction.compute(&parent).await.unwrap();
-        let consumer = transaction.compute(&consumer).await.unwrap();
-        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(parent) = parent else {
-            panic!("root request retained Needs")
-        };
-        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(consumer) = consumer else {
-            panic!("root request retained Needs")
-        };
-        assert!(
-            parent
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .providers()
-                .names()
-                .any(|name| name.as_str() == "ParentInfo")
-        );
-        assert!(
-            consumer
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .providers()
-                .names()
-                .any(|name| name.as_str() == "ConsumerInfo")
-        );
-        assert!(parent.as_ref().as_ref().unwrap().actions().is_empty());
-
         let build_key = BuildCommandRootKey::new(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
             &[TargetPattern::parse("//:parent").unwrap()],
-            ConfigurationKey::target("first-build")
-                .unwrap()
+            build_test_configuration("first-build")
                 .with_root_string_setting(RootStringSettingValue::new("default")),
         )
         .unwrap();
@@ -8976,7 +8967,7 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
             BuildCommandRootKey::new(
                 workspace.clone(),
                 &[TargetPattern::parse("//pkg:pkg").unwrap()],
-                build_test_configuration("other"),
+                build_test_configuration_with_root_setting("other"),
             )
             .unwrap()
         );
@@ -9234,10 +9225,13 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
         epoch.package("error", "", 6);
         let mut transaction = build_root_transaction(&dice, epoch.build()).await;
         let error = transaction
-            .compute(&ConfiguredNodeAnalysisKey::new(
-                NormalizedAbsolutePath::new("/workspace").unwrap(),
-                error_target.clone(),
-            ))
+            .compute(
+                &ConfiguredNodeAnalysisKey::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    error_target.clone(),
+                )
+                .unwrap(),
+            )
             .await
             .unwrap();
         assert!(matches!(

@@ -73,10 +73,14 @@ pub struct AnalysisError {
 }
 
 impl AnalysisError {
-    fn new(message: impl Into<String>) -> Self {
+    pub fn message(message: impl Into<String>) -> Self {
         Self {
             kind: AnalysisErrorKind::Message(message.into()),
         }
+    }
+
+    fn new(message: impl Into<String>) -> Self {
+        Self::message(message)
     }
 
     fn target_not_found(label: CanonicalLabel, build_file: PathBuf) -> Self {
@@ -125,25 +129,27 @@ impl std::error::Error for AnalysisError {}
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
 pub struct ConfiguredNodeAnalysisKey {
     workspace: NormalizedAbsolutePath,
-    input: ConfiguredNodeAnalysisInput,
-}
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
-enum ConfiguredNodeAnalysisInput {
-    Resolved(ConfiguredTargetKey),
-    RootStringSettingRequest {
-        requested: CanonicalLabel,
-        setting: CanonicalLabel,
-        base_configuration: ConfigurationKey,
-        explicit: Option<RootStringSettingValue>,
-    },
+    configured_target: ConfiguredTargetKey,
 }
 
 impl ConfiguredNodeAnalysisKey {
-    pub fn new(workspace: NormalizedAbsolutePath, configured_target: ConfiguredTargetKey) -> Self {
-        Self {
-            workspace,
-            input: ConfiguredNodeAnalysisInput::Resolved(configured_target),
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        configured_target: ConfiguredTargetKey,
+    ) -> Result<Self, AnalysisError> {
+        if configured_target
+            .configuration()
+            .slug_configuration()
+            .is_none()
+        {
+            return Err(AnalysisError::message(
+                "production configured-node analysis requires a structural Slug configuration",
+            ));
         }
+        Ok(Self {
+            workspace,
+            configured_target,
+        })
     }
 
     pub fn workspace(&self) -> &NormalizedAbsolutePath {
@@ -151,93 +157,206 @@ impl ConfiguredNodeAnalysisKey {
     }
 
     pub fn configured_target(&self) -> &ConfiguredTargetKey {
-        match &self.input {
-            ConfiguredNodeAnalysisInput::Resolved(key) => key,
-            ConfiguredNodeAnalysisInput::RootStringSettingRequest { requested, .. } => {
-                panic!("unresolved root string setting request: {requested}")
+        &self.configured_target
+    }
+}
+
+/// Resolve the root setting and structural configuration before admitting the
+/// sole configured-analysis DICE key.
+pub async fn prepare_configured_node_analysis(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    requested: CanonicalLabel,
+    base_configuration: ConfigurationKey,
+    explicit: Option<RootStringSettingValue>,
+) -> LoadingPreparationOutcome<Result<ConfiguredNodeAnalysisKey, AnalysisError>> {
+    if base_configuration.slug_configuration().is_none() {
+        return LoadingPreparationOutcome::Complete(Err(AnalysisError::message(
+            "production configured-node analysis requires a structural Slug configuration",
+        )));
+    }
+    let explicit_validation = match explicit.as_ref() {
+        Some(explicit) => Some(match CanonicalLabel::parse(explicit.label()) {
+            Ok(setting) => root_string_build_setting_default(ctx, &workspace, &setting).await,
+            Err(error) => LoadingPreparationOutcome::Complete(Err(AnalysisError::message(error))),
+        }),
+        None => None,
+    };
+    let package_outcome = match ctx
+        .compute(&RootPackageLoadKey::new(
+            workspace.dupe(),
+            requested.package().package().clone(),
+        ))
+        .await
+    {
+        Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(package) => LoadingPreparationOutcome::Complete(Ok(package.clone())),
+            Err(error) => {
+                LoadingPreparationOutcome::Complete(Err(AnalysisError::message(error.to_string())))
+            }
+        },
+        Err(error) => LoadingPreparationOutcome::Complete(Err(AnalysisError::message(format!(
+            "loading root setting target package through DICE: {error}"
+        )))),
+    };
+    let mut all_need: Option<LoadingPreparationNeeds> = None;
+    let mut first_error = None;
+    if let Some(validation) = explicit_validation {
+        match validation {
+            LoadingPreparationOutcome::Need(need) => all_need = Some(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => first_error = Some(error),
+            LoadingPreparationOutcome::Complete(Ok(_)) => {}
+        }
+    }
+    let mut package = None;
+    match package_outcome {
+        LoadingPreparationOutcome::Need(need) => {
+            all_need = Some(match all_need {
+                Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                    panic!(
+                        "configured-node preparation Needs must be structurally compatible: \
+                         {error:?}"
+                    )
+                }),
+                None => need,
+            });
+        }
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            if first_error.is_none() {
+                first_error = Some(error);
             }
         }
+        LoadingPreparationOutcome::Complete(Ok(value)) => package = Some(value),
     }
-
-    pub fn resolved_configured_target(&self) -> Option<&ConfiguredTargetKey> {
-        match &self.input {
-            ConfiguredNodeAnalysisInput::Resolved(key) => Some(key),
-            ConfiguredNodeAnalysisInput::RootStringSettingRequest { .. } => None,
-        }
+    if let Some(need) = all_need {
+        return LoadingPreparationOutcome::Need(need);
     }
-
-    pub fn root_string_setting_request_parts(
-        &self,
-    ) -> Option<(
-        &CanonicalLabel,
-        &ConfigurationKey,
-        Option<&RootStringSettingValue>,
-    )> {
-        match &self.input {
-            ConfiguredNodeAnalysisInput::Resolved(_) => None,
-            ConfiguredNodeAnalysisInput::RootStringSettingRequest {
-                requested,
-                base_configuration,
-                explicit,
-                ..
-            } => Some((requested, base_configuration, explicit.as_ref())),
-        }
+    if let Some(error) = first_error {
+        return LoadingPreparationOutcome::Complete(Err(error));
     }
-
-    pub fn root_string_setting_request(
-        workspace: NormalizedAbsolutePath,
-        requested: CanonicalLabel,
-        base_configuration: ConfigurationKey,
-        explicit: Option<RootStringSettingValue>,
-    ) -> Self {
-        Self::root_string_setting_request_for_label(
-            workspace,
+    let package = package.expect("complete target package preparation stores its value");
+    let Some(target) = package
+        .targets
+        .iter()
+        .find(|target| target.name == requested.target().as_str())
+    else {
+        return LoadingPreparationOutcome::Complete(Err(AnalysisError::target_not_found(
             requested,
-            CanonicalLabel::parse("@@//:setting").expect("fixed setting label is valid"),
-            base_configuration,
-            explicit,
-        )
-    }
-
-    fn root_string_setting_request_for_label(
-        workspace: NormalizedAbsolutePath,
-        requested: CanonicalLabel,
-        setting: CanonicalLabel,
-        base_configuration: ConfigurationKey,
-        explicit: Option<RootStringSettingValue>,
-    ) -> Self {
-        Self {
+            package.build_file.clone(),
+        )));
+    };
+    let PackageTargetKind::StarlarkRule(rule) = &target.kind else {
+        return LoadingPreparationOutcome::Complete(ConfiguredNodeAnalysisKey::new(
             workspace,
-            input: ConfiguredNodeAnalysisInput::RootStringSettingRequest {
-                requested,
-                setting,
-                base_configuration,
-                explicit,
-            },
-        }
+            ConfiguredTargetKey::new(requested, base_configuration),
+        ));
+    };
+    let required = match required_root_string_setting(rule, &requested) {
+        Ok(required) => required,
+        Err(error) => return LoadingPreparationOutcome::Complete(Err(error)),
+    };
+    if explicit.is_none()
+        && let Err(error) =
+            validate_carried_root_string_setting(&base_configuration, required.as_ref())
+    {
+        return LoadingPreparationOutcome::Complete(Err(error));
     }
+    let configuration = match (required, explicit) {
+        (Some(setting), Some(explicit)) if explicit.label() != setting.to_string() => {
+            return LoadingPreparationOutcome::Complete(Err(AnalysisError::message(format!(
+                "root string setting request for {setting} carried {}",
+                explicit.label()
+            ))));
+        }
+        (Some(_), Some(explicit)) => base_configuration.with_root_string_setting(explicit),
+        (None, Some(explicit)) => base_configuration.with_root_string_setting(explicit),
+        (None, None) => base_configuration,
+        (Some(setting), None)
+            if base_configuration
+                .root_string_setting()
+                .is_some_and(|carried| carried.label() == setting.to_string()) =>
+        {
+            match root_string_build_setting_default(ctx, &workspace, &setting).await {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(_)) => base_configuration,
+            }
+        }
+        (Some(setting), None) => {
+            let default = match root_string_build_setting_default(ctx, &workspace, &setting).await {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(default)) => default,
+            };
+            base_configuration.with_root_string_setting(RootStringSettingValue::new_for_label(
+                setting.to_string(),
+                default,
+            ))
+        }
+    };
+    LoadingPreparationOutcome::Complete(ConfiguredNodeAnalysisKey::new(
+        workspace,
+        ConfiguredTargetKey::new(requested, configuration),
+    ))
+}
+
+async fn root_string_build_setting_default(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    setting: &CanonicalLabel,
+) -> LoadingPreparationOutcome<Result<CompactString, AnalysisError>> {
+    let package = match ctx
+        .compute(&RootPackageLoadKey::new(
+            workspace.dupe(),
+            setting.package().package().clone(),
+        ))
+        .await
+    {
+        Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
+        Ok(LoadingPreparationOutcome::Complete(value)) => match value.as_ref() {
+            Ok(package) => package.clone(),
+            Err(error) => {
+                return LoadingPreparationOutcome::Complete(Err(AnalysisError::message(
+                    error.to_string(),
+                )));
+            }
+        },
+        Err(error) => {
+            return LoadingPreparationOutcome::Complete(Err(AnalysisError::message(format!(
+                "loading root string setting through DICE: {error}"
+            ))));
+        }
+    };
+    let Some(default) = package
+        .targets
+        .iter()
+        .find(|target| target.name == setting.target().as_str())
+        .and_then(|target| match &target.kind {
+            PackageTargetKind::StarlarkRule(rule) if rule.is_root_string_build_setting() => {
+                rule.root_string_build_setting_default()
+            }
+            _ => None,
+        })
+    else {
+        return LoadingPreparationOutcome::Complete(Err(AnalysisError::message(format!(
+            "root string build setting {setting} is missing"
+        ))));
+    };
+    LoadingPreparationOutcome::Complete(Ok(default.into()))
 }
 
 impl fmt::Display for ConfiguredNodeAnalysisKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "configured-node-analysis:{}",
-            match &self.input {
-                ConfiguredNodeAnalysisInput::Resolved(key) => key.to_string(),
-                ConfiguredNodeAnalysisInput::RootStringSettingRequest {
-                    requested,
-                    setting,
-                    base_configuration,
-                    explicit,
-                } => format!(
-                    "request:{requested}[{base_configuration}]/{setting}={}",
-                    explicit
-                        .as_ref()
-                        .map_or("<default>", RootStringSettingValue::as_str)
-                ),
-            }
-        )
+        write!(f, "configured-node-analysis:{}", self.configured_target)
     }
 }
 
@@ -984,10 +1103,13 @@ async fn resolve_root_toolchain(
         ))));
     };
     let selected_result = match ctx
-        .compute(&ConfiguredNodeAnalysisKey::new(
-            workspace.dupe(),
-            ConfiguredTargetKey::new(implementation.clone(), configuration),
-        ))
+        .compute(
+            &ConfiguredNodeAnalysisKey::new(
+                workspace.dupe(),
+                ConfiguredTargetKey::new(implementation.clone(), configuration),
+            )
+            .expect("toolchain analysis inherits a structural configuration"),
+        )
         .await
     {
         Ok(LoadingPreparationOutcome::Need(need)) => return LoadingPreparationOutcome::Need(need),
@@ -1080,80 +1202,7 @@ impl ConfiguredNodeAnalysisKey {
         capture_events: bool,
         event_batch: &mut Option<EventBatch>,
     ) -> RootAnalysisKeyValue {
-        if let ConfiguredNodeAnalysisInput::RootStringSettingRequest {
-            requested,
-            setting,
-            base_configuration,
-            explicit,
-        } = &self.input
-        {
-            if let Some(explicit) = explicit
-                && explicit.label() != setting.to_string()
-            {
-                return root_analysis_complete(Err(AnalysisError::new(format!(
-                    "root string setting request for {setting} carried {}",
-                    explicit.label()
-                ))));
-            }
-            let package = match ctx
-                .compute(&RootPackageLoadKey::new(
-                    self.workspace.dupe(),
-                    setting.package().package().clone(),
-                ))
-                .await
-            {
-                Ok(LoadingPreparationOutcome::Need(need)) => {
-                    return LoadingPreparationOutcome::Need(need);
-                }
-                Ok(LoadingPreparationOutcome::Complete(value)) => value,
-                Err(error) => {
-                    return root_analysis_complete(Err(AnalysisError::new(format!(
-                        "loading setting package through DICE: {error}"
-                    ))));
-                }
-            };
-            let default = match package.as_ref() {
-                Ok(package) => package
-                    .targets
-                    .iter()
-                    .find(|target| target.name == setting.target().as_str())
-                    .and_then(|target| match &target.kind {
-                        PackageTargetKind::StarlarkRule(rule)
-                            if rule.is_root_string_build_setting() =>
-                        {
-                            rule.root_string_build_setting_default()
-                        }
-                        _ => None,
-                    }),
-                Err(error) => {
-                    return root_analysis_complete(Err(AnalysisError::new(error.to_string())));
-                }
-            };
-            let Some(default) = default else {
-                return root_analysis_complete(Err(AnalysisError::new(format!(
-                    "root string build setting {setting} is missing"
-                ))));
-            };
-            let value = explicit.clone().unwrap_or_else(|| {
-                RootStringSettingValue::new_for_label(setting.to_string(), default)
-            });
-            let configuration = base_configuration.with_root_string_setting(value);
-            return ctx
-                .compute(&Self::new(
-                    self.workspace.dupe(),
-                    ConfiguredTargetKey::new(requested.clone(), configuration),
-                ))
-                .await
-                .unwrap_or_else(|error| {
-                    root_analysis_complete(Err(AnalysisError::new(format!(
-                        "resolving root string setting through DICE: {error}"
-                    ))))
-                });
-        }
-        let configured_target = match &self.input {
-            ConfiguredNodeAnalysisInput::Resolved(key) => key,
-            ConfiguredNodeAnalysisInput::RootStringSettingRequest { .. } => unreachable!(),
-        };
+        let configured_target = &self.configured_target;
         if !configured_target.label().package().repo().is_root() {
             return root_analysis_complete(Err(AnalysisError::new(format!(
                 "external repository configured targets are not supported: {}",
@@ -1206,20 +1255,9 @@ impl ConfiguredNodeAnalysisKey {
             .is_none()
             && let Some(setting) = &required_root_string_setting
         {
-            return ctx
-                .compute(&Self::root_string_setting_request_for_label(
-                    self.workspace.dupe(),
-                    configured_target.label().clone(),
-                    setting.clone(),
-                    configured_target.configuration().clone(),
-                    None,
-                ))
-                .await
-                .unwrap_or_else(|error| {
-                    root_analysis_complete(Err(AnalysisError::new(format!(
-                        "resolving inherited root string setting through DICE: {error}"
-                    ))))
-                });
+            return root_analysis_complete(Err(AnalysisError::new(format!(
+                "configured node was constructed before resolving root string setting {setting}"
+            ))));
         }
         let (requirement, marker) = {
             let package = match package_value.as_ref() {
@@ -1295,20 +1333,63 @@ impl ConfiguredNodeAnalysisKey {
             unique.insert(dependency.key.clone());
         }
         let workspace = &self.workspace;
-        let outcomes = ctx
+        let preparations = ctx
             .compute_join(unique.into_iter(), |ctx, configured_target| {
                 Box::pin(async move {
-                    let result = ctx
-                        .compute(&ConfiguredNodeAnalysisKey::new(
-                            workspace.dupe(),
-                            configured_target.clone(),
-                        ))
-                        .await;
-                    (configured_target, result)
+                    let prepared = prepare_configured_node_analysis(
+                        ctx,
+                        workspace.dupe(),
+                        configured_target.label().clone(),
+                        configured_target.configuration().clone(),
+                        None,
+                    )
+                    .await;
+                    (configured_target, prepared)
                 })
             })
             .await;
 
+        let mut all_need: Option<LoadingPreparationNeeds> = None;
+        let mut first_error = None;
+        let mut prepared = Vec::with_capacity(preparations.len());
+        for (configured_target, outcome) in preparations {
+            match outcome {
+                LoadingPreparationOutcome::Need(need) => {
+                    all_need = Some(match all_need {
+                        Some(current) => current.try_union(&need).unwrap_or_else(|error| {
+                            panic!(
+                                "root analysis dependency preparation Needs must be structurally compatible: \
+                                 {error:?}"
+                            )
+                        }),
+                        None => need,
+                    });
+                }
+                LoadingPreparationOutcome::Complete(value) => match value {
+                    Ok(key) => prepared.push((configured_target, key)),
+                    Err(error) => {
+                        if first_error.is_none() {
+                            first_error = Some(error);
+                        }
+                    }
+                },
+            }
+        }
+        if let Some(need) = all_need {
+            return LoadingPreparationOutcome::Need(need);
+        }
+        if let Some(error) = first_error {
+            return root_analysis_complete(Err(error));
+        }
+
+        let outcomes = ctx
+            .compute_join(prepared, |ctx, (configured_target, key)| {
+                Box::pin(async move {
+                    let result = ctx.compute(&key).await;
+                    (configured_target, result)
+                })
+            })
+            .await;
         let mut all_need: Option<LoadingPreparationNeeds> = None;
         let mut first_error = None;
         let mut computed = SmallMap::with_capacity(outcomes.len());

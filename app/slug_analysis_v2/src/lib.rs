@@ -21,6 +21,7 @@ pub use configured_target::TransitionKind;
 pub use dice::AnalysisError;
 pub use dice::AnalysisErrorKind;
 pub use dice::ConfiguredNodeAnalysisKey;
+pub use dice::prepare_configured_node_analysis;
 pub use key::ConfigurationChecksum;
 pub use key::ConfigurationKey;
 pub use key::ConfigurationKind;

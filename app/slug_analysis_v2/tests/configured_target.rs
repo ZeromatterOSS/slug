@@ -79,20 +79,15 @@ fn configured_target_key_serializes_label_mapping_and_configuration() {
 }
 
 #[test]
-fn configured_analysis_key_has_one_workspace_and_target_identity() {
+fn configured_analysis_key_rejects_legacy_configuration_identity() {
     let target = ConfiguredTargetKey::new(canonical("@@//pkg:target"), target_config());
-    let first = ConfiguredNodeAnalysisKey::new(
-        NormalizedAbsolutePath::new("/workspace").unwrap(),
-        target.clone(),
+    let error =
+        ConfiguredNodeAnalysisKey::new(NormalizedAbsolutePath::new("/workspace").unwrap(), target)
+            .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "production configured-node analysis requires a structural Slug configuration"
     );
-    let same = ConfiguredNodeAnalysisKey::new(
-        NormalizedAbsolutePath::new("/workspace").unwrap(),
-        target.clone(),
-    );
-    let other_workspace =
-        ConfiguredNodeAnalysisKey::new(NormalizedAbsolutePath::new("/other").unwrap(), target);
-    assert_eq!(first, same);
-    assert_ne!(first, other_workspace);
 }
 
 #[test]

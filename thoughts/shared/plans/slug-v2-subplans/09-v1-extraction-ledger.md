@@ -760,6 +760,13 @@ review accepted the migration; the two known unrelated full-suite failures are
 unchanged. Root-setting request mode remains the named M2b residual before
 structural/null configured-node identity.
 
+2026-08-09 M2b follow-up: root-setting requests were removed from the DICE key.
+One analysis-owned preparation path now resolves command roots and recursive
+children to structural configurations, using the existing loading keys and
+compact configured-target/result storage. No V1/Buck2 code or representation
+was newly imported; structural/null node and classified-edge/result substrate
+remain the next Stage 6 packet.
+
 ### Stage 6 first-rule analysis handoff
 
 Status: Pending reviewer decision; current worktree only

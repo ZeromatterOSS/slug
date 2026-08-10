@@ -1,39 +1,39 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m2b-command-root-setting-preparation`
+Packet: `WP-6-m2c-configured-node-result-substrate`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
 Cross-owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: second functional packet from the accepted configured-node ownership
-design after single-owner consolidation.
+Result: third functional packet from the accepted configured-node ownership
+design after single-owner consolidation and resolved-setting preparation.
 
 ## Observable slice
 
-Resolve default and explicit root string settings in the existing Build/Cquery
-command-root DICE preparation before constructing `ConfiguredNodeAnalysisKey`.
-Remove the temporary unresolved request mode and admit only structural
-Slug-native configurations at the production key boundary.
+Introduce the reviewed `ConfiguredNodeKey` identity with structural
+configuration or `Null`, classified immutable configured edges, and the single
+retained configured-node result shape. Prove structural equality, null identity,
+transition-output convergence, edge order, and exact implicit/tool bits without
+activating new cquery traversal.
 
 ## Ownership and stops
 
 Keep `ConfiguredNodeAnalysisKey` as the sole configured-analysis DICE owner.
-Move its root-setting/default package preflight into shared analysis preparation
-called from both existing command roots, unioning Needs before semantic errors.
-The key must contain only a resolved target and a `SlugConfiguration`-backed
-configuration; remove the request input enum and reject legacy/opaque
-configuration before key construction. Do not add another DICE graph, node
-kinds, cquery traversal, graph output, exact Bazel hash bytes, filesystem
-bypass, JVM/Java, CI, or compatibility behavior. BUILD, `.bzl`, and MODULE
-evaluation continues through vendored `starlark-rust`.
+Generalize the existing `AnalysisResult` ownership into one configured-node
+result rather than adding a peer cache or graph. A node key is canonical label
+plus structural `ConfigurationKey` or `Null`; transition origin belongs only on
+the incoming edge. Each edge owns semantic kind, target, order, and exact
+`implicit`/`tool` bits from the accepted design. Reuse `Arc<[T]>`,
+`CompactString`, `SmallMap`/`SmallSet`, `Dupe`, and `Allocative`. Do not yet add
+native/delegating/platform nodes, cquery traversal/output, a new DICE key/cache,
+exact Bazel hash bytes, filesystem bypass, JVM/Java, CI, or compatibility
+behavior. Vendored `starlark-rust` remains unchanged.
 
 ## Validation
 
-Allow at most eight production and eight test files, 700 formatted net
-production lines, 900 formatted net test lines, and 1,600 total. Prove
-default/explicit/missing/edit/restoration and convergent transition behavior,
-Need-before-error, structural-key rejection of opaque configurations, one
-configured-node activation per resolved identity, and unchanged one-shot/
-daemon output. Run focused configuration, analysis, core, server, and CLI tests
-serially; rebuild `slug_cli_v2` before CLI tests and clean `slugd` around daemon
-tests. Stop if either command root needs a second key/cache or if upstream
-preparation cannot return the final structural configuration.
+Allow at most six production and six test files, 600 formatted net production
+lines, 700 formatted net test lines, and 1,300 total. Prove configured/null
+identity discrimination, target/exec/host-like structural discrimination,
+equal transition-output convergence, ordered edge equality, and every currently
+admitted edge bit. Run focused analysis and downstream compile/tests serially.
+Stop if the substrate requires a second retained result, DICE key/cache, query
+graph, guessed platform/tool edge, or changes to current observable output.
