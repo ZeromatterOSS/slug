@@ -1371,24 +1371,17 @@ impl NativeCommandRoot for CqueryCommandRoot {
                     ))),
                 ));
             }
-            let Some(root) = self.roots.first() else {
-                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(CqueryCommandError::request(
-                        "cquery deps() requires one root target",
-                    ))),
-                ));
-            };
-            if analyses.len() != 1 {
-                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
-                    Arc::new(Err(CqueryCommandError::request(
-                        "cquery deps() requires one concrete root target",
-                    ))),
-                ));
-            }
+            let root_index = self
+                .literal_roots
+                .iter()
+                .find(|(literal, _)| literal.as_ref() == deps.target())
+                .map(|(_, index)| *index)
+                .expect("validated cquery deps root literal");
+            let root = &self.roots[root_index];
             match compute_cquery_deps_closure(
                 transaction,
                 &root.workspace,
-                analyses.pop().expect("one cquery deps root analysis"),
+                analyses[root_index].dupe(),
                 deps.depth(),
                 self.include_tool,
             )
@@ -1406,6 +1399,62 @@ impl NativeCommandRoot for CqueryCommandRoot {
                     analyses = nodes;
                     node_indices = indices;
                 }
+            }
+        }
+        if let Some(raw_seed) = self.expression.cquery_rdeps_seed() {
+            let TargetPattern::Single(seed) =
+                TargetPattern::parse(raw_seed).expect("validated cquery rdeps seed is one target")
+            else {
+                unreachable!("validated cquery rdeps seed is concrete")
+            };
+            if !seed.repo().is_root() {
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                    Arc::new(Err(CqueryCommandError::request(
+                        "cquery rdeps() seed must be in the root repository",
+                    ))),
+                ));
+            }
+            let workspace = self
+                .roots
+                .first()
+                .expect("rdeps universe has one root")
+                .workspace
+                .dupe();
+            let package = match transaction
+                .compute(&RootPackageLoadKey::new(workspace, seed.package().clone()))
+                .await
+                .map_err(|error| {
+                    NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}"))
+                })? {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                    return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need));
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                    Ok(package) => package.clone(),
+                    Err(error) => {
+                        return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                            Arc::new(Err(CqueryCommandError::Analysis(AnalysisError::message(
+                                error.to_string(),
+                            )))),
+                        ));
+                    }
+                },
+            };
+            if !package
+                .targets
+                .iter()
+                .any(|target| target.name == seed.target().as_str())
+            {
+                let label =
+                    CanonicalLabel::parse(&format!("@@//{}:{}", seed.package(), seed.target()))
+                        .expect("validated root seed has a canonical projection");
+                return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                    Arc::new(Err(CqueryCommandError::MissingTarget {
+                        requested: Arc::from(raw_seed),
+                        label,
+                        build_file: package.build_file.clone(),
+                    })),
+                ));
             }
         }
         let mut environment =
@@ -2115,6 +2164,53 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
             }
             frontier = next;
             level += 1;
+        }
+        Ok(result)
+    }
+
+    async fn rdeps(&mut self, universe: &Self::Set, from: &str) -> Result<Self::Set, QueryError> {
+        let TargetPattern::Single(from) =
+            TargetPattern::parse(from).map_err(QueryError::evaluation)?
+        else {
+            return Err(QueryError::evaluation(
+                "cquery rdeps() seed must be one target",
+            ));
+        };
+        if !from.repo().is_root() {
+            return Err(QueryError::evaluation(
+                "cquery rdeps() seed must be in the root repository",
+            ));
+        }
+        let from = CanonicalLabel::parse(&format!("@@//{}:{}", from.package(), from.target()))
+            .map_err(QueryError::evaluation)?;
+        let mut result = TargetSet::default();
+        let mut frontier = SmallSet::new();
+        for target in universe.iter() {
+            if target.key.label() == &from {
+                result.insert(target.clone());
+                frontier.insert(target.key.clone());
+            }
+        }
+        while !frontier.is_empty() {
+            let mut next = SmallSet::new();
+            for parent in universe.iter() {
+                if result.contains(parent) {
+                    continue;
+                }
+                for edge in parent.analysis.edges() {
+                    if edge.tool() {
+                        return Err(QueryError::evaluation(
+                            "cquery rdeps() tool dependency traversal is unsupported",
+                        ));
+                    }
+                    if !edge.implicit() && frontier.contains(edge.target()) {
+                        result.insert(parent.clone());
+                        next.insert(parent.key.clone());
+                        break;
+                    }
+                }
+            }
+            frontier = next;
         }
         Ok(result)
     }
@@ -7316,6 +7412,112 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         };
         assert_topology(depth_zero, &["  \"//:root (base)\""], &[]);
 
+        let reverse = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
+        let reverse = reverse.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            reverse.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n@@//:root\n@@//:alias_inner\n@@//:alias_outer\n"
+        );
+        assert_eq!(reverse.analyses().count(), 5);
+        assert_eq!(reverse.label_stdout().lines().count(), 5);
+        assert_eq!(reverse.label_kind_stdout().unwrap().lines().count(), 5);
+        assert_topology(
+            reverse,
+            &[
+                "  \"//:alias_inner (base)\"",
+                "  \"//:alias_outer (base)\"",
+                "  \"//:ordinary (base)\"",
+                "  \"//:ordinary (transition)\"",
+                "  \"//:root (base)\"",
+            ],
+            &[
+                "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
+                "  \"//:root (base)\" -> \"//:alias_outer (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
+            ],
+        );
+        let broken = run("//:broken", false, true).unwrap();
+        assert!(
+            broken
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("seed must not be analyzed")
+        );
+        let unreachable = run("rdeps(deps(//:root), //:broken)", false, true).unwrap();
+        let unreachable = unreachable.terminal_for_test().as_ref().as_ref().unwrap();
+        assert!(unreachable.label_stdout().is_empty());
+        assert_eq!(unreachable.analyses().count(), 0);
+        let missing = run("rdeps(deps(//:root), //:missing)", false, true).unwrap();
+        assert!(matches!(
+            missing.terminal_for_test().as_ref().as_ref().unwrap_err(),
+            CqueryCommandError::MissingTarget { requested, .. } if requested.as_ref() == "//:missing"
+        ));
+        let bad_universe = run(
+            "rdeps(deps(//:universe_missing), //pending:seed)",
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(matches!(
+            bad_universe.terminal_for_test().as_ref().as_ref().unwrap_err(),
+            CqueryCommandError::MissingTarget { requested, .. }
+                if requested.as_ref() == "//:universe_missing"
+        ));
+        let default_seed = run("//:transition_only", false, true).unwrap();
+        assert!(
+            default_seed
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("default seed must not be analyzed")
+        );
+        let transitioned = run(
+            "rdeps(deps(//:transition_root), //:transition_only)",
+            false,
+            true,
+        )
+        .unwrap();
+        let transitioned = transitioned.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            transitioned.starlark_label_stdout(),
+            "@@//:transition_only\n@@//:transition_root\n"
+        );
+        let expected_reverse_graph = reverse.graph_stdout();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            CQUERY_DELEGATING_BUILD
+                .replace("aliased = \":alias_outer\"", "aliased = \":ordinary\""),
+        )
+        .unwrap();
+        let bypass = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
+        let bypass = bypass.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            bypass.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n@@//:root\n"
+        );
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            CQUERY_DELEGATING_BUILD,
+        )
+        .unwrap();
+        let restored = run("rdeps(deps(//:root), //:ordinary)", false, true).unwrap();
+        assert_eq!(
+            restored
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .graph_stdout(),
+            expected_reverse_graph
+        );
+
         let depth_one = run("deps(//:root, 1)", false, true).unwrap();
         let depth_one = depth_one.terminal_for_test().as_ref().as_ref().unwrap();
         assert_topology(
@@ -7734,6 +7936,34 @@ executable_rule(
             restored,
             slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn cquery_rdeps_universe_need_precedes_seed_validation() {
+        let expression = QueryExpression::parse("rdeps(deps(//:root), //:missing)").unwrap();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root = CqueryCommandRoot {
+            expression,
+            roots: Arc::from([CqueryRootTarget {
+                requested: Arc::from("//:root"),
+                canonical: CanonicalLabel::parse("@@//:root").unwrap(),
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                base_configuration: build_test_configuration("target"),
+                explicit_root_string_setting: None,
+            }]),
+            literal_roots: Arc::from([(Arc::from("//:root"), 0)]),
+            include_implicit: false,
+            include_tool: true,
+        };
+        let mut missing_source_epoch = BuildRootEpoch::base(2);
+        missing_source_epoch.file("/workspace/defs.bzl", DELEGATING_DEFS, 2);
+        missing_source_epoch.package("", DELEGATING_BUILD, 2);
+        let mut transaction = build_root_transaction(&dice, missing_source_epoch.build()).await;
+        let outcome = root.compute(&mut transaction).await.unwrap();
+        assert!(
+            matches!(outcome, slug_bzlmod_v2::SourcePreparationOutcome::Need(_)),
+            "{outcome:?}"
+        );
     }
 
     #[test]
@@ -10209,6 +10439,12 @@ ordinary_rule = rule(implementation = _ordinary, attrs = {
     "src": attr.label(allow_single_file = True),
     "generated": attr.label(allow_single_file = True),
 })
+def _broken(ctx): fail("seed must not be analyzed")
+broken_rule = rule(implementation = _broken)
+def _transition_only(ctx):
+    if ctx.attr._setting[SettingInfo].value != "transitioned": fail("default seed must not be analyzed")
+    return [DefaultInfo()]
+transition_only_rule = rule(implementation = _transition_only, attrs = {"_setting": attr.label(default = "//:setting")})
 def _producer(ctx):
     out = ctx.actions.declare_file("producer.out")
     ctx.actions.write(out, "producer\n")
@@ -10216,9 +10452,12 @@ def _producer(ctx):
 producer = rule(implementation = _producer, attrs = {"out": attr.output()})
 "#;
 
-    const CQUERY_DELEGATING_BUILD: &str = r#"load(":defs.bzl", "ordinary_rule", "producer", "string_setting")
+    const CQUERY_DELEGATING_BUILD: &str = r#"load(":defs.bzl", "broken_rule", "ordinary_rule", "producer", "string_setting", "transition_only_rule")
 string_setting(name = "setting", build_setting_default = "default")
 ordinary_rule(name = "ordinary")
+broken_rule(name = "broken")
+transition_only_rule(name = "transition_only")
+ordinary_rule(name = "transition_root", transitioned = ":transition_only")
 producer(name = "producer", out = "producer.out")
 alias(name = "alias_inner", actual = ":ordinary")
 alias(name = "alias_outer", actual = ":alias_inner")

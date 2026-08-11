@@ -975,6 +975,18 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             "depth {depth}: {graph_depth:?}"
         );
     }
+    for output in ["label", "label_kind", "starlark_label", "graph"] {
+        let request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"rdeps(deps(//pkg:probe), //pkg:probe)","include_implicit":false,"output":"{output}"}}}}"#,
+        );
+        let reverse = handle_request(&mut daemon, &request);
+        assert_eq!(reverse.exit_code, 0, "{output}: {reverse:?}");
+        assert!(reverse.stderr.is_empty(), "{output}: {reverse:?}");
+        assert!(
+            reverse.stdout.contains("//pkg:probe"),
+            "{output}: {reverse:?}"
+        );
+    }
     for expression in [
         "executables(deps(//pkg:probe))",
         "filter('probe$', executables(deps(//pkg:probe)))",

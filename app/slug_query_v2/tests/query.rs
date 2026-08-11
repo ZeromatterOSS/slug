@@ -59,6 +59,7 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin)",
         "deps(//pkg:bin, 0)",
         "deps(//pkg:bin, 2147483647)",
+        "rdeps(deps(//pkg:root), //pkg:bin)",
         "executables(deps(//pkg:bin))",
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
@@ -96,6 +97,12 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin union //pkg:lib)",
         "deps(//pkg:bin, '-1')",
         "deps(//pkg:bin, 2147483648)",
+        "rdeps(deps(//pkg:root, 1), //pkg:bin)",
+        "rdeps(deps(//pkg:root), //pkg:bin, 1)",
+        "rdeps(//pkg:root, //pkg:bin)",
+        "rdeps(deps(//pkg:root), set(//pkg:bin))",
+        "filter('bin', rdeps(deps(//pkg:root), //pkg:bin))",
+        "rdeps(deps(//pkg:root), //pkg:bin) union //pkg:other",
         "filter('bin', deps(set(//pkg:bin)))",
         "filter('bin', deps(//pkg:bin), //pkg:lib)",
         "filter('bin', kind('rule', deps(set(//pkg:bin))))",
@@ -143,6 +150,7 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
                 || error.contains("arguments to function 'filter'")
                 || error.contains("arguments to function 'deps'")
                 || error.contains("cquery deps()")
+                || error.contains("cquery rdeps()")
                 || error.contains("top-level cquery expression")
                 || error.contains("arguments to function 'some'")
                 || error.contains("arguments to function 'siblings'")
@@ -180,6 +188,13 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(spec.target(), "//pkg:bin");
     assert_eq!(spec.depth(), Some(2));
     assert_eq!(cquery_literals(&expression), ["//pkg:bin"]);
+
+    let rdeps = QueryExpression::parse("rdeps(deps(//pkg:root), //pkg:bin)").unwrap();
+    validate_cquery_query(&rdeps).unwrap();
+    let universe = rdeps.cquery_preactivation_deps_spec().unwrap();
+    assert_eq!((universe.target(), universe.depth()), ("//pkg:root", None));
+    assert_eq!(cquery_literals(&rdeps), ["//pkg:root"]);
+    assert_eq!(rdeps.cquery_rdeps_seed(), Some("//pkg:bin"));
 
     let wrapped = QueryExpression::parse("executables(deps(//pkg:bin, 2))").unwrap();
     validate_cquery_query(&wrapped).unwrap();

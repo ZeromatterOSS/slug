@@ -543,6 +543,12 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
             "--noimplicit_deps",
             "filter('bin$', kind('rule$', deps(//pkg:bin, 2147483647)))",
         ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "rdeps(deps(//pkg:bin), //pkg:child)",
+        ],
     ] {
         assert!(CqueryRequest::parse(&args).is_ok(), "{args:?}");
     }
@@ -723,6 +729,7 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
 #[test]
 fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     assert!(CqueryRequest::parse(&["deps(//pkg:bin)"]).is_err());
+    assert!(CqueryRequest::parse(&["rdeps(deps(//pkg:bin), //pkg:child)"]).is_err());
     for expression in [
         "executables(deps(//pkg:bin))",
         "filter('bin$', executables(deps(//pkg:bin)))",
@@ -737,6 +744,10 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     let noimplicit = CqueryRequest::parse(&["--noimplicit_deps", "deps(//pkg:bin)"]).unwrap();
     assert!(!noimplicit.include_implicit);
     assert!(noimplicit.include_tool);
+    assert!(
+        CqueryRequest::parse(&["--noimplicit_deps", "rdeps(deps(//pkg:bin), //pkg:child)",])
+            .is_ok()
+    );
 
     let filtered = CqueryRequest::parse(&[
         "--implicit_deps=false",

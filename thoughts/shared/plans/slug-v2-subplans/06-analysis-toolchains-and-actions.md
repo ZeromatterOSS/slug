@@ -6837,11 +6837,12 @@ closure, target-kind, label, full-key, and induced-edge owners. Pinned source
 and accepted kind/filter/delegation evidence are sufficient; regex remains the
 approved Slug-native boundary.
 
-The audit considered `rdeps(deps(...), label)` but design review rejected
-implementation from forward edges alone. Bazel's delegation unwinding omits an
-alias node that a naïve reverse scan would include; exact reverse traversal
-needs a separate retained delegation/value-key normalization design. `some`
-also remains stopped on callback cancellation.
+The audit considered `rdeps(deps(...), label)` but design review initially
+rejected implementation from forward edges alone. M31 later corrected that
+reading: the accepted oracle explicitly retains both alias nodes, while
+Bazel's separate delegation unwinding contracts raw Skyframe requester keys
+before producing the same semantic configured-node edges Slug already retains.
+`some` remains stopped on callback cancellation.
 
 Run next `WP-6-m30-cquery-filter-kind-deps-forward-composition`, changing only
 fixed-shape admission/preactivation. Keep all other chains, reverse traversal,
@@ -6868,3 +6869,72 @@ The forward-filter lane is now closed. Run next only
 Bazel delegation/value-key semantics required before exact `rdeps` can reverse
 the accepted configured graph. Do not infer them from alias edges or implement
 reverse traversal in the design packet.
+
+### Configured reverse-delegation normalization design ACCEPT (2026-08-09)
+
+`WP-6-m31-cquery-reverse-delegation-normalization-design` is **ACCEPTED** after
+correcting its premise. The accepted Bazel payload includes `alias_outer` and
+`alias_inner`; bypass removes them only because they leave `deps(//:root)`, and
+restore returns the complete chain. Ordinary aliases are not the delegation
+that `PostAnalysisQueryEnvironment#skipDelegatingAncestors` unwinds.
+
+Pinned Bazel 9.2 source shows that forward query traversal targetifies each raw
+Skyframe dependency to the configured value's lookup key. Reverse traversal
+first contracts requester keys whose values are owned by the current child,
+then targetifies to that same semantic-key domain. Slug already performs this
+normalization at analysis time: every authoritative edge names the computed
+child result key, aliases retain their own keys, transitioned edges retain the
+final structural child key plus transition origin, and source/package-group
+nodes retain final null identity. No admitted noimplicit edge retains a raw
+requester key.
+
+Therefore no delegation relation, retained reverse adjacency, graph, cache,
+DICE key, interner, or representation change is needed. Exact reverse BFS may
+rescan the existing request-local closure's normalized forward edges and
+deduplicate with full `ConfiguredNodeKey` identity. This keeps existing
+`Arc`/`SmallMap`/`SmallSet`/`Allocative` ownership unchanged and adds no lock or
+invalidation boundary.
+
+Run next `WP-6-m31-cquery-rdeps-deps-normalized-reverse-traversal`. Admit only
+unbounded `rdeps(deps(<one concrete root-repository root>), <one concrete
+root-repository label>) --noimplicit_deps` across existing outputs. Resolve the
+second label against every matching full key in the completed universe, retain
+aliases and selected-induced edges, and prove bypass/edit/restore plus
+Need/error and daemon behavior. Keep depth arguments, general reverse syntax,
+implicit/tool/external/factored topology, parser/vendor changes, exact hashes,
+JVM/Java, and CI stopped. No standalone documentation commit is permitted.
+
+### Configured-query normalized reverse traversal ACCEPT (2026-08-09)
+
+`WP-6-m31-cquery-rdeps-deps-normalized-reverse-traversal` is **ACCEPTED**.
+Configured query now admits exactly unbounded
+`rdeps(deps(<one concrete root-repository root>), <one concrete
+root-repository seed>) --noimplicit_deps` across the existing label,
+Starlark-label, label-kind, and unfactored graph outputs.
+
+The evaluator completes the universe first, then validates the seed through
+the existing root package-loading key without configuring or analyzing it.
+Declared seeds resolve against every matching full configured/null key in the
+completed universe; missing seeds report `MissingTarget`, while declared but
+unreachable or default-configuration-failing seeds do not trigger outside-
+universe analysis. Reverse BFS rescans authoritative normalized forward edges,
+retains ordinary aliases, deduplicates by full `ConfiguredNodeKey`, and adds no
+reverse graph, DICE key/cache, interner, lock, or retained representation.
+
+The query crate passes its 50 library, 56 loading, and 10 query tests; commands
+passes 19 and server passes 48. Focused core topology, universe-Need ordering,
+missing/unreachable/transitioned seed, bypass/edit/restore, rebuilt CLI, and two
+one-shot/daemon regressions pass. Formatting, archive, stale-daemon, diff, and
+independent final review gates pass. The net Rust delta is 195 production and
+234 test lines, 429 total, within the correction-adjusted 200/240/440 caps. The
+larger production allowance covers the required universe-first loading-only
+seed-validation seam; no vendored parser/evaluator or retained hot-path utility
+changed.
+
+Run next `WP-6-m32-cquery-rdeps-reverse-depth-admission`. Add only the optional
+signed Java-`int` reverse depth to the accepted unbounded-universe shape: zero
+returns matching seed keys, positive values add that many reverse BFS layers,
+negative values return empty, and omission remains unbounded. Keep bounded
+universe `deps`, general reverse/path expressions, wrappers, default
+implicit/tool/external/factored topology, new reverse state, parser/vendor
+changes, exact hashes, JVM/Java, and CI stopped.

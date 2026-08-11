@@ -396,7 +396,10 @@ fn validate_cquery_expression(
             return Err("graph output requires --noimplicit_deps".to_owned());
         }
     }
-    for literal in slug_query_v2::cquery_literals(&expression) {
+    for literal in slug_query_v2::cquery_literals(&expression)
+        .into_iter()
+        .chain(expression.cquery_rdeps_seed())
+    {
         let target = TargetPattern::parse(literal)?;
         if !matches!(target, TargetPattern::Single(ref label) if label.repo().is_root()) {
             return Err("cquery accepts only root literal target labels".to_owned());

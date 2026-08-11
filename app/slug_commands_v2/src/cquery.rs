@@ -67,7 +67,10 @@ impl CqueryRequest {
             .map_err(|error| unsupported(&error.to_string()))?;
         validate_cquery_query(&parsed_expression)
             .map_err(|error| unsupported(&error.to_string()))?;
-        for literal in cquery_literals(&parsed_expression) {
+        for literal in cquery_literals(&parsed_expression)
+            .into_iter()
+            .chain(parsed_expression.cquery_rdeps_seed())
+        {
             let target = TargetPattern::parse(literal).map_err(|message| {
                 CommandParseError::InvalidTargetPattern {
                     value: literal.to_owned(),

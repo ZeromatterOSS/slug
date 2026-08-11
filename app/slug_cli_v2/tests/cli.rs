@@ -1209,6 +1209,12 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         assert_eq!(daemon.stdout, one_shot.stdout);
         assert!(daemon.stderr.is_empty());
     }
+    let reverse = run(None, "rdeps(deps(//:root), //:child)", false);
+    assert!(reverse.status.success(), "{reverse:?}");
+    assert_eq!(reverse.stdout, b"@@//:child\n@@//:root\n");
+    let reverse_daemon = run(Some(&output_base), "rdeps(deps(//:root), //:child)", false);
+    assert!(reverse_daemon.status.success(), "{reverse_daemon:?}");
+    assert_eq!(reverse_daemon.stdout, reverse.stdout);
 
     let wrapped_expression = "executables(deps(//:root))";
     let wrapped_one_shot = run(None, wrapped_expression, false);
@@ -1400,6 +1406,17 @@ fn cquery_noimplicit_unfactored_graph_matches_between_one_shot_and_daemon() {
     assert!(daemon.status.success(), "{daemon:?}");
     assert_eq!(daemon.stdout, one_shot.stdout);
     assert!(daemon.stderr.is_empty());
+
+    let reverse = run(None, "rdeps(deps(//:root), //:leaf)");
+    assert!(reverse.status.success(), "{reverse:?}");
+    let reverse_stdout = String::from_utf8_lossy(&reverse.stdout);
+    for label in ["root", "child", "leaf"] {
+        assert!(reverse_stdout.contains(&format!("\"//:{label} (slugcfg-v1:")));
+    }
+    assert!(!reverse_stdout.contains("//:depth_three"));
+    let reverse_daemon = run(Some(&output_base), "rdeps(deps(//:root), //:leaf)");
+    assert!(reverse_daemon.status.success(), "{reverse_daemon:?}");
+    assert_eq!(reverse_daemon.stdout, reverse.stdout);
 
     let wrapped_one_shot = run(None, "executables(deps(//:root))");
     assert!(wrapped_one_shot.status.success(), "{wrapped_one_shot:?}");

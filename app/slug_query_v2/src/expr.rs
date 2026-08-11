@@ -65,6 +65,9 @@ impl CqueryDepsSpec {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub(crate) struct CqueryRdepsSpec(pub(crate) CqueryDepsSpec, pub(crate) CompactString);
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum QueryExpressionKind {
     TargetLiteral(CompactString),
     Integer(u64),
@@ -242,6 +245,12 @@ pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryP
 
 /// Validates the deliberately small configured-query subset.
 pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
+    if matches!(
+        &expression.kind,
+        QueryExpressionKind::Function { name, .. } if name.value == "rdeps"
+    ) {
+        return parse_cquery_rdeps_spec(expression).map(|_| ());
+    }
     if matches!(
         &expression.kind,
         QueryExpressionKind::Function { name, .. } if name.value == "deps"
@@ -438,6 +447,9 @@ fn collect_cquery_literals<'a>(expression: &'a QueryExpression, literals: &mut V
         QueryExpressionKind::Function { name, args } if name.value == "kind" => {
             collect_cquery_literals(&args[1], literals);
         }
+        QueryExpressionKind::Function { name, args } if name.value == "rdeps" => {
+            collect_cquery_literals(&args[0], literals);
+        }
         QueryExpressionKind::Function { name, args } if name.value == "deps" => {
             if let Some(operand) = args.first() {
                 collect_cquery_literals(operand, literals);
@@ -485,6 +497,9 @@ impl QueryExpression {
         if let Some(spec) = self.cquery_deps_spec() {
             return Some(spec);
         }
+        if let Some(spec) = self.cquery_rdeps_spec() {
+            return Some(spec.0);
+        }
         let QueryExpressionKind::Function { name, args } = &self.kind else {
             return None;
         };
@@ -525,6 +540,70 @@ impl QueryExpression {
         };
         parse_cquery_deps_spec(operand).ok()
     }
+
+    pub(crate) fn cquery_rdeps_spec(&self) -> Option<CqueryRdepsSpec> {
+        parse_cquery_rdeps_spec(self).ok()
+    }
+
+    pub fn cquery_rdeps_seed(&self) -> Option<&str> {
+        let QueryExpressionKind::Function { name, args } = &self.kind else {
+            return None;
+        };
+        match (name.value.as_str(), &args[..]) {
+            (
+                "rdeps",
+                [
+                    _,
+                    QueryExpression {
+                        kind: QueryExpressionKind::TargetLiteral(seed),
+                        ..
+                    },
+                ],
+            ) => Some(seed),
+            _ => None,
+        }
+    }
+}
+
+fn parse_cquery_rdeps_spec(
+    expression: &QueryExpression,
+) -> Result<CqueryRdepsSpec, QueryParseError> {
+    let QueryExpressionKind::Function { name, args } = &expression.kind else {
+        return Err(QueryParseError::new(
+            "rdeps() is supported only as a top-level cquery expression",
+            expression.span,
+        ));
+    };
+    if name.value != "rdeps" {
+        return Err(QueryParseError::new(
+            "rdeps() is supported only as a top-level cquery expression",
+            name.span,
+        ));
+    }
+    validate_function_arguments(expression, args, cquery_function("rdeps"))?;
+    if args.len() != 2 {
+        return Err(QueryParseError::new(
+            "cquery rdeps() depth is not supported",
+            args[2].span,
+        ));
+    }
+    let universe = parse_cquery_deps_spec(&args[0])?;
+    if universe.depth().is_some() {
+        return Err(QueryParseError::new(
+            "bounded deps() is not supported as the cquery rdeps() universe",
+            args[0].span,
+        ));
+    }
+    let from = match &args[1].kind {
+        QueryExpressionKind::TargetLiteral(from) if !from.starts_with('$') => from.clone(),
+        _ => {
+            return Err(QueryParseError::new(
+                "cquery rdeps() requires one concrete target literal",
+                args[1].span,
+            ));
+        }
+    };
+    Ok(CqueryRdepsSpec(universe, from))
 }
 
 fn parse_cquery_deps_spec(expression: &QueryExpression) -> Result<CqueryDepsSpec, QueryParseError> {

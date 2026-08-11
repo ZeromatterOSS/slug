@@ -116,6 +116,11 @@ pub trait CqueryQueryEnvironment {
             "deps() is not implemented by this configured query environment",
         ))
     }
+    async fn rdeps(&mut self, _universe: &Self::Set, _from: &str) -> Result<Self::Set, QueryError> {
+        Err(QueryError::syntax(
+            "rdeps() is not implemented by this configured query environment",
+        ))
+    }
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError>;
     fn materialize_visible_callers(&self, callers: &Self::Set) -> Self::VisibleCallers;
     async fn visible(
@@ -139,6 +144,11 @@ where
     E: CqueryQueryEnvironment + Send,
 {
     validate_cquery_query(expression).map_err(|error| QueryError::syntax(error.to_string()))?;
+    if let Some(rdeps) = expression.cquery_rdeps_spec() {
+        let roots = environment.resolve_literal(rdeps.0.target()).await?;
+        let universe = environment.deps(&roots, None).await?;
+        return environment.rdeps(&universe, &rdeps.1).await;
+    }
     if let Some(deps) = expression.cquery_deps_spec() {
         let roots = environment.resolve_literal(deps.target()).await?;
         return environment.deps(&roots, deps.depth()).await;
@@ -188,6 +198,10 @@ where
         depth: Option<i32>,
     ) -> Result<Self::Set, QueryError> {
         self.0.deps(targets, depth).await
+    }
+
+    async fn rdeps(&mut self, universe: &Self::Set, from: &str) -> Result<Self::Set, QueryError> {
+        self.0.rdeps(universe, from).await
     }
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -1523,6 +1537,16 @@ mod tests {
             Ok(result)
         }
 
+        async fn rdeps(
+            &mut self,
+            universe: &Self::Set,
+            from: &str,
+        ) -> Result<Self::Set, QueryError> {
+            self.events
+                .push(format!("rdeps:{}:{from}", universe.join(",")));
+            Ok(vec![from.to_owned()])
+        }
+
         async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
             self.events.push(format!("siblings:{}", targets.join(",")));
             if targets.is_empty() {
@@ -1632,6 +1656,32 @@ mod tests {
         assert_eq!(
             environment.events,
             ["resolve://pkg:root", "deps://pkg:root:2"]
+        );
+    }
+
+    #[test]
+    fn cquery_rdeps_passes_the_seed_without_resolving_it() {
+        let expression = QueryExpression::parse("rdeps(deps(//pkg:root), //pkg:child)").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:child"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:root",
+                "deps://pkg:root:all",
+                "rdeps://pkg:root,//pkg:root:child://pkg:child",
+            ]
+        );
+
+        let failed = QueryExpression::parse("rdeps(deps(//pkg:error), //pkg:child)").unwrap();
+        environment.events.clear();
+        futures::executor::block_on(evaluate_cquery_query(&mut environment, &failed)).unwrap_err();
+        assert_eq!(
+            environment.events,
+            ["resolve://pkg:error", "deps://pkg:error:all"]
         );
     }
 
