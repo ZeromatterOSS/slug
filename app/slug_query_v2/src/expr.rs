@@ -502,7 +502,9 @@ impl QueryExpression {
             return Some(spec);
         }
         if let Some(spec) = self.cquery_rdeps_spec() {
-            return Some(spec.0);
+            let mut universe = spec.0;
+            universe.depth = None;
+            return Some(universe);
         }
         let QueryExpressionKind::Function { name, args } = &self.kind else {
             return None;
@@ -580,12 +582,6 @@ fn parse_cquery_rdeps_spec(
     }
     validate_function_arguments(expression, args, cquery_function("rdeps"))?;
     let universe = parse_cquery_deps_spec(&args[0])?;
-    if universe.depth().is_some() {
-        return Err(QueryParseError::new(
-            "bounded deps() is not supported as the cquery rdeps() universe",
-            args[0].span,
-        ));
-    }
     let from = match &args[1].kind {
         QueryExpressionKind::TargetLiteral(from) if !from.starts_with('$') => from.clone(),
         _ => {

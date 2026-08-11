@@ -6961,9 +6961,30 @@ review gates. The net Rust delta is 23 production and 128 test lines, 151 total,
 within 60/220/280 caps. No retained representation, reverse state, DICE owner,
 utility, parser/vendor content, output, or wire mode changed.
 
-Run next `WP-6-m33-cquery-rdeps-bounded-universe-admission`. Admit only the
-already-supported optional nonnegative Java-`int` depth on the inner `deps()`
-universe and compose it with M32's optional signed reverse depth. Keep general
+Run next `WP-6-m33-cquery-rdeps-bounded-universe-syntax-normalization`. Admit
+the already-supported optional nonnegative Java-`int` depth on inner `deps()`,
+but reproduce Bazel's subsequent unbounded transitive re-closure. Keep general
 universe expressions, multi-root/set/variable forms, wrappers, other reverse or
 path functions, default implicit/tool/external/factored topology, new reverse
 state, exact hashes, JVM/Java, and CI stopped.
+
+### Configured-query inner-depth normalization ACCEPT (2026-08-09)
+
+`WP-6-m33-cquery-rdeps-bounded-universe-syntax-normalization` is **ACCEPTED**.
+Bazel accepts the optional nonnegative inner `deps` depth, then cquery
+`RdepsFunction` calls `getTransitiveClosure` on that result; because the root is
+present at every admitted depth, the effective universe is the full unbounded
+root closure. Slug now validates the syntax but explicitly clears the inner
+depth for preactivation and generic universe evaluation.
+
+Oracle-discriminating core coverage proves inner depths zero, one, two, maximum,
+and omitted produce identical DOT topology and full configured-key vectors;
+outer reverse depth remains independent. Query, focused core, rebuilt CLI and
+one-shot/daemon checks pass with formatting, archive, daemon, diff, and review
+gates. The packet changes only seven Rust files and adds no retained state,
+graph, key, cache, or vendor change.
+
+Run next `WP-6-m34-cquery-reverse-successor-audit` to select the next exact
+bounded reverse-query shape from pinned Bazel 9.2 behavior. Keep general
+universes, wrappers, path functions, stopped topology, exact hashes, JVM/Java,
+and CI excluded.

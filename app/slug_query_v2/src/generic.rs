@@ -1688,12 +1688,17 @@ mod tests {
         );
 
         let bounded =
-            QueryExpression::parse("rdeps(deps(//pkg:root), //pkg:child, '-2147483648')").unwrap();
+            QueryExpression::parse("rdeps(deps(//pkg:root, 2), //pkg:child, '-2147483648')")
+                .unwrap();
         environment.events.clear();
         futures::executor::block_on(evaluate_cquery_query(&mut environment, &bounded)).unwrap();
         assert_eq!(
-            environment.events.last().unwrap(),
-            "rdeps://pkg:root,//pkg:root:child://pkg:child:Some(-2147483648)"
+            environment.events,
+            [
+                "resolve://pkg:root",
+                "deps://pkg:root:all",
+                "rdeps://pkg:root,//pkg:root:child://pkg:child:Some(-2147483648)"
+            ]
         );
 
         let failed = QueryExpression::parse("rdeps(deps(//pkg:error), //pkg:child)").unwrap();

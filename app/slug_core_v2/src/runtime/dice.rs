@@ -7511,6 +7511,57 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             negative.graph_stdout(),
             "digraph mygraph {\n  node [shape=box];\n}\n"
         );
+        let reverse_keys = reverse
+            .analyses()
+            .map(|analysis| analysis.key().clone())
+            .collect::<Vec<_>>();
+        for inner in ["0", "1", "2", "2147483647"] {
+            let normalized = run(
+                &format!("rdeps(deps(//:root, {inner}), //:ordinary)"),
+                false,
+                true,
+            )
+            .unwrap();
+            let normalized = normalized.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(
+                normalized.graph_stdout(),
+                reverse.graph_stdout(),
+                "inner {inner} graph"
+            );
+            assert_eq!(
+                normalized
+                    .analyses()
+                    .map(|analysis| analysis.key().clone())
+                    .collect::<Vec<_>>(),
+                reverse_keys,
+                "inner {inner} configured keys"
+            );
+        }
+        let composed = run("rdeps(deps(//:root, 0), //:ordinary, 0)", false, true).unwrap();
+        assert_eq!(
+            composed
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .graph_stdout(),
+            reverse_zero.graph_stdout()
+        );
+        let max_negative = run(
+            "rdeps(deps(//:root, 2147483647), //:ordinary, '-1')",
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(
+            max_negative
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_stdout()
+                .is_empty()
+        );
         let broken = run("//:broken", false, true).unwrap();
         assert!(
             broken
@@ -7552,7 +7603,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .contains("default seed must not be analyzed")
         );
         let transitioned = run(
-            "rdeps(deps(//:transition_root), //:transition_only, 0)",
+            "rdeps(deps(//:transition_root, 1), //:transition_only, 0)",
             false,
             true,
         )
@@ -8013,7 +8064,7 @@ executable_rule(
 
     #[tokio::test]
     async fn cquery_rdeps_universe_need_precedes_seed_validation() {
-        let expression = QueryExpression::parse("rdeps(deps(//:root), //:missing)").unwrap();
+        let expression = QueryExpression::parse("rdeps(deps(//:root, 1), //:missing)").unwrap();
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let root = CqueryCommandRoot {
             expression,

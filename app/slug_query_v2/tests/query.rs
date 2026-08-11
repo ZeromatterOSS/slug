@@ -64,6 +64,10 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "rdeps(deps(//pkg:root), //pkg:bin, '-1')",
         "rdeps(deps(//pkg:root), //pkg:bin, '-2147483648')",
         "rdeps(deps(//pkg:root), //pkg:bin, 2147483647)",
+        "rdeps(deps(//pkg:root, 0), //pkg:bin)",
+        "rdeps(deps(//pkg:root, 1), //pkg:bin, 0)",
+        "rdeps(deps(//pkg:root, 2), //pkg:bin, 1)",
+        "rdeps(deps(//pkg:root, 2147483647), //pkg:bin, 2147483647)",
         "executables(deps(//pkg:bin))",
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
@@ -101,7 +105,8 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin union //pkg:lib)",
         "deps(//pkg:bin, '-1')",
         "deps(//pkg:bin, 2147483648)",
-        "rdeps(deps(//pkg:root, 1), //pkg:bin)",
+        "rdeps(deps(//pkg:root, '-1'), //pkg:bin)",
+        "rdeps(deps(//pkg:root, 2147483648), //pkg:bin)",
         "rdeps(deps(//pkg:root), //pkg:bin, 1, 2)",
         "rdeps(deps(//pkg:root), //pkg:bin, 2147483648)",
         "rdeps(deps(//pkg:root), //pkg:bin, '-2147483649')",
@@ -203,8 +208,10 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!(cquery_literals(&rdeps), ["//pkg:root"]);
     assert_eq!(rdeps.cquery_rdeps_seed(), Some("//pkg:bin"));
     let bounded =
-        QueryExpression::parse("rdeps(deps(//pkg:root), //pkg:bin, '-2147483648')").unwrap();
+        QueryExpression::parse("rdeps(deps(//pkg:root, 2), //pkg:bin, '-2147483648')").unwrap();
     validate_cquery_query(&bounded).unwrap();
+    let universe = bounded.cquery_preactivation_deps_spec().unwrap();
+    assert_eq!((universe.target(), universe.depth()), ("//pkg:root", None));
     assert_eq!(cquery_literals(&bounded), ["//pkg:root"]);
     assert_eq!(bounded.cquery_rdeps_seed(), Some("//pkg:bin"));
 
@@ -488,6 +495,21 @@ fn signed_java_integer_slots_validate_without_narrowing_expression_integers() {
             raw.trim_matches('\'')
         )));
     }
+    let inner = QueryExpression::parse("rdeps(deps(//:root, '-1'), //:seed, 0)").unwrap();
+    assert!(
+        validate_cquery_query(&inner)
+            .unwrap_err()
+            .to_string()
+            .contains("must be nonnegative")
+    );
+    let outer_first =
+        QueryExpression::parse("rdeps(deps(//:root, '-1'), //:seed, 2147483648)").unwrap();
+    assert!(
+        validate_cquery_query(&outer_first)
+            .unwrap_err()
+            .to_string()
+            .contains("2147483648")
+    );
 
     let error = QueryExpression::parse("some(//:single, -1)").unwrap_err();
     assert_eq!(error.span, SourceSpan { start: 19, end: 19 });
