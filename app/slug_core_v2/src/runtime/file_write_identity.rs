@@ -21,6 +21,7 @@ use super::dice::ResolvedFileWriteSemanticView;
 
 const MAGIC: &[u8] = b"slugact\0";
 const VERSION: u16 = 1;
+const AQUERY_DISPLAY_CONTEXT: &str = "slug.v2.filewrite.aquery-display.v1";
 
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Allocative)]
 pub struct FileWriteSemanticIdentity(Arc<[u8]>);
@@ -109,6 +110,14 @@ impl FileWriteSemanticIdentity {
 
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
+    }
+
+    /// Presentation-only projection; never semantic, DICE, cache, or REAPI identity.
+    pub(crate) fn aquery_display_token(&self) -> String {
+        format!(
+            "slugact-display-v1:{}",
+            hex::encode(blake3::derive_key(AQUERY_DISPLAY_CONTEXT, self.as_bytes(),))
+        )
     }
 }
 

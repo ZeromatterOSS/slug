@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-m5-filewrite-aquery-text-formatter-design-retry`](./slug-v2-subplans/current-packet.md).
+[`WP-8-m5-filewrite-aquery-command-root-design`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

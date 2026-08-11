@@ -1,38 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m5-filewrite-aquery-text-formatter-design-retry`
+Packet: `WP-8-m5-filewrite-aquery-command-root-design`
 Milestone: M5 entry
-Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: freeze the first FileWrite aquery text formatter handoff.
+Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
+Result: freeze the first command/root consumer of accepted FileWrite text.
 
 ## Observable slice
 
-Reconcile the pinned Bazel 9.2 FileWrite text evidence with the accepted
-configured action view, closure-resolved platform semantics, and exact Slug
-semantic identity. Freeze the first formatter's field order, punctuation,
-labels, inputs, mnemonic, configuration, output path, and action-token spelling,
-classifying every field as exact Bazel-shaped text or an explicit Slug-native
-projection.
+Reconcile the existing aquery CLI and request placeholders, Buck2-derived
+`QueryExpression` parser, build-command action closure, resolved FileWrite
+semantic views, accepted per-action formatter, and daemon response shape.
+Select at most one bounded main-repository single-root `--output=text`
+consumer and freeze its request, evaluation, selection, ordering, join/final
+newline, diagnostics, and exit semantics.
 
 ## Ownership and stops
 
-The exact canonical bytes remain the only FileWrite semantic identity. Any
-short graph-local display token must be derived from the complete identity,
-domain/version separated, named as a non-identity projection, and never reused
-as Bazel ActionKey/checksum, configuration/output-root hash, REAPI digest, DICE
-key equality, or cache identity. Keep ordinary no-toolchain/non-Write shapes
-fail-closed.
+Stage 8 owns expression/root evaluation, command and protocol wiring, container
+ordering, block joining, and final output. Stage 6 continues to own resolved
+action semantics and per-action formatting. Reuse the retained action closure
+and formatter directly; do not reconstruct actions, duplicate identity, or add
+a command-owned analysis graph.
 
-Keep the vendored Buck2 `starlark-rust` parser/evaluator unchanged for BUILD and
-`.bzl` semantics. Aquery syntax is the separate query language and must reuse
-the existing Buck2-derived `QueryExpression` parser. Add no parser.
+Aquery remains the separate query language and must reuse the existing
+`QueryExpression` parser. Keep recursive/external/multi-root expressions,
+operators or functions not already justified by the selected slice,
+non-default formats, non-FileWrite actions, executable writes, file contents,
+ordinary no-toolchain, and unresolved shapes explicitly unsupported or
+fail-closed.
 
 ## Validation
 
-Read only the accepted FileWrite evidence and live retained views. Select at
-most one bounded implementation successor or return `REPLAN`. No Rust, tests,
-oracle rerun, formatter implementation, aquery command/root/wire, execution,
-new DICE key/state, REAPI reuse, parser/vendor, exact Bazel identity-byte work,
-JVM/Java, or CI. Cap: 180 bookkeeping lines. Require independent design review
-and bundle bookkeeping with the next functional commit; no standalone
-documentation commit.
+This packet is read-only. Inspect the accepted Bazel 9.2 FileWrite evidence and
+live command, query, protocol, action-closure, and formatter sources. Produce
+one exact handoff or `REPLAN`, classifying Bazel-exact command behavior versus
+explicit Slug-native fields. Select at most one bounded implementation
+successor. Add no Rust, tests, fixture growth, oracle rerun, command/wire
+implementation, execution, DICE state, parser/vendor, REAPI reuse, exact Bazel
+identity-byte work, JVM/Java, or CI. Cap: 200 bookkeeping lines. Require
+independent design review and bundle bookkeeping with the next functional
+commit; no standalone documentation commit.

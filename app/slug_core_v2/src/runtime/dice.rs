@@ -11518,6 +11518,38 @@ ordinary_rule(
     }
 
     #[tokio::test]
+    async fn filewrite_aquery_text_matches_frozen_baseline() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//:write").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut transaction =
+            build_root_transaction(&dice, resolved_write_epoch(19, "setting_a", &[])).await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let views = complete_build_evaluation(&outcome)
+            .resolved_file_write_semantic_views()
+            .unwrap();
+        let text = crate::runtime::format_file_write_aquery_text(&views[0]).unwrap();
+        assert_eq!(
+            text,
+            concat!(
+                "action 'Writing file write.txt'\n",
+                "  Mnemonic: FileWrite\n",
+                "  Target: //:write\n",
+                "  Configuration: slugcfg-v1:abc6de66486cc9eff604c3e0795796631112a6d92cf3336370de8e8f6acf953a\n",
+                "  Execution platform: //:platform\n",
+                "  SlugActionToken: slugact-display-v1:9107d642a3e8b06ebfbe865544a76344a8cdf2078f75ba39e01e6dca5125f361\n",
+                "  Inputs: []\n",
+                "  Outputs: [bazel-out/slugcfg-v1-abc6de66486cc9eff604c3e0795796631112a6d92cf3336370de8e8f6acf953a/bin/write.txt]\n",
+                "  IsExecutable: false",
+            )
+        );
+    }
+
+    #[tokio::test]
     async fn filewrite_semantic_identity_discriminates_admitted_structure_and_restores() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
@@ -11538,6 +11570,9 @@ ordinary_rule(
         )
         .await;
         assert!(baseline.as_bytes().starts_with(b"slugact\0\0\x01"));
+        let baseline_token = baseline.aquery_display_token();
+        assert!(baseline_token.starts_with("slugact-display-v1:"));
+        assert_eq!(baseline_token.len(), 83);
         let owner = resolved_identity(
             &dice,
             &key("//:other", configuration.clone()),
@@ -11579,6 +11614,7 @@ ordinary_rule(
         )
         .await;
         for changed in [owner, configured, output, content, property] {
+            assert_ne!(changed.aquery_display_token(), baseline_token);
             assert_ne!(changed, baseline);
         }
         let reordered = resolved_identity(
@@ -11595,6 +11631,7 @@ ordinary_rule(
         )
         .await;
         assert_eq!(reordered, baseline);
+        assert_eq!(reordered.aquery_display_token(), baseline_token);
         let platform = resolved_identity(
             &dice,
             &baseline_key,
@@ -11602,6 +11639,7 @@ ordinary_rule(
         )
         .await;
         assert_ne!(platform, baseline);
+        assert_ne!(platform.aquery_display_token(), baseline_token);
         let platform_restored = resolved_identity(
             &dice,
             &baseline_key,
@@ -11609,6 +11647,7 @@ ordinary_rule(
         )
         .await;
         assert_eq!(platform_restored, baseline);
+        assert_eq!(platform_restored.aquery_display_token(), baseline_token);
         let constraint = resolved_identity(
             &dice,
             &baseline_key,
@@ -11616,6 +11655,7 @@ ordinary_rule(
         )
         .await;
         assert_ne!(constraint, baseline);
+        assert_ne!(constraint.aquery_display_token(), baseline_token);
         let restored = resolved_identity(
             &dice,
             &baseline_key,
@@ -11623,6 +11663,7 @@ ordinary_rule(
         )
         .await;
         assert_eq!(restored, baseline);
+        assert_eq!(restored.aquery_display_token(), baseline_token);
     }
 
     #[tokio::test]

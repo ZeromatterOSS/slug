@@ -7327,3 +7327,101 @@ short graph-local display token as an explicitly non-identity projection over
 the complete canonical identity. Select at most one bounded implementation
 successor or `REPLAN`; add no Rust, tests, oracle rerun, command/root/wire,
 execution, DICE state, parser/vendor, exact Bazel identity bytes, JVM/Java, or CI.
+
+### FileWrite aquery text formatter design retry ACCEPT (2026-08-11)
+
+`WP-6-m5-filewrite-aquery-text-formatter-design-retry` is **ACCEPT** for one
+per-action block over an already resolved FileWrite semantic view. In order,
+the frozen block is:
+
+```text
+action 'Writing file {declared-output}'
+  Mnemonic: FileWrite
+  Target: {aquery-label}
+  Configuration: slugcfg-v1:{64 lowercase hex}
+  Execution platform: {aquery-label}
+  SlugActionToken: slugact-display-v1:{64 lowercase hex}
+  Inputs: []
+  Outputs: [bazel-out/slugcfg-v1-{64 lowercase hex}/bin/{declared-output}]
+  IsExecutable: false
+```
+
+The header, two-space indentation, field order, punctuation, `FileWrite`
+mnemonic, empty inputs, lowercase boolean, declared-output suffix, and aquery
+label spelling are exact Bazel-shaped text. Aquery labels spell the main repo
+as `//...` and canonical external repos as `@@repo//...`; repository-mapping
+provenance remains in semantic identity but is not formatter text. The
+configuration value and configured output root are the existing explicitly
+Slug-native full configuration projections, not Bazel mnemonic/checksum or
+`bazel-out` identity. `SlugActionToken` deliberately replaces `ActionKey`.
+
+`slugact-display-v1:` is a full 32-byte lowercase-hex BLAKE3 derive-key
+projection over the complete `FileWriteSemanticIdentity` canonical bytes with
+context `slug.v2.filewrite.aquery-display.v1`. It is not truncated, retained,
+or admitted for equality, DICE/cache keys, configured paths, Bazel checksum or
+ActionKey, or REAPI/CAS identity. Exact canonical bytes remain the only action
+semantic identity; the token is presentation only.
+
+Run next `WP-6-m5-filewrite-aquery-text-formatter-implementation`. Add only the
+projection and per-action formatter in core over the existing resolved view.
+Admit exact mnemonic `FileWrite`, a main-repository configured owner, one
+already validated relative File output, default exec group, and
+`is_executable = false`; fail closed otherwise. Prove exact baseline text and
+C0/C1/C0, P0/P1/P0, content, output-path, platform-property, and constraint
+change/restoration token relations. Reuse the accepted oracle without rerun or
+growth and record the hash-utility decision in Stage 9. Add no container
+ordering/join/final newline, `--include_file_write_contents`, executable Write,
+external owner, aquery parser/command/root/wire, retained state, DICE key,
+execution, REAPI reuse, exact Bazel identity bytes, JVM/Java, vendor, or CI.
+Caps: 150 production / 210 tests / 400 total Rust net lines, plus the bundled
+design and scheduling bookkeeping.
+
+### FileWrite aquery text formatter implementation ACCEPT (2026-08-11)
+
+`WP-6-m5-filewrite-aquery-text-formatter-implementation` is **ACCEPT**.
+Core now formats one already resolved default-exec-group FileWrite action as
+the frozen Bazel-shaped block. Main-repository target and platform labels use
+aquery spelling, the existing full Slug configuration projection owns the
+configuration and configured-output components, and
+`slugact-display-v1:{64 lowercase hex}` is a full BLAKE3 derive-key projection
+over the canonical FileWrite identity. It remains presentation-only and is not
+retained or reused for semantic equality, DICE/cache keys, Bazel checksums or
+ActionKey, configured paths, or REAPI/CAS identity.
+
+The formatter fails closed for legacy configuration, external owner,
+non-`FileWrite` mnemonic, non-Write action, executable Write, named exec
+group, unsafe output text, unresolved platform facts, and other shapes already
+rejected by the resolved-view producer. Focused tests freeze the exact text and
+prove configuration, owner, output, content, platform, platform-property, and
+constraint token change/restoration. AI cleanup removed a one-call test helper,
+tightened delimiter/control rejection, and kept all display allocations
+request-local.
+
+Validation accepted:
+
+- `cargo test -p slug_core_v2 aquery`: 4 passed;
+- the focused semantic-identity lifecycle test passed;
+- `cargo check -p slug_cli_v2 -p slug_server_v2` passed;
+- formatting and `git diff --check` passed;
+- raw Rust net additions are 105 production / 120 tests / 225 total, within
+  150 / 210 / 400;
+- full core unit tests were 171 passed / 1 unrelated documented external
+  visibility diagnostic-wording baseline failure;
+- the runtime integration target was 12 passed / 1 unrelated legacy
+  `PathObservationEpochKey` injected-compute failure; and
+- the archive script passed every V2 layout check but this checkout lacks the
+  historical `slug-v1-archive` tag/branch and recorded archive commit.
+
+The accepted Bazel 9.2 evidence was reused without oracle rerun or fixture
+growth. Independent design and final review returned `ACCEPT` after the one
+allowed correction added explicit named-exec-group rejection. No container,
+command/root/wire, parser/vendor, execution, retained DICE state, REAPI reuse,
+exact Bazel identity-byte work, JVM/Java, or CI entered the packet.
+
+Run next `WP-8-m5-filewrite-aquery-command-root-design`, owned by Stage 8.
+Reconcile the accepted core formatter and action closure with the existing
+aquery command/parser/protocol scaffolding, then freeze at most one bounded
+single-root text consumer or return `REPLAN`. The packet is read-only: add no
+Rust, tests, fixture growth, oracle rerun, command/wire implementation,
+execution, retained state, parser/vendor, exact Bazel identity bytes, JVM/Java,
+or CI.
