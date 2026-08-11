@@ -27,6 +27,8 @@ pub use key::ConfigurationKind;
 pub use key::ConfiguredNodeKey;
 pub use key::ConfiguredTargetKey;
 pub use result::AnalysisDiagnostic;
+pub use result::ConfiguredActionExecGroup;
+pub use result::ConfiguredActionView;
 pub use result::ConfiguredNodeKind;
 pub use result::ConfiguredNodeResult;
 pub use result::DiagnosticSeverity;

@@ -1,33 +1,34 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m39-cquery-milestone-close-aquery-entry-audit`
-Milestone: M4 close / M5 entry
+Packet: `WP-6-m5-toolchain-filewrite-text-formatter-design`
+Milestone: M5 entry
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only milestone audit after accepted configured reverse consumers.
+Result: read-only text formatter and Slug-native token handoff design.
 
 ## Observable slice
 
-Independently verify whether the accepted M2/M4 evidence proves the canonical
-M4 result: cquery reads the same provider-bearing, transitioned configured graph
-as analysis, with matching graph semantics and explicitly Slug-native provisional
-configuration identity bytes. If proven, mark M4 accepted and select one M5
-aquery design/evidence packet; otherwise leave M4 partial and name one bounded
-missing evidence packet.
+Design the first text-only aquery handoff over the accepted toolchain-backed
+`ConfiguredActionView`. Freeze exact field order, punctuation, owner/platform
+labels, inputs, executable bit, and output-relative path semantics from pinned
+Bazel 9.2 evidence while classifying configuration, configured output root, and
+action identity as explicit Slug-native projections.
 
 ## Ownership and stops
 
-Review existing configured-analysis ownership, command-root reuse, transition/
-provider evidence, normalized forward/reverse edges, configured/null identity,
-toolchain/delegation topology, outputs, Need/error ordering, and daemon lifecycle.
-Do not implement Rust, add cquery breadth, change fixtures/oracles, add retained
-graph/DICE state, begin identity-byte work, add JVM/Java, CI, or M5 production.
+Define collision-safe, tagged, versioned projection inputs so C0/C1/C0,
+P0/P1/P0, content A/B/A, and output path A/B/A preserve the equality/change
+relationships in `f00e99db`. Do not call any value a Bazel checksum, Bazel
+configured root, or ActionKey. Preserve exact REAPI/CAS digest separation.
+
+Keep the vendored Buck2 `starlark-rust` parser/evaluator unchanged for BUILD and
+`.bzl` semantics. Aquery syntax is the separate query language and must reuse
+the existing Buck2-derived `QueryExpression` parser. Add no parser.
 
 ## Validation
 
-Use the canonical M4 exit gate and accepted source/oracle/test records. Require
-one independent milestone-close review. On acceptance, M5 remains `REPLAN` and
-the successor must be a bounded read-only aquery architecture/evidence design
-around the retained Stage 6 action graph and explicitly opaque Slug-native
-configuration/path/ActionKey tokens. Caps: 0 production / 0 test / 80
-bookkeeping lines. Bundle audit bookkeeping with the next functional commit;
-no standalone documentation commit.
+Audit existing configuration projections and choose one bounded implementation
+successor or return `REPLAN`. No Rust, tests, fixtures/oracle reruns, aquery
+command/root/wire, formatter implementation, action execution, REAPI identity
+reuse, exact Bazel-byte work, parser/vendor changes, JVM/Java, or CI. Caps: 0
+production / 0 test / 180 bookkeeping lines. Bundle with the next functional
+commit; no standalone documentation commit.

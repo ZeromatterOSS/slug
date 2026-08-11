@@ -7090,3 +7090,113 @@ test the canonical M4 exit claim against the complete provider/transition/graph
 evidence and, only if it holds, select a read-only M5 aquery design/evidence
 entry packet. Do not add further cquery breadth or any M5 production in the
 audit.
+
+### Configured-query milestone close ACCEPT (2026-08-10)
+
+`WP-6-m39-cquery-milestone-close-aquery-entry-audit` is **ACCEPT**. Cquery
+computes the same Need-aware `ConfiguredNodeAnalysisKey` as analysis and retains
+the resulting provider/action/edge-bearing `ConfiguredNodeResult`; it creates no
+shadow configured graph. Forward and reverse traversal read those authoritative
+classified edges with full configured/null identity, preserving transitions,
+aliases, toolchain/delegation topology, error ordering, and daemon restoration.
+The public projection is derived from structural `SlugConfiguration` and is
+explicitly Slug-native. Exact Bazel checksum, output-path, and ActionKey bytes
+remain M9 work. Independent milestone review accepts the gate; unsupported
+expression and topology shapes are later breadth rather than M4 blockers.
+
+M4 is accepted. Run next `WP-6-m5-aquery-opaque-token-entry-design`, read-only.
+Prove whether one Bazel 9.2 formatter shape can consume the retained action
+closure and its owning configured results without re-analysis or a second graph.
+Freeze separate structural configuration, configured artifact/path, per-action
+execution-platform/exec-group, and Slug action-identity domains; formatter IDs
+may only be explicit opaque Slug-native graph-scoped tokens. Keep vendored Buck2
+`starlark-rust` unchanged for source semantics and reuse the existing
+Buck2-derived query parser for aquery syntax. Add no parser, Rust, tests, wire,
+execution, DICE state, exact-byte work, JVM/Java, CI, or vendor changes.
+
+### Aquery opaque-token entry design REPLAN (2026-08-10)
+
+`WP-6-m5-aquery-opaque-token-entry-design` is **REPLAN**. The retained action
+closure is the correct sole aquery input, but no Bazel 9.2 formatter can yet
+render it truthfully. `ActionSpec`, inputs, outputs, param files, and argv retain
+raw strings without typed configured-artifact provenance; a formatter cannot
+distinguish an artifact path from an identical user literal. The selected
+platform is not retained per action, and a missing topology is not equivalent
+to Bazel's default execution platform. No collision-safe Slug action identity
+exists, and an exact REAPI digest is a separate protocol/content domain.
+
+Independent review confirms the stop. Run next only
+`WP-6-m5-aquery-action-owner-artifact-identity-design`, read-only. Freeze one
+compact structural representation for configured target ownership, typed
+artifact/argument provenance, default and named-exec-group platform selection,
+and action-specific identity material before selecting any formatter. Continue
+to reuse unchanged vendored Buck2 `starlark-rust` for BUILD/`.bzl` and the
+existing Buck2-derived `QueryExpression` parser for aquery syntax. Add no parser,
+Rust, tests, fixture/oracle reruns, formatter, wire, DICE state, execution,
+REAPI identity reuse, exact Bazel bytes, JVM/Java, CI, or vendor change.
+
+### Aquery action-owner/artifact identity design REPLAN (2026-08-10)
+
+`WP-6-m5-aquery-action-owner-artifact-identity-design` is **REPLAN**. Intrinsic
+action data belongs below analysis, while configured target and platform
+identity belong to the configured result; putting `ConfiguredTargetKey` into
+`ActionSpec` would invert the crate dependency. A future analysis-owned retained
+action wrapper is viable, but current no-toolchain rules do not resolve a
+default execution platform, and `run_shell` stringifies declared-file arguments.
+Approving the full multi-kind representation now would therefore guess at
+unimplemented provenance and named-exec-group semantics.
+
+Independent review accepts a narrower read-only successor. Run next
+`WP-6-m5-action-provenance-and-default-exec-platform-design`. Freeze only a
+FileWrite vertical: configured-result owner, typed declared output,
+content/executable identity material, toolchain-selected or explicit Slug
+default execution-platform identity, equality/invalidation, and existing
+build/REAPI consumer projection. Every other action kind and named exec group
+must remain fail-closed for aquery. Preserve unchanged Buck2 `starlark-rust` and
+the existing query parser; add no parser, Rust, tests, oracle rerun, formatter,
+wire, DICE state, execution, exact Bazel bytes, JVM/Java, CI, or vendor change.
+
+### FileWrite provenance/default-platform design ACCEPT (2026-08-10)
+
+`WP-6-m5-action-provenance-and-default-exec-platform-design` is **ACCEPT** for
+one narrower structural vertical. The accepted `f00e99db` FileWrite runs in the
+default exec group but its rule requires `//:demo_type`, so the existing
+`ToolchainTopology::selection` already co-retains exact P0/P1 platform identity
+with the configured result. Its owner key, intrinsic Write content/executable
+bit, and typed file output are likewise present. Ordinary no-toolchain actions
+still lack a platform and remain unsupported rather than guessed.
+
+Run next `WP-6-m5-toolchain-filewrite-configured-action-view-implementation`.
+Add only an analysis-owned borrowed configured-action view over the existing
+result. Admit configured-owner `ActionKind::Write` with exactly one file output,
+default exec group, selected toolchain platform, and empty argv/input/tool/param
+surfaces; reject every other shape, named group, or missing selection. Prove
+structural C0/C1/C0, P0/P1/P0, content, and output-path change/restoration from
+the retained evidence. Add no aquery command/formatter, token/hash/ActionKey,
+path projection, parser/vendor change, retained state, DICE key, execution,
+wire, JVM/Java, or CI. Caps are 110 production, 140 tests, 250 total; the final
+review corrected and accepted the fixture's toolchain-backed scope.
+
+### Toolchain-backed configured FileWrite view ACCEPT (2026-08-10)
+
+`WP-6-m5-toolchain-filewrite-configured-action-view-implementation` is
+**ACCEPT** at 84 production and 136 test lines. `ConfiguredNodeResult` now
+exposes an allocation-free borrowed view of its configured owner, intrinsic
+Write spec, single typed file output, default exec group, and selected toolchain
+execution platform. It rejects non-Write and ambiguous execution surfaces,
+named groups, missing owners/platforms, and unsupported populated fields.
+Zero-action closure nodes correctly yield an empty iterator without requiring a
+platform. No action or graph state is copied or added.
+
+Structural tests mirror the accepted C0/C1/C0, P0/P1/P0, content A/B/A, and
+output-path A/B/A relationships and exercise fail-closed shapes. All 38
+`slug_analysis_v2` tests pass; formatting, diff checks, caps, and independent
+final review pass. Vendored Buck2 `starlark-rust` and the Buck2-derived query
+parser remain unchanged.
+
+Run next only `WP-6-m5-toolchain-filewrite-text-formatter-design`, read-only.
+Freeze one text formatter's exact non-identity fields and explicitly Slug-native
+configuration/path/action-token projections over this view before any command,
+wire, or formatter Rust. Preserve the accepted identity change/restoration
+relations, exact REAPI digest separation, ordinary no-toolchain/non-Write
+fail-closed boundaries, and the no-new-parser/JVM/CI stops.

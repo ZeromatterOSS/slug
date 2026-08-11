@@ -12,6 +12,9 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_build_api_v2::ActionKind;
+use slug_build_api_v2::ActionOutput;
+use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::ProviderCollection;
 use slug_identity_v2::CanonicalLabel;
@@ -109,6 +112,41 @@ impl ToolchainSelection {
 pub struct ToolchainTopology {
     candidate_execution_platforms: Arc<[ConfiguredTargetKey]>,
     selection: Option<ToolchainSelection>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum ConfiguredActionExecGroup {
+    Default,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct ConfiguredActionView<'a> {
+    owner: &'a ConfiguredTargetKey,
+    spec: &'a ActionSpec,
+    output: &'a ActionOutput,
+    execution_platform: &'a ConfiguredTargetKey,
+}
+
+impl<'a> ConfiguredActionView<'a> {
+    pub fn owner(&self) -> &'a ConfiguredTargetKey {
+        self.owner
+    }
+
+    pub fn spec(&self) -> &'a ActionSpec {
+        self.spec
+    }
+
+    pub fn output(&self) -> &'a ActionOutput {
+        self.output
+    }
+
+    pub fn execution_platform(&self) -> &'a ConfiguredTargetKey {
+        self.execution_platform
+    }
+
+    pub fn exec_group(&self) -> ConfiguredActionExecGroup {
+        ConfiguredActionExecGroup::Default
+    }
 }
 
 impl ToolchainTopology {
@@ -223,6 +261,50 @@ impl ConfiguredNodeResult {
 
     pub fn actions(&self) -> &[ActionSpec] {
         &self.actions
+    }
+
+    pub fn configured_file_write_actions(
+        &self,
+    ) -> Result<impl ExactSizeIterator<Item = ConfiguredActionView<'_>>, &'static str> {
+        let owner = self.configured_target_key();
+        let execution_platform = self
+            .toolchain_topology()
+            .and_then(ToolchainTopology::selection)
+            .map(ToolchainSelection::execution_platform);
+        if !self.actions.is_empty() {
+            owner.ok_or("configured action owner is not a configured target")?;
+            execution_platform
+                .ok_or("configured FileWrite action requires a selected toolchain platform")?;
+        }
+        for action in self.actions.iter() {
+            if !matches!(action.kind(), ActionKind::Write { .. }) {
+                return Err("configured action view supports only FileWrite actions");
+            }
+            if !matches!(action.outputs(), [output] if output.kind() == ActionOutputKind::File) {
+                return Err("configured FileWrite action requires exactly one file output");
+            }
+            if action.exec_group().is_some() {
+                return Err("configured FileWrite action requires the default exec group");
+            }
+            if !action.argv().is_empty()
+                || !action.inputs().is_empty()
+                || !action.tools().is_empty()
+                || !action.param_files().is_empty()
+                || !action.env().is_empty()
+                || !action.execution_requirements().is_empty()
+                || !action.exec_properties().is_empty()
+                || action.progress_message().is_some()
+            {
+                return Err("configured FileWrite action has unsupported execution fields");
+            }
+        }
+        Ok(self.actions.iter().map(move |spec| ConfiguredActionView {
+            owner: owner.expect("nonempty configured actions validated their owner"),
+            spec,
+            output: &spec.outputs()[0],
+            execution_platform: execution_platform
+                .expect("nonempty configured actions validated their execution platform"),
+        }))
     }
 
     pub fn declared_outputs(&self) -> &[CompactString] {

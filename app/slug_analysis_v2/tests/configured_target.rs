@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use slug_analysis_v2::AnalysisDiagnostic;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredActionExecGroup;
 use slug_analysis_v2::ConfiguredEdge;
 use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
@@ -22,6 +23,8 @@ use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
 use slug_analysis_v2::ToolchainSelection;
 use slug_analysis_v2::ToolchainTopology;
+use slug_analysis_v2::key::RootStringSettingValue;
+use slug_build_api_v2::ActionInput;
 use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
@@ -29,6 +32,8 @@ use slug_build_api_v2::ActionSpec;
 use slug_build_api_v2::DefaultInfo;
 use slug_build_api_v2::Depset;
 use slug_build_api_v2::DepsetOrder;
+use slug_build_api_v2::ParamFile;
+use slug_build_api_v2::ParamFileFormat;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::UserProvider;
@@ -79,6 +84,49 @@ fn mapped_label(mapping_name: &str, repo_version: &str) -> CanonicalLabel {
         CanonicalRepoName::new(repo_version).unwrap(),
     );
     apparent.resolve(&mapping)
+}
+
+fn file_write_result(
+    configuration: ConfigurationKey,
+    platform_label: &str,
+    content: &str,
+    output_path: &str,
+) -> ConfiguredNodeResult {
+    let owner = ConfiguredTargetKey::new(canonical("@@//:probe"), configuration.clone());
+    let platform = ConfiguredTargetKey::new(
+        canonical(platform_label),
+        structural_configurations()[1].clone(),
+    );
+    let topology = ToolchainTopology::new(
+        vec![platform.clone()],
+        Some(ToolchainSelection::new(
+            platform,
+            canonical("@@//:toolchain"),
+            ConfiguredTargetKey::new(canonical("@@//:type"), configuration.clone()),
+            ConfiguredTargetKey::new(canonical("@@//:implementation"), configuration),
+        )),
+    )
+    .unwrap();
+    let providers =
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
+    ConfiguredNodeResult::new_rule(owner, providers, None)
+        .with_actions(vec![ActionSpec::new(
+            ActionKind::Write {
+                content: content.to_owned(),
+                is_executable: false,
+            },
+            "FileWrite",
+            vec![ActionOutput::new(output_path, ActionOutputKind::File)],
+        )])
+        .with_toolchain_topology(topology)
+}
+
+fn only_file_write(result: &ConfiguredNodeResult) -> slug_analysis_v2::ConfiguredActionView<'_> {
+    result
+        .configured_file_write_actions()
+        .unwrap()
+        .next()
+        .unwrap()
 }
 
 #[test]
@@ -356,4 +404,92 @@ fn toolchain_topology_is_ordered_role_checked_and_structurally_equal() {
         .with_toolchain_topology(topology.clone());
     assert_ne!(plain, retained);
     assert_eq!(retained.toolchain_topology(), Some(&topology));
+}
+
+#[test]
+fn configured_file_write_view_tracks_and_restores_structural_identity() {
+    let c0 = structural_configurations()[0].clone();
+    let c1 = c0.with_root_string_setting(RootStringSettingValue::new("c1"));
+    let baseline = file_write_result(c0.clone(), "@@//:p0", "content-A", "path-A.txt");
+    let changed_configuration = file_write_result(c1, "@@//:p0", "content-A", "path-A.txt");
+    let changed_platform = file_write_result(c0.clone(), "@@//:p1", "content-A", "path-A.txt");
+    let changed_content = file_write_result(c0.clone(), "@@//:p0", "content-B", "path-A.txt");
+    let changed_path = file_write_result(c0.clone(), "@@//:p0", "content-A", "path-B.txt");
+    let restored = file_write_result(c0, "@@//:p0", "content-A", "path-A.txt");
+
+    let baseline = only_file_write(&baseline);
+    assert_eq!(baseline.exec_group(), ConfiguredActionExecGroup::Default);
+    assert_eq!(baseline.owner().label(), &canonical("@@//:probe"));
+    assert_eq!(baseline.execution_platform().label(), &canonical("@@//:p0"));
+    assert_eq!(baseline.output().path(), "path-A.txt");
+    assert!(matches!(
+        baseline.spec().kind(),
+        ActionKind::Write { content, is_executable: false } if content == "content-A"
+    ));
+    assert_ne!(baseline, only_file_write(&changed_configuration));
+    assert_ne!(baseline, only_file_write(&changed_platform));
+    assert_ne!(baseline, only_file_write(&changed_content));
+    assert_ne!(baseline, only_file_write(&changed_path));
+    assert_eq!(baseline, only_file_write(&restored));
+}
+
+#[test]
+fn configured_file_write_view_rejects_unowned_or_ambiguous_shapes() {
+    let c0 = structural_configurations()[0].clone();
+    let baseline = file_write_result(c0, "@@//:p0", "content-A", "path-A.txt");
+    let action = baseline.actions()[0].clone();
+    let without_platform = ConfiguredNodeResult::new_rule(
+        baseline.configured_target_key().unwrap().clone(),
+        baseline.providers().clone(),
+        None,
+    )
+    .with_actions(vec![action.clone()]);
+    let empty = without_platform.clone().with_actions(Vec::new());
+    assert_eq!(empty.configured_file_write_actions().unwrap().len(), 0);
+    assert_eq!(
+        without_platform.configured_file_write_actions().err(),
+        Some("configured FileWrite action requires a selected toolchain platform")
+    );
+
+    let unsupported_shapes = vec![
+        ActionSpec::new(ActionKind::Run, "Spawn", action.outputs().to_vec()),
+        ActionSpec::new(
+            action.kind().clone(),
+            "FileWrite",
+            vec![ActionOutput::new("tree", ActionOutputKind::Directory)],
+        ),
+        action.clone().with_exec_group("named"),
+    ];
+    for unsupported in unsupported_shapes {
+        let result = baseline.clone().with_actions(vec![unsupported]);
+        assert!(result.configured_file_write_actions().is_err());
+    }
+
+    let mut field = BTreeMap::new();
+    field.insert("key".to_owned(), "value".to_owned());
+    let unsupported_execution_fields = vec![
+        action.clone().with_argv(vec!["literal".to_owned()]),
+        action
+            .clone()
+            .with_inputs(vec![ActionInput::new("input", None)]),
+        action
+            .clone()
+            .with_tools(vec![ActionInput::new("tool", None)]),
+        action.clone().with_param_files(vec![ParamFile::new(
+            "params",
+            vec!["arg".to_owned()],
+            ParamFileFormat::Multiline,
+        )]),
+        action.clone().with_env(field.clone()),
+        action.clone().with_execution_requirements(field.clone()),
+        action.clone().with_exec_properties(field),
+        action.with_progress_message("writing"),
+    ];
+    for unsupported in unsupported_execution_fields {
+        let result = baseline.clone().with_actions(vec![unsupported]);
+        assert_eq!(
+            result.configured_file_write_actions().err(),
+            Some("configured FileWrite action has unsupported execution fields")
+        );
+    }
 }
