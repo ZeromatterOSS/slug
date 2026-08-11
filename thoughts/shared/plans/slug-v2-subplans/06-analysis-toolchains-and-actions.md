@@ -7049,3 +7049,23 @@ Run next `WP-6-m37-cquery-executables-rdeps-direct`. Admit only
 `executables(rdeps(<direct root>, <seed>[, depth])) --noimplicit_deps`, run the
 accepted reverse traversal first, then apply the existing executable-non-test
 predicate. Keep every other wrapper and stopped reverse surface excluded.
+
+### Configured-query executable direct reverse ACCEPT (2026-08-10)
+
+`WP-6-m37-cquery-executables-rdeps-direct` is **ACCEPTED**. The fixed wrapper
+runs the accepted direct reverse traversal first and then the existing
+executable-non-test predicate; reverse errors prevent filtering. Full configured
+identity, transitioned duplicates, depths, empty success, and selected-induced
+graph output are retained without changing M36 regex preflight or any semantic
+state.
+
+Query passes 118 tests, commands 19, focused core/server, and rebuilt CLI daemon
+symmetry; formatting, archive, daemon, diff, and independent review gates pass.
+The net Rust delta is 37 production and 141 test lines, 178 total, within
+80/260/340 caps. No DICE, graph, cache, vendor, output, or wire owner changed.
+
+Run next `WP-6-m38-cquery-kind-rdeps-direct`. Admit only
+`kind(<word regex>, rdeps(<direct root>, <seed>[, depth]))`, extend M36's
+compile-before-activation preflight to this one wrapper, then apply the existing
+configured target-kind projection after reverse traversal. Keep all other
+wrappers and stopped reverse surfaces excluded.

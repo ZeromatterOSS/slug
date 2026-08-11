@@ -7931,6 +7931,63 @@ executable_rule(
         );
         assert!(edges.iter().all(|edge| !edge.contains("//:leaf")));
 
+        let reverse_self = run("executables(rdeps(//:root, //:root))");
+        let reverse_self = reverse_self.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(reverse_self.starlark_label_stdout(), "@@//:root\n");
+
+        let reverse_zero = run("executables(rdeps(//:root, //:direct, 0))");
+        let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            reverse_zero.starlark_label_stdout(),
+            "@@//:direct\n@@//:direct\n"
+        );
+        let reverse_full = run("executables(rdeps(//:root, //:direct))");
+        let reverse_full = reverse_full.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            reverse_full.starlark_label_stdout(),
+            "@@//:direct\n@@//:direct\n@@//:root\n"
+        );
+        let reverse_keys = reverse_full
+            .analyses()
+            .map(|analysis| analysis.key().clone())
+            .collect::<Vec<_>>();
+        assert_eq!(reverse_keys.len(), 3);
+        assert_ne!(reverse_keys[0], reverse_keys[1]);
+        let reverse_graph = reverse_full.graph_stdout();
+        assert_eq!(
+            reverse_graph
+                .lines()
+                .filter(|line| line.contains(" -> "))
+                .count(),
+            2
+        );
+        assert!(
+            reverse_graph
+                .lines()
+                .filter(|line| line.contains(" -> "))
+                .all(|line| line.contains("//:root") && line.contains("//:direct"))
+        );
+        for (depth, expected) in [
+            (
+                "'-1'",
+                "digraph mygraph {\n  node [shape=box];\n}\n".to_owned(),
+            ),
+            ("0", reverse_zero.graph_stdout()),
+            ("1", reverse_full.graph_stdout()),
+            ("2147483647", reverse_full.graph_stdout()),
+        ] {
+            let bounded = run(&format!("executables(rdeps(//:root, //:direct, {depth}))"));
+            let bounded = bounded.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(bounded.graph_stdout(), expected, "depth {depth}");
+        }
+        let reverse_empty = run("executables(rdeps(//:root, //:bridge, 0))");
+        let reverse_empty = reverse_empty.terminal_for_test().as_ref().as_ref().unwrap();
+        assert!(reverse_empty.label_stdout().is_empty());
+        assert_eq!(
+            reverse_empty.graph_stdout(),
+            "digraph mygraph {\n  node [shape=box];\n}\n"
+        );
+
         let chained_full = run("filter(':(root|direct|leaf)$', executables(deps(//:root)))");
         let chained_full = chained_full.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(chained_full.label_stdout(), full.label_stdout());

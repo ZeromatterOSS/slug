@@ -1245,6 +1245,20 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         ),
         ("filter('missing', rdeps(//:root, //:child))", ""),
         (
+            "executables(rdeps(//:root, //:child))",
+            "@@//:child\n@@//:root\n",
+        ),
+        ("executables(rdeps(//:root, //:child, '-1'))", ""),
+        ("executables(rdeps(//:root, //:child, 0))", "@@//:child\n"),
+        (
+            "executables(rdeps(//:root, //:child, 1))",
+            "@@//:child\n@@//:root\n",
+        ),
+        (
+            "executables(rdeps(//:root, //:child, 2147483647))",
+            "@@//:child\n@@//:root\n",
+        ),
+        (
             "rdeps(deps(//:root, 0), //:child)",
             "@@//:child\n@@//:root\n",
         ),

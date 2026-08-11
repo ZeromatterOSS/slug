@@ -999,6 +999,17 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let filtered = handle_request(&mut daemon, &filtered_request);
         assert_eq!(filtered.exit_code, 0, "{output}: {filtered:?}");
         assert_eq!(filtered.stdout, direct.stdout, "{output}");
+        let executable_request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"executables(rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
+        );
+        let executable = handle_request(&mut daemon, &executable_request);
+        assert_eq!(executable.exit_code, 0, "{output}: {executable:?}");
+        assert!(executable.stderr.is_empty(), "{output}: {executable:?}");
+        if output == "graph" {
+            assert!(executable.stdout.starts_with("digraph mygraph {"));
+        } else {
+            assert!(executable.stdout.is_empty(), "{output}: {executable:?}");
+        }
     }
     for expression in [
         "filter('(', rdeps(//pkg:missing, //pkg:probe))",

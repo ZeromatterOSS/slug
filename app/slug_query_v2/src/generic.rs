@@ -156,6 +156,9 @@ where
         let reverse = environment.rdeps(&universe, &rdeps.1, rdeps.2).await?;
         return match filter {
             Some(regex) => environment.filter(&regex, &reverse).await,
+            None if expression.is_cquery_executables_rdeps() => {
+                environment.executables(&reverse).await
+            }
             None => Ok(reverse),
         };
     }
@@ -1573,6 +1576,11 @@ mod tests {
         ) -> Result<Self::Set, QueryError> {
             self.events
                 .push(format!("rdeps:{}:{from}:{depth:?}", universe.join(",")));
+            if from.ends_with(":rdeps_error") {
+                return Err(QueryError::evaluation(
+                    "configured reverse traversal failed",
+                ));
+            }
             Ok(vec![from.to_owned()])
         }
 
@@ -1752,6 +1760,33 @@ mod tests {
         environment.events.clear();
         futures::executor::block_on(evaluate_cquery_query(&mut environment, &invalid)).unwrap_err();
         assert!(environment.events.is_empty());
+    }
+
+    #[test]
+    fn cquery_executables_rdeps_filters_only_after_reverse_traversal() {
+        let expression =
+            QueryExpression::parse("executables(rdeps(//pkg:bin, //pkg:bin, 1))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:bin"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:bin",
+                "deps://pkg:bin:all",
+                "rdeps://pkg:bin,//pkg:bin:child://pkg:bin:Some(1)",
+                "executables://pkg:bin",
+            ]
+        );
+
+        let failed =
+            QueryExpression::parse("executables(rdeps(//pkg:root, //pkg:rdeps_error))").unwrap();
+        environment.events.clear();
+        futures::executor::block_on(evaluate_cquery_query(&mut environment, &failed)).unwrap_err();
+        assert_eq!(environment.events.len(), 3);
+        assert!(environment.events.last().unwrap().starts_with("rdeps:"));
     }
 
     #[test]
