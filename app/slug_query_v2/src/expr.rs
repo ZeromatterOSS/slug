@@ -548,12 +548,12 @@ impl QueryExpression {
         parse_cquery_rdeps_spec(self).ok()
     }
 
-    pub(crate) fn cquery_filter_rdeps_pattern(&self) -> Option<&str> {
+    pub(crate) fn cquery_regex_rdeps_pattern(&self) -> Option<&str> {
         let QueryExpressionKind::Function { name, args } = &self.kind else {
             return None;
         };
         match (name.value.as_str(), &args[..]) {
-            ("filter", [pattern, operand])
+            ("filter" | "kind", [pattern, operand])
                 if matches!(
                     operand.kind,
                     QueryExpressionKind::Function { ref name, .. } if name.value == "rdeps"
@@ -581,6 +581,19 @@ impl QueryExpression {
         )
     }
 
+    pub(crate) fn is_cquery_kind_rdeps(&self) -> bool {
+        let QueryExpressionKind::Function { name, args } = &self.kind else {
+            return false;
+        };
+        matches!(
+            (name.value.as_str(), &args[..]),
+            ("kind", [_, QueryExpression {
+                kind: QueryExpressionKind::Function { name, .. },
+                ..
+            }]) if name.value == "rdeps"
+        )
+    }
+
     pub fn cquery_rdeps_seed(&self) -> Option<&str> {
         let QueryExpressionKind::Function { args, .. } = &cquery_rdeps_expression(self)?.kind
         else {
@@ -599,7 +612,7 @@ fn cquery_rdeps_expression(expression: &QueryExpression) -> Option<&QueryExpress
     };
     match (name.value.as_str(), &args[..]) {
         ("rdeps", _) => Some(expression),
-        ("filter", [pattern, operand])
+        ("filter" | "kind", [pattern, operand])
             if matches!(pattern.kind, QueryExpressionKind::TargetLiteral(_))
                 && matches!(
                     operand.kind,
@@ -632,7 +645,7 @@ fn parse_cquery_rdeps_spec(
     let wrapper = match &expression.kind {
         QueryExpressionKind::Function { name, .. } if name.value == "rdeps" => None,
         QueryExpressionKind::Function { name, .. }
-            if matches!(name.value.as_str(), "filter" | "executables") =>
+            if matches!(name.value.as_str(), "filter" | "kind" | "executables") =>
         {
             Some(name.value.as_str())
         }

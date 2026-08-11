@@ -1259,6 +1259,23 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
             "@@//:child\n@@//:root\n",
         ),
         (
+            "kind('^node rule$', rdeps(//:root, //:child))",
+            "@@//:child\n@@//:root\n",
+        ),
+        ("kind('^node rule$', rdeps(//:root, //:child, '-1'))", ""),
+        (
+            "kind('^node rule$', rdeps(//:root, //:child, 0))",
+            "@@//:child\n",
+        ),
+        (
+            "kind('^node rule$', rdeps(//:root, //:child, 1))",
+            "@@//:child\n@@//:root\n",
+        ),
+        (
+            "kind('^node rule$', rdeps(//:root, //:child, 2147483647))",
+            "@@//:child\n@@//:root\n",
+        ),
+        (
             "rdeps(deps(//:root, 0), //:child)",
             "@@//:child\n@@//:root\n",
         ),
@@ -1281,6 +1298,8 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
     for invalid_expression in [
         "filter('(', rdeps(//:missing, //:child))",
         "filter('(', rdeps(//:root, //:missing))",
+        "kind('(', rdeps(//:missing, //:child))",
+        "kind('(', rdeps(//:root, //:missing))",
     ] {
         let one_shot = run(None, invalid_expression, false);
         assert_eq!(one_shot.status.code(), Some(2), "{one_shot:?}");

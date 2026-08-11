@@ -999,6 +999,12 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         let filtered = handle_request(&mut daemon, &filtered_request);
         assert_eq!(filtered.exit_code, 0, "{output}: {filtered:?}");
         assert_eq!(filtered.stdout, direct.stdout, "{output}");
+        let kind_request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"kind('^probe rule$', rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
+        );
+        let kind = handle_request(&mut daemon, &kind_request);
+        assert_eq!(kind.exit_code, 0, "{output}: {kind:?}");
+        assert_eq!(kind.stdout, direct.stdout, "{output}");
         let executable_request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"executables(rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
         );
@@ -1014,6 +1020,8 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
     for expression in [
         "filter('(', rdeps(//pkg:missing, //pkg:probe))",
         "filter('(', rdeps(//pkg:probe, //pkg:missing))",
+        "kind('(', rdeps(//pkg:missing, //pkg:probe))",
+        "kind('(', rdeps(//pkg:probe, //pkg:missing))",
     ] {
         let request = format!(
             r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"label"}}}}"#,

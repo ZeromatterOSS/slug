@@ -155,6 +155,9 @@ where
         let universe = environment.deps(&roots, None).await?;
         let reverse = environment.rdeps(&universe, &rdeps.1, rdeps.2).await?;
         return match filter {
+            Some(regex) if expression.is_cquery_kind_rdeps() => {
+                environment.kind(&regex, &reverse).await
+            }
             Some(regex) => environment.filter(&regex, &reverse).await,
             None if expression.is_cquery_executables_rdeps() => {
                 environment.executables(&reverse).await
@@ -175,7 +178,7 @@ fn compile_cquery_filter_rdeps_regex(
     expression: &QueryExpression,
 ) -> Result<Option<Regex>, QueryError> {
     expression
-        .cquery_filter_rdeps_pattern()
+        .cquery_regex_rdeps_pattern()
         .map(compile_slug_regex)
         .transpose()
 }
@@ -1783,6 +1786,38 @@ mod tests {
 
         let failed =
             QueryExpression::parse("executables(rdeps(//pkg:root, //pkg:rdeps_error))").unwrap();
+        environment.events.clear();
+        futures::executor::block_on(evaluate_cquery_query(&mut environment, &failed)).unwrap_err();
+        assert_eq!(environment.events.len(), 3);
+        assert!(environment.events.last().unwrap().starts_with("rdeps:"));
+    }
+
+    #[test]
+    fn cquery_kind_rdeps_compiles_first_and_projects_only_after_reverse() {
+        let expression =
+            QueryExpression::parse("kind('child$', rdeps(//pkg:root, //pkg:child, 1))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:child"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:root",
+                "deps://pkg:root:all",
+                "rdeps://pkg:root,//pkg:root:child://pkg:child:Some(1)",
+                "kind://pkg:child",
+            ]
+        );
+
+        let invalid = QueryExpression::parse("kind('(', rdeps(//pkg:error, //pkg:child))").unwrap();
+        environment.events.clear();
+        futures::executor::block_on(evaluate_cquery_query(&mut environment, &invalid)).unwrap_err();
+        assert!(environment.events.is_empty());
+
+        let failed =
+            QueryExpression::parse("kind('.*', rdeps(//pkg:root, //pkg:rdeps_error))").unwrap();
         environment.events.clear();
         futures::executor::block_on(evaluate_cquery_query(&mut environment, &failed)).unwrap_err();
         assert_eq!(environment.events.len(), 3);

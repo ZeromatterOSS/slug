@@ -763,6 +763,13 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         ])
         .is_ok()
     );
+    assert!(
+        CqueryRequest::parse(&[
+            "--noimplicit_deps",
+            "kind('(', rdeps(//pkg:bin, //pkg:child))",
+        ])
+        .is_ok()
+    );
     for depth in ["0", "1", "'-1'", "'-2147483648'", "2147483647"] {
         let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &expression]).is_ok());
@@ -772,6 +779,8 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &filtered]).is_ok());
         let executable = format!("executables(rdeps(//pkg:bin, //pkg:child, {depth}))");
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &executable]).is_ok());
+        let kind = format!("kind('rule', rdeps(//pkg:bin, //pkg:child, {depth}))");
+        assert!(CqueryRequest::parse(&["--noimplicit_deps", &kind]).is_ok());
     }
     for depth in ["2147483648", "'-2147483649'"] {
         let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
@@ -799,7 +808,6 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         "filter('child$', rdeps(@dep//pkg:bin, //pkg:child))",
         "filter('child$', rdeps(//pkg:bin, @dep//pkg:child))",
         "filter('child$', rdeps(//pkg/..., //pkg:child))",
-        "kind('rule', rdeps(//pkg:bin, //pkg:child))",
         "filter('child$', filter('child$', rdeps(//pkg:bin, //pkg:child)))",
         "executables(rdeps(deps(//pkg:bin), //pkg:child))",
         "executables(rdeps(set(//pkg:bin), //pkg:child))",
@@ -809,6 +817,14 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         "executables(rdeps(//pkg/..., //pkg:child))",
         "executables(executables(rdeps(//pkg:bin, //pkg:child)))",
         "filter('child$', executables(rdeps(//pkg:bin, //pkg:child)))",
+        "kind('rule', rdeps(deps(//pkg:bin), //pkg:child))",
+        "kind('rule', rdeps(set(//pkg:bin), //pkg:child))",
+        "kind('rule', rdeps(//pkg:bin, set(//pkg:child)))",
+        "kind('rule', rdeps(@dep//pkg:bin, //pkg:child))",
+        "kind('rule', rdeps(//pkg:bin, @dep//pkg:child))",
+        "kind('rule', rdeps(//pkg/..., //pkg:child))",
+        "kind('rule', kind('rule', rdeps(//pkg:bin, //pkg:child)))",
+        "executables(kind('rule', rdeps(//pkg:bin, //pkg:child)))",
     ] {
         assert!(
             CqueryRequest::parse(&["--noimplicit_deps", expression]).is_err(),

@@ -7069,3 +7069,24 @@ Run next `WP-6-m38-cquery-kind-rdeps-direct`. Admit only
 compile-before-activation preflight to this one wrapper, then apply the existing
 configured target-kind projection after reverse traversal. Keep all other
 wrappers and stopped reverse surfaces excluded.
+
+### Configured-query kind direct reverse ACCEPT (2026-08-10)
+
+`WP-6-m38-cquery-kind-rdeps-direct` is **ACCEPTED**. The fixed wrapper shares
+M36's regex-before-activation preflight, then runs the accepted direct reverse
+traversal and existing fail-closed configured-kind projection. Reverse errors
+prevent projection; ordinary-rule versus alias selection, transitioned duplicate
+keys, reverse depths, empty success, selected-induced graphs, and the existing
+unsupported-Platform boundary remain proven.
+
+Query passes 119 tests, commands 19, focused core including Platform, focused
+server, and rebuilt CLI daemon symmetry. Formatting, archive, daemon, diff, and
+independent review gates pass. The net Rust delta is 21 production and 173 test
+lines, 194 total, within 100/300/400 caps. No DICE, state, graph, cache, vendor,
+output, or wire owner changed.
+
+Run next `WP-6-m39-cquery-milestone-close-aquery-entry-audit`. Independently
+test the canonical M4 exit claim against the complete provider/transition/graph
+evidence and, only if it holds, select a read-only M5 aquery design/evidence
+entry packet. Do not add further cquery breadth or any M5 production in the
+audit.

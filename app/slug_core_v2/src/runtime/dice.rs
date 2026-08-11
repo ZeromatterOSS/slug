@@ -7626,6 +7626,90 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             filtered_empty.graph_stdout(),
             "digraph mygraph {\n  node [shape=box];\n}\n"
         );
+        let kind_zero = run(
+            "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, 0))",
+            false,
+            true,
+        )
+        .unwrap();
+        let kind_zero = kind_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            kind_zero.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n"
+        );
+        let zero_keys = kind_zero
+            .analyses()
+            .map(|analysis| analysis.key().clone())
+            .collect::<Vec<_>>();
+        assert_eq!(zero_keys.len(), 2);
+        assert_ne!(zero_keys[0], zero_keys[1]);
+        let kind_full = run(
+            "kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary))",
+            false,
+            true,
+        )
+        .unwrap();
+        let kind_full = kind_full.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            kind_full.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n@@//:root\n"
+        );
+        assert_topology(
+            kind_full,
+            &[
+                "  \"//:ordinary (base)\"",
+                "  \"//:ordinary (transition)\"",
+                "  \"//:root (base)\"",
+            ],
+            &[
+                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
+            ],
+        );
+        let kind_zero_graph = kind_zero.graph_stdout();
+        let kind_full_graph = kind_full.graph_stdout();
+        for (depth, expected) in [
+            ("'-1'", "digraph mygraph {\n  node [shape=box];\n}\n"),
+            ("0", kind_zero_graph.as_str()),
+            ("1", kind_full_graph.as_str()),
+            ("2147483647", kind_full_graph.as_str()),
+        ] {
+            let bounded = run(
+                &format!("kind('^ordinary_rule rule$', rdeps(//:root, //:ordinary, {depth}))"),
+                false,
+                true,
+            )
+            .unwrap();
+            let bounded = bounded.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(bounded.graph_stdout(), expected, "depth {depth}");
+        }
+        let aliases = run(
+            "kind('^alias rule$', rdeps(//:root, //:ordinary))",
+            false,
+            true,
+        )
+        .unwrap();
+        let aliases = aliases.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_topology(
+            aliases,
+            &["  \"//:alias_inner (base)\"", "  \"//:alias_outer (base)\""],
+            &["  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\""],
+        );
+        let kind_empty = run(
+            "kind('^producer rule$', rdeps(//:root, //:ordinary))",
+            false,
+            true,
+        )
+        .unwrap();
+        assert!(
+            kind_empty
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .label_stdout()
+                .is_empty()
+        );
         let reverse_keys = reverse
             .analyses()
             .map(|analysis| analysis.key().clone())
@@ -7699,6 +7783,8 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         for expression in [
             "filter('(', rdeps(//:universe_missing, //:ordinary))",
             "filter('(', rdeps(//:root, //:missing))",
+            "kind('(', rdeps(//:universe_missing, //:ordinary))",
+            "kind('(', rdeps(//:root, //:missing))",
         ] {
             let invalid = run(expression, false, true).unwrap();
             assert!(matches!(
