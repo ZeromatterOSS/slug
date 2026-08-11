@@ -73,6 +73,10 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "rdeps(//pkg:root, //pkg:bin, '-1')",
         "rdeps(//pkg:root, //pkg:bin, '-2147483648')",
         "rdeps(//pkg:root, //pkg:bin, 2147483647)",
+        "filter('bin$', rdeps(//pkg:root, //pkg:bin))",
+        "filter('bin$', rdeps(//pkg:root, //pkg:bin, 0))",
+        "filter('bin$', rdeps(//pkg:root, //pkg:bin, '-2147483648'))",
+        "filter('bin$', rdeps(//pkg:root, //pkg:bin, 2147483647))",
         "executables(deps(//pkg:bin))",
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
@@ -121,6 +125,13 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "let universe = //pkg:root in rdeps($universe, //pkg:bin)",
         "rdeps(deps(//pkg:root), set(//pkg:bin))",
         "filter('bin', rdeps(deps(//pkg:root), //pkg:bin))",
+        "filter('bin', rdeps(set(//pkg:root), //pkg:bin))",
+        "filter('bin', rdeps($universe, //pkg:bin))",
+        "filter('bin', rdeps(//pkg:root, set(//pkg:bin)))",
+        "filter('bin', rdeps(//pkg:root, //pkg:bin, 1, 2))",
+        "filter('bin', filter('bin', rdeps(//pkg:root, //pkg:bin)))",
+        "kind('rule', rdeps(//pkg:root, //pkg:bin))",
+        "executables(rdeps(//pkg:root, //pkg:bin))",
         "rdeps(deps(//pkg:root), //pkg:bin) union //pkg:other",
         "filter('bin', deps(set(//pkg:bin)))",
         "filter('bin', deps(//pkg:bin), //pkg:lib)",
@@ -223,6 +234,15 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     );
     assert_eq!(cquery_literals(&direct), ["//pkg:root"]);
     assert_eq!(direct.cquery_rdeps_seed(), Some("//pkg:bin"));
+    let filtered =
+        QueryExpression::parse("filter('bin$', rdeps(//pkg:root, //pkg:bin, 1))").unwrap();
+    validate_cquery_query(&filtered).unwrap();
+    assert_eq!(
+        filtered.cquery_preactivation_deps_spec(),
+        direct.cquery_preactivation_deps_spec()
+    );
+    assert_eq!(cquery_literals(&filtered), ["//pkg:root"]);
+    assert_eq!(filtered.cquery_rdeps_seed(), Some("//pkg:bin"));
     let bounded =
         QueryExpression::parse("rdeps(deps(//pkg:root, 2), //pkg:bin, '-2147483648')").unwrap();
     validate_cquery_query(&bounded).unwrap();

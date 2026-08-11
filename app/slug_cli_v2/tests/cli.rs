@@ -1230,6 +1230,21 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
             "@@//:child\n@@//:root\n",
         ),
         (
+            "filter('.*', rdeps(//:root, //:child))",
+            "@@//:child\n@@//:root\n",
+        ),
+        ("filter('.*', rdeps(//:root, //:child, '-1'))", ""),
+        ("filter('.*', rdeps(//:root, //:child, 0))", "@@//:child\n"),
+        (
+            "filter('.*', rdeps(//:root, //:child, 1))",
+            "@@//:child\n@@//:root\n",
+        ),
+        (
+            "filter('.*', rdeps(//:root, //:child, 2147483647))",
+            "@@//:child\n@@//:root\n",
+        ),
+        ("filter('missing', rdeps(//:root, //:child))", ""),
+        (
             "rdeps(deps(//:root, 0), //:child)",
             "@@//:child\n@@//:root\n",
         ),
@@ -1248,6 +1263,23 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         let daemon = run(Some(&output_base), reverse_expression, false);
         assert!(daemon.status.success(), "{reverse_expression}: {daemon:?}");
         assert_eq!(daemon.stdout, reverse.stdout, "{reverse_expression}");
+    }
+    for invalid_expression in [
+        "filter('(', rdeps(//:missing, //:child))",
+        "filter('(', rdeps(//:root, //:missing))",
+    ] {
+        let one_shot = run(None, invalid_expression, false);
+        assert_eq!(one_shot.status.code(), Some(2), "{one_shot:?}");
+        assert!(
+            String::from_utf8_lossy(&one_shot.stderr).contains("invalid Slug regex"),
+            "{one_shot:?}"
+        );
+        let daemon = run(Some(&output_base), invalid_expression, false);
+        assert_eq!(daemon.status.code(), Some(2), "{daemon:?}");
+        assert!(
+            String::from_utf8_lossy(&daemon.stderr).contains("invalid Slug regex"),
+            "{daemon:?}"
+        );
     }
 
     let wrapped_expression = "executables(deps(//:root))";

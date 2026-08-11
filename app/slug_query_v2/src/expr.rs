@@ -249,10 +249,7 @@ pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryP
 
 /// Validates the deliberately small configured-query subset.
 pub fn validate_cquery_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
-    if matches!(
-        &expression.kind,
-        QueryExpressionKind::Function { name, .. } if name.value == "rdeps"
-    ) {
+    if cquery_rdeps_expression(expression).is_some() {
         return parse_cquery_rdeps_spec(expression).map(|_| ());
     }
     if matches!(
@@ -551,28 +548,79 @@ impl QueryExpression {
         parse_cquery_rdeps_spec(self).ok()
     }
 
-    pub fn cquery_rdeps_seed(&self) -> Option<&str> {
+    pub(crate) fn cquery_filter_rdeps_pattern(&self) -> Option<&str> {
         let QueryExpressionKind::Function { name, args } = &self.kind else {
             return None;
         };
-        (name.value == "rdeps")
-            .then_some(args.get(1))
-            .flatten()
-            .and_then(|seed| match &seed.kind {
-                QueryExpressionKind::TargetLiteral(seed) => Some(seed.as_str()),
-                _ => None,
-            })
+        match (name.value.as_str(), &args[..]) {
+            ("filter", [pattern, operand])
+                if matches!(
+                    operand.kind,
+                    QueryExpressionKind::Function { ref name, .. } if name.value == "rdeps"
+                ) =>
+            {
+                match &pattern.kind {
+                    QueryExpressionKind::TargetLiteral(pattern) => Some(pattern),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn cquery_rdeps_seed(&self) -> Option<&str> {
+        let QueryExpressionKind::Function { args, .. } = &cquery_rdeps_expression(self)?.kind
+        else {
+            return None;
+        };
+        args.get(1).and_then(|seed| match &seed.kind {
+            QueryExpressionKind::TargetLiteral(seed) => Some(seed.as_str()),
+            _ => None,
+        })
+    }
+}
+
+fn cquery_rdeps_expression(expression: &QueryExpression) -> Option<&QueryExpression> {
+    let QueryExpressionKind::Function { name, args } = &expression.kind else {
+        return None;
+    };
+    match (name.value.as_str(), &args[..]) {
+        ("rdeps", _) => Some(expression),
+        ("filter", [pattern, operand])
+            if matches!(pattern.kind, QueryExpressionKind::TargetLiteral(_))
+                && matches!(
+                    operand.kind,
+                    QueryExpressionKind::Function { ref name, .. } if name.value == "rdeps"
+                ) =>
+        {
+            Some(operand)
+        }
+        _ => None,
     }
 }
 
 fn parse_cquery_rdeps_spec(
     expression: &QueryExpression,
 ) -> Result<CqueryRdepsSpec, QueryParseError> {
-    let QueryExpressionKind::Function { name, args } = &expression.kind else {
-        return Err(QueryParseError::new(
+    let rdeps_expression = cquery_rdeps_expression(expression).ok_or_else(|| {
+        QueryParseError::new(
             "rdeps() is supported only as a top-level cquery expression",
             expression.span,
-        ));
+        )
+    })?;
+    let filter_rdeps = !matches!(
+        expression.kind,
+        QueryExpressionKind::Function { ref name, .. } if name.value == "rdeps"
+    );
+    if filter_rdeps {
+        let QueryExpressionKind::Function { args, .. } = &expression.kind else {
+            unreachable!("fixed filter rdeps shape");
+        };
+        validate_function_arguments(expression, args, cquery_function("filter"))?;
+    }
+    let expression = rdeps_expression;
+    let QueryExpressionKind::Function { name, args } = &expression.kind else {
+        unreachable!("fixed rdeps expression");
     };
     if name.value != "rdeps" {
         return Err(QueryParseError::new(
@@ -581,6 +629,17 @@ fn parse_cquery_rdeps_spec(
         ));
     }
     validate_function_arguments(expression, args, cquery_function("rdeps"))?;
+    if filter_rdeps
+        && !matches!(
+            args[0].kind,
+            QueryExpressionKind::TargetLiteral(ref target) if !target.starts_with('$')
+        )
+    {
+        return Err(QueryParseError::new(
+            "filtered cquery rdeps() requires one direct concrete universe literal",
+            args[0].span,
+        ));
+    }
     let universe = match &args[0].kind {
         QueryExpressionKind::TargetLiteral(target) if !target.starts_with('$') => CqueryDepsSpec {
             target: target.clone(),

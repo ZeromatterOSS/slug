@@ -56,6 +56,7 @@ pub use expr::validate_loading_query;
 pub use generic::CqueryQueryEnvironment;
 pub use generic::TargetSet;
 pub use generic::evaluate_cquery_query;
+pub use generic::preflight_cquery_query;
 pub use graph::QueryAttribute;
 pub use graph::QueryEdge;
 pub use graph::QueryEdgeKind;

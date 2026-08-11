@@ -119,6 +119,7 @@ use slug_query_v2::TargetSet;
 use slug_query_v2::cquery_literals;
 use slug_query_v2::evaluate_cquery_query;
 use slug_query_v2::evaluate_loading_query_with_policy_and_output_completion;
+use slug_query_v2::preflight_cquery_query;
 use slug_query_v2::render_unfactored_dot;
 use slug_query_v2::validate_cquery_query;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -1286,6 +1287,11 @@ impl NativeCommandRoot for CqueryCommandRoot {
         transaction: &mut dice::DiceTransaction,
     ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>
     {
+        if let Err(error) = preflight_cquery_query(&self.expression) {
+            return Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(
+                Arc::new(Err(CqueryCommandError::from_evaluator_error(error))),
+            ));
+        }
         let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
         let mut results = Vec::with_capacity(self.roots.len());
         for root in self.roots.iter() {
@@ -7545,6 +7551,81 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "{depth} configured keys"
             );
         }
+        for (depth, expected) in [
+            ("", reverse),
+            (", '-2147483648'", negative),
+            (", 0", reverse_zero),
+            (", 1", reverse_one),
+            (", 2147483647", reverse),
+        ] {
+            let filtered = run(
+                &format!("filter('.*', rdeps(//:root, //:ordinary{depth}))"),
+                false,
+                true,
+            )
+            .unwrap();
+            let filtered = filtered.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(filtered.label_stdout(), expected.label_stdout(), "{depth}");
+            assert_eq!(
+                filtered.label_kind_stdout().unwrap(),
+                expected.label_kind_stdout().unwrap(),
+                "{depth}"
+            );
+            assert_eq!(
+                filtered.starlark_label_stdout(),
+                expected.starlark_label_stdout(),
+                "{depth}"
+            );
+            assert_eq!(filtered.graph_stdout(), expected.graph_stdout(), "{depth}");
+            assert_eq!(
+                filtered
+                    .analyses()
+                    .map(|analysis| analysis.key().clone())
+                    .collect::<Vec<_>>(),
+                expected
+                    .analyses()
+                    .map(|analysis| analysis.key().clone())
+                    .collect::<Vec<_>>(),
+                "{depth} configured keys"
+            );
+        }
+        let selected = run(
+            "filter('ordinary|alias_', rdeps(//:root, //:ordinary))",
+            false,
+            true,
+        )
+        .unwrap();
+        let selected = selected.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(selected.analyses().count(), 4);
+        assert_topology(
+            selected,
+            &[
+                "  \"//:alias_inner (base)\"",
+                "  \"//:alias_outer (base)\"",
+                "  \"//:ordinary (base)\"",
+                "  \"//:ordinary (transition)\"",
+            ],
+            &[
+                "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:alias_outer (base)\" -> \"//:alias_inner (base)\"",
+            ],
+        );
+        let filtered_empty = run(
+            "filter('never-matches', rdeps(//:root, //:ordinary))",
+            false,
+            true,
+        )
+        .unwrap();
+        let filtered_empty = filtered_empty
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert!(filtered_empty.label_stdout().is_empty());
+        assert_eq!(
+            filtered_empty.graph_stdout(),
+            "digraph mygraph {\n  node [shape=box];\n}\n"
+        );
         let reverse_keys = reverse
             .analyses()
             .map(|analysis| analysis.key().clone())
@@ -7615,6 +7696,16 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             missing.terminal_for_test().as_ref().as_ref().unwrap_err(),
             CqueryCommandError::MissingTarget { requested, .. } if requested.as_ref() == "//:missing"
         ));
+        for expression in [
+            "filter('(', rdeps(//:universe_missing, //:ordinary))",
+            "filter('(', rdeps(//:root, //:missing))",
+        ] {
+            let invalid = run(expression, false, true).unwrap();
+            assert!(matches!(
+                invalid.terminal_for_test().as_ref().as_ref().unwrap_err(),
+                CqueryCommandError::Request(message) if message.contains("invalid Slug regex")
+            ));
+        }
         let bad_universe = run("rdeps(//:universe_missing, //pending:seed)", false, true).unwrap();
         assert!(matches!(
             bad_universe.terminal_for_test().as_ref().as_ref().unwrap_err(),
@@ -8112,6 +8203,19 @@ executable_rule(
         missing_source_epoch.file("/workspace/defs.bzl", DELEGATING_DEFS, 2);
         missing_source_epoch.package("", DELEGATING_BUILD, 2);
         let mut transaction = build_root_transaction(&dice, missing_source_epoch.build()).await;
+        let invalid_root = CqueryCommandRoot {
+            expression: QueryExpression::parse("filter('(', rdeps(//:root, //:missing))").unwrap(),
+            roots: root.roots.clone(),
+            literal_roots: root.literal_roots.clone(),
+            include_implicit: root.include_implicit,
+            include_tool: root.include_tool,
+        };
+        let invalid = invalid_root.compute(&mut transaction).await.unwrap();
+        assert!(matches!(
+            invalid,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(CqueryCommandError::Request(message)) if message.contains("invalid Slug regex"))
+        ));
         let outcome = root.compute(&mut transaction).await.unwrap();
         assert!(
             matches!(outcome, slug_bzlmod_v2::SourcePreparationOutcome::Need(_)),

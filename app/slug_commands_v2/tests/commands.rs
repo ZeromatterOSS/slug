@@ -749,11 +749,20 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         CqueryRequest::parse(&["--noimplicit_deps", "rdeps(deps(//pkg:bin), //pkg:child)",])
             .is_ok()
     );
+    assert!(
+        CqueryRequest::parse(&[
+            "--noimplicit_deps",
+            "filter('(', rdeps(//pkg:bin, //pkg:child))",
+        ])
+        .is_ok()
+    );
     for depth in ["0", "1", "'-1'", "'-2147483648'", "2147483647"] {
         let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &expression]).is_ok());
         let direct = format!("rdeps(//pkg:bin, //pkg:child, {depth})");
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &direct]).is_ok());
+        let filtered = format!("filter('child$', rdeps(//pkg:bin, //pkg:child, {depth}))");
+        assert!(CqueryRequest::parse(&["--noimplicit_deps", &filtered]).is_ok());
     }
     for depth in ["2147483648", "'-2147483649'"] {
         let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
@@ -775,6 +784,15 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         "rdeps(//pkg/..., //pkg:child)",
         "rdeps(@dep//pkg:bin, //pkg:child)",
         "rdeps(//pkg:bin, @dep//pkg:child)",
+        "filter('child$', rdeps(deps(//pkg:bin), //pkg:child))",
+        "filter('child$', rdeps(set(//pkg:bin), //pkg:child))",
+        "filter('child$', rdeps(//pkg:bin, set(//pkg:child)))",
+        "filter('child$', rdeps(@dep//pkg:bin, //pkg:child))",
+        "filter('child$', rdeps(//pkg:bin, @dep//pkg:child))",
+        "filter('child$', rdeps(//pkg/..., //pkg:child))",
+        "kind('rule', rdeps(//pkg:bin, //pkg:child))",
+        "executables(rdeps(//pkg:bin, //pkg:child))",
+        "filter('child$', filter('child$', rdeps(//pkg:bin, //pkg:child)))",
     ] {
         assert!(
             CqueryRequest::parse(&["--noimplicit_deps", expression]).is_err(),

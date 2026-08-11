@@ -993,6 +993,23 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
         assert_eq!(direct.exit_code, 0, "{output}: {direct:?}");
         assert!(direct.stderr.is_empty(), "{output}: {direct:?}");
         assert_eq!(direct.stdout, reverse.stdout, "{output}");
+        let filtered_request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"filter('.*', rdeps(//pkg:probe, //pkg:probe))","include_implicit":false,"output":"{output}"}}}}"#,
+        );
+        let filtered = handle_request(&mut daemon, &filtered_request);
+        assert_eq!(filtered.exit_code, 0, "{output}: {filtered:?}");
+        assert_eq!(filtered.stdout, direct.stdout, "{output}");
+    }
+    for expression in [
+        "filter('(', rdeps(//pkg:missing, //pkg:probe))",
+        "filter('(', rdeps(//pkg:probe, //pkg:missing))",
+    ] {
+        let request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"{expression}","include_implicit":false,"output":"label"}}}}"#,
+        );
+        let invalid = handle_request(&mut daemon, &request);
+        assert_eq!(invalid.exit_code, 2, "{invalid:?}");
+        assert!(invalid.stderr.contains("invalid Slug regex"), "{invalid:?}");
     }
     for (depth, present) in [("0", true), ("1", true), ("'-1'", false)] {
         let request = format!(

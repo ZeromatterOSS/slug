@@ -149,10 +149,15 @@ where
     E: CqueryQueryEnvironment + Send,
 {
     validate_cquery_query(expression).map_err(|error| QueryError::syntax(error.to_string()))?;
+    let filter = compile_cquery_filter_rdeps_regex(expression)?;
     if let Some(rdeps) = expression.cquery_rdeps_spec() {
         let roots = environment.resolve_literal(rdeps.0.target()).await?;
         let universe = environment.deps(&roots, None).await?;
-        return environment.rdeps(&universe, &rdeps.1, rdeps.2).await;
+        let reverse = environment.rdeps(&universe, &rdeps.1, rdeps.2).await?;
+        return match filter {
+            Some(regex) => environment.filter(&regex, &reverse).await,
+            None => Ok(reverse),
+        };
     }
     if let Some(deps) = expression.cquery_deps_spec() {
         let roots = environment.resolve_literal(deps.target()).await?;
@@ -161,6 +166,19 @@ where
     let mut variables = SmallMap::new();
     let mut context = CqueryContext(environment);
     evaluate_query_expression_inner(&mut context, expression, &mut variables).await
+}
+
+fn compile_cquery_filter_rdeps_regex(
+    expression: &QueryExpression,
+) -> Result<Option<Regex>, QueryError> {
+    expression
+        .cquery_filter_rdeps_pattern()
+        .map(compile_slug_regex)
+        .transpose()
+}
+
+pub fn preflight_cquery_query(expression: &QueryExpression) -> Result<(), QueryError> {
+    compile_cquery_filter_rdeps_regex(expression).map(drop)
 }
 
 struct CqueryContext<'a, E>(&'a mut E);
@@ -1708,6 +1726,32 @@ mod tests {
             environment.events,
             ["resolve://pkg:error", "deps://pkg:error:all"]
         );
+    }
+
+    #[test]
+    fn cquery_filter_rdeps_compiles_before_universe_then_filters_reverse_results() {
+        let expression =
+            QueryExpression::parse("filter('child$', rdeps(//pkg:root, //pkg:child, 1))").unwrap();
+        let mut environment = CqueryEnvironment { events: Vec::new() };
+        let result =
+            futures::executor::block_on(evaluate_cquery_query(&mut environment, &expression))
+                .unwrap();
+        assert_eq!(result, ["//pkg:child"]);
+        assert_eq!(
+            environment.events,
+            [
+                "resolve://pkg:root",
+                "deps://pkg:root:all",
+                "rdeps://pkg:root,//pkg:root:child://pkg:child:Some(1)",
+                "filter://pkg:child",
+            ]
+        );
+
+        let invalid =
+            QueryExpression::parse("filter('(', rdeps(//pkg:error, //pkg:child))").unwrap();
+        environment.events.clear();
+        futures::executor::block_on(evaluate_cquery_query(&mut environment, &invalid)).unwrap_err();
+        assert!(environment.events.is_empty());
     }
 
     #[test]

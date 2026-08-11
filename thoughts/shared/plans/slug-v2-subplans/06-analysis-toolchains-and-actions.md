@@ -7022,7 +7022,30 @@ cache, graph, vendor, output, or wire ownership changed.
 
 Run next `WP-6-m36-cquery-filter-rdeps-direct`. Admit only
 `filter(<word regex>, rdeps(<direct root>, <seed>[, depth]))` under
-`--noimplicit_deps`, evaluate reverse traversal before the existing label
-filter, and preserve selected-induced output. Keep every other wrapper,
+`--noimplicit_deps`. Compile the regex before any configured/source activation,
+then evaluate reverse traversal and apply the existing label filter, preserving
+selected-induced output. Keep every other wrapper,
 non-direct universe, multiple seed, same-package reverse, path, stopped
 topology, exact-hash, JVM/Java, and CI surface excluded.
+
+### Configured-query filtered direct reverse ACCEPT (2026-08-10)
+
+`WP-6-m36-cquery-filter-rdeps-direct` is **ACCEPTED** after one source-backed
+precedence correction. The fixed outer filter compiles with the established
+Slug-native regex contract before any command-root DICE, universe, or seed
+work, matching Bazel's compile-before-operand ordering. Valid patterns then run
+the accepted direct reverse traversal and existing label filter. Compilation is
+deterministically repeated in the evaluator and never retained.
+
+Query passes 117 tests, commands 19, two focused core regressions, focused
+server, and rebuilt CLI daemon symmetry. Invalid regex masks universe Need and
+missing universe/seed errors; valid traversal retains duplicate configured
+keys, aliases, reverse depths, empty success, and selected-induced graphs.
+Formatting, archive, daemon, diff, and independent design/final review gates
+pass. The 295-net-line Rust packet remains within 130/320/450 caps and adds no
+semantic state, DICE owner, graph, cache, or vendor change.
+
+Run next `WP-6-m37-cquery-executables-rdeps-direct`. Admit only
+`executables(rdeps(<direct root>, <seed>[, depth])) --noimplicit_deps`, run the
+accepted reverse traversal first, then apply the existing executable-non-test
+predicate. Keep every other wrapper and stopped reverse surface excluded.
