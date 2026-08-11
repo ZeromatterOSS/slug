@@ -581,7 +581,13 @@ fn parse_cquery_rdeps_spec(
         ));
     }
     validate_function_arguments(expression, args, cquery_function("rdeps"))?;
-    let universe = parse_cquery_deps_spec(&args[0])?;
+    let universe = match &args[0].kind {
+        QueryExpressionKind::TargetLiteral(target) if !target.starts_with('$') => CqueryDepsSpec {
+            target: target.clone(),
+            depth: None,
+        },
+        _ => parse_cquery_deps_spec(&args[0])?,
+    };
     let from = match &args[1].kind {
         QueryExpressionKind::TargetLiteral(from) if !from.starts_with('$') => from.clone(),
         _ => {

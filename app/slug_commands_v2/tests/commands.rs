@@ -549,6 +549,12 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
             "--noimplicit_deps",
             "rdeps(deps(//pkg:bin), //pkg:child)",
         ],
+        vec![
+            "--output=graph",
+            "--nograph:factored",
+            "--noimplicit_deps",
+            "rdeps(//pkg:bin, //pkg:child)",
+        ],
     ] {
         assert!(CqueryRequest::parse(&args).is_ok(), "{args:?}");
     }
@@ -648,12 +654,6 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
             "filter('^//pkg:', //pkg:bin)",
         ],
         vec![
-            "--output=graph",
-            "--nograph:factored",
-            "--noimplicit_deps",
-            "rdeps(//pkg:bin, //pkg:bin)",
-        ],
-        vec![
             "--output=graph:nofactored",
             "--noimplicit_deps",
             "deps(//pkg:bin)",
@@ -730,6 +730,7 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
 fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     assert!(CqueryRequest::parse(&["deps(//pkg:bin)"]).is_err());
     assert!(CqueryRequest::parse(&["rdeps(deps(//pkg:bin), //pkg:child)"]).is_err());
+    assert!(CqueryRequest::parse(&["rdeps(//pkg:bin, //pkg:child)"]).is_err());
     for expression in [
         "executables(deps(//pkg:bin))",
         "filter('bin$', executables(deps(//pkg:bin)))",
@@ -751,6 +752,8 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     for depth in ["0", "1", "'-1'", "'-2147483648'", "2147483647"] {
         let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &expression]).is_ok());
+        let direct = format!("rdeps(//pkg:bin, //pkg:child, {depth})");
+        assert!(CqueryRequest::parse(&["--noimplicit_deps", &direct]).is_ok());
     }
     for depth in ["2147483648", "'-2147483649'"] {
         let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
@@ -763,6 +766,20 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
     for depth in ["'-1'", "2147483648"] {
         let expression = format!("rdeps(deps(//pkg:bin, {depth}), //pkg:child)");
         assert!(CqueryRequest::parse(&["--noimplicit_deps", &expression]).is_err());
+    }
+    for expression in [
+        "rdeps(set(//pkg:bin), //pkg:child)",
+        "rdeps(executables(//pkg:bin), //pkg:child)",
+        "rdeps(//pkg:bin union //pkg:other, //pkg:child)",
+        "rdeps(//pkg:all, //pkg:child)",
+        "rdeps(//pkg/..., //pkg:child)",
+        "rdeps(@dep//pkg:bin, //pkg:child)",
+        "rdeps(//pkg:bin, @dep//pkg:child)",
+    ] {
+        assert!(
+            CqueryRequest::parse(&["--noimplicit_deps", expression]).is_err(),
+            "{expression}"
+        );
     }
 
     let filtered = CqueryRequest::parse(&[

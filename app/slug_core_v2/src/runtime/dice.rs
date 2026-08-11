@@ -7511,6 +7511,40 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
             negative.graph_stdout(),
             "digraph mygraph {\n  node [shape=box];\n}\n"
         );
+        for depth in ["", ", '-2147483648'", ", 0", ", 1", ", 2147483647"] {
+            let direct = run(&format!("rdeps(//:root, //:ordinary{depth})"), false, true).unwrap();
+            let direct = direct.terminal_for_test().as_ref().as_ref().unwrap();
+            let normalized = run(
+                &format!("rdeps(deps(//:root), //:ordinary{depth})"),
+                false,
+                true,
+            )
+            .unwrap();
+            let normalized = normalized.terminal_for_test().as_ref().as_ref().unwrap();
+            assert_eq!(direct.label_stdout(), normalized.label_stdout(), "{depth}");
+            assert_eq!(
+                direct.label_kind_stdout().unwrap(),
+                normalized.label_kind_stdout().unwrap(),
+                "{depth}"
+            );
+            assert_eq!(
+                direct.starlark_label_stdout(),
+                normalized.starlark_label_stdout(),
+                "{depth}"
+            );
+            assert_eq!(direct.graph_stdout(), normalized.graph_stdout(), "{depth}");
+            assert_eq!(
+                direct
+                    .analyses()
+                    .map(|analysis| analysis.key().clone())
+                    .collect::<Vec<_>>(),
+                normalized
+                    .analyses()
+                    .map(|analysis| analysis.key().clone())
+                    .collect::<Vec<_>>(),
+                "{depth} configured keys"
+            );
+        }
         let reverse_keys = reverse
             .analyses()
             .map(|analysis| analysis.key().clone())
@@ -7572,21 +7606,16 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .to_string()
                 .contains("seed must not be analyzed")
         );
-        let unreachable = run("rdeps(deps(//:root), //:broken)", false, true).unwrap();
+        let unreachable = run("rdeps(//:root, //:broken)", false, true).unwrap();
         let unreachable = unreachable.terminal_for_test().as_ref().as_ref().unwrap();
         assert!(unreachable.label_stdout().is_empty());
         assert_eq!(unreachable.analyses().count(), 0);
-        let missing = run("rdeps(deps(//:root), //:missing)", false, true).unwrap();
+        let missing = run("rdeps(//:root, //:missing)", false, true).unwrap();
         assert!(matches!(
             missing.terminal_for_test().as_ref().as_ref().unwrap_err(),
             CqueryCommandError::MissingTarget { requested, .. } if requested.as_ref() == "//:missing"
         ));
-        let bad_universe = run(
-            "rdeps(deps(//:universe_missing), //pending:seed)",
-            false,
-            true,
-        )
-        .unwrap();
+        let bad_universe = run("rdeps(//:universe_missing, //pending:seed)", false, true).unwrap();
         assert!(matches!(
             bad_universe.terminal_for_test().as_ref().as_ref().unwrap_err(),
             CqueryCommandError::MissingTarget { requested, .. }
@@ -7603,7 +7632,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .contains("default seed must not be analyzed")
         );
         let transitioned = run(
-            "rdeps(deps(//:transition_root, 1), //:transition_only, 0)",
+            "rdeps(//:transition_root, //:transition_only, 0)",
             false,
             true,
         )
@@ -8064,7 +8093,7 @@ executable_rule(
 
     #[tokio::test]
     async fn cquery_rdeps_universe_need_precedes_seed_validation() {
-        let expression = QueryExpression::parse("rdeps(deps(//:root, 1), //:missing)").unwrap();
+        let expression = QueryExpression::parse("rdeps(//:root, //:missing)").unwrap();
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let root = CqueryCommandRoot {
             expression,

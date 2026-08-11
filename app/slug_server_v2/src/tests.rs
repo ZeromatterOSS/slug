@@ -986,6 +986,13 @@ fn cquery_wire_requires_a_known_output_mode_before_dispatch() {
             reverse.stdout.contains("//pkg:probe"),
             "{output}: {reverse:?}"
         );
+        let direct_request = format!(
+            r#"{{"kind":"cquery","request":{{"expression":"rdeps(//pkg:probe, //pkg:probe)","include_implicit":false,"output":"{output}"}}}}"#,
+        );
+        let direct = handle_request(&mut daemon, &direct_request);
+        assert_eq!(direct.exit_code, 0, "{output}: {direct:?}");
+        assert!(direct.stderr.is_empty(), "{output}: {direct:?}");
+        assert_eq!(direct.stdout, reverse.stdout, "{output}");
     }
     for (depth, present) in [("0", true), ("1", true), ("'-1'", false)] {
         let request = format!(

@@ -1,29 +1,38 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m34-cquery-reverse-successor-audit`
+Packet: `WP-6-m36-cquery-filter-rdeps-direct`
 Milestone: M4 configured query
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only successor audit after accepted inner-depth normalization.
+Result: implementation after accepted direct-universe normalization.
 
 ## Observable slice
 
-Select the next smallest exact Bazel 9.2 configured reverse-query behavior after
-`rdeps(deps(root[, syntactic_depth]), seed[, reverse_depth])`. The optional inner
-depth is syntax only here: Bazel re-closes the universe transitively from root,
-so zero, positive, maximum, and omitted inner depths have identical results.
+Admit exactly
+`filter(<one regex word>, rdeps(<one concrete root-repository universe root>,
+<one concrete root-repository seed>[, <signed Java-int reverse depth>]))
+--noimplicit_deps`. Complete the universe and reverse traversal before applying
+the existing label filter. Regex behavior remains the accepted Slug-native
+valid-Unicode/Rust-regex boundary; non-regex graph semantics are exact Bazel 9.2.
 
 ## Ownership and stops
 
-Reuse the normalized configured graph, full configured/null identity,
-universe-first loading validation, and request-local traversal. Do not implement
-Rust in this audit or add state, keys, caches, adjacency, vendor changes, JVM,
-exact hashes, or CI. Keep general universes, wrappers, path functions, and
-default implicit/tool/external/factored topology stopped unless exact bounded
-source and oracle evidence selects one.
+Reuse M35 direct-universe normalization, universe-first loading-only seed
+validation, full configured/null identity, bounded normalized reverse traversal,
+existing display-label filter, and selected-induced graph output. Production is
+limited to `app/slug_query_v2/src/expr.rs` and `generic.rs`; add no state, keys,
+caches, adjacency, interning, locks, or retained representations.
+
+Keep `kind`/`executables`/nested filter or any other wrapper, `deps`/general/set/
+multi-root/variable/external universes, multiple seeds, same-package reverse,
+paths, default implicit/tool/external/factored topology, parser/vendor changes,
+exact hashes, JVM/Java, and CI stopped.
 
 ## Validation
 
-Read pinned Bazel 9.2 source and accepted oracle evidence, then name one bounded
-implementation packet with exact semantics, stops, caps, and discriminating
-tests, or record `REPLAN`. Bundle this bookkeeping with the next functional
-commit; no standalone documentation commit.
+Use pinned Bazel 9.2 `RdepsFunction` and `RegexFilterExpression` plus accepted
+delegation evidence. Prove universe → reverse → filter order; negative, zero,
+positive, and omitted reverse depth; duplicate configured keys and aliases;
+empty success and selected-induced graph; failures cannot be masked; stopped
+shapes reject; and command/server plus rebuilt CLI daemon symmetry. Run
+formatting, archive, diff, and daemon checks serially. Caps: 90 production / 300
+test / 390 total Rust lines. Bundle bookkeeping with the functional commit.

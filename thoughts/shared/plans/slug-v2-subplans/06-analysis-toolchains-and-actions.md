@@ -6988,3 +6988,41 @@ Run next `WP-6-m34-cquery-reverse-successor-audit` to select the next exact
 bounded reverse-query shape from pinned Bazel 9.2 behavior. Keep general
 universes, wrappers, path functions, stopped topology, exact hashes, JVM/Java,
 and CI excluded.
+
+### Configured reverse successor audit ACCEPT (2026-08-10)
+
+`WP-6-m34-cquery-reverse-successor-audit` is **ACCEPTED** and selects direct
+single-label universe spelling. Pinned Bazel 9.2 `RdepsFunction` evaluates the
+first expression and then builds its unbounded transitive closure before
+reverse traversal, so `rdeps(//:root, seed[, depth])` is equivalent to the
+accepted single-root `deps` spelling. The local delegation oracle confirms
+identical unfactored topology.
+
+Run next `WP-6-m35-cquery-rdeps-direct-universe-normalization`. Normalize one
+concrete root-repository universe label to the existing unbounded
+`CqueryDepsSpec`, retaining all seed validation, full-key traversal, reverse
+depth, output, and daemon behavior. Keep set/multi-root/variable/external
+universes, wrappers, same-package reverse activation, paths, stopped topology,
+exact hashes, JVM/Java, and CI excluded.
+
+### Configured-query direct reverse universe ACCEPT (2026-08-10)
+
+`WP-6-m35-cquery-rdeps-direct-universe-normalization` is **ACCEPTED**. Direct
+`rdeps(root, seed[, depth])` structurally normalizes to the existing unbounded
+single-root universe. Direct and `deps(root)` spellings are byte-identical for
+all four outputs and omitted, negative, zero, positive, and maximum reverse
+depths, including full configured-key vectors, aliases, transitioned seeds,
+missing/unreachable seeds, and universe-first Need ordering.
+
+Query passes 116 tests, commands 19, two focused core regressions, focused
+server and rebuilt CLI daemon symmetry. Formatting, archive, daemon, diff, and
+independent review gates pass. Production changes only `expr.rs` by six net
+lines; tests add 77 net lines, 83 total, within 25/170/195 caps. No state, key,
+cache, graph, vendor, output, or wire ownership changed.
+
+Run next `WP-6-m36-cquery-filter-rdeps-direct`. Admit only
+`filter(<word regex>, rdeps(<direct root>, <seed>[, depth]))` under
+`--noimplicit_deps`, evaluate reverse traversal before the existing label
+filter, and preserve selected-induced output. Keep every other wrapper,
+non-direct universe, multiple seed, same-package reverse, path, stopped
+topology, exact-hash, JVM/Java, and CI surface excluded.

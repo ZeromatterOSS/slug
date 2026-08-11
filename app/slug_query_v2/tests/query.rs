@@ -68,6 +68,11 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "rdeps(deps(//pkg:root, 1), //pkg:bin, 0)",
         "rdeps(deps(//pkg:root, 2), //pkg:bin, 1)",
         "rdeps(deps(//pkg:root, 2147483647), //pkg:bin, 2147483647)",
+        "rdeps(//pkg:root, //pkg:bin)",
+        "rdeps(//pkg:root, //pkg:bin, 0)",
+        "rdeps(//pkg:root, //pkg:bin, '-1')",
+        "rdeps(//pkg:root, //pkg:bin, '-2147483648')",
+        "rdeps(//pkg:root, //pkg:bin, 2147483647)",
         "executables(deps(//pkg:bin))",
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
@@ -110,7 +115,10 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "rdeps(deps(//pkg:root), //pkg:bin, 1, 2)",
         "rdeps(deps(//pkg:root), //pkg:bin, 2147483648)",
         "rdeps(deps(//pkg:root), //pkg:bin, '-2147483649')",
-        "rdeps(//pkg:root, //pkg:bin)",
+        "rdeps(set(//pkg:root), //pkg:bin)",
+        "rdeps(executables(//pkg:root), //pkg:bin)",
+        "rdeps(//pkg:root union //pkg:other, //pkg:bin)",
+        "let universe = //pkg:root in rdeps($universe, //pkg:bin)",
         "rdeps(deps(//pkg:root), set(//pkg:bin))",
         "filter('bin', rdeps(deps(//pkg:root), //pkg:bin))",
         "rdeps(deps(//pkg:root), //pkg:bin) union //pkg:other",
@@ -207,6 +215,14 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!((universe.target(), universe.depth()), ("//pkg:root", None));
     assert_eq!(cquery_literals(&rdeps), ["//pkg:root"]);
     assert_eq!(rdeps.cquery_rdeps_seed(), Some("//pkg:bin"));
+    let direct = QueryExpression::parse("rdeps(//pkg:root, //pkg:bin)").unwrap();
+    validate_cquery_query(&direct).unwrap();
+    assert_eq!(
+        direct.cquery_preactivation_deps_spec(),
+        rdeps.cquery_preactivation_deps_spec()
+    );
+    assert_eq!(cquery_literals(&direct), ["//pkg:root"]);
+    assert_eq!(direct.cquery_rdeps_seed(), Some("//pkg:bin"));
     let bounded =
         QueryExpression::parse("rdeps(deps(//pkg:root, 2), //pkg:bin, '-2147483648')").unwrap();
     validate_cquery_query(&bounded).unwrap();
