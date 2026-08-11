@@ -7271,3 +7271,59 @@ this semantic identity distinct from any graph-local formatter token, Bazel
 ActionKey, and REAPI digest. Select at most one bounded implementation successor
 or `REPLAN`; add no Rust, tests, hashing, formatter, command/wire, execution,
 DICE state, parser/vendor, exact Bazel-byte work, JVM/Java, or CI change.
+
+### FileWrite semantic identity design retry ACCEPT (2026-08-10)
+
+`WP-6-m5-filewrite-semantic-identity-design-retry` is **ACCEPT**. The first
+semantic identity is the complete Slug-owned canonical byte sequence itself,
+not a checksum or digest. Its grammar starts with `slugact\0` and a big-endian
+schema version, then uses tagged, u64-length-framed fields for the configured
+owner; File output kind and relative path; FileWrite mnemonic, content, and
+executable bit; explicit default exec group; selected platform configured key;
+key-ordered exec-property pairs; and the index-ordered configured
+ConstraintValue/ConstraintSetting pairs.
+
+Every configured key encodes its canonical label including repository-mapping
+identity plus the existing structural `SlugConfiguration::canonical_bytes`.
+Legacy/projected configuration strings fail closed. Equality is exact canonical
+byte equality; no 32-byte digest may stand in for semantic equality. Any future
+domain-separated digest or graph-local formatter token is only a presentation
+projection and remains distinct from this identity, Bazel ActionKey/checksum,
+configured output-root spelling, and REAPI/CAS digests.
+
+Run next `WP-6-m5-filewrite-semantic-identity-implementation`. Add only the
+framed encoder and immutable identity over the accepted resolved FileWrite
+view, rejecting every non-structural configured key. Reuse the configuration
+canonical-byte pattern and immutable compact ownership; record the utility
+decision in Stage 9. Prove framing, structural configuration, owner/output,
+Write material, platform property, and constraint-chain change/restoration.
+Add no formatter token/projection digest, aquery command/root/wire, execution,
+DICE state, parser/vendor, exact Bazel bytes, JVM/Java, or CI. Caps: 220
+production / 180 tests / 420 total net lines, including bookkeeping.
+
+### FileWrite semantic identity implementation ACCEPT (2026-08-10)
+
+`WP-6-m5-filewrite-semantic-identity-implementation` is **ACCEPT** at 212
+production and 165 test net lines (377 Rust, 412 including bookkeeping). The
+new immutable `FileWriteSemanticIdentity` is exact `Arc<[u8]>` equality over
+the accepted `slugact\0` versioned, tagged, length-framed grammar. Configured
+keys use canonical labels with mapping provenance and complete structural Slug
+configuration bytes; legacy configurations fail closed.
+
+Resolved-view fields are private behind read-only accessors, leaving the
+validated closure resolver as their sole constructor. Focused tests distinguish
+framing, owner, structural configuration, typed output, content, executable
+bit, selected platform P0/P1/P0, normalized platform properties, and constraint
+setting A/B/A. Formatting, focused identity and resolver tests, diff and archive
+checks, caps, and independent final review pass. No digest, formatter token,
+command/wire, execution, DICE state, parser/vendor, JVM/Java, or CI surface was
+added.
+
+Run next only `WP-6-m5-filewrite-aquery-text-formatter-design-retry`, read-only.
+Reconcile the pinned Bazel 9.2 FileWrite text evidence with the accepted
+configured action view and exact Slug semantic identity. Freeze formatter field
+order and exact-versus-Slug-native classifications, and define any necessary
+short graph-local display token as an explicitly non-identity projection over
+the complete canonical identity. Select at most one bounded implementation
+successor or `REPLAN`; add no Rust, tests, oracle rerun, command/root/wire,
+execution, DICE state, parser/vendor, exact Bazel identity bytes, JVM/Java, or CI.

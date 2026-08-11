@@ -3439,6 +3439,7 @@ dependencies = [
  "regex",
  "sha2",
  "slug_analysis_v2",
+ "slug_build_api_v2",
  "slug_bzlmod_v2",
  "slug_configuration_v2",
  "slug_events_v2",

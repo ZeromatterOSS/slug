@@ -1,25 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m5-filewrite-semantic-identity-design-retry`
+Packet: `WP-6-m5-filewrite-aquery-text-formatter-design-retry`
 Milestone: M5 entry
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: freeze one complete FileWrite semantic identity design.
+Result: freeze the first FileWrite aquery text formatter handoff.
 
 ## Observable slice
 
-Design a collision-safe tagged structural identity for the admitted
-toolchain-backed FileWrite view. Include configured owner, typed output, Write
-content and executable bit, default exec group, selected platform configured
-key, normalized exec properties, and the complete ordered
-Platform-to-ConstraintValue-to-ConstraintSetting chain.
+Reconcile the pinned Bazel 9.2 FileWrite text evidence with the accepted
+configured action view, closure-resolved platform semantics, and exact Slug
+semantic identity. Freeze the first formatter's field order, punctuation,
+labels, inputs, mnemonic, configuration, output path, and action-token spelling,
+classifying every field as exact Bazel-shaped text or an explicit Slug-native
+projection.
 
 ## Ownership and stops
 
-Keep semantic identity separate from any graph-local formatter token, Bazel
-ActionKey/checksum, configuration hash, output-root hash, and REAPI digest.
-Specify domain/version tags, unambiguous field framing, collection order, and
-which existing retained values are borrowed versus projected. Select at most
-one bounded implementation successor or return `REPLAN`.
+The exact canonical bytes remain the only FileWrite semantic identity. Any
+short graph-local display token must be derived from the complete identity,
+domain/version separated, named as a non-identity projection, and never reused
+as Bazel ActionKey/checksum, configuration/output-root hash, REAPI digest, DICE
+key equality, or cache identity. Keep ordinary no-toolchain/non-Write shapes
+fail-closed.
 
 Keep the vendored Buck2 `starlark-rust` parser/evaluator unchanged for BUILD and
 `.bzl` semantics. Aquery syntax is the separate query language and must reuse
@@ -27,9 +29,10 @@ the existing Buck2-derived `QueryExpression` parser. Add no parser.
 
 ## Validation
 
-Audit only the accepted configured-action and closure-resolved platform views.
-No Rust, tests, hash implementation, formatter, aquery command/root/wire,
-execution, new DICE key/state, REAPI reuse, oracle rerun, parser/vendor,
-exact-Bazel-byte work, JVM/Java, or CI changes. Cap: 180 bookkeeping lines.
-Require independent design review and bundle bookkeeping with the next
-functional commit; no standalone documentation commit.
+Read only the accepted FileWrite evidence and live retained views. Select at
+most one bounded implementation successor or return `REPLAN`. No Rust, tests,
+oracle rerun, formatter implementation, aquery command/root/wire, execution,
+new DICE key/state, REAPI reuse, parser/vendor, exact Bazel identity-byte work,
+JVM/Java, or CI. Cap: 180 bookkeeping lines. Require independent design review
+and bundle bookkeeping with the next functional commit; no standalone
+documentation commit.

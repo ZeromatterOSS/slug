@@ -2315,18 +2315,48 @@ pub struct BuildCommandEvaluation {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ResolvedFileWriteSemanticView<'a> {
-    pub action: ConfiguredActionView<'a>,
-    pub platform: &'a ConfiguredNodeResult,
-    pub platform_fact: &'a PlatformSemanticFact,
-    pub platform_constraints: Vec<ResolvedPlatformConstraintSemanticView<'a>>,
+    action: ConfiguredActionView<'a>,
+    platform: &'a ConfiguredNodeResult,
+    platform_fact: &'a PlatformSemanticFact,
+    platform_constraints: Vec<ResolvedPlatformConstraintSemanticView<'a>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct ResolvedPlatformConstraintSemanticView<'a> {
-    pub platform_edge: &'a slug_analysis_v2::ConfiguredEdge,
-    pub constraint_value: &'a ConfiguredNodeResult,
-    pub setting_edge: &'a slug_analysis_v2::ConfiguredEdge,
-    pub constraint_setting: &'a ConfiguredNodeResult,
+    platform_edge: &'a slug_analysis_v2::ConfiguredEdge,
+    constraint_value: &'a ConfiguredNodeResult,
+    setting_edge: &'a slug_analysis_v2::ConfiguredEdge,
+    constraint_setting: &'a ConfiguredNodeResult,
+}
+
+impl<'a> ResolvedFileWriteSemanticView<'a> {
+    pub fn action(&self) -> &ConfiguredActionView<'a> {
+        &self.action
+    }
+    pub fn platform(&self) -> &'a ConfiguredNodeResult {
+        self.platform
+    }
+    pub fn platform_fact(&self) -> &'a PlatformSemanticFact {
+        self.platform_fact
+    }
+    pub fn platform_constraints(&self) -> &[ResolvedPlatformConstraintSemanticView<'a>] {
+        &self.platform_constraints
+    }
+}
+
+impl<'a> ResolvedPlatformConstraintSemanticView<'a> {
+    pub fn platform_edge(&self) -> &'a slug_analysis_v2::ConfiguredEdge {
+        self.platform_edge
+    }
+    pub fn constraint_value(&self) -> &'a ConfiguredNodeResult {
+        self.constraint_value
+    }
+    pub fn setting_edge(&self) -> &'a slug_analysis_v2::ConfiguredEdge {
+        self.setting_edge
+    }
+    pub fn constraint_setting(&self) -> &'a ConfiguredNodeResult {
+        self.constraint_setting
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
@@ -2546,7 +2576,7 @@ impl BuildCommandEvaluation {
                     }
                     if constraints.iter().any(
                         |resolved: &ResolvedPlatformConstraintSemanticView<'_>| {
-                            resolved.constraint_setting.key() == setting.key()
+                            resolved.constraint_setting().key() == setting.key()
                         },
                     ) {
                         return Err("platform has duplicate constraint setting");
@@ -10925,21 +10955,25 @@ def _write(ctx):
 write = rule(implementation = _write, toolchains = ["//:type"])
 "#;
 
-    fn resolved_write_epoch(variant: i64, setting: &str) -> PathObservationEpoch {
+    fn resolved_write_epoch(
+        variant: i64,
+        setting: &str,
+        replacements: &[(&str, &str)],
+    ) -> PathObservationEpoch {
         let mut epoch = BuildRootEpoch::base(variant);
-        epoch.file(
-            "/workspace/MODULE.bazel",
-            "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n",
-            variant,
+        let mut module = "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n".to_owned();
+        let mut defs = RESOLVED_WRITE_DEFS.to_owned();
+        let mut build = format!(
+            "load(\":defs.bzl\", \"toolchain_impl\", \"write\")\nconstraint_setting(name = \"setting_a\")\nconstraint_setting(name = \"setting_b\")\nconstraint_value(name = \"value\", constraint_setting = \":{setting}\")\nplatform(name = \"platform\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\nplatform(name = \"platform_alt\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\ntoolchain_type(name = \"type\")\ntoolchain_impl(name = \"implementation\", marker = \"toolchain\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":implementation\")\nwrite(name = \"write\")\nwrite(name = \"other\")\n"
         );
-        epoch.file("/workspace/defs.bzl", RESOLVED_WRITE_DEFS, variant);
-        epoch.package(
-            "",
-            &format!(
-                "load(\":defs.bzl\", \"toolchain_impl\", \"write\")\nconstraint_setting(name = \"setting_a\")\nconstraint_setting(name = \"setting_b\")\nconstraint_value(name = \"value\", constraint_setting = \":{setting}\")\nplatform(name = \"platform\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\ntoolchain_type(name = \"type\")\ntoolchain_impl(name = \"implementation\", marker = \"toolchain\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":implementation\")\nwrite(name = \"write\")\n"
-            ),
-            variant,
-        );
+        for (from, to) in replacements {
+            module = module.replace(from, to);
+            defs = defs.replace(from, to);
+            build = build.replace(from, to);
+        }
+        epoch.file("/workspace/MODULE.bazel", &module, variant);
+        epoch.file("/workspace/defs.bzl", &defs, variant);
+        epoch.package("", &build, variant);
         epoch.build()
     }
 
@@ -11038,11 +11072,24 @@ ordinary_rule(
     }
 
     fn resolved_setting_label(evaluation: &BuildCommandEvaluation) -> String {
-        evaluation.resolved_file_write_semantic_views().unwrap()[0].platform_constraints[0]
-            .constraint_setting
+        evaluation.resolved_file_write_semantic_views().unwrap()[0].platform_constraints()[0]
+            .constraint_setting()
             .key()
             .label()
             .to_string()
+    }
+
+    async fn resolved_identity(
+        dice: &Arc<Dice>,
+        key: &BuildCommandRootKey,
+        epoch: PathObservationEpoch,
+    ) -> crate::runtime::FileWriteSemanticIdentity {
+        let mut transaction = build_root_transaction(dice, epoch).await;
+        let outcome = transaction.compute(key).await.unwrap();
+        let views = complete_build_evaluation(&outcome)
+            .resolved_file_write_semantic_views()
+            .unwrap();
+        crate::runtime::FileWriteSemanticIdentity::from_resolved(&views[0]).unwrap()
     }
 
     #[test]
@@ -11356,7 +11403,7 @@ ordinary_rule(
         let key = BuildCommandRootKey::new(workspace, &targets, build_test_configuration("target"))
             .unwrap();
         let mut transaction =
-            build_root_transaction(&dice, resolved_write_epoch(3, "setting_a")).await;
+            build_root_transaction(&dice, resolved_write_epoch(3, "setting_a", &[])).await;
         let outcome = transaction.compute(&key).await.unwrap();
         let base = complete_build_evaluation(&outcome);
         let platform = base
@@ -11371,7 +11418,7 @@ ordinary_rule(
             action_closure: closure.into(),
         };
         let views = base.resolved_file_write_semantic_views().unwrap();
-        let constraint = views[0].platform_constraints[0];
+        let constraint = views[0].platform_constraints()[0];
         let baseline_projection = resolved_setting_label(base);
         assert_eq!(baseline_projection, "@@//:setting_a");
         let platform_key = platform.configured_target_key().unwrap().clone();
@@ -11388,18 +11435,19 @@ ordinary_rule(
         ]));
         let bad_value = Arc::new(ConfiguredNodeResult::new_rule(
             constraint
-                .constraint_value
+                .constraint_value()
                 .configured_target_key()
                 .unwrap()
                 .clone(),
-            constraint.constraint_value.providers().clone(),
+            constraint.constraint_value().providers().clone(),
             None,
         ));
-        let missing_setting = Arc::new(constraint.constraint_value.clone().with_edges(Vec::new()));
+        let missing_setting =
+            Arc::new(constraint.constraint_value().clone().with_edges(Vec::new()));
         let mismatched = Arc::new(platform.as_ref().clone().with_edges(vec![
             slug_analysis_v2::ConfiguredEdge::new(
                 ConfiguredTargetKey::new(
-                    constraint.constraint_value.key().label().clone(),
+                    constraint.constraint_value().key().label().clone(),
                     ConfigurationKey::exec("legacy-mismatch").unwrap(),
                 )
                 .into(),
@@ -11456,17 +11504,125 @@ ordinary_rule(
             assert!(error.contains(message));
         }
         let mut edited_tx =
-            build_root_transaction(&dice, resolved_write_epoch(4, "setting_b")).await;
+            build_root_transaction(&dice, resolved_write_epoch(4, "setting_b", &[])).await;
         let edited = edited_tx.compute(&key).await.unwrap();
         let edited_projection = resolved_setting_label(complete_build_evaluation(&edited));
         assert_eq!(edited_projection, "@@//:setting_b");
         assert_ne!(edited_projection, baseline_projection);
         let mut restored_tx =
-            build_root_transaction(&dice, resolved_write_epoch(5, "setting_a")).await;
+            build_root_transaction(&dice, resolved_write_epoch(5, "setting_a", &[])).await;
         let restored = restored_tx.compute(&key).await.unwrap();
         let restored_projection = resolved_setting_label(complete_build_evaluation(&restored));
         assert_eq!(restored_projection, "@@//:setting_a");
         assert_eq!(restored_projection, baseline_projection);
+    }
+
+    #[tokio::test]
+    async fn filewrite_semantic_identity_discriminates_admitted_structure_and_restores() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let configuration = build_test_configuration("target");
+        let key = |target: &str, configuration: ConfigurationKey| {
+            BuildCommandRootKey::new(
+                workspace.clone(),
+                &[TargetPattern::parse(target).unwrap()],
+                configuration,
+            )
+            .unwrap()
+        };
+        let baseline_key = key("//:write", configuration.clone());
+        let baseline = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(20, "setting_a", &[]),
+        )
+        .await;
+        assert!(baseline.as_bytes().starts_with(b"slugact\0\0\x01"));
+        let owner = resolved_identity(
+            &dice,
+            &key("//:other", configuration.clone()),
+            resolved_write_epoch(21, "setting_a", &[]),
+        )
+        .await;
+        let configured = resolved_identity(
+            &dice,
+            &key(
+                "//:write",
+                build_test_configuration_with_root_setting("changed"),
+            ),
+            resolved_write_epoch(22, "setting_a", &[]),
+        )
+        .await;
+        let output = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(23, "setting_a", &[("write.txt", "changed.txt")]),
+        )
+        .await;
+        let content = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(24, "setting_a", &[(r#""content\n""#, r#""changed\n""#)]),
+        )
+        .await;
+        let property = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(
+                25,
+                "setting_a",
+                &[(
+                    r#"{"z": "last", "a": "first"}"#,
+                    r#"{"z": "changed", "a": "first"}"#,
+                )],
+            ),
+        )
+        .await;
+        for changed in [owner, configured, output, content, property] {
+            assert_ne!(changed, baseline);
+        }
+        let reordered = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(
+                26,
+                "setting_a",
+                &[(
+                    r#"{"z": "last", "a": "first"}"#,
+                    r#"{"a": "first", "z": "last"}"#,
+                )],
+            ),
+        )
+        .await;
+        assert_eq!(reordered, baseline);
+        let platform = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(27, "setting_a", &[("//:platform", "//:platform_alt")]),
+        )
+        .await;
+        assert_ne!(platform, baseline);
+        let platform_restored = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(28, "setting_a", &[]),
+        )
+        .await;
+        assert_eq!(platform_restored, baseline);
+        let constraint = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(29, "setting_b", &[]),
+        )
+        .await;
+        assert_ne!(constraint, baseline);
+        let restored = resolved_identity(
+            &dice,
+            &baseline_key,
+            resolved_write_epoch(30, "setting_a", &[]),
+        )
+        .await;
+        assert_eq!(restored, baseline);
     }
 
     #[tokio::test]
