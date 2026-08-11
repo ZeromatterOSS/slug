@@ -6938,3 +6938,32 @@ negative values return empty, and omission remains unbounded. Keep bounded
 universe `deps`, general reverse/path expressions, wrappers, default
 implicit/tool/external/factored topology, new reverse state, parser/vendor
 changes, exact hashes, JVM/Java, and CI stopped.
+
+### Configured-query reverse-depth admission ACCEPT (2026-08-09)
+
+`WP-6-m32-cquery-rdeps-reverse-depth-admission` is **ACCEPTED**. The accepted
+M31 shape now admits Bazel's optional signed Java-`int` reverse depth while its
+`deps()` universe remains unbounded. Omission is unbounded, negative depth
+returns empty after ordinary universe/seed validation, zero returns every
+matching full configured/null seed key, and positive values add exactly that
+many normalized reverse BFS layers.
+
+The existing parser's Java-integer path accepts quoted signed bounds and rejects
+both overflow directions. Core evidence covers base and transitioned duplicate
+seed identities, alias boundaries at depths zero/one/two, maximum-depth equality
+with unbounded traversal, empty negative output in all four output families,
+and selected-induced graph edges. Universe-first Need ordering, loading-only
+seed validation, and M31 lifecycle regressions remain green.
+
+Query, commands, server, focused core, rebuilt CLI, and one-shot/daemon tests
+pass serially, as do formatting, archive, stale-daemon, diff, and independent
+review gates. The net Rust delta is 23 production and 128 test lines, 151 total,
+within 60/220/280 caps. No retained representation, reverse state, DICE owner,
+utility, parser/vendor content, output, or wire mode changed.
+
+Run next `WP-6-m33-cquery-rdeps-bounded-universe-admission`. Admit only the
+already-supported optional nonnegative Java-`int` depth on the inner `deps()`
+universe and compose it with M32's optional signed reverse depth. Keep general
+universe expressions, multi-root/set/variable forms, wrappers, other reverse or
+path functions, default implicit/tool/external/factored topology, new reverse
+state, exact hashes, JVM/Java, and CI stopped.

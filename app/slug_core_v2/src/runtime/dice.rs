@@ -2168,7 +2168,12 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
         Ok(result)
     }
 
-    async fn rdeps(&mut self, universe: &Self::Set, from: &str) -> Result<Self::Set, QueryError> {
+    async fn rdeps(
+        &mut self,
+        universe: &Self::Set,
+        from: &str,
+        depth: Option<i32>,
+    ) -> Result<Self::Set, QueryError> {
         let TargetPattern::Single(from) =
             TargetPattern::parse(from).map_err(QueryError::evaluation)?
         else {
@@ -2184,6 +2189,9 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
         let from = CanonicalLabel::parse(&format!("@@//{}:{}", from.package(), from.target()))
             .map_err(QueryError::evaluation)?;
         let mut result = TargetSet::default();
+        if depth.is_some_and(|depth| depth < 0) {
+            return Ok(result);
+        }
         let mut frontier = SmallSet::new();
         for target in universe.iter() {
             if target.key.label() == &from {
@@ -2191,7 +2199,8 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
                 frontier.insert(target.key.clone());
             }
         }
-        while !frontier.is_empty() {
+        let mut level = 0;
+        while !frontier.is_empty() && depth.is_none_or(|depth| level < depth as usize) {
             let mut next = SmallSet::new();
             for parent in universe.iter() {
                 if result.contains(parent) {
@@ -2211,6 +2220,7 @@ impl CqueryQueryEnvironment for CquerySetEnvironment {
                 }
             }
             frontier = next;
+            level += 1;
         }
         Ok(result)
     }
@@ -7438,6 +7448,69 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
             ],
         );
+        let reverse_zero = run("rdeps(deps(//:root), //:ordinary, 0)", false, true).unwrap();
+        let reverse_zero = reverse_zero.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            reverse_zero.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n"
+        );
+        assert_topology(
+            reverse_zero,
+            &["  \"//:ordinary (base)\"", "  \"//:ordinary (transition)\""],
+            &[],
+        );
+        let reverse_one = run("rdeps(deps(//:root), //:ordinary, 1)", false, true).unwrap();
+        let reverse_one = reverse_one.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            reverse_one.starlark_label_stdout(),
+            "@@//:ordinary\n@@//:ordinary\n@@//:root\n@@//:alias_inner\n"
+        );
+        assert_topology(
+            reverse_one,
+            &[
+                "  \"//:alias_inner (base)\"",
+                "  \"//:ordinary (base)\"",
+                "  \"//:ordinary (transition)\"",
+                "  \"//:root (base)\"",
+            ],
+            &[
+                "  \"//:alias_inner (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (base)\"",
+                "  \"//:root (base)\" -> \"//:ordinary (transition)\"",
+            ],
+        );
+        for depth in ["2", "2147483647"] {
+            let bounded = run(
+                &format!("rdeps(deps(//:root), //:ordinary, {depth})"),
+                false,
+                true,
+            )
+            .unwrap();
+            assert_eq!(
+                bounded
+                    .terminal_for_test()
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .graph_stdout(),
+                reverse.graph_stdout(),
+                "depth {depth}"
+            );
+        }
+        let negative = run(
+            "rdeps(deps(//:root), //:ordinary, '-2147483648')",
+            false,
+            true,
+        )
+        .unwrap();
+        let negative = negative.terminal_for_test().as_ref().as_ref().unwrap();
+        assert!(negative.label_stdout().is_empty());
+        assert!(negative.starlark_label_stdout().is_empty());
+        assert!(negative.label_kind_stdout().unwrap().is_empty());
+        assert_eq!(
+            negative.graph_stdout(),
+            "digraph mygraph {\n  node [shape=box];\n}\n"
+        );
         let broken = run("//:broken", false, true).unwrap();
         assert!(
             broken
@@ -7479,7 +7552,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
                 .contains("default seed must not be analyzed")
         );
         let transitioned = run(
-            "rdeps(deps(//:transition_root), //:transition_only)",
+            "rdeps(deps(//:transition_root), //:transition_only, 0)",
             false,
             true,
         )
@@ -7487,7 +7560,7 @@ top = rule(implementation = _top, attrs = {"child": attr.label()})
         let transitioned = transitioned.terminal_for_test().as_ref().as_ref().unwrap();
         assert_eq!(
             transitioned.starlark_label_stdout(),
-            "@@//:transition_only\n@@//:transition_root\n"
+            "@@//:transition_only\n"
         );
         let expected_reverse_graph = reverse.graph_stdout();
         fs::write(

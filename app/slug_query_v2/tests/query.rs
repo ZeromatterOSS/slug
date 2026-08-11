@@ -60,6 +60,10 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin, 0)",
         "deps(//pkg:bin, 2147483647)",
         "rdeps(deps(//pkg:root), //pkg:bin)",
+        "rdeps(deps(//pkg:root), //pkg:bin, 0)",
+        "rdeps(deps(//pkg:root), //pkg:bin, '-1')",
+        "rdeps(deps(//pkg:root), //pkg:bin, '-2147483648')",
+        "rdeps(deps(//pkg:root), //pkg:bin, 2147483647)",
         "executables(deps(//pkg:bin))",
         "executables(deps(//pkg:bin, 2))",
         "filter('^//pkg:bin$', deps(//pkg:bin))",
@@ -98,7 +102,9 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
         "deps(//pkg:bin, '-1')",
         "deps(//pkg:bin, 2147483648)",
         "rdeps(deps(//pkg:root, 1), //pkg:bin)",
-        "rdeps(deps(//pkg:root), //pkg:bin, 1)",
+        "rdeps(deps(//pkg:root), //pkg:bin, 1, 2)",
+        "rdeps(deps(//pkg:root), //pkg:bin, 2147483648)",
+        "rdeps(deps(//pkg:root), //pkg:bin, '-2147483649')",
         "rdeps(//pkg:root, //pkg:bin)",
         "rdeps(deps(//pkg:root), set(//pkg:bin))",
         "filter('bin', rdeps(deps(//pkg:root), //pkg:bin))",
@@ -151,6 +157,7 @@ fn cquery_validator_tracks_lexical_let_bindings_and_whitelists_deps_filter_some_
                 || error.contains("arguments to function 'deps'")
                 || error.contains("cquery deps()")
                 || error.contains("cquery rdeps()")
+                || error.contains("arguments to function 'rdeps'")
                 || error.contains("top-level cquery expression")
                 || error.contains("arguments to function 'some'")
                 || error.contains("arguments to function 'siblings'")
@@ -195,6 +202,11 @@ fn cquery_deps_spec_and_literal_collection_only_admit_the_top_level_concrete_ope
     assert_eq!((universe.target(), universe.depth()), ("//pkg:root", None));
     assert_eq!(cquery_literals(&rdeps), ["//pkg:root"]);
     assert_eq!(rdeps.cquery_rdeps_seed(), Some("//pkg:bin"));
+    let bounded =
+        QueryExpression::parse("rdeps(deps(//pkg:root), //pkg:bin, '-2147483648')").unwrap();
+    validate_cquery_query(&bounded).unwrap();
+    assert_eq!(cquery_literals(&bounded), ["//pkg:root"]);
+    assert_eq!(bounded.cquery_rdeps_seed(), Some("//pkg:bin"));
 
     let wrapped = QueryExpression::parse("executables(deps(//pkg:bin, 2))").unwrap();
     validate_cquery_query(&wrapped).unwrap();
@@ -465,6 +477,16 @@ fn signed_java_integer_slots_validate_without_narrowing_expression_integers() {
             error.contains(&format!("expected an integer literal: '{raw}'")),
             "{source}: {error}"
         );
+    }
+    for raw in ["2147483648", "'-2147483649'"] {
+        let source = format!("rdeps(deps(//:root), //:seed, {raw})");
+        let error = validate_cquery_query(&QueryExpression::parse(&source).unwrap())
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(&format!(
+            "expected an integer literal: '{}'",
+            raw.trim_matches('\'')
+        )));
     }
 
     let error = QueryExpression::parse("some(//:single, -1)").unwrap_err();

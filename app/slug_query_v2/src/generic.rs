@@ -116,7 +116,12 @@ pub trait CqueryQueryEnvironment {
             "deps() is not implemented by this configured query environment",
         ))
     }
-    async fn rdeps(&mut self, _universe: &Self::Set, _from: &str) -> Result<Self::Set, QueryError> {
+    async fn rdeps(
+        &mut self,
+        _universe: &Self::Set,
+        _from: &str,
+        _depth: Option<i32>,
+    ) -> Result<Self::Set, QueryError> {
         Err(QueryError::syntax(
             "rdeps() is not implemented by this configured query environment",
         ))
@@ -147,7 +152,7 @@ where
     if let Some(rdeps) = expression.cquery_rdeps_spec() {
         let roots = environment.resolve_literal(rdeps.0.target()).await?;
         let universe = environment.deps(&roots, None).await?;
-        return environment.rdeps(&universe, &rdeps.1).await;
+        return environment.rdeps(&universe, &rdeps.1, rdeps.2).await;
     }
     if let Some(deps) = expression.cquery_deps_spec() {
         let roots = environment.resolve_literal(deps.target()).await?;
@@ -200,8 +205,13 @@ where
         self.0.deps(targets, depth).await
     }
 
-    async fn rdeps(&mut self, universe: &Self::Set, from: &str) -> Result<Self::Set, QueryError> {
-        self.0.rdeps(universe, from).await
+    async fn rdeps(
+        &mut self,
+        universe: &Self::Set,
+        from: &str,
+        depth: Option<i32>,
+    ) -> Result<Self::Set, QueryError> {
+        self.0.rdeps(universe, from, depth).await
     }
 
     async fn siblings(&mut self, targets: &Self::Set) -> Result<Self::Set, QueryError> {
@@ -1541,9 +1551,10 @@ mod tests {
             &mut self,
             universe: &Self::Set,
             from: &str,
+            depth: Option<i32>,
         ) -> Result<Self::Set, QueryError> {
             self.events
-                .push(format!("rdeps:{}:{from}", universe.join(",")));
+                .push(format!("rdeps:{}:{from}:{depth:?}", universe.join(",")));
             Ok(vec![from.to_owned()])
         }
 
@@ -1672,8 +1683,17 @@ mod tests {
             [
                 "resolve://pkg:root",
                 "deps://pkg:root:all",
-                "rdeps://pkg:root,//pkg:root:child://pkg:child",
+                "rdeps://pkg:root,//pkg:root:child://pkg:child:None",
             ]
+        );
+
+        let bounded =
+            QueryExpression::parse("rdeps(deps(//pkg:root), //pkg:child, '-2147483648')").unwrap();
+        environment.events.clear();
+        futures::executor::block_on(evaluate_cquery_query(&mut environment, &bounded)).unwrap();
+        assert_eq!(
+            environment.events.last().unwrap(),
+            "rdeps://pkg:root,//pkg:root:child://pkg:child:Some(-2147483648)"
         );
 
         let failed = QueryExpression::parse("rdeps(deps(//pkg:error), //pkg:child)").unwrap();

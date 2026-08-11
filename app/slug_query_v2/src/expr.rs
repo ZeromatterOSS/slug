@@ -65,7 +65,11 @@ impl CqueryDepsSpec {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
-pub(crate) struct CqueryRdepsSpec(pub(crate) CqueryDepsSpec, pub(crate) CompactString);
+pub(crate) struct CqueryRdepsSpec(
+    pub(crate) CqueryDepsSpec,
+    pub(crate) CompactString,
+    pub(crate) Option<i32>,
+);
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub enum QueryExpressionKind {
@@ -549,19 +553,13 @@ impl QueryExpression {
         let QueryExpressionKind::Function { name, args } = &self.kind else {
             return None;
         };
-        match (name.value.as_str(), &args[..]) {
-            (
-                "rdeps",
-                [
-                    _,
-                    QueryExpression {
-                        kind: QueryExpressionKind::TargetLiteral(seed),
-                        ..
-                    },
-                ],
-            ) => Some(seed),
-            _ => None,
-        }
+        (name.value == "rdeps")
+            .then_some(args.get(1))
+            .flatten()
+            .and_then(|seed| match &seed.kind {
+                QueryExpressionKind::TargetLiteral(seed) => Some(seed.as_str()),
+                _ => None,
+            })
     }
 }
 
@@ -581,12 +579,6 @@ fn parse_cquery_rdeps_spec(
         ));
     }
     validate_function_arguments(expression, args, cquery_function("rdeps"))?;
-    if args.len() != 2 {
-        return Err(QueryParseError::new(
-            "cquery rdeps() depth is not supported",
-            args[2].span,
-        ));
-    }
     let universe = parse_cquery_deps_spec(&args[0])?;
     if universe.depth().is_some() {
         return Err(QueryParseError::new(
@@ -603,7 +595,18 @@ fn parse_cquery_rdeps_spec(
             ));
         }
     };
-    Ok(CqueryRdepsSpec(universe, from))
+    let depth = args
+        .get(2)
+        .map(|argument| {
+            argument.java_integer_literal().map_err(|raw| {
+                QueryParseError::new(
+                    format!("expected an integer literal: '{raw}'"),
+                    argument.span,
+                )
+            })
+        })
+        .transpose()?;
+    Ok(CqueryRdepsSpec(universe, from, depth))
 }
 
 fn parse_cquery_deps_spec(expression: &QueryExpression) -> Result<CqueryDepsSpec, QueryParseError> {

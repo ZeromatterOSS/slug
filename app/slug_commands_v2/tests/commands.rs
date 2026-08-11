@@ -748,6 +748,14 @@ fn cquery_deps_requires_noimplicit_and_preserves_bazel_boolean_spellings() {
         CqueryRequest::parse(&["--noimplicit_deps", "rdeps(deps(//pkg:bin), //pkg:child)",])
             .is_ok()
     );
+    for depth in ["0", "1", "'-1'", "'-2147483648'", "2147483647"] {
+        let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
+        assert!(CqueryRequest::parse(&["--noimplicit_deps", &expression]).is_ok());
+    }
+    for depth in ["2147483648", "'-2147483649'"] {
+        let expression = format!("rdeps(deps(//pkg:bin), //pkg:child, {depth})");
+        assert!(CqueryRequest::parse(&["--noimplicit_deps", &expression]).is_err());
+    }
 
     let filtered = CqueryRequest::parse(&[
         "--implicit_deps=false",

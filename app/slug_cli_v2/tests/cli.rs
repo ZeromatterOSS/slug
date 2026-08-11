@@ -1209,12 +1209,29 @@ fn cquery_noimplicit_deps_matches_between_one_shot_and_daemon() {
         assert_eq!(daemon.stdout, one_shot.stdout);
         assert!(daemon.stderr.is_empty());
     }
-    let reverse = run(None, "rdeps(deps(//:root), //:child)", false);
-    assert!(reverse.status.success(), "{reverse:?}");
-    assert_eq!(reverse.stdout, b"@@//:child\n@@//:root\n");
-    let reverse_daemon = run(Some(&output_base), "rdeps(deps(//:root), //:child)", false);
-    assert!(reverse_daemon.status.success(), "{reverse_daemon:?}");
-    assert_eq!(reverse_daemon.stdout, reverse.stdout);
+    for (reverse_expression, expected) in [
+        ("rdeps(deps(//:root), //:child)", "@@//:child\n@@//:root\n"),
+        ("rdeps(deps(//:root), //:child, 0)", "@@//:child\n"),
+        (
+            "rdeps(deps(//:root), //:child, 1)",
+            "@@//:child\n@@//:root\n",
+        ),
+        ("rdeps(deps(//:root), //:child, '-2147483648')", ""),
+        (
+            "rdeps(deps(//:root), //:child, 2147483647)",
+            "@@//:child\n@@//:root\n",
+        ),
+    ] {
+        let reverse = run(None, reverse_expression, false);
+        assert!(
+            reverse.status.success(),
+            "{reverse_expression}: {reverse:?}"
+        );
+        assert_eq!(reverse.stdout, expected.as_bytes(), "{reverse_expression}");
+        let daemon = run(Some(&output_base), reverse_expression, false);
+        assert!(daemon.status.success(), "{reverse_expression}: {daemon:?}");
+        assert_eq!(daemon.stdout, reverse.stdout, "{reverse_expression}");
+    }
 
     let wrapped_expression = "executables(deps(//:root))";
     let wrapped_one_shot = run(None, wrapped_expression, false);
