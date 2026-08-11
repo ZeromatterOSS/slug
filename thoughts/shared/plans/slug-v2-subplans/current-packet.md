@@ -1,24 +1,25 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-m5-toolchain-filewrite-text-formatter-design`
+Packet: `WP-6-m5-filewrite-semantic-identity-design-retry`
 Milestone: M5 entry
 Owner: `slug-v2-subplans/06-analysis-toolchains-and-actions.md`
-Result: read-only text formatter and Slug-native token handoff design.
+Result: freeze one complete FileWrite semantic identity design.
 
 ## Observable slice
 
-Design the first text-only aquery handoff over the accepted toolchain-backed
-`ConfiguredActionView`. Freeze exact field order, punctuation, owner/platform
-labels, inputs, executable bit, and output-relative path semantics from pinned
-Bazel 9.2 evidence while classifying configuration, configured output root, and
-action identity as explicit Slug-native projections.
+Design a collision-safe tagged structural identity for the admitted
+toolchain-backed FileWrite view. Include configured owner, typed output, Write
+content and executable bit, default exec group, selected platform configured
+key, normalized exec properties, and the complete ordered
+Platform-to-ConstraintValue-to-ConstraintSetting chain.
 
 ## Ownership and stops
 
-Define collision-safe, tagged, versioned projection inputs so C0/C1/C0,
-P0/P1/P0, content A/B/A, and output path A/B/A preserve the equality/change
-relationships in `f00e99db`. Do not call any value a Bazel checksum, Bazel
-configured root, or ActionKey. Preserve exact REAPI/CAS digest separation.
+Keep semantic identity separate from any graph-local formatter token, Bazel
+ActionKey/checksum, configuration hash, output-root hash, and REAPI digest.
+Specify domain/version tags, unambiguous field framing, collection order, and
+which existing retained values are borrowed versus projected. Select at most
+one bounded implementation successor or return `REPLAN`.
 
 Keep the vendored Buck2 `starlark-rust` parser/evaluator unchanged for BUILD and
 `.bzl` semantics. Aquery syntax is the separate query language and must reuse
@@ -26,9 +27,9 @@ the existing Buck2-derived `QueryExpression` parser. Add no parser.
 
 ## Validation
 
-Audit existing configuration projections and choose one bounded implementation
-successor or return `REPLAN`. No Rust, tests, fixtures/oracle reruns, aquery
-command/root/wire, formatter implementation, action execution, REAPI identity
-reuse, exact Bazel-byte work, parser/vendor changes, JVM/Java, or CI. Caps: 0
-production / 0 test / 180 bookkeeping lines. Bundle with the next functional
-commit; no standalone documentation commit.
+Audit only the accepted configured-action and closure-resolved platform views.
+No Rust, tests, hash implementation, formatter, aquery command/root/wire,
+execution, new DICE key/state, REAPI reuse, oracle rerun, parser/vendor,
+exact-Bazel-byte work, JVM/Java, or CI changes. Cap: 180 bookkeeping lines.
+Require independent design review and bundle bookkeeping with the next
+functional commit; no standalone documentation commit.

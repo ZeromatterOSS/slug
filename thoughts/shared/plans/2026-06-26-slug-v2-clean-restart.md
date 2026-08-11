@@ -28,7 +28,7 @@ and must name the same packet.
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
-| M5: `aquery` | **replan (FileWrite formatter design active)** | recursive action ownership, complete Slug configuration identity, four-domain change/restoration evidence, and the strict toolchain-backed configured FileWrite view | design one text formatter handoff with explicit Slug-native path/action tokens; ordinary no-toolchain and other action kinds remain fail-closed | `WP-6-m5-toolchain-filewrite-text-formatter-design` |
+| M5: `aquery` | **replan (semantic identity design active)** | recursive action ownership, complete Slug configuration identity, four-domain change/restoration evidence, the strict toolchain-backed configured FileWrite view, and its closure-resolved selected-platform semantics | freeze a collision-safe FileWrite semantic identity separately from any graph-local formatter token; hashing and formatter work remain deferred | `WP-6-m5-filewrite-semantic-identity-design-retry` |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | semantic `aquery` handoff and collision-safe Slug action/cache identity | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-6-m5-toolchain-filewrite-text-formatter-design`](./slug-v2-subplans/current-packet.md).
+[`WP-6-m5-filewrite-semantic-identity-design-retry`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

@@ -114,6 +114,11 @@ pub struct ToolchainTopology {
     selection: Option<ToolchainSelection>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct PlatformSemanticFact {
+    pub exec_properties: Arc<[(CompactString, CompactString)]>,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum ConfiguredActionExecGroup {
     Default,
@@ -200,6 +205,7 @@ pub struct ConfiguredNodeResult {
     diagnostics: Arc<[AnalysisDiagnostic]>,
     rule_capability: Option<RuleCapability>,
     toolchain_topology: Option<ToolchainTopology>,
+    platform_semantic_fact: Option<PlatformSemanticFact>,
 }
 
 impl ConfiguredNodeResult {
@@ -218,6 +224,7 @@ impl ConfiguredNodeResult {
             diagnostics: Arc::from([]),
             rule_capability,
             toolchain_topology: None,
+            platform_semantic_fact: None,
         }
     }
 
@@ -242,6 +249,7 @@ impl ConfiguredNodeResult {
             diagnostics: Arc::from([]),
             rule_capability,
             toolchain_topology: None,
+            platform_semantic_fact: None,
         }
     }
 
@@ -332,6 +340,10 @@ impl ConfiguredNodeResult {
         self.toolchain_topology.as_ref()
     }
 
+    pub fn platform_semantic_fact(&self) -> Option<&PlatformSemanticFact> {
+        self.platform_semantic_fact.as_ref()
+    }
+
     pub fn with_actions(mut self, actions: Vec<ActionSpec>) -> Self {
         self.actions = actions.into();
         self
@@ -358,6 +370,11 @@ impl ConfiguredNodeResult {
 
     pub fn with_toolchain_topology(mut self, topology: ToolchainTopology) -> Self {
         self.toolchain_topology = Some(topology);
+        self
+    }
+
+    pub(crate) fn with_platform_semantic_fact(mut self, fact: PlatformSemanticFact) -> Self {
+        self.platform_semantic_fact = Some(fact);
         self
     }
 }

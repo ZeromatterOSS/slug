@@ -776,7 +776,7 @@ request = rule(implementation = _request, toolchains = ["//:type"])
 "#;
 const TOOLCHAIN_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"setting\")\nconstraint_value(name = \"linux\", constraint_setting = \":setting\")\nconstraint_value(name = \"other\", constraint_setting = \":setting\")\nplatform(name = \"platform\", constraint_values = [\":linux\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\ntoolchain(name = \"first\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":linux\"])\ntoolchain(name = \"second\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":linux\"])\nrequest(name = \"request\")\n";
 const TOPOLOGY_MODULE: &str = "module(name = \"root\")\nregister_execution_platforms(\"//:first_platform\", \"//:second_platform\")\nregister_toolchains(\"//:first_toolchain\", \"//:second_toolchain\")\n";
-const TOPOLOGY_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"selection\")\nconstraint_value(name = \"first\", constraint_setting = \":selection\")\nconstraint_value(name = \"second\", constraint_setting = \":selection\")\nplatform(name = \"first_platform\", constraint_values = [\":first\"])\nplatform(name = \"second_platform\", constraint_values = [\":second\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\nfirst_impl(name = \"orphan\", marker = \"orphan\")\ntoolchain(name = \"first_toolchain\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":first\"])\ntoolchain(name = \"second_toolchain\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":second\"])\nrequest(name = \"request\")\n";
+const TOPOLOGY_BUILD: &str = "load(\":defs.bzl\", \"first_impl\", \"request\", \"second_impl\")\nconstraint_setting(name = \"selection\")\nconstraint_value(name = \"first\", constraint_setting = \":selection\")\nconstraint_value(name = \"second\", constraint_setting = \":selection\")\nplatform(name = \"first_platform\", constraint_values = [\":first\"], exec_properties = {\"z\": \"last\", \"a\": \"first\"})\nplatform(name = \"second_platform\", constraint_values = [\":second\"])\ntoolchain_type(name = \"type\")\nfirst_impl(name = \"first_impl\", marker = \"first\")\nsecond_impl(name = \"second_impl\", marker = \"second\")\nfirst_impl(name = \"orphan\", marker = \"orphan\")\ntoolchain(name = \"first_toolchain\", toolchain_type = \":type\", toolchain = \":first_impl\", exec_compatible_with = [\":first\"])\ntoolchain(name = \"second_toolchain\", toolchain_type = \":type\", toolchain = \":second_impl\", exec_compatible_with = [\":second\"])\nrequest(name = \"request\")\n";
 
 async fn toolchain_case(
     module: &str,
@@ -791,6 +791,21 @@ async fn toolchain_case(
         &Dice::builder().build(DetectCycles::Enabled),
         &workspace,
         "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+}
+
+async fn topology_platform(
+    dice: &Arc<Dice>,
+    workspace: &PathBuf,
+    configuration: &ConfigurationKey,
+) -> Result<Arc<ConfiguredNodeResult>, String> {
+    root_target_request_with_configuration(
+        dice,
+        workspace,
+        "@@//:first_platform",
+        configuration.clone(),
         Arc::new(RootActivationTracker::default()),
     )
     .await
@@ -1076,16 +1091,18 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
             .to_exec()
             .unwrap(),
     );
-    let platform = root_target_request_with_configuration(
-        &dice,
-        &workspace,
-        "@@//:first_platform",
-        exec_configuration.clone(),
-        tracker(),
-    )
-    .await
-    .unwrap();
+    let platform = topology_platform(&dice, &workspace, &exec_configuration)
+        .await
+        .unwrap();
     assert_eq!(platform.kind(), &ConfiguredNodeKind::Platform);
+    assert_eq!(
+        platform
+            .platform_semantic_fact()
+            .unwrap()
+            .exec_properties
+            .as_ref(),
+        &[("a".into(), "first".into()), ("z".into(), "last".into())]
+    );
     assert_eq!(platform.edges().len(), 1);
     assert_eq!(
         platform.edges()[0].kind(),
@@ -1109,7 +1126,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         &dice,
         &workspace,
         "@@//:selection",
-        exec_configuration,
+        exec_configuration.clone(),
         tracker(),
     )
     .await
@@ -1117,6 +1134,33 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
     assert_eq!(setting.kind(), &ConfiguredNodeKind::ConstraintSetting);
     assert!(setting.edges().is_empty());
 
+    let reordered_source = TOPOLOGY_BUILD.replace(
+        "{\"z\": \"last\", \"a\": \"first\"}",
+        "{\"a\": \"first\", \"z\": \"last\"}",
+    );
+    fs::write(workspace.join("BUILD.bazel"), &reordered_source).unwrap();
+    let reordered = topology_platform(&dice, &workspace, &exec_configuration)
+        .await
+        .unwrap();
+    assert_eq!(reordered, platform);
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        reordered_source.replace("\"last\"", "\"edited\""),
+    )
+    .unwrap();
+    assert_ne!(
+        topology_platform(&dice, &workspace, &exec_configuration)
+            .await
+            .unwrap(),
+        platform
+    );
+    fs::write(workspace.join("BUILD.bazel"), TOPOLOGY_BUILD).unwrap();
+    assert_eq!(
+        topology_platform(&dice, &workspace, &exec_configuration)
+            .await
+            .unwrap(),
+        platform
+    );
     assert!(
         root_target_request(&dice, &workspace, "@@//:first_platform", tracker())
             .await
@@ -1156,6 +1200,20 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
             .await
             .unwrap_err()
             .contains("external toolchain topology registration")
+    );
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        TOPOLOGY_BUILD.replace(
+            "exec_properties = {\"z\": \"last\", \"a\": \"first\"}",
+            "exec_properties = {\"z\": \"last\", \"a\": \"first\"}, remote_execution_properties = \"legacy\"",
+        ),
+    )
+    .unwrap();
+    assert!(
+        topology_platform(&dice, &workspace, &exec_configuration)
+            .await
+            .unwrap_err()
+            .contains("unsupported nondefault attribute remote_execution_properties")
     );
 }
 

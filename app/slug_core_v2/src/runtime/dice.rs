@@ -48,11 +48,15 @@ use dupe::Dupe;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfigurationKind;
+use slug_analysis_v2::ConfiguredActionView;
+use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::PlatformSemanticFact;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
@@ -2309,6 +2313,22 @@ pub struct BuildCommandEvaluation {
     action_closure: Arc<[Arc<ConfiguredNodeResult>]>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolvedFileWriteSemanticView<'a> {
+    pub action: ConfiguredActionView<'a>,
+    pub platform: &'a ConfiguredNodeResult,
+    pub platform_fact: &'a PlatformSemanticFact,
+    pub platform_constraints: Vec<ResolvedPlatformConstraintSemanticView<'a>>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct ResolvedPlatformConstraintSemanticView<'a> {
+    pub platform_edge: &'a slug_analysis_v2::ConfiguredEdge,
+    pub constraint_value: &'a ConfiguredNodeResult,
+    pub setting_edge: &'a slug_analysis_v2::ConfiguredEdge,
+    pub constraint_setting: &'a ConfiguredNodeResult,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 struct BuildRequestedTarget {
     pattern: Arc<str>,
@@ -2428,6 +2448,24 @@ impl BuildCommandRootKey {
 }
 
 impl BuildCommandEvaluation {
+    fn unique_closure_node(
+        &self,
+        key: &ConfiguredTargetKey,
+    ) -> Result<&ConfiguredNodeResult, &'static str> {
+        let mut matches = self.action_closure.iter().filter(|candidate| {
+            candidate
+                .configured_target_key()
+                .is_some_and(|candidate| candidate == key)
+        });
+        let node = matches
+            .next()
+            .ok_or("configured semantic node is absent from action closure")?;
+        if matches.next().is_some() {
+            return Err("configured semantic node is duplicated in action closure");
+        }
+        Ok(node)
+    }
+
     pub fn loaded_package_count(&self) -> usize {
         self.targets.len()
     }
@@ -2447,6 +2485,88 @@ impl BuildCommandEvaluation {
 
     pub fn analyses(&self) -> impl Iterator<Item = &ConfiguredNodeResult> {
         self.action_closure.iter().map(Arc::as_ref)
+    }
+
+    pub fn resolved_file_write_semantic_views(
+        &self,
+    ) -> Result<Vec<ResolvedFileWriteSemanticView<'_>>, &'static str> {
+        let mut views = Vec::new();
+        for owner in self.analyses() {
+            for action in owner.configured_file_write_actions()? {
+                let selected = action.execution_platform();
+                if selected.configuration().kind() != ConfigurationKind::Exec
+                    || selected.configuration().slug_configuration().is_none()
+                {
+                    return Err("FileWrite platform requires structural exec configuration");
+                }
+                let platform = self.unique_closure_node(selected)?;
+                if platform.kind() != &ConfiguredNodeKind::Platform {
+                    return Err("selected FileWrite platform closure node has wrong kind");
+                }
+                let fact = platform
+                    .platform_semantic_fact()
+                    .ok_or("selected FileWrite platform has no semantic fact")?;
+                let mut constraints = Vec::with_capacity(platform.edges().len());
+                for (index, platform_edge) in platform.edges().iter().enumerate() {
+                    if !matches!(platform_edge.kind(), ConfiguredEdgeKind::PlatformConstraint { index: edge_index } if usize::try_from(*edge_index) == Ok(index))
+                    {
+                        return Err("selected FileWrite platform has unordered constraint edges");
+                    }
+                    let value_key = platform_edge
+                        .configured_target()
+                        .ok_or("PlatformConstraint edge target is not configured")?;
+                    if value_key.configuration() != selected.configuration()
+                        || value_key.configuration().kind() != ConfigurationKind::Exec
+                        || value_key.configuration().slug_configuration().is_none()
+                    {
+                        return Err("PlatformConstraint value has mismatched configuration");
+                    }
+                    let value = self.unique_closure_node(value_key)?;
+                    if value.kind() != &ConfiguredNodeKind::ConstraintValue {
+                        return Err("PlatformConstraint edge target has wrong kind");
+                    }
+                    let [setting_edge] = value.edges() else {
+                        return Err("ConstraintValue requires exactly one setting edge");
+                    };
+                    if setting_edge.kind() != &ConfiguredEdgeKind::ConstraintSetting {
+                        return Err("ConstraintValue edge has wrong kind");
+                    }
+                    let setting_key = setting_edge
+                        .configured_target()
+                        .ok_or("ConstraintSetting edge target is not configured")?;
+                    if setting_key.configuration() != selected.configuration()
+                        || setting_key.configuration().kind() != ConfigurationKind::Exec
+                        || setting_key.configuration().slug_configuration().is_none()
+                    {
+                        return Err("ConstraintSetting has mismatched configuration");
+                    }
+                    let setting = self.unique_closure_node(setting_key)?;
+                    if setting.kind() != &ConfiguredNodeKind::ConstraintSetting {
+                        return Err("ConstraintSetting closure node has wrong kind");
+                    }
+                    if constraints.iter().any(
+                        |resolved: &ResolvedPlatformConstraintSemanticView<'_>| {
+                            resolved.constraint_setting.key() == setting.key()
+                        },
+                    ) {
+                        return Err("platform has duplicate constraint setting");
+                    }
+                    constraints.push(ResolvedPlatformConstraintSemanticView {
+                        platform_edge,
+                        constraint_value: value,
+                        setting_edge,
+                        constraint_setting: setting,
+                    });
+                }
+                views.push(ResolvedFileWriteSemanticView {
+                    action,
+                    platform,
+                    platform_fact: fact,
+                    platform_constraints: constraints,
+                });
+            }
+        }
+        Ok(views)
     }
 
     pub fn is_observed_exported_source(&self) -> bool {
@@ -10795,6 +10915,34 @@ node = rule(implementation = _node, attrs = {"deps": attr.label_list(), "marker"
         epoch.build()
     }
 
+    const RESOLVED_WRITE_DEFS: &str = r#"def _toolchain(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+toolchain_impl = rule(implementation = _toolchain, attrs = {"marker": attr.string(mandatory = True)})
+def _write(ctx):
+    out = ctx.actions.declare_file("write.txt")
+    ctx.actions.write(out, "content\n")
+    return [DefaultInfo(files = depset([out]))]
+write = rule(implementation = _write, toolchains = ["//:type"])
+"#;
+
+    fn resolved_write_epoch(variant: i64, setting: &str) -> PathObservationEpoch {
+        let mut epoch = BuildRootEpoch::base(variant);
+        epoch.file(
+            "/workspace/MODULE.bazel",
+            "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n",
+            variant,
+        );
+        epoch.file("/workspace/defs.bzl", RESOLVED_WRITE_DEFS, variant);
+        epoch.package(
+            "",
+            &format!(
+                "load(\":defs.bzl\", \"toolchain_impl\", \"write\")\nconstraint_setting(name = \"setting_a\")\nconstraint_setting(name = \"setting_b\")\nconstraint_value(name = \"value\", constraint_setting = \":{setting}\")\nplatform(name = \"platform\", constraint_values = [\":value\"], exec_properties = {{\"z\": \"last\", \"a\": \"first\"}})\ntoolchain_type(name = \"type\")\ntoolchain_impl(name = \"implementation\", marker = \"toolchain\")\ntoolchain(name = \"toolchain\", toolchain_type = \":type\", toolchain = \":implementation\")\nwrite(name = \"write\")\n"
+            ),
+            variant,
+        );
+        epoch.build()
+    }
+
     const DELEGATING_DEFS: &str = r#"def _producer(ctx):
     out = ctx.actions.declare_file("producer.out")
     ctx.actions.write(out, "producer\n")
@@ -10887,6 +11035,14 @@ ordinary_rule(
             panic!("build command retained Needs")
         };
         value.as_ref().as_ref().unwrap()
+    }
+
+    fn resolved_setting_label(evaluation: &BuildCommandEvaluation) -> String {
+        evaluation.resolved_file_write_semantic_views().unwrap()[0].platform_constraints[0]
+            .constraint_setting
+            .key()
+            .label()
+            .to_string()
     }
 
     #[test]
@@ -11190,6 +11346,127 @@ ordinary_rule(
         let warm = warm_transaction.compute(&key).await.unwrap();
         assert!(BuildCommandRootKey::equality(&outcome, &warm));
         assert!(tracker.take().is_empty());
+    }
+
+    #[tokio::test]
+    async fn resolved_file_write_view_borrows_exact_platform_fact_and_rejects_bad_closures() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let targets = [TargetPattern::parse("//:write").unwrap()];
+        let key = BuildCommandRootKey::new(workspace, &targets, build_test_configuration("target"))
+            .unwrap();
+        let mut transaction =
+            build_root_transaction(&dice, resolved_write_epoch(3, "setting_a")).await;
+        let outcome = transaction.compute(&key).await.unwrap();
+        let base = complete_build_evaluation(&outcome);
+        let platform = base
+            .action_closure
+            .iter()
+            .find(|node| node.kind() == &ConfiguredNodeKind::Platform)
+            .unwrap()
+            .dupe();
+        let evaluation = |closure: Vec<Arc<ConfiguredNodeResult>>| BuildCommandEvaluation {
+            anchor: base.anchor.clone(),
+            targets: base.targets.clone(),
+            action_closure: closure.into(),
+        };
+        let views = base.resolved_file_write_semantic_views().unwrap();
+        let constraint = views[0].platform_constraints[0];
+        let baseline_projection = resolved_setting_label(base);
+        assert_eq!(baseline_projection, "@@//:setting_a");
+        let platform_key = platform.configured_target_key().unwrap().clone();
+        let wrong = Arc::new(ConfiguredNodeResult::new_rule(
+            platform_key,
+            platform.providers().clone(),
+            None,
+        ));
+        let unordered = Arc::new(platform.as_ref().clone().with_edges(vec![
+            slug_analysis_v2::ConfiguredEdge::new(
+                platform.edges()[0].target().clone(),
+                ConfiguredEdgeKind::PlatformConstraint { index: 1 },
+            ),
+        ]));
+        let bad_value = Arc::new(ConfiguredNodeResult::new_rule(
+            constraint
+                .constraint_value
+                .configured_target_key()
+                .unwrap()
+                .clone(),
+            constraint.constraint_value.providers().clone(),
+            None,
+        ));
+        let missing_setting = Arc::new(constraint.constraint_value.clone().with_edges(Vec::new()));
+        let mismatched = Arc::new(platform.as_ref().clone().with_edges(vec![
+            slug_analysis_v2::ConfiguredEdge::new(
+                ConfiguredTargetKey::new(
+                    constraint.constraint_value.key().label().clone(),
+                    ConfigurationKey::exec("legacy-mismatch").unwrap(),
+                )
+                .into(),
+                ConfiguredEdgeKind::PlatformConstraint { index: 0 },
+            ),
+        ]));
+        let duplicate_setting = Arc::new(platform.as_ref().clone().with_edges(vec![
+            platform.edges()[0].clone(),
+            slug_analysis_v2::ConfiguredEdge::new(
+                platform.edges()[0].target().clone(),
+                ConfiguredEdgeKind::PlatformConstraint { index: 1 },
+            ),
+        ]));
+        let replace = |replacement: Arc<ConfiguredNodeResult>| {
+            let key = replacement.configured_target_key().unwrap();
+            base.action_closure
+                .iter()
+                .map(|node| {
+                    if node.configured_target_key() == Some(key) {
+                        replacement.dupe()
+                    } else {
+                        node.dupe()
+                    }
+                })
+                .collect()
+        };
+        for (closure, message) in [
+            (
+                base.action_closure
+                    .iter()
+                    .filter(|node| node.kind() != &ConfiguredNodeKind::Platform)
+                    .cloned()
+                    .collect(),
+                "absent",
+            ),
+            (
+                base.action_closure
+                    .iter()
+                    .cloned()
+                    .chain([platform.dupe()])
+                    .collect(),
+                "duplicated",
+            ),
+            (replace(wrong), "wrong kind"),
+            (replace(unordered), "unordered"),
+            (replace(bad_value), "wrong kind"),
+            (replace(missing_setting), "exactly one setting edge"),
+            (replace(mismatched), "mismatched configuration"),
+            (replace(duplicate_setting), "duplicate constraint setting"),
+        ] {
+            let error = evaluation(closure)
+                .resolved_file_write_semantic_views()
+                .unwrap_err();
+            assert!(error.contains(message));
+        }
+        let mut edited_tx =
+            build_root_transaction(&dice, resolved_write_epoch(4, "setting_b")).await;
+        let edited = edited_tx.compute(&key).await.unwrap();
+        let edited_projection = resolved_setting_label(complete_build_evaluation(&edited));
+        assert_eq!(edited_projection, "@@//:setting_b");
+        assert_ne!(edited_projection, baseline_projection);
+        let mut restored_tx =
+            build_root_transaction(&dice, resolved_write_epoch(5, "setting_a")).await;
+        let restored = restored_tx.compute(&key).await.unwrap();
+        let restored_projection = resolved_setting_label(complete_build_evaluation(&restored));
+        assert_eq!(restored_projection, "@@//:setting_a");
+        assert_eq!(restored_projection, baseline_projection);
     }
 
     #[tokio::test]

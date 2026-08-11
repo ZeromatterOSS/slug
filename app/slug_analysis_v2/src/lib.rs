@@ -32,6 +32,7 @@ pub use result::ConfiguredActionView;
 pub use result::ConfiguredNodeKind;
 pub use result::ConfiguredNodeResult;
 pub use result::DiagnosticSeverity;
+pub use result::PlatformSemanticFact;
 pub use result::ToolchainSelection;
 pub use result::ToolchainTopology;
 pub use slug_loading_v2::LoadingPreparationNeeds as AnalysisPreparationNeeds;

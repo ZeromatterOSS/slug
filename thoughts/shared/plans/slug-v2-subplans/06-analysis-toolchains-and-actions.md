@@ -7200,3 +7200,74 @@ configuration/path/action-token projections over this view before any command,
 wire, or formatter Rust. Preserve the accepted identity change/restoration
 relations, exact REAPI digest separation, ordinary no-toolchain/non-Write
 fail-closed boundaries, and the no-new-parser/JVM/CI stops.
+
+### Toolchain FileWrite text formatter design REPLAN (2026-08-10)
+
+`WP-6-m5-toolchain-filewrite-text-formatter-design` is **REPLAN** before Rust.
+The existing Slug configuration projection and configured-output owner are
+valid formatter inputs, and the proposed names correctly avoided claiming a
+Bazel checksum or `ActionKey`. However, a FileWrite token over content,
+executable bit, and platform label deliberately omitted configured owner and
+typed output to mimic Bazel ActionKey change relations. It therefore cannot be
+called a collision-safe Slug action identity: distinct owned actions can alias.
+The canonical platform label also cannot detect a same-label semantic platform
+mutation because that structure is not retained in the current view.
+
+Run next only `WP-6-m5-filewrite-semantic-identity-and-formatter-token-design`,
+read-only. Separate complete owner/output/platform-bearing Slug semantic action
+identity from any graph-local, explicitly non-identity formatter token. Freeze
+the retained structural platform fact needed to fail closed on same-label
+changes, or select one bounded prerequisite. Reuse the existing configuration
+projection/configured-output owner and unchanged Buck2 parser stacks; preserve
+REAPI/CAS separation. Add no formatter, command/wire, Rust, tests, oracle rerun,
+execution, DICE state, exact Bazel bytes, JVM/Java, CI, or vendor change.
+
+### FileWrite semantic identity/token separation design REPLAN (2026-08-10)
+
+`WP-6-m5-filewrite-semantic-identity-and-formatter-token-design` is **REPLAN**
+for one structural prerequisite. The existing action closure already contains
+every candidate platform result through configured `CandidateExecutionPlatform`
+edges. A selected result therefore supplies its full configured key and ordered
+constraint edges without a second graph. But Platform analysis currently drops
+coerced `exec_properties`; a same-label property mutation is invisible after
+loading, so neither a complete semantic identity nor an honest fail-closed
+formatter can proceed.
+
+Run next `WP-6-m5-platform-semantic-fact-retention-and-resolved-filewrite-view`.
+Project the existing normalized ordered native `exec_properties` value into the
+Platform result, reject nondefault unrepresented parents/legacy properties/
+flags/required-settings/toolchain-type controls, and expose a borrowed core view
+that resolves each admitted FileWrite selected key to exactly one exec-configured
+Platform result in the existing action closure. Keep semantic identity and any
+graph-local formatter token separate and deferred. Add no hash, token, formatter,
+command/wire, second graph, DICE key, execution, REAPI reuse, parser/vendor,
+JVM/Java, or CI change. Reserved independent review accepts 220 production / 220
+test caps and requires the complete platform-field fail-closed classification.
+
+### Platform semantic fact and resolved FileWrite view ACCEPT (2026-08-10)
+
+`WP-6-m5-platform-semantic-fact-retention-and-resolved-filewrite-view` is
+**ACCEPT** at 206 production and 215 test net lines. Platform analysis now
+retains normalized key-ordered `exec_properties` in the existing configured
+result and rejects nondefault unrepresented platform-semantic fields. The core
+view resolves each admitted FileWrite's exact selected platform from the
+existing action closure and exposes the ordered
+Platform-to-ConstraintValue-to-ConstraintSetting chain without another graph
+or retained index.
+
+Focused analysis and core tests cover property reordering, mutation and
+restoration, nondefault legacy-property rejection, exact unique closure
+resolution, malformed chain shapes, and a resolved setting A/B/A lifecycle.
+Formatting, diff and archive checks pass, and independent final review accepts
+the corrected full-chain regression. The Buck2-derived Starlark and query
+parsers remain unchanged; no hash, identity token, formatter, command, wire,
+execution, REAPI reuse, DICE state, JVM/Java, or CI surface was added.
+
+Run next only `WP-6-m5-filewrite-semantic-identity-design-retry`, read-only.
+Freeze one collision-safe, tagged structural FileWrite identity over configured
+owner, typed output, Write material, default exec group, selected platform key,
+normalized exec properties, and the complete ordered constraint chain. Keep
+this semantic identity distinct from any graph-local formatter token, Bazel
+ActionKey, and REAPI digest. Select at most one bounded implementation successor
+or `REPLAN`; add no Rust, tests, hashing, formatter, command/wire, execution,
+DICE state, parser/vendor, exact Bazel-byte work, JVM/Java, or CI change.

@@ -59,6 +59,7 @@ use crate::key::ConfiguredTargetKey;
 use crate::key::RootStringSettingValue;
 use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
+use crate::result::PlatformSemanticFact;
 use crate::result::ToolchainSelection;
 use crate::result::ToolchainTopology;
 use crate::starlark_rule::LoadedRuleError;
@@ -739,6 +740,66 @@ fn root_analysis_complete(
 fn native_empty_providers() -> slug_build_api_v2::ProviderCollection {
     slug_build_api_v2::ProviderCollection::from_values(Vec::new(), false)
         .expect("an explicitly non-required provider collection may be empty")
+}
+
+fn platform_semantic_fact(
+    package: &LoadedPackage,
+    target: &str,
+    label: &CanonicalLabel,
+) -> Result<PlatformSemanticFact, AnalysisError> {
+    let attrs = package.native_attributes(target).ok_or_else(|| {
+        AnalysisError::new(format!(
+            "platform {label} has no retained native attributes"
+        ))
+    })?;
+    for name in [
+        "parents",
+        "remote_execution_properties",
+        "flags",
+        "required_settings",
+        "check_toolchain_types",
+        "allowed_toolchain_types",
+    ] {
+        let value = &attrs
+            .get(name)
+            .ok_or_else(|| AnalysisError::new(format!("platform {label} has no {name} fact")))?
+            .1
+            .value;
+        let is_default = match value {
+            CoercedAttributeValue::LabelList(values) => values.is_empty(),
+            CoercedAttributeValue::String(value) => value.is_empty(),
+            CoercedAttributeValue::StringList(values) => values.is_empty(),
+            CoercedAttributeValue::Boolean(value) => !value,
+            _ => false,
+        };
+        if !is_default {
+            return Err(AnalysisError::new(format!(
+                "platform {label} has unsupported nondefault attribute {name}"
+            )));
+        }
+    }
+    match &attrs
+        .get("exec_properties")
+        .ok_or_else(|| AnalysisError::new(format!("platform {label} has no exec_properties fact")))?
+        .1
+        .value
+    {
+        CoercedAttributeValue::StringDict(values) => {
+            let mut values = values.iter().cloned().collect::<Vec<_>>();
+            values.sort_by(|left, right| left.0.cmp(&right.0));
+            if values.windows(2).any(|pair| pair[0].0 == pair[1].0) {
+                return Err(AnalysisError::new(format!(
+                    "platform {label} has duplicate exec_properties keys"
+                )));
+            }
+            Ok(PlatformSemanticFact {
+                exec_properties: values.into(),
+            })
+        }
+        _ => Err(AnalysisError::new(format!(
+            "platform {label} has invalid exec_properties fact"
+        ))),
+    }
 }
 
 fn package_declares_source_label(package: &LoadedPackage, label: &CanonicalLabel) -> bool {
@@ -1723,6 +1784,10 @@ impl ConfiguredNodeAnalysisKey {
                     constraint_values,
                 })),
             ) if configured_target.configuration().kind() == ConfigurationKind::Exec => {
+                let fact = match platform_semantic_fact(package, label.target().as_str(), label) {
+                    Ok(fact) => fact,
+                    Err(error) => return root_analysis_complete(Err(error)),
+                };
                 let mut seen_settings = SmallSet::with_capacity(constraint_values.len());
                 let mut edges = Vec::with_capacity(constraint_values.len());
                 for (index, constraint_value) in constraint_values.iter().enumerate() {
@@ -1775,7 +1840,8 @@ impl ConfiguredNodeAnalysisKey {
                     native_empty_providers(),
                     target.and_then(|target| target.rule_capability()).cloned(),
                 )
-                .with_edges(edges)));
+                .with_edges(edges)
+                .with_platform_semantic_fact(fact)));
             }
             (
                 ConfiguredNodeKey::Configured(configured_target),
