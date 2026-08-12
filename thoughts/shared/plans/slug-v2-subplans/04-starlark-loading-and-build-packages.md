@@ -2136,3 +2136,17 @@ files without activating loading consumers. Stage 4 package and Bzl loading
 remain deferred. The active closure design must enumerate the complete
 `@@bazel_tools//tools/test` source/package dependency boundary before any
 consumer dispatch or catalog expansion.
+
+### Embedded test-tools closure audit REPLAN (2026-08-12)
+
+Pinned Bazel 9.2 `buildfiles(@bazel_tools//tools/test:all)` owns the built-in
+BUILD/default-toolchain Bzl and five `rules_shell+` BUILD/Bzl files;
+`loadfiles` narrows executable loads to the default-toolchain Bzl plus the
+three rules_shell Bzl files. Slug cannot yet represent that boundary:
+repository-qualified external loads are rejected, external package labels are
+canonicalized as root labels, and the external package policy rejects target
+kinds present in this package.
+
+Do not dispatch the accepted built-in source route yet. Stage 4 waits for a
+Stage 5-owned injected-module/contextual repository mapping before designing
+cross-repository Bzl loading and repository-context package coercion.

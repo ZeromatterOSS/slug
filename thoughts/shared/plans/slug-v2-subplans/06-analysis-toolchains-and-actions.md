@@ -7425,3 +7425,17 @@ single-root text consumer or return `REPLAN`. The packet is read-only: add no
 Rust, tests, fixture growth, oracle rerun, command/wire implementation,
 execution, retained state, parser/vendor, exact Bazel identity bytes, JVM/Java,
 or CI.
+
+### Embedded default-test-toolchain closure audit REPLAN (2026-08-12)
+
+Pinned `@bazel_tools//tools/test:all` expands to 20 rules: eight filegroups,
+one sh_binary, two aliases, three toolchains, one toolchain type, one empty
+ToolchainInfo rule, one bool build setting, and three config settings. Its
+loaded labels reach `src/conditions:windows`, `platforms//os`, rules_shell's
+toolchain/runfiles targets, and the generated remote-coverage repository.
+
+Slug analysis currently canonicalizes and loads only root registrations,
+rejects every external registration, and resolves only root toolchain types
+and packages. No bounded Stage 6 correction can precede the hidden
+`bazel_tools` module/mapping owner and Stage 4 contextual package load.
+Configured Test toolchain and TestRunner semantics remain deferred.

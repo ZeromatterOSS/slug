@@ -4573,3 +4573,58 @@ Run next only `WP-4-6-8-bazel-tools-test-closure-design`: audit the complete
 pinned Bazel 9.2 repository/source/package/config/toolchain closure, freeze its
 DICE ownership and exact catalog expansion, and schedule no production
 representation before independent design acceptance.
+
+### Embedded test-tools closure design REPLAN (2026-08-12)
+
+Pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` disproves a bounded
+route-to-package implementation. The exact load-time evidence is:
+
+- `buildfiles(@bazel_tools//tools/test:all)` returns
+  `@bazel_tools//tools/test:{BUILD,default_test_toolchain.bzl}`,
+  `@@rules_shell+//shell:{BUILD,sh_binary.bzl}`, and
+  `@@rules_shell+//shell/private:{BUILD,sh_binary.bzl,sh_executable.bzl}`;
+- `loadfiles` returns the four Bzl files from that set;
+- `:all` contains 20 rules: eight filegroups, one sh_binary, two aliases,
+  three toolchains, one toolchain type, one empty-toolchain rule, one bool
+  build setting, and three config settings; and
+- the package declares ten source labels. The Linux embedded archive contains
+  eight: the accepted catalog already owns five, while
+  `collect_cc_coverage.sh` (SHA-256 `431ced84...cc552`, 9482 bytes),
+  `collect_coverage.sh` (`e1df052d...106fb9`, 9960 bytes), and
+  `extensions.bzl` (`ab2c246f...bdf7e`, 1610 bytes) remain unowned; all
+  three have archive mode 755. Windows-only `tw.exe` and `xml.exe` are
+  query-visible source labels but absent from the Linux archive and remain
+  deferred rather than becoming invented missing-file claims.
+
+The embedded MODULE maps `rules_shell -> rules_shell+`,
+`platforms -> platforms`, the remote-coverage extension repo, and its other
+ordinary/generated dependencies. `rules_shell` 0.6.1 in turn maps
+bazel_features, bazel_skylib, platforms, its generated local shell, and
+bazel_tools. Pinned `mod graph` displays only the user root: this injected
+built-in module and its registrations are deliberately outside the ordinary
+root graph, so a root dependency or two-name mapping would not be equivalent.
+
+The live Slug audit found four independent owner gaps. `RootModuleGraph`
+contains only user-root evaluation/resolution; `RootRepositoryRouteKey`
+accepts only root apparent names. Repository package/source keys enter the
+direct-local Host pipeline, while external Bzl resolution rejects every
+repository-qualified load. `PackageRecorder` carries no canonical repository
+or mapping, rejects `@repo` labels, and emits `@@//` labels even for external
+packages. Finally, Stage 6 accepts only root registrations and root toolchain
+types. The package's aliases, config settings, executable/dependency-bearing
+Starlark rule, contextual platforms labels, and external registrations cannot
+be activated by deleting one guard.
+
+Therefore `WP-4-6-8-bazel-tools-test-closure-design` ends `REPLAN`.
+Pruning the embedded MODULE to rules_shell/platforms, fabricating RepoSpecs or
+repository mappings, scanning the Host Bazel install, or widening package/Test
+semantics in one packet would violate structural identity and the reviewed
+caps. The fixture remains unchanged; its stale Bazel 9.1 Windows manifest is
+still evidence only for the later Test-result surface.
+
+Run next only `WP-5-builtin-bazel-tools-module-injection-design`. It must
+freeze the complete hidden built-in MODULE evaluation/resolution, contextual
+repository mappings, extension-generated names, registration ownership, DICE
+equality/invalidation, and root Need/error order before any catalog expansion,
+package/Bzl dispatch, configured toolchain, TestRunner, execution, or BEP work.

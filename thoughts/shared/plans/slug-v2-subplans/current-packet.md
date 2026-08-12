@@ -1,46 +1,49 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-6-8-bazel-tools-test-closure-design`
+Packet: `WP-5-builtin-bazel-tools-module-injection-design`
 Milestone: cross-stage M7 prerequisite design
-Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: freeze the complete pinned Bazel 9.2 source and ownership closure needed
-before Slug can load `@@bazel_tools//tools/test`.
+Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
+Result: freeze Bazel 9.2's hidden built-in module graph and contextual
+repository mappings before any built-in package consumer dispatch.
 
 ## Active design contract
 
-The immutable built-in repository owner is accepted. It owns a versioned,
-canonical `bazel_tools` route and the exact bytes, SHA-256, archive executable
-state, and typed lookup terminals for a reviewed seven-file partial catalog.
-It deliberately does not dispatch package, BUILD, or Bzl consumers.
+The repository/source owner is accepted, but the reviewed test-tools closure
+packet ends `REPLAN`. Pinned Bazel shows that `bazel_tools` is an injected
+module outside the user-visible `mod graph`; its verbatim MODULE has ordinary
+dependencies, module extensions/use_repo names, repository rules, and ordered
+toolchain registrations. Slug currently evaluates and resolves only the user
+root graph. A two-name rules_shell/platforms map, fabricated RepoSpecs, or a
+root dependency would not preserve Bazel ownership or structural identity.
 
 Audit pinned Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` and the live Slug graph to
-freeze the smallest complete repository/source/package boundary that can load
-`@@bazel_tools//tools/test` without pruning, synthesizing, or reading a Host
-Bazel install. Trace the embedded MODULE registrations and all ordinary module,
-repository-mapping, package, Bzl, label, config-setting, toolchain, filegroup,
-rules_shell, platforms, and generated-source dependencies reached by that
-package. Separate immutable built-in bytes from registry/resolution-owned
-external repositories and name the DICE owner and invalidation edge for every
-admitted input.
+`8220c6198837d5c13d53fea211cf3282aa12408a` primary source for built-in
+module injection, module-file selection, resolution, repo mappings, extension
+generated names, override/lockfile interaction, and registration order.
+Correlate that source with the exact checked-in embedded MODULE bytes and the
+observed `bazel_tools`/rules_shell/platforms mappings. Audit Slug's module
+evaluation, resolution, lockfile, route, mapping-digest, and loading-anchor
+owners.
 
-Decide whether one bounded implementation can reuse the existing route,
-repository package/Bzl loaders, and configured-analysis representation. Freeze
-the exact catalog expansion, source lookup/consumer dispatch, repository
-mapping, Need/error ordering, equality/validity, lifecycle, and fail-closed
-boundary. If no bounded Rust-native slice exists, record `REPLAN` rather than
-inventing content or a parallel graph.
+Freeze one compact DICE-owned representation and dependency direction that
+reuses the existing resolution graph rather than creating a parallel graph.
+Every built-in direct dependency, MVS-selected transitive input,
+extension/use_repo name, registration, snapshot/content identity, registry and
+lockfile policy, and root graph input that can change the combined result must
+participate structurally. Preserve root file Need/error ordering and never hold
+a lock across a compute. If full injection is not bounded, record `REPLAN`
+without pruning the embedded module.
 
 ## Compatibility
 
-Exact: verbatim pinned-source bytes and modes, content hashes, source-known
-file/directory distinction, canonical labels/repository mappings, and admitted
-package/Bzl/config/toolchain relationships. Slug-native: snapshot/manifest and
-DICE type names, diagnostics, compact storage, path/configuration/action
-identity bytes, and any cross-owner iteration order not guaranteed by Bazel.
-Unsupported/deferred: TestProvider, TestRunnerAction, runfiles-tree
-materialization, test execution/result analysis, BEP, coverage, unreviewed
-embedded-tools packages, Windows, JVM/Java, and exact Bazel identity bytes.
+Exact: verbatim embedded MODULE bytes, dependency and registration order,
+Bazel 9.2 MVS/module-repository relationships, apparent-to-canonical mappings,
+registry content hashes, and root/built-in precedence. Slug-native: DICE type
+names, compact representation, diagnostics, manifest framing, and non-Bazel
+identity bytes. Unsupported/deferred: catalog expansion, package/BUILD/Bzl
+dispatch, configured external toolchain resolution, TestProvider/TestRunner,
+execution/results/BEP/coverage, Host scanning, Windows, JVM/Java, and exact
+Bazel identity bytes.
 
 ## Scope, proof, and stops
 
@@ -48,31 +51,24 @@ This design packet may edit only:
 
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md` and
   `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`
+  and `05-bzlmod-checkpoint-evidence-3.md`;
 - `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`,
-  `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
-  and
-  `thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`;
+  `06-analysis-toolchains-and-actions.md`, and
+  `08-ruleset-and-command-conformance.md` for dependency bookkeeping; and
 - `thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md` only if
-  the final reuse decision changes an existing extraction row; and
-- only if pinned Bazel evidence exposes a demonstrated checked-in oracle gap,
-  these six existing fixture files:
-  `tests/v2_oracle/fixtures/test-basic/fixture.toml`,
-  `tests/v2_oracle/fixtures/test-basic/expected/oracle.json`,
-  `tests/v2_oracle/fixtures/test-basic/workspace/MODULE.bazel`,
-  `tests/v2_oracle/fixtures/test-basic/workspace/BUILD.bazel`,
-  `tests/v2_oracle/fixtures/test-basic/workspace/pkg/BUILD.bazel`, and
-  `tests/v2_oracle/fixtures/test-basic/workspace/pkg/defs.bzl`.
+  the final reuse decision changes an existing row.
 
-Cap bookkeeping at 240 net lines and any fixture correction at 180 net lines;
-add no file or dependency. No Rust, Cargo/BUILD metadata, DICE key, package or
-analysis implementation, command/Test/TestRunner, REAPI, BEP, JVM/Java,
-Windows branch, generated source, second graph, Host observation, or runtime
-source selection is authorized.
+Cap bookkeeping at 260 net lines and add no file. No Rust, Cargo/BUILD metadata,
+source asset, fixture/oracle record, DICE key, registry/materializer action,
+package/Bzl/configured-analysis behavior, command/Test/TestRunner, REAPI/BEP,
+JVM/Java, Windows branch, second graph, process-global state, Host observation,
+or runtime source selection is authorized.
 
-Require pinned-source and embedded-archive provenance, a complete transitive
-closure ledger, repository-routing and DICE ownership diagrams in prose,
-explicit accepted/rejected reuse decisions, exact/Slug-native/deferred
-classification, a successor file allowlist/caps/tests/stops, source/structure,
-credential, archive active-layout, fixture (if changed), and diff checks, plus
-independent review. One bounded correction is allowed; a second material miss
-is `REPLAN`. At `ACCEPT`, schedule only the reviewed successor.
+Require pinned primary-source anchors and observed mapping evidence; a complete
+input/output/Need/error/equality/invalidation contract; accepted and rejected
+reuse decisions; exact/Slug-native/deferred classification; an explicit
+successor allowlist/caps/tests/stops; source/structure, credential, archive
+active-layout, and diff checks; and independent review. One bounded correction
+is allowed; a second material miss is `REPLAN`. At `ACCEPT`, schedule only
+the reviewed successor.
