@@ -1199,3 +1199,23 @@ override, recursion/MVS, post-selection, and consumer breadth remain
 fail-closed/deferred. Implement next only
 `WP-5-host-discovered-module-owner-implementation` in
 `source_preparation.rs` under the canonical packet's caps and stops.
+
+### Host discovered-module owner accepted (2026-08-12)
+
+Commit `e7e4a772` accepts the callerless embedded/registry module leaf.
+Root-first classification bypasses embedded evaluation for explicit overrides;
+successful values retain complete evaluation plus immutable built-in or
+selected-registry ordered attempt/hash provenance. A real-DICE test proves
+override bypass, registry A/B/A restoration, cold captured evaluation, and
+warm reuse. Focused 4/4, the full crate, downstream checks, formatting, caps,
+and independent review passed. No graph or consumer landed.
+
+The remaining first gap is general nonregistry discovery. Existing direct-local
+evaluation is rooted in a main-repository apparent name and accepts only direct
+`local_path_override`; it cannot represent a transitive override target,
+archive/Git, or other RepoSpec. Run next only
+`WP-5-host-nonregistry-discovered-module-owner-design`. Audit the sole
+materialization/include/evaluation identity for admitted nonregistry shapes and
+return `REPLAN` at the first missing prerequisite. Command override
+normalization and recursive discovery/MVS remain later. No Rust is authorized
+before independent design acceptance.

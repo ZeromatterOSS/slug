@@ -4661,3 +4661,9 @@ The discovered-module design is accepted for one callerless embedded/registry
 leaf. Stage 8 continues to wait while
 `WP-5-host-discovered-module-owner-implementation` lands no package,
 toolchain, Test, execution, result, coverage, or BEP consumer.
+
+The embedded/registry Host discovered-module leaf is accepted in `e7e4a772`.
+Stage 8 remains parked while
+`WP-5-host-nonregistry-discovered-module-owner-design` audits general
+nonregistry source identity. No package/Bzl, toolchain, Test, execution,
+result, coverage, or BEP behavior is authorized.
