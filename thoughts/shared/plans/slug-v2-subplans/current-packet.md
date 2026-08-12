@@ -1,169 +1,211 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-effective-module-override-owner-implementation`
+Packet: `WP-5-host-module-version-owner-implementation`
 Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement one effective module-override DICE owner and route every
-accepted discovery/source classifier through it without activating a graph.
+Result: implement one exact shared Bazel 9.2 module-version semantic domain
+without activating the Host discovery-to-MVS graph.
 
 ## REPLAN predecessor
 
-`WP-5-host-selected-module-graph-owner-design-r2` ends `REPLAN`. Commit
-`b319b551` gives the existing command policy an exact normalized effective
-`--override_module` map, but every live per-module consumer still reads only
-root-MODULE declarations:
+`WP-5-host-selected-module-graph-owner-design-r3` ends `REPLAN`. Commit
+`dbeb1fb9` closes effective root/command/default override classification, but
+the live representations still do not expose one reusable exact version
+domain to discovery and selection:
 
-- `HostDiscoveredModuleKey` chooses built-in, root nonregistry, or registry
-  discovery from `RootModuleFiles.overrides`;
-- `HostNonregistryModuleClosureKey` and
-  `HostNonregistryPackagePreflightKey` require a root
-  `RootModuleOverride::NonRegistry`; and
-- `RepositoryMaterializationRequestKey` extracts its `RepoSpec` from that same
-  root map, so downstream source-file and repository-ignore ownership cannot
-  route a command path.
+- root `module()`, `bazel_dep()`, `single_version_override()`, and
+  `multiple_version_override()` validate version spellings but retain the raw
+  `+build` suffix, although Bazel discards it before constructing module keys;
+- the nonroot evaluator strips `+build`, while public `NonrootModuleKey::new`
+  accepts an unchecked string and `HostDiscoveredModuleKey` assumes its caller
+  supplied an already-normalized effective key;
+- `lockfile_v28.rs` contains the already accepted exact Bazel 9.2 parser and
+  ordering, but only as private lockfile-specific `LockfileModuleVersion`
+  machinery; and
+- `registry.rs::compare_versions` belongs to the forbidden supplied-file
+  `ResolvedGraph`, does not implement Bazel `Version` ordering, and cannot be
+  promoted into the Host graph.
 
-The command input is therefore invisible to discovery. Command-over-root
-precedence and explicit `bazel_tools` built-in bypass cannot be represented,
-and a selected-graph key cannot repair that without duplicating source routing.
+A selected graph cannot truthfully rewrite discovery edges, choose maxima, or
+snap multiple-version overrides while these inputs can disagree. Copying the
+lockfile comparator into MVS would create a second semantic owner.
 
 ## Source authority
 
 Bazel 9.2.0 commit
-`8220c6198837d5c13d53fea211cf3282aa12408a` remains authoritative. The accepted
-source audit establishes this order:
+`8220c6198837d5c13d53fea211cf3282aa12408a` is authoritative, especially
+`Version`, `ModuleFileGlobals`, `ModuleThreadContext`, `Discovery`,
+`Selection`, `ModuleKey`, and the lockfile `ModuleKey` adapter.
 
-1. root MODULE evaluation produces the root-declared override map;
-2. normalized command overrides overlay it after root evaluation, with command
-   values winning and an override of the evaluated root module failing at this
-   boundary;
-3. a command path becomes the same local-path/nonregistry source form used by
-   Bazel discovery, while retaining command provenance;
-4. only absence of any explicit root or command override permits the default
-   built-in `bazel_tools` sentinel; and
-5. discovery rewrites nonregistry dependencies to the empty effective version
-   before source preparation and evaluation.
+The accepted source audit establishes that a version is
+`RELEASE[-PRERELEASE][+BUILD]`; release identifiers exclude hyphens,
+prerelease/build identifiers admit them, numeric identifiers are unsigned
+64-bit values, and empty is a distinguished nonregistry version greater than
+all nonempty versions. Build metadata is validated and then discarded.
+Equality/hash use the normalized spelling. Ordering is lexicographic over
+identifier lists, compares numeric identifiers numerically then by original
+spelling, orders numeric identifiers before nonnumeric identifiers, orders a
+prerelease below the same release, and orders empty last.
 
-The existing exact inputs remain immutable and separate:
-`RootModuleFilesKey` owns root declarations and evaluated root identity;
-`RootModuleCommandPolicyKey` owns the canonical command map. The live reusable
-source chain is `RepositoryMaterializationKey`/`RepositorySourceFileKey`,
-route-independent package preflight and include-BFS helpers, and
-`HostDiscoveredModuleKey`. Legacy `resolution.rs::ResolvedGraph` is ineligible.
+`Discovery.applyOverrides` rewrites root-name dependencies to the root key,
+nonregistry overrides to empty, and nonempty single-version overrides to their
+normalized version before requesting module files. `Selection` then uses that
+same `Version` ordering for maxima, multiple-version ceilings, deterministic
+resolution strategies, and graph rewriting. No lockfile spelling or legacy
+canonical repository name participates in this identity.
 
 ## Design to freeze
 
-Add one crate-private DICE leaf:
+Audit and freeze one crate-private shared semantic owner, provisionally
+`BazelModuleVersion`, with:
 
-`HostEffectiveModuleOverrideKey { workspace, module_name } ->
-Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>`.
+- a fallible parser over valid Unicode Rust strings that implements the pinned
+  ASCII grammar, unsigned-64-bit bound, normalized spelling, and empty
+  sentinel;
+- exact `Eq`, `Hash`, and `Ord` semantics shared by root evaluation,
+  nonroot/effective discovery keys, lockfile-v28 module keys, and the future
+  selected graph;
+- a compact retained form using `CompactString` and immutable Arc-backed
+  identifier storage only if the audit proves cached parsed identifiers are
+  measurably justified; otherwise retain the normalized compact spelling and
+  one shared comparison routine without per-consumer copies; and
+- typed adapter errors so root evaluation, nonroot evaluation, lockfile JSON,
+  and future selection preserve their existing owner-specific diagnostics
+  without duplicating validation.
 
-It computes `RootModuleFilesKey` and `RootModuleCommandPolicyKey`, rejects a
-winning command override of the evaluated root module at the pinned post-root
-point, and folds without mutating either accepted map. Its compact retained
-classification is:
+The design must inventory every semantic version field and constructor in
+`module_eval.rs`, `interim_module.rs`, `source_preparation.rs`,
+`lockfile_v28.rs`, and the future graph seam. It must decide the smallest
+bounded migration that guarantees all Host-discovered keys are validated and
+normalized before any DICE lookup and that root header/dependency/registry
+override values no longer retain build metadata. Existing public scaffolding
+may remain string-shaped only where it cannot enter the Host selected graph
+without crossing the sole checked adapter.
 
-- `Command { path, override_: RootModuleOverride::NonRegistry(RepoSpec) }` for
-  a winning normalized command path;
-- `Root { override_: RootModuleOverride }` for a root-only declaration; or
-- `None` when neither input supplies the module.
+The accepted lockfile behavior must remain byte-for-byte stable. The old
+registry `compare_versions`, `ModuleKey`, and `ResolvedGraph` stay legacy-only;
+do not silently redirect them into production or claim their tests as Host
+MVS evidence.
 
-`Command.path` remains the accepted normalized absolute identity. Project it
-exactly once into the Bazel local-path `RepoSpec`: canonical
-`@@bazel_tools//tools/build_defs/repo:local.bzl`, rule `local_repository`, and
-one string `path` attribute containing that normalized path. The projection is
-semantic, not a fabricated selected repository: no canonical repository name,
-materialization result, bytes, or filesystem state enters this leaf. Retaining
-provenance prevents a root declaration and an equal-looking command projection
-from collapsing when their path interpretation/error ownership differs.
+## Completed design audit
 
-Absence stays `None`; the built-in `bazel_tools` default is installed only by
-downstream discovery after this leaf. Root registry and nonregistry values pass
-through unchanged. Exact effective equality contains the evaluated root
-identity dependency, normalized command input, provenance, and sole effective
-override; discarded command spelling/history and map insertion order remain
-outside equality. Complete values and typed errors are valid/equal DICE values.
+The sole owner is a new crate-private `module_version.rs` value:
 
-The bounded successor must make this leaf the sole override classification
-edge for `HostDiscoveredModuleKey`, `ModuleSourcePreparationKey`,
-`HostNonregistryModuleClosureKey`, `HostNonregistryPackagePreflightKey`,
-`RepositoryMaterializationRequestKey`, and any repository-ignore guard that
-currently rereads `RootModuleFiles.overrides`. A command nonregistry value
-follows the existing materialization/source/package/include/evaluator chain. The request-kind
-adapter may admit the normalized absolute local path only when the effective
-provenance is `Command`; root-declared local paths preserve their accepted
-workspace-relative validation. No second merge, source reader, evaluator, or
-graph is allowed.
+`BazelModuleVersion { normalized, release, prerelease }`.
 
-Need from root evaluation remains nonterminal through existing root ownership;
-the injected command policy is complete. Root evaluation failure and
-root-name-override rejection precede materialization. Downstream Need/error,
-cycle capability, source order, and complete-only event publication remain
-unchanged.
+The public shape is intentionally absent. `normalized` is a `CompactString`;
+release and prerelease are immutable Arc slices of compact identifiers, each
+retaining numeric/non-numeric kind, unsigned numeric value, and original
+identifier spelling. Empty uses an enum sentinel and allocates no identifier
+slices. Clones are Arc-cheap for future graph rewriting. Equality and hash use
+only normalized spelling; ordering uses the retained parsed identifiers. This
+keeps repeated MVS comparisons linear in identifier count without reparsing or
+introducing an interner/global cache.
 
-## Compatibility
+The exact truth table is:
 
-Exact: Bazel 9.2 command-over-root precedence, post-root root-name rejection,
-command local-path `RepoSpec` shape, explicit `bazel_tools` bypass, default
-built-in only on effective absence, nonregistry empty-version routing, and
-structural invalidation for the actual Slug source chain.
+| Surface | Accepted/ordering result |
+| --- | --- |
+| empty | valid and greater than every nonempty version |
+| `1`, `1.alpha.2`, `1-a-b.2` | valid |
+| `1+build-1.2`, `1-a+build-1.2` | valid; suffix discarded |
+| `18446744073709551615` | valid unsigned numeric identifier |
+| `_`, non-ASCII, `1..2`, `1-`, `1+`, `1+a+b` | invalid |
+| `18446744073709551616` | invalid numeric overflow |
+| `1+a` versus `1+b` | equal/hash-equal normalized `1` |
+| `1-01` versus `1-1` | distinct; `1-01 < 1-1` by spelling tie-break |
+| `1` versus `1.0` | `1 < 1.0` by lexicographic list length |
+| `1-a` versus `1` | prerelease first |
+| `2` versus `10` | numeric `2 < 10` |
+| `1` versus `alpha` | numeric identifier first |
 
-Slug-native: Rust type/error spelling, DICE key names, compact enum/Arc-backed
-representation, OS-native normalized path storage, event framing, and
-non-Bazel identity/display bytes.
+The migration adapters are singular:
 
-Unsupported/deferred: native Windows command-path semantics, additional
-command override kinds, selected graph/MVS, canonical/full repository mappings,
-selected RepoSpec consumers, extension unique names/execution, lockfile
-products, package/Bzl loading, configured analysis/toolchains/actions, command
-output changes, Test, execution/results/BEP/coverage, JVM/Java, and exact Bazel
-identity bytes.
+1. `module_eval.rs` maps the shared parser error to the existing directive
+   diagnostics and stores only normalized strings in root header,
+   dependencies, single-version overrides, ordered multiple-version override
+   entries, and nonroot values. Normalized duplicates in an ordered multiple
+   override remain duplicate elements, matching Bazel's parsed `ImmutableList`.
+2. `lockfile_v28.rs` replaces its private parser/order/type with the shared
+   value and maps its typed parse error to the existing direct-adapter
+   `LockfileParseError`; rendering and normalized duplicate-key behavior stay
+   unchanged.
+3. `HostDiscoveredModuleKey::try_new` parses and normalizes before constructing
+   the DICE key. Its retained `NonrootModuleKey` remains string-shaped for the
+   accepted public evaluator scaffold, but no unchecked spelling can enter the
+   Host discovery graph. The future selected graph retains
+   `BazelModuleVersion` directly and crosses this same checked constructor.
+
+`ModuleSourcePreparationKey` and lower source/closure keys keep compact strings
+because their sole production Host caller receives the normalized discovered
+key. `interim_module.rs` therefore needs no migration or new public type.
+There is no source observation, DICE compute, lock, network access, or mapping
+work in the version owner.
 
 ## Active implementation contract
 
 Implement only
-`WP-5-host-effective-module-override-owner-implementation`.
+`WP-5-host-module-version-owner-implementation` in these six files:
 
-Production and colocated-test allowlist:
+- new `app/slug_bzlmod_v2/src/module_version.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration only;
+- `app/slug_bzlmod_v2/src/module_eval.rs`;
+- `app/slug_bzlmod_v2/src/source_preparation.rs`;
+- `app/slug_bzlmod_v2/src/lockfile_v28.rs`; and
+- `app/slug_bzlmod_v2/src/lockfile_v28_tests.rs`.
 
-- `app/slug_bzlmod_v2/src/module_eval.rs`; and
-- `app/slug_bzlmod_v2/src/source_preparation.rs`.
+No seventh file, public export/API, `interim_module.rs`, `registry.rs`, legacy
+resolver, DICE input/schema, fixture/oracle, Cargo/BUILD metadata, dependency,
+cache/interner/global, filesystem/network observation, selected graph/MVS,
+mapping, loading, or consumer is authorized. Cap formatted net growth at 240
+production lines, 360 test lines, and 600 total.
 
-No third file, public export/API, `dice.rs`, command/CLI/server/wire change,
-fixture, oracle, Cargo/BUILD metadata, dependency, cache, lock, interner,
-global, raw filesystem/network access, selected graph, mapping, loading, or
-consumer is authorized. Cap formatted net growth at 280 production lines, 420
-test lines, and 700 total.
+Required implementation proof:
 
-Required proof:
+- exhaustive focused grammar/normalization/equality/hash/order tests for the
+  table above and property checks that `cmp == Equal` exactly when equality;
+- root/nonroot header, dependency, single/multiple override, and discovered-key
+  build-suffix normalization, with invalid/overflow diagnostic preservation;
+- checked Host key rejection before any source/closure/builtin child key
+  activation;
+- lockfile-v28 focused and full byte-for-byte parse/render/order/duplicate/error
+  regression, proving no adapter-surface change;
+- real-DICE root and Host `+build` A/B/A plus spelling-equivalent cold/warm
+  reuse, and semantic version A/B/A invalidation/restoration;
+- full `slug_bzlmod_v2`, direct core/runtime dependents, formatting, diff,
+  archive, exact allowlist/cap, and structural scans proving one parser/order
+  owner and no production call to legacy `registry.rs::compare_versions`; and
+- fresh independent representation/implementation review.
 
-- effective table for absent, root, command, both, command removal, root module,
-  and ordinary versus `bazel_tools`, with command path/category A/B/A;
-- exact command local-path `RepoSpec` projection and provenance/equality proof;
-- real-DICE absent/root/command A/B/A, distinct input-order equality, and
-  cold/warm reuse;
-- command-over-root source selection, explicit `bazel_tools` command bypass
-  with zero built-in activations, and restoration to the default built-in;
-- preserved root-only registry/nonregistry/built-in behavior;
-- command-local materialization, MODULE/source/package/include/closure/
-  discovery success plus missing, wrong-kind, Need, error-order, cycle, and
-  evaluation-failure lifecycle;
-- structural proof that `ModuleSourcePreparationKey` and every other affected
-  owner depend on the effective leaf and no longer classify
-  `RootModuleFiles.overrides` directly;
-- full Stage 5 owner suite and direct core/runtime dependents, formatting,
-  archive, exact scope/cap/diff and forbidden-edge scans; and
-- independent DICE/source-identity implementation review.
+Return `REPLAN` on any required public type, second parser/order,
+lockfile behavior change, unchecked Host key, seventh file, graph/MVS breadth,
+cap excess, or independent-review blocker.
+
+## Compatibility
+
+Exact: Bazel 9.2 version grammar, normalized spelling, empty sentinel,
+unsigned numeric bounds, identifier/prerelease ordering, build-metadata
+discard, and structural invalidation for normalized versions used by the
+actual Host graph.
+
+Slug-native: Rust error/type names, compact retained representation, and DICE
+key/display framing.
+
+Unsupported/deferred: selected discovery/MVS itself, canonical/full repository
+mappings, selected RepoSpecs and yanked policy, extension identities/execution,
+lockfile production, package/Bzl loading, configured analysis/toolchains/
+actions, Test, execution/results/BEP/coverage, native Windows command-path
+semantics, JVM/Java, and exact Bazel identity bytes.
 
 ## Accepted design evidence
 
-The three-document owner audit, live classification scan, exact command-path
-projection review, scope/cap check, and independent reserved-architecture
-review returned `ACCEPT`. This historical scope grants no implementation file.
+The pinned-source/live-owner audit, compact representation review, exact truth
+table, adapter inventory, scope/cap check, routing record, and independent
+reserved architecture review returned `ACCEPT`. The former four-document
+design scope is historical and grants no files or actions in this packet.
 
-## Terminal stops
+## Accepted predecessor evidence
 
-Return `REPLAN` on command-path `RepoSpec` mismatch, a second merge/projection,
-downstream raw command-map or root-map classification, filesystem work in the
-effective leaf, inability to route the command projection through the accepted
-materialization/source chain, public API, third Rust file, selected-graph/MVS
-or consumer breadth, cap excess, or independent-review blocker.
+Commit `dbeb1fb9` and its independent final review accept the effective
+override owner at +189 production/+416 test/+605 total. That historical
+implementation scope grants no files or actions in this packet.

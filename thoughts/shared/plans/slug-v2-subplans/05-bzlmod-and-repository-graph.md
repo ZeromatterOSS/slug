@@ -1482,3 +1482,53 @@ total caps. Require command-over-root and root-name timing, explicit
 `bazel_tools` bypass, command source lifecycle, real-DICE A/B/A and reuse,
 root-only regression proof, complete structural replacement of direct root-map
 classification, and independent implementation review. No graph, public API,
+mapping, loading, or consumer work is authorized by that implementation packet.
+
+### Effective module override owner implementation accepted (2026-08-12)
+
+Commit `dbeb1fb9` accepts the two-file effective override implementation at
++189 production/+416 test/+605 total. One crate-private DICE key computes root
+files before command policy, rejects a winning command override of the root
+module name, retains `Root`/`Command`/`None` provenance, and projects command
+paths once into the exact local-path `RepoSpec`. All five source/discovery
+classifiers now depend on that leaf; explicit command `bazel_tools` bypasses
+the builtin, root overrides preserve their accepted behavior, and effective
+absence preserves the default builtin. Full owner tests, real-DICE A/B/A,
+source lifecycle, formatting, scope/cap/forbidden-edge checks, downstream
+baseline classifications, and independent review pass.
+
+### Selected-module graph owner design r3 REPLAN (2026-08-12)
+
+The override/source gap is closed, but the live graph still lacks one reusable
+exact version domain. Root `module`, dependency, and registry-override values
+validate but retain `+build`; nonroot values strip it; unchecked string-shaped
+discovery keys assume a normalized caller. The accepted exact Bazel 9.2
+parser/order is private to lockfile v28, while the old registry comparator is
+semantically different and belongs to the forbidden supplied-file
+`ResolvedGraph`. Selection cannot truthfully choose maxima or multiple-version
+ceilings by copying either interpretation.
+
+Run next only `WP-5-host-module-version-owner-design`. Freeze one shared
+crate-private Bazel 9.2 grammar/normalization/equality/hash/order owner, its
+root/nonroot/lockfile adapters, and a bounded future implementation packet.
+No Rust, legacy graph activation, discovery/MVS, mapping, loading, or consumer
+work is authorized before independent design acceptance.
+
+### Module version owner design accepted (2026-08-12)
+
+Pinned Bazel 9.2 source, the live version-field/comparator inventory, the
+compact retained-representation audit, and independent reserved-architecture
+review accept one crate-private `BazelModuleVersion`. Normalized
+`CompactString` owns equality/hash, Arc-backed parsed identifiers own exact
+ordering without reparsing, and an allocation-free empty sentinel orders last.
+Root/nonroot evaluators, lockfile v28, and a checked Host discovered-key
+constructor share the sole parser/order while retaining their existing typed
+adapter diagnostics and public string scaffolding. The legacy resolver stays
+isolated and no graph is activated.
+
+Run next only `WP-5-host-module-version-owner-implementation` in the six files
+and under the 240 production/360 test/600 total caps frozen in
+`current-packet.md`. Require exact grammar/order/equality, root/nonroot/override
+normalization, checked Host-key preactivation rejection, unchanged lockfile
+bytes/errors, real-DICE A/B/A/reuse, structural single-owner proof, full owner
+and direct-dependent validation, and independent implementation review.
