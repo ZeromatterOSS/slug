@@ -26,6 +26,7 @@ use dupe::Dupe;
 use serde_json::Map;
 use serde_json::Value;
 use slug_identity_v2::ApparentRepoName;
+use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::PathOutcome;
@@ -33,6 +34,7 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 use url::Url;
 
+use crate::NonrootRepoOverride;
 use crate::OverrideAttributeKey;
 use crate::OverrideAttributeValue;
 use crate::RegistryFileError;
@@ -49,6 +51,8 @@ use crate::host_registry::RegistryKnownFileHashesMode;
 use crate::module_eval::HostEffectiveModuleOverride;
 use crate::module_eval::HostEffectiveModuleOverrideError;
 use crate::module_eval::HostEffectiveModuleOverrideKey;
+use crate::module_eval::RootExtensionUsage;
+use crate::module_eval::RootModuleFilesKey;
 use crate::selected_graph::HostGraphModuleKey;
 use crate::selected_graph::HostGraphModuleSource;
 use crate::selected_graph::HostSelectedModuleEntry;
@@ -1326,6 +1330,451 @@ impl Key for HostSelectedModuleRoutesKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+enum HostSelectedExtensionIsolation {
+    Root {
+        proxy: CompactString,
+    },
+    Module {
+        module: HostGraphModuleKey,
+        proxy: CompactString,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostSelectedExtensionId {
+    bzl_file: CanonicalLabel,
+    extension_name: CompactString,
+    isolation: Option<HostSelectedExtensionIsolation>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostSelectedExtensionUsage {
+    owner: HostGraphModuleKey,
+    id: HostSelectedExtensionId,
+    unique_name: CanonicalRepoName,
+    imports: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostSelectedExtensionOverride {
+    id: HostSelectedExtensionId,
+    generated_name: CompactString,
+    replacement: CanonicalRepoName,
+    must_exist: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostSelectedExtensionMappings {
+    routes: Arc<HostSelectedModuleRoutes>,
+    root_usages: Arc<[RootExtensionUsage]>,
+    usages: Arc<[HostSelectedExtensionUsage]>,
+    overrides: Arc<[HostSelectedExtensionOverride]>,
+    mappings: Arc<[HostSelectedRepositoryMapping]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostSelectedExtensionMappingsError {
+    Routes(HostSelectedModuleRoutesError),
+    RoutesCompute(CompactString),
+    RootFiles(CompactString),
+    RootFilesCompute(CompactString),
+    Invalid {
+        owner: HostGraphModuleKey,
+        message: CompactString,
+    },
+}
+
+impl fmt::Display for HostSelectedExtensionMappingsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for HostSelectedExtensionMappingsError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostSelectedExtensionMappingsKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostSelectedExtensionMappingsKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostSelectedExtensionMappingsKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-selected-extension-mappings:{}", self.workspace)
+    }
+}
+
+type ExtensionMappingsOutcome = SourcePreparationOutcome<
+    Arc<Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError>>,
+>;
+
+fn extension_invalid(
+    owner: &HostGraphModuleKey,
+    message: impl Into<CompactString>,
+) -> HostSelectedExtensionMappingsError {
+    HostSelectedExtensionMappingsError::Invalid {
+        owner: owner.clone(),
+        message: message.into(),
+    }
+}
+
+fn resolve_extension_label(
+    owner: &HostGraphModuleKey,
+    raw: &str,
+    mapping: &HostSelectedRepositoryMapping,
+) -> Result<CanonicalLabel, HostSelectedExtensionMappingsError> {
+    if let Some(label) = raw.strip_prefix("//") {
+        let spelling = if mapping.context_repo.is_root() {
+            format!("@@//{label}")
+        } else {
+            format!("@@{}//{label}", mapping.context_repo.as_str())
+        };
+        return CanonicalLabel::parse(&spelling)
+            .map_err(|message| extension_invalid(owner, message));
+    }
+    let rest = raw
+        .strip_prefix('@')
+        .ok_or_else(|| extension_invalid(owner, "extension label is not absolute"))?;
+    let (apparent, label) = rest
+        .split_once("//")
+        .ok_or_else(|| extension_invalid(owner, "extension label has no package separator"))?;
+    let canonical = if apparent.is_empty() {
+        CanonicalRepoName::root()
+    } else {
+        let apparent =
+            ApparentRepoName::new(apparent).map_err(|message| extension_invalid(owner, message))?;
+        mapping.entries.get(&apparent).cloned().ok_or_else(|| {
+            extension_invalid(
+                owner,
+                format!("extension label repository '{apparent}' is not visible"),
+            )
+        })?
+    };
+    let spelling = if canonical.is_root() {
+        format!("@@//{label}")
+    } else {
+        format!("@@{}//{label}", canonical.as_str())
+    };
+    CanonicalLabel::parse(&spelling).map_err(|message| extension_invalid(owner, message))
+}
+
+fn generated_repo(
+    owner: &HostGraphModuleKey,
+    unique_name: &CanonicalRepoName,
+    exported: &str,
+) -> Result<CanonicalRepoName, HostSelectedExtensionMappingsError> {
+    CanonicalRepoName::new(format!("{}+{exported}", unique_name.as_str()))
+        .map_err(|message| extension_invalid(owner, message))
+}
+
+struct UsageInput<'a> {
+    owner: &'a HostGraphModuleKey,
+    bzl_label: &'a str,
+    extension_name: &'a str,
+    proxies: &'a [crate::NonrootExtensionProxy],
+    overrides: &'a SmallMap<CompactString, NonrootRepoOverride>,
+    isolation_proxy: Option<&'a str>,
+    root: bool,
+}
+
+fn extension_unique_candidate(id: &HostSelectedExtensionId, collision: usize) -> String {
+    let label = id.bzl_file.to_string();
+    let repo = label
+        .strip_prefix("@@")
+        .and_then(|value| value.split_once("//"))
+        .map(|(repo, _)| repo)
+        .unwrap_or_default();
+    let name = id
+        .extension_name
+        .split_ascii_whitespace()
+        .next_back()
+        .unwrap_or(id.extension_name.as_str());
+    let collision = (collision > 1)
+        .then(|| collision.to_string())
+        .unwrap_or_default();
+    match &id.isolation {
+        None => format!("{repo}+{name}{collision}"),
+        Some(HostSelectedExtensionIsolation::Root { proxy }) => {
+            format!("{repo}+_{name}{collision}+++{proxy}")
+        }
+        Some(HostSelectedExtensionIsolation::Module { module, proxy }) => {
+            let module = match module {
+                HostGraphModuleKey::Root => String::new(),
+                HostGraphModuleKey::Module { name, version } => {
+                    format!("{name}+{}", version.normalized())
+                }
+            };
+            format!("{repo}+_{name}{collision}+{module}+{proxy}")
+        }
+    }
+}
+
+fn selected_extension_mappings(
+    routes: Arc<HostSelectedModuleRoutes>,
+    root_usages: Arc<[RootExtensionUsage]>,
+) -> Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError> {
+    let root_route = routes
+        .entries
+        .iter()
+        .find(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
+        .ok_or_else(|| extension_invalid(&HostGraphModuleKey::Root, "root route is absent"))?;
+    let mut inputs = Vec::new();
+    for usage in root_usages.iter() {
+        inputs.push(UsageInput {
+            owner: &root_route.entry.key,
+            bzl_label: usage.bzl_label.as_str(),
+            extension_name: usage.extension_name.as_str(),
+            proxies: &usage.proxies,
+            overrides: &usage.repo_overrides,
+            isolation_proxy: usage
+                .isolation
+                .as_ref()
+                .map(|isolation| isolation.exported_proxy_name.as_str()),
+            root: true,
+        });
+    }
+    for route in routes.entries.iter() {
+        let HostGraphModuleSource::Discovered(module) = &route.entry.source else {
+            continue;
+        };
+        for usage in module.module.extension_usages.iter() {
+            inputs.push(UsageInput {
+                owner: &route.entry.key,
+                bzl_label: usage.bzl_label.as_str(),
+                extension_name: usage.extension_name.as_str(),
+                proxies: &usage.proxies,
+                overrides: &usage.repo_overrides,
+                isolation_proxy: usage
+                    .isolation
+                    .as_ref()
+                    .map(|isolation| isolation.exported_proxy_name.as_str()),
+                root: false,
+            });
+        }
+    }
+
+    let route_by_owner = routes
+        .entries
+        .iter()
+        .map(|route| (route.entry.key.clone(), route))
+        .collect::<SmallMap<_, _>>();
+    let mut names = SmallMap::<HostSelectedExtensionId, CanonicalRepoName>::new();
+    let mut claimed = SmallSet::<CanonicalRepoName>::new();
+    let mut usages = Vec::new();
+    let mut pending_overrides = Vec::new();
+    let mut no_overrides = routes
+        .entries
+        .iter()
+        .map(|route| (*route.mapping.entries).clone())
+        .collect::<Vec<_>>();
+
+    for input in inputs {
+        let route = route_by_owner
+            .get(input.owner)
+            .expect("every selected usage owner has a route");
+        let id = HostSelectedExtensionId {
+            bzl_file: resolve_extension_label(input.owner, input.bzl_label, &route.mapping)?,
+            extension_name: input.extension_name.into(),
+            isolation: input.isolation_proxy.map(|proxy| {
+                if input.root {
+                    HostSelectedExtensionIsolation::Root {
+                        proxy: proxy.into(),
+                    }
+                } else {
+                    HostSelectedExtensionIsolation::Module {
+                        module: input.owner.clone(),
+                        proxy: proxy.into(),
+                    }
+                }
+            }),
+        };
+        let unique_name = if let Some(existing) = names.get(&id) {
+            existing.clone()
+        } else {
+            let mut suffix = 1usize;
+            let unique = loop {
+                let spelling = extension_unique_candidate(&id, suffix);
+                let candidate = CanonicalRepoName::new(spelling)
+                    .map_err(|message| extension_invalid(input.owner, message))?;
+                if claimed.insert(candidate.clone()) {
+                    break candidate;
+                }
+                suffix += 1;
+                if suffix == usize::MAX {
+                    return Err(extension_invalid(
+                        input.owner,
+                        "extension name space exhausted",
+                    ));
+                }
+            };
+            names.insert(id.clone(), unique.clone());
+            unique
+        };
+        let route_index = routes
+            .entries
+            .iter()
+            .position(|candidate| candidate.entry.key == *input.owner)
+            .expect("selected owner route index exists");
+        let mut imports = SmallMap::new();
+        for proxy in input.proxies {
+            for (local, exported) in proxy.imports.local_to_exported.iter() {
+                let canonical = generated_repo(input.owner, &unique_name, exported)?;
+                insert_mapping(
+                    input.owner,
+                    &mut no_overrides[route_index],
+                    local,
+                    canonical.clone(),
+                )
+                .map_err(|error| extension_invalid(input.owner, error.to_string()))?;
+                let apparent = ApparentRepoName::new(local.as_str())
+                    .map_err(|message| extension_invalid(input.owner, message))?;
+                imports.insert(apparent, canonical);
+            }
+        }
+        if input.root {
+            for (generated, replacement) in input.overrides.iter() {
+                pending_overrides.push((
+                    id.clone(),
+                    unique_name.clone(),
+                    generated.clone(),
+                    replacement.clone(),
+                ));
+            }
+        }
+        usages.push(HostSelectedExtensionUsage {
+            owner: input.owner.clone(),
+            id,
+            unique_name,
+            imports: Arc::new(imports),
+        });
+    }
+    drop(route_by_owner);
+
+    let root_index = routes
+        .entries
+        .iter()
+        .position(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
+        .expect("root route exists");
+    let mut overrides = Vec::new();
+    let mut substitutions = SmallMap::new();
+    for (id, unique_name, generated, replacement) in pending_overrides {
+        let apparent = ApparentRepoName::new(replacement.overriding_repo_name.as_str())
+            .map_err(|message| extension_invalid(&HostGraphModuleKey::Root, message))?;
+        let target = no_overrides[root_index]
+            .get(&apparent)
+            .cloned()
+            .ok_or_else(|| {
+                extension_invalid(
+                    &HostGraphModuleKey::Root,
+                    format!("override target '{apparent}' is not visible"),
+                )
+            })?;
+        let source = generated_repo(&HostGraphModuleKey::Root, &unique_name, &generated)?;
+        if substitutions.insert(source, target.clone()).is_some() {
+            return Err(extension_invalid(
+                &HostGraphModuleKey::Root,
+                "generated repository is overridden more than once",
+            ));
+        }
+        overrides.push(HostSelectedExtensionOverride {
+            id,
+            generated_name: generated,
+            replacement: target,
+            must_exist: replacement.must_exist,
+        });
+    }
+    let mappings = routes
+        .entries
+        .iter()
+        .zip(no_overrides)
+        .map(|(route, mut entries)| {
+            for canonical in entries.values_mut() {
+                if let Some(replacement) = substitutions.get(canonical) {
+                    *canonical = replacement.clone();
+                }
+            }
+            HostSelectedRepositoryMapping {
+                context_repo: route.mapping.context_repo.clone(),
+                entries: Arc::new(entries),
+            }
+        })
+        .collect::<Arc<_>>();
+    Ok(HostSelectedExtensionMappings {
+        routes,
+        root_usages,
+        usages: usages.into(),
+        overrides: overrides.into(),
+        mappings,
+    })
+}
+
+#[async_trait]
+impl Key for HostSelectedExtensionMappingsKey {
+    type Value = ExtensionMappingsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let routes = match ctx
+            .compute(&HostSelectedModuleRoutesKey::new(self.workspace.dupe()))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(routes) => Arc::new(routes.clone()),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostSelectedExtensionMappingsError::Routes(error.clone()),
+                    )));
+                }
+            },
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostSelectedExtensionMappingsError::RoutesCompute(error.to_string().into()),
+                )));
+            }
+        };
+        let root_usages = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Ok(value) => match value.as_ref() {
+                Ok(files) => files.extension_usages.clone(),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostSelectedExtensionMappingsError::RootFiles(error.clone()),
+                    )));
+                }
+            },
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostSelectedExtensionMappingsError::RootFilesCompute(error.to_string().into()),
+                )));
+            }
+        };
+        SourcePreparationOutcome::Complete(Arc::new(selected_extension_mappings(
+            routes,
+            root_usages,
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -1482,7 +1931,11 @@ mod tests {
                 (
                     observation(&module, PathObservationOperation::FileBytes),
                     PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
-                        format!("module(name='{name}')\n").into_bytes(),
+                        if *name == "local" {
+                            b"module(name='local')\np=use_extension('//:local.bzl','shared')\nuse_repo(p,'generated')\n".to_vec()
+                        } else {
+                            format!("module(name='{name}')\n").into_bytes()
+                        },
                     ))),
                 ),
                 (
@@ -1682,6 +2135,21 @@ mod tests {
             .unwrap()
     }
 
+    async fn compute_real_extensions(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        include_epoch: bool,
+    ) -> ExtensionMappingsOutcome {
+        real_transaction(dice, root, generation, &[], include_epoch)
+            .await
+            .compute(&HostSelectedExtensionMappingsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
     fn module() -> HostGraphModuleKey {
         HostGraphModuleKey::Module {
             name: "demo".into(),
@@ -1774,6 +2242,113 @@ mod tests {
             resolved: resolved.clone(),
             unpruned: resolved,
         }
+    }
+
+    fn test_span() -> crate::LogicalSpan {
+        crate::LogicalSpan {
+            file: crate::LogicalModuleFileId::new("/MODULE.bazel"),
+            start_line: 1,
+            start_column: 1,
+            end_line: 1,
+            end_column: 2,
+        }
+    }
+
+    fn test_proxy(
+        proxy: &str,
+        imports: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> crate::NonrootExtensionProxy {
+        crate::NonrootExtensionProxy {
+            proxy_name: proxy.into(),
+            containing_file: crate::LogicalModuleFileId::new("/MODULE.bazel"),
+            dev_dependency: false,
+            location: test_span(),
+            imports: crate::NonrootRepoImports::from_local_to_exported(
+                imports
+                    .into_iter()
+                    .map(|(local, exported)| {
+                        (CompactString::from(local), CompactString::from(exported))
+                    })
+                    .collect::<SmallMap<_, _>>(),
+            )
+            .unwrap(),
+        }
+    }
+
+    fn root_usage(
+        label: &str,
+        name: &str,
+        proxy: crate::NonrootExtensionProxy,
+        isolated: bool,
+        overrides: impl IntoIterator<Item = (&'static str, &'static str)>,
+    ) -> crate::module_eval::RootExtensionUsage {
+        crate::module_eval::RootExtensionUsage {
+            bzl_label: label.into(),
+            extension_name: name.into(),
+            proxies: Arc::from([proxy.clone()]),
+            tags: Arc::from([]),
+            repo_overrides: Arc::new(
+                overrides
+                    .into_iter()
+                    .map(|(generated, replacement)| {
+                        (
+                            CompactString::from(generated),
+                            crate::NonrootRepoOverride {
+                                overriding_repo_name: replacement.into(),
+                                must_exist: true,
+                                location: test_span(),
+                            },
+                        )
+                    })
+                    .collect::<SmallMap<_, _>>(),
+            ),
+            isolation: isolated.then(|| crate::module_eval::RootExtensionIsolationKey {
+                exported_proxy_name: proxy.proxy_name,
+            }),
+        }
+    }
+
+    fn nonroot_usage(
+        owner: &HostGraphModuleKey,
+        label: &str,
+        name: &str,
+        proxy: crate::NonrootExtensionProxy,
+        isolated: bool,
+    ) -> crate::NonrootExtensionUsage {
+        let HostGraphModuleKey::Module {
+            name: module_name,
+            version,
+        } = owner
+        else {
+            panic!("nonroot usage owner must be a module")
+        };
+        crate::NonrootExtensionUsage {
+            bzl_label: label.into(),
+            extension_name: name.into(),
+            proxies: Arc::from([proxy.clone()]),
+            tags: Arc::from([]),
+            repo_overrides: Arc::new(SmallMap::new()),
+            isolation: isolated.then(|| crate::NonrootExtensionIsolationKey {
+                module: NonrootModuleKey::new(module_name.clone(), version.normalized()),
+                exported_proxy_name: proxy.proxy_name,
+            }),
+        }
+    }
+
+    fn route_module_with_usages(
+        name: &str,
+        version: &str,
+        repo_name: &str,
+        usages: Arc<[crate::NonrootExtensionUsage]>,
+    ) -> HostSelectedModuleEntry {
+        let mut entry = route_module(name, version, repo_name, false);
+        let HostGraphModuleSource::Discovered(module) = &entry.source else {
+            unreachable!()
+        };
+        let mut discovered = (**module).clone();
+        discovered.module.extension_usages = usages;
+        entry.source = HostGraphModuleSource::Discovered(Arc::new(discovered));
+        entry
     }
 
     fn route_spec(module: HostGraphModuleKey) -> HostSelectedRegistryRepoSpec {
@@ -2283,6 +2858,229 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn pure_extension_ids_group_isolate_collide_and_map_mvo_contexts() {
+        let v1 = route_key("dep", "1");
+        let v2 = route_key("dep", "2");
+        let dep1_usage = nonroot_usage(
+            &v1,
+            "@dep//:ext.bzl",
+            "shared",
+            test_proxy("dep_one", [("dep_one", "one")]),
+            false,
+        );
+        let dep2_usage = nonroot_usage(
+            &v2,
+            "@dep//:ext.bzl",
+            "shared",
+            test_proxy("dep_two", [("dep_two", "two")]),
+            true,
+        );
+        let graph = route_graph([
+            route_root([("dep_one", v1.clone()), ("dep_two", v2.clone())], None),
+            route_module_with_usages("dep", "1", "dep", Arc::from([dep1_usage])),
+            route_module_with_usages("dep", "2", "dep", Arc::from([dep2_usage])),
+        ]);
+        let routes = Arc::new(
+            selected_routes(
+                &graph,
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([]),
+                },
+            )
+            .unwrap(),
+        );
+        let roots = Arc::from([
+            root_usage(
+                "@root//:same.bzl",
+                "shared",
+                test_proxy("first", [("first", "one")]),
+                false,
+                [],
+            ),
+            root_usage(
+                "@root//:same.bzl",
+                "shared",
+                test_proxy("second", [("second", "two")]),
+                false,
+                [],
+            ),
+            root_usage(
+                "@root//:other.bzl",
+                "shared",
+                test_proxy("collision", [("collision", "three")]),
+                false,
+                [],
+            ),
+            root_usage(
+                "@root//:iso.bzl",
+                "shared",
+                test_proxy("root_iso", [("root_iso", "four")]),
+                true,
+                [],
+            ),
+            root_usage(
+                "@root//:iso_collision.bzl",
+                "shared",
+                test_proxy("root_iso", [("root_iso_two", "five")]),
+                true,
+                [],
+            ),
+            root_usage(
+                "//:MODULE.bazel",
+                "//:repo.bzl simple_repo",
+                test_proxy("", [("innate", "innate")]),
+                false,
+                [],
+            ),
+        ]);
+        let value = selected_extension_mappings(routes, roots).unwrap();
+
+        assert_eq!(value.usages.len(), 8);
+        assert_eq!(value.usages[0].unique_name.as_str(), "+shared");
+        assert_eq!(value.usages[1].unique_name.as_str(), "+shared");
+        assert_eq!(value.usages[2].unique_name.as_str(), "+shared2");
+        assert_eq!(value.usages[3].unique_name.as_str(), "+_shared+++root_iso");
+        assert_eq!(value.usages[4].unique_name.as_str(), "+_shared2+++root_iso");
+        assert_eq!(value.usages[5].unique_name.as_str(), "+simple_repo");
+        assert_eq!(value.usages[6].unique_name.as_str(), "dep+1+shared");
+        assert_eq!(
+            value.usages[7].unique_name.as_str(),
+            "dep+2+_shared+dep+2+dep_two"
+        );
+        assert_ne!(value.usages[6].id, value.usages[7].id);
+        assert_eq!(
+            value.mappings[1].entries.get("dep_one").unwrap().as_str(),
+            "dep+1+shared+one"
+        );
+        assert_eq!(
+            value.mappings[2].entries.get("dep_two").unwrap().as_str(),
+            "dep+2+_shared+dep+2+dep_two+two"
+        );
+
+        let empty = selected_extension_mappings(
+            Arc::new(
+                selected_routes(
+                    &route_graph([route_root([], None)]),
+                    &HostSelectedRegistryRepoSpecs {
+                        entries: Arc::from([]),
+                    },
+                )
+                .unwrap(),
+            ),
+            Arc::from([]),
+        )
+        .unwrap();
+        assert!(empty.usages.is_empty());
+        assert_eq!(empty.mappings.len(), 1);
+    }
+
+    #[test]
+    fn pure_extension_projection_errors_are_typed_and_source_ordered() {
+        let routes = || {
+            Arc::new(
+                selected_routes(
+                    &route_graph([route_root([], None)]),
+                    &HostSelectedRegistryRepoSpecs {
+                        entries: Arc::from([]),
+                    },
+                )
+                .unwrap(),
+            )
+        };
+        let error = |usages| selected_extension_mappings(routes(), usages).unwrap_err();
+
+        assert!(matches!(
+            error(Arc::from([root_usage(
+                "relative.bzl",
+                "ext",
+                test_proxy("p", []),
+                false,
+                [],
+            )])),
+            HostSelectedExtensionMappingsError::Invalid { ref message, .. }
+                if message == "extension label is not absolute"
+        ));
+        assert!(matches!(
+            error(Arc::from([root_usage(
+                "@missing//:ext.bzl",
+                "ext",
+                test_proxy("p", []),
+                false,
+                [],
+            )])),
+            HostSelectedExtensionMappingsError::Invalid { message, .. }
+                if message.contains("is not visible")
+        ));
+        assert!(matches!(
+            error(Arc::from([
+                root_usage(
+                    "@root//:one.bzl",
+                    "ext",
+                    test_proxy("p", [("same", "one")]),
+                    false,
+                    [],
+                ),
+                root_usage(
+                    "@root//:two.bzl",
+                    "ext",
+                    test_proxy("q", [("same", "two")]),
+                    false,
+                    [],
+                ),
+            ])),
+            HostSelectedExtensionMappingsError::Invalid { message, .. }
+                if message.contains("maps to both")
+        ));
+        let missing_target = error(Arc::from([root_usage(
+            "@root//:one.bzl",
+            "ext",
+            test_proxy("p", []),
+            false,
+            [("generated", "missing")],
+        )]));
+        assert!(
+            matches!(
+                missing_target,
+                HostSelectedExtensionMappingsError::Invalid { ref message, .. }
+                    if message.contains("override target") && message.contains("not visible")
+            ),
+            "{missing_target:?}"
+        );
+        assert!(matches!(
+            error(Arc::from([
+                root_usage(
+                    "@root//:one.bzl",
+                    "ext",
+                    test_proxy("p", []),
+                    false,
+                    [("generated", "root")],
+                ),
+                root_usage(
+                    "@root//:one.bzl",
+                    "ext",
+                    test_proxy("q", []),
+                    false,
+                    [("generated", "root")],
+                ),
+            ])),
+            HostSelectedExtensionMappingsError::Invalid { message, .. }
+                if message == "generated repository is overridden more than once"
+        ));
+        assert!(matches!(
+            selected_extension_mappings(
+                Arc::new(HostSelectedModuleRoutes {
+                    entries: Arc::from([]),
+                }),
+                Arc::from([]),
+            ),
+            Err(HostSelectedExtensionMappingsError::Invalid {
+                owner: HostGraphModuleKey::Root,
+                message,
+            }) if message == "root route is absent"
+        ));
+    }
+
     #[tokio::test]
     async fn real_aggregate_selected_only_lifecycle_and_reuse() {
         const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
@@ -2513,6 +3311,171 @@ mod tests {
         assert!(!calls.iter().any(|url| url == DEP_1_SOURCE));
         assert!(calls.iter().any(|url| url == DEP_2_SOURCE));
         assert!(calls.iter().any(|url| url == HOLDER_SOURCE));
+    }
+
+    #[tokio::test]
+    async fn real_selected_extensions_use_two_phase_mapping_and_restore_a_b_a() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let source = |name: &str| {
+            format!(
+                r#"
+module(name = "bazel_tools", repo_name = "root_self")
+p = use_extension("//:ext.bzl", "extension")
+use_repo(p, root_alias = "{name}", overridden_alias = "overridden")
+override_repo(p, overridden = "replacement")
+isolated = use_extension("//:ext.bzl", "extension", isolate = True)
+use_repo(isolated, isolated_alias = "isolated")
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "replacement")
+"#
+            )
+        };
+
+        let a = compute_real_extensions(&dice, &source("plain_a"), 1, true).await;
+        let warm = compute_real_extensions(&dice, &source("plain_a"), 1, true).await;
+        assert!(HostSelectedExtensionMappingsKey::equality(&a, &warm));
+        assert!(HostSelectedExtensionMappingsKey::validity(&a));
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("selected extension projection must complete")
+        };
+        let a_value = a_value.as_ref().as_ref().unwrap();
+        assert_eq!(a_value.usages.len(), 3);
+        assert_eq!(a_value.usages[0].unique_name.as_str(), "+extension");
+        assert_eq!(
+            a_value.usages[1].unique_name.as_str(),
+            "+_extension+++isolated"
+        );
+        assert_eq!(a_value.usages[2].unique_name.as_str(), "+simple_repo");
+        let root = &a_value.mappings[0].entries;
+        assert_eq!(
+            root.get("root_alias").unwrap().as_str(),
+            "+extension+plain_a"
+        );
+        assert_eq!(
+            root.get("replacement").unwrap().as_str(),
+            "+simple_repo+replacement"
+        );
+        assert_eq!(
+            root.get("overridden_alias").unwrap().as_str(),
+            "+simple_repo+replacement"
+        );
+        assert_eq!(
+            root.get("isolated_alias").unwrap().as_str(),
+            "+_extension+++isolated+isolated"
+        );
+        assert_eq!(a_value.overrides.len(), 1);
+        assert!(a_value.overrides[0].must_exist);
+
+        let b = compute_real_extensions(&dice, &source("plain_b"), 2, true).await;
+        assert!(!HostSelectedExtensionMappingsKey::equality(&a, &b));
+        let restored = compute_real_extensions(&dice, &source("plain_a"), 3, true).await;
+        assert!(HostSelectedExtensionMappingsKey::equality(&a, &restored));
+        assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn real_selected_extensions_retain_nonroot_and_collision_order() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let source = |reversed: bool| {
+            let usages = if reversed {
+                "b=use_extension('//:b.bzl','shared')\nuse_repo(b,b_alias='b')\n\
+                 a=use_extension('//:a.bzl','shared')\nuse_repo(a,a_alias='a')"
+            } else {
+                "a=use_extension('//:a.bzl','shared')\nuse_repo(a,a_alias='a')\n\
+                 b=use_extension('//:b.bzl','shared')\nuse_repo(b,b_alias='b')"
+            };
+            format!(
+                "module(name='bazel_tools', repo_name='root_self')\n\
+                 local_path_override(module_name='local', path='local')\n\
+                 bazel_dep(name='local', version='1')\n{usages}\n"
+            )
+        };
+
+        let a = compute_real_extensions(&dice, &source(false), 20, true).await;
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("selected extension projection must complete")
+        };
+        let a_value = a_value.as_ref().as_ref().unwrap();
+        assert_eq!(a_value.usages.len(), 3);
+        assert!(a_value.usages[0].id.bzl_file.to_string().contains(":a.bzl"));
+        assert_eq!(a_value.usages[0].unique_name.as_str(), "+shared");
+        assert!(a_value.usages[1].id.bzl_file.to_string().contains(":b.bzl"));
+        assert_eq!(a_value.usages[1].unique_name.as_str(), "+shared2");
+        assert_eq!(a_value.usages[2].unique_name.as_str(), "local++shared");
+        let local_mapping = a_value
+            .mappings
+            .iter()
+            .find(|mapping| mapping.context_repo.as_str() == "local+")
+            .unwrap();
+        assert_eq!(
+            local_mapping.entries.get("generated").unwrap().as_str(),
+            "local++shared+generated"
+        );
+
+        let b = compute_real_extensions(&dice, &source(true), 21, true).await;
+        let SourcePreparationOutcome::Complete(b_value) = &b else {
+            panic!("reordered extension projection must complete")
+        };
+        let b_value = b_value.as_ref().as_ref().unwrap();
+        assert!(b_value.usages[0].id.bzl_file.to_string().contains(":b.bzl"));
+        assert_eq!(b_value.usages[0].unique_name.as_str(), "+shared");
+        assert!(b_value.usages[1].id.bzl_file.to_string().contains(":a.bzl"));
+        assert_eq!(b_value.usages[1].unique_name.as_str(), "+shared2");
+        assert!(!HostSelectedExtensionMappingsKey::equality(&a, &b));
+
+        let restored = compute_real_extensions(&dice, &source(false), 22, true).await;
+        assert!(HostSelectedExtensionMappingsKey::equality(&a, &restored));
+        assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn real_selected_extension_route_need_and_error_remain_typed() {
+        let io = Arc::new(TrackingRegistryIo::new([(
+            "https://registry.invalid/modules/dep/1/MODULE.bazel",
+            b"module(name='dep', version='1')\n" as &[u8],
+        )]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let need = compute_real_extensions(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n",
+            30,
+            false,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostSelectedExtensionMappingsKey::validity(&need));
+        assert!(!HostSelectedExtensionMappingsKey::equality(&need, &need));
+
+        let error = compute_real_extensions(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='missing', version='1')\n",
+            31,
+            true,
+        )
+        .await;
+        assert!(matches!(
+            error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostSelectedExtensionMappingsError::Routes(
+                        HostSelectedModuleRoutesError::Graph(
+                            HostSelectedModuleGraphError::DiscoveryLeaf {
+                                module: HostGraphModuleKey::Module { name, .. },
+                                ..
+                            }
+                        )
+                    )) if name == "missing"
+                )
+        ));
     }
 
     #[tokio::test]
