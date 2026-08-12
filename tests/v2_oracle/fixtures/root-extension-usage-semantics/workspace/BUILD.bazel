@@ -1,0 +1,1 @@
+exports_files(["MODULE.bazel", "fragment.MODULE.bazel", "ext.bzl", "repo.bzl"])

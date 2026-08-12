@@ -1,0 +1,19 @@
+module(name = "root_extension_usage", version = "1.0.0")
+
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "replacement", marker = "replacement")
+repo(name = "injected", marker = "injected")
+
+shared = use_extension("//:ext.bzl", "extension")
+shared.repo(name = "plain_root_a")
+use_repo(shared, root_alias = "plain_root_a")
+shared.repo(name = "overridden")
+use_repo(shared, overridden_alias = "overridden")
+override_repo(shared, overridden = "replacement")
+inject_repo(shared, injected = "injected")
+
+isolated_root = use_extension("//:ext.bzl", "extension", isolate = True)
+isolated_root.repo(name = "isolated_root")
+use_repo(isolated_root, root_isolated_alias = "isolated_root")
+
+include("//:fragment.MODULE.bazel")

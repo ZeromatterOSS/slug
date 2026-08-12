@@ -1,0 +1,214 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--output=json",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--output=json",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "root_usage_a",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running",
+      "normalized_stdout": "{\"replacement\":\"+simple_repo+replacement\",\"injected\":\"+simple_repo+injected\",\"root_alias\":\"+extension+plain_root_a\",\"overridden_alias\":\"+simple_repo+replacement\",\"fragment_alias\":\"+extension+plain_fragment\",\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\",\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\",\"\":\"\",\"root_extension_usage\":\"\",\"bazel_tools\":\"bazel_tools\"}",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/home/wgray/slug/target/v2o/runs/root-extension-usage-semantics/20260812-090051-175902-bazel/workspace\n  - Only in new server: --workspace_directory=/home/wgray/slug/target/v2o/runs/root-extension-usage-semantics/20260812-090141-176707-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\n no actions running\n no actions running\n",
+      "stdout": "{\"replacement\":\"+simple_repo+replacement\",\"injected\":\"+simple_repo+injected\",\"root_alias\":\"+extension+plain_root_a\",\"overridden_alias\":\"+simple_repo+replacement\",\"fragment_alias\":\"+extension+plain_fragment\",\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\",\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\",\"\":\"\",\"root_extension_usage\":\"\",\"bazel_tools\":\"bazel_tools\"}\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--output=json",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--output=json",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "shared.repo(name = \"plain_root_a\")\nuse_repo(shared, root_alias = \"plain_root_a\")",
+          "old_digest_hint": "730",
+          "path": "MODULE.bazel",
+          "replace": "shared.repo(name = \"plain_root_b\")\nuse_repo(shared, root_alias = \"plain_root_b\")"
+        }
+      ],
+      "name": "root_usage_b",
+      "normalized_stderr": "no actions running\n no actions running",
+      "normalized_stdout": "{\"replacement\":\"+simple_repo+replacement\",\"injected\":\"+simple_repo+injected\",\"root_alias\":\"+extension+plain_root_b\",\"overridden_alias\":\"+simple_repo+replacement\",\"fragment_alias\":\"+extension+plain_fragment\",\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\",\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\",\"\":\"\",\"root_extension_usage\":\"\",\"bazel_tools\":\"bazel_tools\"}",
+      "startup_argv": [],
+      "stderr": " no actions running\n no actions running\n",
+      "stdout": "{\"replacement\":\"+simple_repo+replacement\",\"injected\":\"+simple_repo+injected\",\"root_alias\":\"+extension+plain_root_b\",\"overridden_alias\":\"+simple_repo+replacement\",\"fragment_alias\":\"+extension+plain_fragment\",\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\",\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\",\"\":\"\",\"root_extension_usage\":\"\",\"bazel_tools\":\"bazel_tools\"}\n"
+    },
+    {
+      "argv": [
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--output=json",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "mod",
+        "dump_repo_mapping",
+        "",
+        "--output=json",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "shared.repo(name = \"plain_root_b\")\nuse_repo(shared, root_alias = \"plain_root_b\")",
+          "old_digest_hint": "730",
+          "path": "MODULE.bazel",
+          "replace": "shared.repo(name = \"plain_root_a\")\nuse_repo(shared, root_alias = \"plain_root_a\")"
+        }
+      ],
+      "name": "root_usage_a_restored",
+      "normalized_stderr": "no actions running\n no actions running",
+      "normalized_stdout": "{\"replacement\":\"+simple_repo+replacement\",\"injected\":\"+simple_repo+injected\",\"root_alias\":\"+extension+plain_root_a\",\"overridden_alias\":\"+simple_repo+replacement\",\"fragment_alias\":\"+extension+plain_fragment\",\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\",\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\",\"\":\"\",\"root_extension_usage\":\"\",\"bazel_tools\":\"bazel_tools\"}",
+      "startup_argv": [],
+      "stderr": " no actions running\n no actions running\n",
+      "stdout": "{\"replacement\":\"+simple_repo+replacement\",\"injected\":\"+simple_repo+injected\",\"root_alias\":\"+extension+plain_root_a\",\"overridden_alias\":\"+simple_repo+replacement\",\"fragment_alias\":\"+extension+plain_fragment\",\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\",\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\",\"\":\"\",\"root_extension_usage\":\"\",\"bazel_tools\":\"bazel_tools\"}\n"
+    },
+    {
+      "argv": [
+        "query",
+        "@root_alias//:marker.txt",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@root_alias//:marker.txt",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "override_repo(shared, overridden = \"replacement\")",
+          "old_digest_hint": "730",
+          "path": "MODULE.bazel",
+          "replace": "override_repo(shared, missing = \"replacement\")"
+        }
+      ],
+      "name": "override_requires_generated_repo",
+      "normalized_stderr": "no actions running\n no actions running\nLoading: 0 packages loaded\nERROR: Target parsing failed due to unexpected exception: module extension @@//:ext.bzl%extension does not generate repository \"missing\", yet it is overridden via override_repo() at <workspace>/MODULE.bazel:12:14. Use inject_repo() instead to inject a new repository.",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": " no actions running\n no actions running\nLoading: 0 packages loaded\nERROR: Target parsing failed due to unexpected exception: module extension @@//:ext.bzl%extension does not generate repository \"missing\", yet it is overridden via override_repo() at /home/wgray/slug/target/v2o/runs/root-extension-usage-semantics/20260812-090141-176707-bazel/workspace/MODULE.bazel:12:14. Use inject_repo() instead to inject a new repository.\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "query",
+        "@root_alias//:marker.txt",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "query",
+        "@root_alias//:marker.txt",
+        "--lockfile_mode=off",
+        "--experimental_isolated_extension_usages"
+      ],
+      "exit_code": 7,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "override_repo(shared, missing = \"replacement\")",
+          "old_digest_hint": "727",
+          "path": "MODULE.bazel",
+          "replace": "override_repo(shared, overridden = \"replacement\")"
+        },
+        {
+          "find": "shared_fragment.repo(name = \"plain_fragment\")",
+          "old_digest_hint": "370",
+          "path": "fragment.MODULE.bazel",
+          "replace": "shared_fragment.repo(name = \"injected\")"
+        },
+        {
+          "find": "use_repo(shared_fragment, fragment_alias = \"plain_fragment\")",
+          "old_digest_hint": "364",
+          "path": "fragment.MODULE.bazel",
+          "replace": "# injected import intentionally absent"
+        }
+      ],
+      "name": "inject_rejects_generated_repo_collision",
+      "normalized_stderr": "no actions running\n no actions running\nLoading: 0 packages loaded\nERROR: Target parsing failed due to unexpected exception: module extension @@//:ext.bzl%extension generates repository \"injected\", yet it is injected via inject_repo() at <workspace>/MODULE.bazel:13:12. Use override_repo() instead to override an existing repository.",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": " no actions running\n no actions running\nLoading: 0 packages loaded\nERROR: Target parsing failed due to unexpected exception: module extension @@//:ext.bzl%extension generates repository \"injected\", yet it is injected via inject_repo() at /home/wgray/slug/target/v2o/runs/root-extension-usage-semantics/20260812-090141-176707-bazel/workspace/MODULE.bazel:13:12. Use override_repo() instead to override an existing repository.\n",
+      "stdout": ""
+    }
+  ],
+  "fixture": "root-extension-usage-semantics",
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
+}

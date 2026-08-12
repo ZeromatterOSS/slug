@@ -1,0 +1,79 @@
+[fixture]
+name = "root-extension-usage-semantics"
+description = "Bazel 9.2 root extension usages, includes, isolation, imports, override/inject precedence, and retained-daemon restoration."
+comparison = "message_shape"
+daemon = true
+oracle_notes = "Hermetic root-only fixture. Repository mapping output distinguishes one aggregated ordinary usage from two isolated usages and proves alias/override projection; focused mutations prove semantic A/B/A restoration and override/inject must-exist precedence."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileGlobals.java: useExtension, useRepo, overrideRepo, injectRepo, useRepoRule, include",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleThreadContext.java: ModuleExtensionUsageBuilder, include",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionUsage.java",
+  "src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleExtensionId.java",
+]
+translation_notes = "The first three commands are A/B/A in one Bazel daemon. They inspect mapping identity only; extension implementation and repository materialization remain oracle scaffolding, not admitted Slug behavior. Later failures discriminate override must-exist before injection collision."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture root-extension-usage-semantics --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture root-extension-usage-semantics --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "root_usage_a"
+argv = ["mod", "dump_repo_mapping", "", "--output=json", "--lockfile_mode=off", "--experimental_isolated_extension_usages"]
+expected_exit = 0
+stdout_contains = ["\"root_alias\":\"+extension+plain_root_a\"", "\"fragment_alias\":\"+extension+plain_fragment\"", "\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\"", "\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\"", "\"overridden_alias\":\"+simple_repo+replacement\""]
+
+[[commands]]
+name = "root_usage_b"
+argv = ["mod", "dump_repo_mapping", "", "--output=json", "--lockfile_mode=off", "--experimental_isolated_extension_usages"]
+expected_exit = 0
+stdout_contains = ["\"root_alias\":\"+extension+plain_root_b\"", "\"fragment_alias\":\"+extension+plain_fragment\"", "\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\"", "\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\""]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "shared.repo(name = \"plain_root_a\")\nuse_repo(shared, root_alias = \"plain_root_a\")"
+  replace = "shared.repo(name = \"plain_root_b\")\nuse_repo(shared, root_alias = \"plain_root_b\")"
+
+[[commands]]
+name = "root_usage_a_restored"
+argv = ["mod", "dump_repo_mapping", "", "--output=json", "--lockfile_mode=off", "--experimental_isolated_extension_usages"]
+expected_exit = 0
+stdout_contains = ["\"root_alias\":\"+extension+plain_root_a\"", "\"fragment_alias\":\"+extension+plain_fragment\"", "\"root_isolated_alias\":\"+_extension+++isolated_root+isolated_root\"", "\"fragment_isolated_alias\":\"+_extension+++isolated_fragment+isolated_fragment\""]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "shared.repo(name = \"plain_root_b\")\nuse_repo(shared, root_alias = \"plain_root_b\")"
+  replace = "shared.repo(name = \"plain_root_a\")\nuse_repo(shared, root_alias = \"plain_root_a\")"
+
+[[commands]]
+name = "override_requires_generated_repo"
+argv = ["query", "@root_alias//:marker.txt", "--lockfile_mode=off", "--experimental_isolated_extension_usages"]
+expected_exit = 7
+stderr_contains = ["missing", "override_repo"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "override_repo(shared, overridden = \"replacement\")"
+  replace = "override_repo(shared, missing = \"replacement\")"
+
+[[commands]]
+name = "inject_rejects_generated_repo_collision"
+argv = ["query", "@root_alias//:marker.txt", "--lockfile_mode=off", "--experimental_isolated_extension_usages"]
+expected_exit = 7
+stderr_contains = ["injected", "inject_repo"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = "override_repo(shared, missing = \"replacement\")"
+  replace = "override_repo(shared, overridden = \"replacement\")"
+
+  [[commands.mutations]]
+  path = "fragment.MODULE.bazel"
+  find = "shared_fragment.repo(name = \"plain_fragment\")"
+  replace = "shared_fragment.repo(name = \"injected\")"
+
+  [[commands.mutations]]
+  path = "fragment.MODULE.bazel"
+  find = "use_repo(shared_fragment, fragment_alias = \"plain_fragment\")"
+  replace = "# injected import intentionally absent"

@@ -1,0 +1,7 @@
+shared_fragment = use_extension("//:ext.bzl", "extension")
+shared_fragment.repo(name = "plain_fragment")
+use_repo(shared_fragment, fragment_alias = "plain_fragment")
+
+isolated_fragment = use_extension("//:ext.bzl", "extension", isolate = True)
+isolated_fragment.repo(name = "isolated_fragment")
+use_repo(isolated_fragment, fragment_isolated_alias = "isolated_fragment")

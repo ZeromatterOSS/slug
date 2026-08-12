@@ -1920,3 +1920,46 @@ root semantics and the smallest evaluator-owned retained value against Bazel
 owner, extension evaluation/materialization in Slug, lockfile/final-module
 publication, loading, public consumer, or JVM/Java work is authorized before
 independent design acceptance.
+
+### Root extension-usage semantic owner designed (2026-08-12)
+
+Pinned Bazel 9.2 groups ordinary usages by normalized bzl label and extension
+name, gives every isolated usage a containing-module/exported-proxy identity,
+retains ordered proxy/tag/import/location state, and models
+`override_repo`/`inject_repo` as opposite `must_exist` values. Root dev policy
+filters usage effects; nonroot override/inject remain validated then ignored.
+`use_repo_rule` is one synthetic nonisolated usage per bzl/rule pair.
+
+The smallest leaf is entirely in `module_eval.rs`: crate-private root usage and
+isolation wrappers borrow the accepted compact nonroot proxy/tag/import/
+override values, and an Arc-backed ordered slice is retained only by the
+private root evaluation result and `RootModuleFiles`. The existing root
+evaluation key remains the sole DICE owner. `EvaluatedRootModule`, the public
+root graph, selected graph/routes, extension execution, and consumers stay
+unchanged.
+
+The new eight-file, 342-line Bazel 9.2 fixture proves nonisolated root/include
+aggregation, distinct isolated identities, aliases, override replacement,
+stable-daemon A/B/A, and opposite missing-override/generated-injection
+terminals. Existing directive fixtures remain protected.
+
+After independent acceptance run only
+`WP-5-root-extension-usage-semantic-owner-implementation` in
+`app/slug_bzlmod_v2/src/module_eval.rs`, under 520 production, 750 test, and
+1,270 total formatted net lines. Require the frozen pure and real-DICE matrix,
+oracle/protected fixtures, full owner/direct-loading validation, compact and
+cleanup audits, structural stops, and independent implementation review. A
+second Rust file, public export, new key/evaluator, selected graph/route edge,
+extension execution/materialization, consumer, or cap excess is `REPLAN`.
+
+### Root extension-usage semantic owner design accepted (2026-08-12)
+
+Independent reserved-architecture review accepts the one-file private root
+usage leaf, exact/Slug-native/deferred classifications, pinned eight-file
+oracle, 520/750/1,270 caps, proof matrix, and terminal stops.
+
+Run next only `WP-5-root-extension-usage-semantic-owner-implementation` in
+`app/slug_bzlmod_v2/src/module_eval.rs`. Add no second file, public export,
+key/evaluator, selected graph/route mutation, extension evaluation,
+materialization, loading/consumer edge, or JVM/Java work. Obtain fresh
+independent implementation review before acceptance.
