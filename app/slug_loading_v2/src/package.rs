@@ -40,6 +40,7 @@ use starlark::values::Heap;
 use starlark::values::NoSerialize;
 use starlark::values::StarlarkValue;
 use starlark::values::Trace;
+use starlark::values::UnpackValue;
 use starlark::values::Value;
 use starlark::values::ValueLike;
 use starlark::values::dict::DictRef;
@@ -49,6 +50,7 @@ use starlark::values::list_or_tuple::UnpackListOrTuple;
 use starlark::values::none::NoneType;
 use starlark::values::starlark_value;
 use starlark::values::tuple::TupleRef;
+use starlark::values::typing::StarlarkCallable;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -2904,6 +2906,131 @@ impl<'v> Freeze for RuleAttributeSchema<'v> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct ModuleExtensionTagAttribute {
+    pub(crate) name: CompactString,
+    pub(crate) kind: AttributeKind,
+    pub(crate) mandatory: bool,
+    pub(crate) configurable: bool,
+    pub(crate) default: Option<CoercedAttributeValue>,
+    pub(crate) allow_single_file: Option<AllowSingleFile>,
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    ProvidesStaticType,
+    NoSerialize,
+    Allocative
+)]
+struct TagClassDefinition {
+    attributes: Arc<[ModuleExtensionTagAttribute]>,
+}
+
+starlark::starlark_simple_value!(TagClassDefinition);
+
+impl fmt::Display for TagClassDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("tag_class")
+    }
+}
+
+#[starlark_value(type = "tag_class")]
+impl<'v> StarlarkValue<'v> for TagClassDefinition {
+    type Canonical = Self;
+}
+
+#[derive(Debug, Clone, Trace, ProvidesStaticType, NoSerialize, Allocative)]
+struct ModuleExtensionDefinitionGen<V> {
+    implementation: V,
+    #[trace(unsafe_ignore)]
+    tag_classes: Arc<[(CompactString, Arc<[ModuleExtensionTagAttribute]>)]>,
+    #[trace(unsafe_ignore)]
+    environment: Arc<[CompactString]>,
+    os_dependent: bool,
+    arch_dependent: bool,
+    facts_version: i32,
+}
+
+type ModuleExtensionDefinition<'v> = ModuleExtensionDefinitionGen<Value<'v>>;
+
+#[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
+#[allow(dead_code)] // Frozen callable is lifetime-only until extension execution activation.
+pub(crate) struct FrozenModuleExtensionDefinition {
+    #[allocative(skip)]
+    implementation: FrozenValue,
+    tag_classes: Arc<[(CompactString, Arc<[ModuleExtensionTagAttribute]>)]>,
+    environment: Arc<[CompactString]>,
+    os_dependent: bool,
+    arch_dependent: bool,
+    facts_version: i32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)] // Projected only by the callerless definition-loading owner.
+pub(crate) struct ModuleExtensionDefinitionProjection {
+    pub(crate) tag_classes: Arc<[(CompactString, Arc<[ModuleExtensionTagAttribute]>)]>,
+    pub(crate) environment: Arc<[CompactString]>,
+    pub(crate) os_dependent: bool,
+    pub(crate) arch_dependent: bool,
+    pub(crate) facts_version: i32,
+}
+
+impl FrozenModuleExtensionDefinition {
+    #[allow(dead_code)]
+    pub(crate) fn projection(&self) -> ModuleExtensionDefinitionProjection {
+        let _lifetime_only = self.implementation;
+        ModuleExtensionDefinitionProjection {
+            tag_classes: self.tag_classes.clone(),
+            environment: self.environment.clone(),
+            os_dependent: self.os_dependent,
+            arch_dependent: self.arch_dependent,
+            facts_version: self.facts_version,
+        }
+    }
+}
+
+impl fmt::Display for ModuleExtensionDefinitionGen<Value<'_>> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("module_extension")
+    }
+}
+
+impl fmt::Display for FrozenModuleExtensionDefinition {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("module_extension")
+    }
+}
+
+starlark::starlark_complex_values!(ModuleExtensionDefinition);
+
+impl<'v> Freeze for ModuleExtensionDefinition<'v> {
+    type Frozen = FrozenModuleExtensionDefinition;
+
+    fn freeze(self, freezer: &Freezer) -> FreezeResult<Self::Frozen> {
+        Ok(FrozenModuleExtensionDefinition {
+            implementation: self.implementation.freeze(freezer)?,
+            tag_classes: self.tag_classes,
+            environment: self.environment,
+            os_dependent: self.os_dependent,
+            arch_dependent: self.arch_dependent,
+            facts_version: self.facts_version,
+        })
+    }
+}
+
+#[starlark_value(type = "module_extension")]
+impl<'v> StarlarkValue<'v> for ModuleExtensionDefinition<'v> {
+    type Canonical = FrozenModuleExtensionDefinition;
+}
+
+#[starlark_value(type = "module_extension")]
+impl<'v> StarlarkValue<'v> for FrozenModuleExtensionDefinition {
+    type Canonical = Self;
+}
+
 #[derive(Debug, Trace, Freeze, ProvidesStaticType, NoSerialize, Allocative)]
 struct SelectorBranchGen<V> {
     #[trace(unsafe_ignore)]
@@ -3664,6 +3791,86 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
 
 #[starlark_module]
 pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
+    fn tag_class<'v>(
+        #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
+        #[starlark(require = named)] doc: Option<&str>,
+    ) -> anyhow::Result<TagClassDefinition> {
+        let _ = doc;
+        let mut attributes = Vec::new();
+        for (name, value) in attrs.unwrap_or_default() {
+            let definition = AttributeDefinition::from_value(value)
+                .and_then(|value| match value {
+                    starlark::__macro_refs::Either::Left(value) => Some(value),
+                    starlark::__macro_refs::Either::Right(_) => None,
+                })
+                .ok_or_else(|| anyhow::anyhow!("tag attribute `{name}` must use attr.*()"))?;
+            if definition.transition.is_some() {
+                anyhow::bail!("tag attribute `{name}` does not support cfg transitions");
+            }
+            if definition.configurable_set {
+                anyhow::bail!(
+                    "tag attribute `{name}` does not support explicit configurable policy"
+                );
+            }
+            let name = name
+                .strip_prefix('_')
+                .map(|name| CompactString::from(format!("${name}")))
+                .unwrap_or_else(|| name.into());
+            attributes.push(ModuleExtensionTagAttribute {
+                name,
+                kind: definition.kind,
+                mandatory: definition.mandatory,
+                configurable: definition.configurable,
+                default: definition.default.clone(),
+                allow_single_file: definition.allow_single_file.clone(),
+            });
+        }
+        Ok(TagClassDefinition {
+            attributes: attributes.into(),
+        })
+    }
+
+    fn module_extension<'v>(
+        #[starlark(require = named)] implementation: Value<'v>,
+        #[starlark(require = named)] tag_classes: Option<SmallMap<String, Value<'v>>>,
+        #[starlark(require = named)] doc: Option<&str>,
+        #[starlark(require = named)] environ: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] os_dependent: Option<bool>,
+        #[starlark(require = named)] arch_dependent: Option<bool>,
+        #[starlark(require = named)] facts_version: Option<i32>,
+    ) -> anyhow::Result<ModuleExtensionDefinition<'v>> {
+        let _ = doc;
+        let callable: Option<StarlarkCallable<'v>> =
+            StarlarkCallable::unpack_value_opt(implementation);
+        if callable.is_none() {
+            anyhow::bail!("module_extension implementation must be callable");
+        }
+        let facts_version = facts_version.unwrap_or(0);
+        if facts_version < 0 {
+            anyhow::bail!("facts_version must be non-negative, got {facts_version}");
+        }
+        let mut retained_tag_classes = Vec::new();
+        for (name, value) in tag_classes.unwrap_or_default() {
+            let tag_class = TagClassDefinition::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("tag class `{name}` must use tag_class()"))?;
+            retained_tag_classes.push((name.into(), tag_class.attributes.clone()));
+        }
+        Ok(ModuleExtensionDefinitionGen {
+            implementation,
+            tag_classes: retained_tag_classes.into(),
+            environment: environ
+                .unwrap_or_else(UnpackListOrTuple::default)
+                .items
+                .into_iter()
+                .map(CompactString::new)
+                .collect::<Vec<_>>()
+                .into(),
+            os_dependent: os_dependent.unwrap_or(false),
+            arch_dependent: arch_dependent.unwrap_or(false),
+            facts_version,
+        })
+    }
+
     fn package(
         default_visibility: Option<UnpackListOrTuple<&str>>,
         default_deprecation: Option<&str>,
@@ -4242,4 +4449,124 @@ pub(crate) fn loading_globals() -> Globals {
     globals.set("DefaultInfo", AnalysisBuiltinCallable::new("DefaultInfo"));
     globals.set("depset", AnalysisBuiltinCallable::new("depset"));
     globals.build()
+}
+
+#[cfg(test)]
+mod module_extension_definition_tests {
+    use starlark::environment::Module;
+    use starlark::syntax::AstModule;
+    use starlark::syntax::Dialect;
+
+    use super::*;
+
+    fn evaluate(source: &str) -> anyhow::Result<starlark::environment::FrozenModule> {
+        let ast = AstModule::parse("//:ext.bzl", source.to_owned(), &Dialect::Standard)
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        let module = Module::new();
+        let context = BzlEvaluationContext::new("//:ext.bzl".to_owned());
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&context);
+        evaluator
+            .eval_module(ast, &loading_globals())
+            .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+        drop(evaluator);
+        Ok(module.freeze()?)
+    }
+
+    fn projection(source: &str) -> ModuleExtensionDefinitionProjection {
+        evaluate(source)
+            .unwrap()
+            .get("ext")
+            .unwrap()
+            .downcast::<FrozenModuleExtensionDefinition>()
+            .unwrap()
+            .projection()
+    }
+
+    #[test]
+    fn definition_retains_ordered_schema_and_factors() {
+        let source = r#"
+def _impl(ctx):
+    pass
+first = tag_class(attrs = {
+    "message": attr.string(mandatory = True),
+    "input": attr.label(default = "//:default", allow_single_file = [".txt"]),
+}, doc = "first tags")
+second = tag_class(attrs = {"count": attr.int(default = 2)})
+ext = module_extension(
+    implementation = _impl,
+    tag_classes = {"first": first, "second": second},
+    environ = ["B", "A", "B"],
+    os_dependent = True,
+    arch_dependent = True,
+    facts_version = 3,
+    doc = "extension docs",
+)
+"#;
+        let value = projection(source);
+        assert_eq!(value.tag_classes[0].0, "first");
+        assert_eq!(value.tag_classes[1].0, "second");
+        assert_eq!(value.tag_classes[0].1[0].name, "message");
+        assert_eq!(value.tag_classes[0].1[1].name, "input");
+        assert!(value.tag_classes[0].1[0].mandatory);
+        assert!(value.tag_classes[0].1[1].configurable);
+        assert_eq!(value.environment.as_ref(), ["B", "A", "B"]);
+        assert!(value.os_dependent);
+        assert!(value.arch_dependent);
+        assert_eq!(value.facts_version, 3);
+        assert!(matches!(
+            value.tag_classes[0].1[1].allow_single_file,
+            Some(AllowSingleFile::Extensions(_))
+        ));
+    }
+
+    #[test]
+    fn definition_fields_change_and_restore_structural_identity() {
+        let source = |mandatory: bool, default: &str, facts: i32| {
+            let mandatory = if mandatory { "True" } else { "False" };
+            format!(
+                "def _impl(ctx):\n    pass\n\
+                 tag = tag_class(attrs = {{'value': attr.string(mandatory = {mandatory}, default = '{default}')}})\n\
+                 ext = module_extension(implementation = _impl, tag_classes = {{'tag': tag}}, facts_version = {facts})\n"
+            )
+        };
+        let a = projection(&source(false, "a", 1));
+        let b = projection(&source(true, "b", 2));
+        let restored = projection(&source(false, "a", 1));
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+    }
+
+    #[test]
+    fn definition_failures_are_closed_before_publication() {
+        let cases = [
+            "ext = module_extension(implementation = 1)",
+            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(configurable = False)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
+            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(values = ['x'])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
+            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(providers = [])})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
+            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.label(executable = True)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
+            "def _impl(ctx):\n    pass\ntag = tag_class(attrs = {'x': attr.string(allow_empty = False)})\next = module_extension(implementation = _impl, tag_classes = {'tag': tag})",
+            "def _impl(ctx):\n    pass\next = module_extension(implementation = _impl, facts_version = -1)",
+        ];
+        for source in cases {
+            assert!(evaluate(source).is_err(), "unexpected success: {source}");
+        }
+    }
+
+    #[test]
+    fn export_lookup_distinguishes_missing_private_and_wrong_kind() {
+        let module = evaluate(
+            "def _impl(ctx):\n    pass\n_private = module_extension(implementation = _impl)\nwrong = 1\n",
+        )
+        .unwrap();
+        assert!(module.get("missing").is_err());
+        assert!(module.get("_private").is_err());
+        assert!(
+            module
+                .get("wrong")
+                .unwrap()
+                .downcast::<FrozenModuleExtensionDefinition>()
+                .is_err()
+        );
+    }
 }
