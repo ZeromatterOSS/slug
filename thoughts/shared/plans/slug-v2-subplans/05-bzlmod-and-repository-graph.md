@@ -1099,3 +1099,12 @@ routes backed by `RepoSpec`; root mappings merely reserve
 checked-in verbatim bytes, canonical `@@bazel_tools` routing, exact SHA-256,
 and no Host/Bazel-install/network/workspace selection. Package evaluation and
 the embedded MODULE dependency graph remain deferred.
+
+### Built-in source-kind implementation REPLAN (2026-08-11)
+
+The first owner implementation was discarded after final review: a
+snapshot/path-only source-file key could not satisfy the frozen distinct
+directory/wrong-kind contract, and the sole correction had already been used
+by the pre-`RepoSpec` Host guard. Design the typed kind/error algebra before
+retrying Rust or verbatim assets. No implementation from the failed packet is
+retained.

@@ -4554,3 +4554,10 @@ scan would violate exact verbatim content and structural identity. No fixture,
 content, or Rust changed. Run next only
 `WP-4-5-builtin-bazel-tools-repository-owner-design`; it owns immutable
 canonical routing/source bytes only, not package evaluation or Test semantics.
+
+### Built-in source-kind prerequisite REPLAN (2026-08-11)
+
+The immutable built-in owner implementation is not accepted. Before returning
+to embedded test-tools closure, Stage 5 must freeze whether the partial catalog
+uses a file-only wrong-kind terminal or a general expected-kind key. No route,
+catalog, package, or Test activation from the failed attempt is retained.
