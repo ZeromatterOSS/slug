@@ -473,3 +473,139 @@ slug-v2-oracle validate-evidence /path/to/evidence.jsonl
   ignored); `python3.12 -B -m pytest -q -p no:cacheprovider
   tests/v2_oracle/test_v2_oracle.py` passed 24 tests (2 new AC-evidence
   comparison tests); `cargo fmt --check`.
+
+## 2026-08-11 FileWrite Action IR-to-REAPI handoff design
+
+### Decision and ownership
+
+The bounded M6 handoff does not add another retained action description.
+`ConfiguredNodeResult.actions: Arc<[ActionSpec]>` remains the sole DICE-owned
+declaration. `ConfiguredActionView` validates and borrows its one-output
+FileWrite shape, and `ResolvedFileWriteSemanticView` joins that same action to
+the retained configured owner, selected execution-platform key, sorted
+platform fact, and constraint topology. Both FileWrite aquery and FileWrite
+execution must consume that resolved view; the executor must not accept a raw
+FileWrite `ActionSpec` after the migration.
+
+`slug_reapi_v2` may create a request-local `FileWriteReapiPlan` containing the
+canonical content blob, Merkle `Directory` blobs, `Command`, and encoded
+`Action`. That plan is a serialization/execution projection, not semantic
+analysis state. It must be constructed in one checked operation from the
+resolved view plus the request's remote defaults. CLI and daemon may format
+separate evidence, but may not reconstruct FileWrite commands,
+platforms, inputs, or identity.
+
+No new DICE key, retained field, interner, lock, or filesystem read is needed.
+`ActionSpec` already carries FileWrite contents, executable state, and the
+declared output under structural `Eq`/`Allocative`; the configured result
+already retains toolchain topology and sorted platform semantic facts. Remote
+defaults are request-local execution-semantic inputs and affect the REAPI
+projection/digest, not configured-analysis DICE equality. `--remote_timeout`
+is transport/RPC policy only and must not populate or salt the REAPI `Action`;
+action-semantic timeout remains unsupported until structurally modeled. The
+resolved view remains borrowed and no lock may span its DICE computation.
+
+The Buck2 utility-reuse decision is **no new extraction**. Retain the existing
+`Arc<[ActionSpec]>`, compact configured keys/strings, sorted platform facts,
+and allocation accounting. Ordinary request-local `Vec`, `BTreeMap`, protobuf
+bytes, and `ReapiBlob` are appropriate at the wire boundary. REAPI/CAS uses
+SHA-256 of encoded protocol bytes; neither Buck2 `StrongHash` nor the BLAKE3
+Slug display projection may enter this identity domain. Stage 9 is unchanged.
+
+### Canonical FileWrite projection
+
+For the admitted one-file FileWrite shape, construction freezes these fields:
+
+- contents are the exact Rust `String::as_bytes()` sequence in one inline CAS
+  blob at `__slug_filewrite__/content`; the input-root `Directory` contains
+  that non-executable file and all Directory entries use canonical lexical
+  ordering;
+- a declared output whose first normal segment is `__slug_filewrite__` fails
+  closed, reserving the private input namespace without path aliasing;
+- the worker command is `sh -c` plus positional input/output arguments and a
+  fixed `cp -- "$1" "$2"` recipe, followed by `chmod 0555` for executable
+  writes or `chmod 0444` otherwise. Content never appears in an OS argument,
+  so quotes, newlines, and embedded NUL remain byte exact;
+- working directory is the REAPI input root (the absent/default field), the
+  environment is empty, `output_files` and `output_paths` contain the sole
+  normalized declared path, and `output_directories` is empty. The worker owns
+  creation of output parent directories under the REAPI contract;
+- if the resolved selected platform has any `exec_properties`, its sorted
+  properties are authoritative and all `--remote_default_exec_properties`
+  are ignored. Only an empty selected-platform property map admits the full
+  sorted default map. Bazel 9 documents the flag as the default only when the
+  execution platform does not already set `exec_properties`; per-key merging
+  is not admitted;
+- the same sorted property map is encoded in retained `Command.platform` and
+  `Action.platform`. Platform constraints select and identify the configured
+  platform but are not invented as REAPI properties;
+- the input-root digest is the SHA-256 digest of the encoded root `Directory`;
+  the command digest is the SHA-256 digest of encoded `Command`; FileWrite has
+  no structurally modeled action-semantic timeout, so `Action.timeout` is
+  absent; `do_not_cache` is false and `salt` is empty; and the action digest
+  is the SHA-256 digest of encoded `Action`. Changing `--remote_timeout` must
+  not change these bytes.
+
+Owner/configuration keys and `FileWriteSemanticIdentity` intentionally do not
+salt the REAPI `Action`: two configured actions with identical execution-result
+inputs may safely share an Action Cache entry. They remain structural Slug
+semantic identity and invalidation inputs. Output-root placement, evidence,
+instance name, endpoints, headers, and the RPC timeout are execution envelopes
+outside the REAPI Action digest.
+
+### Compatibility boundary
+
+- **Exact:** FileWrite content bytes for Rust valid-Unicode strings; declared
+  one-file output and executable result on the admitted POSIX worker; canonical
+  REAPI `Directory`, `Command`, and `Action` protobuf bytes and SHA-256
+  digests for Slug's actual graph; selected-platform/default-property choice;
+  absent FileWrite action timeout; and restoration after A/B/A edits.
+- **Slug-native:** the reserved input namespace, `sh`/`cp`/`chmod` lowering,
+  Slug configuration/action display bytes, request/evidence formatting, and
+  already accepted cross-owner traversal order. The worker recipe is admitted
+  only on the retained Linux NativeLink lane and is not a Bazel ActionKey or a
+  claim about Bazel's internal FileWrite execution mechanism.
+- **Unsupported/deferred:** exact Bazel configuration/output/ActionKey bytes,
+  Java UTF-16/non-Unicode edge behavior, Spawn/Run/WriteJson migration,
+  paramfiles, tree outputs, ordinary source/generated input trees, Windows or
+  workers without the admitted POSIX tools, action-semantic timeout, backend
+  expansion, cache policy, transport-only `--remote_timeout`, retries/TLS,
+  output-directory handling, and materializer breadth. Mixed
+  action owners, missing/ambiguous platform closure, malformed topology,
+  reserved-path collision, and any unmodeled field fail closed.
+
+The nonempty input root is the sole prerequisite widened from the design
+packet's deferred list: it is inseparable from exact arbitrary content because
+OS argv cannot carry embedded NUL. It reuses the existing canonical Merkle and
+inline-blob machinery rather than introducing a second input representation.
+
+### Implementation proof and stops
+
+The implementation packet must prove serialized protobuf fields/digests
+directly; contents containing a quote, newline, and embedded NUL; executable
+and non-executable recipes; reserved-path rejection; platform properties
+winning as a whole over conflicting defaults; empty platform properties using
+all defaults; content/output/executable/platform A/B/A identity; and
+`--remote_timeout` changes leaving the Action digest unchanged.
+One-shot and stable-PID daemon builds must execute the same resolved object and
+retain zero direct-local actions. The existing simple FileWrite NativeLink
+slice remains a required regression, and a focused selected-platform fixture
+must prove exact output bytes plus REAPI evidence without changing public CLI
+or daemon wire shape.
+
+Stop rather than widen if implementation needs a second FileWrite command
+model, raw `ActionSpec` execution, a process-global remote configuration,
+filesystem content discovery, a new public wire, backend-specific semantic
+delegation, or an unmodeled identity input.
+
+- 2026-08-11 M6 FileWrite handoff design: accepted one retained semantic action
+  source. `ActionSpec` stays DICE-owned; `ResolvedFileWriteSemanticView` feeds
+  both aquery and a request-local REAPI projection. Exact identity is SHA-256 of
+  canonical Directory/Command/Action bytes with an inline NUL-safe content blob;
+  owner/configuration display identity stays separate. Selected platform
+  properties replace remote defaults as a whole when nonempty. The independent
+  review required one correction: Bazel `--remote_timeout` is transport/RPC
+  policy, so FileWrite `Action.timeout` is absent and the transport flag cannot
+  salt Action identity. Review: ACCEPT after correction. No Stage 9 extraction,
+  retained field, DICE key, public wire, JVM artifact, or backend semantic
+  delegation was selected.

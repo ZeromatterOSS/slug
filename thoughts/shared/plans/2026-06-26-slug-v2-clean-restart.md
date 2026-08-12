@@ -29,14 +29,14 @@ and must name the same packet.
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, and multi-platform choice are later breadth | preserve the admitted FileWrite boundary |
-| M6: execution and caching | **active (handoff design)** | retained REAPI/NativeLink regressions plus the accepted semantic FileWrite aquery/action closure | freeze one collision-safe retained FileWrite Action IR to exact REAPI `Command`/input-root/`Action` identity without duplicating semantics | `WP-7-m6-filewrite-reapi-action-handoff-design` |
+| M6: execution and caching | **active (handoff implementation)** | retained REAPI/NativeLink regressions, the accepted semantic FileWrite aquery/action closure, and the reviewed single-object CAS/protobuf design | make the resolved FileWrite semantic view the sole FileWrite executor input and prove canonical Directory/Command/Action identity through one-shot and daemon REAPI | `WP-7-m6-filewrite-reapi-action-handoff-implementation` |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
 | M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[`WP-7-m6-filewrite-reapi-action-handoff-design`](./slug-v2-subplans/current-packet.md).
+[`WP-7-m6-filewrite-reapi-action-handoff-implementation`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
