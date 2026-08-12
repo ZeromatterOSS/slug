@@ -1416,3 +1416,69 @@ Run next only
 17-file allowlist, 620/700/1,320 caps, lifecycle/DICE/wire proofs, and terminal
 stops frozen in the accepted manifest. After implementation acceptance, resume
 the selected-module graph owner design; do not activate that graph early.
+
+
+### Command module override owner accepted (2026-08-12)
+
+Commit `b319b551` accepts the normalized command override owner. The existing
+command policy now retains one canonical compact
+`SmallMap<CompactString, NormalizedAbsolutePath>` behind an immutable Arc;
+raw occurrence order selects parser errors and fold results, while structural
+equality/hash/order use the sorted effective map. Root command policy retains
+that value separately from root-MODULE overrides.
+
+Build, Run, Query, Cquery, and Aquery normalize at the client-owned workspace
+boundary. The sole serde-defaulted wire field contains only effective absolute
+paths; the server independently rejects invalid names, relative paths, NUL,
+and duplicates. Real-DICE absent/present/path A/B/A, cold/warm reuse,
+one-shot/stable-daemon Build and query, Run admission, wire compatibility, and
+all five decoders are covered. The exact 17-file diff is 398 production, 612
+test, and 1,010 total net lines. Relevant full suites, formatting, scope,
+archive, forbidden-edge scans, and independent review pass; the two broad
+failures are documented untouched baselines.
+
+Run next only `WP-5-host-selected-module-graph-owner-design-r2`. Reopen the
+sole Host discovery-to-MVS design now that normalized command overrides exist.
+Freeze one exact crate-private selected graph and future implementation packet,
+or return `REPLAN` at the first still-missing production leaf. No Rust,
+legacy graph activation, canonical-name/RepoSpec synthesis, mapping, loading,
+or consumer work is authorized before independent design acceptance.
+
+### Selected-module graph owner design r2 REPLAN (2026-08-12)
+
+The normalized command input closes only the request/DICE half of the prior
+gap. The live discovery/source owners still classify only
+`RootModuleFiles.overrides`: `HostDiscoveredModuleKey`,
+`HostNonregistryModuleClosureKey`, `HostNonregistryPackagePreflightKey`, and
+`RepositoryMaterializationRequestKey` cannot see a winning command override.
+An explicit command path therefore cannot replace a root declaration or route
+`bazel_tools` away from its built-in default. Repairing this inside MVS would
+duplicate override and source ownership.
+
+The first missing prerequisite is one effective module-override owner. Run
+next only `WP-5-host-effective-module-override-owner-design`. Freeze a compact
+crate-private leaf that overlays the accepted immutable root and command
+inputs, retains root-versus-command provenance, projects a command path once
+into the exact local-path `RepoSpec` shape, and becomes the sole classification
+edge for discovery/materialization. It must not observe files or activate a
+selected graph. This remains a three-document design packet; no Rust, legacy
+resolver, mapping, loading, or consumer is authorized before independent
+design acceptance.
+
+### Effective module override owner design accepted (2026-08-12)
+
+The live two-file composition and independent reserved-architecture review
+accept one crate-private effective leaf over the immutable root and command
+inputs. It retains `Root` versus `Command` provenance, projects a command path
+once into the exact local-path `RepoSpec`, preserves root-only values unchanged,
+and leaves effective absence for the downstream built-in `bazel_tools` default.
+Every discovery, source-preparation, materialization, package-preflight,
+closure, and repository-ignore classifier must use this sole edge; the leaf
+itself performs no filesystem work.
+
+Run next only `WP-5-host-effective-module-override-owner-implementation` in
+`module_eval.rs` and `source_preparation.rs` under 280 production/420 test/700
+total caps. Require command-over-root and root-name timing, explicit
+`bazel_tools` bypass, command source lifecycle, real-DICE A/B/A and reuse,
+root-only regression proof, complete structural replacement of direct root-map
+classification, and independent implementation review. No graph, public API,
