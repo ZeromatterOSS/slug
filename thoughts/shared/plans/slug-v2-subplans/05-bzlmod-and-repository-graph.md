@@ -2336,3 +2336,40 @@ Independent review accepts the cross-stage loading design. Run next only
 two loading files under 440/650/1,090; Bzlmod's accepted hidden request and
 private selected owners remain unchanged. No public/consumer/execution/
 generated-repository breadth is authorized.
+
+### Definition loading accepted; evaluation-input design active (2026-08-12)
+
+Commit `bf2c36e9` accepts the loading-owned definition prerequisite at
+432 production/649 test/1,081 total. It preserves selected-request-first
+ordering, the sole Host bzl loader, complete manifest identity, contextual
+typed errors, invalid Need, and callable lifetime isolation. Focused lifecycle
+proof, the full loading suite, audits, and independent review pass.
+
+The next leaf is not a frozen callable seam: execution can recompute the Host
+bzl key without moving a heap handle through DICE. Loading instead lacks the
+Bzlmod-owned ordered root module/tag input view; hidden load requests expose
+label/export/mapping while selected usage grouping and root tags remain
+private.
+
+Run only the docs-only
+`WP-5-host-selected-extension-evaluation-input-requests-design`. Freeze one
+callerless root-owned ordinary nonisolated projection retaining complete
+predecessor/request identity, first-encounter extension order, a root module
+view, and source-order raw tags with ordered attributes, dev flags, and
+locations. Do not coerce schemas/defaults, construct `module_ctx`, acquire a
+callable, execute, or infer generated repositories.
+
+The root module view is exactly the selected Root graph key, accepted root
+canonical repository, declared root header name and normalized version,
+`is_root = true`, and the ordered tags for this extension ID. The graph/route
+and `RootModuleFiles` owners supply those fields. Missing required state or a
+usage/request mismatch fails closed; dependencies, registrations, overrides,
+mappings, paths, lockfile state, and unrelated usages remain excluded.
+
+The design owns only canonical/current/Stage 4/this Stage 5 plan under
+45/220/140/220/625 caps. A future implementation may touch only
+`selected_repo_spec.rs` and `lib.rs`, initially 240 production/360
+test/600 total. Rust requires independent design acceptance first. Stop on a
+loading dependency, generic public consumer, heap/callable,
+schema/evaluator/execution, I/O, generated-repository/lockfile/materializer
+edge, third Rust file, JVM/Java work, or cap excess.

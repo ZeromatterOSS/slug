@@ -2213,3 +2213,17 @@ only `WP-4-5-host-module-extension-definition-loading-owner-implementation` in
 `package.rs` and `bzl_module.rs`, under 440 production/650 test/1,090 total
 caps relative to `f17bd250`. Preserve every proof and stop above; obtain fresh
 independent implementation review.
+
+### Module-extension definition loading accepted (2026-08-12)
+
+Commit `bf2c36e9` adds the callerless loading-owned definition boundary. It
+computes selected requests first, borrows the sole Host bzl loader, validates
+the public extension export, and retains requests, transitive manifests, and
+complete heap-free schemas while the callable remains frozen-lifetime-only.
+Request terminals retain full context. Real-DICE lifecycle proof, the full
+loading suite, 432/649/1,081 caps, and independent review pass.
+
+Stage 4 now waits on the Stage 5-owned heap-independent ordered module/tag
+projection. Do not publish a callable or add another loader. A later loading
+composition owner may validate those raw tags against the accepted schemas and
+reacquire the frozen export only at the execution boundary.

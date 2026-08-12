@@ -1,163 +1,88 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-definition-loading-owner-implementation`
-Milestone: M7 module-extension definition loading implementation
+Packet: `WP-5-host-selected-extension-evaluation-input-requests-design`
+Milestone: M7 module-extension evaluation-input prerequisite design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement and validate the independently accepted two-file loading
-owner.
+Result: freeze the smallest heap-independent selected module/tag input owner.
 
-## Active implementation contract
+## Active design contract
 
-Implement the accepted design below only in
-`app/slug_loading_v2/src/package.rs` and
-`app/slug_loading_v2/src/bzl_module.rs`, with canonical/current/Stage 4/Stage 5
-bookkeeping. Caps are 440 production, 650 tests, and 1,090 total formatted net
-Rust lines, measured against `f17bd250`. Complete the frozen proof matrix,
-protected suites, compact/cleanup/scope audits, and independent review.
+Perform a read-only ownership design for one callerless Bzlmod key, keyed by
+normalized workspace, that publishes ordered module/tag inputs for a later
+loading-owned definition/schema composition key. It must not publish or retain
+a Starlark heap, module, value, callable, evaluator, or source handle.
 
-No third Rust file, public API, source/evaluator key, selected-owner mutation,
-extension execution, generated-repository work, I/O, materializer, lockfile,
-consumer, JVM/Java, or behavior-family expansion is authorized. Cap excess or
-any need for a second/purpose-split loader or retained heap/callable is
-`REPLAN`.
+Freeze:
 
-## Accepted design contract
+- reuse of the accepted definition-load request aggregate and its retained
+  selected predecessor, without a second usage grouping owner;
+- first-encounter order for admitted root-owned ordinary nonisolated extension
+  IDs and their exact load requests;
+- one root module view containing exactly: selected graph key
+  `HostGraphModuleKey::Root` from the accepted selected predecessor;
+  canonical repository identity from its accepted root route; declared module
+  name and declared normalized version from
+  `RootModuleFiles.module.header`; constant `is_root = true`; and the
+  source-ordered extension tags associated with this exact extension ID from
+  `RootModuleFiles.extension_usages`. The root view carries no dependency,
+  registration, override, mapping, file-path, lockfile, or unrelated usage
+  field. A missing root header/name, unavailable required version
+  normalization, absent root route, or usage/request mismatch fails closed;
+- source-order tags retaining tag-class name, ordered raw
+  `NonrootAttributeValue` map, dev-dependency bit, and logical location;
+- compact equality over the complete predecessor, requests, module view, tags,
+  values, dev flags, and locations;
+- typed predecessor/projection failures, with Need invalid and non-self-equal
+  before publication.
 
-This section is historical design authority interpreted only through the
-active implementation contract above.
+Do not coerce attributes, insert defaults, validate tag classes, or construct
+`module_ctx`; those require the accepted loading-owned schema. Nonroot,
+isolated, MVO-owner, and innate inputs fail closed.
 
-Freeze one callerless loading owner that:
+## Compatibility boundary
 
-- computes `HostSelectedExtensionDefinitionLoadRequestsKey` first and preserves
-  its Need/completed-error boundary before any bzl source work;
-- converts each admitted root-main canonical label into the existing Host bzl
-  label domain and borrows `HostBzlModuleEvalKey` as the sole source, transitive
-  load, parse, evaluation, freeze, event, manifest, and lifetime owner;
-- adds only the Bazel `.bzl` definition globals needed for `tag_class()` and
-  `module_extension()` to the existing loading globals, without a second
-  evaluator, source key, load graph, or frozen-module cache;
-- validates the requested public export after the complete bzl load, retains
-  the exact request and `BzlLoadManifest`, and projects a compact,
-  heap-independent definition: exported name, ordered tag-class attribute
-  schemas, ordered environment declarations, OS/architecture dependency bits,
-  and nonnegative facts version;
-- leaves the implementation callable only inside the existing cached
-  `FrozenBzlModule` lifetime. No `FrozenValue`, heap, callable, module, or
-  caller-supplied source/mapping may enter definition equality or the projected
-  value.
-
-The audit resolves those questions as follows:
-
-- accept the implementation only through the vendored
-  `StarlarkCallable` argument conversion; reject a noncallable at the
-  `module_extension()` call before definition publication;
-- accept ordered `tag_class` dictionaries whose values use the existing
-  `AttributeDefinition` algebra with no transition and no explicitly set
-  configurable policy. Project every modeled semantic field structurally:
-  kind, mandatory, effective configurable value, coerced default, and
-  allow-single-file. No concrete descriptor may be admitted while carrying an
-  unprojected nondefault option. The current globals reject unmodeled
-  values/allowed-values, allow-empty, providers, executable, cfg, aspects and
-  other label/file restrictions during bzl evaluation; keep those failures
-  closed rather than silently dropping an option or widening tag evaluation;
-- use the shared bzl environment. Bazel's `RepositoryBootstrap` installs these
-  methods in its ordinary bzl environment, so a purpose-split Slug key would be
-  a second, less exact load graph. Existing Slug globals keep their current
-  meanings; only the two missing exact names are added;
-- compute admitted requests in retained encounter order. Within one request,
-  source/load/parse/evaluation/freeze errors precede public export lookup;
-  missing/private/wrong-kind exports are typed definition errors. Across
-  independent requests, first retained terminal/Need is explicitly
-  Slug-native because Bazel evaluates separate extension SkyKeys and exposes no
-  aggregate error order;
-- retain the entire accepted request aggregate and, per definition, the exact
-  request plus complete `BzlLoadManifest`, ordered tag schemas, ordered
-  environment strings, OS/architecture bits and facts version. Source,
-  transitive-load, export, schema, declaration, and request changes therefore
-  participate structurally without pointer identity.
-
-Exact for the admitted Bazel 9.2 slice: selected-request-first ordering,
-root-main canonical bzl resolution, source/load/export/type validation,
-callable acceptance, tag-class schema construction, declaration values, and
-transitive source identity. Slug-native: private key/type names, compact
-containers, diagnostic text and cross-extension scheduling where Bazel exposes
-no user-visible order. Unsupported/deferred: isolated/MVO/innate/nonroot or
-registry definitions, external-repository bzl loads, repository-rule globals
-beyond the current root-local loading slice, extension
-execution/context/module/tag views,
-environment or OS reads, generated repositories/names/RepoSpecs/existence,
-override/inject final validation, evaluation factors, lockfile replay/write,
-materialization, loading/command consumers, and exact JVM identity bytes.
-
-## Evidence and feasibility anchors
-
-Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
-constructs `ModuleExtension` from a callable, ordered tag-class map, environment
-list, OS/architecture bits, and nonnegative facts version. Its
-`RegularRunnableExtension.load` validates the bzl label, loads the complete bzl
-module, then looks up the requested public export and verifies its
-`ModuleExtension` type before environment observation or execution.
-
-Slug already owns that root-main source/load closure in
-`bzl_module.rs::HostBzlModuleEvalKey`; `FrozenBzlModule` equality is exactly its
-complete `BzlLoadManifest`, while frozen modules are lifetime-only state. The
-shared `package.rs::loading_globals()` already owns `attr.*` descriptors and
-the freeze/export patterns needed for a compact definition value, but has no
-`module_extension` or `tag_class`. The accepted hidden Bzlmod request boundary
-in commit `d0d7bde7` exposes only workspace, ordered canonical label/export,
-context repo, and immutable selected mapping while retaining its predecessor
-privately.
+Exact for the admitted Bazel 9.2 slice: selected grouping/identity, singleton
+root module membership, source-order tags, tag-class names, raw retained
+values, established dev filtering, and logical source identity. Slug-native:
+private names, compact containers, diagnostics, and aggregate iteration without
+a Bazel user-visible order. Deferred: schema validation/default insertion,
+callable reacquisition, executable views, `module_ctx`, execution/events,
+environment/OS reads, factors, generated names/RepoSpecs/existence,
+override/inject final validation, lockfile, materialization, consumers,
+nonroot/isolation/MVO/innate execution, and JVM identity bytes.
 
 ## Scope, caps, proof, and stops
 
-This design packet may edit only:
+This docs-only packet may edit exactly canonical, this manifest,
+`04-starlark-loading-and-build-packages.md`, and
+`05-bzlmod-and-repository-graph.md`. Cap net growth at 45 canonical, 220
+manifest, 140 Stage 4, 220 Stage 5, and 625 total lines. Require live
+owner/visibility and pinned Bazel 9.2 ordering audits, explicit compatibility
+classification, compact/Buck2 review, future scope/caps/proof/stops, and
+independent design review.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest;
-- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`; and
-- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
+After acceptance, an implementation may edit only
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`,
+`app/slug_bzlmod_v2/src/lib.rs`, and bookkeeping. Initial Rust caps are 240
+production, 360 tests, and 600 total. Require pure empty/duplicate/order/raw
+value/fail-closed rows; real-DICE predecessor Need/error, absence/multiple
+order, tag/value/order/dev/location and mapping-context A/B/A, plus A/B/A for
+root key/canonical repository/declared name/normalized version/is-root/tags.
+Assert unrelated dependencies, registrations, overrides, mappings, paths, and
+lockfile fields do not enter the module-view projection. Require warm reuse,
+validity/equality, full Bzlmod/loading suites, scope/forbidden-edge/cleanup
+audits, and independent review.
 
-Cap net design growth at 45 canonical, 240 manifest, 220 Stage 4, 180 Stage 5,
-and 685 total lines. Require pinned-source citations, live owner/visibility and
-crate-edge audit, compact/Buck2 representation review, explicit exact/
-Slug-native/deferred classification, an auditable future file allowlist/caps,
-discriminating pure and real-DICE proof, and independent design review.
-
-After independent acceptance, the implementation successor may edit only:
-
-- `app/slug_loading_v2/src/package.rs`;
-- `app/slug_loading_v2/src/bzl_module.rs`;
-- canonical/current/Stage 4/Stage 5 bookkeeping.
-
-Cap that successor at 440 production, 650 tests, and 1,090 total formatted net
-Rust lines. Require pure rows for callable/noncallable, tag and attr insertion
-order, duplicate/malformed descriptors, negative facts version, environment
-order, and missing/private/wrong-kind exports. Add a negative row for each
-unprojected option family accepted by neither the frozen descriptor nor output,
-and A/B/A structural-equality rows for every retained kind/mandatory/
-configurable/default/allow-single-file field. Require real-DICE selected-
-request error/Need with zero bzl observation; root source and transitive-load
-change/restoration; export/schema/environment/factor A/B/A; absent and multiple
-requests in encounter order; Need invalidity/non-self-equality; typed child
-source/load errors; event publication only from complete bzl evaluation; and
-cold/warm reuse. Run the full loading and Bzlmod suites plus formatting,
-diff/scope, forbidden-edge, compact and cleanup audits and independent review.
-
-No Cargo/BUILD, fixture, public
-API, source/evaluator key, selected-owner
-mutation, extension execution, generated-name/spec fabrication, I/O,
-materializer, lockfile, consumer, JVM/Java, or generic loading activation is
-authorized. `REPLAN` if exactness requires a purpose-split or second bzl loader,
-a retained Starlark heap/callable, repository-rule/evaluation breadth, a public
-definition surface, more than two Rust files, or an unresolved
-callable/schema/error-order boundary.
+No Rust is authorized now. `REPLAN` on a loading dependency, generic public
+consumer, FrozenValue/callable, schema/evaluator/execution work, I/O, generated
+repository/lockfile/materializer/consumer edge, third future Rust file,
+JVM/Java work, or cap excess.
 
 ## Accepted predecessor evidence
 
-Commit `d0d7bde7` is independently accepted at 205 production, 236 tests, and
-441 total lines in the authorized two files. It computes selected mappings
-once, publishes only the hidden heap-independent request boundary, preserves
-typed predecessor errors and invalid Need validity, fails closed on every
-deferred usage shape, and proves order/dedup/change/restoration/warm reuse.
-Focused tests, the full Bzlmod and loading suites, formatting/diff/scope audits,
-and independent implementation review pass.
+Commit `bf2c36e9` accepts the loading-owned definition boundary at
+432 production, 649 test, and 1,081 total lines. It computes requests first,
+reuses the sole Host bzl loader, retains manifests and heap-free schemas, and
+keeps callables lifetime-only. Post-request errors retain full request context.
+Real-DICE lifecycle proof and the full loading suite pass; both independent
+reviews return `ACCEPT`.
