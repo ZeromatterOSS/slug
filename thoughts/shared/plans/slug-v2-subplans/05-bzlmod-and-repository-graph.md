@@ -1532,3 +1532,27 @@ and under the 240 production/360 test/600 total caps frozen in
 normalization, checked Host-key preactivation rejection, unchanged lockfile
 bytes/errors, real-DICE A/B/A/reuse, structural single-owner proof, full owner
 and direct-dependent validation, and independent implementation review.
+
+### Module version owner implementation accepted (2026-08-12)
+
+Commit `c997f7e7` accepts the exact shared Bazel 9.2 module-version owner.
+One crate-private compact value now owns grammar, build-suffix normalization,
+empty-sentinel behavior, unsigned numeric bounds, equality/hash, and parsed
+identifier ordering. Root and nonroot retained fields normalize at their
+directive adapters; lockfile v28 reuses the same parser/order without changing
+its bytes or typed diagnostics; and `HostDiscoveredModuleKey::try_new`
+rejects or normalizes before any DICE lookup.
+
+Focused truth-table/property tests, retained root/nonroot surfaces, checked Host
+construction, real-DICE spelling-equivalent and semantic A/B/A/reuse, all 100
+lockfile-v28 regressions, the complete 303-test owner suite with integrations
+and docs, loading, formatting, scope, and independent representation review
+pass. The two broad core failures are unchanged unrelated baselines.
+
+Run next only `WP-5-host-selected-module-graph-owner-design-r4`. Reopen the
+sole Host discovery-to-MVS design now that normalized command/effective
+overrides and exact versions exist. Freeze one bounded crate-private selected
+graph owner and implementation successor, or return `REPLAN` at the first
+still-missing semantic leaf. No Rust, legacy graph activation, canonical
+mapping, loading, or consumer work is authorized before independent design
+acceptance.
