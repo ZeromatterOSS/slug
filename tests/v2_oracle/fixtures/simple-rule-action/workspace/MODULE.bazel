@@ -1,0 +1,4 @@
+module(name = "simple_rule_action", version = "0.0.0")
+
+register_execution_platforms("//:platform")
+register_toolchains("//:write_toolchain")

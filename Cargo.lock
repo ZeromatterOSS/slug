@@ -3524,6 +3524,7 @@ dependencies = [
  "protoc-bin-vendored",
  "sha2",
  "slug_build_api_v2",
+ "slug_core_v2",
  "tokio",
  "tonic",
  "tonic-build",

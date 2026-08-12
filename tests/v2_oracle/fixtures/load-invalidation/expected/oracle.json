@@ -15,6 +15,8 @@
         "//pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [
         {
           "digest": "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806",
@@ -28,9 +30,10 @@
       ],
       "mutations": [],
       "name": "cold_success_v1_order",
-      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: SLUG_TERMINAL_EVENT_ROOT_MODULE\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nDEBUG: <workspace>/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V1\nDEBUG: <workspace>/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: <workspace>/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:7:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE\nINFO: Analyzed target //pkg:message (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nDEBUG: <workspace>/MODULE.bazel:2:6: SLUG_TERMINAL_EVENT_ROOT_MODULE\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nDEBUG: <workspace>/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V1\nDEBUG: <workspace>/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: <workspace>/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:15:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE\nINFO: Analyzed target //pkg:message (79 packages loaded, 432 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
       "normalized_stdout": "",
-      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nINFO: Invocation ID: a29ed6c9-da77-44f8-a021-179fa791036f\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a29ed6c9-da77-44f8-a021-179fa791036f\nComputing main repo mapping: \nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/MODULE.bazel:2:6: SLUG_TERMINAL_EVENT_ROOT_MODULE\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V1\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\n\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl:7:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE\nINFO: Analyzed target //pkg:message (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 4.234s, Critical Path: 0.01s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a29ed6c9-da77-44f8-a021-179fa791036f\n",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/home/wgray/slug/target/v2o/runs/load-invalidation/20260811-200951-178896-bazel/workspace\n  - Only in new server: --workspace_directory=/home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/MODULE.bazel:2:6: SLUG_TERMINAL_EVENT_ROOT_MODULE\nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V1\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:message (5 packages loaded, 6 targets configured)\n\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:15:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE\nINFO: Analyzed target //pkg:message (79 packages loaded, 432 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 4.786s, Critical Path: 0.02s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
       "stdout": ""
     },
     {
@@ -48,6 +51,8 @@
         "//pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [
         {
           "digest": "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806",
@@ -61,9 +66,10 @@
       ],
       "mutations": [],
       "name": "unchanged_warm_build_no_replay",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 5d10f341-bd10-4562-8e72-f36fbb582dee\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/5d10f341-bd10-4562-8e72-f36fbb582dee\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.080s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/5d10f341-bd10-4562-8e72-f36fbb582dee\n",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.280s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
       "stdout": ""
     },
     {
@@ -81,12 +87,15 @@
         "//pkg:message except //pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "valid_empty_warm_query",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stderr": "Loading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 276fc925-e4ab-4035-87be-d0160f9928f4\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -104,6 +113,8 @@
         "//pkg:message except //pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [
         {
@@ -120,9 +131,10 @@
         }
       ],
       "name": "empty_query_after_dependency_edit",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nDEBUG: <workspace>/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V2\nDEBUG: <workspace>/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: <workspace>/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nINFO: Empty results",
+      "normalized_stderr": "Loading: 0 packages loaded\nDEBUG: <workspace>/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V2\nDEBUG: <workspace>/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: <workspace>/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 81873fd3-119d-439b-876a-2ea4df5378b7\nLoading: 0 packages loaded\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V2\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nINFO: Empty results\n",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V2\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -140,12 +152,15 @@
         "//pkg:message except //pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "unchanged_warm_query_no_replay",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nLoading: 0 packages loaded\nINFO: Empty results",
+      "normalized_stderr": "Loading: 0 packages loaded\nINFO: Empty results",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 40c76e44-21d1-4c24-9a63-e1d757ae68f0\nLoading: 0 packages loaded\nINFO: Empty results\n",
+      "startup_argv": [],
+      "stderr": "Loading: 0 packages loaded\nINFO: Empty results\n",
       "stdout": ""
     },
     {
@@ -163,6 +178,8 @@
         "//pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [
         {
           "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
@@ -176,9 +193,10 @@
       ],
       "mutations": [],
       "name": "build_after_query_edit_only_analysis",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:9:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_TWO\nINFO: Analyzed target //pkg:message (0 packages loaded, 1 target configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:17:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_TWO\nINFO: Analyzed target //pkg:message (1 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 3f62153e-6c4c-4f9a-a6af-26f0234666cd\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3f62153e-6c4c-4f9a-a6af-26f0234666cd\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl:9:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_TWO\nINFO: Analyzed target //pkg:message (0 packages loaded, 1 target configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.033s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/3f62153e-6c4c-4f9a-a6af-26f0234666cd\n",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:17:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_TWO\nINFO: Analyzed target //pkg:message (1 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.132s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
       "stdout": ""
     },
     {
@@ -196,12 +214,15 @@
         "//pkg:analysis_failure"
       ],
       "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "eligible_analysis_failure_prefix",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:15:10: SLUG_TERMINAL_EVENT_RULE_ANALYSIS_FAILURE_PREFIX\nERROR: <workspace>/pkg/BUILD.bazel:14:22: in analysis_failure_rule rule //pkg:analysis_failure: \nTraceback (most recent call last):\n\tFile \"<workspace>/pkg/defs.bzl\", line 16, column 9, in _analysis_failure_impl\n\t\tfail(\"SLUG_TERMINAL_\" + \"EVENT_TERMINAL_ANALYSIS_FAILURE\")\nError in fail: SLUG_TERMINAL_EVENT_TERMINAL_ANALYSIS_FAILURE\nERROR: <workspace>/pkg/BUILD.bazel:14:22: Analysis of target '//pkg:analysis_failure' (config: a7a71fd) failed\nERROR: Analysis of target '//pkg:analysis_failure' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:23:10: SLUG_TERMINAL_EVENT_RULE_ANALYSIS_FAILURE_PREFIX\nERROR: <workspace>/pkg/BUILD.bazel:14:22: in analysis_failure_rule rule //pkg:analysis_failure: \nTraceback (most recent call last):\n\tFile \"<workspace>/pkg/defs.bzl\", line 24, column 9, in _analysis_failure_impl\n\t\tfail(\"SLUG_TERMINAL_\" + \"EVENT_TERMINAL_ANALYSIS_FAILURE\")\nError in fail: SLUG_TERMINAL_EVENT_TERMINAL_ANALYSIS_FAILURE\nERROR: <workspace>/pkg/BUILD.bazel:14:22: Analysis of target '//pkg:analysis_failure' (config: a7a71fd) failed\nERROR: Analysis of target '//pkg:analysis_failure' failed; build aborted\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 1886d69b-e6d5-4cf3-b57a-8fd1c6ab1822\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1886d69b-e6d5-4cf3-b57a-8fd1c6ab1822\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl:15:10: SLUG_TERMINAL_EVENT_RULE_ANALYSIS_FAILURE_PREFIX\nERROR: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/BUILD.bazel:14:22: in analysis_failure_rule rule //pkg:analysis_failure: \nTraceback (most recent call last):\n\tFile \"/tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl\", line 16, column 9, in _analysis_failure_impl\n\t\tfail(\"SLUG_TERMINAL_\" + \"EVENT_TERMINAL_ANALYSIS_FAILURE\")\nError in fail: SLUG_TERMINAL_EVENT_TERMINAL_ANALYSIS_FAILURE\nERROR: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/BUILD.bazel:14:22: Analysis of target '//pkg:analysis_failure' (config: a7a71fd) failed\nERROR: Analysis of target '//pkg:analysis_failure' failed; build aborted\nINFO: Elapsed time: 0.034s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/1886d69b-e6d5-4cf3-b57a-8fd1c6ab1822\n",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:analysis_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:23:10: SLUG_TERMINAL_EVENT_RULE_ANALYSIS_FAILURE_PREFIX\nERROR: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/BUILD.bazel:14:22: in analysis_failure_rule rule //pkg:analysis_failure: \nTraceback (most recent call last):\n\tFile \"/home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl\", line 24, column 9, in _analysis_failure_impl\n\t\tfail(\"SLUG_TERMINAL_\" + \"EVENT_TERMINAL_ANALYSIS_FAILURE\")\nError in fail: SLUG_TERMINAL_EVENT_TERMINAL_ANALYSIS_FAILURE\nERROR: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/BUILD.bazel:14:22: Analysis of target '//pkg:analysis_failure' (config: a7a71fd) failed\nERROR: Analysis of target '//pkg:analysis_failure' failed; build aborted\nINFO: Elapsed time: 0.113s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nERROR: Build did NOT complete successfully\n",
       "stdout": ""
     },
     {
@@ -219,12 +240,15 @@
         "//pkg:execution_failure"
       ],
       "exit_code": 1,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "execution_failure_after_semantic_output",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:19:10: SLUG_TERMINAL_EVENT_RULE_EXECUTION_FAILURE_PREFIX\nINFO: Analyzed target //pkg:execution_failure (0 packages loaded, 1 target configured).\nERROR: <workspace>/pkg/BUILD.bazel:18:23: Action pkg/execution_failure.txt failed: (Exit 23): bash failed: error executing Action command (from execution_failure_rule rule target //pkg:execution_failure) /bin/bash -c 'printf '/''SLUG_%s_%s/n'/'' TERMINAL EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC >&2; exit 23'\nSLUG_TERMINAL_EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC\nTarget //pkg:execution_failure failed to build\nUse --verbose_failures to see the command lines of failed build steps.\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:27:10: SLUG_TERMINAL_EVENT_RULE_EXECUTION_FAILURE_PREFIX\nINFO: Analyzed target //pkg:execution_failure (0 packages loaded, 1 target configured).\nERROR: <workspace>/pkg/BUILD.bazel:18:23: Action pkg/execution_failure.txt failed: (Exit 23): bash failed: error executing Action command (from execution_failure_rule rule target //pkg:execution_failure) /bin/bash -c 'printf '/''SLUG_%s_%s/n'/'' TERMINAL EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC >&2; exit 23'\n\nUse --sandbox_debug to see verbose messages from the sandbox and retain the sandbox build root for debugging\nSLUG_TERMINAL_EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC\nTarget //pkg:execution_failure failed to build\nUse --verbose_failures to see the command lines of failed build steps.\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nERROR: Build did NOT complete successfully",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: 51984059-c59c-421e-963a-6b950a6e36d9\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/51984059-c59c-421e-963a-6b950a6e36d9\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/defs.bzl:19:10: SLUG_TERMINAL_EVENT_RULE_EXECUTION_FAILURE_PREFIX\nINFO: Analyzed target //pkg:execution_failure (0 packages loaded, 1 target configured).\nERROR: /tmp/slug-terminal-oracle-retry-generate.mlU5Dn/runs/load-invalidation/20260725-232619-2760482-bazel/workspace/pkg/BUILD.bazel:18:23: Action pkg/execution_failure.txt failed: (Exit 23): bash failed: error executing Action command (from execution_failure_rule rule target //pkg:execution_failure) /bin/bash -c 'printf '\\''SLUG_%s_%s\\n'\\'' TERMINAL EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC >&2; exit 23'\nSLUG_TERMINAL_EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC\nTarget //pkg:execution_failure failed to build\nUse --verbose_failures to see the command lines of failed build steps.\nINFO: Elapsed time: 1.173s, Critical Path: 1.14s\nINFO: 2 processes: 2 internal.\nERROR: Build did NOT complete successfully\nFAILED: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/51984059-c59c-421e-963a-6b950a6e36d9\n",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:execution_failure (0 packages loaded, 0 targets configured)\n\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:27:10: SLUG_TERMINAL_EVENT_RULE_EXECUTION_FAILURE_PREFIX\nINFO: Analyzed target //pkg:execution_failure (0 packages loaded, 1 target configured).\nERROR: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/BUILD.bazel:18:23: Action pkg/execution_failure.txt failed: (Exit 23): bash failed: error executing Action command (from execution_failure_rule rule target //pkg:execution_failure) /bin/bash -c 'printf '\\''SLUG_%s_%s\\n'\\'' TERMINAL EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC >&2; exit 23'\n\nUse --sandbox_debug to see verbose messages from the sandbox and retain the sandbox build root for debugging\nSLUG_TERMINAL_EVENT_TERMINAL_ACTION_FAILURE_DIAGNOSTIC\nTarget //pkg:execution_failure failed to build\nUse --verbose_failures to see the command lines of failed build steps.\nINFO: Elapsed time: 0.135s, Critical Path: 0.03s\nINFO: 2 processes: 2 internal.\nERROR: Build did NOT complete successfully\n",
       "stdout": ""
     },
     {
@@ -242,6 +266,8 @@
         "//pkg:message"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [
         {
           "digest": "27dd8ed44a83ff94d557f9fd0412ed5a8cbca69ea04922d88c01184a07300a5a",
@@ -255,9 +281,59 @@
       ],
       "mutations": [],
       "name": "warm_message_after_failures_no_replay",
-      "normalized_stderr": "INFO: Invocation ID: <uuid>\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/<uuid>",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action",
       "normalized_stdout": "",
-      "stderr": "INFO: Invocation ID: a3eefb3c-17f3-47c3-b2da-1a6c5a30cf3c\nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a3eefb3c-17f3-47c3-b2da-1a6c5a30cf3c\nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.028s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: \nINFO: Streaming build results to: https://app.buildbuddy.io/invocation/a3eefb3c-17f3-47c3-b2da-1a6c5a30cf3c\n",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (0 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:message (0 packages loaded, 0 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.098s, Critical Path: 0.00s\nINFO: 1 process: 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//pkg:message"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:message"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [
+        {
+          "digest": "2c8b08da5ce60398e1f19af0e5dccc744df274b826abe585eaba68c525434806",
+          "mode": "0o555",
+          "path": "message.txt",
+          "root": "bazel-bin/pkg/message.txt",
+          "size": 4,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "SLUG_TERMINAL_EVENT_DEP_BZL_V2",
+          "old_digest_hint": "57",
+          "path": "pkg/message.bzl",
+          "replace": "SLUG_TERMINAL_EVENT_DEP_BZL_V1"
+        },
+        {
+          "find": "MESSAGE = \"two\"",
+          "old_digest_hint": "57",
+          "path": "pkg/message.bzl",
+          "replace": "MESSAGE = \"one\""
+        }
+      ],
+      "name": "restored_message_v1",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nDEBUG: <workspace>/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V1\nDEBUG: <workspace>/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: <workspace>/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\n\nDEBUG: <workspace>/pkg/defs.bzl:15:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE\nINFO: Analyzed target //pkg:message (2 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/message.bzl:1:6: SLUG_TERMINAL_EVENT_DEP_BZL_V1\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:3:6: SLUG_TERMINAL_EVENT_PARENT_BZL\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/BUILD.bazel:8:6: SLUG_TERMINAL_EVENT_BUILD\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:message (1 packages loaded, 0 targets configured)\n\nDEBUG: /home/wgray/slug/target/v2o/runs/load-invalidation/20260811-203025-192238-bazel/workspace/pkg/defs.bzl:15:14: SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE\nINFO: Analyzed target //pkg:message (2 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:message up-to-date:\n  bazel-bin/pkg/message.txt\nINFO: Elapsed time: 0.135s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
       "stdout": ""
     }
   ],

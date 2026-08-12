@@ -18,6 +18,10 @@ use slug_build_api_v2::ReapiCommandProjection;
 use crate::digest::ReapiDigest;
 use crate::proto;
 
+pub fn is_file_write_action(action: &ActionSpec) -> bool {
+    matches!(action.kind(), ActionKind::Write { .. })
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ReapiCommand {
     pub argv: Vec<String>,
@@ -36,6 +40,27 @@ impl ReapiCommand {
             output_files: projection.output_files,
             output_directories: projection.output_directories,
             platform_properties: projection.platform_properties,
+        }
+    }
+    pub(crate) fn file_write(
+        output: &str,
+        is_executable: bool,
+        platform_properties: BTreeMap<String, String>,
+    ) -> Self {
+        let mode = if is_executable { "0555" } else { "0444" };
+        Self {
+            argv: vec![
+                "sh".to_owned(),
+                "-c".to_owned(),
+                format!("cp -- \"$1\" \"$2\" && chmod {mode} -- \"$2\""),
+                "slug-filewrite".to_owned(),
+                "__slug_filewrite__/content".to_owned(),
+                output.to_owned(),
+            ],
+            env: BTreeMap::new(),
+            output_files: vec![output.to_owned()],
+            output_directories: Vec::new(),
+            platform_properties,
         }
     }
 
@@ -57,22 +82,7 @@ impl ReapiCommand {
             .rsplit_once('/')
             .map_or(".", |(parent, _)| parent);
         match action.kind() {
-            ActionKind::Write {
-                content,
-                is_executable,
-            } => {
-                let mut script = format!(
-                    "mkdir -p -- {} && printf %s {} > {}",
-                    shell_quote(parent),
-                    shell_quote(content),
-                    shell_quote(output.path())
-                );
-                if *is_executable {
-                    script.push_str(&format!(" && chmod +x -- {}", shell_quote(output.path())));
-                }
-                command.argv = vec!["sh".to_owned(), "-c".to_owned(), script];
-                Ok(command)
-            }
+            ActionKind::Write { .. } => Err("raw FileWrite REAPI lowering is forbidden".to_owned()),
             ActionKind::WriteJson { content } => {
                 command.argv = vec![
                     "sh".to_owned(),

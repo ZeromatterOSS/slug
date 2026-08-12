@@ -609,3 +609,27 @@ delegation, or an unmodeled identity input.
   salt Action identity. Review: ACCEPT after correction. No Stage 9 extraction,
   retained field, DICE key, public wire, JVM artifact, or backend semantic
   delegation was selected.
+
+- 2026-08-11 M6 FileWrite REAPI handoff implementation: accepted the
+  request-local `FileWriteReapiPlan` constructed only from the resolved
+  FileWrite semantic view plus request remote defaults. The raw
+  `execute_action(&ActionSpec)` path now rejects FileWrite, CLI and daemon use
+  the closure-resolved view, selected platform properties replace defaults as
+  a whole, and `--remote_timeout` cannot enter the encoded Action.
+  Direct canonical-protobuf tests cover the NUL-safe inline content tree,
+  fixed executable/non-executable recipes, reserved namespace, SHA-256 digest
+  domains, all identity discriminators, and A/B/A restoration. A focused
+  NativeLink test proves the checked-in Bazel content bytes/digest and
+  materialized mode; the one-shot selected-platform fixture passes with zero
+  local actions and A/B/A Action digests, and the daemon proof observes the same
+  restoration on one stable `--serve` PID. Output-root placement remains
+  explicitly Slug-native, so shared fixture rows retain Bazel manifests as
+  digest/mode evidence without claiming a common `bazel-bin` path.
+  Validation: REAPI 5 unit + 14 integration tests pass, the explicit NativeLink
+  test passes, the server suite passes 49/49, and pinned Bazel 9.2 plus Slug
+  focused fixtures pass. Broad CLI/core and retained REAPI fixture failures are
+  classified pre-existing DICE/query/diagnostic or convenience-path baselines
+  outside this packet. Independent implementation review: ACCEPT after adding
+  the necessary refreshed expectation to the allowlist. No retained action
+  state, DICE key, public protocol wire, JVM artifact, raw FileWrite executor,
+  or materializer breadth was added.

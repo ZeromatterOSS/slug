@@ -2,6 +2,14 @@ load(":message.bzl", "MESSAGE")
 
 print("SLUG_TERMINAL_EVENT_PARENT_BZL")
 
+def _message_toolchain_impl(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+
+message_toolchain_impl = rule(
+    implementation = _message_toolchain_impl,
+    attrs = {"marker": attr.string(mandatory = True)},
+)
+
 def _message_impl(ctx):
     if MESSAGE == "one":
         print("SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE")
@@ -24,6 +32,9 @@ def _execution_failure_impl(ctx):
     )
     return [DefaultInfo(files = depset([out]))]
 
-message_rule = rule(implementation = _message_impl)
+message_rule = rule(
+    implementation = _message_impl,
+    toolchains = ["//:message_type"],
+)
 analysis_failure_rule = rule(implementation = _analysis_failure_impl)
 execution_failure_rule = rule(implementation = _execution_failure_impl)

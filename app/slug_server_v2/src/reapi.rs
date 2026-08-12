@@ -44,46 +44,91 @@ pub fn run_reapi_build(
         let mut action_digests: Vec<String> = Vec::new();
         let mut uploaded_digests: Vec<String> = Vec::new();
         let mut materialized_outputs: Vec<String> = Vec::new();
-        let mut platform_properties: Vec<(String, String)> = remote
-            .default_exec_properties
-            .iter()
-            .map(|(k, v)| (k.clone(), v.clone()))
-            .collect();
-        platform_properties.sort();
-        for analysis in evaluation.analyses() {
-            let configuration = analysis
-                .configured_target_key()
-                .ok_or_else(|| "production rule analysis returned a null node".to_owned())?
-                .configuration()
-                .slug_configuration()
-                .ok_or_else(|| "production analysis returned an opaque configuration".to_owned())?;
-            let output_root =
-                slug_core_v2::runtime::configured_output_root(workspace, configuration);
-            for action in analysis.actions() {
-                let result = slug_reapi_v2::execute_action(remote, action)
+        let mut platform_properties = std::collections::BTreeMap::new();
+        let mut record = |output_root: &std::path::Path,
+                          result: slug_reapi_v2::RemoteExecutionResult|
+         -> Result<(), String> {
+            slug_reapi_v2::materialize_outputs(output_root, &result)
+                .map_err(|error| error.to_string())?;
+            reapi_actions += result.evidence.reapi_actions;
+            direct_local_actions += result.evidence.direct_local_actions;
+            ac_hits += result.evidence.ac_hits;
+            ac_misses += result.evidence.ac_misses;
+            action_digests.push(result.action_digest.to_string());
+            uploaded_digests.extend(
+                result
+                    .evidence
+                    .uploaded_digests
+                    .iter()
+                    .map(|digest| digest.to_string()),
+            );
+            materialized_outputs.extend(
+                result
+                    .evidence
+                    .materialized_outputs
+                    .iter()
+                    .map(|digest| digest.to_string()),
+            );
+            platform_properties.extend(result.platform_properties);
+            Ok(())
+        };
+
+        let mut file_write_actions = 0_usize;
+        let mut other_actions = 0_usize;
+        for action in evaluation
+            .analyses()
+            .flat_map(|analysis| analysis.actions())
+        {
+            if slug_reapi_v2::is_file_write_action(action) {
+                file_write_actions += 1;
+            } else {
+                other_actions += 1;
+            }
+        }
+        if file_write_actions > 0 && other_actions > 0 {
+            return Err(
+                "mixed FileWrite and non-FileWrite REAPI closures are unsupported".to_owned(),
+            );
+        }
+
+        if file_write_actions > 0 {
+            let views = evaluation
+                .resolved_file_write_semantic_views_in_closure()
+                .map_err(str::to_owned)?;
+            for view in views {
+                let configuration = view
+                    .action()
+                    .owner()
+                    .configuration()
+                    .slug_configuration()
+                    .ok_or_else(|| {
+                        "production FileWrite owner has an opaque configuration".to_owned()
+                    })?;
+                let output_root =
+                    slug_core_v2::runtime::configured_output_root(workspace, configuration);
+                let result = slug_reapi_v2::execute_file_write(remote, &view)
                     .await
                     .map_err(|error| error.to_string())?;
-                slug_reapi_v2::materialize_outputs(&output_root, &result)
-                    .map_err(|error| error.to_string())?;
-                reapi_actions += result.evidence.reapi_actions;
-                direct_local_actions += result.evidence.direct_local_actions;
-                ac_hits += result.evidence.ac_hits;
-                ac_misses += result.evidence.ac_misses;
-                action_digests.push(result.action_digest.to_string());
-                uploaded_digests.extend(
-                    result
-                        .evidence
-                        .uploaded_digests
-                        .iter()
-                        .map(|digest| digest.to_string()),
-                );
-                materialized_outputs.extend(
-                    result
-                        .evidence
-                        .materialized_outputs
-                        .iter()
-                        .map(|digest| digest.to_string()),
-                );
+                record(&output_root, result)?;
+            }
+        } else {
+            for analysis in evaluation.analyses() {
+                let configuration = analysis
+                    .configured_target_key()
+                    .ok_or_else(|| "production rule analysis returned a null node".to_owned())?
+                    .configuration()
+                    .slug_configuration()
+                    .ok_or_else(|| {
+                        "production analysis returned an opaque configuration".to_owned()
+                    })?;
+                let output_root =
+                    slug_core_v2::runtime::configured_output_root(workspace, configuration);
+                for action in analysis.actions() {
+                    let result = slug_reapi_v2::execute_action(remote, action)
+                        .await
+                        .map_err(|error| error.to_string())?;
+                    record(&output_root, result)?;
+                }
             }
         }
         Ok::<_, String>((

@@ -309,6 +309,7 @@ fn reapi_materialization_uses_distinct_and_restored_structural_configuration_roo
         output_blobs: [("pkg/out.txt".to_owned(), b"materialized".to_vec())]
             .into_iter()
             .collect(),
+        platform_properties: BTreeMap::new(),
         evidence: slug_reapi_v2::ExecutionEvidence::reapi("test"),
     };
 

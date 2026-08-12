@@ -1,123 +1,101 @@
 # Current Slug V2 Packet
 
-Packet: `WP-7-m6-filewrite-reapi-action-handoff-implementation`
-Milestone: M6 implementation
-Owner: `slug-v2-subplans/07-reapi-native-execution.md`
-Result: make the accepted configured FileWrite semantic view the sole
-FileWrite-to-REAPI handoff and prove its exact CAS/protobuf identity.
+Packet: `WP-8-m7-filewrite-run-handoff-design`
+Milestone: M7 design
+Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
+Result: freeze the first executable FileWrite `run` handoff over the accepted
+analysis and REAPI objects without inventing runfiles or local build execution.
 
 ## Scope
 
-Implement only the reviewed 2026-08-11 FileWrite Action IR-to-REAPI design.
-Keep `ConfiguredNodeResult.actions: Arc<[ActionSpec]>` as the sole DICE-owned
-action declaration. Add one request-local `FileWriteReapiPlan` in
-`slug_reapi_v2` that is constructed from `ResolvedFileWriteSemanticView`,
-the request's remote-default property map, and no other semantic source.
+Design only the admitted POSIX `run-basic` shape: exactly one requested
+configured rule, executable capability true, a built-in `DefaultInfo` whose
+`executable` and `files_to_run.executable` name the same normalized artifact,
+default/data runfiles containing no artifact except that executable, and exactly
+one executable FileWrite action that produces it.
 
-The plan must own the inline content blob at
-`__slug_filewrite__/content`, canonical Merkle Directory blobs, a fixed
-positional `sh`/`cp`/`chmod` Command, selected/default platform properties,
-and encoded Action identity. `Action.timeout` is absent.
-`--remote_timeout` remains transport/RPC policy and must not change Command or
-Action bytes or digests.
+Freeze one request-local `ResolvedRunSemanticView` owned by
+`BuildCommandEvaluation`. It must borrow the sole requested analyzed node,
+its retained `DefaultInfo`, the matching resolved FileWrite semantic view, and
+the executable artifact relation. It creates no DICE key or second command
+model. Build execution continues through `execute_file_write` and NativeLink;
+after verified owner-derived materialization, the CLI launches only that
+declared executable with `RunRequest.program_args`.
 
-Migrate CLI and daemon FileWrite builds to
-`resolved_file_write_semantic_views_in_closure()`. Derive output-root placement
-from each resolved action owner. Report platform properties from the actual
-plan/result, not by echoing request defaults. After migration, the raw
-`execute_action(&ActionSpec)` path must reject FileWrite; it may remain only
-for the already-admitted non-FileWrite RunShell regression. A closure mixing
-the bounded FileWrite path with other action kinds fails closed in this packet.
+Decide the one-shot and daemon ownership boundary, current-directory and
+environment policy, stdout/stderr streaming, signal/exit propagation,
+post-build launch failure classification, and evidence needed to distinguish
+the user program process from a forbidden direct-local build action. Do not
+implement in this packet.
 
 ## Compatibility boundary
 
-- **Exact:** Rust valid-Unicode FileWrite content bytes including embedded NUL;
-  declared one-file output and executable bit on the admitted POSIX worker;
-  canonical REAPI Directory, Command, and Action protobuf bytes and SHA-256
-  digests for Slug's actual graph; selected-platform versus all-or-nothing
-  remote-default property choice; absent Action timeout; and A/B/A restoration.
-- **Slug-native:** reserved inline-input namespace, fixed POSIX worker recipe,
-  Slug action/configuration display bytes, output-root placement, traversal
-  order, diagnostics, and evidence formatting.
-- **Unsupported/deferred:** exact Bazel configuration/output/ActionKey bytes,
-  non-Unicode/Java string edges, action-semantic timeout, WriteJson/Run/Spawn
-  migration, mixed FileWrite/non-FileWrite closures, paramfiles, tree outputs,
-  ordinary source/generated input trees, ordinary zero-toolchain FileWrite
-  owners, non-POSIX workers, and broader backend/cache/materializer work.
+- **Exact:** admitted target/executable validation; `--` program-argument
+  preservation; successful program stdout/stderr bytes and terminal exit code;
+  and the already accepted FileWrite REAPI bytes, digests, properties, and
+  zero-direct-local build boundary.
+- **Slug-native:** owner-derived executable path, process launch mechanism,
+  environment/current-directory policy until a Bazel-exact bounded policy is
+  demonstrated, diagnostics, signal envelope, and command evidence formatting.
+- **Unsupported/deferred:** additional runfiles, repository mapping manifests,
+  data dependencies, source/generated executable producers other than the sole
+  FileWrite, multiple actions/targets, RunShell/Spawn executables, Windows,
+  tests, coverage, terminal integration, exact Bazel output/configuration bytes,
+  and broad `bazel run` flag/environment parity.
 
-Missing or ambiguous platform closure, malformed topology, an unmodeled
-FileWrite field, a first output segment equal to `__slug_filewrite__`, or a
-raw FileWrite executor call fails closed.
+Any missing or conflicting executable relation, non-executable FileWrite,
+additional runfile/artifact/action, mixed closure, ambiguous platform, absent
+remote executor, or path escape fails closed before launching a program.
 
 ## Evidence
 
-Add direct Rust regressions for:
+Audit pinned Bazel 9.2 `RunCommand`/command-line construction and the
+retained `run-basic` oracle before freezing policy. Refresh that fixture with
+pinned Bazel 9.2 only if its checked-in expectation is stale.
 
-- quote, newline, and embedded-NUL content surviving only in the inline blob;
-- executable and non-executable fixed recipes;
-- reserved namespace and malformed shape rejection;
-- canonical Directory, Command, and Action fields plus SHA-256 digests;
-- nonempty selected-platform properties winning as a whole over conflicting
-  defaults, and an empty selected property map admitting the complete defaults;
-- content/output/executable/platform A/B/A identity restoration; and
-- distinct `--remote_timeout` values leaving encoded Action bytes and digest
-  unchanged.
+The design must require discriminating implementation proof for:
 
-Add one focused five-file-or-smaller FileWrite REAPI fixture with a real
-selected execution platform. It must run A/B/A content edits through one-shot
-and stable-PID daemon builds against the retained NativeLink harness, compare
-exact output manifests/content with Bazel 9.2, prove selected platform
-properties in evidence, and retain `direct_local_actions = 0`. Preserve the
-existing simple FileWrite and RunShell REAPI regressions; converting the simple
-payload fixture to a local selected-platform fixture is allowed if required by
-the fail-closed platform boundary.
+- exact requested-target/DefaultInfo/executable/FileWrite relation and every
+  fail-closed negative;
+- REAPI build evidence with one action and zero direct-local actions;
+- program arguments after `--`, stdout/stderr, success and nonzero exits;
+- executable mode and owner-derived path integrity before launch;
+- one-shot plus stable-PID daemon build/launch A/B/A restoration; and
+- proof that program launch is not counted as a build action or cache event.
 
-No new public CLI/daemon/protocol wire is allowed. Reuse the accepted Bazel 9.2
-FileWrite/aquery evidence and official REAPI protobuf serialization contract;
-do not add redundant oracle rows.
+Reuse `run-basic` unless source audit demonstrates a missing discriminator.
+No public protocol wire, retained state, JVM artifact, or implementation edit is
+allowed in this design packet.
 
 ## Allowlist and caps
 
 Edit only:
 
-- `Cargo.lock` if the existing workspace dependency edge requires refresh;
-- `app/slug_reapi_v2/Cargo.toml` and
-  `app/slug_reapi_v2/src/{command,input_tree,executor,evidence,lib}.rs`;
-- `app/slug_cli_v2/src/commands/build.rs` and its existing focused tests;
-- `app/slug_server_v2/src/reapi.rs` and its existing focused tests;
-- `tests/v2_oracle/fixtures/simple-rule-action/**` only if converting the
-  retained FileWrite regression to the selected-platform boundary;
-- one new `tests/v2_oracle/fixtures/filewrite-reapi-handoff/**` fixture with at
-  most five files; and
-- Stage 7, this manifest, and the canonical V2 plan for acceptance bookkeeping.
+- this manifest;
+- Stage 8 for an accepted design decision; and
+- the canonical V2 plan only if review changes scheduling.
 
-Do not edit retained analysis/DICE representations, Stage 9, generated REAPI
-protocol, unrelated fixtures, or workspace-wide dependency declarations. Cap
-formatted Rust growth at 460 production plus 300 test lines, fixture growth at
-220 lines, documentation growth after this manifest at 90 lines, and total new
-files at five. One new dependency edge from `slug_reapi_v2` to
-`slug_core_v2` is allowed; no new external crate.
+Read-only inspection may cover the existing run parser/CLI placeholder,
+configured analysis/providers, FileWrite executor, `run-basic` fixture and
+expected oracle, pinned Bazel 9.2 source/tests, and REAPI evidence code.
+
+Do not edit Rust, fixtures, expectations, generated protocol, Stage 9, workspace
+dependencies, or any other plan. Cap new Stage 8 design text at 180 lines. No
+new files or dependencies.
 
 ## Validation and review
 
-Run formatter/checks and focused tests for `slug_reapi_v2`, `slug_cli_v2`,
-`slug_server_v2`, and `slug_core_v2`. Rebuild `slug_cli_v2` before Slug
-oracle runs. Clean stale `slugd` before and after daemon/REAPI validation.
-Replay the focused fixture with pinned Bazel 9.2 and Slug/NativeLink, then run
-the retained simple FileWrite, RunShell, platform-property, and daemon
-regressions. Run the affected full command/server/core suites serially and
-classify any unrelated baseline failures precisely. Check allowlist/caps,
-credentials, archive boundary, `git diff --check`, and a clean post-test daemon
-state.
+Validate source citations, existing API ownership, fixture provenance,
+exact/Slug-native/deferred classification, allowlist/cap, archive boundary, and
+`git diff --check`. Do not run Cargo or Slug/NativeLink for a docs-only design;
+a pinned Bazel oracle refresh is allowed only if the existing evidence is stale.
 
-Require one independent Sol implementation review because this packet changes
-action identity, executor ownership, a crate dependency edge, and closes the
-bounded M6 milestone. The reviewer must verify the accepted design literally,
-serialized-protobuf digest construction, raw FileWrite rejection, exact
-all-or-nothing properties, transport-timeout invariance, no new retained/DICE
-state, no public-wire change, and truthful compatibility claims. One bounded
-correction is allowed; a second material correction is `REPLAN`.
+Require one independent Sol design review because this packet reserves a new
+public semantic view and local user-program process boundary. The reviewer must
+verify no second executable/action model, no raw FileWrite executor, no hidden
+direct-local build action, exact failure guards, truthful process-policy claims,
+bounded public API, and discriminating one-shot/daemon evidence.
 
-At `ACCEPT`, mark only bounded M6 FileWrite handoff accepted and schedule the
-next canonical M7 design packet. At `REPLAN`, record the missing prerequisite
-and schedule only its design packet.
+At `ACCEPT`, append the reviewed design to Stage 8 and schedule only its
+bounded implementation packet. At `REPLAN`, record the missing prerequisite
+and schedule that prerequisite's design packet.

@@ -24,6 +24,7 @@ use crate::proto;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum InputTreeEntryKind {
+    FileWriteContent,
     Input,
     Tool,
     ParamFile,
@@ -117,6 +118,25 @@ impl ReapiInputTree {
             root_digest,
             directory_blobs,
             inline_blobs,
+        })
+    }
+
+    pub(crate) fn from_inline_file(
+        path: &str,
+        data: &[u8],
+        kind: InputTreeEntryKind,
+    ) -> Result<Self, InputTreeError> {
+        let blob = ReapiBlob::from_bytes(data.to_vec());
+        let entry = ReapiInputTreeEntry::new(path, blob.digest().clone(), kind);
+        let mut entries = BTreeMap::new();
+        insert_entry(&mut entries, entry)?;
+        let entries = entries.into_values().collect::<Vec<_>>();
+        let (root_digest, directory_blobs) = merkle_directories(&entries)?;
+        Ok(Self {
+            entries,
+            root_digest,
+            directory_blobs,
+            inline_blobs: vec![blob],
         })
     }
 

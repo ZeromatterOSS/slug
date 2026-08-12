@@ -1,2 +1,5 @@
 module(name = "load_invalidation", version = "0.0.0")
 print("SLUG_TERMINAL_EVENT_ROOT_MODULE")
+
+register_execution_platforms("//:platform")
+register_toolchains("//:message_toolchain")

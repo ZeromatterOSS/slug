@@ -1,0 +1,13 @@
+load("//pkg:defs.bzl", "write_toolchain_impl")
+
+platform(
+    name = "platform",
+    exec_properties = {"container-image": "selected:v1"},
+)
+toolchain_type(name = "write_type")
+write_toolchain_impl(name = "write_impl", marker = "write")
+toolchain(
+    name = "write_toolchain",
+    toolchain = ":write_impl",
+    toolchain_type = ":write_type",
+)

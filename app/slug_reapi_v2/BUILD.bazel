@@ -36,6 +36,7 @@ rust_library(
     deps = all_crate_deps(normal = True) + [
         ":build_script",
         "//app/slug_build_api_v2",
+        "//app/slug_core_v2",
     ],
     proc_macro_deps = all_crate_deps(proc_macro = True),
 )

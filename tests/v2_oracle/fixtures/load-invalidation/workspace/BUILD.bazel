@@ -1,0 +1,10 @@
+load("//pkg:defs.bzl", "message_toolchain_impl")
+
+platform(name = "platform")
+toolchain_type(name = "message_type")
+message_toolchain_impl(name = "message_impl", marker = "message")
+toolchain(
+    name = "message_toolchain",
+    toolchain = ":message_impl",
+    toolchain_type = ":message_type",
+)

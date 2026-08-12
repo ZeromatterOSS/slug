@@ -32,7 +32,7 @@ remote_executor = true
 [[commands]]
 name = "cold_success_v1_order"
 argv = ["build", "//pkg:message"]
-compare = "semantic"
+compare = "message_shape"
 expected_exit = 0
 stdout_patterns = ["\\A\\Z"]
 stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_ROOT_MODULE(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_DEP_BZL_V1(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_PARENT_BZL(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_BUILD(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
@@ -41,7 +41,7 @@ manifest_roots = ["bazel-bin/pkg/message.txt"]
 [[commands]]
 name = "unchanged_warm_build_no_replay"
 argv = ["build", "//pkg:message"]
-compare = "semantic"
+compare = "message_shape"
 expected_exit = 0
 stdout_patterns = ["\\A\\Z"]
 stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
@@ -84,7 +84,7 @@ stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
 [[commands]]
 name = "build_after_query_edit_only_analysis"
 argv = ["build", "//pkg:message"]
-compare = "semantic"
+compare = "message_shape"
 expected_exit = 0
 stdout_patterns = ["\\A\\Z"]
 stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_MESSAGE_TWO(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
@@ -109,8 +109,27 @@ stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RUL
 [[commands]]
 name = "warm_message_after_failures_no_replay"
 argv = ["build", "//pkg:message"]
-compare = "semantic"
+compare = "message_shape"
 expected_exit = 0
 stdout_patterns = ["\\A\\Z"]
 stderr_patterns = ["(?s)\\A(?!.*SLUG_TERMINAL_EVENT_).*\\Z"]
 manifest_roots = ["bazel-bin/pkg/message.txt"]
+
+[[commands]]
+name = "restored_message_v1"
+argv = ["build", "//pkg:message"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_DEP_BZL_V1(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_PARENT_BZL(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_BUILD(?:(?!SLUG_TERMINAL_EVENT_).)*SLUG_TERMINAL_EVENT_RULE_MESSAGE_ONE(?:(?!SLUG_TERMINAL_EVENT_).)*\\Z"]
+manifest_roots = ["bazel-bin/pkg/message.txt"]
+
+  [[commands.mutations]]
+  path = "pkg/message.bzl"
+  find = "SLUG_TERMINAL_EVENT_DEP_BZL_V2"
+  replace = "SLUG_TERMINAL_EVENT_DEP_BZL_V1"
+
+  [[commands.mutations]]
+  path = "pkg/message.bzl"
+  find = "MESSAGE = \"two\""
+  replace = "MESSAGE = \"one\""

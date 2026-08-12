@@ -109,7 +109,7 @@ fn action_ir_projects_to_reapi_command_and_identity() {
 }
 
 #[test]
-fn declarative_write_action_lowers_to_a_remote_shell_command() {
+fn declarative_write_action_rejects_the_raw_executor_projection() {
     let action = ActionSpec::new(
         ActionKind::Write {
             content: "hello from reapi\n".to_owned(),
@@ -119,10 +119,10 @@ fn declarative_write_action_lowers_to_a_remote_shell_command() {
         vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
     );
 
-    let command = ReapiCommand::for_execution(&action).unwrap();
-    assert_eq!(command.argv[..2], ["sh", "-c"]);
-    assert!(command.argv[2].contains("pkg/out.txt"));
-    assert!(command.argv[2].contains("hello from reapi"));
+    assert_eq!(
+        ReapiCommand::for_execution(&action).unwrap_err(),
+        "raw FileWrite REAPI lowering is forbidden"
+    );
 }
 
 #[test]
@@ -135,6 +135,7 @@ fn verified_remote_outputs_materialize_beneath_the_requested_root() {
         output_blobs: [("pkg/out.txt".to_owned(), b"materialized".to_vec())]
             .into_iter()
             .collect(),
+        platform_properties: BTreeMap::new(),
         evidence: ExecutionEvidence::reapi("nativelink"),
     };
 
@@ -147,12 +148,9 @@ fn verified_remote_outputs_materialize_beneath_the_requested_root() {
 }
 
 #[tokio::test]
-#[ignore = "requires a locally running NativeLink REAPI service"]
-async fn native_link_executes_uploaded_write_action_and_materializes_output() {
-    let endpoint = std::env::var("SLUG_V2_NATIVELINK_ENDPOINT")
-        .expect("SLUG_V2_NATIVELINK_ENDPOINT points at the local NativeLink server");
+async fn raw_file_write_execution_rejects_before_transport() {
     let config = RemoteConfig {
-        executor: Some(endpoint),
+        executor: Some("grpc://127.0.0.1:1".to_owned()),
         cache: None,
         instance_name: None,
         headers: BTreeMap::new(),
@@ -169,27 +167,14 @@ async fn native_link_executes_uploaded_write_action_and_materializes_output() {
         vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
     );
 
-    let execution = slug_reapi_v2::execute_action(&config, &action)
-        .await
-        .unwrap();
-    assert_eq!(execution.evidence.executor_boundary, "reapi");
-    assert_eq!(execution.evidence.reapi_actions, 1);
-    assert_eq!(execution.evidence.direct_local_actions, 0);
-    assert_eq!(execution.result.output_files().len(), 1);
-    assert_eq!(
-        execution.output_blobs.get("pkg/out.txt").unwrap(),
-        b"hello from NativeLink\n"
+    assert!(
+        slug_reapi_v2::execute_action(&config, &action)
+            .await
+            .unwrap_err()
+            .to_string()
+            .contains("raw FileWrite REAPI lowering is forbidden")
     );
-
-    let root = std::env::temp_dir().join(format!("slug-nativelink-test-{}", std::process::id()));
-    slug_reapi_v2::materialize_outputs(&root, &execution).unwrap();
-    assert_eq!(
-        std::fs::read(root.join("pkg/out.txt")).unwrap(),
-        b"hello from NativeLink\n"
-    );
-    std::fs::remove_dir_all(root).unwrap();
 }
-
 #[test]
 fn evidence_rows_pin_reapi_boundary_and_zero_direct_local_actions() {
     let digest = ReapiDigest::of_bytes(b"output");

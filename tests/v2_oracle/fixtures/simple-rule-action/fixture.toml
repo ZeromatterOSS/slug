@@ -1,17 +1,39 @@
 [fixture]
 name = "simple-rule-action"
-payload_workspace = "simple-rule-action"
-initial_tree_hash = "3b8a1425ef7ea5b92de2f363465e5d52d92ce25c2b1818450bffc9098277f5fb"
 description = "A custom Starlark rule declares and writes one output file."
 comparison = "semantic"
 manifest_roots = ["bazel-bin/pkg"]
 oracle_notes = "Bazel progress output is volatile; compare the declared output manifest and digest generated with upstream Bazel 9."
 
 [reapi]
+default_exec_properties = ["container-image=selected:v1"]
+worker_platform_properties = ["container-image=selected:v1"]
 remote_executor = true
 
 [[commands]]
 name = "build_write_file"
 argv = ["build", "//pkg:write_file"]
-compare = "semantic"
+compare = "message_shape"
 expected_exit = 0
+
+[[commands]]
+name = "build_write_file_b"
+argv = ["build", "//pkg:write_file"]
+compare = "message_shape"
+expected_exit = 0
+
+  [[commands.mutations]]
+  path = "pkg/defs.bzl"
+  find = 'CONTENT = "hello from an action\n"'
+  replace = 'CONTENT = "changed FileWrite content\n"'
+
+[[commands]]
+name = "build_write_file_restored_a"
+argv = ["build", "//pkg:write_file"]
+compare = "message_shape"
+expected_exit = 0
+
+  [[commands.mutations]]
+  path = "pkg/defs.bzl"
+  find = 'CONTENT = "changed FileWrite content\n"'
+  replace = 'CONTENT = "hello from an action\n"'

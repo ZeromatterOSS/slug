@@ -1,0 +1,3 @@
+load(":defs.bzl", "write_file")
+
+write_file(name = "write_file")

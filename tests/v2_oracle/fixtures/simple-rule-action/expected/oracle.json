@@ -15,6 +15,8 @@
         "//pkg:write_file"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [
         {
           "digest": "dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49",
@@ -28,9 +30,96 @@
       ],
       "mutations": [],
       "name": "build_write_file",
-      "normalized_stderr": "Starting local Bazel server (9.1.1) and connecting to it...\nINFO: Invocation ID: <uuid>\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (1 packages loaded)\nAnalyzing: target //pkg:write_file (1 packages loaded)\nAnalyzing: target //pkg:write_file (1 packages loaded)\nAnalyzing: target //pkg:write_file (5 packages loaded)\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:write_file (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=<workspace>\n  - Only in new server: --workspace_directory=<workspace>\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:write_file (79 packages loaded, 432 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action",
       "normalized_stdout": "",
-      "stderr": "Starting local Bazel server (9.1.1) and connecting to it...\nINFO: Invocation ID: 937a2f83-7a54-402b-9514-c31ec796080b\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (1 packages loaded)\nAnalyzing: target //pkg:write_file (1 packages loaded)\nAnalyzing: target //pkg:write_file (1 packages loaded)\nAnalyzing: target //pkg:write_file (5 packages loaded)\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:write_file (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: 22.699s, Critical Path: 0.14s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "startup_argv": [],
+      "stderr": "WARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=/home/wgray/slug/target/v2o/runs/simple-rule-action/20260811-200844-174801-bazel/workspace\n  - Only in new server: --workspace_directory=/home/wgray/slug/target/v2o/runs/simple-rule-action/20260811-203014-191083-bazel/workspace\nStarting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:write_file (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:write_file (79 packages loaded, 432 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: 4.605s, Critical Path: 0.02s\nINFO: 1 process: 1 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//pkg:write_file"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:write_file"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [
+        {
+          "digest": "5f301acb8a1689707146f95feda0f3fdfcee79ce5a637687ef0d7ea867e0d2a5",
+          "mode": "0o555",
+          "path": "write_file.txt",
+          "root": "bazel-bin/pkg",
+          "size": 26,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "CONTENT = \"hello from an action\\n\"",
+          "old_digest_hint": "537",
+          "path": "pkg/defs.bzl",
+          "replace": "CONTENT = \"changed FileWrite content\\n\""
+        }
+      ],
+      "name": "build_write_file_b",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:write_file (2 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:write_file (2 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: 0.298s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
+      "stdout": ""
+    },
+    {
+      "argv": [
+        "build",
+        "//pkg:write_file"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "build",
+        "//pkg:write_file"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [
+        {
+          "digest": "dc5b456bbed0dafb1a5719d46d4484453b730745b12083e67b240c953e427a49",
+          "mode": "0o555",
+          "path": "write_file.txt",
+          "root": "bazel-bin/pkg",
+          "size": 21,
+          "symlink_target": null,
+          "type": "file"
+        }
+      ],
+      "mutations": [
+        {
+          "find": "CONTENT = \"changed FileWrite content\\n\"",
+          "old_digest_hint": "542",
+          "path": "pkg/defs.bzl",
+          "replace": "CONTENT = \"hello from an action\\n\""
+        }
+      ],
+      "name": "build_write_file_restored_a",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:write_file (2 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions",
+      "normalized_stdout": "",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\nAnalyzing: target //pkg:write_file (1 packages loaded, 0 targets configured)\n\nINFO: Analyzed target //pkg:write_file (2 packages loaded, 6 targets configured).\nINFO: Found 1 target...\nTarget //pkg:write_file up-to-date:\n  bazel-bin/pkg/write_file.txt\nINFO: Elapsed time: 0.160s, Critical Path: 0.00s\nINFO: 2 processes: 2 internal.\nINFO: Build completed successfully, 2 total actions\n",
       "stdout": ""
     }
   ],

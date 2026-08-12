@@ -13,8 +13,10 @@ use std::collections::BTreeSet;
 use std::path::Path;
 
 use prost::Message;
+use slug_build_api_v2::ActionKind;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
+use slug_core_v2::runtime::ResolvedFileWriteSemanticView;
 
 use crate::action_cache::ActionResult;
 use crate::cas::GeneratedOutput;
@@ -24,13 +26,103 @@ use crate::command::digest_to_proto;
 use crate::config::RemoteConfig;
 use crate::digest::ReapiDigest;
 use crate::evidence::ExecutionEvidence;
+use crate::input_tree::InputTreeEntryKind;
 use crate::input_tree::ReapiBlob;
 use crate::input_tree::ReapiInputTree;
 use crate::proto;
 
+const FILE_WRITE_CONTENT_PATH: &str = "__slug_filewrite__/content";
+const FILE_WRITE_RESERVED_SEGMENT: &str = "__slug_filewrite__";
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct FileWriteReapiPlan {
+    command: ReapiCommand,
+    input_tree: ReapiInputTree,
+    identity: ReapiActionIdentity,
+}
+
+impl FileWriteReapiPlan {
+    pub fn from_resolved(
+        view: &ResolvedFileWriteSemanticView<'_>,
+        remote_defaults: &BTreeMap<String, String>,
+    ) -> Result<Self, String> {
+        let selected_properties = view
+            .platform_fact()
+            .exec_properties
+            .iter()
+            .map(|(name, value)| (name.to_string(), value.to_string()))
+            .collect::<BTreeMap<_, _>>();
+        let platform_properties =
+            effective_platform_properties(selected_properties, remote_defaults);
+        Self::from_action(view.action().spec(), platform_properties)
+    }
+
+    fn from_action(
+        action: &ActionSpec,
+        platform_properties: BTreeMap<String, String>,
+    ) -> Result<Self, String> {
+        let (content, is_executable) = match action.kind() {
+            ActionKind::Write {
+                content,
+                is_executable,
+            } => (content.as_bytes(), *is_executable),
+            _ => return Err("FileWrite REAPI plan requires a FileWrite action".to_owned()),
+        };
+        let [output] = action.outputs() else {
+            return Err("FileWrite REAPI plan requires exactly one output".to_owned());
+        };
+        if output.kind() != ActionOutputKind::File {
+            return Err("FileWrite REAPI plan requires one file output".to_owned());
+        }
+        if output.path().split('/').next() == Some(FILE_WRITE_RESERVED_SEGMENT) {
+            return Err(format!(
+                "FileWrite output uses reserved REAPI input namespace: {}",
+                output.path()
+            ));
+        }
+        let input_tree = ReapiInputTree::from_inline_file(
+            FILE_WRITE_CONTENT_PATH,
+            content,
+            InputTreeEntryKind::FileWriteContent,
+        )
+        .map_err(|error| error.to_string())?;
+        let command = ReapiCommand::file_write(output.path(), is_executable, platform_properties);
+        let identity = ReapiActionIdentity::new(&command, input_tree.root_digest().clone(), None);
+        Ok(Self {
+            command,
+            input_tree,
+            identity,
+        })
+    }
+
+    pub fn command(&self) -> &ReapiCommand {
+        &self.command
+    }
+
+    pub fn input_tree(&self) -> &ReapiInputTree {
+        &self.input_tree
+    }
+
+    pub fn identity(&self) -> &ReapiActionIdentity {
+        &self.identity
+    }
+}
+
+fn effective_platform_properties(
+    selected: BTreeMap<String, String>,
+    remote_defaults: &BTreeMap<String, String>,
+) -> BTreeMap<String, String> {
+    if selected.is_empty() {
+        remote_defaults.clone()
+    } else {
+        selected
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct RemoteExecutionResult {
     pub action_digest: ReapiDigest,
+    pub platform_properties: BTreeMap<String, String>,
     pub result: ActionResult,
     pub output_blobs: BTreeMap<String, Vec<u8>>,
     pub evidence: ExecutionEvidence,
@@ -94,11 +186,6 @@ pub async fn execute_action(
     config: &RemoteConfig,
     action: &ActionSpec,
 ) -> Result<RemoteExecutionResult, RemoteExecutionError> {
-    let executor = config
-        .executor
-        .as_deref()
-        .ok_or(RemoteExecutionError::MissingExecutor)?;
-    let endpoint = tonic_endpoint(executor)?;
     let mut command = ReapiCommand::for_execution(action).map_err(RemoteExecutionError::Command)?;
     for (name, value) in &config.default_exec_properties {
         command
@@ -113,6 +200,45 @@ pub async fn execute_action(
         input_tree.root_digest().clone(),
         config.timeout_seconds,
     );
+    let inline_output_files = action
+        .outputs()
+        .iter()
+        .filter(|output| output.kind() == ActionOutputKind::File)
+        .map(|output| output.path().to_owned())
+        .collect();
+    execute_prepared(config, command, input_tree, identity, inline_output_files).await
+}
+
+pub async fn execute_file_write(
+    config: &RemoteConfig,
+    view: &ResolvedFileWriteSemanticView<'_>,
+) -> Result<RemoteExecutionResult, RemoteExecutionError> {
+    let plan = FileWriteReapiPlan::from_resolved(view, &config.default_exec_properties)
+        .map_err(RemoteExecutionError::Command)?;
+    let inline_output_files = plan.command.output_files.clone();
+    execute_prepared(
+        config,
+        plan.command,
+        plan.input_tree,
+        plan.identity,
+        inline_output_files,
+    )
+    .await
+}
+
+async fn execute_prepared(
+    config: &RemoteConfig,
+    command: ReapiCommand,
+    input_tree: ReapiInputTree,
+    identity: ReapiActionIdentity,
+    inline_output_files: Vec<String>,
+) -> Result<RemoteExecutionResult, RemoteExecutionError> {
+    let executor = config
+        .executor
+        .as_deref()
+        .ok_or(RemoteExecutionError::MissingExecutor)?;
+    let endpoint = tonic_endpoint(executor)?;
+    let platform_properties = command.platform_properties.clone();
     let owned_blobs = owned_blobs(&command, &identity, &input_tree);
 
     let mut cas =
@@ -178,16 +304,6 @@ pub async fn execute_action(
         .await
         .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
 
-    // Try the ActionCache first. If GetActionResult returns a result, the
-    // action was cached — skip execution entirely. This is the REAPI-spec
-    // client-side AC lookup (distinct from the execution server's internal
-    // skip_cache_lookup).
-    let inline_output_files: Vec<String> = action
-        .outputs()
-        .iter()
-        .filter(|output| output.kind() == ActionOutputKind::File)
-        .map(|output| output.path().to_owned())
-        .collect();
     let mut ac_client = proto::action_cache_client::ActionCacheClient::connect(endpoint)
         .await
         .map_err(|error| RemoteExecutionError::Transport(error.to_string()))?;
@@ -256,6 +372,7 @@ pub async fn execute_action(
         action_digest: identity.action_digest,
         result: action_result,
         output_blobs,
+        platform_properties,
         evidence,
     })
 }
@@ -491,4 +608,243 @@ fn safe_output_path(
         });
     }
     Ok(root.join(relative))
+}
+
+#[cfg(test)]
+mod tests {
+    use prost::Message;
+    use slug_build_api_v2::ActionOutput;
+
+    use super::*;
+
+    fn write_action(content: &str, executable: bool, output: &str) -> ActionSpec {
+        ActionSpec::new(
+            ActionKind::Write {
+                content: content.to_owned(),
+                is_executable: executable,
+            },
+            "FileWrite",
+            vec![ActionOutput::new(output, ActionOutputKind::File)],
+        )
+    }
+
+    fn plan(
+        content: &str,
+        executable: bool,
+        output: &str,
+        properties: &[(&str, &str)],
+    ) -> FileWriteReapiPlan {
+        FileWriteReapiPlan::from_action(
+            &write_action(content, executable, output),
+            properties
+                .iter()
+                .map(|(name, value)| ((*name).to_owned(), (*value).to_owned()))
+                .collect(),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn file_write_plan_owns_canonical_nul_safe_reapi_objects() {
+        let content = "quote'\n\0tail";
+        let plan = plan(
+            content,
+            false,
+            "pkg/out.txt",
+            &[("container-image", "selected:v1")],
+        );
+
+        assert_eq!(
+            plan.command.argv,
+            [
+                "sh",
+                "-c",
+                "cp -- \"$1\" \"$2\" && chmod 0444 -- \"$2\"",
+                "slug-filewrite",
+                FILE_WRITE_CONTENT_PATH,
+                "pkg/out.txt",
+            ]
+        );
+        assert!(plan.command.env.is_empty());
+        assert!(!plan.command.argv.iter().any(|argument| argument == content));
+        assert_eq!(plan.input_tree.entries().len(), 1);
+        assert_eq!(
+            plan.input_tree.entries()[0].kind(),
+            InputTreeEntryKind::FileWriteContent
+        );
+        assert_eq!(plan.input_tree.inline_blobs()[0].data(), content.as_bytes());
+
+        let command = proto::Command::decode(plan.command.serialized().as_slice()).unwrap();
+        assert_eq!(command.output_files, ["pkg/out.txt"]);
+        assert_eq!(command.output_paths, ["pkg/out.txt"]);
+        assert!(command.output_directories.is_empty());
+        assert_eq!(
+            command.platform.unwrap().properties[0],
+            proto::platform::Property {
+                name: "container-image".to_owned(),
+                value: "selected:v1".to_owned(),
+            }
+        );
+
+        let directories = plan.input_tree.directory_blobs();
+        let content_directory = proto::Directory::decode(directories[0].data()).unwrap();
+        assert_eq!(content_directory.files[0].name, "content");
+        assert!(!content_directory.files[0].is_executable);
+        let root = proto::Directory::decode(directories.last().unwrap().data()).unwrap();
+        assert_eq!(root.directories[0].name, FILE_WRITE_RESERVED_SEGMENT);
+        assert_eq!(
+            directories.last().unwrap().digest(),
+            plan.input_tree.root_digest()
+        );
+
+        let action = proto::Action::decode(plan.identity.action_bytes()).unwrap();
+        assert!(action.timeout.is_none());
+        assert!(!action.do_not_cache);
+        assert!(action.salt.is_empty());
+        assert_eq!(
+            action.command_digest.unwrap().hash,
+            plan.identity.command_digest.hash()
+        );
+        assert_eq!(
+            action.input_root_digest.unwrap().hash,
+            plan.identity.input_root_digest.hash()
+        );
+    }
+
+    #[test]
+    fn file_write_plan_identity_discriminates_and_restores() {
+        let baseline = plan("a", false, "pkg/out.txt", &[("cpu", "x86_64")]);
+        for changed in [
+            plan("b", false, "pkg/out.txt", &[("cpu", "x86_64")]),
+            plan("a", true, "pkg/out.txt", &[("cpu", "x86_64")]),
+            plan("a", false, "pkg/other.txt", &[("cpu", "x86_64")]),
+            plan("a", false, "pkg/out.txt", &[("cpu", "arm64")]),
+        ] {
+            assert_ne!(
+                changed.identity.action_digest,
+                baseline.identity.action_digest
+            );
+        }
+        let restored = plan("a", false, "pkg/out.txt", &[("cpu", "x86_64")]);
+        assert_eq!(restored, baseline);
+        assert!(restored.command.argv[2].contains("chmod 0444"));
+        assert!(plan("a", true, "pkg/out.txt", &[]).command.argv[2].contains("chmod 0555"));
+    }
+
+    #[test]
+    fn selected_platform_properties_replace_defaults_as_a_whole() {
+        let defaults = BTreeMap::from([
+            ("container-image".to_owned(), "default:v1".to_owned()),
+            ("default-only".to_owned(), "ignored".to_owned()),
+        ]);
+        let selected = BTreeMap::from([("container-image".to_owned(), "selected:v1".to_owned())]);
+        assert_eq!(
+            effective_platform_properties(selected.clone(), &defaults),
+            selected
+        );
+        assert_eq!(
+            effective_platform_properties(BTreeMap::new(), &defaults),
+            defaults
+        );
+    }
+
+    #[test]
+    fn reserved_namespace_and_raw_file_write_fail_closed() {
+        let action = write_action("content", false, "__slug_filewrite__/out.txt");
+        assert!(
+            FileWriteReapiPlan::from_action(&action, BTreeMap::new())
+                .unwrap_err()
+                .contains("reserved REAPI input namespace")
+        );
+        assert_eq!(
+            ReapiCommand::for_execution(&write_action("content", false, "out.txt")).unwrap_err(),
+            "raw FileWrite REAPI lowering is forbidden"
+        );
+    }
+
+    #[test]
+    fn transport_timeout_cannot_salt_file_write_action() {
+        let first = RemoteConfig {
+            executor: None,
+            cache: None,
+            instance_name: None,
+            headers: BTreeMap::new(),
+            timeout_seconds: Some(1),
+            retry_attempts: None,
+            default_exec_properties: BTreeMap::new(),
+        };
+        let second = RemoteConfig {
+            timeout_seconds: Some(99),
+            ..first.clone()
+        };
+        let action = write_action("content", false, "out.txt");
+        let first_plan =
+            FileWriteReapiPlan::from_action(&action, first.default_exec_properties).unwrap();
+        let second_plan =
+            FileWriteReapiPlan::from_action(&action, second.default_exec_properties).unwrap();
+        assert_eq!(
+            first_plan.identity.action_bytes(),
+            second_plan.identity.action_bytes()
+        );
+        assert_eq!(
+            first_plan.identity.action_digest,
+            second_plan.identity.action_digest
+        );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires SLUG_V2_NATIVELINK_ENDPOINT"]
+    async fn nativelink_file_write_bytes_digest_and_materialized_mode_match_oracle() {
+        let endpoint = std::env::var("SLUG_V2_NATIVELINK_ENDPOINT")
+            .expect("SLUG_V2_NATIVELINK_ENDPOINT points at a local NativeLink server");
+        let config = RemoteConfig {
+            executor: Some(endpoint),
+            cache: None,
+            instance_name: None,
+            headers: BTreeMap::new(),
+            timeout_seconds: Some(30),
+            retry_attempts: None,
+            default_exec_properties: BTreeMap::new(),
+        };
+        let content = b"hello from an action\n";
+        let plan = plan(
+            std::str::from_utf8(content).unwrap(),
+            false,
+            "pkg/write_file.txt",
+            &[("container-image", "selected:v1")],
+        );
+        let inline_output_files = plan.command().output_files.clone();
+        let execution = execute_prepared(
+            &config,
+            plan.command().clone(),
+            plan.input_tree().clone(),
+            plan.identity().clone(),
+            inline_output_files,
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(execution.output_blobs["pkg/write_file.txt"], content);
+        let expected_digest = ReapiDigest::of_bytes(content);
+        assert_eq!(
+            execution.result.output_files()[0].digest(),
+            &expected_digest
+        );
+        assert_eq!(execution.evidence.materialized_outputs, [expected_digest]);
+
+        let root =
+            std::env::temp_dir().join(format!("slug-filewrite-nativelink-{}", std::process::id()));
+        materialize_outputs(&root, &execution).unwrap();
+        let output = root.join("pkg/write_file.txt");
+        assert_eq!(std::fs::read(&output).unwrap(), content);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                std::fs::metadata(&output).unwrap().permissions().mode() & 0o777,
+                0o555
+            );
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }
