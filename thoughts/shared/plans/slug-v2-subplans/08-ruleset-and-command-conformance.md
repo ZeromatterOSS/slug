@@ -4540,3 +4540,17 @@ DICE equality and separated Slug/Bazel/REAPI/result identity domains. Inspect
 the Stage 9 Buck2/V1 action representation candidates, prefer existing compact
 Arc slices/small deterministic collections/Allocative, and add no parallel
 graph or command-owned reconstruction.
+### Embedded test-tools closure REPLAN (2026-08-11)
+
+The design-only closure audit ends `REPLAN`. Pinned Bazel 9.2
+`tools/test/BUILD` is not an isolated five-file package: it loads
+rules_shell 0.6.1, selects through `src/conditions` into platforms 1.0.0,
+defines default test toolchains/config settings/filegroups/coverage aliases,
+and is registered by the embedded module. Slug has no built-in repository
+source owner and routes only root direct local overrides.
+
+A pruned BUILD, synthetic package, content-free labels, or host Bazel install
+scan would violate exact verbatim content and structural identity. No fixture,
+content, or Rust changed. Run next only
+`WP-4-5-builtin-bazel-tools-repository-owner-design`; it owns immutable
+canonical routing/source bytes only, not package evaluation or Test semantics.

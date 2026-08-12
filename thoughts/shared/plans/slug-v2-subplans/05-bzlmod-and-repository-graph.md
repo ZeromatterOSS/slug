@@ -1090,3 +1090,12 @@ slug-v2-oracle run --fixture lockfile-error-mode-stale
 slug-v2-oracle run --fixture yanked-version-policy
 slug-v2-oracle run --fixture repository-materialization-atomicity
 ```
+### Built-in bazel_tools repository-owner entry (2026-08-11)
+
+`RootRepositoryRouteKey` currently owns only direct `local_path_override`
+routes backed by `RepoSpec`; root mappings merely reserve
+`bazel_tools -> bazel_tools`. Design next one structurally distinct immutable
+`BuiltinBazelTools` route/source owner with versioned manifest identity,
+checked-in verbatim bytes, canonical `@@bazel_tools` routing, exact SHA-256,
+and no Host/Bazel-install/network/workspace selection. Package evaluation and
+the embedded MODULE dependency graph remain deferred.

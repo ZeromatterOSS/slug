@@ -2120,3 +2120,11 @@ and all prior source/load and six-row fixes. The sole source must assert that
 `attr.label(default = None, allow_single_file = True)` or an accepted equivalent
 without that invented keyword. A disposable Bazel package-load preflight must
 pass before full two-root replay, with no correction budget.
+### Built-in bazel_tools source-owner prerequisite (2026-08-11)
+
+The Test closure audit proves external package loading cannot begin from a
+mapping-only `bazel_tools` token. The verbatim 9.2 `tools/test/BUILD` loads
+rules_shell and reaches platforms/config/toolchain/filegroup surfaces. Do not
+prune or synthesize that package. Stage 4 next depends only on a Stage 5-owned
+immutable canonical repository/source route; package and Bzl evaluation remain
+deferred until that source owner is accepted.
