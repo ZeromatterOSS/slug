@@ -4667,3 +4667,8 @@ Stage 8 remains parked while
 `WP-5-host-nonregistry-discovered-module-owner-design` audits general
 nonregistry source identity. No package/Bzl, toolchain, Test, execution,
 result, coverage, or BEP behavior is authorized.
+
+The general nonregistry audit ends `REPLAN` at route-bound include closure
+preparation. Stage 8 remains parked while only
+`WP-5-host-nonregistry-module-closure-design` audits that Stage 5 owner; no
+package/Bzl, toolchain, Test, execution, result, coverage, or BEP behavior.

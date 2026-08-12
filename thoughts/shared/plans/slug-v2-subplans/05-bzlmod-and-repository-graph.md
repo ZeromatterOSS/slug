@@ -1219,3 +1219,22 @@ materialization/include/evaluation identity for admitted nonregistry shapes and
 return `REPLAN` at the first missing prerequisite. Command override
 normalization and recursive discovery/MVS remain later. No Rust is authorized
 before independent design acceptance.
+
+### General nonregistry discovery design REPLAN (2026-08-12)
+
+The reviewed audit ends `REPLAN` before Rust. General root RepoSpec
+materialization and root MODULE byte ownership already exist by workspace and
+module name, and the complete evaluator accepts a supplied closure. The
+missing bridge is closure preparation: all accepted direct-local inspection,
+package-horizon, and fragment owners enter through
+`RootRepositoryRouteKey` and a root apparent name. That cannot identify a
+transitive override or preserve immutable archive/Git materialization without
+invented routing.
+
+Run next only `WP-5-host-nonregistry-module-closure-design`. Freeze a
+route-independent closure key over the exact module key and root RepoSpec,
+reusing the sole materialization/source/package-policy owners for root and
+included files. Local and immutable identities, Need/error/order semantics,
+and complete closure equality must remain structural. Evaluation, command
+overrides, discovery/MVS, mappings, consumers, and Rust remain deferred until
+independent acceptance.
