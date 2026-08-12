@@ -20,6 +20,12 @@ use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
 
+use crate::EvaluatedNonrootModule;
+use crate::LogicalModuleFileId;
+use crate::NonrootModuleKey;
+use crate::module_eval::DirectNonregistryEvaluationError;
+use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
+
 const MANIFEST_DOMAIN: &[u8] = b"slug-v2:builtin-bazel-tools-manifest:v1\0";
 
 #[derive(Debug, Clone, Copy, Dupe, PartialEq, Eq, Hash, Allocative)]
@@ -314,9 +320,151 @@ impl Key for BuiltinBazelToolsSourceFileKey {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct BuiltinBazelToolsModuleValue {
+    pub(crate) route_identity: BuiltinBazelToolsRouteIdentity,
+    pub(crate) module_sha256: [u8; 32],
+    pub(crate) module: EvaluatedNonrootModule,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum BuiltinBazelToolsModuleError {
+    Source(BuiltinBazelToolsSourceFileError),
+    Evaluation(DirectNonregistryEvaluationError),
+}
+
+impl fmt::Display for BuiltinBazelToolsModuleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Source(error) => error.fmt(f),
+            Self::Evaluation(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for BuiltinBazelToolsModuleError {}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, Dupe, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct BuiltinBazelToolsModuleKey(BuiltinBazelToolsSnapshot);
+
+#[allow(dead_code)]
+impl BuiltinBazelToolsModuleKey {
+    pub(crate) fn new(snapshot: BuiltinBazelToolsSnapshot) -> Self {
+        Self(snapshot)
+    }
+}
+
+impl fmt::Display for BuiltinBazelToolsModuleKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "builtin-bazel-tools-module:{:?}", self.0)
+    }
+}
+
+fn evaluate_builtin_module_source(
+    snapshot: BuiltinBazelToolsSnapshot,
+    source: &BuiltinBazelToolsSourceFileValue,
+) -> Result<BuiltinBazelToolsModuleValue, BuiltinBazelToolsModuleError> {
+    let (module, events) = evaluate_direct_nonregistry_module_closure_with_events(
+        NonrootModuleKey::new("bazel_tools", ""),
+        LogicalModuleFileId::new("@@bazel_tools//:MODULE.bazel"),
+        source.bytes(),
+        &[],
+        true,
+    );
+    assert!(
+        events
+            .expect("captured built-in MODULE evaluation returns an event batch")
+            .events()
+            .is_empty(),
+        "the pinned built-in MODULE must remain print-free"
+    );
+    Ok(BuiltinBazelToolsModuleValue {
+        route_identity: snapshot.route_identity(),
+        module_sha256: source.sha256(),
+        module: module.map_err(BuiltinBazelToolsModuleError::Evaluation)?,
+    })
+}
+
+#[async_trait]
+impl Key for BuiltinBazelToolsModuleKey {
+    type Value = Arc<Result<BuiltinBazelToolsModuleValue, BuiltinBazelToolsModuleError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let source = ctx
+            .compute(&BuiltinBazelToolsSourceFileKey::new(self.0, "MODULE.bazel"))
+            .await
+            .expect("built-in source-file DICE computation cannot fail");
+        let source = match source.as_ref() {
+            Ok(source) => source,
+            Err(error) => {
+                return Arc::new(Err(BuiltinBazelToolsModuleError::Source(error.clone())));
+            }
+        };
+        Arc::new(evaluate_builtin_module_source(self.0, source))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
+    use dice::ActivationData;
+    use dice::ActivationKind;
+    use dice::ActivationTracker;
+    use dice::DetectCycles;
+    use dice::Dice;
+    use dice::DynKey;
+    use dice::RichActivation;
+    use dice::UserComputationData;
+
     use super::*;
+
+    #[derive(Default)]
+    struct ModuleTracker(Mutex<Vec<(ActivationKind, bool)>>);
+
+    impl ModuleTracker {
+        fn take(&self) -> Vec<(ActivationKind, bool)> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    impl ActivationTracker for ModuleTracker {
+        fn key_activated(
+            &self,
+            _key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key.downcast_ref::<BuiltinBazelToolsModuleKey>().is_some() {
+                self.0
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), activation.evaluation_data().is_none()));
+            }
+        }
+    }
+
+    fn module_source() -> BuiltinBazelToolsSourceFileValue {
+        lookup(CompactString::new("MODULE.bazel")).unwrap()
+    }
 
     #[test]
     fn integrity_failure_is_exercised_through_validation() {
@@ -332,5 +480,205 @@ mod tests {
             error,
             BuiltinBazelToolsSourceFileError::Integrity { .. }
         ));
+    }
+
+    #[test]
+    fn builtin_bazel_tools_module_retains_the_complete_pinned_value() {
+        let source = module_source();
+        assert_eq!(
+            hex::encode(source.sha256()),
+            "a51e647c77be3c7dcb861131e339f2b65301bb572d2a9ac3d7eef30ca5b8a523"
+        );
+        assert!(source.executable());
+
+        let value =
+            evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap();
+        assert_eq!(
+            hex::encode(value.route_identity.manifest_sha256()),
+            "95b4af7c011047d34f6c469d23efdd523c56ce4892791e49f9d2159353262897"
+        );
+        assert_eq!(value.module_sha256, source.sha256());
+        assert_eq!(
+            value.module.base.expected_key,
+            NonrootModuleKey::new("bazel_tools", "")
+        );
+        assert_eq!(value.module.base.declared_name, "bazel_tools");
+        assert_eq!(value.module.base.declared_version, "");
+        assert_eq!(value.module.base.repo_name, "bazel_tools");
+
+        let dependencies = value
+            .module
+            .base
+            .dependencies
+            .iter()
+            .map(|(apparent, dep)| (apparent.as_str(), dep.name.as_str(), dep.version.as_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            dependencies,
+            [
+                ("rules_license", "rules_license", "1.0.0"),
+                ("buildozer", "buildozer", "8.5.1"),
+                ("platforms", "platforms", "1.0.0"),
+                ("zlib", "zlib", "1.3.1.bcr.5"),
+                ("com_google_protobuf", "protobuf", "33.4"),
+                ("rules_java", "rules_java", "9.1.0"),
+                ("rules_cc", "rules_cc", "0.2.17"),
+                ("rules_python", "rules_python", "1.7.0"),
+                ("rules_shell", "rules_shell", "0.6.1"),
+                ("apple_support", "apple_support", "1.24.2"),
+            ]
+        );
+        assert!(!value.module.base.dependencies.contains_key("bazel_tools"));
+        assert_eq!(
+            value.module.base.dependencies,
+            value.module.base.original_dependencies
+        );
+        assert_eq!(
+            value
+                .module
+                .base
+                .nodep_dependencies
+                .iter()
+                .map(|dep| (dep.name.as_str(), dep.version.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                ("bazel_features", "1.42.1"),
+                ("rules_apple", "4.1.0"),
+                ("rules_swift", "3.1.2"),
+                ("abseil-cpp", "20250814.1"),
+            ]
+        );
+
+        assert_eq!(
+            value
+                .module
+                .extension_usages
+                .iter()
+                .map(|usage| (usage.bzl_label.as_str(), usage.extension_name.as_str()))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "@bazel_tools//tools/osx:xcode_configure.bzl",
+                    "xcode_configure_extension"
+                ),
+                ("@rules_java//java:extensions.bzl", "toolchains"),
+                (
+                    "@bazel_tools//tools/test:extensions.bzl",
+                    "remote_coverage_tools_extension"
+                ),
+                ("@buildozer//:buildozer_binary.bzl", "buildozer_binary"),
+                (
+                    "//:MODULE.bazel",
+                    "//tools/res:winsdk_configure.bzl winsdk_configure"
+                ),
+            ]
+        );
+        assert_eq!(
+            value
+                .module
+                .extension_usages
+                .iter()
+                .flat_map(|usage| usage.proxies.iter())
+                .flat_map(|proxy| proxy.imports.local_to_exported.keys())
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "local_config_xcode",
+                "local_jdk",
+                "remote_java_tools",
+                "remote_coverage_tools",
+                "buildozer_binary",
+                "local_config_winsdk",
+            ]
+        );
+        let innate = &value.module.extension_usages[4];
+        assert_eq!(innate.tags.len(), 1);
+        assert_eq!(innate.tags[0].tag_class, "repo");
+        assert_eq!(
+            value
+                .module
+                .base
+                .toolchains
+                .iter()
+                .map(|v| v.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "//tools/launcher:all",
+                "//tools/test:all",
+                "@local_config_winsdk//:all",
+                "//tools/res:empty_rc_toolchain",
+            ]
+        );
+        assert!(value.module.base.execution_platforms.is_empty());
+        assert!(value.module.base.flag_aliases.is_empty());
+
+        assert_eq!(
+            value,
+            evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &source).unwrap()
+        );
+    }
+
+    #[test]
+    fn builtin_bazel_tools_module_preserves_typed_errors() {
+        let invalid = BuiltinBazelToolsSourceFileValue {
+            path: "MODULE.bazel".into(),
+            bytes: Arc::from(b"module(".as_slice()),
+            sha256: file_sha256(b"module("),
+            executable: true,
+        };
+        assert!(matches!(
+            evaluate_builtin_module_source(BuiltinBazelToolsSnapshot::CURRENT, &invalid),
+            Err(BuiltinBazelToolsModuleError::Evaluation(
+                DirectNonregistryEvaluationError::Preparation(_)
+            ))
+        ));
+        assert!(matches!(
+            BuiltinBazelToolsModuleError::Source(
+                BuiltinBazelToolsSourceFileError::UnsupportedCatalog {
+                    path: "outside".into()
+                }
+            ),
+            BuiltinBazelToolsModuleError::Source(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn builtin_bazel_tools_module_is_a_callerless_reused_leaf() {
+        let tracker = Arc::new(ModuleTracker::default());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let key = BuiltinBazelToolsModuleKey::new(BuiltinBazelToolsSnapshot::CURRENT);
+        let data = || UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+
+        let mut transaction = dice.updater_with_data(data()).commit().await;
+        let first = transaction.compute(&key).await.unwrap();
+        assert!(first.as_ref().is_ok());
+        assert_eq!(tracker.take(), [(ActivationKind::Evaluated, true)]);
+        drop(transaction);
+
+        let mut transaction = dice.updater_with_data(data()).commit().await;
+        let second = transaction.compute(&key).await.unwrap();
+        assert_eq!(first, second);
+        assert_eq!(tracker.take(), [(ActivationKind::Reused, true)]);
+
+        let implementation = include_str!("builtin_repository.rs")
+            .split("impl Key for BuiltinBazelToolsModuleKey")
+            .nth(1)
+            .unwrap()
+            .split("#[cfg(test)]")
+            .next()
+            .unwrap();
+        for forbidden in [
+            "RootModuleGraphKey",
+            "RootRepositoryRouteKey",
+            "Host",
+            "Registry",
+            "Lockfile",
+            "RepositoryMapping",
+        ] {
+            assert!(!implementation.contains(forbidden), "{forbidden}");
+        }
     }
 }
