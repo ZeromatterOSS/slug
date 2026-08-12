@@ -29,6 +29,7 @@ use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryPolicy;
 use slug_reapi_v2::RemoteConfig;
 
+use crate::AqueryRequest;
 use crate::BuildRequest;
 use crate::BzlmodRequestInputs;
 use crate::CqueryOutput;
@@ -154,6 +155,52 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
         assert_eq!(result.stdout, "//pkg:probe\n");
     }
     assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
+    for inputs in [defaults(), overrides(), defaults()] {
+        let result = daemon.aquery_with_bzlmod_inputs(
+            &target("//pkg:probe"),
+            inputs.0,
+            inputs.1,
+            inputs.2,
+            inputs.3,
+        );
+        assert_eq!(result.exit_code, 2, "{result:?}");
+        assert!(
+            result
+                .stderr
+                .contains("requires exactly one resolved action"),
+            "{result:?}"
+        );
+    }
+    assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
+}
+
+#[test]
+fn aquery_wire_revalidates_the_raw_literal_expression() {
+    let workspace = scratch("aquery-wire-validation");
+    write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
+    write(&workspace.join("BUILD.bazel"), "");
+    write(
+        &workspace.join("pkg/BUILD.bazel"),
+        "filegroup(name = \"probe\")\n",
+    );
+    let mut daemon = Daemon::new(&workspace).unwrap();
+    let request = |expression: &str| {
+        serde_json::to_string(&DaemonRequest::Aquery(AqueryRequest {
+            expression: expression.to_owned(),
+            bzlmod: BzlmodRequestInputs::default(),
+        }))
+        .unwrap()
+    };
+
+    let invalid = handle_request(&mut daemon, &request("deps(//pkg:probe)"));
+    assert_eq!(invalid.exit_code, 2);
+    assert!(invalid.stderr.contains("aquery_request_error"));
+    assert_eq!(invalid.invalidated_files, 0);
+
+    let valid = handle_request(&mut daemon, &request("//pkg:probe"));
+    assert_eq!(valid.exit_code, 2);
+    assert!(valid.stderr.contains("aquery_runtime_error"));
+    assert!(!valid.stderr.contains("aquery_request_error"));
 }
 
 const DEFS_BZL: &str = "\

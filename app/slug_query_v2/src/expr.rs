@@ -243,6 +243,17 @@ pub fn parse_query_expression(source: &str) -> Result<QueryExpression, QueryPars
     crate::parser::parse(source)
 }
 
+/// Returns the sole concrete literal admitted by the first aquery command.
+pub fn aquery_literal(expression: &QueryExpression) -> Result<&str, QueryParseError> {
+    match &expression.kind {
+        QueryExpressionKind::TargetLiteral(literal) if !literal.starts_with('$') => Ok(literal),
+        _ => Err(QueryParseError::new(
+            "aquery accepts exactly one literal target label",
+            expression.span,
+        )),
+    }
+}
+
 pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryParseError> {
     validate_expression(expression)
 }

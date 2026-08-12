@@ -47,6 +47,7 @@ pub use events::CommandOutput;
 pub use events::PublishedCommand;
 pub use events::TerminalOutput;
 pub use file_write_aquery_text::format_file_write_aquery_text;
+pub use file_write_aquery_text::format_file_write_aquery_text_output;
 pub use file_write_identity::FileWriteSemanticIdentity;
 pub use process_host::ProcessHostOwner;
 pub use slug_query_v2::QueryError;

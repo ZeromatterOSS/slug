@@ -139,7 +139,7 @@ fn command_requests_extract_bzlmod_policy_flags() {
         "//pkg:bin",
     ])
     .unwrap();
-    let aquery = AqueryRequest::parse(&["--ignore_dev_dependency", "deps(//pkg:bin)"]).unwrap();
+    let aquery = AqueryRequest::parse(&["--ignore_dev_dependency", "//pkg:bin"]).unwrap();
     let run = RunRequest::parse(&["--ignore_dev_dependency", "//pkg:bin"]).unwrap();
     let test = TestRequest::parse(&["--noignore_dev_dependency", "//pkg:probe_test"]).unwrap();
 
@@ -151,7 +151,7 @@ fn command_requests_extract_bzlmod_policy_flags() {
         "allow_yanked=all;ignore_dev_dependency=false"
     );
     assert_eq!(cquery.lockfile_mode, LockfileMode::Error);
-    assert!(aquery.query.bzlmod_policy.ignore_dev_dependency());
+    assert!(aquery.bzlmod_policy.ignore_dev_dependency());
     assert!(run.bzlmod_policy.ignore_dev_dependency());
     assert!(!test.bzlmod_policy.ignore_dev_dependency());
     assert_eq!(test.lockfile_mode, LockfileMode::Update);
@@ -712,18 +712,41 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
         ])
         .is_err()
     );
+}
 
-    let aquery = AqueryRequest::parse(&[
-        "--output=streamed_jsonproto",
-        "--order_output=no",
-        "//pkg:bin",
+#[test]
+fn aquery_accepts_only_one_main_repo_literal_and_text_output() {
+    let default = AqueryRequest::parse(&["//pkg:bin"]).unwrap();
+    assert_eq!(default.expression, "//pkg:bin");
+    assert_eq!(default.target.to_string(), "//pkg:bin");
+    assert_eq!(default.output_base, None);
+
+    let explicit = AqueryRequest::parse(&[
+        "--output=text",
+        "--output_base=out",
+        "--registry=https://registry.example/",
+        "(//pkg:bin)",
     ])
     .unwrap();
-    assert_eq!(aquery.query.output, QueryOutputFormat::StreamedJsonProto);
-    assert_eq!(aquery.query.order, slug_query_v2::QueryOrder::Auto);
+    assert_eq!(explicit.target.to_string(), "//pkg:bin");
+    assert_eq!(explicit.output_base.as_deref(), Some("out"));
+    assert_eq!(
+        explicit.registry_urls,
+        vec!["https://registry.example/".to_owned()]
+    );
 
-    let aquery = AqueryRequest::parse(&["--nostrict_test_suite=false", "//pkg:bin"]).unwrap();
-    assert_eq!(aquery.query.policy, QueryPolicy::default());
+    for args in [
+        vec!["deps(//pkg:bin)"],
+        vec!["//pkg:all"],
+        vec!["@dep//pkg:bin"],
+        vec!["//pkg:bin", "//pkg:other"],
+        vec!["--output=jsonproto", "//pkg:bin"],
+        vec!["--output=text", "--output=text", "//pkg:bin"],
+        vec!["--noshow_progress", "//pkg:bin"],
+        vec!["//pkg:bin", "--", "passthrough"],
+    ] {
+        assert!(AqueryRequest::parse(&args).is_err(), "{args:?}");
+    }
 }
 
 #[test]
@@ -914,21 +937,16 @@ fn run_request_preserves_program_args_after_target() {
 }
 
 #[test]
-fn test_and_aquery_have_stage_owned_placeholders() {
+fn test_keeps_its_placeholder_while_aquery_owns_a_literal_request() {
     let test = TestRequest::parse(&["//pkg:probe_test"]).unwrap();
-    let aquery = AqueryRequest::parse(&["deps(//pkg:probe)"]).unwrap();
+    let aquery = AqueryRequest::parse(&["//pkg:probe"]).unwrap();
 
     assert!(
         test.placeholder_error()
             .to_json_line()
             .contains("Stage 7/8")
     );
-    assert!(
-        aquery
-            .placeholder_error()
-            .to_json_line()
-            .contains("Stage 6/8")
-    );
+    assert_eq!(aquery.target.to_string(), "//pkg:probe");
 }
 
 #[test]

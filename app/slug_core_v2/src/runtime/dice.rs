@@ -11529,10 +11529,8 @@ ordinary_rule(
         let mut transaction =
             build_root_transaction(&dice, resolved_write_epoch(19, "setting_a", &[])).await;
         let outcome = transaction.compute(&key).await.unwrap();
-        let views = complete_build_evaluation(&outcome)
-            .resolved_file_write_semantic_views()
-            .unwrap();
-        let text = crate::runtime::format_file_write_aquery_text(&views[0]).unwrap();
+        let evaluation = complete_build_evaluation(&outcome);
+        let text = crate::runtime::format_file_write_aquery_text_output(evaluation).unwrap();
         assert_eq!(
             text,
             concat!(
@@ -11544,8 +11542,29 @@ ordinary_rule(
                 "  SlugActionToken: slugact-display-v1:9107d642a3e8b06ebfbe865544a76344a8cdf2078f75ba39e01e6dca5125f361\n",
                 "  Inputs: []\n",
                 "  Outputs: [bazel-out/slugcfg-v1-abc6de66486cc9eff604c3e0795796631112a6d92cf3336370de8e8f6acf953a/bin/write.txt]\n",
-                "  IsExecutable: false",
+                "  IsExecutable: false\n\n",
             )
+        );
+
+        let empty = BuildCommandEvaluation {
+            anchor: evaluation.anchor.clone(),
+            targets: evaluation.targets.clone(),
+            action_closure: Vec::new().into(),
+        };
+        assert_eq!(
+            crate::runtime::format_file_write_aquery_text_output(&empty),
+            Err("FileWrite aquery text requires exactly one resolved action")
+        );
+        let mut duplicated_closure = evaluation.action_closure.to_vec();
+        duplicated_closure.push(evaluation.action_closure[0].dupe());
+        let duplicated = BuildCommandEvaluation {
+            anchor: evaluation.anchor.clone(),
+            targets: evaluation.targets.clone(),
+            action_closure: duplicated_closure.into(),
+        };
+        assert_eq!(
+            crate::runtime::format_file_write_aquery_text_output(&duplicated),
+            Err("FileWrite aquery text requires exactly one resolved action")
         );
     }
 

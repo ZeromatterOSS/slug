@@ -60,6 +60,13 @@ pub struct QueryRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct AqueryRequest {
+    pub expression: String,
+    #[serde(default)]
+    pub bzlmod: BzlmodRequestInputs,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct CqueryRequest {
     pub expression: String,
     #[serde(default = "default_true")]
@@ -201,6 +208,7 @@ const fn default_true() -> bool {
 pub enum DaemonRequest {
     Build(BuildRequest),
     Query(QueryRequest),
+    Aquery(AqueryRequest),
     Cquery(CqueryRequest),
 }
 
@@ -335,6 +343,40 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 invalidated_files: result.invalidated_files,
             }
         }
+        DaemonRequest::Aquery(request) => {
+            let (command_policy, environment_policy, lockfile_mode, registry_urls) =
+                match request.bzlmod.normalize() {
+                    Ok(inputs) => inputs,
+                    Err(error) => return malformed_bzlmod_response(error),
+                };
+            let target = match validate_aquery_expression(&request.expression) {
+                Ok(target) => target,
+                Err(error) => {
+                    return DaemonResponse {
+                        exit_code: 2,
+                        stdout: String::new(),
+                        stderr: format!(
+                            "{{\"error\":\"aquery_request_error\",\"message\":\"{}\"}}",
+                            slug_core_v2::error::json_escape(&error)
+                        ),
+                        invalidated_files: 0,
+                    };
+                }
+            };
+            let result = daemon.aquery_with_bzlmod_inputs(
+                &target,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                registry_urls,
+            );
+            DaemonResponse {
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                invalidated_files: result.invalidated_files,
+            }
+        }
         DaemonRequest::Cquery(request) => {
             let (command_policy, environment_policy, lockfile_mode, registry_urls) =
                 match request.bzlmod.normalize() {
@@ -377,6 +419,19 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     }
 }
 
+fn validate_aquery_expression(expression: &str) -> Result<TargetPattern, String> {
+    let expression =
+        slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
+    let literal = slug_query_v2::aquery_literal(&expression).map_err(|error| error.to_string())?;
+    let target = TargetPattern::parse(literal)?;
+    if !matches!(
+        &target,
+        TargetPattern::Single(label) if label.repo().is_root()
+    ) {
+        return Err("aquery accepts only a main-repository literal target label".to_owned());
+    }
+    Ok(target)
+}
 fn validate_cquery_expression(
     expression: &str,
     include_implicit: bool,
@@ -491,6 +546,22 @@ pub fn send_query_request(
     write!(stream, "{json}\n").context("sending query request to daemon")?;
     let line = read_line(&mut stream)?;
     serde_json::from_str(&line).context("deserializing daemon query response")
+}
+
+pub fn send_aquery_request(
+    socket_path: &Path,
+    request: &AqueryRequest,
+) -> anyhow::Result<DaemonResponse> {
+    let mut stream = UnixStream::connect(socket_path)
+        .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
+    let json = serde_json::to_string(&DaemonRequest::Aquery(AqueryRequest {
+        expression: request.expression.clone(),
+        bzlmod: request.bzlmod.clone(),
+    }))
+    .context("serializing aquery request for daemon")?;
+    write!(stream, "{json}\n").context("sending aquery request to daemon")?;
+    let line = read_line(&mut stream)?;
+    serde_json::from_str(&line).context("deserializing daemon aquery response")
 }
 
 pub fn send_cquery_request(

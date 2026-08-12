@@ -1,42 +1,47 @@
 # Current Slug V2 Packet
 
-Packet: `WP-8-m5-filewrite-aquery-command-root-design`
-Milestone: M5 entry
+Packet: `WP-8-m5-filewrite-aquery-multi-action-order-evidence-design`
+Milestone: M5 expansion
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: freeze the first command/root consumer of accepted FileWrite text.
+Result: freeze the exact multi-action FileWrite text ordering evidence or
+record a bounded `REPLAN`.
 
-## Observable slice
+## Design question
 
-Reconcile the existing aquery CLI and request placeholders, Buck2-derived
-`QueryExpression` parser, build-command action closure, resolved FileWrite
-semantic views, accepted per-action formatter, and daemon response shape.
-Select at most one bounded main-repository single-root `--output=text`
-consumer and freeze its request, evaluation, selection, ordering, join/final
-newline, diagnostics, and exit semantics.
+Determine whether the accepted one-literal aquery command can widen from
+exactly one FileWrite to a finite closure of FileWrite actions without
+inventing Bazel ordering or container semantics. Keep the accepted command
+root, raw-wire validation, bzlmod transport, retained build DICE evaluation,
+per-action formatter, identity-domain separation, and terminal classifications
+unchanged.
 
-## Ownership and stops
+## Read-only scope
 
-Stage 8 owns expression/root evaluation, command and protocol wiring, container
-ordering, block joining, and final output. Stage 6 continues to own resolved
-action semantics and per-action formatting. Reuse the retained action closure
-and formatter directly; do not reconstruct actions, duplicate identity, or add
-a command-owned analysis graph.
+Inspect the accepted command-root implementation, retained
+`BuildCommandEvaluation::action_closure` ordering and ownership, existing
+FileWrite action tests, accepted `action-query-identity-evidence` and
+`aquery-action-shape` artifacts, and pinned Bazel 9.2 source for the text
+action-graph formatter/order boundary. Freeze the smallest discriminator matrix
+that distinguishes declaration order, dependency-before/after-root order, and
+shared/diamond closure deduplication. Classify every field and ordering rule as
+exact, Slug-native, or unsupported/deferred.
 
-Aquery remains the separate query language and must reuse the existing
-`QueryExpression` parser. Keep recursive/external/multi-root expressions,
-operators or functions not already justified by the selected slice,
-non-default formats, non-FileWrite actions, executable writes, file contents,
-ordinary no-toolchain, and unresolved shapes explicitly unsupported or
-fail-closed.
+Select at most one bounded evidence/implementation successor with explicit
+file allowlist, line caps, failure boundaries, and lifecycle proof. If existing
+retained ordering cannot be justified by pinned source plus a small Bazel 9.2
+matrix, record `REPLAN` rather than broadening the parity claim.
 
 ## Validation
 
-This packet is read-only. Inspect the accepted Bazel 9.2 FileWrite evidence and
-live command, query, protocol, action-closure, and formatter sources. Produce
-one exact handoff or `REPLAN`, classifying Bazel-exact command behavior versus
-explicit Slug-native fields. Select at most one bounded implementation
-successor. Add no Rust, tests, fixture growth, oracle rerun, command/wire
-implementation, execution, DICE state, parser/vendor, REAPI reuse, exact Bazel
-identity-byte work, JVM/Java, or CI. Cap: 200 bookkeeping lines. Require
-independent design review and bundle bookkeeping with the next functional
-commit; no standalone documentation commit.
+This packet is design-only: no Rust, fixture, expected oracle, Cargo, lockfile,
+Bazel execution, daemon process, JVM/Java, REAPI, or CI changes. Confirm the
+accepted one-action command remains untouched, cite the exact existing evidence
+and source obligations, run documentation/diff checks, and require independent
+design review. A material correction consumes the sole correction budget.
+
+## Stops
+
+Do not add query functions, multiple roots, external labels, non-text output,
+file contents, compilation/root-setting flags, action execution, new DICE
+state, action reconstruction, retained identity, exact Bazel checksum/
+ActionKey bytes, or unrelated Stage 4/8 breadth.

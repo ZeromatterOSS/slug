@@ -3674,3 +3674,140 @@ mechanical-rendering obligations. Assert no `allow_none` source bytes and use
 `attr.label(default = None, allow_single_file = True)` or an accepted
 keyword-free equivalent; pass a disposable package-load preflight before full
 replay. No correction budget is available.
+
+## FileWrite aquery command/root design (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-command-root-design` is **ACCEPT**. The existing
+`QueryExpression` parser, build-command DICE root/action closure, resolved
+FileWrite semantic view, and accepted per-action formatter are sufficient for
+one public vertical slice. No new query parser, action graph, DICE key, or
+retained representation is needed.
+
+### Admitted request
+
+The first command accepts one expression whose parsed AST is a direct
+`TargetLiteral`; parentheses may lower away as they already do in the shared
+parser. The literal must parse as one main-repository
+`TargetPattern::Single`. Package-all, recursive, external, set, binary,
+`let`, variable, function, integer, empty, and multiple positional roots fail
+closed.
+
+Default output and exactly `--output=text` are admitted. The existing
+`--output_base` daemon selector and normalized bzlmod
+`--allow_yanked_versions`, `--[no]ignore_dev_dependency`,
+`--lockfile_mode`, and `--registry` inputs remain admitted transport
+inputs. Passthrough, compilation/root-setting flags, include flags,
+`--noshow_progress`, every other output, and all other flags are deferred and
+rejected rather than silently ignored. CLI request validation parses the shared
+AST and target once; the daemon independently repeats semantic validation at
+the untrusted wire boundary.
+
+### Evaluation and output
+
+Both one-shot and daemon routes call the existing typed build command with the
+single validated target and normalized bzlmod inputs. They consume that
+accepted terminal's retained `BuildCommandEvaluation`; neither route invokes
+loading/query analysis separately or reconstructs actions. The formatter
+container calls `resolved_file_write_semantic_views()` and admits exactly one
+resolved view in the complete action closure. Zero, multiple, non-Write,
+non-`FileWrite`, executable, named-exec-group, external-owner,
+ordinary-no-toolchain, unsafe-output, and unresolved platform/constraint
+shapes fail closed through the existing producer/formatter boundaries.
+
+For the sole action, stdout is the accepted per-action block followed by
+exactly two LF bytes, matching Bazel 9.2's one-block text container. There is no
+multi-action ordering claim because multiple resolved actions are rejected.
+Exit is zero and stderr is empty in both runtime modes. The block's header,
+indentation, field order, labels, punctuation, empty inputs, boolean, and
+container framing are exact Bazel-shaped text. Configuration/output-root and
+`SlugActionToken` remain the already accepted explicit Slug-native
+projections. Empty progress stderr and all error diagnostics are Slug-native,
+not Bazel diagnostic-parity claims.
+
+### Wire and errors
+
+Add one public daemon request variant carrying raw `expression` plus the
+existing normalized bzlmod primitive bundle. Output is not a wire field because
+text is the only admitted format; `output_base` remains a local CLI transport
+choice. Reuse `DaemonResponse`. The server validates the raw expression before
+calling the retained daemon runtime. Parse failures use existing command-parse
+JSON and exit 2. Wire validation uses `aquery_request_error`; evaluation or
+formatting uses `aquery_runtime_error`, runtime mode, escaped message, and
+daemon invalidation count. Existing build errors keep their exit classification
+but are relabeled for the aquery surface.
+
+### Implementation and proof handoff
+
+Run next
+`WP-8-m5-filewrite-aquery-command-root-implementation`. The allowlist is:
+
+- `app/slug_query_v2/src/{expr.rs,lib.rs}` for one shared literal validator;
+- `app/slug_commands_v2/src/aquery.rs` and its command tests;
+- `app/slug_core_v2/src/runtime/{file_write_aquery_text.rs,dice.rs,mod.rs}`;
+- `app/slug_cli_v2/src/commands/aquery.rs` and focused CLI tests;
+- `app/slug_server_v2/src/{lib.rs,server.rs,tests.rs}`; and
+- bundled Stage 8/current/canonical scheduling bookkeeping.
+
+Reuse `action-query-identity-evidence` and the accepted formatter golden
+without oracle rerun or fixture growth. Prove parser negatives; default and
+explicit text equivalence; exact two-LF output; one-shot/daemon equality;
+wire validation; bzlmod forwarding; and retained-daemon content A/B/A token
+change/restoration with zero source-bypass or fresh-graph path. Clean stale
+`slugd` before and after daemon-sensitive tests. Run focused owner tests,
+direct-dependent compile checks, formatting, archive, and diff checks. Require
+independent final review because the public wire changes.
+
+Caps are 425 production / 400 tests / 825 total Rust net lines plus bundled
+bookkeeping. Add no multi-action container/order, nonliteral expression,
+external root, non-text format, file-write contents, compilation/root-setting
+flag, execution, new DICE state, action reconstruction, parser/vendor,
+retained identity, REAPI reuse, exact Bazel checksum/ActionKey bytes, JVM/Java,
+oracle growth, or CI. A second material contract or implementation correction
+is `REPLAN`.
+
+Independent design review returned `ACCEPT`: exactness is bounded to the
+one-action text shape and framing, both CLI and raw-wire expression boundaries
+are validated, and the retained DICE action closure is reused. Residual risk is
+implementation fidelity for preserving build terminal exit classifications
+while relabeling errors for aquery.
+## FileWrite aquery command/root implementation accepted (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-command-root-implementation` is **ACCEPT**. The V2
+`aquery` command now admits one shared-parser direct literal main-repository
+target with default or explicit `--output=text`. One-shot and daemon routes
+reuse the typed build command and retained `BuildCommandEvaluation` action
+closure; the public daemon request carries only the raw expression and
+normalized request-local bzlmod inputs, and the server independently
+revalidates that expression.
+
+The container admits exactly one resolved FileWrite semantic view and emits the
+accepted per-action block followed by exactly two LF bytes. Every wider
+root/action/flag/output shape remains fail-closed. Bazel-shaped header, field
+order, punctuation, indentation, labels, empty inputs, boolean, and one-block
+framing are exact for the admitted Bazel 9.2 surface. Configuration/output-root
+and `SlugActionToken` fields, empty progress stderr, runtime observation
+counts, and diagnostics remain explicitly Slug-native. Existing build terminal
+errors retain their exit classifications while the surface relabels them as
+aquery diagnostics.
+
+Focused parser, formatter/container, raw-wire, request-local bzlmod, and
+one-shot/retained-daemon lifecycle tests pass. The lifecycle proves one-shot
+and daemon equality, content A/B token change, B/A full output and token
+restoration, and stable daemon PID. The five affected crate graph checks,
+rustfmt, and diff checks pass. Rust additions are 401 production, 223 tests,
+and 624 total, within the 425/400/825 caps. Archive layout checks pass; the
+known repository-baseline absence of the V1 archive tag, branch, and recorded
+commit remains unchanged. No oracle rerun or fixture growth occurred.
+
+Independent final review returned `ACCEPT`: both request boundaries are
+validated, the public wire and errors are bounded, retained DICE/action
+semantics are reused, terminal classification and identity domains are
+preserved, and no scope, security, or error-handling correction is required.
+
+Run next only
+`WP-8-m5-filewrite-aquery-multi-action-order-evidence-design`, design-only.
+Freeze pinned Bazel 9.2 text-container ordering ownership and the smallest
+declaration/dependency/diamond discriminator matrix before selecting any
+multi-action successor. Add no Rust, fixture, expected oracle, Bazel execution,
+DICE state, action reconstruction, query/function/output breadth, execution,
+JVM/Java, REAPI, or CI.

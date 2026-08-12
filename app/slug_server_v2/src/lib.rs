@@ -420,6 +420,72 @@ impl Daemon {
         }
     }
 
+    pub fn aquery_with_bzlmod_inputs(
+        &mut self,
+        target: &TargetPattern,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+    ) -> QueryResult {
+        let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
+            Ok(observations) => observations,
+            Err(error) => return aquery_error_result(2, &error.to_string(), 0),
+        };
+        #[cfg(test)]
+        self.forwarded_bzlmod_inputs.push(
+            crate::server::BzlmodRequestInputs::from_normalized_with_registry_urls(
+                &command_policy,
+                &environment_policy,
+                &lockfile_mode,
+                &registry_urls,
+            ),
+        );
+        let accepted = match self.runtime.build_command_with_bzlmod_inputs(
+            &[target.clone()],
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            &registry_urls,
+            None,
+        ) {
+            Ok(accepted) => accepted,
+            Err(error) => {
+                let (_, exit_code) = error.terminal_error();
+                return aquery_error_result(exit_code, &error.to_string(), invalidated);
+            }
+        };
+        let published = accepted
+            .project(|terminal| match terminal.as_ref() {
+                Ok(evaluation) => {
+                    match slug_core_v2::runtime::format_file_write_aquery_text_output(evaluation) {
+                        Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
+                        Err(error) => TerminalOutput::new(
+                            2,
+                            String::new(),
+                            aquery_error_json(error, invalidated),
+                        ),
+                    }
+                }
+                Err(error) => {
+                    let (_, exit_code) = error.terminal_error();
+                    TerminalOutput::new(
+                        exit_code,
+                        String::new(),
+                        aquery_error_json(&error.to_string(), invalidated),
+                    )
+                }
+            })
+            .publish();
+        let (_terminal, exit_code, stdout, stderr) = published.into_parts();
+        QueryResult {
+            exit_code,
+            stdout,
+            stderr,
+            invalidated_files: invalidated,
+        }
+    }
+
     #[cfg(test)]
     fn take_forwarded_bzlmod_inputs_for_test(&mut self) -> Vec<crate::server::BzlmodRequestInputs> {
         std::mem::take(&mut self.forwarded_bzlmod_inputs)
@@ -491,6 +557,22 @@ pub struct QueryResult {
     pub stdout: String,
     pub stderr: String,
     pub invalidated_files: usize,
+}
+
+fn aquery_error_json(message: &str, invalidated_files: usize) -> String {
+    format!(
+        "{{\"error\":\"aquery_runtime_error\",\"command\":\"aquery\",\"message\":\"{}\",\"runtime_mode\":\"daemon\",\"invalidated_files\":{invalidated_files}}}\n",
+        json_escape(message),
+    )
+}
+
+fn aquery_error_result(exit_code: i32, message: &str, invalidated_files: usize) -> QueryResult {
+    QueryResult {
+        exit_code,
+        stdout: String::new(),
+        stderr: aquery_error_json(message, invalidated_files),
+        invalidated_files,
+    }
 }
 
 fn cquery_error_result(message: &str, invalidated_files: usize) -> QueryResult {
@@ -579,6 +661,7 @@ impl FilesystemObservationAdapter {
 mod reapi;
 mod server;
 
+pub use server::AqueryRequest;
 pub use server::BuildRequest;
 pub use server::BuildResponse;
 pub use server::BzlmodRequestInputs;
@@ -588,6 +671,7 @@ pub use server::DaemonRequest;
 pub use server::DaemonResponse;
 pub use server::QueryRequest;
 pub use server::pid_path;
+pub use server::send_aquery_request;
 pub use server::send_build_request;
 pub use server::send_cquery_request;
 pub use server::send_query_request;

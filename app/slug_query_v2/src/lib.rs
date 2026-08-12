@@ -47,6 +47,7 @@ pub use expr::QueryFunctionStatus;
 pub use expr::QueryParseError;
 pub use expr::SourceSpan;
 pub use expr::Spanned;
+pub use expr::aquery_literal;
 pub use expr::cquery_literals;
 pub use expr::loading_query_function;
 pub use expr::loading_query_functions;

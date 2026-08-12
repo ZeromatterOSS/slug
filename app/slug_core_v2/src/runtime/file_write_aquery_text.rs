@@ -11,6 +11,7 @@
 use slug_build_api_v2::ActionKind;
 use slug_identity_v2::CanonicalLabel;
 
+use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
 use super::file_write_identity::FileWriteSemanticIdentity;
 
@@ -42,6 +43,18 @@ pub fn format_file_write_aquery_text(
         action_token = identity.aquery_display_token(),
         output_configuration = projection.path_component(),
     ))
+}
+
+pub fn format_file_write_aquery_text_output(
+    evaluation: &BuildCommandEvaluation,
+) -> Result<String, &'static str> {
+    let views = evaluation.resolved_file_write_semantic_views()?;
+    let [view] = views.as_slice() else {
+        return Err("FileWrite aquery text requires exactly one resolved action");
+    };
+    let mut output = format_file_write_aquery_text(view)?;
+    output.push_str("\n\n");
+    Ok(output)
 }
 
 fn aquery_label(label: &CanonicalLabel) -> String {
