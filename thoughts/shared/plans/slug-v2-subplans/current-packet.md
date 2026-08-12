@@ -1,13 +1,61 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-starlark-custom-string-protocol-implementation-r2`
-Milestone: M7 custom Starlark stringification prerequisite implementation r2
+Packet: `WP-4-5-host-pure-module-extension-invocation-owner-r3-cap-design`
+Milestone: M7 pure module-extension invocation final cap correction
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted six-file shared runtime protocol without
-committing the retained unaccepted invocation owner.
+Result: correct only the measured production/test caps for the retained,
+fully passing invocation implementation before final activation.
 
-## Active implementation contract
+## Active docs-only cap-correction contract
+
+The frozen 720/800/1,520 stop fired after the complete required proof was
+formatted: the exact four-path diff measures approximately 724 production, 846
+tests, and 1,570 total lines against `40def0e7`. The excess is the already
+required immutable ABI, all-request preflight/lifetime boundary, and frozen
+Need/error/drift/factor/result/event/A-B-A tests; cleanup removed two unrelated
+callable-visibility widenings, and no safe 50-line mechanical reduction remains
+without weakening the accepted discriminators or auditability. Retain the
+fully passing Rust diff unaccepted and run only
+`WP-4-5-host-pure-module-extension-invocation-owner-r3-cap-design` in
+canonical/current/Stage 4/Stage 5. This correction may edit only those four
+plans under 30/120/100/80/330 docs lines and authorizes no Rust or commit before
+independent acceptance and explicit r3 activation.
+
+Freeze the same four Rust paths, semantics, proof, and stops at 730 production,
+850 tests, and 1,580 total lines against `40def0e7`, leaving only 6/4/10 lines
+of measured contingency and no margin for a field, ABI member, owner, consumer,
+or behavior family. `REPLAN` on a fifth Rust path, any semantic expansion,
+production above 730, tests above 850, total above 1,580, or inability to retain
+the passing complete proof.
+
+## Superseded r2 implementation activation
+
+This section is historical context only, grants no file, action, cap, or
+schedule authority, and is interpreted solely through the active docs-only
+cap-correction contract above.
+
+The shared string prerequisite is accepted in `40def0e7`. Resume only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r2` in
+`app/slug_loading_v2/src/bzl_module.rs`, `package.rs`, private
+`module_extension.rs`, and `lib.rs` solely for its private declaration, plus
+canonical/current/Stage 4/Stage 5 bookkeeping. Measure 720 production, 800
+tests, and 1,520 total against `40def0e7`; no fifth Rust path or cap excess.
+Preserve the accepted prepared-first all-request preflight, optional Label
+None, context-owned tags, immutable exact-list ABI including negative indexes,
+canonical Label str versus repr, strict None, complete-only heap-free receipt,
+and invocation-owned event ordering/replay. Require the full frozen ABI,
+forbidden-member/callable, Need/terminal zero-invocation, drift/factor/result/
+throw, A/B/A, cold/warm, formatting, full loading/Bzlmod, and structural
+heap/callable-absence proof. All repository rules, generated outputs,
+environment/OS/facts, I/O, consumers, public API, second loader/evaluator, JVM,
+and earlier stops remain forbidden.
+
+## Accepted string-protocol prerequisite
+
+This section is historical accepted evidence only, grants no independent file,
+action, cap, or schedule authority, and is interpreted through the active
+docs-only cap-correction contract above.
 
 Independent review accepts the scope correction recorded in `6215fe03`.
 Implement only `WP-4-starlark-custom-string-protocol-implementation-r2` in the
@@ -18,32 +66,6 @@ str/repr, percent, format, print, nesting, and cycle matrix. Preserve all
 default-to-repr, string-fast-path, repr/hash/equality/type, single-protocol,
 derive, public-API, and behavior stops. No app Rust, InvocationLabel, loading,
 or DICE proof is authorized; those resume only with the invocation packet.
-
-### Implementation evidence
-
-The isolated six-file delta against `73b22cec` is approximately 31 production
-and 76 test lines, within 90/220/310. The synthetic protocol matrix passes;
-focused `starlark` string, interpolation, and format suites pass 73/73, 8/8,
-and 9/9. Full `slug_loading_v2 --all-targets` (92 owner tests plus all
-integrations) and `slug_bzlmod_v2 --all-targets` pass. Full vendored
-`starlark --all-targets` passes 808 tests and retains 29 unrelated existing
-profiler/bytecode golden failures; no string, interpolation, format, value, or
-protocol test fails. Formatting and diff checks pass. Independent review
-accepts the isolated six-file implementation and confirms the dirty app paths
-remain unaccepted and unstaged.
-
-### Implementation evidence
-
-The isolated six-file delta against `73b22cec` is approximately 31 production
-and 76 test lines, within 90/220/310. The synthetic protocol matrix passes;
-focused `starlark` string, interpolation, and format suites pass 73/73, 8/8,
-and 9/9. Full `slug_loading_v2 --all-targets` (92 owner tests plus all
-integrations) and `slug_bzlmod_v2 --all-targets` pass. Full vendored
-`starlark --all-targets` passes 808 tests and retains 29 unrelated existing
-profiler/bytecode golden failures; no string, interpolation, format, value, or
-protocol test fails. Formatting and diff checks pass. Independent review
-accepts the isolated six-file implementation and confirms the dirty app paths
-remain unaccepted and unstaged.
 
 ### Implementation evidence
 

@@ -2410,3 +2410,23 @@ suites, full loading and Bzlmod dependents, formatting, and diff checks pass.
 Full vendored Starlark retains only 29 unrelated profiler/bytecode golden
 baselines after 808 passing tests. Commit only the shared runtime files plus
 bookkeeping; preserve every app path as unaccepted dirty state.
+
+### Pure invocation implementation r2 resumed (2026-08-12)
+
+The shared prerequisite is accepted in `40def0e7`. Resume only the four loading
+Rust paths and four plans frozen by current as
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r2`, under
+720/800/1,520 against `40def0e7`. Preserve every accepted ABI, preflight,
+lifetime, event, proof, and terminal stop; no repository/global/output/I/O/
+consumer/public/JVM breadth is authorized.
+
+### Pure invocation final cap correction (2026-08-12)
+
+The complete formatted proof passes but measures approximately 724 production,
+846 tests, and 1,570 total against `40def0e7`, firing the r2 cap. Cleanup
+removed two unrelated visibility widenings; do not compress the required ABI,
+preflight, lifetime, event, or lifecycle discriminators. Retain the Rust diff
+unaccepted and run only the four-plan docs correction
+`WP-4-5-host-pure-module-extension-invocation-owner-r3-cap-design`, freezing
+the same four paths/semantics/proofs/stops at 730/850/1,580. No Rust resumes
+before independent acceptance and explicit r3 activation.

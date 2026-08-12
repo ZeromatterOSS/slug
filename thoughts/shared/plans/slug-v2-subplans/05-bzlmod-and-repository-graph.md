@@ -2519,3 +2519,16 @@ unauthorized in this packet.
 Independent implementation review accepts the isolated six-file runtime
 delta and passing focused/loading/Bzlmod evidence. Stage 5 remains unchanged;
 commit no app or Bzlmod Rust in this packet.
+
+With the shared prerequisite accepted in `40def0e7`, resume only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r2` in the
+four loading paths and four plans under 720/800/1,520 against that base. Stage
+5 production remains unchanged; no selected-input, repository, mapping,
+generated-output, consumer, public, or JVM edge is authorized.
+
+The fully passing invocation diff measures about 724/846/1,570 and fires the
+r2 cap. Run only the four-plan cap correction
+`WP-4-5-host-pure-module-extension-invocation-owner-r3-cap-design`; retain the
+same four loading paths, semantics, proof, and stops at 730/850/1,580 against
+`40def0e7`. Stage 5 production remains unchanged and no Rust resumes before
+acceptance plus explicit r3 activation.
