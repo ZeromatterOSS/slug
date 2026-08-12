@@ -2055,3 +2055,24 @@ Run next only the docs-only
 two-phase no-overrides/resolve/final mapping algorithm, its error order and
 proof, and revalidate the one-file caps/stops. No Rust may resume before
 independent correction acceptance and explicit r3 activation.
+
+### Root extension override semantics prerequisite found (2026-08-12)
+
+The r3 pinned-source audit found that `11be92b9` accepted one incorrect
+review-driven branch. Bazel globally ignores root override/inject under
+`--ignore_dev_dependency`; it does not filter per referenced proxy.
+Ignored-dev `use_repo` still reserves apparent names before its no-op usage
+is discarded. Root usage finalization also rejects missing overriding names,
+inject-and-import of one exported repo, and any apparent repo that is both an
+override target and an imported overridden repo.
+
+These checks belong to the existing sole root evaluator, before selected
+mapping composition. Run next only
+`WP-5-root-extension-override-semantic-correction-implementation` in
+`module_eval.rs`, under 120 production/220 test/340 total net caps. Require
+pinned-source discriminators, protected evaluator/DICE/loading suites,
+A/B/A recovery, cleanup/compact review, and independent implementation review.
+No selected mapping Rust, second file, public/key/evaluator change, extension
+evaluation, I/O/materializer/loading/consumer edge, or JVM/Java work is
+authorized. Resume the two-phase r3 selected-mapping design only after this
+prerequisite is accepted.
