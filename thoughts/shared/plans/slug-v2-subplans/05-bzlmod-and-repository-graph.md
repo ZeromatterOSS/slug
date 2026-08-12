@@ -2382,3 +2382,18 @@ fail-closed joins, field exclusions, and proof matrix. Run next only
 `selected_repo_spec.rs` and `lib.rs`, under 240 production/360 test/600
 total formatted net lines against `a31cf3d9`. Preserve every accepted stop
 and obtain independent implementation review.
+
+### Evaluation-input implementation cap REPLAN (2026-08-12)
+
+The compiling owner fit 240 production, but independent review found that
+post-request root/join terminals discarded the accepted request aggregate and
+could compare equal across mapping/context changes. The necessary structural
+wrapper raises production to about 267 lines before completing field proof;
+the frozen stop therefore fired.
+
+Run only the docs-only
+`WP-5-host-selected-extension-evaluation-input-requests-r2-cap-design`.
+Retain the unaccepted two-file diff and freeze 280 production/360 test/640
+total against `a31cf3d9`, with identical semantics, proof, files, and stops.
+No Rust resumes before independent correction acceptance and explicit r2
+activation.

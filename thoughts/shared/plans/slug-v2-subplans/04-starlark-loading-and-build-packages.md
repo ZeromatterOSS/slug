@@ -2234,3 +2234,10 @@ Independent review accepts the Stage 5 raw module/tag projection design. Run
 only its two-file implementation under 240 production/360 test/600 total caps
 relative to `a31cf3d9`. Stage 4 gains no loading consumer, callable, schema
 composition, evaluator, or execution authority.
+
+### Evaluation-input implementation cap REPLAN (2026-08-12)
+
+The 240 production cap fired when post-request terminals were corrected to
+retain full request/predecessor identity. Preserve the unaccepted Rust diff and
+run only the docs-only r2 cap correction at 280 production/360 test/640 total,
+same files and stops. Stage 4 remains inactive.

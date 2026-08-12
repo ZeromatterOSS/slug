@@ -1,29 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-evaluation-input-requests-implementation`
-Milestone: M7 module-extension evaluation-input prerequisite implementation
+Packet: `WP-5-host-selected-extension-evaluation-input-requests-r2-cap-design`
+Milestone: M7 module-extension evaluation-input cap correction
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the independently accepted selected module/tag input owner.
+Result: freeze the smallest cap correction for the retained unaccepted diff.
 
-## Active implementation contract
+## Active cap-correction contract
 
-Implement the accepted design below only in
-`app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
-`app/slug_bzlmod_v2/src/lib.rs`, plus canonical/current/Stage 4/Stage 5
-bookkeeping. Caps are 240 production, 360 tests, and 600 total formatted net
-Rust lines measured against `a31cf3d9`. Complete the frozen pure/real-DICE
-proof, full Bzlmod/loading suites, scope/forbidden-edge/compact/cleanup audits,
-and independent implementation review.
+The first complete error-identity correction requires about 267 production
+lines: every terminal after successful request computation must retain the
+full accepted request aggregate, and join failures must retain the exact
+request. The 240-line production stop has fired. Retain the unaccepted two-file
+diff and freeze corrected caps of 280 production, 360 tests, and 640 total
+against `a31cf3d9`, with exactly the same semantics, proof, files, and stops.
 
-No loading dependency, generic public consumer, heap/callable,
-schema/evaluator/execution work, I/O, generated repository/lockfile/
-materializer/consumer edge, third Rust file, JVM/Java work, or behavior-family
-expansion is authorized. Cap excess or a missing owner is `REPLAN`.
+No Rust is authorized until independent correction acceptance and explicit r2
+activation. No loading dependency, generic public consumer, heap/callable,
+schema/evaluator/execution, I/O, generated repository/lockfile/materializer/
+consumer, third Rust file, JVM/Java, or behavior expansion is permitted.
 
 ## Accepted design contract
 
 This section is historical design authority interpreted only through the
-active implementation contract above.
+active cap-correction contract above.
 
 Perform a read-only ownership design for one callerless Bzlmod key, keyed by
 normalized workspace, that publishes ordered module/tag inputs for a later
