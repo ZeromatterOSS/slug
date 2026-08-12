@@ -1281,3 +1281,9 @@ uncommitted diff passes the full owner suite and independent review found no
 semantic defect. `WP-5-host-nonregistry-package-preflight-cap-replan` may
 correct only that cap and evidence budget before the same five-file
 implementation resumes.
+
+`WP-5-host-nonregistry-package-preflight-implementation-r2` resumes the
+retained five-file Rust diff after accepted cap correction `0d3e03e8`.
+Production semantics and ownership are unchanged; acceptance now requires the
+remaining immutable, event/reuse, source-kind, and terminal-order proofs within
+460/520/980 formatted bounds.

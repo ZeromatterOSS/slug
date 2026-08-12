@@ -4689,3 +4689,7 @@ Stage 8 remains waiting during
 not activate a package, graph, command, Test, or execution consumer; it only
 preserves the accepted route-independent prerequisite ownership and schedules
 the same implementation with truthful measured bounds.
+
+Stage 8 continues waiting while
+`WP-5-host-nonregistry-package-preflight-implementation-r2` completes only the
+corrected-bounds Stage 5 prerequisite. No consumer activation is authorized.
