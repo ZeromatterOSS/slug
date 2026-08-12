@@ -55,6 +55,8 @@ use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::BuiltinBazelToolsRouteIdentity;
+use crate::BuiltinBazelToolsSnapshot;
 use crate::EvaluatedNonrootModule;
 use crate::ModuleKey;
 use crate::NonrootModuleKey;
@@ -71,6 +73,8 @@ use crate::RootModuleFilesKey;
 use crate::RootModuleOverride;
 use crate::RootRepositoryRoute;
 use crate::apply_unified_patch;
+use crate::builtin_repository::BuiltinBazelToolsModuleError;
+use crate::builtin_repository::BuiltinBazelToolsModuleKey;
 use crate::host_package::ExternalRepositoryPackageLookup;
 use crate::host_package::ExternalRepositoryPackageLookupError;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
@@ -480,6 +484,268 @@ pub enum ModuleSourcePreparationError {
     ModuleNotFound {
         module_file_attempts: Arc<[RegistryModuleFileAttempt]>,
     },
+}
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostDiscoveredModuleProvenance {
+    BuiltinBazelTools {
+        route_identity: BuiltinBazelToolsRouteIdentity,
+        module_sha256: [u8; 32],
+    },
+    Registry {
+        selected_registry: RegistryBaseUrl,
+        module_file_attempts: Arc<[RegistryModuleFileAttempt]>,
+    },
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostDiscoveredModule {
+    pub(crate) module: EvaluatedNonrootModule,
+    pub(crate) provenance: HostDiscoveredModuleProvenance,
+}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostDiscoveredModuleError {
+    RootModuleFiles(CompactString),
+    ExplicitBuiltinOverride,
+    InvalidBuiltinVersion { version: CompactString },
+    MissingVersion { module_name: CompactString },
+    SourcePreparationCompute(Arc<str>),
+    SourcePreparation(ModuleSourcePreparationError),
+    NonRegistryUnsupported { module_name: CompactString },
+    BuiltinCompute(Arc<str>),
+    Builtin(BuiltinBazelToolsModuleError),
+    Evaluation(DirectNonregistryEvaluationError),
+}
+
+impl fmt::Display for HostDiscoveredModuleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootModuleFiles(message) => write!(f, "root MODULE files failed: {message}"),
+            Self::ExplicitBuiltinOverride => {
+                f.write_str("explicit bazel_tools override is not supported by Host discovery")
+            }
+            Self::InvalidBuiltinVersion { version } => {
+                write!(
+                    f,
+                    "built-in bazel_tools requires the empty version, got {version}"
+                )
+            }
+            Self::MissingVersion { module_name } => {
+                write!(f, "registry module {module_name} requires a version")
+            }
+            Self::SourcePreparationCompute(message) => {
+                write!(f, "module source preparation failed to compute: {message}")
+            }
+            Self::SourcePreparation(error) => write!(f, "{error:?}"),
+            Self::NonRegistryUnsupported { module_name } => {
+                write!(
+                    f,
+                    "nonregistry discovery is not supported for {module_name}"
+                )
+            }
+            Self::BuiltinCompute(message) => {
+                write!(f, "built-in MODULE failed to compute: {message}")
+            }
+            Self::Builtin(error) => error.fmt(f),
+            Self::Evaluation(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for HostDiscoveredModuleError {}
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostDiscoveredModuleKey {
+    workspace: NormalizedAbsolutePath,
+    module: NonrootModuleKey,
+}
+
+#[allow(dead_code)]
+impl HostDiscoveredModuleKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, module: NonrootModuleKey) -> Self {
+        Self { workspace, module }
+    }
+}
+
+impl fmt::Display for HostDiscoveredModuleKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-discovered-module:{}:{}@{}",
+            self.workspace, self.module.name, self.module.version
+        )
+    }
+}
+
+fn host_discovered_module_error(
+    error: HostDiscoveredModuleError,
+) -> <HostDiscoveredModuleKey as Key>::Value {
+    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+}
+
+#[async_trait]
+impl Key for HostDiscoveredModuleKey {
+    type Value =
+        SourcePreparationOutcome<Arc<Result<HostDiscoveredModule, HostDiscoveredModuleError>>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let root = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_path_buf(),
+            })
+            .await
+        {
+            Ok(root) => root,
+            Err(error) => {
+                return host_discovered_module_error(HostDiscoveredModuleError::RootModuleFiles(
+                    error.to_string().into(),
+                ));
+            }
+        };
+        let root = match root.as_ref() {
+            Ok(root) => root,
+            Err(error) => {
+                return host_discovered_module_error(HostDiscoveredModuleError::RootModuleFiles(
+                    error.clone(),
+                ));
+            }
+        };
+        let override_ = root.overrides.get(self.module.name.as_str());
+        if self.module.name == "bazel_tools" {
+            if override_.is_some() {
+                return host_discovered_module_error(
+                    HostDiscoveredModuleError::ExplicitBuiltinOverride,
+                );
+            }
+            if !self.module.version.is_empty() {
+                return host_discovered_module_error(
+                    HostDiscoveredModuleError::InvalidBuiltinVersion {
+                        version: self.module.version.clone(),
+                    },
+                );
+            }
+            let value = match ctx
+                .compute(&BuiltinBazelToolsModuleKey::new(
+                    BuiltinBazelToolsSnapshot::CURRENT,
+                ))
+                .await
+            {
+                Ok(value) => value,
+                Err(error) => {
+                    return host_discovered_module_error(
+                        HostDiscoveredModuleError::BuiltinCompute(Arc::from(error.to_string())),
+                    );
+                }
+            };
+            return SourcePreparationOutcome::Complete(Arc::new(match value.as_ref() {
+                Ok(value) => Ok(HostDiscoveredModule {
+                    module: value.module.clone(),
+                    provenance: HostDiscoveredModuleProvenance::BuiltinBazelTools {
+                        route_identity: value.route_identity.clone(),
+                        module_sha256: value.module_sha256,
+                    },
+                }),
+                Err(error) => Err(HostDiscoveredModuleError::Builtin(error.clone())),
+            }));
+        }
+        if self.module.version.is_empty() {
+            return host_discovered_module_error(HostDiscoveredModuleError::MissingVersion {
+                module_name: self.module.name.clone(),
+            });
+        }
+        if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
+            return host_discovered_module_error(
+                HostDiscoveredModuleError::NonRegistryUnsupported {
+                    module_name: self.module.name.clone(),
+                },
+            );
+        }
+        let preparation = match ctx
+            .compute(&ModuleSourcePreparationKey {
+                workspace: self.workspace.as_path().to_path_buf(),
+                module_name: self.module.name.clone(),
+                version: self.module.version.clone(),
+            })
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Err(error) => {
+                return host_discovered_module_error(
+                    HostDiscoveredModuleError::SourcePreparationCompute(Arc::from(
+                        error.to_string(),
+                    )),
+                );
+            }
+        };
+        let preparation = match preparation.as_ref() {
+            Ok(preparation) => preparation,
+            Err(error) => {
+                return host_discovered_module_error(HostDiscoveredModuleError::SourcePreparation(
+                    error.clone(),
+                ));
+            }
+        };
+        let ModuleSourcePreparation::Registry {
+            bytes,
+            selected_registry,
+            module_file_attempts,
+        } = preparation
+        else {
+            return host_discovered_module_error(
+                HostDiscoveredModuleError::NonRegistryUnsupported {
+                    module_name: self.module.name.clone(),
+                },
+            );
+        };
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let logical_id = crate::LogicalModuleFileId::new(format!(
+            "{}modules/{}/{}/MODULE.bazel",
+            selected_registry.as_str(),
+            self.module.name,
+            self.module.version
+        ));
+        let (module, events) = evaluate_direct_nonregistry_module_closure_with_events(
+            self.module.clone(),
+            logical_id,
+            bytes.as_ref(),
+            &[],
+            capture_events,
+        );
+        let value = match module {
+            Ok(module) => Ok(HostDiscoveredModule {
+                module,
+                provenance: HostDiscoveredModuleProvenance::Registry {
+                    selected_registry: selected_registry.clone(),
+                    module_file_attempts: module_file_attempts.clone(),
+                },
+            }),
+            Err(error) => Err(HostDiscoveredModuleError::Evaluation(error)),
+        };
+        if capture_events {
+            ctx.store_evaluation_data(events.unwrap_or_else(EventBatch::empty))
+                .expect("Host discovered MODULE stores exactly one event batch");
+        }
+        SourcePreparationOutcome::Complete(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
 }
 
 impl fmt::Display for RepositoryMaterializationKey {
@@ -7649,5 +7915,319 @@ mod tests {
         ] {
             assert!(!inspection.contains(forbidden), "{forbidden}");
         }
+    }
+    #[test]
+    fn host_discovered_module_registry_value_preserves_semantics_and_provenance() {
+        let key = NonrootModuleKey::new("dep", "1.0");
+        let (module, events) = evaluate_direct_nonregistry_module_closure_with_events(
+            key.clone(),
+            crate::LogicalModuleFileId::new("https://registry.example/modules/dep/1.0/MODULE.bazel"),
+            b"module(name = \"dep\", version = \"1.0\")\nbazel_dep(name = \"child\", version = \"2.0\")\n",
+            &[],
+            true,
+        );
+        assert!(events.unwrap().events().is_empty());
+        let attempts: Arc<[RegistryModuleFileAttempt]> = Arc::from([
+            RegistryModuleFileAttempt {
+                url: RegistryFileUrl::new("https://a.example/modules/dep/1.0/MODULE.bazel"),
+                sha256: None,
+            },
+            RegistryModuleFileAttempt {
+                url: RegistryFileUrl::new("https://b.example/modules/dep/1.0/MODULE.bazel"),
+                sha256: Some([7; 32]),
+            },
+        ]);
+        let value = HostDiscoveredModule {
+            module: module.unwrap(),
+            provenance: HostDiscoveredModuleProvenance::Registry {
+                selected_registry: RegistryBaseUrl::new("https://b.example/"),
+                module_file_attempts: attempts.clone(),
+            },
+        };
+        assert_eq!(value.module.base.expected_key, key);
+        assert!(value.module.base.dependencies.contains_key("child"));
+        assert!(matches!(
+            &value.provenance,
+            HostDiscoveredModuleProvenance::Registry {
+                selected_registry,
+                module_file_attempts,
+            } if selected_registry.as_str().contains("b.example")
+                && module_file_attempts.as_ref() == attempts.as_ref()
+        ));
+        assert_eq!(value, value.clone());
+    }
+
+    #[test]
+    fn host_discovered_module_identity_and_typed_terminals_are_distinct() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let builtin = HostDiscoveredModuleKey::new(
+            workspace.dupe(),
+            NonrootModuleKey::new("bazel_tools", ""),
+        );
+        let registry = HostDiscoveredModuleKey::new(workspace, NonrootModuleKey::new("dep", "1.0"));
+        assert_ne!(builtin, registry);
+        assert!(builtin.to_string().ends_with(":bazel_tools@"));
+        assert!(matches!(
+            HostDiscoveredModuleError::ExplicitBuiltinOverride,
+            HostDiscoveredModuleError::ExplicitBuiltinOverride
+        ));
+        assert!(matches!(
+            HostDiscoveredModuleError::MissingVersion {
+                module_name: "dep".into(),
+            },
+            HostDiscoveredModuleError::MissingVersion { module_name }
+                if module_name == "dep"
+        ));
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::root_module_bootstrap(
+            RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+        ));
+        assert!(!HostDiscoveredModuleKey::validity(&need));
+        assert!(!HostDiscoveredModuleKey::equality(&need, &need));
+    }
+
+    #[test]
+    fn host_discovered_module_owner_has_no_graph_or_consumer_edge() {
+        let source = include_str!("source_preparation.rs");
+        let owner = source
+            .split("impl Key for HostDiscoveredModuleKey")
+            .nth(1)
+            .unwrap()
+            .split("impl fmt::Display for RepositoryMaterializationKey")
+            .next()
+            .unwrap();
+        for required in [
+            "RootModuleFilesKey",
+            "BuiltinBazelToolsModuleKey",
+            "ModuleSourcePreparationKey",
+            "evaluate_direct_nonregistry_module_closure_with_events",
+            "module_file_attempts",
+            "store_evaluation_data",
+        ] {
+            assert!(owner.contains(required), "{required}");
+        }
+        for forbidden in [
+            "ResolvedGraph",
+            "RootModuleGraphKey",
+            "RepositoryMapping",
+            "PackageLoad",
+            "Toolchain",
+            "std::fs",
+        ] {
+            assert!(!owner.contains(forbidden), "{forbidden}");
+        }
+    }
+    #[derive(Default)]
+    struct HostDiscoveryTracker {
+        host: Mutex<Vec<(ActivationKind, bool)>>,
+        builtin: Mutex<Vec<ActivationKind>>,
+    }
+
+    impl ActivationTracker for HostDiscoveryTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key.downcast_ref::<HostDiscoveredModuleKey>().is_some() {
+                self.host
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), activation.evaluation_data().is_none()));
+            } else if key.downcast_ref::<BuiltinBazelToolsModuleKey>().is_some() {
+                self.builtin.lock().unwrap().push(activation.kind());
+            }
+        }
+    }
+
+    struct HostDiscoveryRegistryIo(std::collections::BTreeMap<String, Arc<[u8]>>);
+
+    #[async_trait]
+    impl crate::RegistryIo for HostDiscoveryRegistryIo {
+        async fn read_exact(
+            &self,
+            url: &RegistryFileUrl,
+        ) -> Result<crate::RegistryIoOutcome, crate::RegistryTransportError> {
+            Ok(self
+                .0
+                .get(url.as_str())
+                .map_or(crate::RegistryIoOutcome::NotFound, |bytes| {
+                    crate::RegistryIoOutcome::Found(bytes.clone())
+                }))
+        }
+    }
+
+    async fn compute_host_discovered(
+        dice: &Arc<Dice>,
+        tracker: Arc<HostDiscoveryTracker>,
+        root_source: &str,
+        registries: &[&str],
+        generation: u64,
+        module: NonrootModuleKey,
+    ) -> <HostDiscoveredModuleKey as Key>::Value {
+        let workspace = NormalizedAbsolutePath::new("/host-discovered-test").unwrap();
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_path_buf(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                            root_source.to_owned(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: workspace.as_path().to_path_buf(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel.lock"),
+                        slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        crate::inject_registry_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::RegistryUrls::new(registries.iter().copied()),
+            crate::RegistryRequestGeneration(generation),
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&HostDiscoveredModuleKey::new(workspace, module))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn host_discovered_module_dice_lifecycle_and_builtin_override_bypass() {
+        let a = "https://a.invalid/modules/dep/1.0/MODULE.bazel";
+        let b = "https://b.invalid/modules/dep/1.0/MODULE.bazel";
+        let source: Arc<[u8]> = Arc::from(&b"module(name = \"dep\", version = \"1.0\")\n"[..]);
+        let mut builder = Dice::builder();
+        crate::install_registry_io(
+            &mut builder,
+            Arc::new(HostDiscoveryRegistryIo(
+                [(a.to_owned(), source.clone()), (b.to_owned(), source)]
+                    .into_iter()
+                    .collect(),
+            )),
+        );
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(HostDiscoveryTracker::default());
+
+        let overridden = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            "module(name = \"root\")\nlocal_path_override(module_name = \"bazel_tools\", path = \"tools\")\n",
+            &[],
+            0,
+            NonrootModuleKey::new("bazel_tools", ""),
+        )
+        .await;
+        assert!(matches!(
+            overridden,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostDiscoveredModuleError::ExplicitBuiltinOverride))
+        ));
+        assert!(tracker.builtin.lock().unwrap().is_empty());
+
+        let root = "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0\")\n";
+        let first_a = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            root,
+            &["https://a.invalid"],
+            1,
+            NonrootModuleKey::new("dep", "1.0"),
+        )
+        .await;
+        let selected_b = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            root,
+            &["https://b.invalid"],
+            2,
+            NonrootModuleKey::new("dep", "1.0"),
+        )
+        .await;
+        let second_a = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            root,
+            &["https://a.invalid"],
+            3,
+            NonrootModuleKey::new("dep", "1.0"),
+        )
+        .await;
+        let warm_a = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            root,
+            &["https://a.invalid"],
+            3,
+            NonrootModuleKey::new("dep", "1.0"),
+        )
+        .await;
+        assert!(HostDiscoveredModuleKey::equality(&first_a, &second_a));
+        assert!(HostDiscoveredModuleKey::equality(&second_a, &warm_a));
+        assert!(!HostDiscoveredModuleKey::equality(&first_a, &selected_b));
+        assert!(matches!(
+            first_a,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    &value.as_ref().as_ref().unwrap().provenance,
+                    HostDiscoveredModuleProvenance::Registry {
+                        selected_registry,
+                        module_file_attempts,
+                    } if selected_registry.as_str() == "https://a.invalid"
+                        && module_file_attempts.len() == 1
+                        && module_file_attempts[0].sha256.is_some()
+                )
+        ));
+        let activations = tracker.host.lock().unwrap();
+        assert!(
+            activations
+                .iter()
+                .any(|(kind, event_free)| *kind == ActivationKind::Evaluated && !event_free)
+        );
+        assert!(
+            activations
+                .iter()
+                .any(|(kind, _)| *kind == ActivationKind::Reused)
+        );
     }
 }
