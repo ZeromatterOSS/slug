@@ -86,6 +86,7 @@ use crate::module_eval::DirectNonregistryIncludeFile;
 use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
 use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
+use crate::module_eval::parse_nonroot_include;
 use crate::module_eval::parse_root_include;
 use crate::module_eval::validate_root_module_source;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
@@ -1401,7 +1402,7 @@ enum DirectLocalModulePreparationError {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum DirectLocalIncludeFragmentFailure {
+pub(crate) enum DirectLocalIncludeFragmentFailure {
     SourceCompute {
         message: Arc<str>,
     },
@@ -1413,20 +1414,148 @@ enum DirectLocalIncludeFragmentFailure {
     },
 }
 
+#[derive(Debug, Clone)]
+enum NonregistryPreparationOwner {
+    Direct(RootRepositoryRoute),
+    Host {
+        workspace: NormalizedAbsolutePath,
+        module: NonrootModuleKey,
+    },
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct DirectLocalIncludeAncestryEntry {
-    package: PackageIdentifier,
+pub(crate) struct NonregistryIncludeOccurrence {
+    package: PackagePath,
     target: TargetName,
     raw_label: CompactString,
     location: crate::LogicalSpan,
 }
 
-#[derive(Debug, Clone)]
-struct DirectLocalIncludeFrontierEntry {
-    request: NonrootIncludeRequest,
-    ancestry: Arc<[DirectLocalIncludeAncestryEntry]>,
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct NonregistryPreparedFragment {
+    occurrence: NonregistryIncludeOccurrence,
+    logical_path: NormalizedAbsolutePath,
+    bytes: Arc<[u8]>,
+    inspection: NonrootModuleFileInspection,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct NonregistryIncludeCycleCapability {
+    package: PackagePath,
+    target: TargetName,
+    repeated_raw_label: CompactString,
+    repeated_location: crate::LogicalSpan,
+    ancestor_raw_label: CompactString,
+    ancestor_location: crate::LogicalSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum NonregistryPreparedModule {
+    Supported(Arc<[NonregistryPreparedFragment]>),
+    UnsupportedCycle {
+        fragments: Arc<[NonregistryPreparedFragment]>,
+        capability: NonregistryIncludeCycleCapability,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct NonregistryIncludeFrontierEntry {
+    request: NonrootIncludeRequest,
+    ancestry: Arc<[NonregistryIncludeAncestryEntry]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct NonregistryIncludeAncestryEntry {
+    package: PackagePath,
+    target: TargetName,
+    raw_label: CompactString,
+    location: crate::LogicalSpan,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostNonregistryModuleSourceIdentity {
+    Local {
+        repo_spec: RepoSpec,
+    },
+    Immutable {
+        repo_spec: RepoSpec,
+        source_identity: Arc<str>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostNonregistryModuleRoot {
+    logical_path: NormalizedAbsolutePath,
+    bytes: Arc<[u8]>,
+    inspection: NonrootModuleFileInspection,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct HostNonregistryPreparedClosure {
+    module: NonrootModuleKey,
+    source_identity: HostNonregistryModuleSourceIdentity,
+    root: HostNonregistryModuleRoot,
+    fragments: Arc<[NonregistryPreparedFragment]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostNonregistryModuleClosure {
+    Supported(HostNonregistryPreparedClosure),
+    UnsupportedCycle {
+        closure: HostNonregistryPreparedClosure,
+        capability: NonregistryIncludeCycleCapability,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostNonregistryIncludePackageFailure {
+    Compute(Arc<str>),
+    Preflight(HostNonregistryPackagePreflightError),
+    InvalidPackageName { message: Arc<str> },
+    Ignored,
+    NoBuildFile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostNonregistryModuleClosureError {
+    RootModuleFiles(CompactString),
+    NonregistryOverrideRequired(CompactString),
+    MaterializationCompute(Arc<str>),
+    Materialization(RepositoryMaterializationError),
+    RootSourceCompute(Arc<str>),
+    RootSource(RepositorySourceFileError),
+    RootAbsent,
+    RootValidation {
+        logical_path: NormalizedAbsolutePath,
+        message: CompactString,
+    },
+    BadLabel {
+        raw_label: CompactString,
+        location: crate::LogicalSpan,
+        message: CompactString,
+    },
+    Package {
+        raw_label: CompactString,
+        location: crate::LogicalSpan,
+        package: PackagePath,
+        failure: HostNonregistryIncludePackageFailure,
+    },
+    Fragment {
+        raw_label: CompactString,
+        location: crate::LogicalSpan,
+        repo_relative_path: Arc<PathBuf>,
+        failure: DirectLocalIncludeFragmentFailure,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum NonregistryPreparationError {
+    Direct(DirectLocalModulePreparationError),
+    Host(HostNonregistryModuleClosureError),
+}
+
+type NonregistryPreparationValue =
+    SourcePreparationOutcome<Result<NonregistryPreparedModule, NonregistryPreparationError>>;
 impl DirectLocalModulePreparationKey {
     fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
@@ -1560,10 +1689,203 @@ async fn prepare_direct_local_module(
             }
         },
     };
+    let prepared = match prepare_nonregistry_module(
+        ctx,
+        NonregistryPreparationOwner::Direct(route.clone()),
+        root_requests,
+    )
+    .await
+    {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+        SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Direct(error))) => {
+            return direct_local_preparation_error(error);
+        }
+        SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Host(_))) => {
+            unreachable!("direct-local preparation cannot produce a Host error");
+        }
+    };
+    let convert_fragment = |fragment: &NonregistryPreparedFragment| DirectLocalIncludeFragment {
+        package: PackageIdentifier::new(
+            route.canonical_repo().clone(),
+            fragment.occurrence.package.clone(),
+        ),
+        target: fragment.occurrence.target.clone(),
+        raw_label: fragment.occurrence.raw_label.clone(),
+        location: fragment.occurrence.location.clone(),
+        logical_path: fragment.logical_path.dupe(),
+        bytes: fragment.bytes.dupe(),
+        inspection: fragment.inspection.clone(),
+    };
+    let preparation = match prepared {
+        NonregistryPreparedModule::Supported(fragments) => {
+            DirectLocalModulePreparation::Supported(DirectLocalModuleClosure {
+                root,
+                fragments: fragments.iter().map(convert_fragment).collect(),
+            })
+        }
+        NonregistryPreparedModule::UnsupportedCycle {
+            fragments: _,
+            capability,
+        } => DirectLocalModulePreparation::Unsupported(DirectLocalIncludeCycleCapability {
+            package: PackageIdentifier::new(route.canonical_repo().clone(), capability.package),
+            target: capability.target,
+            repeated_raw_label: capability.repeated_raw_label,
+            repeated_location: capability.repeated_location,
+            ancestor_raw_label: capability.ancestor_raw_label,
+            ancestor_location: capability.ancestor_location,
+        }),
+    };
+    SourcePreparationOutcome::Complete(Arc::new(Ok(preparation)))
+}
+type NonregistryIncludeHorizonValue = SourcePreparationOutcome<
+    Result<Vec<NonregistryIncludeOccurrence>, NonregistryPreparationError>,
+>;
+
+async fn preflight_nonregistry_include_horizon(
+    ctx: &mut DiceComputations<'_>,
+    owner: &NonregistryPreparationOwner,
+    requests: &[NonrootIncludeRequest],
+) -> NonregistryIncludeHorizonValue {
+    if let NonregistryPreparationOwner::Direct(route) = owner {
+        return match preflight_direct_local_include_package_horizon(ctx, route.clone(), requests)
+            .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Err(error) => {
+                    SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Direct(
+                        DirectLocalModulePreparationError::Package(error.clone()),
+                    )))
+                }
+                Ok(value) => SourcePreparationOutcome::Complete(Ok(value
+                    .occurrences
+                    .iter()
+                    .map(|occurrence| NonregistryIncludeOccurrence {
+                        package: occurrence.package.package().clone(),
+                        target: occurrence.target.clone(),
+                        raw_label: occurrence.raw_label.clone(),
+                        location: occurrence.location.clone(),
+                    })
+                    .collect())),
+            },
+        };
+    }
+
+    let NonregistryPreparationOwner::Host { workspace, module } = owner else {
+        unreachable!()
+    };
+    let mut occurrences = Vec::with_capacity(requests.len());
+    for request in requests {
+        let (package, target) = match parse_nonroot_include(request) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                return SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Host(
+                    HostNonregistryModuleClosureError::BadLabel {
+                        raw_label: request.path.clone(),
+                        location: request.location.clone(),
+                        message,
+                    },
+                )));
+            }
+        };
+        occurrences.push(NonregistryIncludeOccurrence {
+            package,
+            target,
+            raw_label: request.path.clone(),
+            location: request.location.clone(),
+        });
+    }
+
+    let mut unique = SmallSet::with_capacity(occurrences.len());
+    unique.extend(
+        occurrences
+            .iter()
+            .map(|occurrence| occurrence.package.clone()),
+    );
+    let outcomes = ctx
+        .compute_join(unique, |ctx, package| {
+            let workspace = workspace.dupe();
+            let module = module.clone();
+            Box::pin(async move {
+                let value = ctx
+                    .compute(&HostNonregistryPackagePreflightKey::new(
+                        workspace,
+                        module,
+                        package.clone(),
+                    ))
+                    .await
+                    .map_err(|error| Arc::<str>::from(error.to_string()));
+                (package, value)
+            })
+        })
+        .await
+        .into_iter()
+        .collect::<SmallMap<_, _>>();
+    let all_need =
+        outcomes
+            .values()
+            .fold(None, |current: Option<SourcePreparationNeeds>, outcome| {
+                let Ok(SourcePreparationOutcome::Need(incoming)) = outcome else {
+                    return current;
+                };
+                Some(match current {
+                    Some(current) => current
+                        .try_union(incoming)
+                        .expect("one nonregistry package horizon's Needs cannot conflict"),
+                    None => incoming.dupe(),
+                })
+            });
+
+    for occurrence in &occurrences {
+        let outcome = outcomes
+            .get(&occurrence.package)
+            .expect("every package was computed");
+        let failure = match outcome {
+            Err(message) => HostNonregistryIncludePackageFailure::Compute(message.dupe()),
+            Ok(SourcePreparationOutcome::Need(_)) => {
+                return SourcePreparationOutcome::Need(
+                    all_need.expect("the current package contributed a Need"),
+                );
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(HostNonregistryPackagePreflight::BuildDotBazel)
+                | Ok(HostNonregistryPackagePreflight::Build) => continue,
+                Ok(HostNonregistryPackagePreflight::Ignored) => {
+                    HostNonregistryIncludePackageFailure::Ignored
+                }
+                Ok(HostNonregistryPackagePreflight::InvalidPackageName { message }) => {
+                    HostNonregistryIncludePackageFailure::InvalidPackageName {
+                        message: message.dupe(),
+                    }
+                }
+                Ok(HostNonregistryPackagePreflight::NoBuildFile) => {
+                    HostNonregistryIncludePackageFailure::NoBuildFile
+                }
+                Err(error) => HostNonregistryIncludePackageFailure::Preflight(error.clone()),
+            },
+        };
+        return SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Host(
+            HostNonregistryModuleClosureError::Package {
+                raw_label: occurrence.raw_label.clone(),
+                location: occurrence.location.clone(),
+                package: occurrence.package.clone(),
+                failure,
+            },
+        )));
+    }
+    SourcePreparationOutcome::Complete(Ok(occurrences))
+}
+
+async fn prepare_nonregistry_module(
+    ctx: &mut DiceComputations<'_>,
+    owner: NonregistryPreparationOwner,
+    root_requests: Arc<[NonrootIncludeRequest]>,
+) -> NonregistryPreparationValue {
     let mut frontier = root_requests
         .iter()
         .cloned()
-        .map(|request| DirectLocalIncludeFrontierEntry {
+        .map(|request| NonregistryIncludeFrontierEntry {
             request,
             ancestry: Arc::from([]),
         })
@@ -1576,58 +1898,47 @@ async fn prepare_direct_local_module(
             .iter()
             .map(|entry| entry.request.clone())
             .collect::<Vec<_>>();
-        let preflight =
-            preflight_direct_local_include_package_horizon(ctx, route.clone(), &requests).await;
-        let preflight = match preflight {
-            SourcePreparationOutcome::Need(need) => {
-                return SourcePreparationOutcome::Need(need);
+        let occurrences = match preflight_nonregistry_include_horizon(ctx, &owner, &requests).await
+        {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
             }
-            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.clone(),
-                Err(error) => {
-                    return direct_local_preparation_error(
-                        DirectLocalModulePreparationError::Package(error.clone()),
-                    );
-                }
-            },
         };
-        let paths = preflight
-            .occurrences
+        let paths = occurrences
             .iter()
-            .map(direct_local_fragment_relative_path)
+            .map(nonregistry_fragment_relative_path)
             .collect::<Vec<_>>();
         let mut unique_paths = SmallSet::with_capacity(paths.len());
         unique_paths.extend(paths.iter().cloned());
-        let computed = ctx
-            .compute_join(unique_paths, |ctx, repo_relative_path| {
-                let route = route.clone();
-                Box::pin(async move {
-                    let outcome = ctx
-                        .compute(&HostRepositorySourceFileKey::new(
-                            route,
-                            repo_relative_path.clone(),
-                        ))
-                        .await
-                        .map_err(|error| Arc::<str>::from(error.to_string()));
-                    (repo_relative_path, outcome)
-                })
-            })
-            .await;
-        let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
-        let all_need = union_direct_local_fragment_needs(&outcomes);
+        let outcomes = read_nonregistry_fragment_sources(ctx, &owner, unique_paths).await;
+        let all_need =
+            outcomes
+                .values()
+                .fold(None, |current: Option<SourcePreparationNeeds>, outcome| {
+                    let Ok(SourcePreparationOutcome::Need(incoming)) = outcome else {
+                        return current;
+                    };
+                    Some(match current {
+                        Some(current) => current
+                            .try_union(incoming)
+                            .expect("one nonregistry module's fragment Needs cannot conflict"),
+                        None => incoming.dupe(),
+                    })
+                });
 
         let mut next_frontier = Vec::new();
-        for ((entry, occurrence), repo_relative_path) in frontier
-            .iter()
-            .zip(preflight.occurrences.iter())
-            .zip(paths.iter())
+        for ((entry, occurrence), repo_relative_path) in
+            frontier.iter().zip(occurrences.iter()).zip(paths.iter())
         {
             let outcome = outcomes
                 .get(repo_relative_path)
                 .expect("every fragment path was computed");
             let source = match outcome {
                 Err(message) => {
-                    return direct_local_fragment_error(
+                    return nonregistry_fragment_error(
+                        &owner,
                         occurrence,
                         repo_relative_path,
                         DirectLocalIncludeFragmentFailure::SourceCompute {
@@ -1641,34 +1952,30 @@ async fn prepare_direct_local_module(
                     );
                 }
                 Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                    return direct_local_fragment_error(
+                    return nonregistry_fragment_error(
+                        &owner,
                         occurrence,
                         repo_relative_path,
                         DirectLocalIncludeFragmentFailure::Source(error.clone()),
                     );
                 }
-                Ok(SourcePreparationOutcome::Complete(Ok(
-                    HostRepositorySourceFileValue::Absent,
-                ))) => {
-                    return direct_local_fragment_error(
+                Ok(SourcePreparationOutcome::Complete(Ok(None))) => {
+                    return nonregistry_fragment_error(
+                        &owner,
                         occurrence,
                         repo_relative_path,
                         DirectLocalIncludeFragmentFailure::Absent,
                     );
                 }
-                Ok(SourcePreparationOutcome::Complete(Ok(
-                    HostRepositorySourceFileValue::Present {
-                        bytes,
-                        logical_path,
-                    },
-                ))) => (bytes, logical_path),
+                Ok(SourcePreparationOutcome::Complete(Ok(Some(source)))) => source,
             };
             let logical_id =
                 crate::LogicalModuleFileId::new(source.1.as_path().display().to_string());
-            let inspection = match validate_root_module_source(logical_id, source.0) {
+            let inspection = match validate_root_module_source(logical_id, &source.0) {
                 Ok(inspection) => inspection,
                 Err(message) => {
-                    return direct_local_fragment_error(
+                    return nonregistry_fragment_error(
+                        &owner,
                         occurrence,
                         repo_relative_path,
                         DirectLocalIncludeFragmentFailure::Validation {
@@ -1678,11 +1985,8 @@ async fn prepare_direct_local_module(
                     );
                 }
             };
-            fragments.push(DirectLocalIncludeFragment {
-                package: occurrence.package.clone(),
-                target: occurrence.target.clone(),
-                raw_label: occurrence.raw_label.clone(),
-                location: occurrence.location.clone(),
+            fragments.push(NonregistryPreparedFragment {
+                occurrence: occurrence.clone(),
                 logical_path: source.1.dupe(),
                 bytes: source.0.dupe(),
                 inspection: inspection.clone(),
@@ -1694,7 +1998,7 @@ async fn prepare_direct_local_module(
             if let Some(index) = repeated {
                 if pending_cycle.is_none() {
                     let ancestor = &entry.ancestry[index];
-                    pending_cycle = Some(DirectLocalIncludeCycleCapability {
+                    pending_cycle = Some(NonregistryIncludeCycleCapability {
                         package: occurrence.package.clone(),
                         target: occurrence.target.clone(),
                         repeated_raw_label: occurrence.raw_label.clone(),
@@ -1710,7 +2014,7 @@ async fn prepare_direct_local_module(
                 .ancestry
                 .iter()
                 .cloned()
-                .chain([DirectLocalIncludeAncestryEntry {
+                .chain([NonregistryIncludeAncestryEntry {
                     package: occurrence.package.clone(),
                     target: occurrence.target.clone(),
                     raw_label: occurrence.raw_label.clone(),
@@ -1718,7 +2022,7 @@ async fn prepare_direct_local_module(
                 }])
                 .collect::<Arc<[_]>>();
             next_frontier.extend(inspection.includes.iter().cloned().map(|request| {
-                DirectLocalIncludeFrontierEntry {
+                NonregistryIncludeFrontierEntry {
                     request,
                     ancestry: ancestry.dupe(),
                 }
@@ -1727,55 +2031,117 @@ async fn prepare_direct_local_module(
         frontier = next_frontier;
     }
 
-    let preparation = match pending_cycle {
-        Some(cycle) => DirectLocalModulePreparation::Unsupported(cycle),
-        None => DirectLocalModulePreparation::Supported(DirectLocalModuleClosure {
-            root,
-            fragments: fragments.into(),
-        }),
+    let fragments: Arc<[NonregistryPreparedFragment]> = fragments.into();
+    SourcePreparationOutcome::Complete(Ok(match pending_cycle {
+        Some(capability) => NonregistryPreparedModule::UnsupportedCycle {
+            fragments,
+            capability,
+        },
+        None => NonregistryPreparedModule::Supported(fragments),
+    }))
+}
+
+type NonregistryFragmentSourceValue =
+    SourcePreparationResult<Option<(Arc<[u8]>, NormalizedAbsolutePath)>, RepositorySourceFileError>;
+
+async fn read_nonregistry_fragment_sources(
+    ctx: &mut DiceComputations<'_>,
+    owner: &NonregistryPreparationOwner,
+    paths: SmallSet<PathBuf>,
+) -> SmallMap<PathBuf, Result<NonregistryFragmentSourceValue, Arc<str>>> {
+    match owner {
+        NonregistryPreparationOwner::Direct(route) => ctx
+            .compute_join(paths, |ctx, path| {
+                let route = route.clone();
+                Box::pin(async move {
+                    let value = ctx
+                        .compute(&HostRepositorySourceFileKey::new(route, path.clone()))
+                        .await
+                        .map(|value| {
+                            value.map(|result| {
+                                result.map(|source| match source {
+                                    HostRepositorySourceFileValue::Absent => None,
+                                    HostRepositorySourceFileValue::Present {
+                                        bytes,
+                                        logical_path,
+                                    } => Some((bytes, logical_path)),
+                                })
+                            })
+                        })
+                        .map_err(|error| Arc::<str>::from(error.to_string()));
+                    (path, value)
+                })
+            })
+            .await
+            .into_iter()
+            .collect(),
+        NonregistryPreparationOwner::Host { workspace, module } => ctx
+            .compute_join(paths, |ctx, path| {
+                let workspace = workspace.dupe();
+                let module = module.clone();
+                Box::pin(async move {
+                    let value = ctx
+                        .compute(&RepositorySourceFileKey {
+                            workspace: workspace.as_path().to_path_buf(),
+                            module_name: module.name.clone(),
+                            repo_relative_path: path.clone(),
+                        })
+                        .await
+                        .map(|value| {
+                            value.map(|result| {
+                                result.map(|source| match source {
+                                    RepositorySourceFileValue::Absent => None,
+                                    RepositorySourceFileValue::Present(bytes) => {
+                                        Some((bytes, host_nonregistry_logical_path(&module, &path)))
+                                    }
+                                })
+                            })
+                        })
+                        .map_err(|error| Arc::<str>::from(error.to_string()));
+                    (path, value)
+                })
+            })
+            .await
+            .into_iter()
+            .collect(),
+    }
+}
+
+fn nonregistry_fragment_error(
+    owner: &NonregistryPreparationOwner,
+    occurrence: &NonregistryIncludeOccurrence,
+    repo_relative_path: &Path,
+    failure: DirectLocalIncludeFragmentFailure,
+) -> NonregistryPreparationValue {
+    let error = match owner {
+        NonregistryPreparationOwner::Direct(_) => {
+            NonregistryPreparationError::Direct(DirectLocalModulePreparationError::Fragment {
+                raw_label: occurrence.raw_label.clone(),
+                location: occurrence.location.clone(),
+                repo_relative_path: Arc::new(repo_relative_path.to_path_buf()),
+                failure,
+            })
+        }
+        NonregistryPreparationOwner::Host { .. } => {
+            NonregistryPreparationError::Host(HostNonregistryModuleClosureError::Fragment {
+                raw_label: occurrence.raw_label.clone(),
+                location: occurrence.location.clone(),
+                repo_relative_path: Arc::new(repo_relative_path.to_path_buf()),
+                failure,
+            })
+        }
     };
-    SourcePreparationOutcome::Complete(Arc::new(Ok(preparation)))
+    SourcePreparationOutcome::Complete(Err(error))
 }
 
-fn direct_local_fragment_relative_path(
-    occurrence: &DirectLocalIncludePackageOccurrence,
-) -> PathBuf {
-    PathBuf::from(occurrence.package.package().as_str()).join(occurrence.target.as_str())
-}
-
-fn union_direct_local_fragment_needs(
-    outcomes: &SmallMap<PathBuf, Result<<HostRepositorySourceFileKey as Key>::Value, Arc<str>>>,
-) -> Option<SourcePreparationNeeds> {
-    outcomes.values().fold(None, |current, outcome| {
-        let Ok(SourcePreparationOutcome::Need(incoming)) = outcome else {
-            return current;
-        };
-        Some(match current {
-            Some(current) => current
-                .try_union(incoming)
-                .expect("one-route fragment Needs cannot conflict"),
-            None => incoming.dupe(),
-        })
-    })
+fn nonregistry_fragment_relative_path(occurrence: &NonregistryIncludeOccurrence) -> PathBuf {
+    PathBuf::from(occurrence.package.as_str()).join(occurrence.target.as_str())
 }
 
 fn direct_local_preparation_error(
     error: DirectLocalModulePreparationError,
 ) -> <DirectLocalModulePreparationKey as Key>::Value {
     SourcePreparationOutcome::Complete(Arc::new(Err(error)))
-}
-
-fn direct_local_fragment_error(
-    occurrence: &DirectLocalIncludePackageOccurrence,
-    repo_relative_path: &Path,
-    failure: DirectLocalIncludeFragmentFailure,
-) -> <DirectLocalModulePreparationKey as Key>::Value {
-    direct_local_preparation_error(DirectLocalModulePreparationError::Fragment {
-        raw_label: occurrence.raw_label.clone(),
-        location: occurrence.location.clone(),
-        repo_relative_path: Arc::new(repo_relative_path.to_path_buf()),
-        failure,
-    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
@@ -3646,6 +4012,221 @@ fn checked_relative_path(path: &Path) -> Result<&Path, CompactString> {
 pub fn source_identity(bytes: &[u8]) -> Arc<str> {
     Arc::from(hex::encode(Sha256::digest(bytes)))
 }
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryModuleClosureKey {
+    workspace: NormalizedAbsolutePath,
+    module: NonrootModuleKey,
+}
+
+impl HostNonregistryModuleClosureKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, module: NonrootModuleKey) -> Self {
+        Self { workspace, module }
+    }
+}
+
+impl fmt::Display for HostNonregistryModuleClosureKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-nonregistry-module-closure:{}@{}",
+            self.module.name, self.module.version
+        )
+    }
+}
+
+type HostNonregistryModuleClosureValue = SourcePreparationOutcome<
+    Arc<Result<HostNonregistryModuleClosure, HostNonregistryModuleClosureError>>,
+>;
+
+fn host_nonregistry_closure_complete(
+    value: Result<HostNonregistryModuleClosure, HostNonregistryModuleClosureError>,
+) -> HostNonregistryModuleClosureValue {
+    SourcePreparationOutcome::Complete(Arc::new(value))
+}
+
+fn host_nonregistry_logical_path(
+    module: &NonrootModuleKey,
+    repo_relative_path: &Path,
+) -> NormalizedAbsolutePath {
+    NormalizedAbsolutePath::new(
+        PathBuf::from("/.slug-nonregistry")
+            .join(format!("{}@{}", module.name, module.version))
+            .join(repo_relative_path),
+    )
+    .expect("module identity and normalized repository-relative path form a logical path")
+}
+
+#[async_trait]
+impl Key for HostNonregistryModuleClosureKey {
+    type Value = HostNonregistryModuleClosureValue;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let root = preflight_dice_invariant(
+            ctx.compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_path_buf(),
+            })
+            .await,
+        );
+        let root = match root.as_ref() {
+            Ok(root) => root,
+            Err(error) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::RootModuleFiles(error.clone()),
+                ));
+            }
+        };
+        if !matches!(
+            root.overrides.get(self.module.name.as_str()),
+            Some(RootModuleOverride::NonRegistry(_))
+        ) {
+            return host_nonregistry_closure_complete(Err(
+                HostNonregistryModuleClosureError::NonregistryOverrideRequired(
+                    self.module.name.clone(),
+                ),
+            ));
+        }
+
+        let materialization = match ctx
+            .compute(&RepositoryMaterializationKey {
+                workspace: self.workspace.as_path().to_path_buf(),
+                module_name: self.module.name.clone(),
+            })
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Err(error) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::MaterializationCompute(Arc::from(
+                        error.to_string(),
+                    )),
+                ));
+            }
+        };
+        let source_identity = match materialization.as_ref() {
+            Err(error) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::Materialization(error.clone()),
+                ));
+            }
+            Ok(RepositoryMaterialization::Local { repo_spec, .. }) => {
+                HostNonregistryModuleSourceIdentity::Local {
+                    repo_spec: repo_spec.clone(),
+                }
+            }
+            Ok(RepositoryMaterialization::Immutable {
+                repo_spec,
+                source_identity,
+                ..
+            }) => HostNonregistryModuleSourceIdentity::Immutable {
+                repo_spec: repo_spec.clone(),
+                source_identity: source_identity.dupe(),
+            },
+        };
+
+        let root_source = match ctx
+            .compute(&RepositorySourceFileKey {
+                workspace: self.workspace.as_path().to_path_buf(),
+                module_name: self.module.name.clone(),
+                repo_relative_path: PathBuf::from("MODULE.bazel"),
+            })
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
+                bytes,
+            )))) => bytes,
+            Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::RootAbsent,
+                ));
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::RootSource(error),
+                ));
+            }
+            Err(error) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::RootSourceCompute(Arc::from(
+                        error.to_string(),
+                    )),
+                ));
+            }
+        };
+        let root_path = host_nonregistry_logical_path(&self.module, Path::new("MODULE.bazel"));
+        let inspection = match validate_root_module_source(
+            crate::LogicalModuleFileId::new(root_path.as_path().display().to_string()),
+            &root_source,
+        ) {
+            Ok(inspection) => inspection,
+            Err(message) => {
+                return host_nonregistry_closure_complete(Err(
+                    HostNonregistryModuleClosureError::RootValidation {
+                        logical_path: root_path,
+                        message,
+                    },
+                ));
+            }
+        };
+        let root = HostNonregistryModuleRoot {
+            logical_path: root_path,
+            bytes: root_source,
+            inspection: inspection.clone(),
+        };
+        let prepared = match prepare_nonregistry_module(
+            ctx,
+            NonregistryPreparationOwner::Host {
+                workspace: self.workspace.dupe(),
+                module: self.module.clone(),
+            },
+            inspection.includes,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok(prepared)) => prepared,
+            SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Host(error))) => {
+                return host_nonregistry_closure_complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Direct(_))) => {
+                unreachable!("Host preparation cannot produce a direct-local error");
+            }
+        };
+        let (fragments, capability) = match prepared {
+            NonregistryPreparedModule::Supported(fragments) => (fragments, None),
+            NonregistryPreparedModule::UnsupportedCycle {
+                fragments,
+                capability,
+            } => (fragments, Some(capability)),
+        };
+        let closure = HostNonregistryPreparedClosure {
+            module: self.module.clone(),
+            source_identity,
+            root,
+            fragments,
+        };
+        host_nonregistry_closure_complete(Ok(match capability {
+            Some(capability) => HostNonregistryModuleClosure::UnsupportedCycle {
+                closure,
+                capability,
+            },
+            None => HostNonregistryModuleClosure::Supported(closure),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -3672,6 +4253,35 @@ mod tests {
     use crate::RootRepositoryRouteKey;
     use crate::inject_root_module_request_inputs;
     use crate::inject_root_package_policy_inputs;
+
+    fn union_direct_local_fragment_needs(
+        outcomes: &SmallMap<PathBuf, Result<<HostRepositorySourceFileKey as Key>::Value, Arc<str>>>,
+    ) -> Option<SourcePreparationNeeds> {
+        outcomes.values().fold(None, |current, outcome| {
+            let Ok(SourcePreparationOutcome::Need(incoming)) = outcome else {
+                return current;
+            };
+            Some(match current {
+                Some(current) => current
+                    .try_union(incoming)
+                    .expect("one-route fragment Needs cannot conflict"),
+                None => incoming.dupe(),
+            })
+        })
+    }
+
+    fn direct_local_fragment_error(
+        occurrence: &DirectLocalIncludePackageOccurrence,
+        repo_relative_path: &Path,
+        failure: DirectLocalIncludeFragmentFailure,
+    ) -> <DirectLocalModulePreparationKey as Key>::Value {
+        direct_local_preparation_error(DirectLocalModulePreparationError::Fragment {
+            raw_label: occurrence.raw_label.clone(),
+            location: occurrence.location.clone(),
+            repo_relative_path: Arc::new(repo_relative_path.to_path_buf()),
+            failure,
+        })
+    }
 
     #[derive(Default)]
     struct HostSourceDependencyTracker {
@@ -3752,6 +4362,7 @@ mod tests {
     struct NonregistryPreflightTracker {
         preflight: Mutex<Vec<(ActivationKind, bool)>>,
         repo: Mutex<Vec<(ActivationKind, bool)>>,
+        closure: Mutex<Vec<ActivationKind>>,
     }
 
     impl ActivationTracker for NonregistryPreflightTracker {
@@ -3770,6 +4381,11 @@ mod tests {
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             let record = (activation.kind(), activation.evaluation_data().is_none());
             if key
+                .downcast_ref::<HostNonregistryModuleClosureKey>()
+                .is_some()
+            {
+                self.closure.lock().unwrap().push(activation.kind());
+            } else if key
                 .downcast_ref::<HostNonregistryPackagePreflightKey>()
                 .is_some()
             {
@@ -4692,12 +5308,14 @@ mod tests {
         route_path: &str,
         module: Option<&[u8]>,
         repo: Option<&[u8]>,
+        module_wrong_kind: Option<PathNodeKind>,
         ignore: Option<&[u8]>,
         packages: &[(&str, bool)],
         omitted: &[(&str, &str)],
         directory_markers: &[(&str, &str)],
         fragments: &[(&str, Option<&[u8]>)],
         fragment_needs: &[&str],
+        fragment_wrong_kinds: &[(&str, PathNodeKind)],
         variant: i64,
     ) -> PathObservationEpoch {
         let demand = |path: &str, operation| {
@@ -4746,6 +5364,7 @@ mod tests {
             demand(&module_path, PathObservationOperation::Lstat),
             module
                 .map(|_| lstat(PathNodeKind::RegularFile))
+                .or_else(|| module_wrong_kind.map(lstat))
                 .unwrap_or(PathObservationResult::Lstat(PathOperationResult::Missing)),
         );
         if let Some(module) = module {
@@ -4816,6 +5435,15 @@ mod tests {
                 );
             }
         }
+        for (relative, kind) in fragment_wrong_kinds {
+            observations.insert(
+                demand(
+                    &format!("{route_path}/{relative}"),
+                    PathObservationOperation::Lstat,
+                ),
+                lstat(*kind),
+            );
+        }
         for relative in fragment_needs {
             observations.insert(
                 demand(
@@ -4862,9 +5490,11 @@ mod tests {
                     route_path,
                     module,
                     repo,
+                    None,
                     ignore,
                     packages,
                     omitted,
+                    &[],
                     &[],
                     &[],
                     &[],
@@ -4946,11 +5576,13 @@ mod tests {
                     module,
                     repo,
                     None,
+                    None,
                     packages,
                     &[],
                     &[],
                     fragments,
                     fragment_needs,
+                    &[],
                     variant,
                 ),
             )])
@@ -5026,11 +5658,13 @@ mod tests {
                     module,
                     repo,
                     None,
+                    None,
                     packages,
                     &[],
                     &[],
                     fragments,
                     fragment_needs,
+                    &[],
                     variant,
                 ),
             )])
@@ -5278,6 +5912,14 @@ mod tests {
         generation_root: &str,
         observation_instance: PathObservationInstanceId,
     ) -> RepositoryMaterializationResultEpoch {
+        immutable_material_with_identity(generation_root, observation_instance, "fixed-content")
+    }
+
+    fn immutable_material_with_identity(
+        generation_root: &str,
+        observation_instance: PathObservationInstanceId,
+        source_identity: &str,
+    ) -> RepositoryMaterializationResultEpoch {
         let route = immutable_route();
         RepositoryMaterializationResultEpoch::new(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -5292,7 +5934,7 @@ mod tests {
                 }),
                 result: RepositoryMaterializationResult::Success(
                     RepositoryMaterializationSuccess::Immutable {
-                        source_identity: Arc::from("fixed-content"),
+                        source_identity: Arc::from(source_identity),
                         generation_root: PathBuf::from(generation_root),
                         observation_instance,
                     },
@@ -8572,11 +9214,13 @@ mod tests {
                     "/workspace/dep",
                     Some(b"module(name = \"dep\", version = \"1\")\n"),
                     repo,
+                    None,
                     ignore,
                     &[("pkg", false)],
                     &omitted,
                     &directories,
                     &fragments,
+                    &[],
                     &[],
                     variant,
                 ),
@@ -8802,10 +9446,12 @@ mod tests {
                     None,
                     None,
                     None,
+                    None,
                     &[("pkg", false)],
                     &[],
                     &[],
                     &[("pkg/BUILD.bazel", Some(b"exports_files([])\n"))],
+                    &[],
                     &[],
                     instance_id as i64,
                 ),
@@ -8925,59 +9571,462 @@ mod tests {
         assert!(matches!(&b, SourcePreparationOutcome::Complete(value)
             if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::NoBuildFile))));
         assert!(HostNonregistryPackagePreflightKey::equality(&a, &restored));
+    }
 
-        for scenario in [
-            ("pkg", Some("BUILD"), false, false),
-            ("pkg", Some("BUILD"), false, true),
-        ] {
-            let value = nonregistry_preflight_compute(
-                &dice,
+    async fn host_nonregistry_closure_compute(
+        dice: &Arc<Dice>,
+        root_module: Option<&[u8]>,
+        root_wrong_kind: Option<PathNodeKind>,
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        variant: i64,
+        immutable: Option<(&str, u64, &str)>,
+        tracker: Option<Arc<NonregistryPreflightTracker>>,
+        fragment_wrong_kind: Option<(&str, PathNodeKind)>,
+    ) -> HostNonregistryModuleClosureValue {
+        let root_source = if immutable.is_some() {
+            "bazel_dep(name = 'dep', version = '1')\narchive_override(module_name = 'dep')\n"
+        } else {
+            "bazel_dep(name = 'dep', version = '1')\nlocal_path_override(module_name = 'dep', path = 'dep')\n"
+        };
+        let (namespace, route_path, materialization) = match immutable {
+            Some((generation, instance, source_identity)) => {
+                let instance = PathObservationInstanceId::new(instance);
+                (
+                    PathObservationNamespace::Materialization(instance),
+                    generation,
+                    immutable_material_with_identity(generation, instance, source_identity),
+                )
+            }
+            None => (
+                PathObservationNamespace::Host,
+                "/workspace/dep",
+                material("dep"),
+            ),
+        };
+        let mut updater = dice.updater_with_data(UserComputationData {
+            activation_tracker: tracker.map(|value| value as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        });
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                            root_source.to_owned(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel.lock"),
+                        slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        let mut observed_fragments = vec![
+            ("pkg/BUILD.bazel", Some(&b""[..])),
+            ("other/BUILD.bazel", Some(&b""[..])),
+        ];
+        observed_fragments.extend_from_slice(fragments);
+        let fragment_wrong_kinds = fragment_wrong_kind.into_iter().collect::<Vec<_>>();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    root_source,
+                    namespace,
+                    route_path,
+                    root_module,
+                    None,
+                    root_wrong_kind,
+                    None,
+                    &[("pkg", true), ("other", true)],
+                    &[],
+                    &[],
+                    &observed_fragments,
+                    fragment_needs,
+                    &fragment_wrong_kinds,
+                    variant,
+                ),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                materialization,
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                std::iter::empty::<&str>(),
                 None,
-                None,
-                Some(b"fallback\n"),
-                &[],
-                23,
-                false,
-                None,
-                scenario,
+                Some("warning"),
             )
-            .await;
-            assert!(matches!(value, SourcePreparationOutcome::Complete(value)
-                if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::Build))));
-        }
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&HostNonregistryModuleClosureKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                NonrootModuleKey::new("dep", "1"),
+            ))
+            .await
+            .unwrap()
+    }
 
-        let invalid = nonregistry_preflight_compute(
+    fn supported_host_closure(
+        value: &HostNonregistryModuleClosureValue,
+    ) -> &HostNonregistryPreparedClosure {
+        let SourcePreparationOutcome::Complete(value) = value else {
+            panic!("expected complete closure")
+        };
+        let HostNonregistryModuleClosure::Supported(closure) = value.as_ref().as_ref().unwrap()
+        else {
+            panic!("expected supported closure")
+        };
+        closure
+    }
+
+    #[tokio::test]
+    async fn host_nonregistry_module_closure_local_aba_order_need_and_reuse() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        let root = b"module(name = 'dep', version = '1')\ninclude('//pkg:a.MODULE.bazel')\ninclude('//pkg:a.MODULE.bazel')\n";
+        let a_fragments = [
+            (
+                "pkg/a.MODULE.bazel",
+                Some(&b"include('//other:b.MODULE.bazel')\n"[..]),
+            ),
+            (
+                "other/b.MODULE.bazel",
+                Some(&b"bazel_dep(name='b',version='1')\n"[..]),
+            ),
+        ];
+        let a = host_nonregistry_closure_compute(
             &dice,
-            Some(b"not evaluated\n"),
+            Some(root),
             None,
-            None,
+            &a_fragments,
             &[],
-            24,
-            false,
+            60,
             None,
-            ("bad:name", None, false, false),
+            Some(tracker.clone()),
+            None,
         )
         .await;
-        assert!(matches!(invalid, SourcePreparationOutcome::Complete(value)
-            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::InvalidPackageName { .. }))));
-
-        let need = nonregistry_preflight_compute(
+        let b = host_nonregistry_closure_compute(
             &dice,
+            Some(root),
             None,
-            None,
-            None,
+            &[
+                ("pkg/a.MODULE.bazel", Some(&b"include('//other:b.MODULE.bazel')\nbazel_dep(name='changed',version='1')\n"[..])),
+                a_fragments[1],
+            ],
             &[],
-            25,
-            false,
+            61,
             None,
-            ("pkg", None, true, false),
+            None,
+            None,
         )
         .await;
+        let need = host_nonregistry_closure_compute(
+            &dice,
+            Some(root),
+            None,
+            &[],
+            &["pkg/a.MODULE.bazel"],
+            62,
+            None,
+            Some(tracker.clone()),
+            None,
+        )
+        .await;
+        let restored = host_nonregistry_closure_compute(
+            &dice,
+            Some(root),
+            None,
+            &a_fragments,
+            &[],
+            63,
+            None,
+            Some(tracker.clone()),
+            None,
+        )
+        .await;
+        let warm = host_nonregistry_closure_compute(
+            &dice,
+            Some(root),
+            None,
+            &a_fragments,
+            &[],
+            63,
+            None,
+            Some(tracker.clone()),
+            None,
+        )
+        .await;
+        let category_b = host_nonregistry_closure_compute(
+            &dice,
+            Some(root),
+            None,
+            &a_fragments,
+            &[],
+            64,
+            Some(("/generation-category", 64, "fixed-content")),
+            None,
+            None,
+        )
+        .await;
+        let multi_need = host_nonregistry_closure_compute(
+            &dice,
+            Some(b"module(name='dep',version='1')\ninclude('//pkg:a.MODULE.bazel')\ninclude('//other:b.MODULE.bazel')\n"),
+            None,
+            &[],
+            &["pkg/a.MODULE.bazel", "other/b.MODULE.bazel"],
+            65,
+            None,
+            None,
+            None,
+        )
+        .await;
+        assert!(!HostNonregistryModuleClosureKey::equality(&a, &category_b));
+        assert!(matches!(
+            multi_need,
+            SourcePreparationOutcome::Need(need)
+                if need.path_observations().unwrap().demands().len() == 2
+        ));
         assert!(matches!(need, SourcePreparationOutcome::Need(_)));
-        let recovered = local_preflight(&dice, Some(b"recovered\n"), 26).await;
-        assert!(
-            matches!(recovered, SourcePreparationOutcome::Complete(value)
-            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::BuildDotBazel)))
+        assert!(HostNonregistryModuleClosureKey::equality(&a, &restored));
+        assert!(HostNonregistryModuleClosureKey::equality(&restored, &warm));
+        let closure = supported_host_closure(&a);
+        assert_eq!(closure.fragments.len(), 4);
+        assert_eq!(
+            closure
+                .fragments
+                .iter()
+                .map(|fragment| fragment.occurrence.target.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "a.MODULE.bazel",
+                "a.MODULE.bazel",
+                "b.MODULE.bazel",
+                "b.MODULE.bazel"
+            ]
         );
+        assert!(!HostNonregistryModuleClosureKey::equality(&a, &b));
+        assert!(
+            tracker
+                .closure
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|kind| *kind == ActivationKind::Reused)
+        );
+
+        let changed = host_nonregistry_closure_compute(
+            &dice,
+            Some(b"module(name='dep',version='1')\n"),
+            None,
+            &[],
+            &[],
+            66,
+            None,
+            None,
+            None,
+        )
+        .await;
+        assert!(!HostNonregistryModuleClosureKey::equality(&a, &changed));
+    }
+
+    #[tokio::test]
+    async fn host_nonregistry_module_closure_immutable_cycle_and_root_failures() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let cycle_root = b"module(name='dep',version='1')\ninclude('//pkg:a.MODULE.bazel')\n";
+        let cycle_fragment = b"include('//pkg:a.MODULE.bazel')\n";
+        let cycle = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[("pkg/a.MODULE.bazel", Some(cycle_fragment))],
+            &[],
+            70,
+            Some(("/generation-a", 70, "fixed-content")),
+            None,
+            None,
+        )
+        .await;
+        assert!(matches!(
+            cycle,
+            SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Ok(HostNonregistryModuleClosure::UnsupportedCycle {
+                    closure,
+                    ..
+                }) if closure.fragments.len() == 2)
+        ));
+
+        let generation_b = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[("pkg/a.MODULE.bazel", Some(cycle_fragment))],
+            &[],
+            71,
+            Some(("/generation-b", 71, "fixed-content")),
+            None,
+            None,
+        )
+        .await;
+        let generation_a = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[("pkg/a.MODULE.bazel", Some(cycle_fragment))],
+            &[],
+            72,
+            Some(("/generation-a", 72, "fixed-content")),
+            None,
+            None,
+        )
+        .await;
+        assert!(HostNonregistryModuleClosureKey::equality(
+            &cycle,
+            &generation_b
+        ));
+        assert!(HostNonregistryModuleClosureKey::equality(
+            &cycle,
+            &generation_a
+        ));
+
+        let content_b = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[(
+                "pkg/a.MODULE.bazel",
+                Some(&b"include('//pkg:a.MODULE.bazel')\nbazel_dep(name='changed',version='1')\n"[..]),
+            )],
+            &[],
+            73,
+            Some(("/generation-c", 73, "fixed-content")),
+            None,
+            None,
+        )
+        .await;
+        let identity_b = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[("pkg/a.MODULE.bazel", Some(cycle_fragment))],
+            &[],
+            74,
+            Some(("/generation-d", 74, "different-content-id")),
+            None,
+            None,
+        )
+        .await;
+        assert!(!HostNonregistryModuleClosureKey::equality(
+            &cycle, &content_b
+        ));
+        assert!(!HostNonregistryModuleClosureKey::equality(
+            &cycle,
+            &identity_b
+        ));
+        let fragment_absent = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[("pkg/a.MODULE.bazel", None)],
+            &[],
+            75,
+            Some(("/generation-e", 75, "fixed-content")),
+            None,
+            None,
+        )
+        .await;
+        let fragment_wrong = host_nonregistry_closure_compute(
+            &dice,
+            Some(cycle_root),
+            None,
+            &[("pkg/a.MODULE.bazel", None)],
+            &[],
+            76,
+            Some(("/generation-f", 76, "fixed-content")),
+            None,
+            Some(("pkg/a.MODULE.bazel", PathNodeKind::Directory)),
+        )
+        .await;
+        assert!(matches!(
+            fragment_absent,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostNonregistryModuleClosureError::Fragment {
+                    failure: DirectLocalIncludeFragmentFailure::Absent,
+                    ..
+                }))
+        ));
+        assert!(matches!(
+            fragment_wrong,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostNonregistryModuleClosureError::Fragment {
+                    failure: DirectLocalIncludeFragmentFailure::Source(
+                        RepositorySourceFileError::WrongKind { .. }
+                    ),
+                    ..
+                }))
+        ));
+        let absent =
+            host_nonregistry_closure_compute(&dice, None, None, &[], &[], 77, None, None, None)
+                .await;
+        let wrong_kind = host_nonregistry_closure_compute(
+            &dice,
+            None,
+            Some(PathNodeKind::Directory),
+            &[],
+            &[],
+            78,
+            None,
+            None,
+            None,
+        )
+        .await;
+        assert!(matches!(
+            absent,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostNonregistryModuleClosureError::RootAbsent))
+        ));
+        assert!(matches!(
+            wrong_kind,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostNonregistryModuleClosureError::RootSource(
+                    RepositorySourceFileError::WrongKind { .. }
+                )))
+        ));
     }
 }

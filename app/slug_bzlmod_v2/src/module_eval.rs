@@ -129,13 +129,19 @@ impl ParsedRootInclude {
 pub(crate) fn parse_root_include(
     request: &NonrootIncludeRequest,
 ) -> Result<ParsedRootInclude, CompactString> {
-    let (package, target) = parse_root_include_label(request.path.as_str())?;
+    let (package, target) = parse_nonroot_include(request)?;
     Ok(ParsedRootInclude {
         package: PackageIdentifier::new(CanonicalRepoName::root(), package),
         target,
         raw_label: request.path.clone(),
         location: request.location.clone(),
     })
+}
+
+pub(crate) fn parse_nonroot_include(
+    request: &NonrootIncludeRequest,
+) -> Result<(PackagePath, TargetName), CompactString> {
+    parse_root_include_label(request.path.as_str())
 }
 
 /// Parser-backed syntax information for a single non-root MODULE file. Source
