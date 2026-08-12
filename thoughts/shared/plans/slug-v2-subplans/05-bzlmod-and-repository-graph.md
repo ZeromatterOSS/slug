@@ -1786,3 +1786,32 @@ retained unaccepted diff, apply those focused corrections and discriminators,
 complete the original proof matrix, and obtain independent implementation
 review. Every prior file, public, legacy, second-I/O, raw-I/O, route,
 materializer/loading/consumer, and cap stop remains terminal.
+
+### Selected registry RepoSpec owner implementation accepted (2026-08-12)
+
+Commit `e8ad58dd` accepts the private callerless selected-only registry
+RepoSpec aggregate at 1,010 production, 844 tests, and 1,854 total formatted
+lines, within the corrected 1,020/1,050/2,070 caps. It composes the accepted
+selected graph, Host registry policy, registry-file observations, winning
+MODULE provenance, effective override, and recursive compact RepoSpec algebra
+without a second catalog, I/O owner, map merge, raw observation, route, or
+consumer.
+
+The exact admitted projection covers archive, local_path, and git_repository;
+mirror priority/deduplication; blank registry JSON; decoded file-registry
+anchoring and lexical path normalization; MODULE SRI; and RegistrySingle patch
+augmentation. Structural equality retains every semantic input, Need remains
+invalid, and completed typed errors beat compatible Need.
+
+Ten pure and five real aggregate DICE tests prove selected-only source access,
+unselected-version exclusion, root/built-in/nonregistry zero registry work,
+source/registry-json/MODULE/mirror/override A/B/A restoration, warm reuse, Need
+validity, and typed-error precedence. The full owner and loading suites,
+formatting/diff/scope scans, AI cleanup, and independent review pass.
+
+Run next only `WP-5-host-selected-module-route-owner-design-r2`. Revisit the
+accepted route audit now that selected registry RepoSpecs exist, and freeze the
+smallest canonical-name, contextual-mapping, and selected-route composition
+owner or return `REPLAN` at the first missing leaf. No Rust, route/mapping
+consumer, materialization, loading, legacy graph activation, public API, or
+JVM/Java work is authorized before independent design acceptance.
