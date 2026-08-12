@@ -4500,3 +4500,43 @@ allowlist. The POSIX executable FileWrite Run vertical is accepted.
 
 Run next only `WP-8-m7-filewrite-test-handoff-design`: audit pinned Bazel
 9.2 test ownership and freeze the first bounded FileWrite Test vertical.
+### FileWrite Test handoff replan (2026-08-11)
+
+`WP-8-m7-filewrite-test-handoff-design` ends `REPLAN` before fixture or
+production edits. Pinned Bazel 9.2 does not implement Test as Run plus
+command-owned status. `RuleConfiguredTargetBuilder.initializeTestProvider`
+requires runfiles support and constructs `TestProvider` parameters from the
+executable, test attributes/tools, execution requirements, and optional
+`RunEnvironmentInfo`. It then creates a distinct non-shareable
+`TestRunnerAction`, not a client launch of the rule's FileWrite action.
+
+The TestRunner action consumes the executable, runfiles tree, setup/XML tools,
+and test environment. It owns test log, XML, cache-status, stderr,
+undeclared-output, timeout, shard/run, coverage, and infrastructure-failure
+state. Result analysis and Test command reporting separately own aggregate
+status and terminal exit. The existing stale `test-basic` manifest already
+exposes these synthetic result artifacts; no extra oracle row is needed to
+prove that Run equivalence is false.
+
+Slug loading does retain test capability, size/timeout/flaky/shard/local/args,
+and the implicit Bazel test-tool labels. The configured result retains only
+the rule-declared FileWrite and built-in providers, however: there is no
+TestProvider, TestRunner action, declared test result set, action identity, or
+result analyzer. The accepted Run view deliberately rejects test rules and
+additional runfiles. Reusing it would silently omit exact observable action,
+runfiles, cache, timeout/environment, log/XML, and result semantics.
+
+Compatibility remains exact only for the already accepted rule-declared
+FileWrite producer. Slug-native configured/action/path identity remains
+separate. All Test execution/result semantics remain unsupported/deferred
+until structurally modeled and must fail closed; no client/local shortcut or
+BEP claim is admitted.
+
+Run next only `WP-8-m7-test-runner-semantic-design`. Audit pinned Bazel
+`RuleConfiguredTargetBuilder`, `TestActionBuilder`, `TestRunnerAction`,
+strategies, result analyzer, Test command, and BEP ownership. Freeze one compact
+retained test-action model derived during configured analysis, with structural
+DICE equality and separated Slug/Bazel/REAPI/result identity domains. Inspect
+the Stage 9 Buck2/V1 action representation candidates, prefer existing compact
+Arc slices/small deterministic collections/Allocative, and add no parallel
+graph or command-owned reconstruction.

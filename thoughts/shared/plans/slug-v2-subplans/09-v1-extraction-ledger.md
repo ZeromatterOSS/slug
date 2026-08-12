@@ -1754,3 +1754,25 @@ ownership were sufficient. The exact 25-row one-shot/daemon gate, ordered
 singleton-delivery regression, no-topology assertion, and cross-package
 format/restrict/delete/recreate lifecycle passed; independent final review
 returned `ACCEPT` after one evidence-only test strengthening.
+### Stage 8 TestRunner semantic prerequisite decision (2026-08-11)
+
+Source inspected: Bazel 9.2 `RuleConfiguredTargetBuilder`,
+`TestActionBuilder`, and `TestRunnerAction`; V1 commit
+`e218054d4c796655939b968d90208b185decb352` test provider, external runner,
+orchestrator, client, event, and exit-code paths; current V2
+`ActionSpec`/`ConfiguredNodeResult`/DefaultInfo/runfiles/Run view/REAPI
+boundaries.
+
+Decision: reject V1's Buck-specific external test-runner protocol, provider
+shape, orchestration graph, event stream, and client exit machinery. Retain
+only the already adopted V2 action-registry, immutable `Arc<[T]>`,
+`CompactString`, deterministic small collection, `Dupe`, and
+`Allocative` patterns for a future Bazel-owned TestRunner semantic action.
+Do not add an interner, cache, weak identity hash, parallel action graph, or
+command-owned reconstruction.
+
+The future action is blocked on the real embedded `@bazel_tools//tools/test`
+repository/content closure and generated-input/multi-output REAPI breadth.
+Design that prerequisite first. Any later import must cite exact Bazel 9.2
+verbatim files and preserve structural DICE equality plus separated
+configured/action/REAPI/result identity domains.
