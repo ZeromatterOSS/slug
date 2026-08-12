@@ -1556,3 +1556,31 @@ graph owner and implementation successor, or return `REPLAN` at the first
 still-missing semantic leaf. No Rust, legacy graph activation, canonical
 mapping, loading, or consumer work is authorized before independent design
 acceptance.
+
+### Selected module graph owner design accepted (2026-08-12)
+
+Pinned Bazel 9.2 discovery and selection source, the complete accepted Host
+leaf inventory, the compact retained-representation audit, and independent
+reserved-architecture review accept one callerless crate-private selected
+graph owner. Candidate override names form only an audit horizon; every
+classification and precedence result comes from
+`HostEffectiveModuleOverrideKey`, and every discovered value comes from
+`HostDiscoveredModuleKey`, so the owner neither re-merges inputs nor duplicates
+source preparation. The shared `BazelModuleVersion` is the sole checked key and
+ordering domain.
+
+The accepted slice owns roots-first discovery horizons, complete-error-over-
+Need behavior, exact-key cycle termination, whole-graph nodep fixed points,
+multiple-version ceilings, per-name maxima, validation including fulfilled
+nodep, and final BFS excluding nodep reachability. Pinned no-op compatibility
+levels need no missing owner. Post-selection direct-dependency, yanked,
+compatibility-diagnostic, mapping, final-module, loading, and consumer work
+remains explicitly deferred.
+
+Run next only `WP-5-host-selected-module-graph-owner-implementation` in the new
+private `selected_graph.rs` plus the private `lib.rs` declaration, under the
+760 production/1,050 test/1,810 total caps frozen in `current-packet.md`.
+Require the frozen discovery, selection, retained-provenance, DICE lifecycle,
+scope, and independent implementation proofs. A third Rust file, public API,
+second graph/override merge, recursive DICE graph, lock across compute, raw
+filesystem/network observation, or post-selection consumer is `REPLAN`.
