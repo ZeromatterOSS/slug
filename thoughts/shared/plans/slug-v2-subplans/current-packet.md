@@ -1,13 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-pure-module-extension-invocation-event-contract-r4-design`
-Milestone: M7 pure module-extension invocation event-contract correction
+Packet: `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4`
+Milestone: M7 pure module-extension invocation implementation r4
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct the invocation event claim to match the established DICE and
-command-effect ownership boundary before final implementation acceptance.
+Result: land the complete pure invocation owner with the accepted DICE and
+command-effect event-lineage contract.
 
-## Active docs-only event-contract correction
+## Active implementation contract
+
+Independent review accepts the event correction in `f36ec593`. Implement only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the
+same four app Rust paths plus canonical/current/Stage 4/Stage 5, under
+730/850/1,580 against `40def0e7`. Rename the overclaiming focused test to
+publication plus semantic reuse; fresh evaluated activations publish exactly
+one prefix, reused activations carry no duplicate batch, event content stays
+out of equality, and command-output lineage remains deferred to its real
+consumer. Preserve every other accepted semantic, proof, compatibility claim,
+cleanup, and stop. No fifth Rust path or behavior expansion.
+
+### Final implementation evidence
+
+The formatted four-path delta measures approximately 724 production, 846
+tests, and 1,570 total lines against `40def0e7`, within 730/850/1,580. The full
+`slug_loading_v2 --all-targets` suite passes 92 owner tests plus every loading
+integration, and `slug_bzlmod_v2 --all-targets` passes 349 owner tests plus all
+integrations. The renamed event-lineage test passes and proves one evaluated
+batch followed by semantic reuse with no duplicate batch. Formatting and diff
+checks pass. Cleanup removed two unrelated visibility widenings; structural
+review finds `FrozenModule`/`FrozenValue` only in ephemeral preflight rows and
+none in the retained receipt. Independent implementation reviews accept the
+architecture, ABI, errors, events, scope, caps, and all stops.
+
+## Accepted docs-only event-contract correction
+
+This section is historical correction context only, grants no file, action,
+cap, or schedule authority, and is interpreted solely through the active
+implementation contract above.
 
 Final implementation review accepts the invocation architecture but rejects
 the phrase that the invocation key itself replays its batch on warm reuse.

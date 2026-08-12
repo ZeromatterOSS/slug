@@ -3119,7 +3119,7 @@ type ModuleExtensionDefinition<'v> = ModuleExtensionDefinitionGen<Value<'v>>;
 #[allow(dead_code)] // Frozen callable is lifetime-only until extension execution activation.
 pub(crate) struct FrozenModuleExtensionDefinition {
     #[allocative(skip)]
-    implementation: FrozenValue,
+    pub(crate) implementation: FrozenValue,
     tag_classes: Arc<[(CompactString, Arc<[ModuleExtensionTagAttribute]>)]>,
     environment: Arc<[CompactString]>,
     os_dependent: bool,
@@ -4641,6 +4641,14 @@ mod module_extension_definition_tests {
             .downcast::<FrozenModuleExtensionDefinition>()
             .unwrap()
             .projection()
+    }
+
+    #[test]
+    fn module_extension_globals_exclude_repository_and_label_constructors() {
+        for name in ["repository_rule", "Label"] {
+            let error = evaluate(&format!("captured = {name}\n")).unwrap_err();
+            assert!(error.to_string().contains("not found"), "{error:#}");
+        }
     }
 
     fn tag_attribute(

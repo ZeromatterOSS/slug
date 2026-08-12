@@ -17,6 +17,7 @@ pub mod globals;
 mod host_glob;
 pub mod keys;
 pub mod load_label;
+mod module_extension;
 pub mod package;
 #[doc(hidden)]
 pub mod provider;

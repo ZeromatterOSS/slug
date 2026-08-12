@@ -2450,3 +2450,18 @@ four-plan docs correction
 Preserve the same four paths, 730/850/1,580 caps, semantics, proof, and stops;
 rename the overclaiming test and defer command-output integration until a real
 consumer exists. No Rust resumes before acceptance and explicit r4 activation.
+
+### Pure invocation implementation r4 activated (2026-08-12)
+
+Independent review accepts `f36ec593`. Run only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the
+same four loading paths plus four plans under 730/850/1,580 against `40def0e7`.
+Rename the focused event test to publication plus semantic reuse and preserve
+the accepted evaluated/reused/command-lineage boundary, all prior proofs, and
+every stop.
+
+Final implementation review accepts the four-path owner at approximately
+724/846/1,570. Full loading and Bzlmod suites, the renamed evaluated/reused
+event row, formatting, and diff checks pass. Retained state is heap/callable
+free; lifetime values remain local to preflight. Commit the exact authorized
+paths and no visibility, repository, output, I/O, consumer, or public breadth.

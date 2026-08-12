@@ -490,10 +490,10 @@ pub struct ParsedBzl {
 #[doc(hidden)]
 pub struct FrozenBzlModule {
     #[allocative(skip)]
-    module: FrozenModule,
+    pub(crate) module: FrozenModule,
     path: PathBuf,
     loads: Vec<String>,
-    manifest: BzlLoadManifest,
+    pub(crate) manifest: BzlLoadManifest,
     /// Kept separately from `manifest`: frozen module pointers are lifetime
     /// ownership, never semantic equality.
     retained_bzl_modules: Arc<[FrozenBzlLifetimeEntry]>,
@@ -783,7 +783,7 @@ pub(crate) struct HostRootBzlLabel {
 }
 
 impl HostRootBzlLabel {
-    fn new(package: PackagePath, target: RootPackageBzlTarget) -> Self {
+    pub(crate) fn new(package: PackagePath, target: RootPackageBzlTarget) -> Self {
         Self { package, target }
     }
 
@@ -1208,7 +1208,7 @@ pub(crate) struct HostBzlModuleEvalKey {
 }
 
 impl HostBzlModuleEvalKey {
-    fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
         Self { workspace, label }
     }
 }
@@ -1847,15 +1847,15 @@ impl Key for HostBzlModuleEvalKey {
 #[allow(dead_code)] // Callerless owner; activated only by a future extension evaluator.
 pub(crate) struct HostLoadedModuleExtensionDefinition {
     request: HostSelectedExtensionDefinitionLoadRequest,
-    manifest: BzlLoadManifest,
-    definition: ModuleExtensionDefinitionProjection,
+    pub(crate) manifest: BzlLoadManifest,
+    pub(crate) definition: ModuleExtensionDefinitionProjection,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 #[allow(dead_code)] // Callerless owner; activated only by a future extension evaluator.
 pub(crate) struct HostLoadedModuleExtensionDefinitions {
     requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
-    definitions: Arc<[HostLoadedModuleExtensionDefinition]>,
+    pub(crate) definitions: Arc<[HostLoadedModuleExtensionDefinition]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -3885,6 +3885,11 @@ mod module_extension_definition_loading_tests {
     use starlark_map::sorted_map::SortedMap;
 
     use super::*;
+    use crate::module_extension::HostPureModuleExtensionInvocationError;
+    use crate::module_extension::HostPureModuleExtensionInvocationsError;
+    use crate::module_extension::HostPureModuleExtensionInvocationsKey;
+    use crate::module_extension::test_support::InvocationConsumerKey;
+    use crate::module_extension::test_support::InvokePreparedKey;
 
     const WORKSPACE: &str = "/extension-definition-loading";
 
@@ -3921,6 +3926,18 @@ mod module_extension_definition_loading_tests {
             if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
                 self.0.lock().unwrap().push(BzlActivation {
                     label: key.label.canonical_label(),
+                    kind: activation.kind(),
+                    batch: activation
+                        .evaluation_data()
+                        .and_then(|data| data.downcast_ref::<EventBatch>())
+                        .map(Dupe::dupe),
+                });
+            } else if key
+                .downcast_ref::<HostPureModuleExtensionInvocationsKey>()
+                .is_some()
+            {
+                self.0.lock().unwrap().push(BzlActivation {
+                    label: CanonicalLabel::parse("@@//:module_extension_invocation").unwrap(),
                     kind: activation.kind(),
                     batch: activation
                         .evaluation_data()
@@ -3979,6 +3996,21 @@ mod module_extension_definition_loading_tests {
         case_transaction(dice, module_source, extension_source, "", true, tracker)
             .await
             .compute(&HostPreparedModuleExtensionInputsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_invocation_case(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> crate::module_extension::HostPureModuleExtensionInvocationsOutcome {
+        case_transaction(dice, module_source, extension_source, "", true, tracker)
+            .await
+            .compute(&HostPureModuleExtensionInvocationsKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             ))
             .await
@@ -4651,6 +4683,393 @@ mod module_extension_definition_loading_tests {
                     })
                 )
         ));
+    }
+
+    #[tokio::test]
+    async fn real_pure_invocation_publishes_prints_and_reuses_semantics() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='A',target='//:item')\n";
+        let extension = "def implementation(ctx):\n    m=ctx.modules[0]\n    t=m.tags.tag[0]\n    print('%s|%s|%s|%s|%s|%s' % (m.name,m.version,m.is_root,t.text,t.target,ctx.is_dev_dependency(t)))\ntag=tag_class(attrs={'text':attr.string(),'target':attr.label()})\next=module_extension(implementation=implementation,tag_classes={'tag':tag})\n";
+        let first = compute_invocation_case(&dice, module, extension, Some(tracker.clone())).await;
+        assert!(matches!(first, SourcePreparationOutcome::Complete(ref value) if value.is_ok()));
+        let first_events = tracker.take();
+        assert!(first_events.iter().any(|event| {
+            event.label.target().as_str() == "module_extension_invocation"
+                && event
+                    .batch
+                    .as_ref()
+                    .is_some_and(|batch| matches!(batch.events(), [slug_events_v2::EvaluationEvent::StarlarkPrint { text, .. }] if text.contains("@@//:item")))
+        }));
+        let warm = compute_invocation_case(&dice, module, extension, Some(tracker.clone())).await;
+        assert!(HostPureModuleExtensionInvocationsKey::equality(
+            &first, &warm
+        ));
+        tracker.take();
+        let mut transaction =
+            case_transaction(&dice, module, extension, "", true, Some(tracker.clone())).await;
+        let replay = transaction
+            .compute(&InvocationConsumerKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                id: 1,
+            })
+            .await
+            .unwrap();
+        assert!(HostPureModuleExtensionInvocationsKey::equality(
+            &first, &replay
+        ));
+        let activations = tracker.take();
+        assert!(
+            activations.iter().any(|event| {
+                event.label.target().as_str() == "module_extension_invocation"
+                    && event.kind == ActivationKind::Reused
+                    && event.batch.is_none()
+            }),
+            "{activations:#?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn invocation_preflights_every_request_before_running_user_code() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let prepared_need = compute_invocation_case(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='dep',version='1.0')\nlocal_path_override(module_name='dep',path='dep')\ne=use_extension('//:ext.bzl','ext')\n",
+            "def implementation(ctx):\n    fail('must not run')\next=module_extension(implementation=implementation)\n",
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(matches!(prepared_need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostPureModuleExtensionInvocationsKey::validity(
+            &prepared_need
+        ));
+        assert!(!HostPureModuleExtensionInvocationsKey::equality(
+            &prepared_need,
+            &prepared_need
+        ));
+        assert!(tracker.take().iter().all(|event| {
+            event.label.target().as_str() == "module_extension_invocation" && event.batch.is_none()
+        }));
+
+        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','ext')\nb=use_extension('//:child.bzl','other')\n";
+        let extension = "def implementation(ctx):\n    print('first')\next=module_extension(implementation=implementation)\n";
+        let child = "def implementation(ctx):\n    print('second')\nother=module_extension(implementation=implementation)\n";
+        let mut initial = case_transaction(&dice, module, extension, child, true, None).await;
+        let prepared = initial
+            .compute(&HostPreparedModuleExtensionInputsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let prepared = match prepared {
+            SourcePreparationOutcome::Complete(value) => {
+                Arc::new(value.as_ref().as_ref().unwrap().clone())
+            }
+            SourcePreparationOutcome::Need(need) => panic!("unexpected Need: {need:?}"),
+        };
+
+        let mut missing = case_transaction(&dice, module, extension, child, false, None).await;
+        let missing = missing
+            .compute(&InvokePreparedKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                prepared: prepared.clone(),
+                id: 1,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            missing.outcome,
+            SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Bzl(_),
+                    ..
+                }))
+        ));
+        assert!(missing.prints.is_empty());
+
+        let mut restored = case_transaction(&dice, module, extension, child, true, None).await;
+        let restored = restored
+            .compute(&InvokePreparedKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                prepared,
+                id: 2,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            restored.outcome,
+            SourcePreparationOutcome::Complete(ref value) if value.is_ok()
+        ));
+        assert_eq!(restored.prints.as_ref(), ["first", "second"]);
+    }
+
+    #[tokio::test]
+    async fn invocation_preserves_definition_terminals_and_loaded_callable_abi() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        for source in ["ext=1\n", "def broken(\n"] {
+            let tracker = Arc::new(BzlEventTracker::default());
+            let outcome =
+                compute_invocation_case(&dice, module, source, Some(tracker.clone())).await;
+            assert!(matches!(
+                outcome,
+                SourcePreparationOutcome::Complete(value)
+                    if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::Prepared(_)))
+            ));
+            assert!(tracker.take().iter().all(|event| {
+                event.label.target().as_str() != "module_extension_invocation"
+                    || event.batch.is_none()
+            }));
+        }
+
+        let tracker = Arc::new(BzlEventTracker::default());
+        let mut transaction = case_transaction(
+            &dice,
+            module,
+            "load('//:child.bzl','captured')\next=module_extension(implementation=captured)\n",
+            "def captured(ctx):\n    return ctx.execute(['forbidden'])\n",
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let outcome = transaction
+            .compute(&HostPureModuleExtensionInvocationsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            outcome,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Invocation(_),
+                    ..
+                }))
+        ));
+        let invocation = tracker
+            .take()
+            .into_iter()
+            .find(|event| event.label.target().as_str() == "module_extension_invocation")
+            .unwrap();
+        assert!(
+            invocation
+                .batch
+                .is_some_and(|batch| batch.events().is_empty())
+        );
+    }
+
+    #[tokio::test]
+    async fn invocation_rejects_factors_results_and_preserves_print_before_throw() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        for options in [
+            "environ=['X']",
+            "os_dependent=True",
+            "arch_dependent=True",
+            "facts_version=1",
+        ] {
+            let factors = compute_invocation_case(
+                &dice,
+                module,
+                &format!(
+                    "def implementation(ctx):\n    fail('must not run')\next=module_extension(implementation=implementation,{options})\n"
+                ),
+                None,
+            )
+            .await;
+            assert!(matches!(
+                factors,
+                SourcePreparationOutcome::Complete(value)
+                    if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                        error: HostPureModuleExtensionInvocationError::UnsupportedFactors,
+                        ..
+                    }))
+            ));
+        }
+
+        let wrong = compute_invocation_case(
+            &dice,
+            module,
+            "def implementation(ctx):\n    return 1\next=module_extension(implementation=implementation)\n",
+            None,
+        )
+        .await;
+        assert!(matches!(
+            wrong,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Result(_),
+                    ..
+                }))
+        ));
+
+        let tracker = Arc::new(BzlEventTracker::default());
+        let thrown = compute_invocation_case(
+            &dice,
+            module,
+            "def implementation(ctx):\n    print('before')\n    fail('boom')\next=module_extension(implementation=implementation)\n",
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(matches!(
+            thrown,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Invocation(_),
+                    ..
+                }))
+        ));
+        let invocation = tracker
+            .take()
+            .into_iter()
+            .find(|event| event.label.target().as_str() == "module_extension_invocation")
+            .unwrap();
+        let events = invocation.batch.unwrap();
+        assert_eq!(events.events().len(), 1);
+        assert!(matches!(
+            &events.events()[0],
+            slug_events_v2::EvaluationEvent::StarlarkPrint { text, .. } if text == "before"
+        ));
+    }
+
+    #[tokio::test]
+    async fn invocation_identity_and_reacquisition_drift_are_structural() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module_a =
+            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='A')\n";
+        let module_b =
+            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\ne.tag(text='B')\n";
+        let source_a = "def implementation(ctx):\n    print('A')\ntag=tag_class(attrs={'text':attr.string()})\next=module_extension(implementation=implementation,tag_classes={'tag':tag})\n";
+        let source_b = "def implementation(ctx):\n    print('B')\ntag=tag_class(attrs={'text':attr.string()})\next=module_extension(implementation=implementation,tag_classes={'tag':tag})\n";
+        let a = compute_invocation_case(&dice, module_a, source_a, None).await;
+        let tag_changed = compute_invocation_case(&dice, module_b, source_a, None).await;
+        let tag_restored = compute_invocation_case(&dice, module_a, source_a, None).await;
+        let callable_changed = compute_invocation_case(&dice, module_a, source_b, None).await;
+        let callable_restored = compute_invocation_case(&dice, module_a, source_a, None).await;
+        assert!(!HostPureModuleExtensionInvocationsKey::equality(
+            &a,
+            &tag_changed
+        ));
+        assert!(HostPureModuleExtensionInvocationsKey::equality(
+            &a,
+            &tag_restored
+        ));
+        assert!(!HostPureModuleExtensionInvocationsKey::equality(
+            &a,
+            &callable_changed
+        ));
+        assert!(HostPureModuleExtensionInvocationsKey::equality(
+            &a,
+            &callable_restored
+        ));
+
+        let prepared = compute_prepared_case(&dice, module_a, source_a, None).await;
+        let prepared = match prepared {
+            SourcePreparationOutcome::Complete(value) => {
+                Arc::new(value.as_ref().as_ref().unwrap().clone())
+            }
+            SourcePreparationOutcome::Need(need) => panic!("unexpected Need: {need:?}"),
+        };
+        let mut changed = case_transaction(&dice, module_a, source_b, "", true, None).await;
+        let changed = changed
+            .compute(&InvokePreparedKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                prepared: prepared.clone(),
+                id: 20,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            changed.outcome,
+            SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Drift(_),
+                    ..
+                }))
+        ));
+        assert!(changed.prints.is_empty());
+        let mut restored = case_transaction(&dice, module_a, source_a, "", true, None).await;
+        let restored = restored
+            .compute(&InvokePreparedKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                prepared: prepared.clone(),
+                id: 21,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            restored.outcome,
+            SourcePreparationOutcome::Complete(ref value) if value.is_ok()
+        ));
+        assert_eq!(restored.prints.as_ref(), ["A"]);
+
+        let mut altered = prepared.as_ref().clone();
+        let mut aggregate = altered.definitions.as_ref().clone();
+        let mut definitions = aggregate.definitions.to_vec();
+        definitions[0].definition.tag_classes = Arc::from([]);
+        aggregate.definitions = definitions.into();
+        altered.definitions = Arc::new(aggregate);
+        let mut transaction = case_transaction(&dice, module_a, source_a, "", true, None).await;
+        let definition_drift = transaction
+            .compute(&InvokePreparedKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                prepared: Arc::new(altered),
+                id: 22,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            definition_drift.outcome,
+            SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Drift(_),
+                    ..
+                }))
+        ));
+        assert!(definition_drift.prints.is_empty());
+
+        let wrong_kind = "ext=1\n";
+        let mut transaction = case_transaction(&dice, module_a, wrong_kind, "", true, None).await;
+        let request = prepared.inputs[0].input.parts().0;
+        let label = request.parts().0;
+        let target = RootPackageBzlTarget::parse(label.target().as_str()).unwrap();
+        let module = transaction
+            .compute(&HostBzlModuleEvalKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                HostRootBzlLabel::new(label.package().package().clone(), target),
+            ))
+            .await
+            .unwrap();
+        let manifest = match module {
+            SourcePreparationOutcome::Complete(value) => {
+                value.as_ref().as_ref().unwrap().manifest.clone()
+            }
+            SourcePreparationOutcome::Need(need) => panic!("unexpected Need: {need:?}"),
+        };
+        let mut altered = prepared.as_ref().clone();
+        let mut aggregate = altered.definitions.as_ref().clone();
+        let mut definitions = aggregate.definitions.to_vec();
+        definitions[0].manifest = manifest;
+        aggregate.definitions = definitions.into();
+        altered.definitions = Arc::new(aggregate);
+        let export_drift = transaction
+            .compute(&InvokePreparedKey {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                prepared: Arc::new(altered),
+                id: 23,
+            })
+            .await
+            .unwrap();
+        assert!(matches!(
+            export_drift.outcome,
+            SourcePreparationOutcome::Complete(ref value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+                    error: HostPureModuleExtensionInvocationError::Drift(_),
+                    ..
+                }))
+        ));
+        assert!(export_drift.prints.is_empty());
     }
 }
 

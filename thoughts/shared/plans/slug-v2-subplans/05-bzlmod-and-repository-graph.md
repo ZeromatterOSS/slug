@@ -2546,3 +2546,13 @@ only `WP-4-5-host-pure-module-extension-invocation-event-contract-r4-design`
 in the four plans. Keep the same four loading paths, 730/850/1,580 caps,
 semantics/proofs/stops, and no Stage 5 or command-consumer change before
 acceptance plus explicit r4 activation.
+
+Independent review accepts `f36ec593` and activates only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the
+same four loading paths plus four plans under 730/850/1,580 against `40def0e7`.
+Stage 5 and command-consumer production remain unchanged; preserve all event,
+repository, output, public, and JVM stops.
+
+Independent implementation review accepts the callerless loading owner and
+full loading/Bzlmod evidence at approximately 724/846/1,570. Stage 5 remains
+unchanged; commit no Bzlmod or command-consumer Rust.
