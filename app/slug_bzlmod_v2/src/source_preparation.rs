@@ -1625,6 +1625,15 @@ pub(crate) struct HostNonregistryPreparedClosure {
     fragments: Arc<[NonregistryPreparedFragment]>,
 }
 
+impl HostNonregistryPreparedClosure {
+    pub(crate) fn repo_spec(&self) -> &RepoSpec {
+        match &self.source_identity {
+            HostNonregistryModuleSourceIdentity::Local { repo_spec }
+            | HostNonregistryModuleSourceIdentity::Immutable { repo_spec, .. } => repo_spec,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) enum HostNonregistryModuleClosure {
     Supported(HostNonregistryPreparedClosure),
