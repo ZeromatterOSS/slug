@@ -4639,3 +4639,12 @@ graph, so a root merge or guessed dependency subset is rejected. Stage 8 waits
 while Stage 5 implements only the complete callerless embedded MODULE value;
 that leaf authorizes no package, Test, toolchain, command, execution, or BEP
 consumer.
+
+### Built-in MODULE value prerequisite accepted (2026-08-12)
+
+Stage 5 now retains the complete callerless embedded MODULE value in
+`3bc745de`, with exact source/semantic content and no selected-graph or
+consumer edge. Stage 8 remains parked. Run only the Stage 5
+`WP-5-builtin-bazel-tools-selected-graph-owner-design` prerequisite; no
+catalog expansion, package/Bzl dispatch, configured toolchain, TestRunner,
+execution, result, coverage, or BEP behavior is authorized here.

@@ -1145,3 +1145,23 @@ Implement next only one callerless built-in module value over the exact source
 key and existing complete evaluator. Retain route-manifest identity, MODULE
 SHA-256, and the complete evaluated value; defer all injection, selection,
 mapping, lockfile, package/Bzl, configured toolchain, and command behavior.
+
+### Built-in bazel_tools module value accepted (2026-08-12)
+
+Commit `3bc745de` accepts the crate-private callerless module-value key. It
+computes only the exact embedded `MODULE.bazel` source key and existing
+complete nonregistry evaluator, retains distinct route-manifest and source
+SHA-256 identity plus the full `EvaluatedNonrootModule`, and proves cold/warm
+DICE reuse with no event data. Exact dependency aliases/versions, nodep set,
+extension usages/imports/innate tag, four-item toolchain order, no self edge,
+typed terminals, equality, caps, full crate/downstream checks, and independent
+review passed. No root, override, registry, lockfile, discovery, selection,
+mapping, package, command, or consumer edge landed.
+
+Run next only `WP-5-builtin-bazel-tools-selected-graph-owner-design`. Freeze
+the sole future Host discovery-to-MVS key and selected-graph value, including
+default sentinel precedence and explicit override bypass. If the accepted
+root, registry, direct-nonregistry, and embedded owners cannot compose exactly,
+return `REPLAN` into the first missing prerequisite. No Rust, legacy
+`ResolvedGraph` activation, fabricated RepoSpec/mapping, root-only merge, or
+consumer work is authorized.
