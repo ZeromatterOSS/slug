@@ -1287,3 +1287,17 @@ retained five-file Rust diff after accepted cap correction `0d3e03e8`.
 Production semantics and ownership are unchanged; acceptance now requires the
 remaining immutable, event/reuse, source-kind, and terminal-order proofs within
 460/520/980 formatted bounds.
+
+### Nonregistry package preflight accepted (2026-08-12)
+
+Commit `411af144` accepts the route-independent package-policy leaf. The new
+crate-private REPO, ignore, and marker keys use only the retained
+materialization/source owners, preserve local and immutable invalidation, and
+fail closed for every nonempty deleted-package set before repository source
+work. Real-key local/immutable/category A/B/A, precedence, source-kind, Need,
+event, and reuse proofs passed the full owner and downstream suites.
+
+Run next only `WP-5-host-nonregistry-module-closure-resume-design`. Reopen the
+closure design now that its sole package-preflight blocker is owned, and freeze
+one shared route-independent preparation core plus exact implementation bounds.
+No closure Rust, evaluation, graph, mapping, or consumer is yet authorized.
