@@ -89,6 +89,8 @@ use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
 use crate::module_eval::parse_nonroot_include;
 use crate::module_eval::parse_root_include;
 use crate::module_eval::validate_root_module_source;
+use crate::module_version::BazelModuleVersion;
+use crate::module_version::BazelModuleVersionParseError;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::registry_module_file_url;
 use crate::repository_ignore::HostNonregistryRepositoryIgnoreKey;
@@ -610,8 +612,15 @@ pub(crate) struct HostDiscoveredModuleKey {
 
 #[allow(dead_code)]
 impl HostDiscoveredModuleKey {
-    pub(crate) fn new(workspace: NormalizedAbsolutePath, module: NonrootModuleKey) -> Self {
-        Self { workspace, module }
+    pub(crate) fn try_new(
+        workspace: NormalizedAbsolutePath,
+        module: NonrootModuleKey,
+    ) -> Result<Self, BazelModuleVersionParseError> {
+        let version = BazelModuleVersion::parse(&module.version)?;
+        Ok(Self {
+            workspace,
+            module: NonrootModuleKey::new(module.name, version.normalized()),
+        })
     }
 }
 
@@ -9001,12 +9010,28 @@ mod tests {
     #[test]
     fn host_discovered_module_identity_and_typed_terminals_are_distinct() {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-        let builtin = HostDiscoveredModuleKey::new(
+        let builtin = HostDiscoveredModuleKey::try_new(
             workspace.dupe(),
             NonrootModuleKey::new("bazel_tools", ""),
-        );
-        let registry = HostDiscoveredModuleKey::new(workspace, NonrootModuleKey::new("dep", "1.0"));
+        )
+        .unwrap();
+        let registry =
+            HostDiscoveredModuleKey::try_new(workspace, NonrootModuleKey::new("dep", "1.0"))
+                .unwrap();
         assert_ne!(builtin, registry);
+        let normalized = HostDiscoveredModuleKey::try_new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("dep", "1.0+client"),
+        )
+        .unwrap();
+        assert!(normalized.to_string().ends_with(":dep@1.0"));
+        assert!(
+            HostDiscoveredModuleKey::try_new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                NonrootModuleKey::new("dep", "18446744073709551616"),
+            )
+            .is_err()
+        );
         assert!(builtin.to_string().ends_with(":bazel_tools@"));
         assert!(matches!(
             HostDiscoveredModuleError::ExplicitBuiltinOverride,
@@ -9177,7 +9202,7 @@ mod tests {
         updater
             .commit()
             .await
-            .compute(&HostDiscoveredModuleKey::new(workspace, module))
+            .compute(&HostDiscoveredModuleKey::try_new(workspace, module).unwrap())
             .await
             .unwrap()
     }
@@ -9186,14 +9211,22 @@ mod tests {
     async fn host_discovered_module_dice_lifecycle_and_builtin_override_bypass() {
         let a = "https://a.invalid/modules/dep/1.0/MODULE.bazel";
         let b = "https://b.invalid/modules/dep/1.0/MODULE.bazel";
-        let source: Arc<[u8]> = Arc::from(&b"module(name = \"dep\", version = \"1.0\")\n"[..]);
+        let semantic_b_url = "https://a.invalid/modules/dep/2.0/MODULE.bazel";
+        let source: Arc<[u8]> =
+            Arc::from(&b"module(name = \"dep\", version = \"1.0+source\")\n"[..]);
+        let semantic_b_source: Arc<[u8]> =
+            Arc::from(&b"module(name = \"dep\", version = \"2.0\")\n"[..]);
         let mut builder = Dice::builder();
         crate::install_registry_io(
             &mut builder,
             Arc::new(HostDiscoveryRegistryIo(
-                [(a.to_owned(), source.clone()), (b.to_owned(), source)]
-                    .into_iter()
-                    .collect(),
+                [
+                    (a.to_owned(), source.clone()),
+                    (b.to_owned(), source),
+                    (semantic_b_url.to_owned(), semantic_b_source),
+                ]
+                .into_iter()
+                .collect(),
             )),
         );
         let dice = Arc::new(builder.build(DetectCycles::Enabled));
@@ -9215,23 +9248,25 @@ mod tests {
         ));
         assert!(tracker.builtin.lock().unwrap().is_empty());
 
-        let root = "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0\")\n";
+        let root = "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0+root\")\n";
+        let equivalent_root =
+            "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0+other\")\n";
         let first_a = compute_host_discovered(
             &dice,
             tracker.clone(),
             root,
             &["https://a.invalid"],
             1,
-            NonrootModuleKey::new("dep", "1.0"),
+            NonrootModuleKey::new("dep", "1.0+request-a"),
         )
         .await;
         let selected_b = compute_host_discovered(
             &dice,
             tracker.clone(),
-            root,
+            equivalent_root,
             &["https://b.invalid"],
             2,
-            NonrootModuleKey::new("dep", "1.0"),
+            NonrootModuleKey::new("dep", "1.0+request-b"),
         )
         .await;
         let second_a = compute_host_discovered(
@@ -9240,21 +9275,44 @@ mod tests {
             root,
             &["https://a.invalid"],
             3,
-            NonrootModuleKey::new("dep", "1.0"),
+            NonrootModuleKey::new("dep", "1.0+request-restored"),
         )
         .await;
         let warm_a = compute_host_discovered(
             &dice,
             tracker.clone(),
-            root,
+            equivalent_root,
             &["https://a.invalid"],
             3,
-            NonrootModuleKey::new("dep", "1.0"),
+            NonrootModuleKey::new("dep", "1.0+request-warm"),
+        )
+        .await;
+        let semantic_b = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            "module(name = \"root\")\nbazel_dep(name = \"dep\", version = \"2.0\")\n",
+            &["https://a.invalid"],
+            4,
+            NonrootModuleKey::new("dep", "2.0"),
+        )
+        .await;
+        let semantic_a_restored = compute_host_discovered(
+            &dice,
+            tracker.clone(),
+            root,
+            &["https://a.invalid"],
+            5,
+            NonrootModuleKey::new("dep", "1.0+final"),
         )
         .await;
         assert!(HostDiscoveredModuleKey::equality(&first_a, &second_a));
         assert!(HostDiscoveredModuleKey::equality(&second_a, &warm_a));
         assert!(!HostDiscoveredModuleKey::equality(&first_a, &selected_b));
+        assert!(!HostDiscoveredModuleKey::equality(&first_a, &semantic_b));
+        assert!(HostDiscoveredModuleKey::equality(
+            &first_a,
+            &semantic_a_restored
+        ));
         assert!(matches!(
             first_a,
             SourcePreparationOutcome::Complete(value)
@@ -9460,10 +9518,11 @@ mod tests {
             )])
             .unwrap();
         let mut transaction = updater.commit().await;
-        let key = HostDiscoveredModuleKey::new(
+        let key = HostDiscoveredModuleKey::try_new(
             workspace.dupe(),
             NonrootModuleKey::new("bazel_tools", ""),
-        );
+        )
+        .unwrap();
         let mut observations = Vec::new();
         for _ in 0..8 {
             let outcome = transaction.compute(&key).await.unwrap();
@@ -10317,10 +10376,13 @@ mod tests {
             capture_events,
         )
         .await
-        .compute(&HostDiscoveredModuleKey::new(
-            NormalizedAbsolutePath::new("/workspace").unwrap(),
-            module,
-        ))
+        .compute(
+            &HostDiscoveredModuleKey::try_new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                module,
+            )
+            .unwrap(),
+        )
         .await
         .unwrap()
     }

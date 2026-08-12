@@ -25,6 +25,7 @@ mod lockfile_v28;
 mod lockfile_v28_tests;
 pub mod module_eval;
 pub mod module_patch;
+mod module_version;
 mod package_policy;
 pub mod parser;
 pub mod registry;

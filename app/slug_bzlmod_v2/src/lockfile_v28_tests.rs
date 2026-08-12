@@ -490,7 +490,7 @@ fn lockfile_v28_module_key_root_underscore_and_build_suffix() {
             .contains_key(&LockfileModuleKey::Root)
     );
     assert!(value.selected_yanked_versions.keys().any(
-        |key| matches!(key, LockfileModuleKey::Module { version, .. } if version.canonical == "1.2")
+        |key| matches!(key, LockfileModuleKey::Module { version, .. } if version.normalized() == "1.2")
     ));
 }
 

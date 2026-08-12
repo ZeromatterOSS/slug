@@ -93,6 +93,7 @@ use crate::VisibleLockfileRead;
 use crate::dice::CommandModuleOverrides;
 use crate::lockfile::bad_visible_lockfile_message;
 use crate::lockfile::parse_visible_lockfile_bytes_for_mode;
+use crate::module_version::BazelModuleVersion;
 
 /// A direct, literal `include()` request found while compiling one non-root
 /// MODULE file. The later closure evaluator supplies and executes these files.
@@ -1658,53 +1659,13 @@ fn validate_repo_name(name: &str) -> anyhow::Result<()> {
 }
 
 fn validate_version(version: &str, directive: &str) -> anyhow::Result<()> {
-    if !is_valid_version(version) {
-        anyhow::bail!("Invalid version in {directive}()");
-    }
-    Ok(())
+    normalized_version(version, directive).map(|_| ())
 }
 
-fn normalize_version(version: &str) -> CompactString {
-    version
-        .split_once('+')
-        .map_or(version, |(normalized, _)| normalized)
-        .into()
-}
-
-fn is_valid_version(version: &str) -> bool {
-    if version.is_empty() {
-        return true;
-    }
-    let mut build_split = version.split('+');
-    let core = build_split.next().unwrap_or_default();
-    let build = build_split.next();
-    if build_split.next().is_some()
-        || build.is_some_and(|build| build.is_empty() || !valid_version_chars(build, true))
-    {
-        return false;
-    }
-    let (release, prerelease) = match core.split_once('-') {
-        Some((release, prerelease)) => (release, Some(prerelease)),
-        None => (core, None),
-    };
-    valid_version_identifiers(release, false)
-        && prerelease.is_none_or(|value| valid_version_identifiers(value, true))
-}
-
-fn valid_version_chars(value: &str, allow_hyphen: bool) -> bool {
-    value
-        .bytes()
-        .all(|byte| byte.is_ascii_alphanumeric() || byte == b'.' || (allow_hyphen && byte == b'-'))
-}
-
-fn valid_version_identifiers(value: &str, allow_hyphen: bool) -> bool {
-    !value.is_empty()
-        && valid_version_chars(value, allow_hyphen)
-        && value.split('.').all(|identifier| {
-            !identifier.is_empty()
-                && (!identifier.bytes().all(|byte| byte.is_ascii_digit())
-                    || identifier.parse::<u64>().is_ok())
-        })
+fn normalized_version(version: &str, directive: &str) -> anyhow::Result<CompactString> {
+    BazelModuleVersion::parse(version)
+        .map(|version| version.normalized().into())
+        .map_err(|_| anyhow::anyhow!("Invalid version in {directive}()"))
 }
 
 fn validate_bazel_compatibility(value: &str) -> anyhow::Result<()> {
@@ -2525,7 +2486,7 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         if !name.is_empty() {
             validate_module_name(name)?;
         }
-        validate_version(version, "module")?;
+        let version = normalized_version(version, "module")?;
         let repo_name = if repo_name.is_empty() {
             name
         } else {
@@ -2538,7 +2499,7 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         state.module_called = true;
         reserve_nonroot_repo_name(&mut state, repo_name)?;
         state.builder.declared_name = name.into();
-        state.builder.declared_version = normalize_version(version);
+        state.builder.declared_version = version;
         state.builder.repo_name = repo_name.into();
         state.builder.bazel_compatibility = bazel_compatibility
             .items
@@ -2558,7 +2519,7 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
         validate_module_name(name)?;
-        validate_version(version, "bazel_dep")?;
+        let version = normalized_version(version, "bazel_dep")?;
         if let Some(NoneOr::Other(repo)) = repo_name {
             validate_repo_name(repo)?;
         }
@@ -2573,7 +2534,7 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
             reserve_nonroot_repo_name(&mut state, repo)?;
         }
         if !dev_dependency {
-            let dep = NonrootDependency::new(name, normalize_version(version));
+            let dep = NonrootDependency::new(name, version);
             if nodep {
                 state.builder.nodep_dependencies.push(dep);
             } else if state
@@ -3893,6 +3854,46 @@ repo_rule(name = "ignored_innate", dev_dependency = True, value = len)
     }
 
     #[test]
+    fn root_versions_are_normalized_once_for_every_retained_surface() {
+        let source = Arc::new(
+            "module(name='root', version='1+header')\n\
+             bazel_dep(name='dep', version='2+dependency')\n\
+             single_version_override(module_name='single', version='3+single')\n\
+             multiple_version_override(module_name='multiple', versions=['4+first', '5+second'])\n"
+                .to_owned(),
+        );
+        let logical_id = LogicalModuleFileId::new("//:MODULE.bazel");
+        let evaluation = evaluate_root_module_closure(
+            false,
+            vec![RootModuleSourceFile {
+                path: PathBuf::from("MODULE.bazel"),
+                _inspection: inspect_nonroot_module_file(logical_id, source.as_bytes()).unwrap(),
+                source,
+            }],
+            SmallMap::new(),
+            Arc::from([PathBuf::from("MODULE.bazel")]),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            evaluation.module.header.unwrap().version.as_deref(),
+            Some("1")
+        );
+        assert_eq!(evaluation.module.dependencies[0].version, "2");
+        assert!(matches!(
+            evaluation.overrides.get("single"),
+            Some(RootModuleOverride::RegistrySingle(value)) if value.version == "3"
+        ));
+        assert!(matches!(
+            evaluation.overrides.get("multiple"),
+            Some(RootModuleOverride::RegistryMultiple(value))
+                if value.versions.as_ref() == ["4", "5"]
+        ));
+        let error = normalized_version("18446744073709551616", "bazel_dep").unwrap_err();
+        assert_eq!(error.to_string(), "Invalid version in bazel_dep()");
+    }
+
+    #[test]
     fn enforces_repo_name_and_export_collision_boundaries() {
         for source in [
             "module(name='subject', version='1.0')\nbazel_dep(name='dep', version='1.0', repo_name='subject')",
@@ -4274,14 +4275,14 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         if !name.is_empty() {
             validate_module_name(name)?;
         }
-        validate_version(version, "module")?;
+        let version = normalized_version(version, "module")?;
         validate_repo_name(repo_name)?;
         for value in bazel_compatibility.items {
             validate_bazel_compatibility(value)?;
         }
         state.header = Some(RootModuleHeader {
             name: name.into(),
-            version: (!version.is_empty()).then(|| version.into()),
+            version: (!version.is_empty()).then_some(version),
             repo_name: (!repo_name.is_empty()).then(|| repo_name.into()),
         });
         Ok(NoneType)
@@ -4317,7 +4318,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
     ) -> anyhow::Result<NoneType> {
         let _max_compatibility_level = max_compatibility_level;
         validate_module_name(name)?;
-        validate_version(version, "bazel_dep")?;
+        let version = normalized_version(version, "bazel_dep")?;
         if let Some(NoneOr::Other(repo_name)) = repo_name {
             validate_repo_name(repo_name)?;
         }
@@ -4331,7 +4332,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         if !dev_dependency || !state.ignore_dev_dependency {
             state.dependencies.push(RootModuleDependency {
                 name: name.into(),
-                version: version.into(),
+                version,
                 repo_name,
                 nodep,
                 dev_dependency,
@@ -4400,7 +4401,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = 0)] patch_strip: i32,
         eval: &mut Evaluator,
     ) -> anyhow::Result<NoneType> {
-        validate_version(version, "single_version_override")?;
+        let version = normalized_version(version, "single_version_override")?;
         let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         for patch in &patches.items {
             let _ = normalize_patch_label(patch, state.header.as_ref())?;
@@ -4409,7 +4410,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
             &mut state,
             module_name,
             RecordedRootModuleOverride::RegistrySingle {
-                version: version.into(),
+                version,
                 registry: registry.into(),
                 patches: patches.items.into_iter().map(Into::into).collect(),
                 patch_cmds: patch_cmds.items.into_iter().map(Into::into).collect(),
@@ -4428,15 +4429,17 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         if versions.items.len() < 2 {
             anyhow::bail!("multiple_version_override() requires at least two versions");
         }
-        for version in &versions.items {
-            validate_version(version, "multiple_version_override")?;
-        }
+        let versions = versions
+            .items
+            .into_iter()
+            .map(|version| normalized_version(version, "multiple_version_override"))
+            .collect::<anyhow::Result<Vec<_>>>()?;
         let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         record_override(
             &mut state,
             module_name,
             RecordedRootModuleOverride::RegistryMultiple(RegistryMultipleOverride {
-                versions: versions.items.into_iter().map(Into::into).collect(),
+                versions: versions.into(),
                 registry: registry.into(),
             }),
         )?;

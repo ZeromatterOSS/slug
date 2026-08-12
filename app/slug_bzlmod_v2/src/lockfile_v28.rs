@@ -27,6 +27,8 @@ use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 use starlark_map::sorted_map::SortedMap;
 
+use crate::module_version::BazelModuleVersion;
+
 pub(crate) const LOCK_FILE_VERSION_28: i32 = 28;
 pub(crate) const REGISTRY_FILE_NOT_FOUND_V28: &str = "not found";
 pub(crate) const MAX_FACT_NESTING_DEPTH: u8 = 7;
@@ -94,7 +96,7 @@ pub(crate) enum LockfileModuleKey {
     Root,
     Module {
         name: CompactString,
-        version: LockfileModuleVersion,
+        version: BazelModuleVersion,
     },
 }
 
@@ -120,29 +122,11 @@ impl PartialOrd for LockfileModuleKey {
 
 impl Ord for LockfileModuleKey {
     fn cmp(&self, other: &Self) -> Ordering {
-        let (left_name, left_version) = module_key_components(self);
-        let (right_name, right_version) = module_key_components(other);
+        let (left_name, _) = module_key_components(self);
+        let (right_name, _) = module_key_components(other);
         left_name
             .cmp(right_name)
-            .then_with(|| compare_versions(left_version, right_version))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub(crate) struct LockfileModuleVersion {
-    /// Canonical Bazel version spelling with build metadata removed.
-    pub(crate) canonical: CompactString,
-}
-
-impl PartialOrd for LockfileModuleVersion {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for LockfileModuleVersion {
-    fn cmp(&self, other: &Self) -> Ordering {
-        compare_versions(self.canonical.as_str(), other.canonical.as_str())
+            .then_with(|| compare_module_key_versions(self, other))
     }
 }
 
@@ -799,13 +783,11 @@ pub(crate) fn parse_module_key(
         return Err(delimiter_error(AdapterDomain::ModuleKey));
     };
     let version = if version_spelling == "_" {
-        LockfileModuleVersion {
-            canonical: CompactString::new(""),
-        }
+        BazelModuleVersion::empty()
     } else {
         parse_version(version_spelling)?
     };
-    if name.is_empty() && version.canonical.is_empty() {
+    if name.is_empty() && version.is_empty() {
         return Ok(LockfileModuleKey::Root);
     }
     Ok(LockfileModuleKey::Module {
@@ -817,122 +799,40 @@ pub(crate) fn parse_module_key(
 fn module_key_components(key: &LockfileModuleKey) -> (&str, &str) {
     match key {
         LockfileModuleKey::Root => ("", ""),
-        LockfileModuleKey::Module { name, version } => (name, &version.canonical),
+        LockfileModuleKey::Module { name, version } => (name, version.normalized()),
     }
 }
 
-fn parse_version(spelling: &str) -> Result<LockfileModuleVersion, LockfileParseError> {
-    if spelling.is_empty() {
-        return Ok(LockfileModuleVersion {
-            canonical: CompactString::new(""),
-        });
-    }
-    let mut build_split = spelling.split('+');
-    let without_build = build_split.next().unwrap_or(spelling);
-    let build = build_split.next();
-    if build_split.next().is_some() || build.is_some_and(|part| !valid_version_part(part, true)) {
-        return Err(direct_adapter_error(
-            AdapterDomain::Version,
-            "invalid Bazel module version build suffix",
-        ));
-    }
-    let (release, prerelease) = match without_build.split_once('-') {
-        Some((release, prerelease)) => (release, Some(prerelease)),
-        None => (without_build, None),
-    };
-    if !valid_version_part(release, false)
-        || prerelease.is_some_and(|prerelease| !valid_version_part(prerelease, true))
-    {
-        return Err(direct_adapter_error(
-            AdapterDomain::Version,
-            "invalid Bazel module version",
-        ));
-    }
-    for identifier in release
-        .split('.')
-        .chain(prerelease.into_iter().flat_map(|value| value.split('.')))
-    {
-        if identifier.bytes().all(|byte| byte.is_ascii_digit())
-            && identifier.parse::<u64>().is_err()
-        {
-            return Err(direct_adapter_error(
-                AdapterDomain::Version,
-                "numeric version identifier exceeds unsigned 64-bit range",
-            ));
+fn parse_version(spelling: &str) -> Result<BazelModuleVersion, LockfileParseError> {
+    BazelModuleVersion::parse(spelling)
+        .map_err(|error| direct_adapter_error(AdapterDomain::Version, error.lockfile_message()))
+}
+
+fn compare_module_key_versions(left: &LockfileModuleKey, right: &LockfileModuleKey) -> Ordering {
+    fn version(key: &LockfileModuleKey) -> Option<&BazelModuleVersion> {
+        match key {
+            LockfileModuleKey::Root => None,
+            LockfileModuleKey::Module { version, .. } => Some(version),
         }
     }
-    Ok(LockfileModuleVersion {
-        canonical: without_build.into(),
-    })
-}
-
-fn compare_versions(left: &str, right: &str) -> Ordering {
-    match (left.is_empty(), right.is_empty()) {
-        (true, true) => return Ordering::Equal,
-        (true, false) => return Ordering::Greater,
-        (false, true) => return Ordering::Less,
-        (false, false) => {}
-    }
-    let (left_release, left_pre) = split_version_for_order(left);
-    let (right_release, right_pre) = split_version_for_order(right);
-    compare_identifier_lists(left_release, right_release).then_with(|| {
-        match (left_pre, right_pre) {
-            (Some(left), Some(right)) => compare_identifier_lists(left, right),
-            (Some(_), None) => Ordering::Less,
-            (None, Some(_)) => Ordering::Greater,
-            (None, None) => Ordering::Equal,
-        }
-    })
-}
-
-fn split_version_for_order(version: &str) -> (&str, Option<&str>) {
-    match version.split_once('-') {
-        Some((release, prerelease)) => (release, Some(prerelease)),
-        None => (version, None),
-    }
-}
-
-fn compare_identifier_lists(left: &str, right: &str) -> Ordering {
-    let mut left = left.split('.');
-    let mut right = right.split('.');
-    loop {
-        match (left.next(), right.next()) {
-            (Some(left), Some(right)) => {
-                let ordering = compare_identifier(left, right);
-                if ordering != Ordering::Equal {
-                    return ordering;
-                }
+    match (version(left), version(right)) {
+        (Some(left), Some(right)) => left.cmp(right),
+        (None, None) => Ordering::Equal,
+        (None, Some(right)) => {
+            if right.is_empty() {
+                Ordering::Equal
+            } else {
+                Ordering::Greater
             }
-            (Some(_), None) => return Ordering::Greater,
-            (None, Some(_)) => return Ordering::Less,
-            (None, None) => return Ordering::Equal,
+        }
+        (Some(left), None) => {
+            if left.is_empty() {
+                Ordering::Equal
+            } else {
+                Ordering::Less
+            }
         }
     }
-}
-
-fn compare_identifier(left: &str, right: &str) -> Ordering {
-    let left_numeric = left.bytes().all(|byte| byte.is_ascii_digit());
-    let right_numeric = right.bytes().all(|byte| byte.is_ascii_digit());
-    match (left_numeric, right_numeric) {
-        (true, true) => left
-            .parse::<u64>()
-            .expect("validated numeric identifier")
-            .cmp(&right.parse::<u64>().expect("validated numeric identifier"))
-            .then_with(|| left.cmp(right)),
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-        (false, false) => left.cmp(right),
-    }
-}
-
-fn valid_version_part(part: &str, allow_hyphen: bool) -> bool {
-    !part.is_empty()
-        && part.split('.').all(|identifier| {
-            !identifier.is_empty()
-                && identifier
-                    .bytes()
-                    .all(|byte| byte.is_ascii_alphanumeric() || (allow_hyphen && byte == b'-'))
-        })
 }
 
 fn parse_extension_id(spelling: CompactString) -> Result<ModuleExtensionId, LockfileParseError> {
@@ -1530,10 +1430,10 @@ fn render_module_key(key: &LockfileModuleKey) -> String {
         LockfileModuleKey::Root => "<root>".to_owned(),
         LockfileModuleKey::Module { name, version } => format!(
             "{name}@{}",
-            if version.canonical.is_empty() {
+            if version.is_empty() {
                 "_"
             } else {
-                version.canonical.as_str()
+                version.normalized()
             }
         ),
     }
