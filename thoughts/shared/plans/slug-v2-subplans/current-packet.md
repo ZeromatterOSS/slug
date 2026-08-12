@@ -1,12 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-mapping-owner-design-r2`
-Milestone: cross-stage M7 prerequisite design
+Packet: `WP-5-host-selected-extension-mapping-owner-implementation`
+Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: audit and freeze the first additive selected-extension mapping owner,
-or return `REPLAN` at the first missing post-selection semantic leaf.
+Result: implement the accepted additive pre-evaluation selected-extension
+mapping owner without activating extension evaluation or consumers.
 
-## Active design contract
+## Active implementation contract
+
+Implement exactly the independently accepted one-file successor below. This
+packet may edit only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`. Cap
+formatted net growth at 520 production lines, 800 test lines, and 1,320 total.
+Complete the frozen pure and real-DICE proof matrix, protected suites/oracles,
+structural and cap checks, compact-representation and AI-cleanup audits, and
+independent implementation review.
+
+No second Rust file, public API, predecessor mutation, another graph/route/
+usage owner, extension evaluation or generated-existence validation, file or
+network I/O, RepoSpec/materializer/loading/consumer edge, command, analysis,
+execution, or JVM/Java work is authorized. Return `REPLAN` on any stop or cap
+excess; `REVISE` on one bounded implementation defect; a second material
+correction is `REPLAN`.
+
+## Accepted design contract
+
+This section is historical context for the active implementation and grants no
+separate file, action, cap, or scheduling authority.
 
 Perform a read-only ownership and pinned Bazel 9.2 audit now that commit
 `11be92b9` retains complete root extension usages. Determine whether one

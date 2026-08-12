@@ -2024,3 +2024,18 @@ and cleanup audits, structural stops, and independent review. A second file,
 public API, predecessor mutation, another graph/route/usage owner, extension
 evaluation or generated-existence validation, I/O/materializer/loading/
 consumer edge, or cap excess is `REPLAN`.
+
+### Selected extension mapping owner r2 design accepted (2026-08-12)
+
+Independent reserved-architecture reviews accept the one-file private
+pre-evaluation owner, exact/Slug-native/deferred classifications,
+520/800/1,320 caps, proof matrix, and terminal stops. The accepted routes,
+root usage slice, and discovered nonroot usages provide every required input;
+generated repository existence remains correctly deferred.
+
+Run next only
+`WP-5-host-selected-extension-mapping-owner-implementation` in
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`. Add no second file, public
+API, predecessor mutation, another graph/route/usage owner, extension
+evaluation or existence validation, I/O/materializer/loading/consumer edge,
+or JVM/Java work. Obtain fresh independent implementation review.
