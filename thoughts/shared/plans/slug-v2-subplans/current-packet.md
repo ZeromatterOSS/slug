@@ -1,13 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-8-m7-filewrite-run-handoff-implementation-retry`
-Milestone: M7 implementation retry
+Packet: `WP-8-m7-filewrite-run-fixture-admission-design`
+Milestone: M7 fixture-boundary replan
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: activate the accepted FileWrite Run vertical while using the reviewed
-smallest oracle-harness amendment to supply
-the already-started NativeLink endpoint and default execution properties to the
-accepted `run-basic` Slug command, without changing production semantics or
-silently widening the exhausted implementation packet.
+Result: freeze the complete POSIX source shape for `run-basic` on the already
+admitted Slug Starlark surface, without adding host-configuration semantics or
+changing the accepted production Run architecture.
+
+## Retry stop
+
+The endpoint-injection retry passed its focused harness tests and reached Slug
+analysis. Its one fixture correction added the already-required explicit marker
+leaf and forwarded that marker through `ToolchainInfo`. The next replay passed
+that boundary but failed independently because the old cross-platform fixture
+reads `ctx.configuration.host_path_separator`, which Slug does not admit.
+Because that is separate from toolchain topology, the retry ends `REPLAN`
+without acceptance or commit.
+
+## Design scope
+
+Audit the entire four-file `run-basic` workspace source against existing Slug
+loading/analysis capabilities. Freeze a POSIX-only fixture: add the existing
+`required_host_os = "posix"` fixture guard, remove `_is_windows` and the
+Windows content/output branches, declare only the `.sh` artifact, and retain
+the exact Bash content, executable FileWrite, DefaultInfo, toolchain marker,
+registered platform, mutations, and command rows already in the worktree.
+
+This fixture guard and source reduction are Slug-oracle-native scaffolding.
+They do not change the pinned Bazel 9.2 Linux observable output and make no
+Windows or host-configuration compatibility claim. Windows, host-path context,
+other action producers, and broader Run surfaces remain unsupported/deferred.
+
+Edit only this manifest, canonical/Stage 8/routing bookkeeping. The successor
+may additionally edit the six existing `run-basic` files and resume the retry's
+production/harness allowlist and caps. Cap this design at 60 bookkeeping lines
+and the successor source correction at 20 fixture lines. Require pinned Bazel
+9.2 replay, Slug replay, source grep proving no `ctx.configuration`/Windows
+branch, and independent design review before implementation resumes.
 
 ## Concrete stop
 

@@ -4421,3 +4421,17 @@ Build/Run endpoint placement and the existing evidence schema; no production,
 wire, lifecycle, fixture-schema, or other-verb behavior changes. Run next only
 `WP-8-m7-filewrite-run-handoff-implementation-retry`, retaining the existing
 production diff and adding the reviewed runner/comparison regressions.
+
+### Run fixture admission replan (2026-08-11)
+
+The endpoint-injection retry passed seven focused harness cases and correctly
+placed Run flags before `--`. Its sole correction completed the explicit
+toolchain marker leaf. The subsequent Slug replay reached rule analysis and
+then rejected the old fixture's independent
+`ctx.configuration.host_path_separator` read, which is outside the admitted
+POSIX Starlark context.
+
+That second scope miss ends the retry `REPLAN` without accepting or committing
+the retained production/harness diff. Run next only
+`WP-8-m7-filewrite-run-fixture-admission-design`: audit all four workspace
+sources and freeze one POSIX-only source reduction before another retry.
