@@ -70,7 +70,6 @@ use crate::RegistryFileValue;
 use crate::RegistryPolicyKey;
 use crate::RepoSpec;
 use crate::RootModuleBootstrapRequest;
-use crate::RootModuleFilesKey;
 use crate::RootModuleOverride;
 use crate::RootRepositoryRoute;
 use crate::apply_unified_patch;
@@ -83,6 +82,7 @@ use crate::host_package::HostBuildFileName;
 use crate::host_package::invalid_package_name;
 use crate::module_eval::DirectNonregistryEvaluationError;
 use crate::module_eval::DirectNonregistryIncludeFile;
+use crate::module_eval::HostEffectiveModuleOverrideKey;
 use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
 use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
@@ -713,29 +713,30 @@ impl Key for HostDiscoveredModuleKey {
         SourcePreparationOutcome<Arc<Result<HostDiscoveredModule, HostDiscoveredModuleError>>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let root = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.as_path().to_path_buf(),
-            })
+        let effective = match ctx
+            .compute(&HostEffectiveModuleOverrideKey::new(
+                self.workspace.dupe(),
+                self.module.name.clone(),
+            ))
             .await
         {
-            Ok(root) => root,
+            Ok(effective) => effective,
             Err(error) => {
                 return host_discovered_module_error(HostDiscoveredModuleError::RootModuleFiles(
                     error.to_string().into(),
                 ));
             }
         };
-        let root = match root.as_ref() {
-            Ok(root) => root,
+        let effective = match effective.as_ref() {
+            Ok(effective) => effective,
             Err(error) => {
                 return host_discovered_module_error(HostDiscoveredModuleError::RootModuleFiles(
-                    error.clone(),
+                    error.to_string().into(),
                 ));
             }
         };
-        let override_ = root.overrides.get(self.module.name.as_str());
-        if self.module.name == "bazel_tools" {
+        let override_ = effective.override_();
+        if self.module.name == "bazel_tools" && !effective.is_command() {
             if override_.is_some() {
                 return host_discovered_module_error(
                     HostDiscoveredModuleError::ExplicitBuiltinOverride,
@@ -2731,28 +2732,37 @@ impl Key for RepositoryMaterializationRequestKey {
     type Value = Arc<Result<RepositoryMaterializationRequest, RepositoryMaterializationError>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let root_files = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.clone(),
-            })
+        let workspace = match NormalizedAbsolutePath::new(self.workspace.clone()) {
+            Ok(workspace) => workspace,
+            Err(error) => {
+                return Arc::new(Err(RepositoryMaterializationError::InvalidWorkspace(
+                    error.to_string().into(),
+                )));
+            }
+        };
+        let effective = match ctx
+            .compute(&HostEffectiveModuleOverrideKey::new(
+                workspace.dupe(),
+                self.module_name.clone(),
+            ))
             .await
         {
-            Ok(root_files) => root_files,
+            Ok(effective) => effective,
             Err(error) => {
                 return Arc::new(Err(RepositoryMaterializationError::RootModuleFiles(
                     error.to_string().into(),
                 )));
             }
         };
-        let root_files = match root_files.as_ref() {
-            Ok(root_files) => root_files,
+        let effective = match effective.as_ref() {
+            Ok(effective) => effective,
             Err(error) => {
                 return Arc::new(Err(RepositoryMaterializationError::RootModuleFiles(
-                    error.clone(),
+                    error.to_string().into(),
                 )));
             }
         };
-        let repo_spec = match root_files.overrides.get(self.module_name.as_str()) {
+        let repo_spec = match effective.override_() {
             Some(RootModuleOverride::NonRegistry(repo_spec)) => repo_spec.clone(),
             Some(_) => {
                 return Arc::new(Err(RepositoryMaterializationError::UnsupportedOverride(
@@ -2777,15 +2787,7 @@ impl Key for RepositoryMaterializationRequestKey {
                 ));
             }
         };
-        let workspace = match NormalizedAbsolutePath::new(self.workspace.clone()) {
-            Ok(workspace) => workspace,
-            Err(error) => {
-                return Arc::new(Err(RepositoryMaterializationError::InvalidWorkspace(
-                    error.to_string().into(),
-                )));
-            }
-        };
-        let kind = match request_kind(&workspace, &repo_spec) {
+        let kind = match request_kind(&workspace, &repo_spec, effective.is_command()) {
             Ok(kind) => kind,
             Err(error) => return Arc::new(Err(error)),
         };
@@ -2807,6 +2809,7 @@ impl Key for RepositoryMaterializationRequestKey {
 fn request_kind(
     workspace: &NormalizedAbsolutePath,
     repo_spec: &RepoSpec,
+    allow_absolute_local_path: bool,
 ) -> Result<RepositoryMaterializationKind, RepositoryMaterializationError> {
     let local_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
         .expect("pinned local repository label is canonical");
@@ -2822,19 +2825,31 @@ fn request_kind(
                 "local_repository requires a string path".into(),
             ));
         };
-        let relative = Path::new(path.as_str());
-        if relative.as_os_str().is_empty()
-            || relative.is_absolute()
-            || relative
-                .components()
-                .any(|component| !matches!(component, Component::Normal(_)))
+        let source = Path::new(path.as_str());
+        if source.as_os_str().is_empty()
+            || source.components().any(|component| {
+                !matches!(
+                    component,
+                    Component::Prefix(_) | Component::RootDir | Component::Normal(_)
+                )
+            })
+            || source.is_absolute() != allow_absolute_local_path
         {
             return Err(RepositoryMaterializationError::Spec(
-                "local_repository path must be normalized and workspace-relative".into(),
+                if allow_absolute_local_path {
+                    "command local_repository path must be normalized and absolute"
+                } else {
+                    "local_repository path must be normalized and workspace-relative"
+                }
+                .into(),
             ));
         }
-        let root = NormalizedAbsolutePath::new(workspace.as_path().join(relative))
-            .map_err(|error| RepositoryMaterializationError::Spec(error.to_string().into()))?;
+        let root = NormalizedAbsolutePath::new(if allow_absolute_local_path {
+            source.to_owned()
+        } else {
+            workspace.as_path().join(source)
+        })
+        .map_err(|error| RepositoryMaterializationError::Spec(error.to_string().into()))?;
         return Ok(RepositoryMaterializationKind::Local { logical_root: root });
     }
     let http_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:http.bzl")
@@ -2866,7 +2881,7 @@ fn host_repository_materialization_request(
             canonical_repo: route.canonical_repo().clone(),
         },
         repo_spec: route.repo_spec().clone(),
-        kind: request_kind(route.workspace(), route.repo_spec())?,
+        kind: request_kind(route.workspace(), route.repo_spec(), false)?,
     }))
 }
 
@@ -3626,22 +3641,23 @@ impl Key for HostNonregistryPackagePreflightKey {
     type Value = HostNonregistryPackagePreflightValue;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let root = preflight_dice_invariant(
-            ctx.compute(&RootModuleFilesKey {
-                workspace: self.workspace.as_path().to_owned(),
-            })
+        let effective = preflight_dice_invariant(
+            ctx.compute(&HostEffectiveModuleOverrideKey::new(
+                self.workspace.dupe(),
+                self.module.name.clone(),
+            ))
             .await,
         );
-        let root = match root.as_ref() {
-            Ok(root) => root,
+        let effective = match effective.as_ref() {
+            Ok(effective) => effective,
             Err(error) => {
                 return preflight_complete(Err(
-                    HostNonregistryPackagePreflightError::RootModuleFiles(error.clone()),
+                    HostNonregistryPackagePreflightError::RootModuleFiles(error.to_string().into()),
                 ));
             }
         };
         if !matches!(
-            root.overrides.get(self.module.name.as_str()),
+            effective.override_(),
             Some(RootModuleOverride::NonRegistry(_))
         ) {
             return preflight_complete(Err(
@@ -3753,10 +3769,19 @@ impl Key for ModuleSourcePreparationKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let root = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.clone(),
-            })
+        let workspace = match NormalizedAbsolutePath::new(self.workspace.clone()) {
+            Ok(workspace) => workspace,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
+                )));
+            }
+        };
+        let effective = match ctx
+            .compute(&HostEffectiveModuleOverrideKey::new(
+                workspace,
+                self.module_name.clone(),
+            ))
             .await
         {
             Ok(value) => value,
@@ -3766,15 +3791,15 @@ impl Key for ModuleSourcePreparationKey {
                 )));
             }
         };
-        let root = match root.as_ref() {
+        let effective = match effective.as_ref() {
             Ok(value) => value,
             Err(error) => {
                 return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    ModuleSourcePreparationError::RootModuleFiles(error.clone()),
+                    ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
                 )));
             }
         };
-        let override_ = root.overrides.get(self.module_name.as_str()).cloned();
+        let override_ = effective.override_().cloned();
         if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
             let value = match ctx
                 .compute(&RepositorySourceFileKey {
@@ -4178,22 +4203,23 @@ impl Key for HostNonregistryModuleClosureKey {
     type Value = HostNonregistryModuleClosureValue;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let root = preflight_dice_invariant(
-            ctx.compute(&RootModuleFilesKey {
-                workspace: self.workspace.as_path().to_path_buf(),
-            })
+        let effective = preflight_dice_invariant(
+            ctx.compute(&HostEffectiveModuleOverrideKey::new(
+                self.workspace.dupe(),
+                self.module.name.clone(),
+            ))
             .await,
         );
-        let root = match root.as_ref() {
-            Ok(root) => root,
+        let effective = match effective.as_ref() {
+            Ok(effective) => effective,
             Err(error) => {
                 return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::RootModuleFiles(error.clone()),
+                    HostNonregistryModuleClosureError::RootModuleFiles(error.to_string().into()),
                 ));
             }
         };
         if !matches!(
-            root.overrides.get(self.module.name.as_str()),
+            effective.override_(),
             Some(RootModuleOverride::NonRegistry(_))
         ) {
             return host_nonregistry_closure_complete(Err(
@@ -9005,6 +9031,8 @@ mod tests {
     #[test]
     fn host_discovered_module_owner_has_no_graph_or_consumer_edge() {
         let source = include_str!("source_preparation.rs");
+        let production = source.split("#[cfg(test)]").next().unwrap();
+        assert!(!production.contains("RootModuleFilesKey"));
         let owner = source
             .split("async fn discover_nonregistry")
             .nth(1)
@@ -9013,7 +9041,7 @@ mod tests {
             .next()
             .unwrap();
         for required in [
-            "RootModuleFilesKey",
+            "HostEffectiveModuleOverrideKey",
             "BuiltinBazelToolsModuleKey",
             "ModuleSourcePreparationKey",
             "HostNonregistryModuleClosureKey",
@@ -9037,6 +9065,7 @@ mod tests {
     #[derive(Default)]
     struct HostDiscoveryTracker {
         host: Mutex<Vec<(ActivationKind, bool)>>,
+        effective: Mutex<Vec<ActivationKind>>,
         builtin: Mutex<Vec<ActivationKind>>,
     }
 
@@ -9059,6 +9088,11 @@ mod tests {
                     .lock()
                     .unwrap()
                     .push((activation.kind(), activation.evaluation_data().is_none()));
+            } else if key
+                .downcast_ref::<HostEffectiveModuleOverrideKey>()
+                .is_some()
+            {
+                self.effective.lock().unwrap().push(activation.kind());
             } else if key.downcast_ref::<BuiltinBazelToolsModuleKey>().is_some() {
                 self.builtin.lock().unwrap().push(activation.kind());
             }
@@ -9245,6 +9279,414 @@ mod tests {
                 .iter()
                 .any(|(kind, _)| *kind == ActivationKind::Reused)
         );
+    }
+    async fn compute_host_effective(
+        dice: &Arc<Dice>,
+        root_source: &str,
+        module_name: &str,
+        override_values: &[&str],
+    ) -> <HostEffectiveModuleOverrideKey as Key>::Value {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                            root_source.to_owned(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel.lock"),
+                        slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                workspace.as_path(),
+                override_values.iter().copied(),
+            )
+            .unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&HostEffectiveModuleOverrideKey::new(
+                workspace,
+                module_name.into(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn effective_override_and_command_discovery_are_single_owned() {
+        use crate::module_eval::HostEffectiveModuleOverride;
+
+        let root = "module(name = \"root\")\nlocal_path_override(module_name = \"dep\", path = \"root-dep\")\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root_a = compute_host_effective(&dice, root, "dep", &[]).await;
+        let command_b = compute_host_effective(&dice, root, "dep", &["dep=/workspace/dep"]).await;
+        let root_a_restored = compute_host_effective(&dice, root, "dep", &[]).await;
+        assert_eq!(root_a, root_a_restored);
+        let path_a = compute_host_effective(&dice, root, "dep", &["dep=/workspace/dep-a"]).await;
+        let path_b = compute_host_effective(&dice, root, "dep", &["dep=/workspace/dep-b"]).await;
+        let path_a_restored =
+            compute_host_effective(&dice, root, "dep", &["dep=/workspace/dep-a"]).await;
+        assert_ne!(path_a, path_b);
+        assert_eq!(path_a, path_a_restored);
+        assert!(matches!(
+            root_a.as_ref(),
+            Ok(HostEffectiveModuleOverride::Root {
+                override_: RootModuleOverride::NonRegistry(_),
+            })
+        ));
+        let command = command_b.as_ref().as_ref().unwrap();
+        let HostEffectiveModuleOverride::Command { path, override_ } = command else {
+            panic!("command must win over the root declaration")
+        };
+        assert_eq!(path.as_path(), Path::new("/workspace/dep"));
+        let RootModuleOverride::NonRegistry(repo_spec) = override_ else {
+            panic!("command paths project to local nonregistry specs")
+        };
+        assert_eq!(repo_spec.rule_id.rule_name, "local_repository");
+        assert_eq!(
+            repo_spec.rule_id.bzl_file,
+            CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl").unwrap()
+        );
+        assert!(matches!(
+            repo_spec.attributes.get("path"),
+            Some(OverrideAttributeValue::String(path)) if path == "/workspace/dep"
+        ));
+        let root_error = compute_host_effective(
+            &dice,
+            "module(name = \"root\")\n",
+            "dep",
+            &["root=/workspace/replacement"],
+        )
+        .await;
+        assert!(matches!(
+            root_error.as_ref(),
+            Err(crate::module_eval::HostEffectiveModuleOverrideError::RootModuleOverride {
+                module_name,
+            }) if module_name == "root"
+        ));
+
+        let tracker = Arc::new(HostDiscoveryTracker::default());
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let module_source = b"module(name = \"bazel_tools\")\n";
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                            "module(name = \"root\")\n".to_owned(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel.lock"),
+                        slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                workspace.as_path(),
+                ["bazel_tools=/workspace/tools"],
+            )
+            .unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new([]).unwrap(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let key = HostDiscoveredModuleKey::new(
+            workspace.dupe(),
+            NonrootModuleKey::new("bazel_tools", ""),
+        );
+        let mut observations = Vec::new();
+        for _ in 0..8 {
+            let outcome = transaction.compute(&key).await.unwrap();
+            match outcome {
+                SourcePreparationOutcome::Complete(value) => {
+                    let discovered = value.as_ref().as_ref().unwrap();
+                    assert_eq!(discovered.module.base.declared_name, "bazel_tools");
+                    assert!(matches!(
+                        &discovered.provenance,
+                        HostDiscoveredModuleProvenance::NonRegistry { closure }
+                            if closure.root.bytes.as_ref() == module_source
+                    ));
+                    assert!(tracker.builtin.lock().unwrap().is_empty());
+                    let warm = transaction.compute(&key).await.unwrap();
+                    assert!(HostDiscoveredModuleKey::equality(
+                        &SourcePreparationOutcome::Complete(value.clone()),
+                        &warm,
+                    ));
+                    assert!(
+                        tracker
+                            .host
+                            .lock()
+                            .unwrap()
+                            .iter()
+                            .any(|(kind, _)| *kind == ActivationKind::Reused)
+                    );
+                    assert!(
+                        tracker
+                            .effective
+                            .lock()
+                            .unwrap()
+                            .iter()
+                            .any(|kind| *kind == ActivationKind::Reused)
+                    );
+                    return;
+                }
+                SourcePreparationOutcome::Need(needs) => {
+                    let requests = needs
+                        .repository_materializations()
+                        .values()
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    if let Some(demands) = needs.path_observations() {
+                        observations.extend(demands.demands().iter().map(|demand| {
+                            let result = match demand.operation() {
+                                PathObservationOperation::Lstat => {
+                                    let kind = if demand.path().as_path().ends_with("MODULE.bazel")
+                                    {
+                                        PathNodeKind::RegularFile
+                                    } else {
+                                        PathNodeKind::Directory
+                                    };
+                                    PathObservationResult::Lstat(PathOperationResult::Present(
+                                        PathLstat::new(kind, 1, 1, 1, 1, 0o644),
+                                    ))
+                                }
+                                PathObservationOperation::FileBytes => {
+                                    PathObservationResult::FileBytes(PathOperationResult::Present(
+                                        Arc::from(module_source.as_slice()),
+                                    ))
+                                }
+                                operation => {
+                                    panic!("unexpected command source demand: {operation:?}")
+                                }
+                            };
+                            (demand.dupe(), result)
+                        }));
+                    }
+                    let mut next = transaction.into_updater();
+                    if !requests.is_empty() {
+                        next.changed_to(vec![(
+                            RepositoryMaterializationResultEpochKey {
+                                workspace: workspace.dupe(),
+                            },
+                            RepositoryMaterializationResultEpoch::new(
+                                workspace.dupe(),
+                                requests.into_iter().map(|request| {
+                                    RepositoryMaterializationEpochEntry {
+                                        request,
+                                        result: RepositoryMaterializationResult::Success(
+                                            RepositoryMaterializationSuccess::Local,
+                                        ),
+                                    }
+                                }),
+                            )
+                            .unwrap(),
+                        )])
+                        .unwrap();
+                    }
+                    if !observations.is_empty() {
+                        next.changed_to(vec![(
+                            PathObservationEpochKey,
+                            PathObservationEpoch::new(observations.clone()).unwrap(),
+                        )])
+                        .unwrap();
+                    }
+                    transaction = next.commit().await;
+                }
+            }
+        }
+        panic!("command-overridden bazel_tools did not complete")
+    }
+    #[tokio::test]
+    async fn command_source_preserves_missing_and_wrong_kind_terminals() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root = "module(name = \"root\")\n";
+        let effective = compute_host_effective(&dice, root, "dep", &["dep=/workspace/dep"]).await;
+        assert!(matches!(
+            effective.as_ref(),
+            Ok(crate::module_eval::HostEffectiveModuleOverride::Command { .. })
+        ));
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let request = transaction
+            .compute(&RepositoryMaterializationRequestKey {
+                workspace: workspace.as_path().to_owned(),
+                module_name: "dep".into(),
+            })
+            .await
+            .unwrap()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .clone();
+        assert!(matches!(
+            &request.kind,
+            RepositoryMaterializationKind::Local { logical_root }
+                if logical_root.as_path() == Path::new("/workspace/dep")
+        ));
+        let source_key = RepositorySourceFileKey {
+            workspace: workspace.as_path().to_owned(),
+            module_name: "dep".into(),
+            repo_relative_path: "MODULE.bazel".into(),
+        };
+        let materialization = RepositoryMaterializationResultEpoch::new(
+            workspace.dupe(),
+            [RepositoryMaterializationEpochEntry {
+                request: Arc::new(request),
+                result: RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Local,
+                ),
+            }],
+        )
+        .unwrap();
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                materialization.clone(),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    root,
+                    PathObservationNamespace::Host,
+                    "/workspace/dep",
+                    None,
+                    None,
+                    None,
+                    None,
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    901,
+                ),
+            )])
+            .unwrap();
+        transaction = updater.commit().await;
+        assert!(matches!(
+            transaction.compute(&source_key).await.unwrap(),
+            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
+        ));
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey { workspace },
+                materialization,
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    root,
+                    PathObservationNamespace::Host,
+                    "/workspace/dep",
+                    None,
+                    None,
+                    Some(PathNodeKind::Directory),
+                    None,
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    &[],
+                    902,
+                ),
+            )])
+            .unwrap();
+        assert!(matches!(
+            updater.commit().await.compute(&source_key).await.unwrap(),
+            SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
+                actual: PathNodeKind::Directory,
+                ..
+            }))
+        ));
     }
     fn nonregistry_preflight(package: &str) -> HostNonregistryPackagePreflightKey {
         HostNonregistryPackagePreflightKey::new(

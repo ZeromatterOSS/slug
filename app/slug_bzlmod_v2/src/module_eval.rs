@@ -30,6 +30,7 @@ use slug_identity_v2::PackagePath;
 use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
 use slug_identity_v2::TargetName;
+use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileKey;
@@ -848,6 +849,12 @@ impl RootModuleCommandPolicy {
     pub fn command_module_overrides(&self) -> impl Iterator<Item = (&str, &Path)> {
         self.command_module_overrides.iter()
     }
+
+    fn command_module_override(&self, module_name: &str) -> Option<&Path> {
+        self.command_module_overrides
+            .iter()
+            .find_map(|(name, path)| (name == module_name).then_some(path))
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -1283,6 +1290,162 @@ async fn read_root_module_source(
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RootModuleGraphKey {
     pub workspace: PathBuf,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostEffectiveModuleOverride {
+    Command {
+        path: NormalizedAbsolutePath,
+        override_: RootModuleOverride,
+    },
+    Root {
+        override_: RootModuleOverride,
+    },
+    None,
+}
+
+impl HostEffectiveModuleOverride {
+    pub(crate) fn override_(&self) -> Option<&RootModuleOverride> {
+        match self {
+            Self::Command { override_, .. } | Self::Root { override_ } => Some(override_),
+            Self::None => None,
+        }
+    }
+
+    pub(crate) fn is_command(&self) -> bool {
+        matches!(self, Self::Command { .. })
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostEffectiveModuleOverrideError {
+    RootModuleFiles(CompactString),
+    CommandPolicy(CompactString),
+    RootModuleOverride { module_name: CompactString },
+}
+
+impl fmt::Display for HostEffectiveModuleOverrideError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::RootModuleFiles(message) => write!(f, "root MODULE files failed: {message}"),
+            Self::CommandPolicy(message) => write!(f, "command policy failed: {message}"),
+            Self::RootModuleOverride { module_name } => {
+                write!(
+                    f,
+                    "module override for the root module {module_name} is not allowed"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for HostEffectiveModuleOverrideError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostEffectiveModuleOverrideKey {
+    workspace: NormalizedAbsolutePath,
+    module_name: CompactString,
+}
+
+impl HostEffectiveModuleOverrideKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, module_name: CompactString) -> Self {
+        Self {
+            workspace,
+            module_name,
+        }
+    }
+}
+
+impl fmt::Display for HostEffectiveModuleOverrideKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-effective-module-override:{}:{}",
+            self.workspace, self.module_name
+        )
+    }
+}
+
+fn command_local_path_override(path: &Path) -> RootModuleOverride {
+    RootModuleOverride::NonRegistry(RepoSpec {
+        rule_id: repo_rule_id(
+            "@@bazel_tools//tools/build_defs/repo:local.bzl",
+            "local_repository",
+        ),
+        attributes: Arc::new(SmallMap::from_iter([(
+            CompactString::new("path"),
+            OverrideAttributeValue::String(
+                path.to_str()
+                    .expect("normalized command paths are valid Unicode")
+                    .into(),
+            ),
+        )])),
+    })
+}
+
+#[async_trait]
+impl Key for HostEffectiveModuleOverrideKey {
+    type Value = Arc<Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let files = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Ok(files) => match files.as_ref().clone() {
+                Ok(files) => files,
+                Err(error) => {
+                    return Arc::new(Err(HostEffectiveModuleOverrideError::RootModuleFiles(
+                        error.clone(),
+                    )));
+                }
+            },
+            Err(error) => {
+                return Arc::new(Err(HostEffectiveModuleOverrideError::RootModuleFiles(
+                    error.to_string().into(),
+                )));
+            }
+        };
+        let policy = match ctx
+            .compute(&RootModuleCommandPolicyKey {
+                workspace: self.workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Ok(policy) => policy,
+            Err(error) => {
+                return Arc::new(Err(HostEffectiveModuleOverrideError::CommandPolicy(
+                    error.to_string().into(),
+                )));
+            }
+        };
+        if let Some(root_name) = files.module.header.as_ref().map(|header| &header.name)
+            && policy.command_module_override(root_name).is_some()
+        {
+            return Arc::new(Err(HostEffectiveModuleOverrideError::RootModuleOverride {
+                module_name: root_name.clone(),
+            }));
+        }
+        if let Some(path) = policy.command_module_override(self.module_name.as_str()) {
+            return Arc::new(Ok(HostEffectiveModuleOverride::Command {
+                path: NormalizedAbsolutePath::new(path.to_owned())
+                    .expect("injected command override paths are normalized"),
+                override_: command_local_path_override(path),
+            }));
+        }
+        Arc::new(Ok(match files.overrides.get(self.module_name.as_str()) {
+            Some(override_) => HostEffectiveModuleOverride::Root {
+                override_: override_.clone(),
+            },
+            None => HostEffectiveModuleOverride::None,
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
 }
 impl fmt::Display for RootModuleGraphKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
