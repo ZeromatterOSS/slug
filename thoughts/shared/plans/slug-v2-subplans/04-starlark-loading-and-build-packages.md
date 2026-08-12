@@ -2394,3 +2394,19 @@ Freeze the successor to the six shared starlark-rust files under the same
 str/repr/interpolation/format/print/nesting/cycle matrix, and defer exact Label
 and loading/DICE proof to the invocation packet. No Rust resumes before
 independent correction acceptance and explicit r2 activation.
+
+### Custom string protocol implementation r2 activated (2026-08-12)
+
+Independent review accepts the scope correction in `6215fe03`. Run only
+`WP-4-starlark-custom-string-protocol-implementation-r2` in the six shared
+starlark-rust files and four plans frozen by current, under 90/220/310 against
+`73b22cec`. Require the complete synthetic protocol matrix and preserve every
+stop. App Rust, InvocationLabel, loading, and DICE proof remain deferred to the
+invocation packet.
+
+The six-file implementation is independently accepted: isolated growth is
+within 90/220/310; the complete synthetic matrix, focused 73/8/9 Starlark
+suites, full loading and Bzlmod dependents, formatting, and diff checks pass.
+Full vendored Starlark retains only 29 unrelated profiler/bytecode golden
+baselines after 808 passing tests. Commit only the shared runtime files plus
+bookkeeping; preserve every app path as unaccepted dirty state.

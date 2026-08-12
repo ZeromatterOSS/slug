@@ -1,13 +1,68 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-starlark-custom-string-protocol-implementation-r2-scope-design`
-Milestone: M7 custom Starlark stringification prerequisite scope correction
+Packet: `WP-4-starlark-custom-string-protocol-implementation-r2`
+Milestone: M7 custom Starlark stringification prerequisite implementation r2
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct the implementation boundary so the shared runtime protocol can
-land without committing the retained unaccepted invocation owner.
+Result: implement the accepted six-file shared runtime protocol without
+committing the retained unaccepted invocation owner.
 
-## Active docs-only scope-correction contract
+## Active implementation contract
+
+Independent review accepts the scope correction recorded in `6215fe03`.
+Implement only `WP-4-starlark-custom-string-protocol-implementation-r2` in the
+six vendored starlark-rust files frozen below plus canonical/current/Stage 4/
+Stage 5 bookkeeping. Caps remain 90 production, 220 tests, and 310 total
+formatted net lines against `73b22cec`. Require the complete synthetic global
+str/repr, percent, format, print, nesting, and cycle matrix. Preserve all
+default-to-repr, string-fast-path, repr/hash/equality/type, single-protocol,
+derive, public-API, and behavior stops. No app Rust, InvocationLabel, loading,
+or DICE proof is authorized; those resume only with the invocation packet.
+
+### Implementation evidence
+
+The isolated six-file delta against `73b22cec` is approximately 31 production
+and 76 test lines, within 90/220/310. The synthetic protocol matrix passes;
+focused `starlark` string, interpolation, and format suites pass 73/73, 8/8,
+and 9/9. Full `slug_loading_v2 --all-targets` (92 owner tests plus all
+integrations) and `slug_bzlmod_v2 --all-targets` pass. Full vendored
+`starlark --all-targets` passes 808 tests and retains 29 unrelated existing
+profiler/bytecode golden failures; no string, interpolation, format, value, or
+protocol test fails. Formatting and diff checks pass. Independent review
+accepts the isolated six-file implementation and confirms the dirty app paths
+remain unaccepted and unstaged.
+
+### Implementation evidence
+
+The isolated six-file delta against `73b22cec` is approximately 31 production
+and 76 test lines, within 90/220/310. The synthetic protocol matrix passes;
+focused `starlark` string, interpolation, and format suites pass 73/73, 8/8,
+and 9/9. Full `slug_loading_v2 --all-targets` (92 owner tests plus all
+integrations) and `slug_bzlmod_v2 --all-targets` pass. Full vendored
+`starlark --all-targets` passes 808 tests and retains 29 unrelated existing
+profiler/bytecode golden failures; no string, interpolation, format, value, or
+protocol test fails. Formatting and diff checks pass. Independent review
+accepts the isolated six-file implementation and confirms the dirty app paths
+remain unaccepted and unstaged.
+
+### Implementation evidence
+
+The isolated six-file delta against `73b22cec` is approximately 31 production
+and 76 test lines, within 90/220/310. The synthetic protocol matrix passes;
+focused `starlark` string, interpolation, and format suites pass 73/73, 8/8,
+and 9/9. Full `slug_loading_v2 --all-targets` (92 owner tests plus all
+integrations) and `slug_bzlmod_v2 --all-targets` pass. Full vendored
+`starlark --all-targets` passes 808 tests and retains 29 unrelated existing
+profiler/bytecode golden failures; no string, interpolation, format, value, or
+protocol test fails. Formatting and diff checks pass. Independent review
+accepts the isolated six-file implementation and confirms the dirty app paths
+remain unaccepted and unstaged.
+
+## Accepted docs-only scope-correction contract
+
+This section is historical correction context only, grants no file, action,
+cap, or schedule authority, and is interpreted solely through the active
+implementation contract above.
 
 Independent implementation review found the six shared runtime files sound but
 rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly

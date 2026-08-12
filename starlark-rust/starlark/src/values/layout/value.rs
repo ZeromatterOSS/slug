@@ -858,10 +858,9 @@ impl<'v> Value<'v> {
     /// Implement the `str()` function - converts a string value to itself,
     /// otherwise uses `repr()`.
     pub fn to_str(self) -> String {
-        match self.unpack_str() {
-            None => self.to_repr(),
-            Some(s) => s.to_owned(),
-        }
+        let mut s = String::new();
+        self.collect_str(&mut s);
+        s
     }
 
     /// Implement the `repr()` function.
@@ -1421,6 +1420,17 @@ impl<'v> ValueLike<'v> for Value<'v> {
         }
     }
 
+    fn collect_str(self, collector: &mut String) {
+        if let Some(s) = self.unpack_str() {
+            collector.push_str(s);
+            return;
+        }
+        match repr_stack_push(self) {
+            Ok(_guard) => self.get_ref().collect_str(collector),
+            Err(..) => self.get_ref().collect_repr_cycle(collector),
+        }
+    }
+
     fn write_hash(self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
         self.get_ref().write_hash(hasher)
     }
@@ -1464,6 +1474,11 @@ impl<'v> ValueLike<'v> for FrozenValue {
     }
 
     #[inline]
+    fn collect_str(self, collector: &mut String) {
+        self.to_value().collect_str(collector)
+    }
+
+    #[inline]
     fn write_hash(self, hasher: &mut StarlarkHasher) -> crate::Result<()> {
         self.to_value().write_hash(hasher)
     }
@@ -1487,12 +1502,25 @@ where
 
 #[cfg(test)]
 mod tests {
-    use num_bigint::BigInt;
+    use std::cell::RefCell;
+    use std::fmt;
 
+    use allocative::Allocative;
+    use num_bigint::BigInt;
+    use starlark_derive::starlark_value;
+
+    use crate as starlark;
+    use crate::any::ProvidesStaticType;
     use crate::assert;
+    use crate::assert::Assert;
     use crate::environment::Globals;
+    use crate::starlark_simple_value;
+    use crate::stdlib::PrintHandler;
+    use crate::stdlib::PrintLocation;
     use crate::typing::Ty;
     use crate::values::Heap;
+    use crate::values::NoSerialize;
+    use crate::values::StarlarkValue;
     use crate::values::Value;
     use crate::values::ValueLike;
     use crate::values::int::pointer_i32::PointerI32;
@@ -1500,6 +1528,68 @@ mod tests {
     use crate::values::none::NoneType;
     use crate::values::string::str_type::StarlarkStr;
     use crate::values::unpack::UnpackValue;
+
+    #[derive(Debug, ProvidesStaticType, NoSerialize, Allocative)]
+    struct DistinctString;
+
+    impl fmt::Display for DistinctString {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.write_str("repr-form")
+        }
+    }
+
+    starlark_simple_value!(DistinctString);
+
+    #[starlark_value(type = "distinct_string")]
+    impl<'v> StarlarkValue<'v> for DistinctString {
+        fn collect_str(&self, collector: &mut String) {
+            collector.push_str("str-form")
+        }
+    }
+
+    #[test]
+    fn custom_string_protocol_defaults_to_repr_and_can_diverge() {
+        Heap::temp(|heap| {
+            let custom = heap.alloc_simple(DistinctString);
+            assert_eq!("str-form", custom.to_str());
+            assert_eq!("repr-form", custom.to_repr());
+            assert_eq!(
+                "[repr-form]",
+                heap.alloc(AllocList([custom])).to_value().to_str()
+            );
+            let default = Value::new_none();
+            assert_eq!(default.to_repr(), default.to_str());
+            assert_eq!("plain", heap.alloc_str("plain").to_value().to_str());
+        });
+
+        struct CapturedPrints(RefCell<Vec<String>>);
+        impl PrintHandler for CapturedPrints {
+            fn println(&self, _location: PrintLocation, text: &str) -> crate::Result<()> {
+                self.0.borrow_mut().push(text.to_owned());
+                Ok(())
+            }
+        }
+
+        let prints = CapturedPrints(RefCell::new(Vec::new()));
+        let mut a = Assert::new();
+        a.globals_add(|g| g.set("custom", DistinctString));
+        a.set_print_handler(&prints);
+        a.eq("str(custom)", r#""str-form""#);
+        a.eq("repr(custom)", r#""repr-form""#);
+        a.eq(r#""%s" % custom"#, r#""str-form""#);
+        a.eq(r#""%r" % custom"#, r#""repr-form""#);
+        a.eq(r#""{}".format(custom)"#, r#""str-form""#);
+        a.eq(r#""{!s}".format(custom)"#, r#""str-form""#);
+        a.eq(r#""{!r}".format(custom)"#, r#""repr-form""#);
+        a.eq("str([custom])", r#""[repr-form]""#);
+        a.eq("x = []; x.append(x); str(x)", r#""[[...]]""#);
+        prints.0.borrow_mut().clear();
+        a.pass("print(custom)");
+        assert_eq!(
+            ["str-form", "str-form", "str-form"],
+            prints.0.borrow().as_slice()
+        );
+    }
 
     #[test]
     fn test_downcast_ref() {

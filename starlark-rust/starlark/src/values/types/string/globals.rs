@@ -141,7 +141,7 @@ pub(crate) fn register_str(globals: &mut GlobalsBuilder) {
             Ok(a)
         } else {
             let mut s = eval.string_pool.alloc();
-            a.collect_repr(&mut s);
+            a.collect_str(&mut s);
             let r = eval.heap().alloc_str(&s);
             eval.string_pool.release(s);
             Ok(r)

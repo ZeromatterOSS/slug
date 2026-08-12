@@ -2509,3 +2509,13 @@ a six-file shared-runtime successor under unchanged 90/220/310 caps against
 `73b22cec` and moving Label/loading/DICE proof back to the invocation packet.
 Stage 5 production remains unchanged and no Rust resumes before acceptance and
 explicit r2 activation.
+
+Independent review accepts the scope correction in `6215fe03` and activates
+only `WP-4-starlark-custom-string-protocol-implementation-r2` in the six shared
+runtime files plus four plans, under 90/220/310 against `73b22cec`. Stage 5
+production and all app/Label/loading/DICE surfaces remain unchanged and
+unauthorized in this packet.
+
+Independent implementation review accepts the isolated six-file runtime
+delta and passing focused/loading/Bzlmod evidence. Stage 5 remains unchanged;
+commit no app or Bzlmod Rust in this packet.

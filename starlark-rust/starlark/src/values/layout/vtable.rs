@@ -501,6 +501,11 @@ impl<'v> AValueDyn<'v> {
     }
 
     #[inline]
+    pub(crate) fn collect_str(self, collector: &mut String) {
+        (self.vtable.starlark_value.collect_str)(self.value, collector)
+    }
+
+    #[inline]
     pub(crate) fn collect_repr_cycle(self, collector: &mut String) {
         (self.vtable.starlark_value.collect_repr_cycle)(self.value, collector)
     }

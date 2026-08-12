@@ -362,6 +362,13 @@ pub trait StarlarkValue<'v>:
         write!(collector, "{self}").unwrap()
     }
 
+    /// Return the string representation used by `str`, `%s`, and print.
+    /// Defaults to `repr`; values with a distinct Starlark string form may
+    /// override this without changing their debug representation.
+    fn collect_str(&self, collector: &mut String) {
+        self.collect_repr(collector)
+    }
+
     /// Invoked to print `repr` when a cycle is the object stack is detected.
     fn collect_repr_cycle(&self, collector: &mut String) {
         write!(collector, "<{}...>", Self::TYPE).unwrap()
