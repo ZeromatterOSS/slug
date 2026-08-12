@@ -2261,3 +2261,11 @@ JVM/Java work is authorized before independent design acceptance. `REPLAN`
 on a second loader, retained Starlark heap/callable, repository-rule breadth,
 public definition surface, third future Rust file, unresolved exact error
 order, or cap excess.
+
+### Module-extension definition loading implementation activated (2026-08-12)
+
+Independent review accepts the cross-stage loading design. Run next only
+`WP-4-5-host-module-extension-definition-loading-owner-implementation` in the
+two loading files under 440/650/1,090; Bzlmod's accepted hidden request and
+private selected owners remain unchanged. No public/consumer/execution/
+generated-repository breadth is authorized.

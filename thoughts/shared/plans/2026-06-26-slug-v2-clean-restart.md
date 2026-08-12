@@ -30,13 +30,13 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, and multi-platform choice are later breadth | preserve the admitted FileWrite boundary |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **active (module-extension definition loading design)** | early command/ruleset scaffolding, accepted query/cquery/aquery and FileWrite execution, accepted POSIX executable FileWrite run, complete Host discovered leaves, normalized/effective overrides, exact shared versions, accepted callerless selected graph in `216a0be8`, selected registry RepoSpecs in `e8ad58dd`, selected routes in `6f72baaf`, root extension usages in `11be92b9`, corrected root overrides in `2644f091`, selected extension mappings in `75a431d6`, and the hidden selected definition-load request projection in `d0d7bde7` | freeze the loading-owned heap-independent definition boundary without a second bzl loader or retained callable | WP-4-5-host-module-extension-definition-loading-owner-design |
+| M7: command/ruleset breadth | **active (module-extension definition loading implementation)** | early command/ruleset scaffolding, accepted query/cquery/aquery and FileWrite execution, accepted POSIX executable FileWrite run, complete Host discovered leaves, normalized/effective overrides, exact shared versions, accepted callerless selected graph in `216a0be8`, selected registry RepoSpecs in `e8ad58dd`, selected routes in `6f72baaf`, root extension usages in `11be92b9`, corrected root overrides in `2644f091`, selected extension mappings in `75a431d6`, and the hidden selected definition-load request projection in `d0d7bde7` | implement the accepted loading-owned heap-independent definition boundary without a second bzl loader or retained callable | WP-4-5-host-module-extension-definition-loading-owner-implementation |
 | M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
 | M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-host-module-extension-definition-loading-owner-design](./slug-v2-subplans/current-packet.md).
+[WP-4-5-host-module-extension-definition-loading-owner-implementation](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -630,6 +630,26 @@ The rejected regex candidate does not authorize a UTF-16 engine fork.
 requires its own UTF-16, diagnostic, resource, allocation, and
 differential-corpus gate.
 
+## Adopted Cross-Stage Improvement Overlay (2026-08-12)
+
+The [Zabel-derived adoption roadmap](./slug-v2-subplans/zabel-adoption-roadmap.md)
+records accepted planning, oracle, runtime, action-ownership, repository,
+execution, progress, explain, watch, complexity, and performance follow-ups.
+The [plan-authoring guide](./slug-v2-plan-authoring-guide.md) is the readiness
+contract for new and materially revised packets.
+
+Neither document widens the active M7 packet. After that packet reaches a
+terminal result, schedule adoption work only as bounded packets: first the
+Bazel-derived Starlark/provider/action/toolchain oracle wave; then Stage 2
+request revisions and source certificates; then Stage 6 immutable action-owner
+context; then Stage 7 REAPI concurrency/interoperability evidence. Schedule
+repository-output caching, progress, explain, and watch only after their named
+semantic owners and lifecycle prerequisites exist.
+
+Zabel remains a pinned donor of design lessons and fixture themes, never the
+compatibility oracle. Exact claims still require Bazel 9.2 source or generated
+oracle evidence.
+
 ## Operating Decision
 
 Use the existing repository for continuity, but restart the implementation
@@ -796,6 +816,11 @@ Sol-low returned `ACCEPT`. M0 is green.
   divergence must be explicitly documented as an extension, not assumed.
 - V1 plans and code are evidence and extraction sources, not the V2 source of
   truth.
+- New packets and replans follow
+  [slug-v2-plan-authoring-guide.md](./slug-v2-plan-authoring-guide.md): name
+  learned facts, decisions and non-decisions, exact/Slug-native/deferred
+  classification, natural producer ownership, request/revision behavior,
+  memory lifetime, upstream tests, fallback deletion, scope, and stops.
 
 ## V1 Material Worth Keeping
 
@@ -931,7 +956,8 @@ loading-query, 6 parser/registry); Sol-low final review returned `ACCEPT`.
 
 `.codex/skills/slug-agent-orchestration/SKILL.md` is the sole operating
 contract. It owns routing, packet/reviewer templates, validation ownership, and
-bounded logging. This plan owns only milestone state and acceptance evidence.
+bounded logging. The plan-authoring guide owns readiness for a new or materially
+revised packet. This plan owns only milestone state and acceptance evidence.
 
 ## Retained First Real Bazel Build Integration Gate
 
@@ -1015,7 +1041,10 @@ slice's subplan and record compact evidence in the owning V2 plan.
 
 Plan-following sessions use
 `.codex/skills/slug-agent-orchestration/SKILL.md`; Live Status above owns
-scheduling.
+scheduling. Packet creation and `REPLAN` also apply
+[slug-v2-plan-authoring-guide.md](./slug-v2-plan-authoring-guide.md); cross-stage
+Zabel-derived work is tracked in
+[zabel-adoption-roadmap.md](./slug-v2-subplans/zabel-adoption-roadmap.md).
 
 ## Reviewed Next M3 Direction: Build and Load Files (2026-07-23)
 

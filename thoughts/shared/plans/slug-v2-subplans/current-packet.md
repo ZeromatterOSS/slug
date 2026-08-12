@@ -1,15 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-definition-loading-owner-design`
-Milestone: M7 module-extension definition loading design
+Packet: `WP-4-5-host-module-extension-definition-loading-owner-implementation`
+Milestone: M7 module-extension definition loading implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: independently review the completed loading-owner design and its
-bounded two-file implementation successor.
+Result: implement and validate the independently accepted two-file loading
+owner.
 
-## Active design contract
+## Active implementation contract
 
-Design only. Audit pinned Bazel 9.2 and the live `slug_loading_v2` ownership
-before authorizing Rust. Freeze one callerless loading owner that:
+Implement the accepted design below only in
+`app/slug_loading_v2/src/package.rs` and
+`app/slug_loading_v2/src/bzl_module.rs`, with canonical/current/Stage 4/Stage 5
+bookkeeping. Caps are 440 production, 650 tests, and 1,090 total formatted net
+Rust lines, measured against `f17bd250`. Complete the frozen proof matrix,
+protected suites, compact/cleanup/scope audits, and independent review.
+
+No third Rust file, public API, source/evaluator key, selected-owner mutation,
+extension execution, generated-repository work, I/O, materializer, lockfile,
+consumer, JVM/Java, or behavior-family expansion is authorized. Cap excess or
+any need for a second/purpose-split loader or retained heap/callable is
+`REPLAN`.
+
+## Accepted design contract
+
+This section is historical design authority interpreted only through the
+active implementation contract above.
+
+Freeze one callerless loading owner that:
 
 - computes `HostSelectedExtensionDefinitionLoadRequestsKey` first and preserves
   its Need/completed-error boundary before any bzl source work;
@@ -126,15 +143,14 @@ source/load errors; event publication only from complete bzl evaluation; and
 cold/warm reuse. Run the full loading and Bzlmod suites plus formatting,
 diff/scope, forbidden-edge, compact and cleanup audits and independent review.
 
-No Rust is authorized by this design packet. No Cargo/BUILD, fixture, public
+No Cargo/BUILD, fixture, public
 API, source/evaluator key, selected-owner
 mutation, extension execution, generated-name/spec fabrication, I/O,
 materializer, lockfile, consumer, JVM/Java, or generic loading activation is
 authorized. `REPLAN` if exactness requires a purpose-split or second bzl loader,
 a retained Starlark heap/callable, repository-rule/evaluation breadth, a public
-definition surface, more than three future Rust files, or an unresolved
-callable/schema/error-order boundary. Rust may begin only after independent
-design acceptance and explicit implementation activation.
+definition surface, more than two Rust files, or an unresolved
+callable/schema/error-order boundary.
 
 ## Accepted predecessor evidence
 
