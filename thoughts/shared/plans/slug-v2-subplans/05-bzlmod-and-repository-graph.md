@@ -1584,3 +1584,27 @@ Require the frozen discovery, selection, retained-provenance, DICE lifecycle,
 scope, and independent implementation proofs. A third Rust file, public API,
 second graph/override merge, recursive DICE graph, lock across compute, raw
 filesystem/network observation, or post-selection consumer is `REPLAN`.
+
+### Selected module graph implementation cap REPLAN (2026-08-12)
+
+The first compiling two-file implementation is retained but unaccepted at 875
+net formatted production lines before tests, exceeding the frozen 760-line
+cap by 115. Independent implementation and AI-cleanup review found no safe
+mechanical reduction of that size: the override/root adapters, breadth-first
+horizons, nodep fixed point, MVO selection, two validation/reachability walks,
+and resolved/unpruned rewrite are distinct required phases.
+
+One semantic correction is also required before implementation acceptance:
+completed `HostDiscoveredModuleError` leaves must remain typed and structural
+inside the selected-graph error. Only DICE compute failures may use a
+Slug-native message. Flattening accepted leaf errors into `CompactString`
+would lose predecessor identity and violate the accepted invalidation
+contract.
+
+Run next only the docs-only
+`WP-5-host-selected-module-graph-owner-implementation-r2-cap-design`. Freeze
+the same two-file implementation at corrected 920 production/1,050 test/1,970
+total caps, with no new file, owner, policy, consumer, or behavior family.
+Require a distinct typed leaf-error variant and focused equality proof. Retain
+the unaccepted Rust diff; authorize no Rust until independent correction
+acceptance and explicit r2 implementation activation.

@@ -1,10 +1,46 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-module-graph-owner-implementation`
-Milestone: cross-stage M7 prerequisite implementation
+Packet: `WP-5-host-selected-module-graph-owner-implementation-r2-cap-design`
+Milestone: cross-stage M7 correction design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted callerless Host discovery-to-MVS
-selected-module graph owner within the frozen two-file boundary.
+Result: correct the selected-graph implementation cap and typed leaf-error
+contract after the first compiling implementation triggered the frozen stop.
+
+## Active correction contract
+
+The first compiling two-file implementation is retained but unaccepted at 874
+formatted lines in `selected_graph.rs` plus one `lib.rs` declaration: 875 net
+production lines, 115 above the frozen 760-line cap before tests. Independent
+implementation and AI-cleanup review found no safe mechanical reduction that
+preserves the distinct override/root adapters, breadth-first horizons, nodep
+fixed point, MVO selection, validation walks, and retained graph rewrite.
+
+This docs-only packet may edit only:
+
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest; and
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
+
+Freeze `WP-5-host-selected-module-graph-owner-implementation-r2` with the same
+two Rust files and all accepted semantics, proof requirements, and terminal
+stops, but corrected formatted net caps of 920 production lines, 1,050 test
+lines, and 1,970 total. The increase grants no margin for another file, owner,
+policy, consumer, or behavior family.
+
+Also require the retained implementation to preserve complete
+`HostDiscoveredModuleError` values structurally. Compute failures may retain a
+typed predecessor module plus Slug-native message, but completed leaf failures
+must use a distinct typed variant such as
+`Leaf { module, error: HostDiscoveredModuleError }`; converting those failures
+to `CompactString` is forbidden. Add a focused equality test that distinguishes
+two typed leaf variants even when their display framing is similar.
+
+Cap this correction at 120 manifest lines, 90 owner-plan lines, 20 canonical
+lines, and 230 total. No Rust, Cargo/BUILD, test, public API, graph behavior,
+consumer, mapping, or source/materialization change is authorized. Obtain
+fresh independent acceptance before resuming Rust. Return `REPLAN` on any
+semantic or file-boundary expansion; `REVISE` on one bounded bookkeeping
+correction; a second material correction is `REPLAN`.
 
 ## Accepted prerequisite
 
@@ -217,9 +253,12 @@ and unequal. Captured evaluation events remain owned by the computed root and
 discovered leaves; the selected graph stores no duplicate batch and introduces
 no consumer/publication edge.
 
-## Active implementation contract
+## Unaccepted predecessor implementation contract
 
-Implement only `WP-5-host-selected-module-graph-owner-implementation` in:
+This retained predecessor contract is historical context only and grants no
+file, action, cap, or scheduling authority.
+
+The predecessor proposed implementation only in:
 
 - new `app/slug_bzlmod_v2/src/selected_graph.rs`; and
 - `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration.
