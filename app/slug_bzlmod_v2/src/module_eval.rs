@@ -2566,10 +2566,6 @@ fn module_use_repo<'v>(
     let repos = TupleRef::from_value(repos)
         .context("use_repo positional arguments must be repository names")?;
     with_extension_state(eval, |state, meta| {
-        let referenced_proxy = &state.usages[proxy.usage].proxies[proxy.proxy];
-        if meta.root_semantics && referenced_proxy.dev_dependency && meta.ignore_dev_dependency {
-            return Ok(NoneType);
-        }
         for repo in repos.iter() {
             let repo = repo
                 .unpack_str()
@@ -2600,8 +2596,7 @@ fn module_repo_override<'v>(
 ) -> anyhow::Result<NoneType> {
     let proxy = proxy_from_value(proxy)?;
     with_extension_state(eval, |state, meta| {
-        let referenced_proxy = &state.usages[proxy.usage].proxies[proxy.proxy];
-        if !meta.root_semantics || (referenced_proxy.dev_dependency && meta.ignore_dev_dependency) {
+        if !meta.root_semantics || meta.ignore_dev_dependency {
             return Ok(NoneType);
         }
         let repos = TupleRef::from_value(repos)
@@ -3546,6 +3541,7 @@ fn finalize_root_extension_usages(
     {
         anyhow::bail!("bazel_tools is a built-in dependency and its repo name is reserved");
     }
+    validate_root_repo_overrides(&state)?;
     state
         .usages
         .drain(..)
@@ -3610,6 +3606,46 @@ fn finalize_root_extension_usages(
             })
         })
         .collect::<anyhow::Result<Arc<_>>>()
+}
+
+fn validate_root_repo_overrides(state: &ExtensionEvalState) -> anyhow::Result<()> {
+    let mut overridden_imports = SmallSet::new();
+    let mut overriding_repos = SmallSet::new();
+    for usage in state.usages.iter().filter(|usage| usage.active) {
+        for (overridden, replacement) in usage.repo_overrides.iter() {
+            if !state
+                .repo_names
+                .contains(replacement.overriding_repo_name.as_str())
+            {
+                anyhow::bail!(
+                    "extension repository '{overridden}' overrides with repository '{}' that is not visible to the root module",
+                    replacement.overriding_repo_name
+                );
+            }
+            let imported_as = usage.proxies.iter().find_map(|proxy| {
+                proxy
+                    .imports
+                    .iter()
+                    .find_map(|(local, exported)| (exported == overridden).then(|| local.clone()))
+            });
+            if let Some(imported_as) = imported_as {
+                if !replacement.must_exist {
+                    anyhow::bail!(
+                        "extension repository '{overridden}' is both imported and injected"
+                    );
+                }
+                overridden_imports.insert(imported_as);
+            }
+            overriding_repos.insert(replacement.overriding_repo_name.clone());
+        }
+    }
+    if let Some(repo) = overriding_repos
+        .iter()
+        .find(|repo| overridden_imports.contains(repo.as_str()))
+    {
+        anyhow::bail!("repository '{repo}' is both overriding and overridden");
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -5130,6 +5166,7 @@ mod root_extension_usage_tests {
         let evaluated = evaluate(
             r#"
 module(name = "root", version = "1.2.3", repo_name = "root_self")
+bazel_dep(name = "replacement_module", version = "1", repo_name = "replacement")
 shared = use_extension("//:ext.bzl", "extension")
 shared.repo(order = 1)
 use_repo(shared, root_alias = "{name}-{version}")
@@ -5258,44 +5295,35 @@ repo(name = "dev_direct", dev_dependency = True)
     }
 
     #[test]
-    fn root_dev_policy_filters_only_the_referenced_dev_proxy() {
+    fn root_dev_policy_globally_filters_overrides_but_dev_imports_reserve_names() {
         let evaluated = evaluate(
             r#"
 module(name = "root")
 ordinary = use_extension("//:ordinary.bzl", "ordinary")
 override_repo(ordinary, replaced = "replacement")
 inject_repo(ordinary, injected = "direct")
-dev = use_extension("//:dev.bzl", "dev", dev_dependency = True)
-use_repo(dev, "shared")
-override_repo(dev, ignored_override = "ignored")
-inject_repo(dev, ignored_inject = "ignored")
-kept = use_extension("//:kept.bzl", "kept")
-use_repo(kept, "shared")
 "#,
             &[],
             true,
         )
         .unwrap();
 
-        assert_eq!(evaluated.extension_usages.len(), 2);
-        let ordinary = &evaluated.extension_usages[0];
-        assert_eq!(ordinary.repo_overrides.len(), 2);
-        assert!(ordinary.repo_overrides.get("replaced").unwrap().must_exist);
-        assert!(!ordinary.repo_overrides.get("injected").unwrap().must_exist);
-        assert_eq!(
-            evaluated.extension_usages[1].proxies[0]
-                .imports
-                .local_to_exported
-                .get("shared")
-                .unwrap(),
-            "shared"
-        );
-        assert!(
-            evaluated
-                .extension_usages
-                .iter()
-                .all(|usage| usage.extension_name != "dev")
-        );
+        assert_eq!(evaluated.extension_usages.len(), 1);
+        assert!(evaluated.extension_usages[0].repo_overrides.is_empty());
+
+        let collision = evaluate(
+            r#"
+module(name = "root")
+dev = use_extension("//:dev.bzl", "dev", dev_dependency = True)
+use_repo(dev, "shared")
+kept = use_extension("//:kept.bzl", "kept")
+use_repo(kept, "shared")
+"#,
+            &[],
+            true,
+        )
+        .unwrap_err();
+        assert!(collision.contains("repository name 'shared' is already defined"));
     }
 
     #[test]
@@ -5323,6 +5351,47 @@ use_repo(kept, "shared")
         )
         .unwrap_err();
         assert!(duplicate_override.contains("overridden more than once"));
+    }
+
+    #[test]
+    fn root_override_finalization_validates_visibility_imports_and_chains() {
+        let missing = evaluate(
+            "module(name='root')\np=use_extension('//:ext.bzl','ext')\noverride_repo(p, generated='missing')",
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(missing.contains("not visible to the root module"));
+
+        let injected_import = evaluate(
+            r#"
+module(name = "root")
+bazel_dep(name = "dep", version = "1", repo_name = "replacement")
+p = use_extension("//:ext.bzl", "ext")
+use_repo(p, "generated")
+inject_repo(p, generated = "replacement")
+"#,
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(injected_import.contains("both imported and injected"));
+
+        let chain = evaluate(
+            r#"
+module(name = "root")
+bazel_dep(name = "dep", version = "1")
+p = use_extension("//:one.bzl", "one")
+use_repo(p, bridge = "generated")
+override_repo(p, generated = "dep")
+q = use_extension("//:two.bzl", "two")
+override_repo(q, other = "bridge")
+"#,
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(chain.contains("repository 'bridge' is both overriding and overridden"));
     }
 
     #[test]
@@ -5364,6 +5433,12 @@ use_repo(kept, "shared")
         let warm_a = dice_evaluate(&dice, source("a").as_str()).await;
         assert!(Arc::ptr_eq(&a, &warm_a));
         let b = dice_evaluate(&dice, source("b").as_str()).await;
+        let bad = dice_evaluate(
+            &dice,
+            "module(name='root')\np=use_extension('//:ext.bzl','ext')\noverride_repo(p, generated='missing')",
+        )
+        .await;
+        assert!(bad.as_ref().as_ref().unwrap_err().contains("not visible"));
         let restored_a = dice_evaluate(&dice, source("a").as_str()).await;
 
         assert_ne!(a, b);
