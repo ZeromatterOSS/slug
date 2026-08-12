@@ -4672,3 +4672,9 @@ The general nonregistry audit ends `REPLAN` at route-bound include closure
 preparation. Stage 8 remains parked while only
 `WP-5-host-nonregistry-module-closure-design` audits that Stage 5 owner; no
 package/Bzl, toolchain, Test, execution, result, coverage, or BEP behavior.
+
+The nonregistry closure audit ends `REPLAN` at route-bound package policy and
+marker lookup. Stage 8 remains parked while only
+`WP-5-host-nonregistry-package-preflight-design` audits that Stage 5 owner
+and its preselection deleted-package boundary. No package/Bzl evaluation,
+toolchain, Test, execution, result, coverage, or BEP behavior.

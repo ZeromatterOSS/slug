@@ -1238,3 +1238,25 @@ included files. Local and immutable identities, Need/error/order semantics,
 and complete closure equality must remain structural. Evaluation, command
 overrides, discovery/MVS, mappings, consumers, and Rust remain deferred until
 independent acceptance.
+
+### Route-independent MODULE closure design REPLAN (2026-08-12)
+
+The reviewed closure audit ends `REPLAN` before Rust. Root and fragment
+source bytes can use the existing route-independent materialization/source
+owners, but exact include package preflight cannot. Every accepted external
+package, repository-ignore, REPO.bazel, and marker-path key carries
+`RootRepositoryRoute`; the root package boundary is main-repository-only.
+Fabricating a route would corrupt transitive override identity, while direct
+source reads would duplicate policy/lookup ownership.
+
+The first missing prerequisite is
+`WP-5-host-nonregistry-package-preflight-design`: freeze one
+route-independent package-policy and BUILD-marker owner over workspace,
+module key, root RepoSpec, and package path, using only
+`RepositorySourceFileKey`. Preserve REPO.bazel, .bazelignore,
+BUILD.bazel-before-BUILD, source kind/Need/error ordering, and local/immutable
+invalidation. Root deleted-package policy needs special care because final
+canonical repository identity is post-MVS; do not guess `name+` or a
+multiple-version suffix. Closure preparation, evaluation, command overrides,
+selection, mappings, and consumers remain deferred. No Rust is authorized
+before independent design acceptance.

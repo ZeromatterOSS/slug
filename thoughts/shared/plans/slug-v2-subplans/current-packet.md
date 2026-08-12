@@ -1,68 +1,75 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-nonregistry-module-closure-design`
+Packet: `WP-5-host-nonregistry-package-preflight-design`
 Milestone: cross-stage M7 prerequisite design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze a route-independent nonregistry MODULE/include closure owner.
+Result: freeze route-independent package policy and BUILD-marker preflight for
+one materialized nonregistry module.
 
 ## Accepted predecessor boundary
 
-Commit `e7e4a772` accepts the embedded/registry discovered-module leaf.
-Commit `1b2f1a0a` accepts the general nonregistry discovery audit, which ends
-`REPLAN` before Rust.
+Commit `054844d4` accepts the route-independent nonregistry MODULE-closure
+design. Its live-owner audit ends `REPLAN` before Rust because exact include
+package preflight is still route-bound.
 
-The audit found that `RepositoryMaterializationKey` and
-`RepositorySourceFileKey` already select root `RepoSpec` by workspace and
-module name and can own root MODULE bytes for local and immutable sources.
-The complete evaluator already accepts a supplied closure. The missing bridge
-is include closure preparation: `DirectLocalModuleInspectionKey`,
-`DirectLocalIncludePackageHorizonKey`, and
-`DirectLocalModulePreparationKey` are keyed by a root apparent repository
-name and call `RootRepositoryRouteKey`/route-bound package lookup. A
-transitive root override has no required root apparent name, and archive/Git
-sources must retain the selected immutable materialization rather than enter
-the direct-local route. Widening that route or fabricating an apparent name
-would be inexact.
+`RepositoryMaterializationKey` and `RepositorySourceFileKey` already own
+route-independent local/immutable source bytes. However,
+`ExternalRepositoryPackageLookupKey`, `HostRouteRepositoryIgnoreKey`,
+`HostRouteRepoFileKey`, and `HostRepositoryPathKey` all require a
+`RootRepositoryRoute` carrying apparent/canonical repository names.
+`HostRootPackageBoundaryKey` is main-repository-only. Reusing either path
+would fabricate routing for a transitive override; bypassing them would lose
+REPO.bazel `ignore_directories()`, .bazelignore, deleted-package policy,
+BUILD.bazel-before-BUILD selection, symlink/kind handling, and first-error
+ordering.
+
+A further identity constraint is explicit: root package policy stores
+`--deleted_packages` as `PackageIdentifier` values, while a discovered
+module's final canonical repository name is a post-MVS product. The
+preselection owner cannot guess `name+` or a multiple-version suffix.
 
 ## Active design contract
 
-Design one crate-private nonregistry MODULE closure preparation key identified
-by normalized workspace plus exact `NonrootModuleKey`. It must compute root
-files/override classification first, require exactly one retained
-`NonRegistry(RepoSpec)`, and use the existing sole
-`RepositoryMaterializationKey` and `RepositorySourceFileKey` rather than
-reading or materializing independently.
+Design the smallest crate-private package-preflight owner identified by
+normalized workspace, exact `NonrootModuleKey`, and `PackagePath`. It must
+compute root files first, require the exact `NonRegistry(RepoSpec)`, and use
+only `RepositorySourceFileKey` for `REPO.bazel`, `.bazelignore`,
+`<package>/BUILD.bazel`, and `<package>/BUILD`.
 
-Freeze root MODULE inspection, breadth-first include preflight, package
-boundary/deletion/ignore policy, exact fragment source observations, compile-
-complete-before-execution ordering, repeated labels, typed missing/wrong-kind/
-cycle capability/errors, logical source IDs/spans, and complete closure
-equality. Determine the smallest reuse seam from the direct-local owners
-without making apparent names or canonical repos semantic inputs. Local live
-sources and immutable archive/Git generations must invalidate through their
-existing materialization/source dependencies; operational roots not exposed by
-semantic equality remain distinct from content/source identity as already
-accepted.
+Freeze a route-independent REPO.bazel semantic value over the existing
+`evaluate_repo_file` semantics and event contract, plus a route-independent
+repository-ignore matcher reusing the existing parser. Preserve validation and
+terminal order: invalid package, package-policy input, deleted-package
+classification where structurally knowable, repository-ignore evaluation,
+ignored package, BUILD.bazel, BUILD, then no marker. All source values retain
+existing Missing/wrong-kind/symlink/Need/error semantics and local versus
+immutable invalidation.
 
-This packet owns preparation only. Evaluation into
-`HostDiscoveredModule`, command overrides, recursive discovery/MVS,
-mappings/extensions/registrations, lockfile products, package/Bzl consumers,
-configured analysis, and commands remain later. Freeze the exact Rust
-allowlist, production/test/total caps, focused local and immutable A/B/A,
-Need/error/order/reuse evidence, downstream validation, and independent review
-gate. Return `REPLAN` if package-boundary reuse still requires a route or if
-one closure cannot preserve both live-local and immutable identity.
+Resolve the deleted-package identity boundary explicitly. Either identify an
+accepted preselection representation that Bazel 9.2 uses before final canonical
+mapping, or admit only a structurally proven empty/unambiguous external-deleted
+policy and fail closed on every ambiguous entry until selected-graph identity
+exists. Do not compare by guessed module name or fabricate a canonical repo.
+
+The output is only a typed package classification and selected marker identity;
+it does not return BUILD bytes, evaluate BUILD/Bzl, prepare MODULE fragments,
+or activate discovery/MVS/consumers. Freeze exact Rust allowlist, formatted
+caps, focused local/immutable A/B/A and REPO/.bazelignore/marker/Need/error/
+event/reuse proofs, downstream validation, and independent review gate. Return
+`REPLAN` if the existing source owner cannot express REPO/.bazelignore
+semantics without duplicate IO or if deleted-package policy requires
+post-selection mapping.
 
 ## Compatibility
 
-Exact: Bazel 9.2 nonregistry MODULE/include closure semantics for explicitly
-admitted local and immutable RepoSpec shapes. Slug-native: DICE type names,
-diagnostic wording outside accepted shapes, compact storage, Host observation
-framing, and non-Bazel identity bytes. Unsupported/deferred: evaluation/
-discovery consumption, command overrides, recursive discovery/MVS,
-post-selection identities, package/BUILD/Bzl loading, toolchains, Test,
-execution/results/BEP/coverage, unadmitted repository rules, Windows, JVM/Java,
-and exact Bazel identity bytes.
+Exact: Bazel 9.2 package-policy and BUILD-marker preflight for explicitly
+admitted nonregistry source and deleted-policy shapes. Slug-native: DICE type
+and diagnostic names, Host observation framing, compact storage, and non-Bazel
+identity bytes. Unsupported/deferred: ambiguous external deleted-package
+mapping, MODULE closure/evaluation consumption, command overrides, recursive
+selection, post-selection mappings, BUILD/Bzl evaluation, toolchains, Test,
+execution/results/BEP/coverage, unadmitted RepoSpecs, Windows, JVM/Java, and
+exact Bazel identity bytes.
 
 ## Scope, proof, and stops
 
@@ -74,12 +81,13 @@ Edit only:
   and
 - `thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`.
 
-Cap formatted net documentation growth at 220 lines. Add no Rust, Cargo/BUILD
+Cap formatted net documentation growth at 230 lines. Add no Rust, Cargo/BUILD
 metadata, fixture, asset, dependency, public surface, command behavior, or
 production representation. Validate diff/scope/cap, active archive layout,
-packet consistency, live owner citations, and independent latest-diff review.
+packet consistency, live owner and pinned-source citations, and independent
+latest-diff review.
 
-Stop with `REPLAN` on route/apparent/canonical-name dependency, duplicate
-materialization/source/package ownership, lost RepoSpec/content/include
-identity, untracked IO, lock-held compute, evaluation or graph consumer,
-second graph, JVM/Java, fifth file, or cap excess.
+Stop with `REPLAN` on duplicate source/IO ownership, route/apparent/fabricated
+canonical identity, lost REPO/.bazelignore/marker semantics, premature BUILD
+bytes/evaluation, graph consumer, lock-held compute, JVM/Java, fifth file, or
+cap excess.
