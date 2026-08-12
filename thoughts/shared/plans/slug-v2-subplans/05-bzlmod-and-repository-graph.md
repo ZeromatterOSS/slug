@@ -2626,3 +2626,22 @@ call names/set, existence/override validation, loading dependency, I/O,
 materialization, lockfile, consumer/API/JVM, third Rust file, or cap excess is
 `REPLAN`. No Rust resumes before independent design acceptance and explicit
 activation.
+
+### Generated namespace request design accepted and implementation activated (2026-08-12)
+
+Independent review accepts `fff82ecd`. Run only
+`WP-5-host-selected-extension-generated-namespace-request-implementation`
+in `app/slug_bzlmod_v2/src/selected_repo_spec.rs` and `lib.rs` solely for
+the existing `#[doc(hidden)]` request/export accessor, plus canonical/current/
+Stage 4/Stage 5 bookkeeping. Caps are mandatory 180 production/300 tests/480
+total formatted net Rust lines against `fff82ecd`.
+
+Retain route-ordered pre-substitution mappings in the selected-mapping value;
+project the root base mapping, unique prefix, and exact-ID-joined ordered
+override metadata beside the existing final request mapping. Preserve full
+predecessor identity, fail closed on missing/duplicate/mismatched ownership,
+and prove collisions, empty/ordered overrides, target/`must_exist`, A/B/A,
+Need/error/reuse, unchanged loading dependents, and zero repository I/O. No
+third file, new key/graph/projection, loading edge, reconstructed mapping,
+generated call set/existence, schema/RepoSpec, I/O, materializer, lockfile,
+consumer/API/JVM breadth, or cap excess.

@@ -2571,3 +2571,14 @@ schema/default/visibility processing, RepoSpec, generated existence/final
 mapping, repository implementation/context, I/O, consumer, public API, or JVM
 work is authorized before the prerequisite is independently accepted and
 explicitly activated.
+
+### Selected extension namespace request implementation activated (2026-08-12)
+
+Independent review accepts the prerequisite design in `fff82ecd`. Run only
+`WP-5-host-selected-extension-generated-namespace-request-implementation`
+in `selected_repo_spec.rs` and `slug_bzlmod_v2/src/lib.rs` solely for the
+existing hidden accessor, plus four-plan bookkeeping, under mandatory
+180/300/480 caps. Stage 4 production remains unchanged. The implementation may
+retain and project selected namespace inputs only; loading, schema/RepoSpec,
+existence, repository execution/context, I/O, consumers, APIs, and JVM remain
+deferred.

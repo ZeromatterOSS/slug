@@ -1,21 +1,26 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-generated-namespace-request-design`
-Milestone: M7 selected extension namespace prerequisite design
+Packet: `WP-5-host-selected-extension-generated-namespace-request-implementation`
+Milestone: M7 selected extension namespace prerequisite implementation
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the smallest Bzlmod-owned hidden request projection that exposes
+Result: implement the accepted Bzlmod-owned hidden request projection that exposes
 the collision-sensitive selected extension namespace needed by later loading
 instantiation, without constructing RepoSpecs or validating existence.
 
-## Active docs-only design contract
+## Active implementation contract
 
-Run only `WP-5-host-selected-extension-generated-namespace-request-design` in
-canonical/current/Stage 4/Stage 5. The exact docs allowlist and caps are 45
-canonical, 220 current, 180 Stage 4, 220 Stage 5, and 665 total changed lines.
-Authorize no Rust, Cargo, fixture, activation, loading mutation, RepoSpec,
-schema work, generated existence verdict, I/O, materializer, lockfile,
-consumer, public API, or JVM work before independent design acceptance.
+Independent design review accepts `fff82ecd`. Run only
+`WP-5-host-selected-extension-generated-namespace-request-implementation`.
+The exact Rust allowlist is
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
+`app/slug_bzlmod_v2/src/lib.rs` solely for the existing
+`#[doc(hidden)]` request/export accessor, plus canonical/current/Stage 4/
+Stage 5 bookkeeping. Caps are 180 production, 300 tests, and 480 total
+formatted net Rust lines against `fff82ecd`. Authorize no third Rust file,
+new key or second projection, loading mutation, RepoSpec, schema work,
+generated call-name set or existence verdict, I/O, materializer, lockfile,
+consumer, generic public API, or JVM work.
 
 Accepted commit `b7c70a1b` owns ordered heap-free raw repository-rule calls in
 the sole loading invocation key; `f5d64085` makes the selected root input
@@ -68,7 +73,7 @@ schema work, retained Starlark values, third future Rust file, or cap excess.
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active docs-only design contract above.
+interpreted solely through the active implementation contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
