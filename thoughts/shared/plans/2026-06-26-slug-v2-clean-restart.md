@@ -28,7 +28,7 @@ and must name the same packet.
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
-| M5: `aquery` | **active (one-action literal command accepted)** | recursive action ownership, complete Slug configuration identity, strict closure-resolved toolchain-backed FileWrite semantics, exact framed Slug FileWrite identity, and the accepted one-action literal CLI/daemon text surface | multi-action ordering/container semantics and later expression/output breadth remain open | `WP-8-m5-filewrite-aquery-multi-action-order-evidence-design` |
+| M5: `aquery` | **active (one-action literal command accepted)** | recursive action ownership, complete Slug configuration identity, strict closure-resolved toolchain-backed FileWrite semantics, exact framed Slug FileWrite identity, and the accepted one-action literal CLI/daemon text surface | root-local multi-action ordering/container implementation and later expression/output breadth remain open | `WP-8-m5-filewrite-aquery-root-local-order-oracle-implementation` |
 | M6: execution and caching | gated | retained REAPI/NativeLink regression fixtures | semantic `aquery` handoff and collision-safe Slug action/cache identity | preserve regressions only |
 | M7: command/ruleset breadth | gated | early command/ruleset scaffolding | M5 and M6 | none |
 | M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[`WP-8-m5-filewrite-aquery-multi-action-order-evidence-design`](./slug-v2-subplans/current-packet.md).
+[`WP-8-m5-filewrite-aquery-root-local-order-oracle-implementation`](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

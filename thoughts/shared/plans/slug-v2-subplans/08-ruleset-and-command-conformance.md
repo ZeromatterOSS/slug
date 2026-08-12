@@ -3811,3 +3811,125 @@ declaration/dependency/diamond discriminator matrix before selecting any
 multi-action successor. Add no Rust, fixture, expected oracle, Bazel execution,
 DICE state, action reconstruction, query/function/output breadth, execution,
 JVM/Java, REAPI, or CI.
+
+## FileWrite aquery root-local multi-action order design (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-multi-action-order-evidence-design` is **ACCEPT**. It
+narrows the
+multi-action successor to the ordering Bazel 9.2 actually owns. It does not
+promote Slug's retained closure traversal order into an exact aquery claim.
+
+### Pinned-source decision
+
+At Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`,
+`ActionGraphQueryEnvironment#getTargetsMatchingPattern` transforms a direct
+literal target-pattern result into configured values for that same label; it
+does not add dependency targets. `ActionGraphTextOutputFormatterCallback`
+`processOutput` iterates those configured values and each
+`RuleConfiguredTargetValue#getActions()` list without sorting, while
+`writeText` appends one final LF after the action fields. The callback therefore
+owns declaration-list order and one blank line after every action for a single
+configured target. `RuleConfiguredTargetValue` retains the configured target's
+immutable action list without copying or sorting it.
+
+The broader `deps()` path is different. Aquery's
+`createThreadSafeMutableSet()` uses
+`QueryUtil.ThreadSafeMutableKeyExtractorBackedSetImpl`, whose iterator is
+`ConcurrentHashMap.values().iterator()`. Bazel source supplies no cross-target
+iteration-order contract. The query set deduplicates one configured target in
+a diamond by `ActionLookupKey`, but Bazel's documented shared-action behavior
+may still print equivalent actions owned by distinct configured targets.
+Repeated oracle output cannot turn that concurrent-map iteration into an exact
+ordering contract.
+
+Slug's retained `BuildCommandEvaluation::action_closure` is intentionally a
+roots-first breadth-first configured-target closure with dependency-order
+frontiers and diamond deduplication. That order remains correct Slug build
+state, but it is **not** Bazel direct-literal aquery order. Cross-owner
+dependency-before/after-root order is unsupported/deferred until a later
+`deps()` expression packet selects an explicit compatibility strategy.
+
+### Admitted successor
+
+Keep the public request and wire unchanged: one direct main-repository literal,
+default or `--output=text`, plus the accepted transport flags. For its sole
+analyzed requested target, admit one or more supported FileWrite actions in the
+retained per-owner declaration order. Resolve every root action's platform and
+constraints against the existing complete action closure, but do not emit
+actions owned by dependency, platform, constraint, toolchain, alias, or
+generated-file nodes. Dependency actions remain analyzed build state and are
+ignored for direct-literal output exactly as Bazel ignores dependency targets.
+
+The container formats each admitted root action with the accepted formatter
+and appends exactly two LF bytes after each block. It performs no label, output
+path, token, or key sort. Zero root actions, multiple requested analyses, any
+unsupported root action, duplicate/missing semantic platform nodes, or any
+existing FileWrite guard failure remains a closed Slug-native runtime error.
+The accepted one-action output is byte-for-byte unchanged.
+
+Action block shape, per-target declaration order, direct-literal dependency
+exclusion, and two-LF-per-block framing are exact Bazel 9.2 behavior for this
+slice. Configuration/output-root and `SlugActionToken` bytes, progress silence,
+invalidation counts, and diagnostics remain Slug-native. Multi-owner order,
+`deps()` activation, shared actions across distinct owners, aspects, multiple
+configurations/roots, other action kinds, contents, output formats, and exact
+Bazel checksum/ActionKey bytes remain unsupported/deferred.
+
+### Discriminating evidence and proof
+
+Add one self-contained Bazel 9.2 fixture with a root rule that declares
+`z-root.txt` before `a-root.txt`, plus left/right dependency owners sharing one
+diamond leaf and each declaring a distinct FileWrite. The fixture must use the
+accepted explicit execution-platform/marker-toolchain construction.
+
+Run direct-literal text rows in one retained Bazel server for declaration order
+A (`z`, `a`), edited order B (`a`, `z`), and restored A. Anchored stdout
+patterns over normalized stdout must prove exactly two root blocks, declaration
+rather than lexical path order, and absence of every dependency output. Bazel's
+pinned `writeText` source and the generated raw `stdout` evidence record own the
+two-LF framing fact because the harness intentionally normalizes trailing
+whitespace; focused Slug byte assertions own its regression. Add one
+oracle-only `deps(//:root)` row whose assertions prove all four owners are
+present and the shared owner occurs exactly once, while deliberately
+making no cross-owner block-order claim. This row is boundary evidence only and
+does not activate `deps()` in Slug.
+
+Core proof must construct or evaluate a root with two actions and action-bearing
+diamond dependencies, then prove the root-only semantic views preserve `z,a`,
+exclude dependency actions, and still resolve platform facts through the full
+closure. CLI proof must show default/explicit text and one-shot/daemon equality,
+two-block framing, dependency exclusion, retained-daemon A/B/A order
+change/restoration, stable identity restoration, and stable daemon PID. Preserve
+underlying build terminal exit classifications and the existing raw-wire and
+bzlmod tests.
+
+### Implementation handoff
+
+On design acceptance, run next only
+`WP-8-m5-filewrite-aquery-root-local-order-oracle-implementation`. The allowlist
+is:
+
+- one new `tests/v2_oracle/fixtures/filewrite-aquery-root-order/` fixture with
+  only `fixture.toml`, `MODULE.bazel`, `BUILD.bazel`, `defs.bzl`, and generated
+  `expected/oracle.json`;
+- `app/slug_core_v2/src/runtime/{dice.rs,file_write_aquery_text.rs}`;
+- focused `app/slug_cli_v2/tests/cli.rs` coverage; and
+- bundled Stage 8/current/canonical scheduling bookkeeping.
+
+Caps are 70 production / 220 tests / 290 total Rust net lines, five fixture
+files / 350 fixture text lines, plus bookkeeping. Rebuild no Slug binary for
+the Bazel-only oracle. Validate the new fixture with pinned Bazel 9.2, protected
+one-action evidence, focused core/CLI tests, direct compile dependents, retained
+daemon lifecycle, rustfmt, archive, and diff checks. Require independent final
+review because root action ownership and lifecycle behavior change.
+
+Add no command/wire fields, parser or query-function breadth, cross-owner
+ordering, action reconstruction, new DICE key/state, execution, file contents,
+other action kinds/formats, retained identity representation, exact Bazel
+identity bytes, JVM/Java artifact, REAPI reuse, or CI. A second material
+contract or implementation correction is `REPLAN`.
+
+Independent design review returned `ACCEPT`: direct-literal root ownership and
+declaration-list order are source-backed, concurrent-map cross-owner order is
+correctly deferred, and the A/B/A plus diamond boundary evidence, caps,
+negative surface, and retained-daemon proof are sufficient.
