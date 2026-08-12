@@ -2477,3 +2477,28 @@ callable/schema/export/definition identity, frozen lifetime versus heap-free
 projection, and the smallest future loading-owned successor. No Rust, fixture,
 repository call, generated `RepoSpec`, context, I/O, materializer, consumer,
 public API, or JVM work is authorized before independent design acceptance.
+
+### Repository-rule definition audit REPLAN (2026-08-12)
+
+Pinned Bazel 9.2 tag commit `8220c619` shows that
+`repository_rule()` does not yield a standalone semantic definition leaf: it
+creates an immutable exported Starlark callable, and
+`ModuleExtensionEvalStarlarkThreadContext.lazilyCreateRepo` is its first
+semantic consumer. The callable captures name/raw kwargs and call provenance;
+only later `createRepos` applies full mappings, schema defaults/type checks,
+and `RepoRule.instantiate` to produce RepoSpecs. Slug's
+`BzlEvaluationContext`, sole `HostBzlModuleEvalKey`, frozen module lifetime,
+and pure-invocation preflight already own the corresponding inputs.
+
+Run only the four-plan docs audit
+`WP-4-5-host-module-extension-repository-rule-call-protocol-design` under
+45/260/240/180/725. Design one shared loading global/exported lifetime value
+plus ephemeral invocation-local sink that emits ordered heap-free raw call
+records, with exact positional/context/export/name/duplicate/deep-clone order
+for a bounded root-main ordinary slice. The future ceiling is `package.rs`,
+existing private `module_extension.rs`, one private
+`module_extension_repository_rule.rs`, and `lib.rs` solely for its private
+declaration. No Rust resumes before independent design acceptance. RepoSpec,
+schema application, repository implementation/context, generated naming or
+existence, I/O, materialization, consumers, public API, and JVM remain
+deferred; a second loader/key or retained heap/callable is forbidden.

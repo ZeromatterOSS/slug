@@ -1,59 +1,90 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-repository-rule-definition-owner-design`
-Milestone: M7 repository-rule definition/loading prerequisite design
+Packet: `WP-4-5-host-module-extension-repository-rule-call-protocol-design`
+Milestone: M7 repository-rule definition/capture prerequisite design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: design the first missing loading-owned repository-rule definition leaf
-before generated-repository call capture or existence validation.
+Result: design one loading-owned `repository_rule` definition/export and
+module-extension call-capture protocol before RepoSpec construction or
+generated-repository existence validation.
 
 ## Active docs-only design contract
 
-Pure invocation is accepted in `986ccebd`. The next truthful leaf is not an
-extension result receipt: Bazel module-extension implementations return
-`None`, while generated repositories arise from repository-rule call side
-effects. Live shared loading globals deliberately omit `repository_rule`, so
-the sole accepted `HostBzlModuleEvalKey` cannot yet load an ordinary extension
-file that declares one. Run only
-`WP-4-5-host-repository-rule-definition-owner-design` in canonical/current/
-Stage 4/Stage 5 under 45/240/200/120/605 documentation lines. Authorize no
-Rust, Cargo, fixture, generated output, or activation before independent
-acceptance.
+The definition-owner audit below found no truthful standalone definition DICE
+leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
+Starlark callable, and its first semantic consumer is
+`ModuleExtensionEvalStarlarkThreadContext.lazilyCreateRepo`; separating a
+definition projection would duplicate the sole loader or retain a callable
+without its natural invocation-local owner. Run only
+`WP-4-5-host-module-extension-repository-rule-call-protocol-design` in
+canonical/current/Stage 4/Stage 5 under 45/260/240/180/725 documentation lines.
+Authorize no Rust, Cargo, fixture, generated output, or activation before
+independent acceptance.
 
-Audit pinned Bazel 9.2 `repository_rule()` definition and export ownership:
-exact parameters/defaults and first-error order; callable implementation
-requirements; implicit `name`; ordered attribute schema and default identity;
-exported-name binding, definition label/location, doc/private behavior;
-`environ`, `configure`, `local`, `remotable`, and every identity-affecting
-option. Separate definition-time retained data from call-time name/kwargs,
-repository context, implementation execution, and heap lifetime. Reuse the
-existing shared loading globals and sole `HostBzlModuleEvalKey`; determine
-whether a frozen definition stays lifetime-owned by `FrozenBzlModule` while a
-heap-free projection owns DICE equality. Do not assume a scalar subset until
-pinned sources establish its complete semantics and fail-closed boundary.
+Freeze one root-main, ordinary, nonisolated, empty-factor protocol that reuses
+the shared `.bzl` globals, `HostBzlModuleEvalKey`, and accepted pure-invocation
+preflight. Audit the exact global parameters and construction order; export
+binding and defining-label identity; lifetime-only implementation callable;
+an ephemeral per-invocation sink/token; exact positional/context/export/name/
+duplicate/deep-clone first-error order; and source-order capture of
+heap-independent raw call records. Determine a complete first attr/option
+surface rather than guessing breadth. Schema type/default/visibility
+application belongs to later `RepoRule.instantiate` and must not be moved into
+the capture phase.
 
-Freeze a future implementation successor only if the audit proves one bounded
-owner. The likely ceiling is `package.rs`, `bzl_module.rs`, one new private
-`repository_rule.rs`, and `lib.rs` solely for its private declaration, but the
-design must choose the smallest cohesive subset and explicit production/test/
-total caps. Require definition/global/export/schema positives, every admitted
-field A/B/A, unsupported option/type first errors, private/missing/wrong-kind
-exports, transitive manifest changes, Need/error precedence, complete-only
-equality, cold/warm loading events, and structural absence of a second loader,
-retained heap/callable in semantic projection, repository calls, generated
-rows, `RepoSpec`, context, or I/O.
+The design must freeze an implementation allowlist no broader than
+`app/slug_loading_v2/src/package.rs`, existing private
+`module_extension.rs`, one new private
+`module_extension_repository_rule.rs`, and `lib.rs` solely for its private
+declaration, with explicit production/test/total caps. Require definition,
+export/private, context ownership, one/two-call order, duplicate name,
+call-before-throw prefix, all-request Need/error zero-call, definition/source/
+mapping/name/raw-attr A/B/A, complete-only heap-free equality, event ownership,
+cold/warm reuse, full loading/Bzlmod dependents, and structural absence of a
+second loader, retained Starlark lifetime value, RepoSpec, repository
+implementation execution, or I/O.
 
-Compatibility is exact for the eventually admitted Bazel 9.2 definition/load/
-export surface; private Rust layout, compact containers, diagnostic framing,
-and DICE scheduling are Slug-native. Repository-rule invocation,
-`repository_ctx`, environment/filesystem/network/watch/download/execute,
-generated names/RepoSpecs, materialization, override/inject existence,
-mappings, lockfile, nonroot/MVO/isolation/innate breadth, commands, public API,
-and JVM are unsupported/deferred. `REPLAN` on execution or generated state in
-this packet, a second loader/evaluator/graph, retained heap/callable outside
-the accepted frozen-module lifetime, public/wire surface, repository I/O,
-unresolved pinned option/error order, more than four future Rust paths, or an
-unbounded schema.
+Compatibility is exact only for the admitted Bazel 9.2 definition/export and
+capture surface. Private Rust representation, compact call records,
+diagnostic framing, and DICE scheduling are Slug-native. `RepoRule.instantiate`,
+`repository_ctx`, schema coercion/default insertion, environment/filesystem/
+network/watch/download/execute, generated canonical names/RepoSpecs,
+materialization, override/inject existence, final mappings, lockfile,
+nonroot/MVO/isolation/innate breadth, commands, public API, and JVM are
+unsupported/deferred. `REPLAN` on any RepoSpec/existence inference, repository
+implementation execution, second loader/evaluator/graph, retained heap or
+callable, public/wire surface, Bzlmod mutation/reverse dependency, repository
+I/O, fifth Rust path, unresolved pinned order, unbounded attr/options, or cap
+excess.
+
+## Completed repository-rule definition owner audit
+
+This section and everything below are historical context only, grant no file,
+action, cap, or schedule authority, and are interpreted solely through the
+active docs-only design contract above.
+
+The audit uses Bazel 9.2 tag commit `8220c619`:
+`RepositoryModuleApi.repository_rule`,
+`StarlarkRepositoryModule.repositoryRule`/`StarlarkRepoRule`,
+`RepoRule`, `ModuleExtensionEvalStarlarkThreadContext`, and focused
+`ModuleExtensionResolutionTest` export rows. The global accepts required
+callable `implementation`, `attrs=None`, `local=False`, `environ=[]`,
+`configure=False`, flag-gated `remotable=False`, and `doc=None`.
+Construction retains ordered descriptors, defining label, transitive bzl
+digest, repository-mapping entries, options, and lifetime-only callable;
+`export_as` supplies the rule name. A call rejects positional arguments,
+foreign context, and unexported rules before validating `name`, duplicate
+names, call location, and recursively cloned raw kwargs.
+
+Only later `createRepos` builds the full generated-repository mapping and
+invokes `RepoRule.instantiate` in insertion order to type/default attributes
+and produce RepoSpecs. Slug already owns the defining source label in
+`BzlEvaluationContext`, the sole frozen module and transitive manifest in
+`HostBzlModuleEvalKey`, and an ephemeral invocation-context lifetime. It lacks
+only the shared global/value and invocation-local capture sink. Therefore a
+separate definition key would be a second owner with no semantic consumer;
+the smallest truthful next design composes definition/export and capture while
+stopping before instantiation.
 
 ## Accepted pure-invocation implementation evidence
 

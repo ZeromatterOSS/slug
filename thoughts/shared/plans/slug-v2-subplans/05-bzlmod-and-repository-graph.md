@@ -2565,3 +2565,14 @@ definition owner. Run only the four-plan docs audit
 RepoSpecs, override/inject existence, mappings, lockfile products, or any
 repository/materialization/consumer edge before this definition prerequisite
 is independently accepted and explicitly activated.
+
+The pinned definition audit REPLANs to the loading-owned docs design
+`WP-4-5-host-module-extension-repository-rule-call-protocol-design` under
+45/260/240/180/725. A Bazel repository-rule value is an exported callable, so a
+standalone definition key would duplicate loading without owning its first
+semantic use. Stage 5 remains unchanged: the future protocol may consume the
+accepted selected/prepared request, mapping, and manifest identities only
+through existing hidden loading seams. It may not mutate Bzlmod, reverse the
+dependency, infer generated names/RepoSpecs or override/inject existence, or
+add a second selected projection, graph, materializer, lockfile, consumer,
+public API, or JVM edge.
