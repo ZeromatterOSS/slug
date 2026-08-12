@@ -620,7 +620,6 @@ dynamic extension proxy/tag behavior, dev suppression, and public
 starlark-rust seam. Include composition, preparation provenance, and discovery
 remain later serial owners; no Rust is authorized before fresh design
 acceptance.
-
 That design returned `REPLAN` before Rust. Pinned `TagCallable` retains raw
 Starlark kwargs directly in `AttributeValues`; the adapter-backed
 `None`/bool/int/string/label/iterable/dict domain is only the serializable
@@ -1996,3 +1995,32 @@ evaluation, or `REPLAN` at the first missing post-selection leaf. No Rust,
 fixture mutation, extension evaluation/materialization, loading/consumer,
 public API, or JVM/Java work is authorized before independent design
 acceptance.
+
+### Selected extension mapping owner r2 designed (2026-08-12)
+
+Pinned Bazel 9.2 proves one bounded pre-evaluation owner. It walks the selected
+graph and source-ordered usages, resolves bzl labels through each module's
+Bazel-dependency mapping, forms canonical extension/isolation IDs, assigns
+first-encounter collision-safe unique names, resolves root override/inject
+targets through the deps-only root mapping, and adds proxy imports to each
+module's full contextual mapping.
+
+The accepted selected routes provide graph order, canonical module identity,
+and deps-only mappings. Commit `11be92b9` supplies the ordered root usage
+slice through `RootModuleFiles`; discovered nonroot entries already retain
+their usages. No second graph, route, usage evaluator, or I/O owner is needed.
+
+The `must_exist` bit remains structural, but checking override-missing versus
+inject-collision requires extension evaluation's generated repository set and
+is deferred together with generated RepoSpecs, generated-repository mappings,
+materialization, lockfile/final-module products, loading, and consumers.
+
+After independent acceptance run only
+`WP-5-host-selected-extension-mapping-owner-implementation` in
+`selected_repo_spec.rs`, under 520 production, 800 test, and 1,320 total
+formatted net lines. Require the frozen identity/order/collision/mapping/
+override/error/Need/A-B-A/reuse matrix, protected suites and oracles, compact
+and cleanup audits, structural stops, and independent review. A second file,
+public API, predecessor mutation, another graph/route/usage owner, extension
+evaluation or generated-existence validation, I/O/materializer/loading/
+consumer edge, or cap excess is `REPLAN`.
