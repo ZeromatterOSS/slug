@@ -2430,3 +2430,23 @@ unaccepted and run only the four-plan docs correction
 `WP-4-5-host-pure-module-extension-invocation-owner-r3-cap-design`, freezing
 the same four paths/semantics/proofs/stops at 730/850/1,580. No Rust resumes
 before independent acceptance and explicit r3 activation.
+
+### Pure invocation implementation r3 activated (2026-08-12)
+
+Independent review accepts `86f478c0`. Run only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r3` in the
+same four loading paths plus four plans under 730/850/1,580 against `40def0e7`.
+Preserve every accepted semantic/proof/stop and the cleanup that removed
+unrelated visibility widening; no fifth path or behavior expansion.
+
+### Pure invocation event-contract correction (2026-08-12)
+
+Final review finds the implementation follows the established DICE contract:
+fresh evaluated activations publish invocation print batches, warm reused
+activations carry no duplicate batch, and command-effect lineage, not this
+callerless key, later selects reachable evaluated batches. Run only the
+four-plan docs correction
+`WP-4-5-host-pure-module-extension-invocation-event-contract-r4-design`.
+Preserve the same four paths, 730/850/1,580 caps, semantics, proof, and stops;
+rename the overclaiming test and defer command-output integration until a real
+consumer exists. No Rust resumes before acceptance and explicit r4 activation.

@@ -1,13 +1,58 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-pure-module-extension-invocation-owner-r3-cap-design`
-Milestone: M7 pure module-extension invocation final cap correction
+Packet: `WP-4-5-host-pure-module-extension-invocation-event-contract-r4-design`
+Milestone: M7 pure module-extension invocation event-contract correction
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct only the measured production/test caps for the retained,
-fully passing invocation implementation before final activation.
+Result: correct the invocation event claim to match the established DICE and
+command-effect ownership boundary before final implementation acceptance.
 
-## Active docs-only cap-correction contract
+## Active docs-only event-contract correction
+
+Final implementation review accepts the invocation architecture but rejects
+the phrase that the invocation key itself replays its batch on warm reuse.
+Existing DICE ownership intentionally attaches evaluation data only to the
+fresh `Evaluated` activation; a `Reused` activation has no batch. The existing
+`CommandEffectOwner` later selects reachable earlier evaluated batches within
+one command/retry lineage, while a fresh owner does not replay them. This
+callerless invocation packet has no command consumer and must not duplicate
+events in its heap-free semantic receipt or fabricate per-activation replay.
+
+Run only `WP-4-5-host-pure-module-extension-invocation-event-contract-r4-design`
+in canonical/current/Stage 4/Stage 5 under 30/140/100/80/350 docs lines. It
+authorizes no Rust or commit before acceptance and explicit r4 activation.
+Freeze the same four Rust paths, 730/850/1,580 caps against `40def0e7`, all
+semantics/proofs/stops, and one bounded test-name/assertion correction: fresh
+complete success/failure publishes exactly one invocation-owned print prefix;
+warm semantic reuse yields `ActivationKind::Reused` with no duplicate batch;
+command-lineage selection/replay remains owned and already proved by
+`CommandEffectOwner`, and invocation command-output integration is deferred
+until a real consumer exists. Rename the overclaiming `replays_prints` test to
+describe publication plus semantic reuse. `REPLAN` on events in semantic
+equality, duplicate warm batches, a command consumer, fifth Rust path, cap
+excess, or any behavior expansion.
+
+## Superseded r3 implementation activation
+
+This section is historical context only, grants no file, action, cap, or
+schedule authority, and is interpreted solely through the active docs-only
+event-contract correction above.
+
+Independent review accepts the final cap correction in `86f478c0`. Implement
+only `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r3` in
+`bzl_module.rs`, `package.rs`, private `module_extension.rs`, and `lib.rs`
+solely for its private declaration, plus canonical/current/Stage 4/Stage 5
+bookkeeping. Caps are 730 production, 850 tests, and 1,580 total against
+`40def0e7`. Preserve the complete r2 semantics, proof, compatibility boundary,
+and stops; cleanup may not reintroduce the two unrelated visibility widenings.
+No fifth Rust path, public API, second evaluator, repository/global/output/I/O/
+consumer/JVM breadth, or cap excess.
+
+## Accepted docs-only cap-correction contract
+
+This section is historical correction context only, grants no file, action,
+cap, or schedule authority, and is interpreted solely through the active
+implementation contract above.
 
 The frozen 720/800/1,520 stop fired after the complete required proof was
 formatted: the exact four-path diff measures approximately 724 production, 846

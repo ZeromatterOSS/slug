@@ -2532,3 +2532,17 @@ r2 cap. Run only the four-plan cap correction
 same four loading paths, semantics, proof, and stops at 730/850/1,580 against
 `40def0e7`. Stage 5 production remains unchanged and no Rust resumes before
 acceptance plus explicit r3 activation.
+
+Independent review accepts `86f478c0` and activates only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r3` in the
+same four loading paths plus four plans under 730/850/1,580 against `40def0e7`.
+Stage 5 production and all repository/mapping/output/consumer/public/JVM edges
+remain unchanged and unauthorized.
+
+Final review requires only an event-contract wording correction: evaluated
+invocation activations own batches; reused activations intentionally do not,
+and existing command-effect lineage owns later reachable-batch selection. Run
+only `WP-4-5-host-pure-module-extension-invocation-event-contract-r4-design`
+in the four plans. Keep the same four loading paths, 730/850/1,580 caps,
+semantics/proofs/stops, and no Stage 5 or command-consumer change before
+acceptance plus explicit r4 activation.
