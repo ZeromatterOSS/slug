@@ -1,6 +1,6 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-nonregistry-module-closure-implementation`
+Packet: `WP-5-host-nonregistry-module-closure-implementation-r2`
 Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
 Result: implement the accepted route-independent nonregistry MODULE/include
@@ -37,6 +37,18 @@ Commit `5757ea1d` and independent latest-diff review accept the resumed
 architecture: one route-independent closure key, a shared parsing/BFS core,
 the two-file allowlist, 420/480/900 caps, lifecycle/error/order proof, and
 fail-closed evaluation/graph boundaries.
+
+## Accepted cap correction
+
+The first implementation attempt ended REPLAN solely because exact section
+accounting measured 587 formatted net production lines and 468 test lines,
+1,055 total, beyond the frozen 420/480/900 limits. Independent latest-diff
+review found no semantic, identity, ownership, or error-order blocker and found
+that forcing the shared Host/direct adapter algebra under the original
+production cap would create riskier abstraction. Revision two preserves the
+complete diff and every scope, behavior, proof, and terminal stop, changing
+only the bounds to 620/500/1,120. The margin grants no authority for another
+owner, diagnostic, behavior, evaluator, graph consumer, or public surface.
 
 ## Active implementation contract
 
@@ -86,7 +98,10 @@ Edit only
 `app/slug_bzlmod_v2/src/module_eval.rs`. The latter is limited to the
 crate-private route-free include parser projection and its colocated tests;
 all DICE ownership and preparation remain in `source_preparation.rs`. Cap
-formatted net growth at 420 production lines, 480 test lines, and 900 total.
+formatted net growth at 620 production lines, 500 test lines, and 1,120 total.
+Account production and tests exactly by splitting each file at its main
+cfg(test) module boundary; the corrected margin may cover only this retained
+implementation and focused corrections.
 Add no file, public export, Cargo/BUILD metadata, dependency, fixture, asset,
 cache, lock, interner, process-global state, or direct filesystem path.
 

@@ -1310,3 +1310,20 @@ Run next only `WP-5-host-nonregistry-module-closure-implementation` in
 `source_preparation.rs` and the crate-private parser projection in
 `module_eval.rs`, under 420/480/900 caps and the canonical proof/stops. No
 evaluation, graph, mapping, loading, or command consumer is authorized.
+
+### Nonregistry MODULE closure implementation cap REPLAN (2026-08-12)
+
+The first implementation attempt ended REPLAN solely on its explicit line-cap
+stop. Exact section accounting measured 587 formatted net production lines and
+468 test lines, 1,055 total, against 420/480/900. Focused closure proof, the
+complete owner suite, downstream checks, formatting, and diff checks pass;
+independent latest-diff review found no semantic, identity, ownership, order,
+or lifecycle defect. Compressing the retained value/error identities and
+materially distinct Host/direct adapters to the original production bound
+would make the accepted shared BFS less auditable.
+
+Run next only WP-5-host-nonregistry-module-closure-implementation-r2. Preserve
+the same two Rust files, complete retained diff, behavior, evidence, and stops
+under corrected 620/500/1,120 bounds. Account the production/test split exactly
+and use no margin for another owner, diagnostic, behavior, evaluator, graph
+consumer, or public surface.
