@@ -2113,3 +2113,36 @@ projection. Add no second file, public API, predecessor mutation, another
 graph/route/usage owner, extension evaluation or generated-existence
 validation, I/O/materializer/loading/consumer edge, or JVM/Java work. Obtain
 fresh independent implementation review.
+
+### Selected extension mappings accepted (2026-08-12)
+
+Commit `75a431d6` owns the bounded pre-evaluation projection. The private
+routes-first DICE key consumes only resolved selected entries and the retained
+root/nonroot usage owners, forms canonical ordinary/isolated IDs, assigns
+first-encounter collision-safe names, composes every full no-overrides
+mapping, resolves root override/inject targets through the completed root
+mapping, and substitutes final mappings while retaining `must_exist`.
+
+The owner uses Arc-backed compact retained values and transient compact
+maps/sets. It adds no public surface, Starlark evaluator, I/O, lock,
+materializer, loading consumer, or generated-existence claim. Five focused
+rows discriminate root/nonroot grouping, root/nonroot isolation, two MVO
+contexts, innate naming, isolated collision suffixes, typed errors, real-DICE
+Need/error ordering, nonroot mappings, zero I/O, warm reuse, and A/B/A. All
+345 Bzlmod owner tests plus integrations and the full loading suite pass.
+Formatting, diff, one-file scope, 454/516/970 measured growth, compact/cleanup
+audits, and independent review pass.
+
+The next ownership audit returns `REPLAN`: Slug has no production
+`module_extension()`/`tag_class()` definition loader or extension-context
+evaluator, so generated repository names and override/inject existence cannot
+yet be known. Run next only the docs-only
+`WP-5-host-module-extension-definition-owner-design`. Freeze the smallest
+heap-independent root-local definition leaf, exact source/load/export/schema
+ordering, DICE identity, and implementation feasibility. Do not retain a
+Starlark heap/callable or fabricate generated names/RepoSpecs.
+
+The design may edit only canonical/current/this Stage 5 plan, under
+260/320/45/625 caps. No Rust, fixture, selected-owner mutation, evaluation,
+I/O/materializer, lockfile, loading/command consumer, public API, or JVM/Java
+work is authorized before independent acceptance.

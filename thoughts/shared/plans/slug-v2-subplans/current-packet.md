@@ -1,101 +1,109 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-mapping-owner-implementation-r3`
-Milestone: cross-stage M7 selected Bzlmod semantic owner
+Packet: `WP-5-host-module-extension-definition-owner-design`
+Milestone: cross-stage M7 Bzlmod prerequisite design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: retain the complete pre-evaluation selected extension identity and
-contextual repository-mapping projection.
+Result: freeze the first heap-independent module-extension definition owner or
+REPLAN at the first missing compile/load prerequisite.
 
-## Active implementation contract
+## Active design contract
 
-Implement exactly the independently accepted corrected owner in
-`app/slug_bzlmod_v2/src/selected_repo_spec.rs`. This is the sole authorized
-file. Cap formatted net growth at 520 production lines, 800 test lines, and
-1,320 total relative to `2644f091`.
+Perform one read-only ownership audit for the definition input required after
+commit `75a431d6`. Pinned Bazel 9.2 ordering is:
 
-Compute `HostSelectedModuleRoutesKey` first. A route Need is invalid and a
-completed route error is terminal before any root-file work. Then borrow
-`RootModuleFilesKey` for the source-ordered root usage slice and take
-nonroot usages only from the selected discovered route sources. Use only
-resolved selected entries; unpruned graph entries do not own selected usage
-membership.
+1. selected pre-evaluation extension mapping and identity;
+2. canonical bzl-label load under the selected owner mapping;
+3. exported `module_extension` lookup and tag-class/schema validation;
+4. ordered module/tag view assembly for that extension ID and isolation;
+5. replay-input/evaluation-factor ownership;
+6. one implementation execution producing ordered generated names, RepoSpecs,
+   metadata, and events;
+7. only then override/inject generated-existence validation and final products.
 
-Retain one compact private result containing:
+Slug owns step 1 but has no production `module_extension()`, `tag_class()`,
+extension-context evaluator, loaded extension definition value, or generated
+repository result. MODULE-side proxies, lockfile schemas, digest scaffolding,
+and BUILD/.bzl rule-definition loading are not substitutes.
 
-- the accepted selected routes and complete root usage input for structural
-  equality and invalidation;
-- selected usage owners in route order, source-ordered extension IDs,
-  collision-safe unique names, proxy imports, root override/inject intent,
-  and complete contextual repository mappings;
-- canonical IDs formed from each bzl label resolved through that selected
-  owner's accepted dependency mapping, extension name, and optional isolation
-  identity (root proxy name or nonroot selected module key plus proxy name);
-- `must_exist` as structural override identity without claiming generated
-  repository existence.
+Audit the smallest callerless private definition leaf for an admitted
+root-main-repository, nonisolated ordinary Starlark extension with one
+source-controlled `.bzl` definition, one exported extension, and statically
+declared tag classes. Start with no `load()` unless the accepted Bzl closure
+can be reused without creating a second loader.
 
-Use the corrected two-phase algorithm:
+Freeze:
 
-1. resolve every selected usage ID and first-encounter unique name, then build
-   every selected module's full no-overrides mapping by adding all proxy
-   imports to the accepted dependency-only mapping;
-2. resolve every root override/inject target through the completed root
-   no-overrides mapping with an empty override table, then build final full
-   mappings by substituting those already resolved canonical targets for the
-   overridden generated destinations.
+- a key structurally identified by workspace, canonical bzl label, selected
+  route/mapping context, and exported extension name;
+- routes/selected-extension-mapping computation first, with Need invalid and a
+  completed predecessor error before any package/source/load work;
+- existing package/Bzl source ownership, with source/load errors before export
+  lookup and schema validation;
+- a compact heap-independent result retaining exact transitive definition
+  source identity, exported extension name, implementation schema/IR boundary,
+  ordered tag-class attribute schemas, declared environ/OS dependencies, and
+  typed load/export/schema errors;
+- structural equality/invalidation for the complete selected mapping context,
+  transitive bytes/semantics, export, schemas, and declarations;
+- the explicit feasibility question: no Starlark heap, frozen callable, or
+  evaluator-lifetime value may cross DICE. If the implementation cannot be
+  represented as a compact replayable heap-independent program/schema, return
+  `REPLAN` and name the first compile/execute owner rather than fabricating a
+  definition.
 
-Preserve source/route order and return typed projection errors for unresolved
-bzl labels, isolation/export defects, unique-name exhaustion, no-overrides
-mapping conflicts, invisible override targets, and final mapping conflicts.
-Completed predecessor errors win over Need; Need unions remain invalid and
-non-self-equal. Slug diagnostic wording and collision-safe internal identity
-bytes are Slug-native. Selected membership, label resolution, source order,
-extension grouping/isolation, imports, override target resolution, and final
-mapping entries are exact for the admitted Bazel 9.2 pre-evaluation slice.
+Exact: canonical label resolution, package/source/load/export/tag-schema error
+order, extension ID association, and retained source-defined schemas for the
+admitted Bazel 9.2 slice. Slug-native: private DICE/type names, compact
+containers, diagnostic wording, and collision-safe internal identity bytes.
+Unsupported/deferred: nonroot or registry-resident extension definitions,
+isolated/MVO execution factors, repository-rule execution, generated
+names/RepoSpecs/existence checks, network/environment/OS inputs, lockfile
+replay/write, final module products, materialization, loading consumers, and
+commands.
 
-## Required proof
+## Scope, evidence, and stops
 
-Add colocated pure and real-DICE tests discriminating:
+This design packet may edit only:
 
-- root and nonroot ordinary aggregation, distinct isolated identities, two MVO
-  owner contexts, innate rules, aliases, and first-encounter name collisions;
-- no-overrides imports from another extension as valid override targets;
-- duplicate imports, missing targets, chains/cycles, final replacement, and
-  distinct typed predecessor/projection errors;
-- route-error-before-root-work and complete-error-over-Need ordering;
-- graph/root usage/edit/remove/restore A/B/A, cold/warm reuse, Need invalidity,
-  and semantic equality;
-- default ignore-dev behavior now fixed by `2644f091`;
-- structural absence of unpruned graph consumption, a second route/usage
-  owner, extension evaluation, registry/materialization/file/network I/O,
-  loading/consumer edges, public exports, locks, or raw filesystem access.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest; and
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
 
-Run focused tests, full `slug_bzlmod_v2`, full `slug_loading_v2`,
-formatting/diff/cap/scope checks, compact-representation and AI-cleanup audits,
-and fresh independent implementation review.
+Cap formatted net growth at 260 manifest lines, 320 owner-plan lines, 45
+canonical lines, and 625 total. Inspect pinned Bazel 9.2 source and live Slug
+owners read-only. Record exact source anchors, reusable loading/package/DICE
+seams, retained identity, Need/error/event ordering, representation choice,
+proof matrix, successor allowlist/caps/stops, and independent review.
 
-A second file, public API, predecessor mutation, another graph/route/usage
-owner, extension evaluation or generated-repository existence validation,
-RepoSpec/I/O/materializer/loading/consumer edge, command/analysis/execution
-work, JVM/Java, or any cap excess is `REPLAN`. One bounded defect is
-`REVISE`; a second material correction is `REPLAN`.
+No Rust/Cargo/BUILD, fixture mutation, selected-owner mutation, generic loading
+consumer activation, retained Starlark heap/callable, extension execution,
+generated-name/spec/existence fabrication, registry/network/environment I/O,
+materialization, lockfile write/replay, command/loading consumer, JVM/Java, or
+public API is authorized.
+
+A proven heap-independent definition seam may freeze a future implementation
+in at most three explicit Rust files with measured caps. `REPLAN` on an
+unresolved callable lifetime, need for a second loader/graph, non-root source
+materialization, evaluation/I/O, public surface, fourth Rust file, or cap
+excess. No implementation may begin before independent design acceptance and
+explicit activation.
 
 ## Accepted predecessor evidence
 
 This section is historical and grants no separate file, action, cap, or
 scheduling authority.
 
-Commit `11be92b9` owns root extension usages. Commit `2644f091` corrects
-pinned Bazel 9.2 root semantics: ignored-dev `use_repo` still reserves names,
-root override/inject are globally suppressed when dev dependencies are
-ignored, and finalization validates replacement visibility, inject/import
-conflicts, and overriding/overridden chains. Its 340 owner tests, all
-integrations, full loading suite, formatting/diff/cap/cleanup checks, real-DICE
-failure/restoration row, and independent review pass.
+Commit `75a431d6` is independently accepted. Its private routes-first owner
+uses only resolved selected entries and the root/nonroot retained usage
+owners; groups ordinary and isolated IDs; assigns exact first-encounter names
+including non-`extension` isolated collision suffixes; builds complete
+no-overrides mappings; resolves root targets through the completed root
+mapping; and performs final substitution while retaining `must_exist`.
+Growth is 454 production and 516 net test lines in one file, within
+520/800/1,320. Five new focused rows, all 345 owner tests plus integrations,
+the full loading suite, formatting/diff/scope/compact/cleanup audits, real-DICE
+Need/error/A-B-A/reuse, and independent review pass.
 
-The r2 mapping implementation was stopped before Rust. Pinned Bazel
-`BazelDepGraphFunction.resolveRepoOverrides` proved that deps-only target
-resolution was wrong. The independently accepted r3 correction above matches
-the checked-in root extension fixture: an innate extension import may be the
-target replacing another extension repository. Generated-name existence,
-extension evaluation, generated RepoSpecs/internal mappings, lockfile/final
-module products, materialization, loading, and consumers remain deferred.
+Generated repository existence remains deliberately unknown. It may be
+validated only after a future exact extension execution owner returns its
+generated name set.
