@@ -96,6 +96,134 @@ create a second registry graph. `RootRepositoryRouteKey` must retain its
 accepted direct-local and built-in slice unchanged until the missing selected
 registry RepoSpec owner and the subsequent mapping/route owner are accepted.
 
+## Proposed completed registry RepoSpec design
+
+The read-only owner audit finds one bounded composition seam; no smaller
+registry-policy or source-observation prerequisite is required. The future
+callerless owner is
+`HostSelectedRegistryRepoSpecsKey { workspace: NormalizedAbsolutePath }` in a
+new private `selected_repo_spec.rs`. It computes
+`HostSelectedModuleGraphKey` first and visits only its resolved BFS entries.
+Root, built-in, and nonregistry entries perform no registry work. Each registry
+entry must carry `HostDiscoveredModuleProvenance::Registry`; any source/key
+mismatch is a typed invariant failure, never a guessed route.
+
+For each selected registry entry the owner computes
+`HostRegistryFunctionKey` using the retained original selected registry. That
+accepted value remains the sole projection of resolved registry spelling,
+URI scheme, known-file-hash mode, vendor directory, ordered command mirrors,
+and lockfile policy. The new owner retains a compact semantic policy identity
+containing those fields except the refresh/request-generation token. Refresh
+tokens invalidate predecessor work but are operational generations, not
+repository semantic identity. No lock is held across DICE computation.
+
+All registry bytes come exclusively from `RegistryFileKey`. The owner forms
+the selected source.json URL from the resolved registry and exact normalized
+module key, then retains the complete `RegistryFileValue` identity: URL,
+bytes/SHA-256, remote expectation, or typed absence source. Missing
+source.json is terminal. Archive and local-path sources lazily request the
+same registry's bazel_registry.json once per aggregate computation; Git does
+not. Blank/missing bazel_registry.json is retained absence. The selected
+entry's last successful `RegistryModuleFileAttempt` supplies the exact MODULE
+URL and SHA-256 used as `remote_module_file_integrity`; absence or disagreement
+with the selected registry provenance is terminal.
+
+### Exact projection
+
+For the admitted well-typed JSON domain, unknown fields are ignored and a
+missing `type` defaults to `archive`, matching pinned Gson behavior. The owner
+parses and projects exactly:
+
+- archive: required absolute `url` and `integrity`; command mirrors then
+  bazel_registry.json mirrors with first-occurrence deduplication; mirrored
+  primary URLs, original primary URL, then source `mirror_urls`; optional
+  `strip_prefix`, `archive_type`, patches, overlay, and integer `patch_strip`; exact
+  registry patch/overlay URLs; and exact SHA-256 SRI MODULE injection into the
+  pinned `http_archive` RepoSpec attributes;
+- local_path: required `path`; an absolute path unchanged, or a relative path
+  joined to required `module_base_path`; a relative module base is admitted
+  only for a normalized `file://` registry and is anchored below that registry
+  directory; the result is the pinned `local_repository` RepoSpec; and
+- git_repository: required admitted remote/ref fields as applicable, optional
+  shallow/tag/strip fields, both submodule booleans from `init_submodules`,
+  verbose, remote patches/strip, and exact MODULE SRI injection into the pinned
+  `git_repository` RepoSpec.
+
+The existing `RepoSpec`, `RepoRuleId`, and recursive
+`OverrideAttributeValue` algebra represents every required string, bool,
+32-bit integer, ordered iterable, and string-keyed map without widening a
+public type. Registry source projection must not reuse the public
+`RegistrySourceSpec`: that supplied-file shape omits fields and observation
+identity. Pure field-validation helpers may be newly implemented in the
+private owner; the legacy parser remains untouched and callerless.
+
+After remote projection, the owner computes
+`HostEffectiveModuleOverrideKey` for the module. Only a root-provenance
+`RegistrySingle` may augment a registry RepoSpec. When patches, patch commands,
+or nonzero strip are present, it appends exact `patches`, `patch_cmds`, and
+`patch_args = ["-pN"]` attributes. Command/nonregistry provenance or an
+incompatible effective override is terminal. Multiple-version/absence adds no
+patch fields. The owner never reads or merges either raw override map.
+
+The retained value is an Arc-backed BFS slice of selected registry entries.
+Each entry structurally owns the exact graph module key, original/resolved
+registry policy identity, ordered MODULE attempts and winning hash, complete
+source.json observation, optional bazel_registry.json observation, effective
+override provenance relevant to final augmentation, and final `RepoSpec`.
+Complete equality compares all of those semantic fields. Need from the
+selected graph or Host registry policy remains invalid/non-self-equal; complete
+typed graph, registry-policy, file, parse, projection, provenance, and
+override failures are stable DICE values. The aggregate scans all selected
+entries so a completed typed failure wins over unioned compatible Need;
+otherwise Needs union. First completed failure follows resolved BFS order and
+is explicitly Slug-native where Bazel's parallel Skyframe scheduling exposes
+no stable cross-key diagnostic order.
+
+### Frozen implementation successor
+
+After independent design acceptance, activate only
+`WP-5-host-selected-registry-repo-spec-owner-implementation` in:
+
+- new `app/slug_bzlmod_v2/src/selected_repo_spec.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration.
+
+Cap formatted net growth at 780 production lines, 1,050 test lines, and 1,830
+total. Tests stay colocated. No third Rust file, public export, Cargo/BUILD
+change, legacy `registry.rs`/`resolution.rs` activation or edit, second
+registry observation/policy key, selected-graph mutation, canonical mapping,
+route conversion, materialization, lockfile publication, loading, command,
+analysis, execution, or consumer is authorized.
+
+Required proof includes pure default/archive/local/Git truth tables; unknown,
+missing, wrong-kind, overflow, malformed URI, and unsupported-shape failures;
+mirror priority/deduplication, registry-json absence/presence, patches,
+overlay, type, MODULE SRI, local module-base, Git omission/default behavior,
+and root patch augmentation. Real-DICE rows must prove selected-only fetching,
+zero registry work for root/built-in/nonregistry/unselected entries, source and
+registry JSON plus MODULE hash and mirror/override A/B/A, lockfile expectation
+and mode behavior, local/remote registry identity, complete-error-over-Need,
+Need invalidity, cold/warm reuse, and restoration. Structural scans must prove
+the sole selected-graph/effective-override/Host-registry/RegistryFile edges and
+absence of the legacy catalog, supplied graph, raw filesystem/network, route,
+materializer, loading, lock, public export, and consumer edges.
+
+Exact: the admitted pinned Bazel 9.2 source types, field defaults, URL and SRI
+projection, mirror order, patch/overlay/MODULE injection, and complete
+RepoSpec/source identity. Slug-native: Rust/DICE names, compact storage,
+well-formed Unicode/JSON parser edge behavior, diagnostic framing outside
+named exact messages, BFS cross-module first-error order, and lifecycle
+instrumentation. Unsupported/deferred: malformed Gson-coercion edge cases,
+non-UTF-8 JSON, native-Windows local-path semantics, unadmitted URI forms,
+materialization/execution of the produced specs, selected lockfile products,
+canonical/full mappings, extension repositories/overrides, route/loading and
+public consumers, JVM/Java, and exact Bazel identity bytes.
+
+Return `REPLAN` on any required edit to legacy registry/catalog/resolution
+files, a third Rust file, a new observation/policy key, RepoSpec algebra
+widening, inability to preserve selected-only fetching or typed file identity,
+raw I/O, route/materializer/consumer coupling, cap excess, or proof that an
+admitted source field cannot be represented exactly.
+
 ## Accepted correction contract
 
 This independently accepted correction is historical context for r2. It grants

@@ -1689,3 +1689,42 @@ freeze the smallest post-selection registry source/RepoSpec owner over
 I/O, legacy catalog activation, mapping/route conversion, materialization,
 loading, lockfile production, public API, or consumer work is authorized
 before independent design acceptance.
+
+### Selected registry RepoSpec owner design proposed (2026-08-12)
+
+The owner audit finds no smaller prerequisite. One callerless
+`HostSelectedRegistryRepoSpecsKey { workspace }` can compute the accepted
+selected graph, skip root/built-in/nonregistry entries, and derive only
+resolved registry RepoSpecs. `HostRegistryFunctionKey` supplies compact
+resolved URL/mirror/vendor/hash-mode policy; `RegistryFileKey` remains the sole
+source.json and optional bazel_registry.json byte/hash/lockfile observation;
+the selected discovered provenance supplies ordered MODULE attempts and its
+winning hash; and `HostEffectiveModuleOverrideKey` supplies final root
+single-version patch augmentation without a second map merge.
+
+The admitted exact projection covers pinned archive, local_path, and
+git_repository source.json families, default archive type, mirror priority and
+dedupe, remote patches/overlay, registry module-base policy, exact MODULE
+SHA-256 SRI injection, and final patch/patch_cmd/patch_args fields. The existing
+private-compatible `RepoSpec` recursive attribute algebra is sufficient. The
+legacy public `RegistrySourceCatalog` remains untouched: it owns no Host/DICE
+observation and lacks required fields.
+
+The future retained Arc-backed BFS slice structurally owns module, registry
+policy, ordered MODULE attempts/hash, complete source and optional registry
+JSON observations, relevant effective override provenance, and final RepoSpec.
+Need remains invalid; complete typed predecessor/parse/projection failures are
+stable; completed errors beat compatible Need and first-error order across
+selected modules is Slug-native.
+
+After independent design acceptance, run only
+`WP-5-host-selected-registry-repo-spec-owner-implementation` in the new private
+`selected_repo_spec.rs` and one private `lib.rs` declaration, under 780
+production/1,050 test/1,830 total formatted net lines. Require pure field and
+projection truth tables, selected-only/zero-extra-fetch proof, source/policy/
+MODULE/override A/B/A, error-over-Need and lifecycle evidence, full owner and
+dependent validation, structural sole-edge scans, caps, and independent
+implementation review. A third Rust file, public or RepoSpec-algebra widening,
+legacy catalog/graph edit, second I/O/policy owner, raw I/O, route,
+materialization, loading, lockfile publication, consumer, or cap excess is
+`REPLAN`.
