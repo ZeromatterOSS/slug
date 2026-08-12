@@ -81,6 +81,8 @@ use crate::host_glob::HostGlobLoadingOperation;
 use crate::host_glob::HostGlobLoadingRequest;
 use crate::host_glob::HostGlobPrepared;
 use crate::host_glob::HostGlobRequestTraversalError;
+use crate::module_extension_repository_rule::RepositoryRuleAttribute;
+use crate::module_extension_repository_rule::RepositoryRuleDefinition;
 use crate::provider::AnalysisBuiltinCallable;
 use crate::provider::BzlEvaluationContext;
 use crate::provider::UserProviderCallable;
@@ -3950,6 +3952,100 @@ impl<'v> StarlarkValue<'v> for FrozenRuleDefinition {
 
 #[starlark_module]
 pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
+    fn repository_rule<'v>(
+        implementation: Value<'v>,
+        #[starlark(require = named)] attrs: Option<Value<'v>>,
+        #[starlark(require = named)] local: Option<bool>,
+        #[starlark(require = named)] environ: Option<UnpackListOrTuple<&str>>,
+        #[starlark(require = named)] configure: Option<bool>,
+        #[starlark(require = named)] doc: Option<Value<'v>>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<RepositoryRuleDefinition<'v>> {
+        let callable: Option<StarlarkCallable<'v>> =
+            StarlarkCallable::unpack_value_opt(implementation);
+        if callable.is_none() {
+            anyhow::bail!("repository_rule implementation must be callable");
+        }
+        if local.unwrap_or(false)
+            || configure.unwrap_or(false)
+            || !environ.unwrap_or_default().items.is_empty()
+            || doc.is_some_and(|value| !value.is_none())
+        {
+            anyhow::bail!("unsupported repository_rule option in the admitted capture slice");
+        }
+        let context = BzlEvaluationContext::from_evaluator(eval)
+            .map_err(|_| anyhow::anyhow!("repository_rule may only be called in a .bzl module"))?;
+        let defining_label = CanonicalLabel::parse(&format!("@@{}", context.source_label()))
+            .map_err(anyhow::Error::msg)?;
+        let attrs = match attrs {
+            None => Vec::new(),
+            Some(value) if value.is_none() => Vec::new(),
+            Some(value) => DictRef::from_value(value)
+                .ok_or_else(|| anyhow::anyhow!("repository_rule attrs must be a dict or None"))?
+                .iter()
+                .map(|(name, value)| {
+                    Ok((
+                        name.unpack_str()
+                            .ok_or_else(|| {
+                                anyhow::anyhow!("repository_rule attr names must be strings")
+                            })?
+                            .to_owned(),
+                        value,
+                    ))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?,
+        };
+        let mut attributes = Vec::new();
+        for (name, value) in attrs {
+            if matches!(
+                name.as_str(),
+                "name" | "tags" | "deprecation" | "visibility"
+            ) {
+                anyhow::bail!(
+                    "There is already a built-in attribute '{name}' which cannot be overridden"
+                );
+            }
+            if !is_repository_rule_attribute_name(&name) {
+                anyhow::bail!("unsupported repository_rule attribute name '{name}'");
+            }
+            let definition = AttributeDefinition::from_value(value)
+                .and_then(|value| match value {
+                    starlark::__macro_refs::Either::Left(value) => Some(value),
+                    starlark::__macro_refs::Either::Right(_) => None,
+                })
+                .ok_or_else(|| {
+                    anyhow::anyhow!("repository attribute '{name}' must use attr.*()")
+                })?;
+            if !matches!(
+                definition.kind,
+                AttributeKind::String
+                    | AttributeKind::Boolean
+                    | AttributeKind::Integer
+                    | AttributeKind::Label
+            ) || definition.configurable_set
+                || definition.transition.is_some()
+                || definition.allow_single_file.is_some()
+                || definition
+                    .default
+                    .as_ref()
+                    .is_some_and(|value| !module_extension_default_matches(definition.kind, value))
+            {
+                anyhow::bail!("unsupported repository_rule attribute schema '{name}'");
+            }
+            attributes.push(RepositoryRuleAttribute {
+                name: name.into(),
+                kind: definition.kind,
+                mandatory: definition.mandatory,
+                default: definition.default.clone(),
+            });
+        }
+        Ok(RepositoryRuleDefinition::new(
+            implementation,
+            defining_label,
+            attributes.into(),
+        ))
+    }
+
     fn tag_class<'v>(
         #[starlark(require = named)] attrs: Option<SmallMap<String, Value<'v>>>,
         #[starlark(require = named)] doc: Option<&str>,
@@ -4342,6 +4438,13 @@ pub(crate) fn package_globals(builder: &mut GlobalsBuilder) {
     }
 }
 
+fn is_repository_rule_attribute_name(name: &str) -> bool {
+    name.bytes()
+        .enumerate()
+        .all(|(index, byte)| byte.is_ascii_alphanumeric() || (index > 0 && byte == b'_'))
+        && name.as_bytes().first().is_some_and(u8::is_ascii_alphabetic)
+}
+
 fn transition_output_has_recursive_package_segment(output: &str) -> bool {
     let Some(label) = output.strip_prefix("//") else {
         return false;
@@ -4644,11 +4747,19 @@ mod module_extension_definition_tests {
     }
 
     #[test]
-    fn module_extension_globals_exclude_repository_and_label_constructors() {
-        for name in ["repository_rule", "Label"] {
-            let error = evaluate(&format!("captured = {name}\n")).unwrap_err();
-            assert!(error.to_string().contains("not found"), "{error:#}");
-        }
+    fn module_extension_globals_admit_repository_rule_and_exclude_label() {
+        let module =
+            evaluate("def impl(ctx):\n  pass\ncaptured = repository_rule(implementation=impl)\n")
+                .unwrap();
+        assert!(
+            module
+                .get("captured")
+                .unwrap()
+                .downcast::<crate::module_extension_repository_rule::FrozenRepositoryRuleDefinition>()
+                .is_ok()
+        );
+        let error = evaluate("captured = Label\n").unwrap_err();
+        assert!(error.to_string().contains("not found"), "{error:#}");
     }
 
     fn tag_attribute(

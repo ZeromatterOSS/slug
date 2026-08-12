@@ -55,6 +55,8 @@ use crate::bzl_module::HostPreparedModuleExtensionInputsKey;
 use crate::bzl_module::HostRootBzlLabel;
 use crate::bzl_module::PreparedModuleExtensionInput;
 use crate::bzl_module::PreparedModuleExtensionTag;
+use crate::module_extension_repository_rule::RepositoryRuleCallRecord;
+use crate::module_extension_repository_rule::RepositoryRuleInvocationState;
 use crate::package::FrozenModuleExtensionDefinition;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -66,6 +68,7 @@ pub(crate) struct HostPureModuleExtensionInvocations {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostPureModuleExtensionInvocationReceipt {
     pub(crate) request: HostSelectedExtensionDefinitionLoadRequest,
+    pub(crate) repository_rule_calls: Arc<[RepositoryRuleCallRecord]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -75,6 +78,8 @@ pub(crate) enum HostPureModuleExtensionInvocationsError {
     AfterPrepared {
         prepared: Arc<HostPreparedModuleExtensionInputs>,
         request: Option<HostSelectedExtensionDefinitionLoadRequest>,
+        completed: Arc<[HostPureModuleExtensionInvocationReceipt]>,
+        current_calls: Arc<[RepositoryRuleCallRecord]>,
         error: HostPureModuleExtensionInvocationError,
     },
 }
@@ -211,10 +216,15 @@ async fn invoke_all(
     capture_events: bool,
     event_batch: &mut EventBatch,
 ) -> HostPureModuleExtensionInvocationsOutcome {
-    let after = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>, error| {
+    let after = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>,
+                 completed: &[HostPureModuleExtensionInvocationReceipt],
+                 current_calls: Arc<[RepositoryRuleCallRecord]>,
+                 error| {
         HostPureModuleExtensionInvocationsError::AfterPrepared {
             prepared: prepared.clone(),
             request: request.cloned(),
+            completed: completed.to_vec().into(),
+            current_calls,
             error,
         }
     };
@@ -236,6 +246,8 @@ async fn invoke_all(
         {
             return complete(Err(after(
                 Some(input.input.parts().0),
+                &[],
+                Arc::from([]),
                 HostPureModuleExtensionInvocationError::UnsupportedFactors,
             )));
         }
@@ -244,6 +256,8 @@ async fn invoke_all(
             Err(error) => {
                 return complete(Err(after(
                     Some(input.input.parts().0),
+                    &[],
+                    Arc::from([]),
                     HostPureModuleExtensionInvocationError::Label(error.to_string().into()),
                 )));
             }
@@ -261,6 +275,8 @@ async fn invoke_all(
                 Err(error) => {
                     return complete(Err(after(
                         Some(input.input.parts().0),
+                        &[],
+                        Arc::from([]),
                         HostPureModuleExtensionInvocationError::Bzl(error.clone()),
                     )));
                 }
@@ -268,6 +284,8 @@ async fn invoke_all(
             Err(error) => {
                 return complete(Err(after(
                     Some(input.input.parts().0),
+                    &[],
+                    Arc::from([]),
                     HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()),
                 )));
             }
@@ -275,6 +293,8 @@ async fn invoke_all(
         if &module.manifest != loaded_manifest {
             return complete(Err(after(
                 Some(input.input.parts().0),
+                &[],
+                Arc::from([]),
                 HostPureModuleExtensionInvocationError::Drift("reacquired manifest differs".into()),
             )));
         }
@@ -283,6 +303,8 @@ async fn invoke_all(
             Err(error) => {
                 return complete(Err(after(
                     Some(input.input.parts().0),
+                    &[],
+                    Arc::from([]),
                     HostPureModuleExtensionInvocationError::Drift(error.to_string().into()),
                 )));
             }
@@ -292,6 +314,8 @@ async fn invoke_all(
             Err(_) => {
                 return complete(Err(after(
                     Some(input.input.parts().0),
+                    &[],
+                    Arc::from([]),
                     HostPureModuleExtensionInvocationError::Drift(
                         "reacquired export is not module_extension".into(),
                     ),
@@ -301,6 +325,8 @@ async fn invoke_all(
         if &definition.projection() != loaded_definition {
             return complete(Err(after(
                 Some(input.input.parts().0),
+                &[],
+                Arc::from([]),
                 HostPureModuleExtensionInvocationError::Drift(
                     "reacquired definition differs".into(),
                 ),
@@ -327,8 +353,10 @@ async fn invoke_all(
             .heap()
             .alloc_simple(InvocationContext::new(input, preflight.tag_classes, &owner));
         let capture = capture_events.then(InvocationPrintCapture::default);
+        let repository_rules = RepositoryRuleInvocationState::new();
         let returned = {
             let mut evaluator = Evaluator::new(&invocation_module);
+            evaluator.extra = Some(&repository_rules);
             if let Some(capture) = capture.as_ref() {
                 evaluator.set_print_handler(capture);
             }
@@ -347,11 +375,14 @@ async fn invoke_all(
                     .chain(capture.events().iter().cloned()),
             );
         }
+        let repository_rule_calls = repository_rules.records();
         let returned = match returned {
             Ok(value) => value,
             Err(error) => {
                 return complete(Err(after(
                     Some(input.input.parts().0),
+                    &invoked,
+                    repository_rule_calls,
                     HostPureModuleExtensionInvocationError::Invocation(error.to_string().into()),
                 )));
             }
@@ -359,6 +390,8 @@ async fn invoke_all(
         if !returned.is_none() {
             return complete(Err(after(
                 Some(input.input.parts().0),
+                &invoked,
+                repository_rule_calls,
                 HostPureModuleExtensionInvocationError::Result(
                     format!(
                         "module extension must return None, got {}",
@@ -370,6 +403,7 @@ async fn invoke_all(
         }
         invoked.push(HostPureModuleExtensionInvocationReceipt {
             request: input.input.parts().0.clone(),
+            repository_rule_calls,
         });
     }
     complete(Ok(HostPureModuleExtensionInvocations {
@@ -666,7 +700,17 @@ impl<'v> StarlarkValue<'v> for InvocationTagSortKey {
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
-struct InvocationLabel(CanonicalLabel);
+pub(crate) struct InvocationLabel(CanonicalLabel);
+impl InvocationLabel {
+    #[cfg(test)]
+    pub(crate) fn new(label: CanonicalLabel) -> Self {
+        Self(label)
+    }
+
+    pub(crate) fn canonical(&self) -> &CanonicalLabel {
+        &self.0
+    }
+}
 impl fmt::Display for InvocationLabel {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
@@ -824,9 +868,39 @@ pub(crate) mod test_support {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Mutex;
+
+    use dice::ActivationData;
+    use dice::ActivationKind;
+    use dice::ActivationTracker;
+    use dice::DetectCycles;
+    use dice::Dice;
+    use dice::DynKey;
+    use dice::RichActivation;
+    use dice::UserComputationData;
+    use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+    use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+    use slug_bzlmod_v2::LockfileMode;
+    use slug_bzlmod_v2::RegistryRequestGeneration;
+    use slug_bzlmod_v2::RegistryUrls;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpoch;
+    use slug_bzlmod_v2::RepositoryMaterializationResultEpochKey;
+    use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
+    use slug_workspace_v2::PathObservationDemand;
+    use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationNamespace;
+    use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+    use slug_workspace_v2::WorkspaceFileValue;
+    use slug_workspace_v2::WorkspaceRawFileValue;
     use starlark::environment::Globals;
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
+    use starlark_map::sorted_map::SortedMap;
 
     use super::*;
 
@@ -1137,5 +1211,382 @@ mod tests {
             value,
             "[1, \"root\", \"\", True, True, \"item\", \"pkg\", \"dep+\", \"dep+\", \"@@dep+//pkg:item\", \"Label(\\\"@@dep+//pkg:item\\\")\", \"@@dep+//pkg:item\", \"Label(\\\"@@dep+//pkg:item\\\")\", \"@@dep+//pkg:item\", \"@@dep+//pkg:item\", \"Label(\\\"@@dep+//pkg:item\\\")\", \"other\", 1, True]"
         );
+    }
+
+    const REPO_RULE_WORKSPACE: &str = "/module-extension-repository-rule";
+
+    #[derive(Default)]
+    struct RepositoryRuleActivationTracker(Mutex<Vec<(ActivationKind, Option<EventBatch>)>>);
+
+    impl RepositoryRuleActivationTracker {
+        fn take(&self) -> Vec<(ActivationKind, Option<EventBatch>)> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    impl ActivationTracker for RepositoryRuleActivationTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key
+                .downcast_ref::<HostPureModuleExtensionInvocationsKey>()
+                .is_some()
+            {
+                self.0.lock().unwrap().push((
+                    activation.kind(),
+                    activation
+                        .evaluation_data()
+                        .and_then(|data| data.downcast_ref::<EventBatch>())
+                        .map(Dupe::dupe),
+                ));
+            }
+        }
+    }
+
+    async fn repository_rule_transaction(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+        tracker: Option<Arc<RepositoryRuleActivationTracker>>,
+    ) -> dice::DiceTransaction {
+        let workspace = NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap();
+        let mut user_data = UserComputationData {
+            cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
+            activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(SortedMap::from_iter([
+                        (
+                            workspace.as_path().join("MODULE.bazel"),
+                            WorkspaceFileValue::Present(Arc::new(module_source.to_owned())),
+                        ),
+                        (
+                            workspace.as_path().join("ext.bzl"),
+                            if extension_present {
+                                WorkspaceFileValue::Present(Arc::new(extension_source.to_owned()))
+                            } else {
+                                WorkspaceFileValue::Absent
+                            },
+                        ),
+                        (
+                            workspace.as_path().join("BUILD.bazel"),
+                            WorkspaceFileValue::Present(Arc::new(String::new())),
+                        ),
+                    ])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel.lock"),
+                        WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        slug_bzlmod_v2::inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        slug_bzlmod_v2::inject_registry_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            RegistryUrls::new(["https://registry.invalid"]),
+            RegistryRequestGeneration(1),
+        )
+        .unwrap();
+        slug_bzlmod_v2::inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                workspace.dupe(),
+                Arc::from([workspace.dupe()]),
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+            )])
+            .unwrap();
+        let observations = ["/", REPO_RULE_WORKSPACE]
+            .into_iter()
+            .enumerate()
+            .map(|(index, path)| {
+                (
+                    PathObservationDemand::new(
+                        PathObservationNamespace::Host,
+                        NormalizedAbsolutePath::new(path).unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                        PathNodeKind::Directory,
+                        index as i64 + 1,
+                        1,
+                        1,
+                        1,
+                        0o755,
+                    ))),
+                )
+            })
+            .chain(
+                ["REPO.bazel", ".bazelignore", "BUILD"]
+                    .into_iter()
+                    .map(|name| {
+                        (
+                            PathObservationDemand::new(
+                                PathObservationNamespace::Host,
+                                NormalizedAbsolutePath::new(format!(
+                                    "{REPO_RULE_WORKSPACE}/{name}"
+                                ))
+                                .unwrap(),
+                                PathObservationOperation::Lstat,
+                            ),
+                            PathObservationResult::Lstat(PathOperationResult::Missing),
+                        )
+                    }),
+            )
+            .chain(std::iter::once((
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/BUILD.bazel"))
+                        .unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::RegularFile,
+                    10,
+                    1,
+                    1,
+                    1,
+                    0o644,
+                ))),
+            )))
+            .chain(std::iter::once((
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/ext.bzl")).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(if extension_present {
+                    PathOperationResult::Present(PathLstat::new(
+                        PathNodeKind::RegularFile,
+                        11,
+                        1,
+                        1,
+                        1,
+                        0o644,
+                    ))
+                } else {
+                    PathOperationResult::Missing
+                }),
+            )))
+            .chain(std::iter::once((
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(format!("{REPO_RULE_WORKSPACE}/ext.bzl")).unwrap(),
+                    PathObservationOperation::FileBytes,
+                ),
+                PathObservationResult::FileBytes(if extension_present {
+                    PathOperationResult::Present(Arc::from(extension_source.as_bytes()))
+                } else {
+                    PathOperationResult::Missing
+                }),
+            )));
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new(observations).unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    async fn compute_repository_rule_case(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+        tracker: Option<Arc<RepositoryRuleActivationTracker>>,
+    ) -> HostPureModuleExtensionInvocationsOutcome {
+        repository_rule_transaction(
+            dice,
+            module_source,
+            extension_source,
+            extension_present,
+            tracker,
+        )
+        .await
+        .compute(&HostPureModuleExtensionInvocationsKey::new(
+            NormalizedAbsolutePath::new(REPO_RULE_WORKSPACE).unwrap(),
+        ))
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn real_repository_rule_calls_retain_order_prefix_and_reuse() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n";
+        let source =
+            |rule: &str, schema: &str, name: &str, first: &str, second: &str, value: &str| {
+                format!(
+                    "{rule}=repository_rule(lambda ctx: None, attrs={{'value':{schema}}})\n\
+             def impl(ctx):\n    {rule}(name='{name}', {first}='{value}', {second}=True)\n\
+             ext=module_extension(implementation=impl)\n"
+                )
+            };
+        let tracker = Arc::new(RepositoryRuleActivationTracker::default());
+        let a = compute_repository_rule_case(
+            &dice,
+            module,
+            &source("repo", "attr.string()", "one", "raw", "enabled", "A"),
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let warm = compute_repository_rule_case(
+            &dice,
+            module,
+            &source("repo", "attr.string()", "one", "raw", "enabled", "A"),
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(HostPureModuleExtensionInvocationsKey::equality(&a, &warm));
+        let activations = tracker.take();
+        assert!(
+            activations
+                .iter()
+                .any(|(kind, batch)| *kind == ActivationKind::Evaluated && batch.is_some())
+        );
+        assert!(
+            activations
+                .iter()
+                .any(|(kind, batch)| *kind == ActivationKind::Reused && batch.is_none())
+        );
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("repository-rule invocation must complete")
+        };
+        let calls = &a_value.as_ref().as_ref().unwrap().invoked[0].repository_rule_calls;
+        assert_eq!(
+            calls
+                .iter()
+                .map(|call| call.name.as_str())
+                .collect::<Vec<_>>(),
+            ["one"]
+        );
+        assert_eq!(
+            calls[0]
+                .kwargs
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["name", "raw", "enabled"]
+        );
+        for changed in [
+            source("other", "attr.string()", "one", "raw", "enabled", "A"),
+            source(
+                "repo",
+                "attr.string(mandatory=True)",
+                "one",
+                "raw",
+                "enabled",
+                "A",
+            ),
+            source("repo", "attr.string()", "renamed", "raw", "enabled", "A"),
+            source("repo", "attr.string()", "one", "enabled", "raw", "A"),
+            source("repo", "attr.string()", "one", "raw", "enabled", "B"),
+            source("repo", "attr.string()", "one", "raw", "enabled", "A")
+                .replace("    repo", "\n    repo"),
+        ] {
+            let b = compute_repository_rule_case(&dice, module, &changed, true, None).await;
+            assert!(!HostPureModuleExtensionInvocationsKey::equality(&a, &b));
+            let restored = compute_repository_rule_case(
+                &dice,
+                module,
+                &source("repo", "attr.string()", "one", "raw", "enabled", "A"),
+                true,
+                None,
+            )
+            .await;
+            assert!(HostPureModuleExtensionInvocationsKey::equality(
+                &a, &restored
+            ));
+        }
+
+        let missing = compute_repository_rule_case(
+            &dice,
+            module,
+            &source("repo", "attr.string()", "one", "raw", "enabled", "A"),
+            false,
+            None,
+        )
+        .await;
+        assert!(matches!(
+            missing,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostPureModuleExtensionInvocationsError::Prepared(_)))
+        ));
+    }
+
+    #[tokio::test]
+    async fn real_repository_rule_failure_retains_completed_and_current_prefixes() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nb=use_extension('//:ext.bzl','second')\n";
+        let source = "repo=repository_rule(lambda ctx: None)\n\
+            def first_impl(ctx):\n    repo(name='first')\n\
+            def second_impl(ctx):\n    repo(name='second')\n    fail('boom')\n\
+            first=module_extension(implementation=first_impl)\n\
+            second=module_extension(implementation=second_impl)\n";
+        let outcome = compute_repository_rule_case(&dice, module, source, true, None).await;
+        let SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("invocation failure is a complete terminal")
+        };
+        let Err(HostPureModuleExtensionInvocationsError::AfterPrepared {
+            completed,
+            current_calls,
+            error: HostPureModuleExtensionInvocationError::Invocation(_),
+            ..
+        }) = value.as_ref()
+        else {
+            panic!("expected invocation terminal: {value:?}")
+        };
+        assert_eq!(completed[0].repository_rule_calls[0].name, "first");
+        assert_eq!(current_calls[0].name, "second");
     }
 }
