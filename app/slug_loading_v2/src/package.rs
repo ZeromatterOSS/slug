@@ -17,7 +17,11 @@ use std::sync::Arc;
 
 use allocative::Allocative;
 use compact_str::CompactString;
+use slug_bzlmod_v2::NonrootAttributeValue;
+use slug_identity_v2::ApparentLabel;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
+use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use starlark::any::ProvidesStaticType;
 use starlark::environment::Globals;
@@ -2916,6 +2920,161 @@ pub(crate) struct ModuleExtensionTagAttribute {
     pub(crate) allow_single_file: Option<AllowSingleFile>,
 }
 
+pub(crate) type ModuleExtensionTagCoercionError = CompactString;
+
+fn module_extension_label(
+    raw: &str,
+    context_repo: &CanonicalRepoName,
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+) -> Result<CanonicalLabel, ModuleExtensionTagCoercionError> {
+    let apparent = ApparentLabel::parse(raw).map_err(CompactString::from)?;
+    let repository = if apparent.repo().is_root() {
+        context_repo
+    } else {
+        mapping.get(apparent.repo()).ok_or_else(|| {
+            CompactString::from(format!(
+                "no repository visible as '@{}'",
+                apparent.repo().as_str()
+            ))
+        })?
+    };
+    let canonical = if repository.is_root() {
+        format!("@@//{}:{}", apparent.package(), apparent.target())
+    } else {
+        format!(
+            "@@{}//{}:{}",
+            repository.as_str(),
+            apparent.package(),
+            apparent.target()
+        )
+    };
+    CanonicalLabel::parse(&canonical).map_err(CompactString::from)
+}
+
+fn coerce_module_extension_scalar(
+    kind: AttributeKind,
+    raw: &NonrootAttributeValue,
+    context_repo: &CanonicalRepoName,
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+) -> Result<CoercedAttributeValue, ModuleExtensionTagCoercionError> {
+    match (kind, raw) {
+        (AttributeKind::String, NonrootAttributeValue::String(value)) => {
+            Ok(CoercedAttributeValue::String(value.clone()))
+        }
+        (AttributeKind::Boolean, NonrootAttributeValue::Bool(value)) => {
+            Ok(CoercedAttributeValue::Boolean(*value))
+        }
+        (AttributeKind::Integer, NonrootAttributeValue::Int(value)) => value
+            .as_i32()
+            .map(CoercedAttributeValue::Integer)
+            .ok_or_else(|| CompactString::from("integer is outside i32")),
+        (
+            AttributeKind::Label,
+            NonrootAttributeValue::String(value) | NonrootAttributeValue::Label(value),
+        ) => module_extension_label(value, context_repo, mapping).map(CoercedAttributeValue::Label),
+        _ => Err(format!("unsupported value for module-extension {kind:?} attribute").into()),
+    }
+}
+
+fn module_extension_intrinsic_default(kind: AttributeKind) -> CoercedAttributeValue {
+    match kind {
+        AttributeKind::String => CoercedAttributeValue::String(CompactString::new("")),
+        AttributeKind::Boolean => CoercedAttributeValue::Boolean(false),
+        AttributeKind::Integer => CoercedAttributeValue::Integer(0),
+        AttributeKind::Label => CoercedAttributeValue::None,
+        _ => unreachable!("caller validates the admitted scalar kind"),
+    }
+}
+
+fn module_extension_default_matches(kind: AttributeKind, value: &CoercedAttributeValue) -> bool {
+    matches!(
+        (kind, value),
+        (AttributeKind::String, CoercedAttributeValue::String(_))
+            | (AttributeKind::Boolean, CoercedAttributeValue::Boolean(_))
+            | (AttributeKind::Integer, CoercedAttributeValue::Integer(_))
+            | (
+                AttributeKind::Label,
+                CoercedAttributeValue::Label(_) | CoercedAttributeValue::None
+            )
+    )
+}
+
+pub(crate) fn prepare_module_extension_tag_attributes(
+    schema: &[ModuleExtensionTagAttribute],
+    raw: &SmallMap<CompactString, NonrootAttributeValue>,
+    context_repo: &CanonicalRepoName,
+    mapping: &SmallMap<ApparentRepoName, CanonicalRepoName>,
+) -> Result<Arc<[(CompactString, CoercedAttributeValue)]>, ModuleExtensionTagCoercionError> {
+    validate_module_extension_tag_schema(schema)?;
+    let mut supplied = SmallMap::new();
+    for (name, raw) in raw {
+        if matches!(raw, NonrootAttributeValue::None) {
+            continue;
+        }
+        let attribute = schema
+            .iter()
+            .find(|attribute| attribute.name == *name)
+            .ok_or_else(|| CompactString::from(format!("unknown attribute '{name}'")))?;
+        supplied.insert(
+            name.clone(),
+            coerce_module_extension_scalar(attribute.kind, raw, context_repo, mapping)?,
+        );
+    }
+    schema
+        .iter()
+        .map(|attribute| {
+            let value = if let Some(value) = supplied.get(&attribute.name) {
+                value.clone()
+            } else if attribute.mandatory {
+                return Err(format!(
+                    "mandatory attribute '{}' isn't being specified",
+                    attribute.name
+                )
+                .into());
+            } else {
+                attribute
+                    .default
+                    .clone()
+                    .unwrap_or_else(|| module_extension_intrinsic_default(attribute.kind))
+            };
+            if let CoercedAttributeValue::Label(label) = &value {
+                let repo = label.package().repo();
+                if repo != context_repo && !mapping.values().any(|visible| visible == repo) {
+                    return Err(
+                        format!("no repository visible as '{}': default label", repo).into(),
+                    );
+                }
+            }
+            Ok((attribute.name.clone(), value))
+        })
+        .collect::<Result<Arc<_>, _>>()
+}
+
+pub(crate) fn validate_module_extension_tag_schema(
+    schema: &[ModuleExtensionTagAttribute],
+) -> Result<(), ModuleExtensionTagCoercionError> {
+    for attribute in schema {
+        if !matches!(
+            attribute.kind,
+            AttributeKind::String
+                | AttributeKind::Boolean
+                | AttributeKind::Integer
+                | AttributeKind::Label
+        ) || attribute
+            .default
+            .as_ref()
+            .is_some_and(|value| !module_extension_default_matches(attribute.kind, value))
+        {
+            return Err(format!(
+                "unsupported module-extension attribute schema '{}': {:?}",
+                attribute.name, attribute.kind
+            )
+            .into());
+        }
+    }
+    Ok(())
+}
+
 #[derive(
     Debug,
     Clone,
@@ -4453,6 +4612,7 @@ pub(crate) fn loading_globals() -> Globals {
 
 #[cfg(test)]
 mod module_extension_definition_tests {
+    use slug_bzlmod_v2::NonrootAttributeInt;
     use starlark::environment::Module;
     use starlark::syntax::AstModule;
     use starlark::syntax::Dialect;
@@ -4481,6 +4641,259 @@ mod module_extension_definition_tests {
             .downcast::<FrozenModuleExtensionDefinition>()
             .unwrap()
             .projection()
+    }
+
+    fn tag_attribute(
+        name: &str,
+        kind: AttributeKind,
+        mandatory: bool,
+        default: Option<CoercedAttributeValue>,
+    ) -> ModuleExtensionTagAttribute {
+        ModuleExtensionTagAttribute {
+            name: name.into(),
+            kind,
+            mandatory,
+            configurable: true,
+            default,
+            allow_single_file: None,
+        }
+    }
+
+    fn root_context() -> (
+        CanonicalRepoName,
+        SmallMap<ApparentRepoName, CanonicalRepoName>,
+    ) {
+        (
+            CanonicalRepoName::root(),
+            SmallMap::from_iter([(
+                ApparentRepoName::new("dep").unwrap(),
+                CanonicalRepoName::new("dep+").unwrap(),
+            )]),
+        )
+    }
+
+    #[test]
+    fn prepared_tag_scalar_matrix_defaults_and_label_mapping() {
+        let schema = [
+            tag_attribute("text", AttributeKind::String, false, None),
+            tag_attribute("flag", AttributeKind::Boolean, false, None),
+            tag_attribute("count", AttributeKind::Integer, false, None),
+            tag_attribute("target", AttributeKind::Label, false, None),
+        ];
+        let raw = SmallMap::from_iter([
+            (
+                CompactString::from("text"),
+                NonrootAttributeValue::String("value".into()),
+            ),
+            (
+                CompactString::from("flag"),
+                NonrootAttributeValue::Bool(true),
+            ),
+            (
+                CompactString::from("count"),
+                NonrootAttributeValue::Int(NonrootAttributeInt::from_decimal("7").unwrap()),
+            ),
+            (
+                CompactString::from("target"),
+                NonrootAttributeValue::Label("@dep//pkg:item".into()),
+            ),
+        ]);
+        let (context, mapping) = root_context();
+        let prepared =
+            prepare_module_extension_tag_attributes(&schema, &raw, &context, &mapping).unwrap();
+        assert_eq!(prepared[0].1, CoercedAttributeValue::String("value".into()));
+        assert_eq!(prepared[1].1, CoercedAttributeValue::Boolean(true));
+        assert_eq!(prepared[2].1, CoercedAttributeValue::Integer(7));
+        assert_eq!(
+            prepared[3].1,
+            CoercedAttributeValue::Label(CanonicalLabel::parse("@@dep+//pkg:item").unwrap())
+        );
+
+        let omitted =
+            SmallMap::from_iter([(CompactString::from("text"), NonrootAttributeValue::None)]);
+        let defaults =
+            prepare_module_extension_tag_attributes(&schema, &omitted, &context, &mapping).unwrap();
+        assert_eq!(defaults[0].1, CoercedAttributeValue::String("".into()));
+        assert_eq!(defaults[1].1, CoercedAttributeValue::Boolean(false));
+        assert_eq!(defaults[2].1, CoercedAttributeValue::Integer(0));
+        assert_eq!(defaults[3].1, CoercedAttributeValue::None);
+    }
+
+    #[test]
+    fn prepared_tag_preserves_supplied_then_schema_error_order() {
+        let schema = [
+            tag_attribute("first", AttributeKind::String, true, None),
+            tag_attribute("second", AttributeKind::Boolean, true, None),
+        ];
+        let (context, mapping) = root_context();
+        let unknown_first = SmallMap::from_iter([
+            (
+                CompactString::from("unknown"),
+                NonrootAttributeValue::String("x".into()),
+            ),
+            (
+                CompactString::from("first"),
+                NonrootAttributeValue::Bool(true),
+            ),
+        ]);
+        assert_eq!(
+            prepare_module_extension_tag_attributes(&schema, &unknown_first, &context, &mapping,)
+                .unwrap_err()
+                .to_string(),
+            "unknown attribute 'unknown'"
+        );
+        let type_first = SmallMap::from_iter([
+            (
+                CompactString::from("first"),
+                NonrootAttributeValue::Bool(true),
+            ),
+            (
+                CompactString::from("unknown"),
+                NonrootAttributeValue::String("x".into()),
+            ),
+        ]);
+        assert!(
+            prepare_module_extension_tag_attributes(&schema, &type_first, &context, &mapping)
+                .unwrap_err()
+                .to_string()
+                .contains("String")
+        );
+        assert_eq!(
+            prepare_module_extension_tag_attributes(&schema, &SmallMap::new(), &context, &mapping,)
+                .unwrap_err()
+                .to_string(),
+            "mandatory attribute 'first' isn't being specified"
+        );
+        let invisible = SmallMap::from_iter([(
+            CompactString::from("target"),
+            NonrootAttributeValue::String("@missing//:x".into()),
+        )]);
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute("target", AttributeKind::Label, false, None)],
+                &invisible,
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .to_string()
+            .contains("no repository visible")
+        );
+
+        let visible_default = [tag_attribute(
+            "target",
+            AttributeKind::Label,
+            false,
+            Some(CoercedAttributeValue::Label(
+                CanonicalLabel::parse("@@dep+//:default").unwrap(),
+            )),
+        )];
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &visible_default,
+                &SmallMap::new(),
+                &context,
+                &mapping,
+            )
+            .is_ok()
+        );
+        let invisible_default = [
+            tag_attribute("first", AttributeKind::String, true, None),
+            tag_attribute(
+                "target",
+                AttributeKind::Label,
+                false,
+                Some(CoercedAttributeValue::Label(
+                    CanonicalLabel::parse("@@missing+//:default").unwrap(),
+                )),
+            ),
+        ];
+        assert_eq!(
+            prepare_module_extension_tag_attributes(
+                &invisible_default,
+                &SmallMap::new(),
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .as_str(),
+            "mandatory attribute 'first' isn't being specified"
+        );
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &invisible_default,
+                &SmallMap::from_iter([(
+                    CompactString::from("first"),
+                    NonrootAttributeValue::String("set".into()),
+                )]),
+                &context,
+                &mapping,
+            )
+            .unwrap_err()
+            .contains("missing+")
+        );
+    }
+
+    #[test]
+    fn prepared_tag_fails_closed_on_every_deferred_family() {
+        let (context, mapping) = root_context();
+        for kind in [
+            AttributeKind::LabelList,
+            AttributeKind::StringKeyedLabelDict,
+            AttributeKind::LabelKeyedStringDict,
+            AttributeKind::LabelListDict,
+            AttributeKind::Output,
+            AttributeKind::OutputList,
+            AttributeKind::StringList,
+            AttributeKind::StringListDict,
+            AttributeKind::StringDict,
+        ] {
+            assert!(
+                prepare_module_extension_tag_attributes(
+                    &[tag_attribute("value", kind, false, None)],
+                    &SmallMap::new(),
+                    &context,
+                    &mapping,
+                )
+                .is_err(),
+                "unexpected admitted kind: {kind:?}"
+            );
+        }
+        let deferred = [
+            NonrootAttributeValue::List(Arc::from([])),
+            NonrootAttributeValue::Tuple(Arc::from([])),
+            NonrootAttributeValue::Dict(Arc::new(SmallMap::new())),
+            NonrootAttributeValue::Int(NonrootAttributeInt::from_decimal("2147483648").unwrap()),
+            NonrootAttributeValue::Float314,
+            NonrootAttributeValue::BuiltinPrint,
+            NonrootAttributeValue::ExtensionProxy,
+            NonrootAttributeValue::SelfList,
+        ];
+        for value in deferred {
+            assert!(
+                prepare_module_extension_tag_attributes(
+                    &[tag_attribute("value", AttributeKind::String, false, None)],
+                    &SmallMap::from_iter([(CompactString::from("value"), value)]),
+                    &context,
+                    &mapping,
+                )
+                .is_err()
+            );
+        }
+        assert!(
+            prepare_module_extension_tag_attributes(
+                &[tag_attribute(
+                    "value",
+                    AttributeKind::String,
+                    false,
+                    Some(CoercedAttributeValue::Boolean(false)),
+                )],
+                &SmallMap::new(),
+                &context,
+                &mapping,
+            )
+            .is_err()
+        );
     }
 
     #[test]

@@ -2263,3 +2263,46 @@ invoked accepted loader keeps its normal event behavior. No
 callable, `module_ctx`, execution, I/O, generated repository, lockfile,
 materializer, consumer, second loader/evaluator, Bzlmod mutation, or Rust edit
 is authorized before independent design acceptance.
+
+### Evaluation-input composition implementation activated (2026-08-12)
+
+Independent review accepts the bounded loading composition: selected raw
+inputs precede definition loading; exact request identity joins the aggregates;
+the scalar String/Bool/i32/Label matrix and two-phase Bazel error order are
+frozen; every container/output/deferred family fails closed. Run only
+`WP-4-5-host-module-extension-evaluation-input-composition-implementation` in
+`bzl_module.rs` and `package.rs`, under 420 production/700 test/1,120 total
+lines against `aee502ff`. Preserve every event, equality, proof, and terminal
+stop; obtain independent implementation review.
+
+### Evaluation-input composition accepted; pure invocation design active (2026-08-12)
+
+Independent review accepts the loading-owned composition at 414 production,
+529 test, and 943 total lines against `aee502ff`. Raw selected inputs precede
+the sole definition loader; exact request identity joins the aggregates; the
+String/Bool/i32/Label scalar matrix follows supplied-map then declaration-order
+error semantics, including canonical-default visibility; every terminal keeps
+complete predecessor/request identity. Full loading tests, the protected
+Bzlmod suite, format/diff/scope/cleanup checks, and two independent reviews
+pass. No callable, runtime context, execution, I/O, or generated repository is
+retained or activated.
+
+Run next only the docs-only
+`WP-4-5-host-pure-module-extension-invocation-owner-design`. Audit one
+loading-owned leaf that prepares inputs first, reacquires the exact export
+through the sole Host bzl loader, constructs ephemeral read-only root module/
+tag/context values, invokes only an empty-factor implementation, and requires
+strict `None` with no repository-rule call or generated output. Retained DICE
+state must remain heap-independent. Canonical/current/Stage 4/Stage 5 are the
+only authorized files under 45/260/240/220/765 caps. No Rust or fixture is
+authorized before independent design acceptance.
+
+The design audit must freeze the actual Bazel 9.2 callable ABI rather than a
+generic read-only context: only `ctx.modules`, `ctx.is_dev_dependency(tag)`,
+and `ctx.tag_sort_key(tag)` are admitted; module name/version/is_root/tags and
+declared scalar tag fields are immutable; dev is method-only and location is
+debug/error-only. Every repository, external-context, facts, metadata,
+isolation, and unowned root-usage member fails closed. Loader events stay with
+the Host-bzl key; invocation print/throw prefixes belong to and replay from the
+invocation key, while its semantic receipt stores no event batch or Starlark
+lifetime state.

@@ -36,6 +36,11 @@ use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequest;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequests;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsError;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionLoadRequestsKey;
+use slug_bzlmod_v2::HostSelectedExtensionEvaluationInput;
+use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequests;
+use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsError;
+use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsKey;
+use slug_bzlmod_v2::LogicalSpan;
 use slug_bzlmod_v2::RepositoryPackageSourceError;
 use slug_bzlmod_v2::RepositoryPackageSourceKey;
 use slug_bzlmod_v2::RepositorySourceFileError;
@@ -96,9 +101,12 @@ use crate::package::HostGlobAttemptControl;
 use crate::package::HostGlobAttemptError;
 use crate::package::LoadedPackage;
 use crate::package::ModuleExtensionDefinitionProjection;
+use crate::package::ModuleExtensionTagCoercionError;
 use crate::package::PackageRecorder;
 use crate::package::PackageTargetKind;
 use crate::package::loading_globals;
+use crate::package::prepare_module_extension_tag_attributes;
+use crate::package::validate_module_extension_tag_schema;
 use crate::provider::BzlEvaluationContext;
 use crate::visibility::RuleVisibility;
 use crate::visibility::VisibilitySource;
@@ -2054,6 +2062,253 @@ impl Key for HostLoadedModuleExtensionDefinitionsKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct PreparedModuleExtensionTag {
+    pub(crate) tag_class: CompactString,
+    pub(crate) attributes: Arc<[(CompactString, crate::attrs::CoercedAttributeValue)]>,
+    pub(crate) dev_dependency: bool,
+    pub(crate) location: LogicalSpan,
+    pub(crate) module_index: usize,
+    pub(crate) tag_index: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct PreparedModuleExtensionInput {
+    pub(crate) input: HostSelectedExtensionEvaluationInput,
+    pub(crate) tags: Arc<[PreparedModuleExtensionTag]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct HostPreparedModuleExtensionInputs {
+    pub(crate) raw: Arc<HostSelectedExtensionEvaluationInputRequests>,
+    pub(crate) definitions: Arc<HostLoadedModuleExtensionDefinitions>,
+    pub(crate) inputs: Arc<[PreparedModuleExtensionInput]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+#[allow(dead_code)]
+pub(crate) enum HostPreparedModuleExtensionInputsError {
+    Raw(HostSelectedExtensionEvaluationInputRequestsError),
+    RawCompute(CompactString),
+    Definitions {
+        raw: Arc<HostSelectedExtensionEvaluationInputRequests>,
+        error: Result<HostLoadedModuleExtensionDefinitionsError, CompactString>,
+    },
+    AfterInputs {
+        raw: Arc<HostSelectedExtensionEvaluationInputRequests>,
+        definitions: Arc<HostLoadedModuleExtensionDefinitions>,
+        request: Option<HostSelectedExtensionDefinitionLoadRequest>,
+        error: HostPreparedModuleExtensionInputError,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostPreparedModuleExtensionInputError {
+    Join(CompactString),
+    UnknownTagClass(CompactString),
+    Attribute(ModuleExtensionTagCoercionError),
+}
+
+fn prepare_module_extension_inputs(
+    raw: Arc<HostSelectedExtensionEvaluationInputRequests>,
+    definitions: Arc<HostLoadedModuleExtensionDefinitions>,
+) -> Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError> {
+    let after = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>, error| {
+        HostPreparedModuleExtensionInputsError::AfterInputs {
+            raw: raw.clone(),
+            definitions: definitions.clone(),
+            request: request.cloned(),
+            error,
+        }
+    };
+    if definitions.requests.as_ref() != raw.parts().0 {
+        return Err(after(
+            None,
+            HostPreparedModuleExtensionInputError::Join(
+                "definition and raw-input request aggregates differ".into(),
+            ),
+        ));
+    }
+    let raw_inputs = raw.parts().1;
+    if raw_inputs.len() != definitions.definitions.len() {
+        return Err(after(
+            None,
+            HostPreparedModuleExtensionInputError::Join(
+                "definition and raw-input counts differ".into(),
+            ),
+        ));
+    }
+    let mut inputs = Vec::with_capacity(raw_inputs.len());
+    for (input, loaded) in raw_inputs.iter().zip(definitions.definitions.iter()) {
+        let (request, _, _, _, _, tags) = input.parts();
+        if request != &loaded.request {
+            return Err(after(
+                Some(request),
+                HostPreparedModuleExtensionInputError::Join(
+                    "definition and raw-input request order differs".into(),
+                ),
+            ));
+        }
+        for (_, schema) in loaded.definition.tag_classes.iter() {
+            validate_module_extension_tag_schema(schema).map_err(|error| {
+                after(
+                    Some(request),
+                    HostPreparedModuleExtensionInputError::Attribute(error),
+                )
+            })?;
+        }
+        let (_, _, context_repo, mapping) = request.parts();
+        let mut prepared_tags = Vec::with_capacity(tags.len());
+        for (tag_index, tag) in tags.iter().enumerate() {
+            let schema = loaded
+                .definition
+                .tag_classes
+                .iter()
+                .find_map(|(name, schema)| (name == &tag.tag_class).then_some(schema.as_ref()))
+                .ok_or_else(|| {
+                    after(
+                        Some(request),
+                        HostPreparedModuleExtensionInputError::UnknownTagClass(
+                            tag.tag_class.clone(),
+                        ),
+                    )
+                })?;
+            let attributes = prepare_module_extension_tag_attributes(
+                schema,
+                &tag.attributes,
+                context_repo,
+                mapping,
+            )
+            .map_err(|error| {
+                after(
+                    Some(request),
+                    HostPreparedModuleExtensionInputError::Attribute(error),
+                )
+            })?;
+            prepared_tags.push(PreparedModuleExtensionTag {
+                tag_class: tag.tag_class.clone(),
+                attributes,
+                dev_dependency: tag.dev_dependency,
+                location: tag.location.clone(),
+                module_index: 0,
+                tag_index,
+            });
+        }
+        inputs.push(PreparedModuleExtensionInput {
+            input: input.clone(),
+            tags: prepared_tags.into(),
+        });
+    }
+    Ok(HostPreparedModuleExtensionInputs {
+        raw,
+        definitions,
+        inputs: inputs.into(),
+    })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct HostPreparedModuleExtensionInputsKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostPreparedModuleExtensionInputsKey {
+    #[allow(dead_code)]
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostPreparedModuleExtensionInputsKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-prepared-module-extension-inputs:{}",
+            self.workspace
+        )
+    }
+}
+
+type HostPreparedModuleExtensionInputsOutcome = SourcePreparationOutcome<
+    Arc<Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>>,
+>;
+
+fn prepared_module_extension_inputs_complete(
+    value: Result<HostPreparedModuleExtensionInputs, HostPreparedModuleExtensionInputsError>,
+) -> HostPreparedModuleExtensionInputsOutcome {
+    SourcePreparationOutcome::Complete(Arc::new(value))
+}
+
+#[async_trait]
+impl Key for HostPreparedModuleExtensionInputsKey {
+    type Value = HostPreparedModuleExtensionInputsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let raw = match ctx
+            .compute(&HostSelectedExtensionEvaluationInputRequestsKey::new(
+                self.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(value) => Arc::new(value.clone()),
+                Err(error) => {
+                    return prepared_module_extension_inputs_complete(Err(
+                        HostPreparedModuleExtensionInputsError::Raw(error.clone()),
+                    ));
+                }
+            },
+            Err(error) => {
+                return prepared_module_extension_inputs_complete(Err(
+                    HostPreparedModuleExtensionInputsError::RawCompute(error.to_string().into()),
+                ));
+            }
+        };
+        let definitions = match ctx
+            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+                self.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(value) => Arc::new(value.clone()),
+                Err(error) => {
+                    return prepared_module_extension_inputs_complete(Err(
+                        HostPreparedModuleExtensionInputsError::Definitions {
+                            raw,
+                            error: Ok(error.clone()),
+                        },
+                    ));
+                }
+            },
+            Err(error) => {
+                return prepared_module_extension_inputs_complete(Err(
+                    HostPreparedModuleExtensionInputsError::Definitions {
+                        raw,
+                        error: Err(error.to_string().into()),
+                    },
+                ));
+            }
+        };
+        prepared_module_extension_inputs_complete(prepare_module_extension_inputs(raw, definitions))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 fn external_bzl_complete(
     result: Result<FrozenBzlModule, ExternalBzlModuleError>,
 ) -> SourcePreparationOutcome<Arc<Result<FrozenBzlModule, ExternalBzlModuleError>>> {
@@ -3699,6 +3954,45 @@ mod module_extension_definition_loading_tests {
         child_present: bool,
         tracker: Option<Arc<BzlEventTracker>>,
     ) -> HostLoadedModuleExtensionDefinitionsOutcome {
+        case_transaction(
+            dice,
+            module_source,
+            extension_source,
+            child_source,
+            child_present,
+            tracker,
+        )
+        .await
+        .compute(&HostLoadedModuleExtensionDefinitionsKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        ))
+        .await
+        .unwrap()
+    }
+
+    async fn compute_prepared_case(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> HostPreparedModuleExtensionInputsOutcome {
+        case_transaction(dice, module_source, extension_source, "", true, tracker)
+            .await
+            .compute(&HostPreparedModuleExtensionInputsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn case_transaction(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        child_source: &str,
+        child_present: bool,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut user_data = UserComputationData {
             cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
@@ -3902,12 +4196,7 @@ mod module_extension_definition_loading_tests {
         updater
             .changed_to(vec![(PathObservationEpochKey, path_epoch)])
             .unwrap();
-        updater
-            .commit()
-            .await
-            .compute(&HostLoadedModuleExtensionDefinitionsKey::new(workspace))
-            .await
-            .unwrap()
+        updater.commit().await
     }
 
     fn source(environment: &str, facts: i32) -> String {
@@ -4121,6 +4410,247 @@ mod module_extension_definition_loading_tests {
                     )
             ));
         }
+    }
+
+    fn prepared_source(default: &str) -> String {
+        format!(
+            "print('extension')\n\
+             def implementation(ctx):\n    pass\n\
+             tag=tag_class(attrs={{\n\
+               'text':attr.string(default='{default}'),\n\
+               'flag':attr.bool(default=False),\n\
+               'count':attr.int(default=0),\n\
+               'target':attr.label(),\n\
+             }})\n\
+             ext=module_extension(implementation=implementation,tag_classes={{'tag':tag}})\n"
+        )
+    }
+
+    fn prepared_module(text: Option<&str>) -> String {
+        let text = text
+            .map(|text| format!(",text='{text}'"))
+            .unwrap_or_default();
+        format!(
+            "module(name='bazel_tools')\n\
+             e=use_extension('//:ext.bzl','ext')\n\
+             e.tag(flag=True,count=7,target='//:item'{text})\n\
+             e.tag(flag=False,count=8,target='//:second',text='second')\n"
+        )
+    }
+
+    #[tokio::test]
+    async fn real_prepared_inputs_order_type_default_restore_and_event_boundary() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let a = compute_prepared_case(
+            &dice,
+            &prepared_module(Some("A")),
+            &prepared_source("default-a"),
+            Some(tracker.clone()),
+        )
+        .await;
+        let warm = compute_prepared_case(
+            &dice,
+            &prepared_module(Some("A")),
+            &prepared_source("default-a"),
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(HostPreparedModuleExtensionInputsKey::validity(&a), "{a:?}");
+        assert!(HostPreparedModuleExtensionInputsKey::equality(&a, &warm));
+        let SourcePreparationOutcome::Complete(value) = &a else {
+            panic!("prepared input must complete")
+        };
+        let value = value.as_ref().as_ref().unwrap();
+        assert_eq!(value.inputs.len(), 1);
+        let tags = &value.inputs[0].tags;
+        assert_eq!(tags.len(), 2);
+        assert_eq!(tags[0].module_index, 0);
+        assert_eq!(tags[0].tag_index, 0);
+        assert_eq!(tags[1].tag_index, 1);
+        assert_eq!(tags[0].attributes[0].0, "text");
+        assert_eq!(
+            tags[0].attributes[0].1,
+            crate::attrs::CoercedAttributeValue::String("A".into())
+        );
+        assert!(matches!(
+            &tags[0].attributes[3].1,
+            crate::attrs::CoercedAttributeValue::Label(label)
+                if label == &CanonicalLabel::parse("@@//:item").unwrap()
+        ));
+        let activations = tracker.take();
+        assert!(activations.iter().any(|event| {
+            event.label.target().as_str() == "ext.bzl"
+                && event.kind == ActivationKind::Evaluated
+                && event.batch.is_some()
+        }));
+        let changed = compute_prepared_case(
+            &dice,
+            &prepared_module(Some("B")),
+            &prepared_source("default-a"),
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(tracker.take().iter().any(|event| {
+            event.label.target().as_str() == "ext.bzl" && event.kind == ActivationKind::Reused
+        }));
+        let restored = compute_prepared_case(
+            &dice,
+            &prepared_module(Some("A")),
+            &prepared_source("default-a"),
+            None,
+        )
+        .await;
+        assert!(!HostPreparedModuleExtensionInputsKey::equality(
+            &a, &changed
+        ));
+        assert!(HostPreparedModuleExtensionInputsKey::equality(
+            &a, &restored
+        ));
+
+        let dev_module = prepared_module(Some("A")).replace(
+            "use_extension('//:ext.bzl','ext')",
+            "use_extension('//:ext.bzl','ext',dev_dependency=True)",
+        );
+        let dev =
+            compute_prepared_case(&dice, &dev_module, &prepared_source("default-a"), None).await;
+        let shifted = compute_prepared_case(
+            &dice,
+            &format!("\n{}", prepared_module(Some("A"))),
+            &prepared_source("default-a"),
+            None,
+        )
+        .await;
+        assert!(!HostPreparedModuleExtensionInputsKey::equality(&a, &dev));
+        assert!(!HostPreparedModuleExtensionInputsKey::equality(
+            &a, &shifted
+        ));
+        let SourcePreparationOutcome::Complete(dev) = dev else {
+            panic!("dev input completes")
+        };
+        assert!(dev.as_ref().as_ref().unwrap().inputs[0].tags[0].dev_dependency);
+        let SourcePreparationOutcome::Complete(shifted) = shifted else {
+            panic!("shifted input completes")
+        };
+        assert_ne!(
+            value.inputs[0].tags[0].location,
+            shifted.as_ref().as_ref().unwrap().inputs[0].tags[0].location
+        );
+
+        let default_a = compute_prepared_case(
+            &dice,
+            &prepared_module(None),
+            &prepared_source("default-a"),
+            None,
+        )
+        .await;
+        let default_b = compute_prepared_case(
+            &dice,
+            &prepared_module(None),
+            &prepared_source("default-b"),
+            None,
+        )
+        .await;
+        let default_restored = compute_prepared_case(
+            &dice,
+            &prepared_module(None),
+            &prepared_source("default-a"),
+            None,
+        )
+        .await;
+        assert!(!HostPreparedModuleExtensionInputsKey::equality(
+            &default_a, &default_b
+        ));
+        assert!(HostPreparedModuleExtensionInputsKey::equality(
+            &default_a,
+            &default_restored
+        ));
+    }
+
+    #[tokio::test]
+    async fn real_prepared_inputs_preserve_raw_first_and_contextual_errors() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let raw_error = compute_prepared_case(
+            &dice,
+            "module(",
+            &prepared_source("default"),
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(matches!(
+            raw_error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Err(HostPreparedModuleExtensionInputsError::Raw(_)))
+        ));
+        assert!(tracker.take().is_empty());
+
+        let raw_need = compute_prepared_case(
+            &dice,
+            "module(name='bazel_tools')\n\
+             bazel_dep(name='dep',version='1.0')\n\
+             local_path_override(module_name='dep',path='dep')\n\
+             e=use_extension('//:ext.bzl','ext')\n",
+            &prepared_source("default"),
+            Some(tracker.clone()),
+        )
+        .await;
+        assert!(matches!(raw_need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostPreparedModuleExtensionInputsKey::validity(&raw_need));
+        assert!(!HostPreparedModuleExtensionInputsKey::equality(
+            &raw_need, &raw_need
+        ));
+        assert!(tracker.take().is_empty());
+
+        let definition_error =
+            compute_prepared_case(&dice, &prepared_module(Some("A")), "ext=1\n", None).await;
+        assert!(matches!(
+            definition_error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostPreparedModuleExtensionInputsError::Definitions { .. })
+                )
+        ));
+        let unknown_tag = compute_prepared_case(
+            &dice,
+            &prepared_module(Some("A")),
+            "def implementation(ctx):\n    pass\next=module_extension(implementation=implementation)\n",
+            None,
+        )
+        .await;
+        assert!(matches!(
+            unknown_tag,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostPreparedModuleExtensionInputsError::AfterInputs {
+                        request: Some(_),
+                        error: HostPreparedModuleExtensionInputError::UnknownTagClass(_),
+                        ..
+                    })
+                )
+        ));
+        let unused_deferred_schema = compute_prepared_case(
+            &dice,
+            "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n",
+            "def implementation(ctx):\n    pass\n\
+             tag=tag_class(attrs={'values':attr.string_list()})\n\
+             ext=module_extension(implementation=implementation,tag_classes={'tag':tag})\n",
+            None,
+        )
+        .await;
+        assert!(matches!(
+            unused_deferred_schema,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostPreparedModuleExtensionInputsError::AfterInputs {
+                        error: HostPreparedModuleExtensionInputError::Attribute(_),
+                        ..
+                    })
+                )
+        ));
     }
 }
 

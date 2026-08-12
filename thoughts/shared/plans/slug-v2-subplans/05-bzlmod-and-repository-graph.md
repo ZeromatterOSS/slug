@@ -2418,3 +2418,36 @@ owns no schema coercion, callable, `module_ctx`, execution, or consumer. The
 audit may consume this accepted hidden key from loading but may not mutate
 Bzlmod, introduce another raw owner, or authorize Rust before independent
 design acceptance.
+
+### Loading composition implementation activated (2026-08-12)
+
+Commit `aee502ff` records independent acceptance of the cross-stage scalar
+composition design. Run only
+`WP-4-5-host-module-extension-evaluation-input-composition-implementation` in
+`app/slug_loading_v2/src/bzl_module.rs` and
+`app/slug_loading_v2/src/package.rs`, plus canonical/current/Stage 4/Stage 5
+bookkeeping, under 420 production/700 test/1,120 total lines against
+`aee502ff`. Stage 5 remains unchanged. Preserve every accepted proof and stop;
+no Bzlmod mutation, second raw owner, callable, `module_ctx`, execution, I/O,
+generated repository, lockfile, materializer, consumer, or JVM/Java breadth is
+authorized.
+
+### Loading composition accepted; pure invocation audit scheduled (2026-08-12)
+
+The cross-stage composition owner is independently accepted at 414 production,
+529 test, and 943 total lines against `aee502ff`. It consumes the accepted
+Stage 5 raw projection without mutating Bzlmod, preserves complete selected
+request/module/tag/mapping identity, and leaves callable reacquisition,
+runtime context, invocation, repository rules, generated repositories,
+lockfiles, materialization, and consumers absent.
+
+Run next only the docs-only
+`WP-4-5-host-pure-module-extension-invocation-owner-design` in canonical,
+current, Stage 4, and this Stage 5 plan under 45/260/240/220/765 caps. Audit the
+strict root-main singleton, ordinary nonisolated, empty-factor, read-only
+context, `None`-returning invocation seam. Stage 5 production and public
+surfaces remain unchanged. `REPLAN` on Bzlmod mutation/reverse dependency, a
+second selected-input owner, environment/facts observation, repository rules,
+generated outputs, retained Starlark heap/callable, or any loading consumer
+breadth beyond the callerless receipt. No Rust or fixture is authorized before
+independent design acceptance.
