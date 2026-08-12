@@ -2039,3 +2039,19 @@ Run next only
 API, predecessor mutation, another graph/route/usage owner, extension
 evaluation or existence validation, I/O/materializer/loading/consumer edge,
 or JVM/Java work. Obtain fresh independent implementation review.
+
+### Selected extension mapping implementation REPLAN (2026-08-12)
+
+The first implementation audit stopped before Rust. R2 incorrectly said root
+override/inject targets resolve through the deps-only root mapping. Pinned
+Bazel 9.2 first constructs the root's full mapping from all selected extension
+imports with an empty override table, resolves override targets through that
+mapping, and only then substitutes resolved targets into final mappings. The
+checked-in root fixture proves the distinction because the `replacement`
+target is imported from an innate extension.
+
+Run next only the docs-only
+`WP-5-host-selected-extension-mapping-owner-design-r3-correction`. Freeze the
+two-phase no-overrides/resolve/final mapping algorithm, its error order and
+proof, and revalidate the one-file caps/stops. No Rust may resume before
+independent correction acceptance and explicit r3 activation.
