@@ -503,6 +503,9 @@ pub(crate) enum HostDiscoveredModuleProvenance {
         selected_registry: RegistryBaseUrl,
         module_file_attempts: Arc<[RegistryModuleFileAttempt]>,
     },
+    NonRegistry {
+        closure: HostNonregistryPreparedClosure,
+    },
 }
 
 #[allow(dead_code)]
@@ -517,11 +520,27 @@ pub(crate) struct HostDiscoveredModule {
 pub(crate) enum HostDiscoveredModuleError {
     RootModuleFiles(CompactString),
     ExplicitBuiltinOverride,
-    InvalidBuiltinVersion { version: CompactString },
-    MissingVersion { module_name: CompactString },
+    InvalidBuiltinVersion {
+        version: CompactString,
+    },
+    MissingVersion {
+        module_name: CompactString,
+    },
     SourcePreparationCompute(Arc<str>),
     SourcePreparation(ModuleSourcePreparationError),
-    NonRegistryUnsupported { module_name: CompactString },
+    InvalidNonRegistryVersion {
+        module_name: CompactString,
+        version: CompactString,
+    },
+    NonRegistryClosureCompute(Arc<str>),
+    NonRegistryClosure(HostNonregistryModuleClosureError),
+    NonRegistryCycle {
+        closure: HostNonregistryPreparedClosure,
+        capability: NonregistryIncludeCycleCapability,
+    },
+    NonRegistryUnsupported {
+        module_name: CompactString,
+    },
     BuiltinCompute(Arc<str>),
     Builtin(BuiltinBazelToolsModuleError),
     Evaluation(DirectNonregistryEvaluationError),
@@ -547,6 +566,24 @@ impl fmt::Display for HostDiscoveredModuleError {
                 write!(f, "module source preparation failed to compute: {message}")
             }
             Self::SourcePreparation(error) => write!(f, "{error:?}"),
+            Self::InvalidNonRegistryVersion {
+                module_name,
+                version,
+            } => write!(
+                f,
+                "nonregistry module {module_name} requires the empty effective version, got {version}"
+            ),
+            Self::NonRegistryClosureCompute(message) => {
+                write!(f, "nonregistry MODULE closure failed to compute: {message}")
+            }
+            Self::NonRegistryClosure(error) => write!(f, "{error:?}"),
+            Self::NonRegistryCycle { capability, .. } => write!(
+                f,
+                "nonregistry MODULE include cycle at {:?}:{}:{}",
+                capability.repeated_raw_label,
+                capability.repeated_location.start_line,
+                capability.repeated_location.start_column
+            ),
             Self::NonRegistryUnsupported { module_name } => {
                 write!(
                     f,
@@ -594,6 +631,82 @@ fn host_discovered_module_error(
     SourcePreparationOutcome::Complete(Arc::new(Err(error)))
 }
 
+impl HostDiscoveredModuleKey {
+    async fn discover_nonregistry(&self, ctx: &mut DiceComputations<'_>) -> <Self as Key>::Value {
+        let closure = match ctx
+            .compute(&HostNonregistryModuleClosureKey::new(
+                self.workspace.dupe(),
+                self.module.clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Err(error) => {
+                return host_discovered_module_error(
+                    HostDiscoveredModuleError::NonRegistryClosureCompute(Arc::from(
+                        error.to_string(),
+                    )),
+                );
+            }
+        };
+        let closure = match closure.as_ref() {
+            Ok(HostNonregistryModuleClosure::Supported(closure)) => closure.clone(),
+            Ok(HostNonregistryModuleClosure::UnsupportedCycle {
+                closure,
+                capability,
+            }) => {
+                return host_discovered_module_error(HostDiscoveredModuleError::NonRegistryCycle {
+                    closure: closure.clone(),
+                    capability: capability.clone(),
+                });
+            }
+            Err(error) => {
+                return host_discovered_module_error(
+                    HostDiscoveredModuleError::NonRegistryClosure(error.clone()),
+                );
+            }
+        };
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let included = closure
+            .fragments
+            .iter()
+            .map(|fragment| DirectNonregistryIncludeFile {
+                raw_label: fragment.occurrence.raw_label.as_str(),
+                logical_id: crate::LogicalModuleFileId::new(
+                    fragment.logical_path.as_path().display().to_string(),
+                ),
+                source: fragment.bytes.as_ref(),
+            })
+            .collect::<Vec<_>>();
+        let (module, events) = evaluate_direct_nonregistry_module_closure_with_events(
+            self.module.clone(),
+            crate::LogicalModuleFileId::new(
+                closure.root.logical_path.as_path().display().to_string(),
+            ),
+            closure.root.bytes.as_ref(),
+            &included,
+            capture_events,
+        );
+        let value = module
+            .map(|module| HostDiscoveredModule {
+                module,
+                provenance: HostDiscoveredModuleProvenance::NonRegistry { closure },
+            })
+            .map_err(HostDiscoveredModuleError::Evaluation);
+        if capture_events {
+            ctx.store_evaluation_data(events.unwrap_or_else(EventBatch::empty))
+                .expect("Host discovered MODULE stores exactly one event batch");
+        }
+        SourcePreparationOutcome::Complete(Arc::new(value))
+    }
+}
 #[async_trait]
 impl Key for HostDiscoveredModuleKey {
     type Value =
@@ -659,17 +772,21 @@ impl Key for HostDiscoveredModuleKey {
                 Err(error) => Err(HostDiscoveredModuleError::Builtin(error.clone())),
             }));
         }
+        if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
+            if !self.module.version.is_empty() {
+                return host_discovered_module_error(
+                    HostDiscoveredModuleError::InvalidNonRegistryVersion {
+                        module_name: self.module.name.clone(),
+                        version: self.module.version.clone(),
+                    },
+                );
+            }
+            return self.discover_nonregistry(ctx).await;
+        }
         if self.module.version.is_empty() {
             return host_discovered_module_error(HostDiscoveredModuleError::MissingVersion {
                 module_name: self.module.name.clone(),
             });
-        }
-        if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
-            return host_discovered_module_error(
-                HostDiscoveredModuleError::NonRegistryUnsupported {
-                    module_name: self.module.name.clone(),
-                },
-            );
         }
         let preparation = match ctx
             .compute(&ModuleSourcePreparationKey {
@@ -4363,6 +4480,7 @@ mod tests {
         preflight: Mutex<Vec<(ActivationKind, bool)>>,
         repo: Mutex<Vec<(ActivationKind, bool)>>,
         closure: Mutex<Vec<ActivationKind>>,
+        discovered: Mutex<Vec<(ActivationKind, bool)>>,
     }
 
     impl ActivationTracker for NonregistryPreflightTracker {
@@ -4380,7 +4498,9 @@ mod tests {
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             let record = (activation.kind(), activation.evaluation_data().is_none());
-            if key
+            if key.downcast_ref::<HostDiscoveredModuleKey>().is_some() {
+                self.discovered.lock().unwrap().push(record);
+            } else if key
                 .downcast_ref::<HostNonregistryModuleClosureKey>()
                 .is_some()
             {
@@ -8886,7 +9006,7 @@ mod tests {
     fn host_discovered_module_owner_has_no_graph_or_consumer_edge() {
         let source = include_str!("source_preparation.rs");
         let owner = source
-            .split("impl Key for HostDiscoveredModuleKey")
+            .split("async fn discover_nonregistry")
             .nth(1)
             .unwrap()
             .split("impl fmt::Display for RepositoryMaterializationKey")
@@ -8896,6 +9016,7 @@ mod tests {
             "RootModuleFilesKey",
             "BuiltinBazelToolsModuleKey",
             "ModuleSourcePreparationKey",
+            "HostNonregistryModuleClosureKey",
             "evaluate_direct_nonregistry_module_closure_with_events",
             "module_file_attempts",
             "store_evaluation_data",
@@ -9573,7 +9694,7 @@ mod tests {
         assert!(HostNonregistryPackagePreflightKey::equality(&a, &restored));
     }
 
-    async fn host_nonregistry_closure_compute(
+    async fn host_nonregistry_transaction(
         dice: &Arc<Dice>,
         root_module: Option<&[u8]>,
         root_wrong_kind: Option<PathNodeKind>,
@@ -9583,7 +9704,8 @@ mod tests {
         immutable: Option<(&str, u64, &str)>,
         tracker: Option<Arc<NonregistryPreflightTracker>>,
         fragment_wrong_kind: Option<(&str, PathNodeKind)>,
-    ) -> HostNonregistryModuleClosureValue {
+        capture_events: bool,
+    ) -> dice::DiceTransaction {
         let root_source = if immutable.is_some() {
             "bazel_dep(name = 'dep', version = '1')\narchive_override(module_name = 'dep')\n"
         } else {
@@ -9604,10 +9726,14 @@ mod tests {
                 material("dep"),
             ),
         };
-        let mut updater = dice.updater_with_data(UserComputationData {
+        let mut data = UserComputationData {
             activation_tracker: tracker.map(|value| value as Arc<dyn ActivationTracker>),
             ..Default::default()
-        });
+        };
+        if capture_events {
+            data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(data);
         updater
             .changed_to(vec![(
                 slug_workspace_v2::WorkspaceSnapshotKey {
@@ -9691,15 +9817,70 @@ mod tests {
             crate::LockfileMode::Update,
         )
         .unwrap();
-        updater
-            .commit()
-            .await
-            .compute(&HostNonregistryModuleClosureKey::new(
-                NormalizedAbsolutePath::new("/workspace").unwrap(),
-                NonrootModuleKey::new("dep", "1"),
-            ))
-            .await
-            .unwrap()
+        updater.commit().await
+    }
+    async fn host_nonregistry_closure_compute(
+        dice: &Arc<Dice>,
+        root_module: Option<&[u8]>,
+        root_wrong_kind: Option<PathNodeKind>,
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        variant: i64,
+        immutable: Option<(&str, u64, &str)>,
+        tracker: Option<Arc<NonregistryPreflightTracker>>,
+        fragment_wrong_kind: Option<(&str, PathNodeKind)>,
+    ) -> HostNonregistryModuleClosureValue {
+        host_nonregistry_transaction(
+            dice,
+            root_module,
+            root_wrong_kind,
+            fragments,
+            fragment_needs,
+            variant,
+            immutable,
+            tracker,
+            fragment_wrong_kind,
+            false,
+        )
+        .await
+        .compute(&HostNonregistryModuleClosureKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("dep", "1"),
+        ))
+        .await
+        .unwrap()
+    }
+
+    async fn host_nonregistry_discovered_compute(
+        dice: &Arc<Dice>,
+        root_module: Option<&[u8]>,
+        fragments: &[(&str, Option<&[u8]>)],
+        fragment_needs: &[&str],
+        variant: i64,
+        immutable: Option<(&str, u64, &str)>,
+        tracker: Option<Arc<NonregistryPreflightTracker>>,
+        module: NonrootModuleKey,
+        capture_events: bool,
+    ) -> <HostDiscoveredModuleKey as Key>::Value {
+        host_nonregistry_transaction(
+            dice,
+            root_module,
+            None,
+            fragments,
+            fragment_needs,
+            variant,
+            immutable,
+            tracker,
+            None,
+            capture_events,
+        )
+        .await
+        .compute(&HostDiscoveredModuleKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            module,
+        ))
+        .await
+        .unwrap()
     }
 
     fn supported_host_closure(
@@ -9715,6 +9896,186 @@ mod tests {
         closure
     }
 
+    #[tokio::test]
+    async fn host_discovered_nonregistry_composes_empty_key_order_and_lifecycle() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        let root = b"module(name='dep',version='declared')\ninclude('//pkg:a.MODULE.bazel')\ninclude('//pkg:a.MODULE.bazel')\n";
+        let fragment_a = [("pkg/a.MODULE.bazel", Some(&b""[..]))];
+        let compute = |root, fragments, variant, immutable, tracker, module| {
+            host_nonregistry_discovered_compute(
+                &dice,
+                root,
+                fragments,
+                &[],
+                variant,
+                immutable,
+                tracker,
+                module,
+                true,
+            )
+        };
+        let a = compute(
+            Some(root),
+            &fragment_a,
+            90,
+            None,
+            Some(tracker.clone()),
+            NonrootModuleKey::new("dep", ""),
+        )
+        .await;
+        let b_fragments = [(
+            "pkg/a.MODULE.bazel",
+            Some(
+                &b"# changed
+"[..],
+            ),
+        )];
+        let b = compute(
+            Some(root),
+            &b_fragments,
+            91,
+            None,
+            None,
+            NonrootModuleKey::new("dep", ""),
+        )
+        .await;
+        let category_b = compute(
+            Some(root),
+            &fragment_a,
+            92,
+            Some(("/generation-discovery", 92, "fixed-content")),
+            None,
+            NonrootModuleKey::new("dep", ""),
+        )
+        .await;
+        let restored = compute(
+            Some(root),
+            &fragment_a,
+            93,
+            None,
+            Some(tracker.clone()),
+            NonrootModuleKey::new("dep", ""),
+        )
+        .await;
+        let warm = compute(
+            Some(root),
+            &fragment_a,
+            93,
+            None,
+            Some(tracker.clone()),
+            NonrootModuleKey::new("dep", ""),
+        )
+        .await;
+        assert!(!HostDiscoveredModuleKey::equality(&a, &b));
+        assert!(!HostDiscoveredModuleKey::equality(&a, &category_b));
+        assert!(HostDiscoveredModuleKey::equality(&a, &restored));
+        assert!(HostDiscoveredModuleKey::equality(&restored, &warm));
+        assert!(
+            matches!(a, SourcePreparationOutcome::Complete(value) if matches!(
+                value.as_ref(), Ok(HostDiscoveredModule {
+                    module,
+                    provenance: HostDiscoveredModuleProvenance::NonRegistry { closure },
+                }) if module.base.expected_key.version.is_empty()
+                    && module.base.declared_version == "declared"
+                    && closure.fragments.len() == 2
+            ))
+        );
+        let activations = tracker.discovered.lock().unwrap();
+        assert!(
+            activations
+                .iter()
+                .any(|(kind, event_free)| *kind == ActivationKind::Evaluated && !event_free)
+        );
+        assert!(
+            activations
+                .iter()
+                .any(|(kind, _)| *kind == ActivationKind::Reused)
+        );
+    }
+
+    #[tokio::test]
+    async fn host_discovered_nonregistry_guards_need_cycle_and_recovers() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let root = b"module(name='dep',version='declared')\ninclude('//pkg:a.MODULE.bazel')\n";
+        let nonempty = host_nonregistry_discovered_compute(
+            &dice,
+            Some(root),
+            &[],
+            &[],
+            94,
+            None,
+            None,
+            NonrootModuleKey::new("dep", "requested"),
+            true,
+        )
+        .await;
+        assert!(
+            matches!(nonempty, SourcePreparationOutcome::Complete(value) if matches!(value.as_ref(), Err(HostDiscoveredModuleError::InvalidNonRegistryVersion { .. })))
+        );
+        let need = host_nonregistry_discovered_compute(
+            &dice,
+            Some(root),
+            &[],
+            &["pkg/a.MODULE.bazel"],
+            95,
+            None,
+            None,
+            NonrootModuleKey::new("dep", ""),
+            true,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        let cycle_fragments = [(
+            "pkg/a.MODULE.bazel",
+            Some(&b"include('//pkg:a.MODULE.bazel')\n"[..]),
+        )];
+        let cycle = host_nonregistry_discovered_compute(
+            &dice,
+            Some(root),
+            &cycle_fragments,
+            &[],
+            96,
+            None,
+            None,
+            NonrootModuleKey::new("dep", ""),
+            true,
+        )
+        .await;
+        assert!(
+            matches!(cycle, SourcePreparationOutcome::Complete(value) if matches!(value.as_ref(), Err(HostDiscoveredModuleError::NonRegistryCycle { closure, .. }) if closure.fragments.len() == 2))
+        );
+        let invalid = host_nonregistry_discovered_compute(
+            &dice,
+            Some(b"module(name='wrong')\n"),
+            &[],
+            &[],
+            97,
+            None,
+            None,
+            NonrootModuleKey::new("dep", ""),
+            true,
+        )
+        .await;
+        assert!(
+            matches!(invalid, SourcePreparationOutcome::Complete(value) if matches!(value.as_ref(), Err(HostDiscoveredModuleError::Evaluation(DirectNonregistryEvaluationError::DeclaredNameMismatch { .. }))))
+        );
+        let recovered = host_nonregistry_discovered_compute(
+            &dice,
+            Some(b"module(name='dep',version='1')\n"),
+            &[],
+            &[],
+            98,
+            None,
+            None,
+            NonrootModuleKey::new("dep", ""),
+            true,
+        )
+        .await;
+        assert!(
+            matches!(recovered, SourcePreparationOutcome::Complete(value) if matches!(value.as_ref(), Ok(HostDiscoveredModule { provenance: HostDiscoveredModuleProvenance::NonRegistry { .. }, .. })))
+        );
+    }
     #[tokio::test]
     async fn host_nonregistry_module_closure_local_aba_order_need_and_reuse() {
         let dice = Dice::builder().build(DetectCycles::Enabled);
