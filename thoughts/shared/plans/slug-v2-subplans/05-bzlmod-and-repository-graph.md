@@ -1358,3 +1358,42 @@ Run next only
 Registry/built-in behavior is protected; recursion/MVS, command overrides,
 post-selection mappings, lockfile products, package/Bzl loading, configured
 toolchains, Test, execution, and every graph/consumer remain deferred.
+
+
+### Nonregistry discovered-module composition accepted (2026-08-12)
+
+Commit `6b2967c7` accepts the one-file Host composition under independently
+reviewed +117 production/+244 test/+361 total growth. Exact root nonregistry
+overrides now take the empty effective version branch before the registry-only
+missing-version guard, borrow the retained closure, reject its cycle capability
+before evaluation, retain ordered repeated logical inputs and the complete
+closure once as provenance, and publish one captured event batch only for
+complete evaluation success/failure. Protected built-in and registry behavior,
+Need/error validity, cold/warm reuse, the full owner suite, downstream checks,
+formatting, structural scans, and independent review pass. The leaf remains
+callerless and no graph, mapping, loading, or consumer is active.
+
+Run next only `WP-5-host-selected-module-graph-owner-design`. Freeze the sole
+future Host discovery-to-MVS selected-module graph owner, its exact
+override/policy/discovery identity and error lifecycle, or REPLAN into the first
+missing normalized production input. This is a three-document design packet:
+no Rust, legacy `ResolvedGraph` reuse, canonical-name synthesis, mapping, or
+consumer activation is authorized.
+
+### Selected-module graph owner design REPLAN (2026-08-12)
+
+The live owner audit and independent reserved-architecture review found the
+first missing semantic input before a selected graph. Slug has no normalized
+command-line module override in its command policy or DICE graph:
+`BzlmodCommandPolicyKey` owns only yanked-version and dev-dependency policy,
+while `RootModuleOverrides` owns only root-MODULE declarations. A selected
+graph therefore cannot preserve command-over-root/default-sentinel precedence
+or explicit `bazel_tools` built-in bypass. Reusing either map or legacy
+`ResolvedGraph` would create false equality and a second graph.
+
+Run next only `WP-5-host-command-module-override-owner-design`. Freeze the
+exact Bazel 9.2 flag grammar/path/precedence contract and one normalized
+command/request/server/runtime/DICE input owner, or REPLAN at the first smaller
+missing request/wire prerequisite. This is a three-document design packet. No
+Rust, wire/schema change, RepoSpec, filesystem/materialization observation,
+discovery, graph, mapping, or consumer is authorized.
