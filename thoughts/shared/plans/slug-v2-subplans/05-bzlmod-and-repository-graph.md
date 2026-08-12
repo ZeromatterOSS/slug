@@ -2089,3 +2089,27 @@ Run next only
 API, key/evaluator, selected mapping work, extension evaluation, I/O/
 materializer/loading/consumer edge, or JVM/Java work. Obtain fresh independent
 implementation review before resuming the two-phase r3 mapping design.
+
+### Root extension override correction accepted (2026-08-12)
+
+Commit `2644f091` restores the pinned root evaluator boundary. Ignored-dev
+`use_repo` validates and reserves names before the inactive usage is
+discarded; root override/inject globally no-op when dev dependencies are
+ignored; active-usage finalization validates visible replacement names,
+inject-and-import conflicts, and overriding/overridden intersections in
+retained order. Nonroot behavior and public/selected surfaces remain unchanged.
+
+Focused branch rows and real-DICE failure/restoration pass. All 340 Bzlmod
+owner unit tests and every integration suite pass, as does the full loading
+suite. Formatting, diff, one-file scope, 120/220/340 caps, compact and cleanup
+audits, and independent review pass.
+
+Run next only
+`WP-5-host-selected-extension-mapping-owner-implementation-r3` in
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, under the accepted
+520 production/800 test/1,320 total caps. Implement the two-phase full
+no-overrides mapping, root target resolution, and final substitution
+projection. Add no second file, public API, predecessor mutation, another
+graph/route/usage owner, extension evaluation or generated-existence
+validation, I/O/materializer/loading/consumer edge, or JVM/Java work. Obtain
+fresh independent implementation review.
