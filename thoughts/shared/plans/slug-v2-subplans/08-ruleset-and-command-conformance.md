@@ -3985,3 +3985,88 @@ proof before selecting one successor. Add no Rust, fixture/expected evidence,
 Bazel execution, command/wire fields, action reconstruction, DICE state,
 execution, other action kinds/formats, identity-byte work, JVM/Java, REAPI, or
 CI.
+
+## FileWrite aquery deps owner-set design accepted (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-deps-owner-set-design` is **ACCEPT**. Activate only
+an unbounded top-level `deps(<one direct main-repository literal>)`. Depth,
+wrappers, nesting, external repositories, package/all-target patterns, and
+multiple roots remain unsupported. The existing direct-literal behavior must
+remain byte-for-byte unchanged. The CLI and daemon independently parse the raw
+expression into a shared typed scope (`literal` or `deps`) and the public daemon
+wire remains raw expression plus normalized bzlmod inputs; no scope field is
+added to the wire.
+
+Both scopes build the same sole requested root through the accepted typed build
+DICE path. Literal scope selects only the requested analysis. `deps()` scope
+selects every action-bearing configured owner in the retained build action
+closure, deduplicated by configured-target identity. This is the exact Bazel
+9.2 FileWrite owner set for the admitted aspect-free graph: configured-query
+`deps()` includes its seed, ordinary and transitioned configured dependencies,
+aliases/generated producers, implicit dependencies, and resolved toolchain
+configured targets under the default settings. Source, visibility, platform,
+constraint, and other semantic-support nodes are actionless and therefore emit
+nothing; an action-bearing selected toolchain implementation is query-visible
+and must emit. No new retained state or semantic-support filter is required.
+
+Within each owner, retained action declaration order, existing block shape, and
+two-LF framing remain exact. Cross-owner order is explicitly Slug-native:
+roots-first breadth-first retained closure order, with no Bazel parity claim.
+Slug configuration/output-root and `SlugActionToken` bytes, progress silence,
+invalidation counts, and diagnostics remain Slug-native. Aspect-bearing graphs,
+shared equivalent actions owned by distinct configured owners, depth-bounded or
+composed expressions, multiple requested roots/configurations, other action
+kinds/formats, contents, and exact Bazel checksum/ActionKey bytes remain
+unsupported/deferred. Any action-bearing owner with a non-FileWrite action
+fails the entire request closed; actionless owners are ignored.
+
+Run next only
+`WP-8-m5-filewrite-aquery-deps-owner-set-oracle-implementation`. Reuse or
+introduce one shared aquery expression-scope parser in `slug_query_v2`; both
+command parsing and daemon boundary validation must call it. Preserve the raw
+public wire. Add a closure-wide resolved FileWrite selector beside the accepted
+root-only selector, sharing platform/constraint resolution and the formatter.
+Do not reconstruct actions or add a DICE key.
+
+Extend only the existing five-file `filewrite-aquery-root-order` fixture. Keep
+the two-action literal rows as the dependency-exclusion regression and expand
+the order-agnostic `deps()` row to discriminate an action-bearing selected
+toolchain implementation, alias/generated producer ownership, a configured
+transition owner, and the existing ordinary diamond with the shared owner
+exactly once. The fixture owns raw stdout including two-LF framing; assert
+membership and per-owner declaration order without asserting cross-owner
+order. Add focused parser/command/server negatives, core closure selection and
+mixed-action failure tests, and CLI default/explicit plus one-shot/daemon
+equality. Retained-daemon A/B/A must remove and restore one dependency edge,
+prove exact owner membership/token restoration and stable PID, and retain the
+direct-literal A/B/A order proof.
+
+The implementation allowlist is:
+
+- `app/slug_query_v2/src/{expr.rs,lib.rs}` and existing query tests;
+- `app/slug_commands_v2/src/aquery.rs` and existing command tests;
+- `app/slug_core_v2/src/runtime/{dice.rs,file_write_aquery_text.rs,mod.rs}`;
+- `app/slug_cli_v2/src/commands/aquery.rs` and existing CLI tests;
+- `app/slug_server_v2/src/{lib.rs,server.rs,tests.rs}`;
+- the existing five files under
+  `tests/v2_oracle/fixtures/filewrite-aquery-root-order/`; and
+- canonical/current-packet/Stage 8 bookkeeping.
+
+Cap Rust growth at 250 production, 320 tests, and 570 total net lines. Keep the
+fixture at five files and cap fixture text at 420 lines; cap bookkeeping at 170
+lines. Validate the expanded fixture with pinned Bazel 9.2 and the protected
+direct-literal/identity evidence, focused query/commands/core/server/CLI tests,
+direct compile dependents, rebuilt `slug_cli_v2`, retained-daemon lifecycle,
+rustfmt, archive, and diff checks. Require independent final review because a
+public expression shape and closure-wide action ownership are activated.
+
+Add no depth/wrapper/general query activation, command/wire field, aspect
+state, new DICE key/state, action reconstruction/execution/contents, other
+action kind/format, retained identity representation, exact Bazel identity
+bytes, JVM/Java artifact, REAPI reuse, or CI. One material correction maximum;
+a second is `REPLAN`.
+
+Independent design review returned `ACCEPT`: the bounded expression shape,
+configured-owner membership, actionless-support treatment, explicit
+Slug-native cross-owner order, fail-closed mixed/aspect boundaries, fixture
+discriminators, caps, and daemon A/B/A proof are source-backed and sufficient.
