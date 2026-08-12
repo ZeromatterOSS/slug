@@ -4628,3 +4628,14 @@ freeze the complete hidden built-in MODULE evaluation/resolution, contextual
 repository mappings, extension-generated names, registration ownership, DICE
 equality/invalidation, and root Need/error order before any catalog expansion,
 package/Bzl dispatch, configured toolchain, TestRunner, execution, or BEP work.
+
+
+### Built-in MODULE injection design REPLAN (2026-08-12)
+
+Full injection is not bounded: Bazel adds the built-in to every module and
+derives contextual mappings, extension unique names, and registrations only
+after ordinary discovery/MVS selection. Slug has no corresponding Host selected
+graph, so a root merge or guessed dependency subset is rejected. Stage 8 waits
+while Stage 5 implements only the complete callerless embedded MODULE value;
+that leaf authorizes no package, Test, toolchain, command, execution, or BEP
+consumer.

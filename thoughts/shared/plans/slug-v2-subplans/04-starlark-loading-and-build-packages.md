@@ -2150,3 +2150,10 @@ kinds present in this package.
 Do not dispatch the accepted built-in source route yet. Stage 4 waits for a
 Stage 5-owned injected-module/contextual repository mapping before designing
 cross-repository Bzl loading and repository-context package coercion.
+
+
+The module-injection audit confirms Stage 4 cannot derive context from a
+root-only map: extension ids/imports and canonical module names are
+post-selection state. Stage 4 remains parked while Stage 5 first retains the
+complete callerless embedded MODULE value; no package/Bzl consumer dispatch is
+authorized by that leaf.

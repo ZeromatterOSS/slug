@@ -7439,3 +7439,10 @@ rejects every external registration, and resolves only root toolchain types
 and packages. No bounded Stage 6 correction can precede the hidden
 `bazel_tools` module/mapping owner and Stage 4 contextual package load.
 Configured Test toolchain and TestRunner semantics remain deferred.
+
+
+The module-injection audit further pins that Bazel's registered toolchain and
+execution-platform consumers iterate modules from the selected dependency
+graph using each module's full contextual mapping. A callerless embedded MODULE
+value may preserve registration order, but it cannot activate Stage 6
+registration or selection before the one combined graph exists.

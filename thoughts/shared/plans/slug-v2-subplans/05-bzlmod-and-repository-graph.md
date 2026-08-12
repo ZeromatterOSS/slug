@@ -1123,3 +1123,25 @@ observation, install scan, runtime source choice, package evaluation, or
 consumer dispatch is admitted. The active cross-stage closure design must
 freeze the complete embedded test-tools dependency graph before widening the
 catalog or routing existing package/Bzl consumers.
+
+
+### Built-in MODULE injection design REPLAN (2026-08-12)
+
+Pinned Bazel 9.2 injects `bazel_tools@<empty>` into every other module,
+reserves its apparent name, and lets a root/user command override replace the
+default non-registry sentinel. The embedded MODULE then participates in
+ordinary discovery/MVS. Only after selection does Bazel derive canonical and
+full mappings, collision-disambiguated extension names, repo overrides, and
+registration consumers.
+
+Slug's compact `EvaluatedNonrootModule` can represent the complete embedded
+MODULE, but no Host discovery/MVS owner yet joins it to root, registry, and
+direct-nonregistry inputs. The legacy supplied-file `ResolvedGraph` cannot
+become a second production graph. Full injection therefore ends `REPLAN`;
+partial dependency selection, fabricated RepoSpecs/mappings, and a synthetic
+root-only merge are rejected.
+
+Implement next only one callerless built-in module value over the exact source
+key and existing complete evaluator. Retain route-manifest identity, MODULE
+SHA-256, and the complete evaluated value; defer all injection, selection,
+mapping, lockfile, package/Bzl, configured toolchain, and command behavior.

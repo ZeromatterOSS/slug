@@ -19188,3 +19188,60 @@ confined to pinned bytes/modes/hashes, path kind, canonical routing, and
 content/repository identity. Snapshot framing, diagnostics, and compact
 storage are Slug-native; package/Bzl dispatch and the complete embedded closure
 remain deferred.
+
+
+### WP-5 built-in MODULE injection design (2026-08-12)
+
+**Status: REPLAN full injection; implement only the bounded module value.**
+Primary authority is Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`:
+
+- `ModuleFileFunction.getBuiltinModules` installs exactly the
+  `bazel_tools -> BAZEL_TOOLS_OVERRIDE` sentinel, while
+  `NonRegistryOverride.BAZEL_TOOLS_OVERRIDE` forbids RepoSpec inspection.
+- `ModuleThreadContext.buildModule` adds the empty-version built-in dependency
+  to every module except itself and reserves its apparent name against
+  `bazel_dep` and `use_repo`. Root override construction uses the sentinel
+  only if no module override already exists; root/user command overrides win.
+- `Discovery.applyOverrides` rewrites non-registry modules to the empty key.
+  `BazelModuleResolutionFunction` discovers/selects one graph, fetches
+  RepoSpecs only for registry modules, and carries registry hashes into the
+  visible lockfile owner. The embedded MODULE hash is not a lockfile entry.
+- `BazelDepGraphFunction` derives canonical repo lookup, contextual extension
+  ids, collision-disambiguated unique names, imports, and root repo overrides
+  only from the selected graph. `BazelDepGraphValue.getFullRepoMapping`
+  combines selected deps with imported extension repos.
+- registered platform/toolchain functions iterate selected graph order and
+  parse each module's retained registration list in its full mapping.
+
+The exact checked-in MODULE at SHA-256
+`a51e647c77be3c7dcb861131e339f2b65301bb572d2a9ac3d7eef30ca5b8a523`
+contains ten ordinary dependencies, four nodep version constraints, four
+ordinary extension usages, one innate winsdk repository-rule usage, six
+generated/imported repository names, and four ordered toolchain patterns.
+Observed mappings remain consistent: `bazel_tools` sees the generated
+local/remote tool repos plus ordinary apparent dependencies including
+`rules_shell -> rules_shell+` and `platforms -> platforms`;
+`rules_shell+` sees its own generated local shell, bazel_features,
+bazel_skylib, platforms, and bazel_tools. Default `bazel mod graph` omits the
+built-in node, which is display filtering rather than separate graph ownership.
+
+Slug audit: `EvaluatedNonrootModule` already retains complete dependencies,
+original deps, nodep deps, registrations, extension proxies/tags/imports/
+isolation/innate calls, compact equality, and exact no-self built-in
+finalization. `BuiltinBazelToolsSourceFileKey` owns the exact bytes/hash/mode
+and route manifest. Conversely, active Host state has no selected discovery/
+MVS graph; root mappings synthesize bazel_tools, legacy `ResolvedGraph`
+accepts supplied parsed files, unique extension names are not modeled, and
+`RootRepositoryRouteKey` is a source route rather than selection.
+
+The accepted dependency direction for eventual injection is root file first,
+then built-in override/collision choice, then the exact embedded value only for
+the default sentinel, then ordinary discovery/MVS with registry/lockfile
+inputs, and finally one selected graph deriving canonical/full mappings,
+extension unique names, registrations, routes, and consumers. Every semantic
+input belongs in that graph's equality; no lock may span a DICE compute.
+Because that owner is not bounded here, the successor retains only the complete
+callerless module value. Its exact two-file, 110-production/300-test/410-total
+contract is frozen in `current-packet.md`; a public export, consumer, mapping,
+selection, or third file is a stop.
