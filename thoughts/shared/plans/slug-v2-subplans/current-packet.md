@@ -1,12 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-registry-repo-spec-owner-implementation-r2-cap-design`
-Milestone: cross-stage M7 prerequisite correction design
+Packet: `WP-5-host-selected-registry-repo-spec-owner-implementation-r2`
+Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct the frozen production cap and two pinned local/registry JSON
-semantics before the selected registry RepoSpec implementation may resume.
+Result: resume the retained implementation, apply the two accepted semantic
+corrections, and prove the callerless selected registry RepoSpec owner.
 
-## Active correction contract
+## Active implementation contract
+
+Resume exactly the retained two-file implementation under the independently
+accepted correction in commit `84bba7cf`. This packet may edit only:
+
+- new `app/slug_bzlmod_v2/src/selected_repo_spec.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration.
+
+Apply the whitespace-only registry JSON and normalized/decoded file-registry
+local_path corrections before acceptance. Cap formatted net growth at 1,020
+production, 1,050 tests, and 2,070 total. Complete the entire accepted proof
+matrix and retain all earlier third-file, public, legacy, second-I/O/policy,
+raw-I/O, mapping/route/materializer/loading/consumer, and cap stops.
+
+Return `REPLAN` on any stop or scope expansion; `REVISE` on one bounded
+implementation correction; a second material correction is `REPLAN`.
+
+## Accepted correction contract
+
+This accepted correction is historical context for r2 and grants no separate
+file, action, cap, or scheduling authority.
 
 The first compiling two-file implementation is retained but unaccepted at 979
 formatted production lines in `selected_repo_spec.rs` plus one `lib.rs`

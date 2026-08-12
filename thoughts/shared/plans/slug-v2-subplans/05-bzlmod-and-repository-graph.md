@@ -1771,3 +1771,18 @@ require whitespace/dot-separator/encoded-file-URI discriminators, and preserve
 every existing behavior, proof, and terminal stop. The retained Rust diff is
 unaccepted; no Rust may resume until independent correction acceptance and
 explicit r2 activation.
+
+### Selected registry RepoSpec cap correction accepted (2026-08-12)
+
+Independent correction review accepts the same two-file owner at 1,020
+production/1,050 test/2,070 total caps, with no new owner, source family, or
+consumer. R2 must treat whitespace-only bazel_registry.json as absence and
+must lexically normalize local paths while anchoring relative module bases to
+the decoded path of a parsed file-registry URI.
+
+Run next only
+`WP-5-host-selected-registry-repo-spec-owner-implementation-r2`. Resume the
+retained unaccepted diff, apply those focused corrections and discriminators,
+complete the original proof matrix, and obtain independent implementation
+review. Every prior file, public, legacy, second-I/O, raw-I/O, route,
+materializer/loading/consumer, and cap stop remains terminal.
