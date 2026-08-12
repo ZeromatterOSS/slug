@@ -10,6 +10,7 @@
 
 use slug_build_api_v2::ActionKind;
 use slug_identity_v2::CanonicalLabel;
+use slug_query_v2::AqueryScope;
 
 use super::dice::BuildCommandEvaluation;
 use super::dice::ResolvedFileWriteSemanticView;
@@ -48,7 +49,17 @@ pub fn format_file_write_aquery_text(
 pub fn format_file_write_aquery_text_output(
     evaluation: &BuildCommandEvaluation,
 ) -> Result<String, &'static str> {
-    let views = evaluation.resolved_file_write_semantic_views()?;
+    format_file_write_aquery_text_output_for_scope(evaluation, AqueryScope::Literal)
+}
+
+pub fn format_file_write_aquery_text_output_for_scope(
+    evaluation: &BuildCommandEvaluation,
+    scope: AqueryScope,
+) -> Result<String, &'static str> {
+    let views = match scope {
+        AqueryScope::Literal => evaluation.resolved_file_write_semantic_views()?,
+        AqueryScope::Deps => evaluation.resolved_file_write_semantic_views_in_closure()?,
+    };
     if views.is_empty() {
         return Err("FileWrite aquery text requires at least one resolved action");
     }

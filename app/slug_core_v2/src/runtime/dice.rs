@@ -2530,80 +2530,95 @@ impl BuildCommandEvaluation {
     pub fn resolved_file_write_semantic_views(
         &self,
     ) -> Result<Vec<ResolvedFileWriteSemanticView<'_>>, &'static str> {
-        let mut views = Vec::new();
         let owner = self.sole_requested_analysis()?;
-        for action in owner.configured_file_write_actions()? {
-            let selected = action.execution_platform();
-            if selected.configuration().kind() != ConfigurationKind::Exec
-                || selected.configuration().slug_configuration().is_none()
-            {
-                return Err("FileWrite platform requires structural exec configuration");
-            }
-            let platform = self.unique_closure_node(selected)?;
-            if platform.kind() != &ConfiguredNodeKind::Platform {
-                return Err("selected FileWrite platform closure node has wrong kind");
-            }
-            let fact = platform
-                .platform_semantic_fact()
-                .ok_or("selected FileWrite platform has no semantic fact")?;
-            let mut constraints = Vec::with_capacity(platform.edges().len());
-            for (index, platform_edge) in platform.edges().iter().enumerate() {
-                if !matches!(platform_edge.kind(), ConfiguredEdgeKind::PlatformConstraint { index: edge_index } if usize::try_from(*edge_index) == Ok(index))
+        self.resolved_file_write_semantic_views_for_owners(std::iter::once(owner))
+    }
+
+    pub fn resolved_file_write_semantic_views_in_closure(
+        &self,
+    ) -> Result<Vec<ResolvedFileWriteSemanticView<'_>>, &'static str> {
+        self.resolved_file_write_semantic_views_for_owners(self.analyses())
+    }
+
+    fn resolved_file_write_semantic_views_for_owners<'a>(
+        &'a self,
+        owners: impl IntoIterator<Item = &'a ConfiguredNodeResult>,
+    ) -> Result<Vec<ResolvedFileWriteSemanticView<'a>>, &'static str> {
+        let mut views = Vec::new();
+        for owner in owners {
+            for action in owner.configured_file_write_actions()? {
+                let selected = action.execution_platform();
+                if selected.configuration().kind() != ConfigurationKind::Exec
+                    || selected.configuration().slug_configuration().is_none()
                 {
-                    return Err("selected FileWrite platform has unordered constraint edges");
+                    return Err("FileWrite platform requires structural exec configuration");
                 }
-                let value_key = platform_edge
-                    .configured_target()
-                    .ok_or("PlatformConstraint edge target is not configured")?;
-                if value_key.configuration() != selected.configuration()
-                    || value_key.configuration().kind() != ConfigurationKind::Exec
-                    || value_key.configuration().slug_configuration().is_none()
-                {
-                    return Err("PlatformConstraint value has mismatched configuration");
+                let platform = self.unique_closure_node(selected)?;
+                if platform.kind() != &ConfiguredNodeKind::Platform {
+                    return Err("selected FileWrite platform closure node has wrong kind");
                 }
-                let value = self.unique_closure_node(value_key)?;
-                if value.kind() != &ConfiguredNodeKind::ConstraintValue {
-                    return Err("PlatformConstraint edge target has wrong kind");
+                let fact = platform
+                    .platform_semantic_fact()
+                    .ok_or("selected FileWrite platform has no semantic fact")?;
+                let mut constraints = Vec::with_capacity(platform.edges().len());
+                for (index, platform_edge) in platform.edges().iter().enumerate() {
+                    if !matches!(platform_edge.kind(), ConfiguredEdgeKind::PlatformConstraint { index: edge_index } if usize::try_from(*edge_index) == Ok(index))
+                    {
+                        return Err("selected FileWrite platform has unordered constraint edges");
+                    }
+                    let value_key = platform_edge
+                        .configured_target()
+                        .ok_or("PlatformConstraint edge target is not configured")?;
+                    if value_key.configuration() != selected.configuration()
+                        || value_key.configuration().kind() != ConfigurationKind::Exec
+                        || value_key.configuration().slug_configuration().is_none()
+                    {
+                        return Err("PlatformConstraint value has mismatched configuration");
+                    }
+                    let value = self.unique_closure_node(value_key)?;
+                    if value.kind() != &ConfiguredNodeKind::ConstraintValue {
+                        return Err("PlatformConstraint edge target has wrong kind");
+                    }
+                    let [setting_edge] = value.edges() else {
+                        return Err("ConstraintValue requires exactly one setting edge");
+                    };
+                    if setting_edge.kind() != &ConfiguredEdgeKind::ConstraintSetting {
+                        return Err("ConstraintValue edge has wrong kind");
+                    }
+                    let setting_key = setting_edge
+                        .configured_target()
+                        .ok_or("ConstraintSetting edge target is not configured")?;
+                    if setting_key.configuration() != selected.configuration()
+                        || setting_key.configuration().kind() != ConfigurationKind::Exec
+                        || setting_key.configuration().slug_configuration().is_none()
+                    {
+                        return Err("ConstraintSetting has mismatched configuration");
+                    }
+                    let setting = self.unique_closure_node(setting_key)?;
+                    if setting.kind() != &ConfiguredNodeKind::ConstraintSetting {
+                        return Err("ConstraintSetting closure node has wrong kind");
+                    }
+                    if constraints.iter().any(
+                        |resolved: &ResolvedPlatformConstraintSemanticView<'_>| {
+                            resolved.constraint_setting().key() == setting.key()
+                        },
+                    ) {
+                        return Err("platform has duplicate constraint setting");
+                    }
+                    constraints.push(ResolvedPlatformConstraintSemanticView {
+                        platform_edge,
+                        constraint_value: value,
+                        setting_edge,
+                        constraint_setting: setting,
+                    });
                 }
-                let [setting_edge] = value.edges() else {
-                    return Err("ConstraintValue requires exactly one setting edge");
-                };
-                if setting_edge.kind() != &ConfiguredEdgeKind::ConstraintSetting {
-                    return Err("ConstraintValue edge has wrong kind");
-                }
-                let setting_key = setting_edge
-                    .configured_target()
-                    .ok_or("ConstraintSetting edge target is not configured")?;
-                if setting_key.configuration() != selected.configuration()
-                    || setting_key.configuration().kind() != ConfigurationKind::Exec
-                    || setting_key.configuration().slug_configuration().is_none()
-                {
-                    return Err("ConstraintSetting has mismatched configuration");
-                }
-                let setting = self.unique_closure_node(setting_key)?;
-                if setting.kind() != &ConfiguredNodeKind::ConstraintSetting {
-                    return Err("ConstraintSetting closure node has wrong kind");
-                }
-                if constraints.iter().any(
-                    |resolved: &ResolvedPlatformConstraintSemanticView<'_>| {
-                        resolved.constraint_setting().key() == setting.key()
-                    },
-                ) {
-                    return Err("platform has duplicate constraint setting");
-                }
-                constraints.push(ResolvedPlatformConstraintSemanticView {
-                    platform_edge,
-                    constraint_value: value,
-                    setting_edge,
-                    constraint_setting: setting,
+                views.push(ResolvedFileWriteSemanticView {
+                    action,
+                    platform,
+                    platform_fact: fact,
+                    platform_constraints: constraints,
                 });
             }
-            views.push(ResolvedFileWriteSemanticView {
-                action,
-                platform,
-                platform_fact: fact,
-                platform_constraints: constraints,
-            });
         }
         Ok(views)
     }
@@ -11611,6 +11626,15 @@ ordinary_rule(
         assert!(!text.contains("write.txt"));
         assert_eq!(text.matches("\n\n").count(), 2);
         assert!(text.ends_with("  IsExecutable: false\n\n"));
+
+        let deps_text = crate::runtime::format_file_write_aquery_text_output_for_scope(
+            evaluation,
+            slug_query_v2::AqueryScope::Deps,
+        )
+        .unwrap();
+        assert_eq!(deps_text.matches("action '").count(), 3);
+        assert!(deps_text.contains("write.txt"));
+        assert_eq!(deps_text.matches("\n\n").count(), 3);
 
         let mut empty_transaction =
             build_root_transaction(&dice, resolved_write_epoch(21, "setting_a", &[])).await;

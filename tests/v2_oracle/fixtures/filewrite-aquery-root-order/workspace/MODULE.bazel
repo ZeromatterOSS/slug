@@ -1,4 +1,4 @@
 module(name = "filewrite_aquery_root_order")
 
 register_execution_platforms("//:platform")
-register_toolchains("//:demo_toolchain")
+register_toolchains("//:demo_toolchain", "//:transition_toolchain")

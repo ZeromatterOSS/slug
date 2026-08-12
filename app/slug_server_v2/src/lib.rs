@@ -28,6 +28,7 @@ use slug_core_v2::runtime::WorkspaceRuntime;
 use slug_core_v2::runtime::observe_workspace;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::keys::WorkspaceFileValue;
+use slug_query_v2::AqueryScope;
 use slug_query_v2::QueryOrder;
 use slug_query_v2::QueryOutputCompletion;
 use slug_query_v2::QueryPolicy;
@@ -423,6 +424,7 @@ impl Daemon {
     pub fn aquery_with_bzlmod_inputs(
         &mut self,
         target: &TargetPattern,
+        scope: AqueryScope,
         command_policy: BzlmodCommandPolicyKey,
         environment_policy: BzlmodEnvironmentPolicyKey,
         lockfile_mode: LockfileMode,
@@ -458,7 +460,9 @@ impl Daemon {
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
                 Ok(evaluation) => {
-                    match slug_core_v2::runtime::format_file_write_aquery_text_output(evaluation) {
+                    match slug_core_v2::runtime::format_file_write_aquery_text_output_for_scope(
+                        evaluation, scope,
+                    ) {
                         Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
                         Err(error) => TerminalOutput::new(
                             2,

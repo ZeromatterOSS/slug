@@ -715,11 +715,16 @@ fn cquery_accepts_only_the_label_kind_and_bounded_graph_output_matrix() {
 }
 
 #[test]
-fn aquery_accepts_only_one_main_repo_literal_and_text_output() {
+fn aquery_accepts_one_main_repo_literal_or_deps_and_text_output() {
     let default = AqueryRequest::parse(&["//pkg:bin"]).unwrap();
     assert_eq!(default.expression, "//pkg:bin");
     assert_eq!(default.target.to_string(), "//pkg:bin");
+    assert_eq!(default.scope, slug_query_v2::AqueryScope::Literal);
     assert_eq!(default.output_base, None);
+
+    let deps = AqueryRequest::parse(&["deps(//pkg:bin)"]).unwrap();
+    assert_eq!(deps.target.to_string(), "//pkg:bin");
+    assert_eq!(deps.scope, slug_query_v2::AqueryScope::Deps);
 
     let explicit = AqueryRequest::parse(&[
         "--output=text",
@@ -736,7 +741,9 @@ fn aquery_accepts_only_one_main_repo_literal_and_text_output() {
     );
 
     for args in [
-        vec!["deps(//pkg:bin)"],
+        vec!["deps(//pkg:bin, 1)"],
+        vec!["deps(deps(//pkg:bin))"],
+        vec!["kind('rule', //pkg:bin)"],
         vec!["//pkg:all"],
         vec!["@dep//pkg:bin"],
         vec!["//pkg:bin", "//pkg:other"],

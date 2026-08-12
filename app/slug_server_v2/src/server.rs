@@ -349,8 +349,8 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     Ok(inputs) => inputs,
                     Err(error) => return malformed_bzlmod_response(error),
                 };
-            let target = match validate_aquery_expression(&request.expression) {
-                Ok(target) => target,
+            let (target, scope) = match validate_aquery_expression(&request.expression) {
+                Ok(validated) => validated,
                 Err(error) => {
                     return DaemonResponse {
                         exit_code: 2,
@@ -365,6 +365,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
             };
             let result = daemon.aquery_with_bzlmod_inputs(
                 &target,
+                scope,
                 command_policy,
                 environment_policy,
                 lockfile_mode,
@@ -419,18 +420,21 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
     }
 }
 
-fn validate_aquery_expression(expression: &str) -> Result<TargetPattern, String> {
+fn validate_aquery_expression(
+    expression: &str,
+) -> Result<(TargetPattern, slug_query_v2::AqueryScope), String> {
     let expression =
         slug_query_v2::QueryExpression::parse(expression).map_err(|error| error.to_string())?;
-    let literal = slug_query_v2::aquery_literal(&expression).map_err(|error| error.to_string())?;
-    let target = TargetPattern::parse(literal)?;
+    let spec =
+        slug_query_v2::aquery_expression_spec(&expression).map_err(|error| error.to_string())?;
+    let target = TargetPattern::parse(spec.target())?;
     if !matches!(
         &target,
         TargetPattern::Single(label) if label.repo().is_root()
     ) {
         return Err("aquery accepts only a main-repository literal target label".to_owned());
     }
-    Ok(target)
+    Ok((target, spec.scope()))
 }
 fn validate_cquery_expression(
     expression: &str,

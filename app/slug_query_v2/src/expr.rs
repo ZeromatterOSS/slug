@@ -47,6 +47,28 @@ pub struct QueryExpression {
     pub kind: QueryExpressionKind,
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Allocative)]
+pub enum AqueryScope {
+    Literal,
+    Deps,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative)]
+pub struct AqueryExpressionSpec {
+    target: CompactString,
+    scope: AqueryScope,
+}
+
+impl AqueryExpressionSpec {
+    pub fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub const fn scope(&self) -> AqueryScope {
+        self.scope
+    }
+}
+
 /// The one configured `deps()` form whose traversal semantics are admitted.
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 pub struct CqueryDepsSpec {
@@ -243,15 +265,64 @@ pub fn parse_query_expression(source: &str) -> Result<QueryExpression, QueryPars
     crate::parser::parse(source)
 }
 
-/// Returns the sole concrete literal admitted by the first aquery command.
-pub fn aquery_literal(expression: &QueryExpression) -> Result<&str, QueryParseError> {
+/// Returns the sole literal or unbounded top-level `deps()` form admitted by
+/// the FileWrite aquery command.
+pub fn aquery_expression_spec(
+    expression: &QueryExpression,
+) -> Result<AqueryExpressionSpec, QueryParseError> {
     match &expression.kind {
-        QueryExpressionKind::TargetLiteral(literal) if !literal.starts_with('$') => Ok(literal),
+        QueryExpressionKind::TargetLiteral(target) if !target.starts_with('$') => {
+            Ok(AqueryExpressionSpec {
+                target: target.clone(),
+                scope: AqueryScope::Literal,
+            })
+        }
+        QueryExpressionKind::Function { name, args } if name.value == "deps" => {
+            if args.len() != 1 {
+                return Err(QueryParseError::new(
+                    "aquery deps() requires exactly one argument",
+                    expression.span,
+                ));
+            }
+            let QueryExpressionKind::TargetLiteral(target) = &args[0].kind else {
+                return Err(QueryParseError::new(
+                    "aquery deps() requires one direct concrete target literal",
+                    args[0].span,
+                ));
+            };
+            if target.starts_with('$') {
+                return Err(QueryParseError::new(
+                    "aquery deps() requires one direct concrete target literal",
+                    args[0].span,
+                ));
+            }
+            Ok(AqueryExpressionSpec {
+                target: target.clone(),
+                scope: AqueryScope::Deps,
+            })
+        }
         _ => Err(QueryParseError::new(
-            "aquery accepts exactly one literal target label",
+            "aquery accepts one literal target or deps(literal)",
             expression.span,
         )),
     }
+}
+
+/// Returns the sole concrete literal admitted by literal-only callers.
+pub fn aquery_literal(expression: &QueryExpression) -> Result<&str, QueryParseError> {
+    let QueryExpressionKind::TargetLiteral(literal) = &expression.kind else {
+        return Err(QueryParseError::new(
+            "aquery accepts exactly one literal target label",
+            expression.span,
+        ));
+    };
+    if literal.starts_with('$') {
+        return Err(QueryParseError::new(
+            "aquery accepts exactly one literal target label",
+            expression.span,
+        ));
+    }
+    Ok(literal)
 }
 
 pub fn validate_loading_query(expression: &QueryExpression) -> Result<(), QueryParseError> {

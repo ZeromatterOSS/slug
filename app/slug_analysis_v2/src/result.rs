@@ -275,10 +275,17 @@ impl ConfiguredNodeResult {
         &self,
     ) -> Result<impl ExactSizeIterator<Item = ConfiguredActionView<'_>>, &'static str> {
         let owner = self.configured_target_key();
-        let execution_platform = self
-            .toolchain_topology()
-            .and_then(ToolchainTopology::selection)
-            .map(ToolchainSelection::execution_platform);
+        let execution_platform = self.toolchain_topology().and_then(|topology| {
+            topology
+                .selection()
+                .map(ToolchainSelection::execution_platform)
+                .or_else(|| {
+                    let [candidate] = topology.candidate_execution_platforms() else {
+                        return None;
+                    };
+                    Some(candidate)
+                })
+        });
         if !self.actions.is_empty() {
             owner.ok_or("configured action owner is not a configured target")?;
             execution_platform

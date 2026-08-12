@@ -1490,16 +1490,13 @@ async fn resolve_root_toolchain(
         selected_result.edges().is_empty() && selected_result.toolchain_topology().is_none()
     };
     if !selected_topology_is_exact
-        || !selected_result.actions().is_empty()
-        || !selected_result.declared_outputs().is_empty()
         || !selected_result.diagnostics().is_empty()
         || selected_result.providers().len() != 2
-        || selected_result.providers().default_info()
-            != Some(&slug_build_api_v2::providers::DefaultInfo::empty())
+        || selected_result.providers().default_info().is_none()
         || selected_result.providers().toolchain_info().is_none()
     {
         return toolchain_outcome(Err(AnalysisError::new(
-            "selected toolchain implementation must return only empty DefaultInfo and ToolchainInfo",
+            "selected toolchain implementation must return only DefaultInfo and ToolchainInfo with exact topology",
         )));
     }
     toolchain_outcome(Ok(PreparedToolchain {

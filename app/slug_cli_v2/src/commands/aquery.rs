@@ -14,7 +14,7 @@ use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_core_v2::error::json_escape;
 use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs;
-use slug_core_v2::runtime::format_file_write_aquery_text_output;
+use slug_core_v2::runtime::format_file_write_aquery_text_output_for_scope;
 use slug_server_v2::AqueryRequest as DaemonAqueryRequest;
 
 pub fn run(argv: Vec<String>) -> i32 {
@@ -62,10 +62,14 @@ pub fn run(argv: Vec<String>) -> i32 {
     };
     let published = accepted
         .project(|terminal| match terminal.as_ref() {
-            Ok(evaluation) => match format_file_write_aquery_text_output(evaluation) {
-                Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
-                Err(error) => TerminalOutput::new(2, String::new(), error_json(error, "one-shot")),
-            },
+            Ok(evaluation) => {
+                match format_file_write_aquery_text_output_for_scope(evaluation, request.scope) {
+                    Ok(stdout) => TerminalOutput::new(0, stdout, String::new()),
+                    Err(error) => {
+                        TerminalOutput::new(2, String::new(), error_json(error, "one-shot"))
+                    }
+                }
+            }
             Err(error) => {
                 let (_, exit_code) = error.terminal_error();
                 TerminalOutput::new(

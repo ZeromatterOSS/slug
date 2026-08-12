@@ -1,8 +1,8 @@
 [fixture]
 name = "filewrite-aquery-root-order"
-description = "Bazel 9.2 direct-literal aquery retains FileWrite declaration order, two-LF block framing, and root-only ownership across A/B/A edits."
+description = "Bazel 9.2 FileWrite aquery retains direct-literal declaration order and proves aspect-free deps owner membership across diamonds, toolchains, delegation, and transitions."
 comparison = "message_shape"
-oracle_notes = "Exact evidence is limited to the direct-literal text shape. The deps row proves owner membership and diamond deduplication only; concurrent query-set iteration does not support a cross-owner ordering claim."
+oracle_notes = "Direct-literal block order and framing are exact. The deps row proves configured owner membership and deduplication only; concurrent query-set iteration does not support a cross-owner ordering claim."
 
 [provenance]
 bazel_release = "9.2.0"
@@ -12,9 +12,13 @@ source_anchors = [
   "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java#processOutput",
   "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java#writeText",
   "src/main/java/com/google/devtools/build/lib/skyframe/RuleConfiguredTargetValue.java#getActions",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#getFwdDeps",
+  "src/main/java/com/google/devtools/build/lib/query2/PostAnalysisQueryEnvironment.java#targetifyValues",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/DepsFunction.java",
   "src/main/java/com/google/devtools/build/lib/query2/engine/QueryUtil.java#ThreadSafeMutableKeyExtractorBackedSetImpl",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/ToolchainResolutionFunction.java#findExecutionPlatformForToolchains",
 ]
-translation_notes = "The root registers z-root.txt before a-root.txt despite their reverse lexical order and depends on a left/right diamond with one shared leaf. A single retained Bazel server observes A/B/A source edits. Direct literal output must contain exactly the two root blocks in declaration order. deps(//:root) patterns count owners without coupling them to iteration order."
+translation_notes = "The root registers z-root.txt before a-root.txt despite reverse lexical order. Its deps closure discriminates a left/right diamond, one-candidate action-bearing selected toolchain implementation, alias delegation, generated-file producer, and transitioned owner. Direct literal output remains exactly two root blocks. deps(//:root) patterns count owners and framing without coupling them to cross-owner iteration order."
 generation_command = "python3 -B -m tools.v2_oracle run --fixture filewrite-aquery-root-order --tool bazel --bazel /usr/bin/bazel --update-expected"
 verification_command = "python3 -B -m tools.v2_oracle run --fixture filewrite-aquery-root-order --tool bazel --bazel /usr/bin/bazel"
 
@@ -51,8 +55,13 @@ name = "deps_owner_membership_only"
 argv = ["aquery", "deps(//:root)", "--output=text"]
 expected_exit = 0
 stdout_patterns = [
+  '''(?s)\A(?=(?:(?:(?!  Mnemonic: FileWrite\n).)*  Mnemonic: FileWrite\n){9}(?:(?!  Mnemonic: FileWrite\n).)*\Z)''',
   '''(?s)\A(?:(?!  Target: //:root\n).)*  Target: //:root\n(?:(?!  Target: //:root\n).)*  Target: //:root\n(?:(?!  Target: //:root\n).)*\Z''',
   '''(?s)\A(?:(?!  Target: //:left\n).)*  Target: //:left\n(?:(?!  Target: //:left\n).)*\Z''',
   '''(?s)\A(?:(?!  Target: //:right\n).)*  Target: //:right\n(?:(?!  Target: //:right\n).)*\Z''',
   '''(?s)\A(?:(?!  Target: //:shared\n).)*  Target: //:shared\n(?:(?!  Target: //:shared\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:demo_impl\n).)*  Target: //:demo_impl\n(?:(?!  Target: //:demo_impl\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:aliased_owner\n).)*  Target: //:aliased_owner\n(?:(?!  Target: //:aliased_owner\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:producer\n).)*  Target: //:producer\n(?:(?!  Target: //:producer\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:transitioned\n).)*  Target: //:transitioned\n(?:(?!  Target: //:transitioned\n).)*\Z''',
 ]

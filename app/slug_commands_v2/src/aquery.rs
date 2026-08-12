@@ -11,8 +11,9 @@
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
+use slug_query_v2::AqueryScope;
 use slug_query_v2::QueryExpression;
-use slug_query_v2::aquery_literal;
+use slug_query_v2::aquery_expression_spec;
 
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
@@ -27,6 +28,7 @@ use crate::common::split_args;
 pub struct AqueryRequest {
     pub expression: String,
     pub target: TargetPattern,
+    pub scope: AqueryScope,
     pub output_base: Option<String>,
     pub bzlmod_policy: BzlmodCommandPolicyKey,
     pub lockfile_mode: LockfileMode,
@@ -45,14 +47,14 @@ impl AqueryRequest {
                 message: error.to_string(),
             }
         })?;
-        let literal = aquery_literal(&parsed_expression).map_err(|error| {
+        let spec = aquery_expression_spec(&parsed_expression).map_err(|error| {
             CommandParseError::InvalidQueryExpression {
                 message: error.to_string(),
             }
         })?;
-        let target = TargetPattern::parse(literal).map_err(|message| {
+        let target = TargetPattern::parse(spec.target()).map_err(|message| {
             CommandParseError::InvalidTargetPattern {
-                value: literal.to_owned(),
+                value: spec.target().to_owned(),
                 message,
             }
         })?;
@@ -99,6 +101,7 @@ impl AqueryRequest {
         Ok(Self {
             expression,
             target,
+            scope: spec.scope(),
             output_base,
             bzlmod_policy: bzlmod_command_policy(&parsed.flags)?,
             lockfile_mode: bzlmod_lockfile_mode(&parsed.flags)?,

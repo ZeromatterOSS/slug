@@ -1352,8 +1352,7 @@ async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_es
         ("wrong callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(value = ctx.attr.marker)"), TOOLCHAIN_BUILD.to_owned(), "named argument `marker`"),
         ("extra callable name", first_module.clone(), TOOLCHAIN_DEFS.replace("platform_common.ToolchainInfo(marker = ctx.attr.marker)", "platform_common.ToolchainInfo(marker = ctx.attr.marker, extra = \"bad\")"), TOOLCHAIN_BUILD.to_owned(), "exactly one named"),
         ("context index", TOOLCHAIN_MODULE.to_owned(), TOOLCHAIN_DEFS.replace("ctx.toolchains[\"//:type\"]", "ctx.toolchains[\"//:missing\"]"), TOOLCHAIN_BUILD.to_owned(), "only contains //:type"),
-        ("action postguard", first_module.clone(), TOOLCHAIN_DEFS.replacen("    print(\"FIRST_LOCAL\")", "    out = ctx.actions.declare_file(\"bad\")\n    ctx.actions.write(out, \"bad\")", 1), TOOLCHAIN_BUILD.to_owned(), "must return only"),
-        ("nonempty DefaultInfo", first_module.clone(), TOOLCHAIN_DEFS.replacen("    print(\"FIRST_LOCAL\")\n    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "    out = ctx.actions.declare_file(\"bad\")\n    return [DefaultInfo(files = depset([out])), platform_common.ToolchainInfo(marker = ctx.attr.marker)]", 1), TOOLCHAIN_BUILD.to_owned(), "must return only"),
+
         ("user ToolchainInfo", first_module.clone(), format!("ToolchainInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), ToolchainInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
         ("user DefaultInfo", first_module.clone(), format!("DefaultInfo = provider(fields = {{}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), DefaultInfo()]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
         ("provider cardinality", first_module, format!("Extra = provider(fields = {{\"value\": \"\"}})\n{}", TOOLCHAIN_DEFS.replacen("return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]", "return [platform_common.ToolchainInfo(marker = ctx.attr.marker), Extra(value = \"bad\")]", 1)), TOOLCHAIN_BUILD.to_owned(), "must return only"),
@@ -1362,6 +1361,24 @@ async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_es
         let error = toolchain_case(&module, &defs, &build).await.unwrap_err();
         assert!(error.contains(expected), "{name}: {error}");
     }
+}
+#[tokio::test]
+async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
+    let defs = TOOLCHAIN_DEFS.replacen(
+        "    print(\"FIRST_LOCAL\")\n    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
+        "    out = ctx.actions.declare_file(\"toolchain.txt\")\n    ctx.actions.write(out, \"toolchain\")\n    return [DefaultInfo(files = depset([out])), platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
+        1,
+    );
+    let result = toolchain_case(
+        &TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\""),
+        &defs,
+        TOOLCHAIN_BUILD,
+    )
+    .await
+    .unwrap();
+    assert!(result.edges().iter().any(|edge| {
+        edge.kind() == &slug_analysis_v2::ConfiguredEdgeKind::SelectedToolchainImplementation
+    }));
 }
 
 #[tokio::test]

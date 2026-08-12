@@ -451,6 +451,33 @@ fn configured_file_write_view_rejects_unowned_or_ambiguous_shapes() {
         Some("configured FileWrite action requires a selected toolchain platform")
     );
 
+    let sole = ConfiguredTargetKey::new(
+        canonical("@@//:sole"),
+        structural_configurations()[1].clone(),
+    );
+    let derived = without_platform
+        .clone()
+        .with_toolchain_topology(ToolchainTopology::new(vec![sole.clone()], None).unwrap());
+    assert_eq!(only_file_write(&derived).execution_platform(), &sole);
+    for candidates in [
+        Vec::new(),
+        vec![
+            sole,
+            ConfiguredTargetKey::new(
+                canonical("@@//:other"),
+                structural_configurations()[1].clone(),
+            ),
+        ],
+    ] {
+        let ambiguous = without_platform
+            .clone()
+            .with_toolchain_topology(ToolchainTopology::new(candidates, None).unwrap());
+        assert_eq!(
+            ambiguous.configured_file_write_actions().err(),
+            Some("configured FileWrite action requires a selected toolchain platform")
+        );
+    }
+
     let unsupported_shapes = vec![
         ActionSpec::new(ActionKind::Run, "Spawn", action.outputs().to_vec()),
         ActionSpec::new(

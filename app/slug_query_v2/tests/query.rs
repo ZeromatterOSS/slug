@@ -8,13 +8,41 @@
  * above-listed licenses.
  */
 
+use slug_query_v2::AqueryScope;
 use slug_query_v2::BinaryOperator;
 use slug_query_v2::QueryError;
 use slug_query_v2::QueryExpression;
 use slug_query_v2::QueryExpressionKind;
 use slug_query_v2::QueryFunctionStatus;
 use slug_query_v2::SourceSpan;
+use slug_query_v2::aquery_expression_spec;
 use slug_query_v2::cquery_literals;
+#[test]
+fn aquery_scope_accepts_only_literal_or_unbounded_top_level_deps_literal() {
+    for (source, scope) in [
+        ("//pkg:bin", AqueryScope::Literal),
+        ("(//pkg:bin)", AqueryScope::Literal),
+        ("deps(//pkg:bin)", AqueryScope::Deps),
+        ("deps((//pkg:bin))", AqueryScope::Deps),
+    ] {
+        let expression = QueryExpression::parse(source).unwrap();
+        let spec = aquery_expression_spec(&expression).unwrap();
+        assert_eq!(spec.target(), "//pkg:bin");
+        assert_eq!(spec.scope(), scope);
+    }
+
+    for source in [
+        "deps(//pkg:bin, 1)",
+        "deps(deps(//pkg:bin))",
+        "deps(set(//pkg:bin))",
+        "kind('rule', //pkg:bin)",
+        "//pkg:bin union //pkg:lib",
+    ] {
+        let expression = QueryExpression::parse(source).unwrap();
+        assert!(aquery_expression_spec(&expression).is_err(), "{source}");
+    }
+}
+
 use slug_query_v2::loading_query_functions;
 use slug_query_v2::validate_cquery_query;
 use slug_query_v2::validate_loading_query;

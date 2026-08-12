@@ -158,24 +158,20 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
     for inputs in [defaults(), overrides(), defaults()] {
         let result = daemon.aquery_with_bzlmod_inputs(
             &target("//pkg:probe"),
+            slug_query_v2::AqueryScope::Literal,
             inputs.0,
             inputs.1,
             inputs.2,
             inputs.3,
         );
         assert_eq!(result.exit_code, 2, "{result:?}");
-        assert!(
-            result
-                .stderr
-                .contains("requires exactly one resolved action"),
-            "{result:?}"
-        );
+        assert!(result.stderr.contains("aquery_runtime_error"), "{result:?}");
     }
     assert_eq!(daemon.take_forwarded_bzlmod_inputs_for_test(), expected);
 }
 
 #[test]
-fn aquery_wire_revalidates_the_raw_literal_expression() {
+fn aquery_wire_revalidates_the_raw_expression_scope() {
     let workspace = scratch("aquery-wire-validation");
     write(&workspace.join("MODULE.bazel"), "module(name = \"demo\")\n");
     write(&workspace.join("BUILD.bazel"), "");
@@ -192,15 +188,17 @@ fn aquery_wire_revalidates_the_raw_literal_expression() {
         .unwrap()
     };
 
-    let invalid = handle_request(&mut daemon, &request("deps(//pkg:probe)"));
+    let invalid = handle_request(&mut daemon, &request("deps(//pkg:probe, 1)"));
     assert_eq!(invalid.exit_code, 2);
     assert!(invalid.stderr.contains("aquery_request_error"));
     assert_eq!(invalid.invalidated_files, 0);
 
-    let valid = handle_request(&mut daemon, &request("//pkg:probe"));
-    assert_eq!(valid.exit_code, 2);
-    assert!(valid.stderr.contains("aquery_runtime_error"));
-    assert!(!valid.stderr.contains("aquery_request_error"));
+    for expression in ["//pkg:probe", "deps(//pkg:probe)"] {
+        let valid = handle_request(&mut daemon, &request(expression));
+        assert_eq!(valid.exit_code, 2);
+        assert!(valid.stderr.contains("aquery_runtime_error"));
+        assert!(!valid.stderr.contains("aquery_request_error"));
+    }
 }
 
 const DEFS_BZL: &str = "\

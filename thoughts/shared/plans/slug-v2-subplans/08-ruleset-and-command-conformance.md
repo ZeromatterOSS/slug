@@ -4187,3 +4187,58 @@ uses already retained configuration-bearing topology, keeps toolchain selection
 and action platform identity separate, fails closed on ambiguous/broader
 zero-toolchain shapes, and gives a bounded successor with discriminating
 oracle and lifecycle proof.
+## FileWrite aquery deps owner-set implementation accepted (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-deps-owner-set-platform-oracle-implementation`
+is **ACCEPT**. A shared parsed scope admits only a direct main-repository
+literal or unary unbounded top-level `deps(literal)`; the CLI and daemon each
+reparse the raw expression, and the public daemon wire remains unchanged.
+Literal output still selects only the sole requested analysis and preserves its
+retained declaration order plus two-LF framing. `deps()` selects action-bearing
+owners from the retained roots-first breadth-first action closure. Configured
+owner membership and per-owner action order/framing are exact for the admitted
+aspect-free Bazel 9.2 slice; cross-owner BFS order is explicitly Slug-native.
+
+Configured FileWrite actions prefer an existing toolchain selection. A
+selection-free owner derives an action execution platform only from exactly one
+retained candidate configured key. No `ToolchainSelection`, DICE key, field,
+or reconstructed action is created. The selected-implementation guard now
+allows retained actions, declared outputs, and nonempty built-in `DefaultInfo`
+while still requiring exact candidate topology, exactly built-in `DefaultInfo`
+plus `ToolchainInfo`, and no diagnostics. Zero/multiple/missing candidates,
+ordinary zero-toolchain action owners, mixed actions, aspects, external
+registrations, shared equivalent configured owners, wrappers/depth, other
+formats/action kinds, and Bazel identity bytes remain fail-closed or deferred.
+
+The five-file pinned Bazel 9.2 fixture is 343 lines and discriminates two
+root-local nonlexical actions, an ordinary diamond, action-bearing selected
+toolchain implementation, alias target, generated-file producer, and
+transitioned owner without asserting cross-owner order. Refresh and protected
+replay both passed. Focused analysis/query/commands/core/server tests, full
+analysis/commands/query/server suites, rebuilt `slug_cli_v2`, and the
+one-shot/daemon stable-PID dependency-edge A/B/A lifecycle passed. The
+lifecycle includes the action-bearing selected implementation and exact output/
+SlugActionToken restoration.
+
+Rust growth is 258 net lines total (129 in production-path files and 129 in
+test-path files, with the mixed core file conservatively counted as
+production), inside all packet caps. `cargo check`, rustfmt, scope/credential,
+fixture, and diff checks passed. The archive checker passed every active V2
+layout boundary and reported only the established missing V1 tag/branch/
+recorded-commit baseline. Broad integration runs also reproduced two unrelated
+baselines: the CLI loadfiles fixture's unavailable root DICE node and the core
+external-visibility diagnostic wording assertion. Packet-specific paths do not
+reach either failure.
+
+Independent final review returned `ACCEPT`: exact/Slug-native/deferred claims,
+identity separation, retained topology, closure platform/constraint resolution,
+fail-closed boundaries, fixture discrimination, lifecycle proof, and caps are
+truthful. This closes M5 for the bounded FileWrite surface; broader aquery
+breadth remains later work rather than an execution-gate parity claim.
+
+Run next only `WP-7-m6-filewrite-reapi-action-handoff-design`, design-only.
+Freeze one semantic FileWrite action object shared by aquery and execution and
+the exact REAPI `Command`/input-root/`Action` identity boundary. Do not add
+production state, execution, backend calls, cache/materialization, or protocol
+breadth until that retained ownership and digest-domain design is independently
+accepted.

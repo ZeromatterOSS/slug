@@ -5050,7 +5050,12 @@ register_toolchains("//:demo_toolchain")
     write(
         &defs,
         r#"def _toolchain_impl(ctx):
-    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+    out = ctx.actions.declare_file("toolchain.txt")
+    ctx.actions.write(out, "toolchain")
+    return [
+        DefaultInfo(files = depset([out])),
+        platform_common.ToolchainInfo(marker = ctx.attr.marker),
+    ]
 
 demo_toolchain_impl = rule(
     implementation = _toolchain_impl,
@@ -5149,6 +5154,53 @@ root_rule(name = "root", deps = [":left", ":right"])
     };
     let baseline_tokens = tokens(&baseline);
     assert_eq!(baseline_tokens.len(), 2);
+
+    let deps_one_shot = accepted(&run(&["aquery", "deps(//:root)"]));
+    let deps_explicit = accepted(&run(&["aquery", "--output=text", "deps(//:root)"]));
+    assert_eq!(deps_explicit, deps_one_shot);
+    let deps_daemon = accepted(&run(&[output_base_arg.as_str(), "aquery", "deps(//:root)"]));
+    assert_eq!(deps_daemon, deps_one_shot);
+    for (owner, count) in [
+        ("root", 2),
+        ("demo_impl", 1),
+        ("left", 1),
+        ("right", 1),
+        ("shared", 1),
+    ] {
+        assert_eq!(
+            deps_daemon
+                .matches(&format!("  Target: //:{owner}\n"))
+                .count(),
+            count,
+            "{deps_daemon}"
+        );
+    }
+    assert_eq!(deps_daemon.matches("\n\n").count(), 6);
+    let deps_baseline_tokens = tokens(&deps_daemon);
+    assert_eq!(deps_baseline_tokens.len(), 6);
+
+    let build_source = std::fs::read_to_string(&build).unwrap();
+    let both_edges = r#"root_rule(name = "root", deps = [":left", ":right"])"#;
+    let left_edge = r#"root_rule(name = "root", deps = [":left"])"#;
+    assert!(build_source.contains(both_edges));
+    write(&build, &build_source.replace(both_edges, left_edge));
+    let deps_edited = accepted(&run(&[output_base_arg.as_str(), "aquery", "deps(//:root)"]));
+    assert!(!deps_edited.contains("  Target: //:right\n"));
+    assert_eq!(deps_edited.matches("  Target: //:shared\n").count(), 1);
+    assert_eq!(deps_edited.matches("action '").count(), 5);
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        baseline_pid
+    );
+
+    write(&build, &build_source);
+    let deps_restored = accepted(&run(&[output_base_arg.as_str(), "aquery", "deps(//:root)"]));
+    assert_eq!(deps_restored, deps_daemon);
+    assert_eq!(tokens(&deps_restored), deps_baseline_tokens);
+    assert_eq!(
+        std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
+        baseline_pid
+    );
 
     let source = std::fs::read_to_string(&defs).unwrap();
     let order_a = "    ctx.actions.write(z, \"z\")\n    ctx.actions.write(a, \"a\")";
