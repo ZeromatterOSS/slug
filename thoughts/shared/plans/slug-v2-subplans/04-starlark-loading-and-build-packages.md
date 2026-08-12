@@ -2157,3 +2157,50 @@ root-only map: extension ids/imports and canonical module names are
 post-selection state. Stage 4 remains parked while Stage 5 first retains the
 complete callerless embedded MODULE value; no package/Bzl consumer dispatch is
 authorized by that leaf.
+## Module-extension definition loading owner audit (2026-08-12)
+
+The accepted Bzlmod request projection in `d0d7bde7` resolves the selected
+extension identity and complete owner mapping before loading. The smallest
+loading-side composition seam is the existing crate-private
+`HostBzlModuleEvalKey`: it already owns root-main source observation,
+transitive `load()` resolution, parse/evaluation/freeze, event capture,
+`BzlLoadManifest` equality, frozen-module lifetime, Need validity, and typed
+source/load errors. A second evaluator, source key, or purpose-split frozen
+module graph is not justified.
+
+Pinned Bazel 9.2 commit `8220c6198837d5c13d53fea211cf3282aa12408a`
+constructs a `ModuleExtension` from a callable, ordered tag-class map, ordered
+environment declarations, OS/architecture dependency bits, and a nonnegative
+facts version. `RegularRunnableExtension.load` validates and loads the bzl
+module before looking up the requested public export and verifying its
+`ModuleExtension` type; environment observation and execution occur later.
+
+Slug's shared `loading_globals()` already owns `attr.*` descriptors and the
+freeze/export patterns used by retained rule definitions. It lacks only
+`tag_class` and `module_extension`. The design must prove that adding those
+exact Bazel definition globals to the shared bzl environment preserves the sole
+Host loader and existing package-loading behavior. The exported definition may
+retain the selected request, complete transitive manifest, ordered heap-free tag
+schemas and factor declarations. Each admitted tag descriptor must retain kind,
+mandatory, effective configurable value, coerced default, and
+allow-single-file; transition/explicit-configurability and every unmodeled
+restriction family fail closed during bzl evaluation. Its callable must remain
+lifetime-only inside the cached `FrozenBzlModule`, never in semantic equality
+or a projected value.
+
+Run next only the docs-only
+`WP-4-5-host-module-extension-definition-loading-owner-design`. Settle
+callable validation; attribute admission; missing/private/wrong-kind export and
+schema error ordering; retained-field A/B/A and unprojected-option negative
+rows; transitive-load identity; multi-request Need/error
+behavior; and exact versus Slug-native/deferred boundaries. A future successor
+may use only `app/slug_loading_v2/src/package.rs` and
+`app/slug_loading_v2/src/bzl_module.rs`, with colocated tests and no public
+API, only if this audit proves one shared-loader implementation. Initial
+credible caps are 440 production, 650 tests, and 1,090 total.
+
+Stop on a purpose-split/second loader, retained heap/callable, repository-rule
+or execution breadth, public definition surface, third Rust file, I/O,
+generated repository/spec/existence work, materialization, lockfile, consumer,
+or JVM/Java dependency. No Rust is authorized before independent design
+acceptance and explicit implementation activation.

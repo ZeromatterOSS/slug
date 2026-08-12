@@ -2227,3 +2227,37 @@ Independent review accepts the cap-only correction. Resume only
 in `selected_repo_spec.rs` and `lib.rs`, under 220 production, 260 tests, and
 480 total. Preserve the exact accepted semantics, proof, and every prior stop;
 obtain independent implementation review before acceptance.
+
+### Selected extension definition-load requests accepted (2026-08-12)
+
+Commit `d0d7bde7` publishes the narrow hidden bridge required by loading. The
+callerless Bzlmod key computes selected mappings exactly once, preserves
+typed completed predecessor errors and invalid/non-self-equal Need, and emits
+first-encounter root-main ordinary nonisolated requests containing only the
+workspace, canonical bzl label, exported name, context repo, and immutable
+selected mapping. The complete private predecessor remains structural identity;
+isolated, MVO-owner, innate, nonroot, and non-root-repository definitions fail
+closed.
+
+Growth is 205 production, 236 tests, and 441 total lines against the corrected
+220/260/480 caps in the authorized two files. Focused order/dedup/fail-closed
+and real-DICE absence/change/restoration/reuse/Need/error rows pass. The full
+Bzlmod and loading all-target suites, formatting, diff/scope/compact/cleanup
+audits, and independent implementation review pass. No source/load evaluator,
+I/O, callable, heap, generated-repository, or consumer edge was added.
+
+The next missing leaf is loading-owned. Run only the docs-only
+`WP-4-5-host-module-extension-definition-loading-owner-design`, jointly
+recorded in Stage 4. Compose the accepted request first with the existing sole
+`HostBzlModuleEvalKey`; freeze exact `module_extension`/`tag_class` globals,
+export/schema validation and a heap-independent definition value without a
+purpose-split loader or retained callable. The design allowlist is canonical,
+current, Stage 4, and this Stage 5 plan under 45/240/220/180/685 caps.
+
+No Rust, Cargo/BUILD, fixture, public API, selected-owner mutation,
+source/evaluator key, extension execution/context, environment observation,
+generated name/RepoSpec/existence, materializer, lockfile, consumer, or
+JVM/Java work is authorized before independent design acceptance. `REPLAN`
+on a second loader, retained Starlark heap/callable, repository-rule breadth,
+public definition surface, third future Rust file, unresolved exact error
+order, or cap excess.
