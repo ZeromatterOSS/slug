@@ -1608,3 +1608,18 @@ total caps, with no new file, owner, policy, consumer, or behavior family.
 Require a distinct typed leaf-error variant and focused equality proof. Retain
 the unaccepted Rust diff; authorize no Rust until independent correction
 acceptance and explicit r2 implementation activation.
+
+### Selected module graph cap correction accepted (2026-08-12)
+
+Independent correction review accepts the same two-file implementation at
+920 production/1,050 test/1,970 total formatted net lines. The increase grants
+no new file, owner, policy, consumer, or behavior family. R2 must retain
+completed `HostDiscoveredModuleError` leaves structurally in a distinct typed
+variant and prove that identity with a focused equality discriminator.
+
+Run next only
+`WP-5-host-selected-module-graph-owner-implementation-r2`. Resume the retained
+unaccepted Rust diff, apply the typed leaf-error correction, complete the
+frozen proof matrix, and obtain independent implementation review. All prior
+third-file, public, second-graph/merge, recursive-DICE, lock, raw-observation,
+post-selection, and cap stops remain terminal.

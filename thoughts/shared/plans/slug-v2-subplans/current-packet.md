@@ -1,12 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-module-graph-owner-implementation-r2-cap-design`
-Milestone: cross-stage M7 correction design
+Packet: `WP-5-host-selected-module-graph-owner-implementation-r2`
+Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct the selected-graph implementation cap and typed leaf-error
-contract after the first compiling implementation triggered the frozen stop.
+Result: complete and prove the accepted callerless selected-module graph owner
+within the corrected two-file boundary.
 
-## Active correction contract
+## Accepted correction contract
+
+This independently accepted correction is historical context for r2. It grants
+no separate file, action, cap, or scheduling authority.
 
 The first compiling two-file implementation is retained but unaccepted at 874
 formatted lines in `selected_graph.rs` plus one `lib.rs` declaration: 875 net
@@ -253,18 +256,15 @@ and unequal. Captured evaluation events remain owned by the computed root and
 discovered leaves; the selected graph stores no duplicate batch and introduces
 no consumer/publication edge.
 
-## Unaccepted predecessor implementation contract
+## Active implementation contract
 
-This retained predecessor contract is historical context only and grants no
-file, action, cap, or scheduling authority.
-
-The predecessor proposed implementation only in:
+Resume the retained unaccepted implementation only in:
 
 - new `app/slug_bzlmod_v2/src/selected_graph.rs`; and
 - `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration.
 
 All implementation and tests are colocated in the new file. Cap formatted net
-growth at 760 production lines, 1,050 test lines, and 1,810 total. A third Rust
+growth at 920 production lines, 1,050 test lines, and 1,970 total. A third Rust
 file or any public export is a terminal `REPLAN`.
 
 Required proof:
