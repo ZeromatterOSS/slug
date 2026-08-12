@@ -1860,3 +1860,33 @@ Run next only `WP-5-host-selected-module-route-owner-implementation` in
 predecessor mutation, second graph/I/O/override owner, extension breadth,
 materialization/loading/consumer edge, or third file. Obtain fresh independent
 implementation review before acceptance.
+
+### Selected module route owner implementation accepted (2026-08-12)
+
+Commit `6f72baaf` accepts the private callerless selected-module route owner at
+328 production, 439 tests, and 767 total formatted net lines, within the
+420/700/1,120 caps. It computes the accepted selected graph before the accepted
+selected registry RepoSpec aggregate and retains roots-first BFS entries with
+the shallow graph entry, exact canonical identity, compact context-bearing
+Bazel-dependency mapping, and optional whole selected registry RepoSpec.
+
+Exact behavior covers root, well-known, unique-version, normalized MVO
+canonical names; canonical collisions; root-empty, self, and transformed
+ordinary dependency mappings; registry/nonregistry/built-in source
+classification; and whole predecessor identity. Need remains invalid;
+completed graph errors precede selected-source work. Slug-native error wording
+and deterministic completed-error selection remain explicit.
+
+One borrowed nonregistry RepoSpec projection reuses the retained closure source
+identity. Pure and real-DICE tests cover both MVO contexts, every mapping and
+registry mismatch terminal, root/built-in/nonregistry zero registry work,
+registry source A/B/A, warm reuse, Need, and graph-before-source precedence.
+The full owner and loading suites, formatting/diff/scope/cap checks, compact
+representation and AI-cleanup audits, and independent implementation review
+pass. The public root route and every consumer remain unchanged.
+
+Run next only `WP-5-host-selected-extension-mapping-owner-design`. Audit the
+first additive post-selection extension mapping owner over the accepted module
+routes. No Rust, extension evaluation, repository rule, materialization,
+lockfile/final-module publication, loading, public mapping/route consumer, or
+JVM/Java work is authorized before independent design acceptance.
