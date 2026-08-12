@@ -4441,3 +4441,62 @@ found no other unsupported construct beyond the cross-platform host-context
 branch. Run next only
 `WP-8-m7-filewrite-run-handoff-implementation-retry-2`, retaining the reviewed
 production/harness diff and applying only the accepted POSIX fixture reduction.
+
+### Executable FileWrite Run implementation evidence (2026-08-11)
+
+`WP-8-m7-filewrite-run-handoff-implementation-retry-2` activates only the
+reviewed POSIX one-target shape. `BuildCommandEvaluation` owns one borrowed
+`ResolvedRunSemanticView`; execution still derives only
+`FileWriteReapiPlan::from_resolved` and `execute_file_write`. The daemon
+builds, validates, and returns a bounded plan; only the client launches with
+locally retained arguments and inherited streams/environment minus the fixed
+five names. No DICE key/state, second action model, raw/direct-local executor,
+runfiles materializer, daemon child launch, or environment value entered the
+wire.
+
+The retry used its one correction to rename the fixture's content attribute to
+the already admitted `ctx.attr.marker`; pinned Bazel 9.2 output remained
+identical. The final POSIX fixture has one explicit marker-leaf toolchain,
+selected `container-image=run:selected` platform, executable FileWrite, and
+A/B/failing-B/A rows. Nondiscriminating generated capture fields were pruned
+from the message-shape expectation; its fixture patterns still own every
+argument/stdout/stderr/exit byte.
+
+Pinned Bazel 9.2 refresh/replay passed at
+`20260811-220914-230144-bazel` and `20260811-222448-238556-bazel`. Rebuilt
+Slug replay passed at `20260811-222855-241623-slug`; the monitored replay
+`20260811-222109-238219-slug` observed exactly daemon PID `238261` across
+all four rows and cleaned its socket/PID. Each row reports one REAPI action,
+zero direct-local actions, selected properties, and executable mode `0555`.
+Invalidations are `0/1/0/1`; action digests are A/B/B/A with exact A
+restoration. A direct no-output-base execution independently passed ordered
+args, environment clearing, owner materialization, one-shot evidence, and exit
+zero. The focused NativeLink bytes/digest/mode test passed.
+
+Focused/full results: commands 20/20, analysis 39/39, server 50/50, REAPI
+5+14 passing with its one endpoint-required test also run and passing, CLI Run
+2/2, oracle endpoint 7/7, and direct compile/format checks pass. Core is
+173/174 only on the unchanged external-visibility wording baseline; CLI is
+50/51 only on the unchanged unavailable-root loadfiles baseline. The full
+Python harness is 101/104 on three unrelated stale fixture-test baselines.
+Archive active-layout checks pass; only the known absent V1 refs/record and
+canonical-reference checker baseline fail.
+
+Cleanup removed a no-op metadata binding and duplicated request reconstruction,
+centralized cross-command plan rejection, and added output-root symlink/type
+validation. Final growth is 606 production and 217 test Rust lines, 823 total;
+harness growth is 7 production and 47 test lines; fixture net growth is 56.
+Allowlist, credential grep, formatting, and diff checks pass. Compatibility
+remains exact for the admitted target/action/args/stream/numeric-exit relation,
+Slug-native for paths/wire/cwd/environment/process/signal envelope, and deferred
+for every broader Run surface listed by the accepted design.
+
+Independent final implementation review returned `ACCEPT`. It verified the
+borrowed request-local semantic view, resolved-only FileWrite executor path,
+provider/action/runfiles guards, owner-root and symlink/mode checks,
+client-only process ownership, bounded no-secret daemon wire, exact build
+failure classifications, endpoint evidence, lifecycle proof, caps, and
+allowlist. The POSIX executable FileWrite Run vertical is accepted.
+
+Run next only `WP-8-m7-filewrite-test-handoff-design`: audit pinned Bazel
+9.2 test ownership and freeze the first bounded FileWrite Test vertical.

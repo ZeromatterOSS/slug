@@ -39,6 +39,7 @@ pub use executor::RemoteExecutionResult;
 pub use executor::execute_action;
 pub use executor::execute_file_write;
 pub use executor::materialize_outputs;
+pub use executor::verify_materialized_run_executable;
 pub use input_tree::InputTreeEntryKind;
 pub use input_tree::InputTreeError;
 pub use input_tree::ReapiBlob;

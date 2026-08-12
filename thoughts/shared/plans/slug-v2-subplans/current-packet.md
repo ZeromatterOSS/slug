@@ -1,12 +1,54 @@
 # Current Slug V2 Packet
 
-Packet: `WP-8-m7-filewrite-run-handoff-implementation-retry-2`
-Milestone: M7 implementation retry 2
+Packet: `WP-8-m7-filewrite-test-handoff-design`
+Milestone: M7 design
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: activate the accepted FileWrite Run vertical using the reviewed
-endpoint injector and complete POSIX `run-basic` source shape on the already
-admitted Slug Starlark surface, without adding host-configuration semantics or
-changing the accepted production Run architecture.
+Result: freeze the smallest truthful Bazel 9.2 executable FileWrite `test`
+vertical, or record `REPLAN` if test process, result, log, or exit semantics
+cannot reuse the accepted graph/executor and client-owned launch boundary.
+
+## Active design contract
+
+Audit pinned Bazel 9.2 test-command source and the complete six-file
+`test-basic` fixture against Slug's accepted configured graph, built-in
+`DefaultInfo`, FileWrite semantic view, REAPI materialization, Run launch
+authorization, command parsing, daemon wire, evidence schema, and BEP state.
+Pin the admitted process owner, test environment, working directory, streams,
+timeout, status/exit mapping, log/output ownership, cache evidence, and
+one-shot/daemon lifecycle. Do not infer test semantics from Run alone.
+
+The design must classify every changed behavior as exact, Slug-native, or
+unsupported/deferred. Preserve the existing exact FileWrite action and REAPI
+digest boundary and Slug-native configured paths. Any unmodeled provider,
+runfiles tree, manifest, test shard/run number, coverage, timeout, sandbox,
+flaky retry, remote test execution, BEP event, or test action fails closed
+unless pinned source and a bounded retained representation prove otherwise.
+
+This packet may edit only canonical/current/Stage 8 bookkeeping and, when
+needed for a discriminating Bazel-only oracle, the six existing
+`tests/v2_oracle/fixtures/test-basic/` files. It may inspect all relevant
+Rust and pinned-source inputs but must not edit production Rust, public wire,
+schemas, dependencies, Stage 9, CI, or another fixture. Fixture growth is
+capped at 100 lines and bookkeeping at 180 lines.
+
+Required evidence:
+
+- cite the pinned Bazel 9.2 source ownership for test execution, environment,
+  status/exit, log, timeout, and BEP boundaries;
+- refresh/replay a deterministic POSIX `test-basic` oracle only if existing
+  evidence cannot discriminate the proposed slice;
+- prove whether the accepted FileWrite semantic/action view can be borrowed
+  without a second retained model or DICE key;
+- prove whether daemon/client process ownership can remain bounded with no
+  arguments, environment values, streams, secrets, or arbitrary paths crossing
+  the wire; and
+- name the exact successor allowlist, caps, fail-closed stops, focused tests,
+  lifecycle proof, and broad-suite checkpoint.
+
+This is a reserved public process/result boundary. Require independent Sol
+design review before scheduling implementation. One bounded design correction
+is allowed; a second material miss is `REPLAN`. At `ACCEPT`, update Stage 8
+with the frozen boundary, set canonical/current to the implementation packet,
 
 ## Retry stop
 

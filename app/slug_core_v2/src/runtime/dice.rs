@@ -2320,6 +2320,13 @@ pub struct ResolvedFileWriteSemanticView<'a> {
     platform_fact: &'a PlatformSemanticFact,
     platform_constraints: Vec<ResolvedPlatformConstraintSemanticView<'a>>,
 }
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ResolvedRunSemanticView<'a> {
+    owner: &'a ConfiguredNodeResult,
+    default_info: &'a slug_build_api_v2::DefaultInfo,
+    file_write: ResolvedFileWriteSemanticView<'a>,
+    executable: &'a str,
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub struct ResolvedPlatformConstraintSemanticView<'a> {
@@ -2344,6 +2351,23 @@ impl<'a> ResolvedFileWriteSemanticView<'a> {
     }
 }
 
+impl<'a> ResolvedRunSemanticView<'a> {
+    pub fn owner(&self) -> &'a ConfiguredNodeResult {
+        self.owner
+    }
+
+    pub fn default_info(&self) -> &'a slug_build_api_v2::DefaultInfo {
+        self.default_info
+    }
+
+    pub fn file_write(&self) -> &ResolvedFileWriteSemanticView<'a> {
+        &self.file_write
+    }
+
+    pub fn executable(&self) -> &'a str {
+        self.executable
+    }
+}
 impl<'a> ResolvedPlatformConstraintSemanticView<'a> {
     pub fn platform_edge(&self) -> &'a slug_analysis_v2::ConfiguredEdge {
         self.platform_edge
@@ -2621,6 +2645,86 @@ impl BuildCommandEvaluation {
             }
         }
         Ok(views)
+    }
+
+    pub fn resolved_run_semantic_view(&self) -> Result<ResolvedRunSemanticView<'_>, &'static str> {
+        let owner = self.sole_requested_analysis()?;
+        if owner.kind() != &ConfiguredNodeKind::Rule {
+            return Err("run requires one configured rule");
+        }
+        let capability = owner
+            .rule_capability()
+            .ok_or("run target has no executable rule capability")?;
+        if !capability.executable || capability.test_kind.is_some() {
+            return Err("run requires an executable non-test rule");
+        }
+        if !owner.diagnostics().is_empty() {
+            return Err("run target analysis has diagnostics");
+        }
+        if owner.providers().len() != 1 {
+            return Err("run target requires only built-in DefaultInfo");
+        }
+        let default_info = owner
+            .providers()
+            .default_info()
+            .ok_or("run target has no built-in DefaultInfo")?;
+        let executable = default_info
+            .executable
+            .as_deref()
+            .ok_or("run DefaultInfo has no executable")?;
+        if executable.is_empty()
+            || default_info.files_to_run.executable.as_deref() != Some(executable)
+        {
+            return Err("run DefaultInfo executable relation is inconsistent");
+        }
+        if default_info.files_to_run.runfiles_manifest.is_some()
+            || default_info.files_to_run.repo_mapping_manifest.is_some()
+        {
+            return Err("run manifests are unsupported");
+        }
+        let singleton = |files: &slug_build_api_v2::Depset<String>| matches!(files.to_list().as_slice(), [only] if only == executable);
+        if !singleton(&default_info.files)
+            || !singleton(&default_info.default_runfiles.files)
+            || !singleton(&default_info.data_runfiles.files)
+        {
+            return Err("run files and runfiles must contain only the executable");
+        }
+        for runfiles in [&default_info.default_runfiles, &default_info.data_runfiles] {
+            if !runfiles.symlinks.is_empty() || !runfiles.empty_filenames.to_list().is_empty() {
+                return Err("run symlinks and empty files are unsupported");
+            }
+        }
+        if self
+            .action_closure
+            .iter()
+            .map(|node| node.actions().len())
+            .sum::<usize>()
+            != 1
+        {
+            return Err("run requires exactly one action in the configured closure");
+        }
+        let [file_write] = self
+            .resolved_file_write_semantic_views_in_closure()?
+            .try_into()
+            .map_err(|_| "run requires exactly one resolved FileWrite action")?;
+        if file_write.action().owner() != owner.configured_target_key().unwrap()
+            || file_write.action().output().path() != executable
+            || !matches!(
+                file_write.action().spec().kind(),
+                slug_build_api_v2::ActionKind::Write {
+                    is_executable: true,
+                    ..
+                }
+            )
+        {
+            return Err("run executable is not the sole executable FileWrite output");
+        }
+        Ok(ResolvedRunSemanticView {
+            owner,
+            default_info,
+            file_write,
+            executable,
+        })
     }
 
     pub fn is_observed_exported_source(&self) -> bool {
@@ -11430,6 +11534,125 @@ ordinary_rule(
         let warm = warm_transaction.compute(&key).await.unwrap();
         assert!(BuildCommandRootKey::equality(&outcome, &warm));
         assert!(tracker.take().is_empty());
+    }
+
+    #[tokio::test]
+    async fn resolved_run_view_reuses_exact_executable_filewrite_relation() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse("//:write").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        let mut rejected_tx =
+            build_root_transaction(&dice, resolved_write_epoch(40, "setting_a", &[])).await;
+        let rejected = rejected_tx.compute(&key).await.unwrap();
+        assert_eq!(
+            complete_build_evaluation(&rejected)
+                .resolved_run_semantic_view()
+                .unwrap_err(),
+            "run requires an executable non-test rule"
+        );
+
+        let replacements = [
+            (
+                "ctx.actions.write(out, \"content\\n\")",
+                "ctx.actions.write(out, \"content\\n\", is_executable = True)",
+            ),
+            (
+                "return [DefaultInfo(files = depset([out]))]",
+                "return [DefaultInfo(executable = out)]",
+            ),
+            (
+                "write = rule(implementation = _write, toolchains",
+                "write = rule(implementation = _write, executable = True, toolchains",
+            ),
+        ];
+        let mut accepted_tx =
+            build_root_transaction(&dice, resolved_write_epoch(41, "setting_a", &replacements))
+                .await;
+        let accepted = accepted_tx.compute(&key).await.unwrap();
+        let view = complete_build_evaluation(&accepted)
+            .resolved_run_semantic_view()
+            .unwrap();
+        assert_eq!(view.executable(), "write.txt");
+        assert_eq!(view.file_write().action().output().path(), "write.txt");
+        assert!(std::ptr::eq(
+            view.owner().providers().default_info().unwrap(),
+            view.default_info(),
+        ));
+
+        let fail_closed_cases = [
+            (
+                42,
+                vec![
+                    (
+                        "def _write(ctx):",
+                        "Extra = provider(fields = {\"value\": \"value\"})\ndef _write(ctx):",
+                    ),
+                    (
+                        "ctx.actions.write(out, \"content\\n\")",
+                        "ctx.actions.write(out, \"content\\n\", is_executable = True)",
+                    ),
+                    (
+                        "return [DefaultInfo(files = depset([out]))]",
+                        "return [DefaultInfo(executable = out), Extra(value = \"extra\")]",
+                    ),
+                    (
+                        "write = rule(implementation = _write, toolchains",
+                        "write = rule(implementation = _write, executable = True, toolchains",
+                    ),
+                ],
+                "run target requires only built-in DefaultInfo",
+            ),
+            (
+                43,
+                vec![
+                    (
+                        "ctx.actions.write(out, \"content\\n\")",
+                        "ctx.actions.write(out, \"content\\n\", is_executable = True)",
+                    ),
+                    (
+                        "return [DefaultInfo(files = depset([out]))]",
+                        "return [DefaultInfo(executable = out, files = depset([]))]",
+                    ),
+                    (
+                        "write = rule(implementation = _write, toolchains",
+                        "write = rule(implementation = _write, executable = True, toolchains",
+                    ),
+                ],
+                "run files and runfiles must contain only the executable",
+            ),
+            (
+                44,
+                vec![
+                    (
+                        "return [DefaultInfo(files = depset([out]))]",
+                        "return [DefaultInfo(executable = out)]",
+                    ),
+                    (
+                        "write = rule(implementation = _write, toolchains",
+                        "write = rule(implementation = _write, executable = True, toolchains",
+                    ),
+                ],
+                "run executable is not the sole executable FileWrite output",
+            ),
+        ];
+        for (variant, replacements, expected) in fail_closed_cases {
+            let mut transaction = build_root_transaction(
+                &dice,
+                resolved_write_epoch(variant, "setting_a", &replacements),
+            )
+            .await;
+            let outcome = transaction.compute(&key).await.unwrap();
+            assert_eq!(
+                complete_build_evaluation(&outcome)
+                    .resolved_run_semantic_view()
+                    .unwrap_err(),
+                expected
+            );
+        }
     }
 
     #[tokio::test]

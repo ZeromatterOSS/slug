@@ -343,7 +343,12 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
         Ok(DeclaredFile { output })
     }
 
-    fn write(this: Value, output: Value, content: &str) -> anyhow::Result<NoneType> {
+    fn write(
+        this: Value,
+        output: Value,
+        content: &str,
+        #[starlark(default = false)] is_executable: bool,
+    ) -> anyhow::Result<NoneType> {
         let actions = AnalysisActions::from_value(this)
             .ok_or_else(|| anyhow::anyhow!("ctx.actions receiver is invalid"))?;
         let output = DeclaredFile::from_value(output)
@@ -352,7 +357,7 @@ fn analysis_actions_methods(builder: &mut MethodsBuilder) {
             .actions
             .lock()
             .map_err(|_| anyhow::anyhow!("ctx.actions state lock is poisoned"))?
-            .write(output.output.clone(), content, false)
+            .write(output.output.clone(), content, is_executable)
             .map_err(|error| anyhow::anyhow!(error.to_string()))?;
         Ok(NoneType)
     }

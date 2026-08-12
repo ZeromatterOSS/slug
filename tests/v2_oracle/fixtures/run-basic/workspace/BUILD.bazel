@@ -1,1 +1,16 @@
+load("//pkg:defs.bzl", "run_toolchain_impl")
 
+platform(
+    name = "platform",
+    exec_properties = {"container-image": "run:selected"},
+)
+toolchain_type(name = "run_type")
+run_toolchain_impl(
+    name = "run_impl",
+    marker = "run-basic",
+)
+toolchain(
+    name = "run_toolchain",
+    toolchain = ":run_impl",
+    toolchain_type = ":run_type",
+)

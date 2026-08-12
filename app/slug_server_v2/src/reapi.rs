@@ -204,6 +204,42 @@ pub fn run_reapi_build(
     }
 }
 
+pub fn run_reapi_executable(
+    workspace: &Path,
+    evaluation: &BuildCommandEvaluation,
+    remote: &RemoteConfig,
+    runtime_mode: &str,
+    invalidated_files: usize,
+) -> (ReapiBuildOutcome, Option<std::path::PathBuf>) {
+    let view = match evaluation.resolved_run_semantic_view() {
+        Ok(view) => view,
+        Err(error) => {
+            return (
+                ReapiBuildOutcome::error(runtime_mode, invalidated_files, error),
+                None,
+            );
+        }
+    };
+    let outcome = run_reapi_build(
+        workspace,
+        evaluation,
+        evaluation.analyzed_target_count(),
+        evaluation.declared_action_count(),
+        remote,
+        runtime_mode,
+        invalidated_files,
+    );
+    if outcome.exit_code != 0 {
+        return (outcome, None);
+    }
+    match slug_reapi_v2::verify_materialized_run_executable(workspace, &view) {
+        Ok(path) => (outcome, Some(path)),
+        Err(error) => (
+            ReapiBuildOutcome::error(runtime_mode, invalidated_files, &error.to_string()),
+            None,
+        ),
+    }
+}
 /// The outcome of a REAPI build: exit code and the stderr JSON line.
 #[derive(Debug, Clone)]
 pub struct ReapiBuildOutcome {

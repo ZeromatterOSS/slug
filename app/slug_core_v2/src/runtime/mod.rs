@@ -29,6 +29,7 @@ pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
 pub use dice::ResolvedFileWriteSemanticView;
 pub use dice::ResolvedPlatformConstraintSemanticView;
+pub use dice::ResolvedRunSemanticView;
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceDirectoryObservation;
 pub use dice::WorkspaceEvaluation;

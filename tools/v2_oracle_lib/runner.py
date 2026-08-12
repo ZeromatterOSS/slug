@@ -752,11 +752,18 @@ def _slug_reapi_argv(
     default_exec_properties: tuple[str, ...],
 ) -> list[str]:
     result = list(argv)
-    if command.argv[0] != "build":
+    if command.argv[0] not in {"build", "run"}:
         return result
-    result.append(f"--remote_executor={endpoint}")
-    for prop in default_exec_properties:
-        result.append(f"--remote_default_exec_properties={prop}")
+    remote_flags = [f"--remote_executor={endpoint}"]
+    remote_flags.extend(
+        f"--remote_default_exec_properties={prop}"
+        for prop in default_exec_properties
+    )
+    if command.argv[0] == "run" and "--" in result:
+        separator = result.index("--")
+        result[separator:separator] = remote_flags
+    else:
+        result.extend(remote_flags)
     return result
 
 

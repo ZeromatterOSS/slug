@@ -1,38 +1,24 @@
 {
   "commands": [
     {
-      "argv": [
-        "run",
-        "//pkg:hello"
-      ],
-      "cwd": "<workspace>",
-      "duration_ms": "<duration_ms>",
-      "env_allowlist": {},
-      "env_overrides": {},
-      "executed_argv": [
-        "<tool_executable>",
-        "run",
-        "//pkg:hello"
-      ],
       "exit_code": 0,
-      "fixture_env_overrides": {},
-      "fixture_startup_argv": [],
-      "manifest": [],
-      "mutations": [],
-      "name": "run_hello",
-      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:hello (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.sh\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/pkg/hello.sh",
-      "normalized_stdout": "hello slug\nrunfile payload",
-      "startup_argv": [],
-      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:hello (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.sh\nINFO: Elapsed time: 4.067s, Critical Path: 0.02s\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/pkg/hello.sh\n",
-      "stdout": "hello slug\nrunfile payload\n"
+      "name": "run_a_with_ordered_args"
+    },
+    {
+      "exit_code": 0,
+      "name": "run_b_after_content_edit"
+    },
+    {
+      "exit_code": 7,
+      "name": "run_b_nonzero_with_stderr"
+    },
+    {
+      "exit_code": 0,
+      "name": "run_a_restored"
     }
   ],
   "fixture": "run-basic",
   "generated": true,
-  "output_base": "<output_base>",
-  "run_dir": "<run_dir>",
   "schema_version": 1,
-  "tool": "bazel",
-  "tool_executable": "<tool_executable>",
-  "workspace": "<workspace>"
+  "tool": "bazel"
 }

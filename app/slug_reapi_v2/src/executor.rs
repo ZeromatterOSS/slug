@@ -470,6 +470,71 @@ pub fn materialize_outputs(
     Ok(())
 }
 
+pub fn verify_materialized_run_executable(
+    workspace: &Path,
+    view: &slug_core_v2::runtime::ResolvedRunSemanticView<'_>,
+) -> Result<std::path::PathBuf, RemoteExecutionError> {
+    let configuration = view
+        .file_write()
+        .action()
+        .owner()
+        .configuration()
+        .slug_configuration()
+        .ok_or_else(|| {
+            RemoteExecutionError::Command(
+                "run FileWrite owner has an opaque configuration".to_owned(),
+            )
+        })?;
+    let root = slug_core_v2::runtime::configured_output_root(workspace, configuration);
+    if !root.is_absolute() {
+        return Err(RemoteExecutionError::OutputPath {
+            path: root.display().to_string(),
+        });
+    }
+    let root_metadata =
+        std::fs::symlink_metadata(&root).map_err(|error| RemoteExecutionError::Io {
+            path: root.display().to_string(),
+            error: error.to_string(),
+        })?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(RemoteExecutionError::OutputPath {
+            path: root.display().to_string(),
+        });
+    }
+    let path = safe_output_path(&root, view.executable())?;
+    let segments = view.executable().split('/').collect::<Vec<_>>();
+    let mut current = root;
+    for (index, segment) in segments.iter().enumerate() {
+        current.push(segment);
+        let metadata =
+            std::fs::symlink_metadata(&current).map_err(|error| RemoteExecutionError::Io {
+                path: current.display().to_string(),
+                error: error.to_string(),
+            })?;
+        if metadata.file_type().is_symlink() {
+            return Err(RemoteExecutionError::OutputPath {
+                path: current.display().to_string(),
+            });
+        }
+        let final_entry = index + 1 == segments.len();
+        if (!final_entry && !metadata.is_dir()) || (final_entry && !metadata.is_file()) {
+            return Err(RemoteExecutionError::OutputPath {
+                path: current.display().to_string(),
+            });
+        }
+        #[cfg(unix)]
+        if final_entry {
+            use std::os::unix::fs::PermissionsExt;
+            if metadata.permissions().mode() & 0o111 == 0 {
+                return Err(RemoteExecutionError::OutputPath {
+                    path: current.display().to_string(),
+                });
+            }
+        }
+    }
+    Ok(path)
+}
+
 fn tonic_endpoint(value: &str) -> Result<String, RemoteExecutionError> {
     let endpoint = value
         .strip_prefix("grpc://")

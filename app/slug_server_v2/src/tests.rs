@@ -846,6 +846,7 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
         stdout: String::new(),
         stderr: "{\"error\":\"analysis_not_implemented\"}".to_owned(),
         invalidated_files: 3,
+        run_launch_plan: None,
     };
     let response: DaemonResponse =
         serde_json::from_str(&serde_json::to_string(&response).unwrap()).unwrap();
@@ -853,6 +854,56 @@ fn tagged_build_protocol_preserves_existing_fields_and_common_response() {
     assert!(response.stdout.is_empty());
     assert_eq!(response.stderr, "{\"error\":\"analysis_not_implemented\"}");
     assert_eq!(response.invalidated_files, 3);
+}
+
+#[test]
+fn run_wire_carries_only_build_inputs_and_bounded_launch_authorization() {
+    let request = DaemonRequest::Run(BuildRequest {
+        targets: vec!["//pkg:hello".to_owned()],
+        root_string_setting: None,
+        executor: Some("grpc://executor".to_owned()),
+        default_exec_properties: vec![("cpu".to_owned(), "x86_64".to_owned())],
+        bzlmod: BzlmodRequestInputs::default(),
+    });
+    let json = serde_json::to_string(&request).unwrap();
+    assert!(json.contains("\"kind\":\"run\""));
+    assert!(!json.contains("program_args"));
+    assert!(!json.contains("CLIENT_SECRET"));
+    assert!(matches!(
+        serde_json::from_str::<DaemonRequest>(&json).unwrap(),
+        DaemonRequest::Run(BuildRequest { targets, .. }) if targets == ["//pkg:hello"]
+    ));
+
+    let plan = crate::RunLaunchPlan {
+        executable_path: "/workspace/out/pkg/hello.sh".to_owned(),
+        working_directory: "/workspace".to_owned(),
+        environment_to_clear: crate::RUN_ENVIRONMENT_TO_CLEAR
+            .iter()
+            .map(|name| (*name).to_owned())
+            .collect(),
+    };
+    let response = DaemonResponse {
+        exit_code: 0,
+        stdout: String::new(),
+        stderr: String::new(),
+        invalidated_files: 1,
+        run_launch_plan: Some(plan.clone()),
+    };
+    let json = serde_json::to_string(&response).unwrap();
+    assert!(!json.contains("CLIENT_SECRET"));
+    assert_eq!(
+        serde_json::from_str::<DaemonResponse>(&json)
+            .unwrap()
+            .run_launch_plan,
+        Some(plan)
+    );
+    assert!(
+        crate::server::decode_response(&json, "build", false)
+            .unwrap_err()
+            .to_string()
+            .contains("included run launch authorization")
+    );
+    assert!(crate::server::decode_response(&json, "run", true).is_ok());
 }
 
 #[test]

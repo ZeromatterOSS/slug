@@ -130,7 +130,7 @@ def compare_result(fixture: Fixture, actual: dict[str, Any], expected: dict[str,
         if (
             actual.get("tool") == "slug"
             and fixture.reapi.remote_executor
-            and command.argv[0] == "build"
+            and command.argv[0] in {"build", "run"}
             and command.expected_exit == 0
         ):
             failures.extend(_compare_reapi_evidence(actual_command, fixture))

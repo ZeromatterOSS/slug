@@ -31,7 +31,7 @@ use slug_reapi_v2::RemoteConfig;
 use crate::Daemon;
 
 /// A build request sent by the CLI client over the socket.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BuildRequest {
     pub targets: Vec<String>,
     /// Raw command-boundary input. The retained runtime will turn this into a
@@ -201,12 +201,28 @@ const fn default_true() -> bool {
     true
 }
 
+pub const RUN_ENVIRONMENT_TO_CLEAR: [&str; 5] = [
+    "JAVA_RUNFILES",
+    "RUNFILES_DIR",
+    "RUNFILES_MANIFEST_FILE",
+    "RUNFILES_MANIFEST_ONLY",
+    "TEST_SRCDIR",
+];
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RunLaunchPlan {
+    pub executable_path: String,
+    pub working_directory: String,
+    pub environment_to_clear: Vec<String>,
+}
+
 /// Tagged command request. The envelope is deliberately small; query syntax
 /// remains raw until the retained runtime parses it.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "request", rename_all = "snake_case")]
 pub enum DaemonRequest {
     Build(BuildRequest),
+    Run(BuildRequest),
     Query(QueryRequest),
     Aquery(AqueryRequest),
     Cquery(CqueryRequest),
@@ -219,6 +235,8 @@ pub struct DaemonResponse {
     pub stdout: String,
     pub stderr: String,
     pub invalidated_files: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_launch_plan: Option<RunLaunchPlan>,
 }
 
 pub type BuildResponse = DaemonResponse;
@@ -273,6 +291,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                     error
                 ),
                 invalidated_files: 0,
+                run_launch_plan: None,
             };
         }
     };
@@ -304,6 +323,53 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 stdout: result.stdout,
                 stderr: result.stderr,
                 invalidated_files: result.invalidated_files,
+                run_launch_plan: None,
+            }
+        }
+        DaemonRequest::Run(request) => {
+            let (command_policy, environment_policy, lockfile_mode, registry_urls) =
+                match request.bzlmod.normalize() {
+                    Ok(inputs) => inputs,
+                    Err(error) => return malformed_bzlmod_response(error),
+                };
+            let [target] = request.targets.as_slice() else {
+                return run_request_error("run requires exactly one target");
+            };
+            let target = match TargetPattern::parse(target) {
+                Ok(TargetPattern::Single(label)) if label.repo().is_root() => {
+                    TargetPattern::Single(label)
+                }
+                _ => return run_request_error("run requires one main-repository target"),
+            };
+            if request.root_string_setting.is_some() {
+                return run_request_error("run root string setting is unsupported");
+            }
+            let remote = build_remote_config(&request);
+            let (result, executable) = daemon.run_with_bzlmod_inputs(
+                &[target],
+                &remote,
+                command_policy,
+                environment_policy,
+                lockfile_mode,
+                registry_urls,
+            );
+            let run_launch_plan = executable.map(|path| RunLaunchPlan {
+                executable_path: path.display().to_string(),
+                working_directory: daemon.workspace().display().to_string(),
+                environment_to_clear: RUN_ENVIRONMENT_TO_CLEAR
+                    .iter()
+                    .map(|name| (*name).to_owned())
+                    .collect(),
+            });
+            if result.exit_code == 0 && run_launch_plan.is_none() {
+                return run_request_error("successful run build omitted launch authorization");
+            }
+            DaemonResponse {
+                exit_code: result.exit_code,
+                stdout: result.stdout,
+                stderr: result.stderr,
+                invalidated_files: result.invalidated_files,
+                run_launch_plan,
             }
         }
         DaemonRequest::Query(request) => {
@@ -320,6 +386,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                         stdout: String::new(),
                         stderr: format!("{{\"error\":\"query_error\",\"message\":\"{}\"}}", error),
                         invalidated_files: 0,
+                        run_launch_plan: None,
                     };
                 }
             };
@@ -341,6 +408,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 stdout: result.stdout,
                 stderr: result.stderr,
                 invalidated_files: result.invalidated_files,
+                run_launch_plan: None,
             }
         }
         DaemonRequest::Aquery(request) => {
@@ -360,6 +428,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                             slug_core_v2::error::json_escape(&error)
                         ),
                         invalidated_files: 0,
+                        run_launch_plan: None,
                     };
                 }
             };
@@ -376,6 +445,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 stdout: result.stdout,
                 stderr: result.stderr,
                 invalidated_files: result.invalidated_files,
+                run_launch_plan: None,
             }
         }
         DaemonRequest::Cquery(request) => {
@@ -397,6 +467,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                         slug_core_v2::error::json_escape(&error)
                     ),
                     invalidated_files: 0,
+                    run_launch_plan: None,
                 };
             }
             let result = daemon.cquery_with_bzlmod_inputs(
@@ -415,6 +486,7 @@ pub(crate) fn handle_request(daemon: &mut Daemon, request_json: &str) -> DaemonR
                 stdout: result.stdout,
                 stderr: result.stderr,
                 invalidated_files: result.invalidated_files,
+                run_launch_plan: None,
             }
         }
     }
@@ -467,6 +539,19 @@ fn validate_cquery_expression(
     Ok(())
 }
 
+fn run_request_error(message: &str) -> DaemonResponse {
+    DaemonResponse {
+        exit_code: 2,
+        stdout: String::new(),
+        stderr: format!(
+            "{{\"error\":\"run_request_error\",\"message\":\"{}\"}}",
+            slug_core_v2::error::json_escape(message),
+        ),
+        invalidated_files: 0,
+        run_launch_plan: None,
+    }
+}
+
 fn malformed_bzlmod_response(error: String) -> DaemonResponse {
     DaemonResponse {
         exit_code: 2,
@@ -476,6 +561,7 @@ fn malformed_bzlmod_response(error: String) -> DaemonResponse {
             slug_core_v2::error::json_escape(&error)
         ),
         invalidated_files: 0,
+        run_launch_plan: None,
     }
 }
 
@@ -516,19 +602,23 @@ pub fn send_build_request(
 ) -> anyhow::Result<BuildResponse> {
     let mut stream = UnixStream::connect(socket_path)
         .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
-    let json = serde_json::to_string(&DaemonRequest::Build(BuildRequest {
-        targets: request.targets.clone(),
-        root_string_setting: request.root_string_setting.clone(),
-        executor: request.executor.clone(),
-        default_exec_properties: request.default_exec_properties.clone(),
-        bzlmod: request.bzlmod.clone(),
-    }))
-    .context("serializing build request for daemon")?;
+    let json = serde_json::to_string(&DaemonRequest::Build(request.clone()))
+        .context("serializing build request for daemon")?;
     write!(stream, "{json}\n").context("sending build request to daemon")?;
     let line = read_line(&mut stream)?;
-    let response: BuildResponse =
-        serde_json::from_str(&line).context("deserializing daemon build response")?;
-    Ok(response)
+    decode_response(&line, "build", false)
+}
+pub fn send_run_request(
+    socket_path: &Path,
+    request: &BuildRequest,
+) -> anyhow::Result<DaemonResponse> {
+    let mut stream = UnixStream::connect(socket_path)
+        .with_context(|| format!("connecting to daemon socket {}", socket_path.display()))?;
+    let json = serde_json::to_string(&DaemonRequest::Run(request.clone()))
+        .context("serializing run request for daemon")?;
+    write!(stream, "{json}\n").context("sending run request to daemon")?;
+    let line = read_line(&mut stream)?;
+    decode_response(&line, "run", true)
 }
 
 /// Send a raw query request to a running daemon.
@@ -549,7 +639,7 @@ pub fn send_query_request(
     .context("serializing query request for daemon")?;
     write!(stream, "{json}\n").context("sending query request to daemon")?;
     let line = read_line(&mut stream)?;
-    serde_json::from_str(&line).context("deserializing daemon query response")
+    decode_response(&line, "query", false)
 }
 
 pub fn send_aquery_request(
@@ -565,7 +655,7 @@ pub fn send_aquery_request(
     .context("serializing aquery request for daemon")?;
     write!(stream, "{json}\n").context("sending aquery request to daemon")?;
     let line = read_line(&mut stream)?;
-    serde_json::from_str(&line).context("deserializing daemon aquery response")
+    decode_response(&line, "aquery", false)
 }
 
 pub fn send_cquery_request(
@@ -585,7 +675,20 @@ pub fn send_cquery_request(
     .context("serializing cquery request for daemon")?;
     write!(stream, "{json}\n").context("sending cquery request to daemon")?;
     let line = read_line(&mut stream)?;
-    serde_json::from_str(&line).context("deserializing daemon cquery response")
+    decode_response(&line, "cquery", false)
+}
+
+pub(crate) fn decode_response(
+    line: &str,
+    command: &str,
+    allow_run_plan: bool,
+) -> anyhow::Result<DaemonResponse> {
+    let response: DaemonResponse = serde_json::from_str(line)
+        .with_context(|| format!("deserializing daemon {command} response"))?;
+    if !allow_run_plan && response.run_launch_plan.is_some() {
+        anyhow::bail!("daemon {command} response included run launch authorization");
+    }
+    Ok(response)
 }
 
 /// Send a shutdown command to a running daemon.

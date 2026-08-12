@@ -2351,7 +2351,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
     fs::write(workspace.join("MODULE.bazel"), "module(name = \"root\")\n").unwrap();
     fs::write(
         package.join("defs.bzl"),
-        "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    ctx.actions.write(out, \"hello from an action\\n\")\n    return [DefaultInfo(files = depset([out]))]\n\nwrite_file = rule(implementation = _impl)\n",
+        "def _impl(ctx):\n    out = ctx.actions.declare_file(ctx.label.name + \".txt\")\n    ctx.actions.write(out, \"hello from an action\\n\", is_executable = True)\n    return [DefaultInfo(files = depset([out]))]\n\nwrite_file = rule(implementation = _impl)\n",
     )
     .unwrap();
     fs::write(
@@ -2470,7 +2470,7 @@ fn frozen_loaded_rule_evaluates_into_default_info_and_write_action() {
         result.actions()[0].kind(),
         &ActionKind::Write {
             content: "hello from an action\n".to_owned(),
-            is_executable: false,
+            is_executable: true,
         }
     );
 }

@@ -1,12 +1,55 @@
 [fixture]
 name = "run-basic"
-description = "Stage 8 run command executes an executable target and compares stdout."
+description = "Stage 8 run command builds one executable FileWrite remotely and launches it client-side."
 comparison = "semantic"
-oracle_notes = "Regenerate with upstream Bazel 9 once runfiles materialization and executable handoff are wired."
+daemon = true
+required_host_os = "posix"
+oracle_notes = "Pinned Bazel 9.2 owns target/argument/stream/exit behavior; Slug has owner-derived paths and a bounded client launch wire."
+
+[reapi]
+default_exec_properties = ["container-image=run:selected"]
+worker_platform_properties = ["container-image=run:selected"]
+remote_executor = true
 
 [[commands]]
-name = "run_hello"
-argv = ["run", "//pkg:hello"]
-compare = "semantic"
+name = "run_a_with_ordered_args"
+argv = ["run", "//pkg:hello", "--", "alpha", "beta"]
+compare = "message_shape"
 expected_exit = 0
-stdout_contains = ["hello slug", "runfile payload"]
+stdout_patterns = ["(?s)\\Ahello slug\\nrunfile payload\\nargs:alpha beta\\nrunfiles:unset\\Z"]
+env_allowlist = ["RUNFILES_DIR"]
+
+  [commands.env]
+  RUNFILES_DIR = "must-be-cleared"
+
+[[commands]]
+name = "run_b_after_content_edit"
+argv = ["run", "//pkg:hello"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["(?s)\\Ahello slug\\nchanged payload\\nargs:\\nrunfiles:unset\\Z"]
+
+  [[commands.mutations]]
+  path = "pkg/BUILD.bazel"
+  find = 'marker = "runfile payload"'
+  replace = 'marker = "changed payload"'
+
+[[commands]]
+name = "run_b_nonzero_with_stderr"
+argv = ["run", "//pkg:hello", "--", "fail"]
+compare = "message_shape"
+expected_exit = 7
+stdout_patterns = ["(?s)\\Ahello slug\\nchanged payload\\nargs:fail\\nrunfiles:unset\\Z"]
+stderr_patterns = ["(?s).*run stderr\\Z"]
+
+[[commands]]
+name = "run_a_restored"
+argv = ["run", "//pkg:hello"]
+compare = "message_shape"
+expected_exit = 0
+stdout_patterns = ["(?s)\\Ahello slug\\nrunfile payload\\nargs:\\nrunfiles:unset\\Z"]
+
+  [[commands.mutations]]
+  path = "pkg/BUILD.bazel"
+  find = 'marker = "changed payload"'
+  replace = 'marker = "runfile payload"'

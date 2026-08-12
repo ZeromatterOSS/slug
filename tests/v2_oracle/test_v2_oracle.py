@@ -1970,6 +1970,50 @@ def test_expected_failing_remote_build_gets_flags_without_evidence_requirement()
     ) == []
 
 
+@pytest.mark.parametrize(
+    ("command_argv", "base_argv", "expected"),
+    [
+        (
+            ("run", "//pkg:probe", "--", "alpha", "beta"),
+            ["slug", "run", "//pkg:probe", "--", "alpha", "beta"],
+            [
+                "slug",
+                "run",
+                "//pkg:probe",
+                "--remote_executor=grpc://127.0.0.1:50051",
+                "--remote_default_exec_properties=cpu=x86_64",
+                "--",
+                "alpha",
+                "beta",
+            ],
+        ),
+        (
+            ("run", "//pkg:probe"),
+            ["slug", "run", "//pkg:probe"],
+            [
+                "slug",
+                "run",
+                "//pkg:probe",
+                "--remote_executor=grpc://127.0.0.1:50051",
+                "--remote_default_exec_properties=cpu=x86_64",
+            ],
+        ),
+    ],
+)
+def test_remote_run_gets_flags_before_program_arguments(
+    command_argv: tuple[str, ...], base_argv: list[str], expected: list[str]
+) -> None:
+    command = FixtureCommand(
+        name="run", argv=command_argv, compare="message_shape", expected_exit=0
+    )
+    assert _slug_reapi_argv(
+        base_argv, command, "grpc://127.0.0.1:50051", ("cpu=x86_64",)
+    ) == expected
+    failures = compare_result(
+        _remote_fixture(command), _actual_command(command), expected=None
+    )
+    assert any("REAPI evidence was not emitted" in failure for failure in failures)
+
 def test_reapi_evidence_applicability_is_independent_of_actual_exit() -> None:
     successful_contract = FixtureCommand(
         name="unexpected_build_failure",
@@ -2000,14 +2044,17 @@ def test_reapi_evidence_applicability_is_independent_of_actual_exit() -> None:
     assert not any("REAPI evidence" in failure for failure in failures)
 
 
-def test_remote_fixture_query_gets_neither_flags_nor_evidence_requirement() -> None:
+@pytest.mark.parametrize("verb", ["query", "aquery", "cquery"])
+def test_remote_fixture_queries_get_neither_flags_nor_evidence_requirement(
+    verb: str,
+) -> None:
     command = FixtureCommand(
-        name="query",
-        argv=("query", "//pkg:probe"),
+        name=verb,
+        argv=(verb, "//pkg:probe"),
         compare="message_shape",
         expected_exit=0,
     )
-    base_argv = ["slug", "query", "//pkg:probe"]
+    base_argv = ["slug", verb, "//pkg:probe"]
     assert (
         _slug_reapi_argv(
             base_argv,

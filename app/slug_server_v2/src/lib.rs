@@ -69,6 +69,9 @@ impl Daemon {
             forwarded_bzlmod_inputs: Vec::new(),
         })
     }
+    pub fn workspace(&self) -> &Path {
+        &self.workspace
+    }
 
     /// Run one build: observe files, inject one DICE batch, evaluate packages, analyze
     /// targets, and (if REAPI execute mode) execute actions. Returns the JSON
@@ -103,10 +106,61 @@ impl Daemon {
         registry_urls: Vec<String>,
         root_string_setting: Option<&str>,
     ) -> BuildResult {
+        self.build_or_run_with_bzlmod_inputs(
+            targets,
+            remote,
+            argv,
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            root_string_setting,
+            false,
+        )
+        .0
+    }
+
+    pub fn run_with_bzlmod_inputs(
+        &mut self,
+        targets: &[TargetPattern],
+        remote: &RemoteConfig,
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+    ) -> (BuildResult, Option<PathBuf>) {
+        self.build_or_run_with_bzlmod_inputs(
+            targets,
+            remote,
+            &[],
+            command_policy,
+            environment_policy,
+            lockfile_mode,
+            registry_urls,
+            None,
+            true,
+        )
+    }
+
+    fn build_or_run_with_bzlmod_inputs(
+        &mut self,
+        targets: &[TargetPattern],
+        remote: &RemoteConfig,
+        argv: &[String],
+        command_policy: BzlmodCommandPolicyKey,
+        environment_policy: BzlmodEnvironmentPolicyKey,
+        lockfile_mode: LockfileMode,
+        registry_urls: Vec<String>,
+        root_string_setting: Option<&str>,
+        run: bool,
+    ) -> (BuildResult, Option<PathBuf>) {
         let (_metric_observations, invalidated) = match self.observations.observe(&self.workspace) {
             Ok(observations) => observations,
             Err(error) => {
-                return BuildResult::error("build_runtime_error", &error.to_string());
+                return (
+                    BuildResult::error("build_runtime_error", &error.to_string()),
+                    None,
+                );
             }
         };
         #[cfg(test)]
@@ -128,13 +182,17 @@ impl Daemon {
         ) {
             Ok(accepted) => accepted,
             Err(error) => {
-                return BuildResult::error_with_invalidated(
-                    "build_runtime_error",
-                    &error.to_string(),
-                    invalidated,
+                return (
+                    BuildResult::error_with_invalidated(
+                        "build_runtime_error",
+                        &error.to_string(),
+                        invalidated,
+                    ),
+                    None,
                 );
             }
         };
+        let launch_path = std::cell::RefCell::new(None);
         let published = accepted
             .project(|terminal| match terminal.as_ref() {
                 Err(error) => {
@@ -158,15 +216,27 @@ impl Daemon {
                     let analyzed_target_count = evaluation.analyzed_target_count();
                     let declared_action_count = evaluation.declared_action_count();
                     if remote.mode() == RemoteMode::Execute {
-                        let outcome = run_reapi_build(
-                            &self.workspace,
-                            evaluation,
-                            analyzed_target_count,
-                            declared_action_count,
-                            remote,
-                            "daemon",
-                            invalidated,
-                        );
+                        let outcome = if run {
+                            let (outcome, path) = crate::reapi::run_reapi_executable(
+                                &self.workspace,
+                                evaluation,
+                                remote,
+                                "daemon",
+                                invalidated,
+                            );
+                            launch_path.replace(path);
+                            outcome
+                        } else {
+                            run_reapi_build(
+                                &self.workspace,
+                                evaluation,
+                                analyzed_target_count,
+                                declared_action_count,
+                                remote,
+                                "daemon",
+                                invalidated,
+                            )
+                        };
                         TerminalOutput::new(outcome.exit_code, String::new(), outcome.stderr)
                     } else {
                         let argv_json = argv
@@ -198,12 +268,15 @@ impl Daemon {
             })
             .publish();
         let (_terminal, exit_code, stdout, stderr) = published.into_parts();
-        BuildResult {
-            exit_code,
-            stdout,
-            stderr,
-            invalidated_files: invalidated,
-        }
+        (
+            BuildResult {
+                exit_code,
+                stdout,
+                stderr,
+                invalidated_files: invalidated,
+            },
+            launch_path.into_inner(),
+        )
     }
 
     /// Run one loading query against the same retained runtime and observation
@@ -663,6 +736,8 @@ impl FilesystemObservationAdapter {
 }
 
 mod reapi;
+pub use reapi::ReapiBuildOutcome;
+pub use reapi::run_reapi_executable;
 mod server;
 
 pub use server::AqueryRequest;
@@ -674,11 +749,14 @@ pub use server::CqueryRequest;
 pub use server::DaemonRequest;
 pub use server::DaemonResponse;
 pub use server::QueryRequest;
+pub use server::RUN_ENVIRONMENT_TO_CLEAR;
+pub use server::RunLaunchPlan;
 pub use server::pid_path;
 pub use server::send_aquery_request;
 pub use server::send_build_request;
 pub use server::send_cquery_request;
 pub use server::send_query_request;
+pub use server::send_run_request;
 pub use server::send_shutdown;
 pub use server::serve;
 pub use server::socket_path;

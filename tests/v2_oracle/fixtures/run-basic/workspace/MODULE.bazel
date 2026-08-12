@@ -1,1 +1,4 @@
 module(name = "run_basic", version = "0.1.0")
+
+register_execution_platforms("//:platform")
+register_toolchains("//:run_toolchain")
