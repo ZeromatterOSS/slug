@@ -1165,3 +1165,26 @@ root, registry, direct-nonregistry, and embedded owners cannot compose exactly,
 return `REPLAN` into the first missing prerequisite. No Rust, legacy
 `ResolvedGraph` activation, fabricated RepoSpec/mapping, root-only merge, or
 consumer work is authorized.
+
+### Selected Host graph owner design REPLAN (2026-08-12)
+
+The reviewed source audit ends `REPLAN` before Rust. Slug has no uniform
+per-module discovery value: the embedded leaf retains a complete module and
+immutable route/hash identity; registry preparation retains bytes, selected
+registry, and ordered URL/SHA-or-absence attempts but no evaluated semantic
+module; and the private direct-local evaluator retains a module/route only for
+a main-repository-visible `local_path_override`. Normalized command override
+state is absent. The legacy handwritten `ResolvedGraph` remains an inexact
+second graph.
+
+The first missing prerequisite is
+`WP-5-host-discovered-module-owner-design`. Freeze one crate-private
+workspace/module-key leaf that computes root files first, bypasses the
+embedded key for every explicit `bazel_tools` override, and returns the
+complete evaluated module paired with built-in or ordered selected-registry
+provenance. Admit only unoverridden `bazel_tools@<empty>` and versioned
+registry modules. Nonregistry and command override discovery, recursion/MVS,
+post-selection mappings/extensions/registrations/RepoSpecs/yanked/hashes,
+lockfile writing, package/Bzl, configured toolchains, commands, Test, and
+execution remain fail-closed/deferred. No Rust is authorized until this
+smaller design is independently accepted.

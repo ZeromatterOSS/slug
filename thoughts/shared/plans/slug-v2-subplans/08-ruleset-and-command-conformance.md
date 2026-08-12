@@ -4648,3 +4648,11 @@ consumer edge. Stage 8 remains parked. Run only the Stage 5
 `WP-5-builtin-bazel-tools-selected-graph-owner-design` prerequisite; no
 catalog expansion, package/Bzl dispatch, configured toolchain, TestRunner,
 execution, result, coverage, or BEP behavior is authorized here.
+
+### Selected-graph prerequisite narrowed (2026-08-12)
+
+Stage 5's selected-graph design ends `REPLAN` at the missing uniform
+per-module discovery/evaluation value. Stage 8 stays parked while only
+`WP-5-host-discovered-module-owner-design` freezes the embedded/registry
+leaf. No nonregistry, graph/MVS, mapping, catalog, package/Bzl, toolchain,
+TestRunner, execution, result, coverage, or BEP behavior is authorized.
