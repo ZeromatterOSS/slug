@@ -1963,3 +1963,36 @@ Run next only `WP-5-root-extension-usage-semantic-owner-implementation` in
 key/evaluator, selected graph/route mutation, extension evaluation,
 materialization, loading/consumer edge, or JVM/Java work. Obtain fresh
 independent implementation review before acceptance.
+
+### Root extension-usage semantic owner implementation accepted (2026-08-12)
+
+Commit `11be92b9` accepts the one-file private root extension-usage owner at
+386 production, 327 tests, and 713 total formatted net lines, within the
+520/750/1,270 caps. Root and nonroot MODULE evaluation share the compact proxy,
+tag, import, override, and deferred-attribute machinery while preserving
+root-only override/inject retention, per-proxy root dev filtering, and the
+accepted nonroot discard/reservation behavior.
+
+The existing root DICE evaluation remains the sole owner. Its private complete
+value and `RootModuleFiles` retain the ordered Arc-backed usage slice;
+`EvaluatedRootModule`, the public root graph, selected graph/routes, and all
+consumers remain unchanged. Root/include logical locations, ordinary
+aggregation, isolated proxy identity, alias bijections, ordered tags,
+override/inject `must_exist`, synthetic repo rules, event publication,
+structural equality, warm reuse, and A/B/A restoration are discriminated.
+
+All 339 owner unit tests and every integration suite pass, as does the complete
+direct-loading suite. Pinned Bazel 9.2 passes the new eight-file root fixture
+and six protected extension/mapping fixtures. Formatting, diff, scope,
+compact-representation, AI-cleanup, and independent implementation review
+pass. Archive content checks pass; missing local V1 archive refs remain the
+known environment baseline.
+
+Run next only the docs-only
+`WP-5-host-selected-extension-mapping-owner-design-r2`. Audit whether the
+accepted selected routes plus root/nonroot usages suffice for exact extension
+IDs, unique names, imports, and root override/inject mapping before extension
+evaluation, or `REPLAN` at the first missing post-selection leaf. No Rust,
+fixture mutation, extension evaluation/materialization, loading/consumer,
+public API, or JVM/Java work is authorized before independent design
+acceptance.
