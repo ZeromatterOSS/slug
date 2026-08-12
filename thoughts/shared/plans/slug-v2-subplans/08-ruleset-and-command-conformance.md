@@ -4242,3 +4242,153 @@ the exact REAPI `Command`/input-root/`Action` identity boundary. Do not add
 production state, execution, backend calls, cache/materialization, or protocol
 breadth until that retained ownership and digest-domain design is independently
 accepted.
+## Executable FileWrite `run` handoff design (2026-08-11)
+
+`WP-8-m7-filewrite-run-handoff-design` freezes the first `run` slice over the
+accepted configured analysis and FileWrite REAPI executor. Bazel 9.2
+`RunCommand` owns the build on the server, validates one successful executable
+target, then returns an `ExecRequest` for the client to launch with its terminal
+and environment. Slug preserves that boundary with a smaller, explicitly
+Slug-native daemon wire; neither daemon nor build executor launches the program.
+
+### Admitted semantic view
+
+Add a request-local `ResolvedRunSemanticView<'a>`, constructed only by
+`BuildCommandEvaluation`. It borrows the sole requested configured analysis,
+its single built-in `DefaultInfo`, the sole existing
+`ResolvedFileWriteSemanticView<'a>` selected through the closure-wide
+platform/constraint resolver, and their shared normalized executable artifact.
+
+Admit only a configured rule whose retained `RuleCapability` is executable and
+not a test, with no analysis diagnostic. `DefaultInfo.executable` and
+`files_to_run.executable` must equal the same nonempty normalized artifact.
+Both manifest fields must be absent. `files`, `default_runfiles.files`, and
+`data_runfiles.files` must each flatten to exactly that artifact; both symlink
+maps and both empty-file depsets must be empty. No separate
+`FilesToRunProvider`, `RunEnvironmentInfo`, or user provider may alter it.
+
+The complete action closure must contain exactly one action-bearing owner and
+one action: the existing resolved FileWrite view. Its sole output must equal the
+executable artifact and `is_executable` must be true. All accepted FileWrite
+platform, constraint, namespace, property, digest, and mixed-action guards
+remain. The view exposes borrowed accessors only: no DICE key, retained field,
+reconstruction, filesystem search, convenience link, or second action model.
+
+### Build and launch ownership
+
+One-shot and daemon paths call one shared run evaluation routine. It constructs
+the run view, derives the accepted `FileWriteReapiPlan`, and calls only
+`execute_file_write`; the raw FileWrite executor remains rejecting. Successful
+REAPI execution must materialize the declared output at its owner-derived
+configured output path before launch.
+
+Validate that the normalized artifact joined under the configured output root
+cannot escape, that no component or final entry is a symlink, and that the
+final entry is a regular file with a Unix execute bit. Derive the absolute path
+from that checked join; do not scan `bazel-bin`, synthesize a mirror, or trust
+an arbitrary executor path. The CLI repeats the final regular-file/execute-bit
+check immediately before spawn. Content digest and executable mode remain owned
+by the FileWrite plan/materialization boundary.
+
+Program launch is command behavior, never a build action. Use a direct Rust
+process with `RunRequest.program_args` in order and inherited stdin/stdout/
+stderr; do not buffer or serialize program streams. Preserve a normal numeric
+program exit status. Map a POSIX signal Slug-natively to `128 + signal`.
+Launch/inspection failure after build is a stable Slug-native command error and
+exit 1. Analysis, REAPI, cache, and materialization failures preserve their
+accepted build terminal classifications.
+
+Launch from the workspace root with the client's inherited environment after
+clearing exactly `JAVA_RUNFILES`, `RUNFILES_DIR`, `RUNFILES_MANIFEST_FILE`,
+`RUNFILES_MANIFEST_ONLY`, and `TEST_SRCDIR`. Do not set Bazel `BUILD_*`
+variables. This cwd/environment policy is Slug-native and valid only because
+additional runfiles are rejected.
+
+### Bounded daemon wire
+
+Extend the tagged request with `DaemonRequest::Run(BuildRequest)`. It carries
+the normalized target/configuration/bzlmod/executor inputs used by build and no
+program arguments or client environment. The daemon independently validates
+one run target and all semantic guards, builds/materializes, and creates no
+user-program child.
+
+Add a defaulted, absent-when-none `run_launch_plan` field to
+`DaemonResponse` and this public payload:
+
+```text
+RunLaunchPlan {
+    executable_path: String,
+    working_directory: String,
+    environment_to_clear: Vec<String>,
+}
+```
+
+`Some(plan)` is the only launch authorization and is legal exactly when a Run
+request finishes build, materialization, and server path/mode validation with
+exit zero. All other responses, including Build/Query/Aquery/Cquery, have no
+plan. The client rejects a missing successful-Run plan, any plan on nonzero Run,
+a relative executable/cwd, an unexpected clear variable, or a plan for another
+kind. It appends locally parsed arguments; they never cross the wire. The plan
+contains no complete environment, value, secret, program argument, content,
+digest, or arbitrary executor metadata.
+
+One-shot constructs the same plan locally from the same view/checks and feeds
+the same client launcher. No plan is retained. This bounded public-wire addition
+requires serialization, cross-command absence, malformed-plan, and client tests
+plus independent final review.
+
+### Compatibility and failure boundary
+
+Exact for the admitted Bazel 9.2 slice are one-target executable relationship
+checks, already accepted FileWrite/REAPI semantics, arguments after `--`,
+noninteractive program stdout/stderr bytes, and normal numeric exits.
+Slug-native are output/configuration path bytes, launch wire, workspace cwd,
+inherited-minus-clear environment, process mechanism, diagnostics/evidence,
+and signal mapping.
+
+Deferred are additional runfiles, manifests, symlinks/empty files,
+`RunEnvironmentInfo`, exact `BUILD_*`, target-supplied binary arguments,
+`run_in_cwd`, `run_under`, `script_path`, tests/coverage, interactive
+terminal equivalence, multiple targets/actions, other executable producers or
+action kinds, Windows, and exact Bazel identity bytes. Missing/conflicting
+providers/artifacts, non-executable output, extra action owner, mixed action,
+ambiguous platform, absent remote executor, materialization mismatch, symlink,
+path escape, or missing authorization fails closed before spawn.
+
+### Implementation packet and proof
+
+The successor may edit only `app/slug_commands_v2/src/run.rs` and existing
+command tests; `app/slug_cli_v2/src/commands/run.rs` and existing CLI tests;
+`app/slug_core_v2/src/runtime/{dice.rs,mod.rs}` and existing focused core
+tests; `app/slug_reapi_v2/src/{executor.rs,lib.rs}` and existing focused REAPI
+tests; `app/slug_server_v2/src/{lib.rs,reapi.rs,server.rs,tests.rs}`; all six
+existing files under `tests/v2_oracle/fixtures/run-basic/`; and canonical/
+current/Stage 8 bookkeeping. Add no DICE state, local build executor, runfiles
+tree/materializer, fixture, dependency, JVM artifact, other action kind, or
+broad run flag. Cap Rust growth at 270 production, 340 tests, 610 total;
+fixture growth at 150 and bookkeeping at 120 lines. One material correction is
+allowed; a second is `REPLAN`.
+
+Extend `run-basic` because its pinned 9.2 baseline proves success but not args,
+stderr/nonzero exit, selected properties, or invalidation. Keep one executable
+FileWrite topology and add one registered execution platform. Required proof:
+
+- core positives and fail-closed provider/runfiles/action/path negatives;
+- exact FileWrite REAPI bytes/digests/mode/properties, one remote and zero
+  direct-local build actions, and no launch cache/action event;
+- focused one-shot argument order, inherited stdout/stderr, numeric nonzero
+  exit, launch failure, and fixed environment clearing;
+- wire round trips proving args/env values absent, cross-command plans absent,
+  and malformed authorization rejected; and
+- pinned Bazel 9.2 refresh/replay plus stable-PID Slug daemon A/B/A script
+  content mutation, discriminating owner path, output, action/cache evidence,
+  and exact restoration.
+
+The checked-in `run-basic` expectation was refreshed and replayed with pinned
+Bazel 9.2; it replaces stale Bazel 9.1 Windows provenance. Independent design
+review returned `ACCEPT` after one bounded bookkeeping correction. The final
+explicit allowlist covers all six existing fixture files and each permitted
+Rust module/test surface. The reviewer found the borrowed semantic-view
+ownership, resolved FileWrite executor reuse, daemon/client launch boundary,
+no-secret wire, path/mode guards, compatibility classification, exit
+classification, and discriminating evidence plan sound. Implementation is now

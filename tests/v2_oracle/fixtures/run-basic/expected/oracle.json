@@ -8,18 +8,22 @@
       "cwd": "<workspace>",
       "duration_ms": "<duration_ms>",
       "env_allowlist": {},
+      "env_overrides": {},
       "executed_argv": [
         "<tool_executable>",
         "run",
         "//pkg:hello"
       ],
       "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
       "manifest": [],
       "mutations": [],
       "name": "run_hello",
-      "normalized_stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/run-basic/20260626-202004-9072-bazel/workspace\n  - Only in new server: --workspace_directory=c:/users/walter gray/appdata/local/temp/slug-v2-oracle/runs/run-basic/20260626-202025-27008-bazel/workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:hello (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.bat\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 1 process: 5 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: Running command line: bazel-bin/pkg/hello.bat",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:hello (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.sh\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/pkg/hello.sh",
       "normalized_stdout": "hello slug\nrunfile payload",
-      "stderr": "WARNING: Ignoring JAVA_HOME, because it must point to a JDK, not a JRE.\nWARNING: Running Bazel server needs to be killed, because the following startup options are different:\n  - Only in old server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\run-basic\\20260626-202004-9072-bazel\\workspace\n  - Only in new server: --workspace_directory=c:\\users\\walter gray\\appdata\\local\\temp\\slug-v2-oracle\\runs\\run-basic\\20260626-202025-27008-bazel\\workspace\nStarting local Bazel server (9.1.1) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:hello (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.bat\nINFO: Elapsed time: 3.875s, Critical Path: 0.02s\nINFO: 1 process: 5 action cache hit, 1 internal.\nINFO: Build completed successfully, 1 total action\nINFO: Running command line: bazel-bin/pkg/hello.bat\n",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\nAnalyzing: target //pkg:hello (5 packages loaded, 6 targets configured)\n\nINFO: Analyzed target //pkg:hello (5 packages loaded, 7 targets configured).\nINFO: Found 1 target...\nTarget //pkg:hello up-to-date:\n  bazel-bin/pkg/hello.sh\nINFO: Elapsed time: 4.067s, Critical Path: 0.02s\nINFO: 6 processes: 6 internal.\nINFO: Build completed successfully, 6 total actions\nINFO: Running command line: bazel-bin/pkg/hello.sh\n",
       "stdout": "hello slug\nrunfile payload\n"
     }
   ],
