@@ -54,6 +54,7 @@ use starlark::values::none::NoneType;
 use starlark::values::range::Range;
 use starlark::values::tuple::TupleRef;
 
+use crate::NonrootModuleKey;
 use crate::RootPackagePolicyProjectionError;
 use crate::RootRepoFileSemanticsProjectionKey;
 use crate::RootRepoFileUtf8Mode;
@@ -64,6 +65,8 @@ use crate::host_file::HostFileError;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
+use crate::source_preparation::RepositorySourceFileKey;
+use crate::source_preparation::RepositorySourceFileValue;
 use crate::source_preparation::SourcePreparationOutcome;
 
 const INVALID_UTF8: &str = "not a valid UTF-8 encoded file; this can lead to inconsistent behavior and will be disallowed in a future version of Bazel";
@@ -891,6 +894,109 @@ impl fmt::Display for HostRouteRepoFileError {
 }
 
 impl std::error::Error for HostRouteRepoFileError {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryRepoFileKey {
+    workspace: NormalizedAbsolutePath,
+    module: NonrootModuleKey,
+}
+
+impl HostNonregistryRepoFileKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, module: NonrootModuleKey) -> Self {
+        Self { workspace, module }
+    }
+}
+
+impl fmt::Display for HostNonregistryRepoFileKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-nonregistry-repo-file:{}@{}",
+            self.module.name, self.module.version
+        )
+    }
+}
+
+#[async_trait]
+impl Key for HostNonregistryRepoFileKey {
+    type Value = SourcePreparationOutcome<Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let source = match dice_invariant(
+            ctx.compute(&RepositorySourceFileKey {
+                workspace: self.workspace.as_path().to_owned(),
+                module_name: self.module.name.clone(),
+                repo_relative_path: "REPO.bazel".into(),
+            })
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent)) => {
+                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
+                return SourcePreparationOutcome::Complete(Arc::new(
+                    Ok(HostRepoFileValue::empty()),
+                ));
+            }
+            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes))) => {
+                bytes
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostRouteRepoFileError::Source(error),
+                )));
+            }
+        };
+        let semantics = match dice_invariant(
+            ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
+                self.workspace.dupe(),
+            ))
+            .await,
+        ) {
+            Ok(semantics) => semantics,
+            Err(error) => {
+                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostRouteRepoFileError::PolicyProjection(error),
+                )));
+            }
+        };
+        let logical_path = NormalizedAbsolutePath::new(
+            self.workspace
+                .as_path()
+                .join(".slug-nonregistry")
+                .join(self.module.name.as_str())
+                .join("REPO.bazel"),
+        )
+        .expect("joining a normalized workspace remains absolute");
+        let recording = capture_events.then(RecordingRepoEventReporter::default);
+        let direct = DirectRepoEventReporter;
+        let reporter: &dyn RepoEventReporter = recording
+            .as_ref()
+            .map_or(&direct, |value| value as &dyn RepoEventReporter);
+        let value = evaluate_repo_file(&logical_path, &source, semantics.utf8_mode, reporter)
+            .map_err(HostRouteRepoFileError::Evaluation);
+        store_route_repo_batch(
+            ctx,
+            capture_events,
+            recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch),
+        );
+        SourcePreparationOutcome::Complete(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostRouteRepoFileKey {

@@ -149,7 +149,7 @@ impl fmt::Display for HostRootPackageLookupKey {
     }
 }
 
-fn invalid_package_name(package: &PackagePath) -> Option<Arc<str>> {
+pub(crate) fn invalid_package_name(package: &PackagePath) -> Option<Arc<str>> {
     let value = package.as_str();
     if !value
         .bytes()

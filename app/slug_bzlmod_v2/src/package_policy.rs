@@ -207,6 +207,10 @@ pub(crate) struct CanonicalDeletedPackages {
 }
 
 impl CanonicalDeletedPackages {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.packages.is_empty()
+    }
+
     pub(crate) fn contains(&self, package: &PackageIdentifier) -> bool {
         self.packages.contains(package)
     }

@@ -33,6 +33,7 @@ use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
+use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetName;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
@@ -78,6 +79,8 @@ use crate::builtin_repository::BuiltinBazelToolsModuleKey;
 use crate::host_package::ExternalRepositoryPackageLookup;
 use crate::host_package::ExternalRepositoryPackageLookupError;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
+use crate::host_package::HostBuildFileName;
+use crate::host_package::invalid_package_name;
 use crate::module_eval::DirectNonregistryEvaluationError;
 use crate::module_eval::DirectNonregistryIncludeFile;
 use crate::module_eval::NonrootIncludeRequest;
@@ -85,7 +88,10 @@ use crate::module_eval::NonrootModuleFileInspection;
 use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
 use crate::module_eval::parse_root_include;
 use crate::module_eval::validate_root_module_source;
+use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::registry_module_file_url;
+use crate::repository_ignore::HostNonregistryRepositoryIgnoreKey;
+use crate::repository_ignore::HostRepositoryIgnoreError;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RepositoryMaterializationKey {
@@ -3064,6 +3070,199 @@ impl Key for RepositorySourceFileKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostNonregistryPackagePreflight {
+    BuildDotBazel,
+    Build,
+    Ignored,
+    InvalidPackageName { message: Arc<str> },
+    NoBuildFile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) enum HostNonregistryPackagePreflightError {
+    RootModuleFiles(CompactString),
+    NonregistryOverrideRequired(CompactString),
+    PolicyInput(crate::RootPackagePolicyProjectionError),
+    UnsupportedDeletedPackages,
+    RepositoryIgnore(HostRepositoryIgnoreError),
+    RepositorySource {
+        marker: HostBuildFileName,
+        error: RepositorySourceFileError,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryPackagePreflightKey {
+    workspace: NormalizedAbsolutePath,
+    module: NonrootModuleKey,
+    package: PackagePath,
+}
+
+impl HostNonregistryPackagePreflightKey {
+    pub(crate) fn new(
+        workspace: NormalizedAbsolutePath,
+        module: NonrootModuleKey,
+        package: PackagePath,
+    ) -> Self {
+        Self {
+            workspace,
+            module,
+            package,
+        }
+    }
+}
+
+impl fmt::Display for HostNonregistryPackagePreflightKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-nonregistry-package-preflight:{}@{}//{}",
+            self.module.name, self.module.version, self.package
+        )
+    }
+}
+
+#[track_caller]
+fn preflight_dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
+    result.unwrap_or_else(|error| panic!("nonregistry package-preflight DICE invariant: {error:?}"))
+}
+
+type HostNonregistryPackagePreflightValue = SourcePreparationOutcome<
+    Arc<Result<HostNonregistryPackagePreflight, HostNonregistryPackagePreflightError>>,
+>;
+
+fn preflight_complete(
+    value: Result<HostNonregistryPackagePreflight, HostNonregistryPackagePreflightError>,
+) -> HostNonregistryPackagePreflightValue {
+    SourcePreparationOutcome::Complete(Arc::new(value))
+}
+
+#[async_trait]
+impl Key for HostNonregistryPackagePreflightKey {
+    type Value = HostNonregistryPackagePreflightValue;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let root = preflight_dice_invariant(
+            ctx.compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_owned(),
+            })
+            .await,
+        );
+        let root = match root.as_ref() {
+            Ok(root) => root,
+            Err(error) => {
+                return preflight_complete(Err(
+                    HostNonregistryPackagePreflightError::RootModuleFiles(error.clone()),
+                ));
+            }
+        };
+        if !matches!(
+            root.overrides.get(self.module.name.as_str()),
+            Some(RootModuleOverride::NonRegistry(_))
+        ) {
+            return preflight_complete(Err(
+                HostNonregistryPackagePreflightError::NonregistryOverrideRequired(
+                    self.module.name.clone(),
+                ),
+            ));
+        }
+        if let Some(message) = invalid_package_name(&self.package) {
+            return preflight_complete(Ok(HostNonregistryPackagePreflight::InvalidPackageName {
+                message,
+            }));
+        }
+        let deleted = match preflight_dice_invariant(
+            ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
+                self.workspace.dupe(),
+            ))
+            .await,
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                return preflight_complete(Err(HostNonregistryPackagePreflightError::PolicyInput(
+                    error,
+                )));
+            }
+        };
+        if !deleted.is_empty() {
+            return preflight_complete(Err(
+                HostNonregistryPackagePreflightError::UnsupportedDeletedPackages,
+            ));
+        }
+        let ignore = match preflight_dice_invariant(
+            ctx.compute(&HostNonregistryRepositoryIgnoreKey::new(
+                self.workspace.dupe(),
+                self.module.clone(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(value) => value.dupe(),
+                Err(error) => {
+                    return preflight_complete(Err(
+                        HostNonregistryPackagePreflightError::RepositoryIgnore(error.clone()),
+                    ));
+                }
+            },
+        };
+        if ignore.matching_entry(&self.package).is_some() {
+            return preflight_complete(Ok(HostNonregistryPackagePreflight::Ignored));
+        }
+        for marker in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
+            let name = match marker {
+                HostBuildFileName::BuildDotBazel => "BUILD.bazel",
+                HostBuildFileName::Build => "BUILD",
+            };
+            let path = if self.package.as_str().is_empty() {
+                PathBuf::from(name)
+            } else {
+                PathBuf::from(self.package.as_str()).join(name)
+            };
+            match preflight_dice_invariant(
+                ctx.compute(&RepositorySourceFileKey {
+                    workspace: self.workspace.as_path().to_owned(),
+                    module_name: self.module.name.clone(),
+                    repo_relative_path: path,
+                })
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(_))) => {
+                    let value = match marker {
+                        HostBuildFileName::BuildDotBazel => {
+                            HostNonregistryPackagePreflight::BuildDotBazel
+                        }
+                        HostBuildFileName::Build => HostNonregistryPackagePreflight::Build,
+                    };
+                    return preflight_complete(Ok(value));
+                }
+                SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
+                | SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
+                    actual: PathNodeKind::Directory,
+                    ..
+                })) => {}
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return preflight_complete(Err(
+                        HostNonregistryPackagePreflightError::RepositorySource { marker, error },
+                    ));
+                }
+            }
+        }
+        preflight_complete(Ok(HostNonregistryPackagePreflight::NoBuildFile))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[async_trait]
 impl Key for ModuleSourcePreparationKey {
     type Value = SourcePreparationOutcome<
@@ -3549,6 +3748,41 @@ mod tests {
             }
         }
     }
+    #[derive(Default)]
+    struct NonregistryPreflightTracker {
+        preflight: Mutex<Vec<(ActivationKind, bool)>>,
+        repo: Mutex<Vec<(ActivationKind, bool)>>,
+    }
+
+    impl ActivationTracker for NonregistryPreflightTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let record = (activation.kind(), activation.evaluation_data().is_none());
+            if key
+                .downcast_ref::<HostNonregistryPackagePreflightKey>()
+                .is_some()
+            {
+                self.preflight.lock().unwrap().push(record);
+            } else if key
+                .downcast_ref::<crate::repo_file::HostNonregistryRepoFileKey>()
+                .is_some()
+            {
+                self.repo.lock().unwrap().push(record);
+            }
+        }
+    }
+
     #[derive(Debug, Default)]
     struct HorizonTracker {
         horizon: Mutex<Vec<(ActivationKind, bool)>>,
@@ -4454,19 +4688,21 @@ mod tests {
     }
     fn horizon_epoch(
         root_source: &str,
+        namespace: PathObservationNamespace,
         route_path: &str,
         module: Option<&[u8]>,
         repo: Option<&[u8]>,
         ignore: Option<&[u8]>,
         packages: &[(&str, bool)],
         omitted: &[(&str, &str)],
+        directory_markers: &[(&str, &str)],
         fragments: &[(&str, Option<&[u8]>)],
         fragment_needs: &[&str],
         variant: i64,
     ) -> PathObservationEpoch {
         let demand = |path: &str, operation| {
             PathObservationDemand::new(
-                PathObservationNamespace::Host,
+                namespace,
                 NormalizedAbsolutePath::new(path).unwrap(),
                 operation,
             )
@@ -4480,6 +4716,15 @@ mod tests {
         for directory in ["/", "/workspace", route_path] {
             observations.insert(
                 demand(directory, PathObservationOperation::Lstat),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        for ancestor in Path::new(route_path).ancestors().skip(1) {
+            observations.insert(
+                demand(
+                    ancestor.to_str().expect("test route paths are UTF-8"),
+                    PathObservationOperation::Lstat,
+                ),
                 lstat(PathNodeKind::Directory),
             );
         }
@@ -4544,7 +4789,9 @@ mod tests {
                 let path = format!("{package_root}/{marker}");
                 observations.insert(
                     demand(&path, PathObservationOperation::Lstat),
-                    if *selected && marker == "BUILD.bazel" {
+                    if directory_markers.contains(&(*package, marker)) {
+                        lstat(PathNodeKind::Directory)
+                    } else if *selected && marker == "BUILD.bazel" {
                         lstat(PathNodeKind::RegularFile)
                     } else {
                         PathObservationResult::Lstat(PathOperationResult::Missing)
@@ -4611,12 +4858,14 @@ mod tests {
                 PathObservationEpochKey,
                 horizon_epoch(
                     &root_source,
+                    PathObservationNamespace::Host,
                     route_path,
                     module,
                     repo,
                     ignore,
                     packages,
                     omitted,
+                    &[],
                     &[],
                     &[],
                     variant,
@@ -4692,11 +4941,13 @@ mod tests {
                 PathObservationEpochKey,
                 horizon_epoch(
                     &root_source,
+                    PathObservationNamespace::Host,
                     route_path,
                     module,
                     repo,
                     None,
                     packages,
+                    &[],
                     &[],
                     fragments,
                     fragment_needs,
@@ -4770,11 +5021,13 @@ mod tests {
                 PathObservationEpochKey,
                 horizon_epoch(
                     &root_source,
+                    PathObservationNamespace::Host,
                     "/workspace/dep",
                     module,
                     repo,
                     None,
                     packages,
+                    &[],
                     &[],
                     fragments,
                     fragment_needs,
@@ -8228,6 +8481,503 @@ mod tests {
             activations
                 .iter()
                 .any(|(kind, _)| *kind == ActivationKind::Reused)
+        );
+    }
+    fn nonregistry_preflight(package: &str) -> HostNonregistryPackagePreflightKey {
+        HostNonregistryPackagePreflightKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("dep", "1"),
+            PackagePath::parse(package).unwrap(),
+        )
+    }
+
+    const PREFLIGHT_DEFAULT: (&str, Option<&str>, bool, bool) =
+        ("pkg", Some("BUILD.bazel"), false, false);
+
+    async fn nonregistry_preflight_compute(
+        dice: &Arc<Dice>,
+        repo: Option<&[u8]>,
+        ignore: Option<&[u8]>,
+        build: Option<&[u8]>,
+        deleted: &[&str],
+        variant: i64,
+        capture: bool,
+        tracker: Option<Arc<NonregistryPreflightTracker>>,
+        scenario: (&str, Option<&str>, bool, bool),
+    ) -> HostNonregistryPackagePreflightValue {
+        let mut data = UserComputationData {
+            activation_tracker: tracker.map(|value| value as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        if capture {
+            data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(data);
+        let root_source = root("dep", "1");
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                            root_source.clone(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel.lock"),
+                        slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        let fragments = build
+            .zip(scenario.1)
+            .map(|(bytes, marker)| {
+                let relative = if marker == "BUILD" {
+                    "pkg/BUILD"
+                } else {
+                    "pkg/BUILD.bazel"
+                };
+                vec![(relative, Some(bytes))]
+            })
+            .unwrap_or_default();
+        let omitted = scenario
+            .2
+            .then_some(("pkg", "BUILD.bazel"))
+            .into_iter()
+            .collect::<Vec<_>>();
+        let directories = scenario
+            .3
+            .then_some(("pkg", "BUILD.bazel"))
+            .into_iter()
+            .collect::<Vec<_>>();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    &root_source,
+                    PathObservationNamespace::Host,
+                    "/workspace/dep",
+                    Some(b"module(name = \"dep\", version = \"1\")\n"),
+                    repo,
+                    ignore,
+                    &[("pkg", false)],
+                    &omitted,
+                    &directories,
+                    &fragments,
+                    &[],
+                    variant,
+                ),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                material("dep"),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                deleted,
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&nonregistry_preflight(scenario.0))
+            .await
+            .unwrap()
+    }
+
+    async fn local_preflight(
+        dice: &Arc<Dice>,
+        build: Option<&[u8]>,
+        variant: i64,
+    ) -> HostNonregistryPackagePreflightValue {
+        nonregistry_preflight_compute(
+            dice,
+            None,
+            None,
+            build,
+            &[],
+            variant,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn host_nonregistry_package_build_marker_and_ignore_order() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let built = nonregistry_preflight_compute(
+            &dice,
+            Some(b"ignore_directories([\"repo_ignored\"])\n"),
+            None,
+            Some(b"exports_files([])\n"),
+            &[],
+            1,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        assert!(matches!(built, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::BuildDotBazel))));
+        let ignored = nonregistry_preflight_compute(
+            &dice,
+            None,
+            Some(b"pkg\n"),
+            Some(b"exports_files([])\n"),
+            &[],
+            2,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        assert!(matches!(ignored, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::Ignored))));
+    }
+
+    #[tokio::test]
+    async fn host_nonregistry_package_deleted_policy_fails_closed_and_recovers() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let a = nonregistry_preflight_compute(
+            &dice,
+            None,
+            None,
+            None,
+            &[],
+            1,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        let blocked = nonregistry_preflight_compute(
+            &dice,
+            Some(b"this is not evaluated\n"),
+            Some(b"/invalid/absolute\n"),
+            None,
+            &["@dep+//pkg"],
+            2,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        assert!(matches!(blocked, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Err(HostNonregistryPackagePreflightError::UnsupportedDeletedPackages))));
+        let restored = nonregistry_preflight_compute(
+            &dice,
+            None,
+            None,
+            None,
+            &[],
+            3,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        assert!(HostNonregistryPackagePreflightKey::equality(&a, &restored));
+    }
+    #[tokio::test]
+    async fn host_nonregistry_package_repo_events_are_captured_and_reused() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        for _ in 0..2 {
+            let value = nonregistry_preflight_compute(
+                &dice,
+                Some(b"print('captured')\n"),
+                None,
+                None,
+                &[],
+                7,
+                true,
+                Some(tracker.clone()),
+                PREFLIGHT_DEFAULT,
+            )
+            .await;
+            assert!(matches!(
+                value,
+                SourcePreparationOutcome::Complete(value)
+                    if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::NoBuildFile))
+            ));
+        }
+        assert_eq!(
+            *tracker.preflight.lock().unwrap(),
+            [
+                (ActivationKind::Evaluated, true),
+                (ActivationKind::Reused, true),
+            ]
+        );
+        assert_eq!(
+            *tracker.repo.lock().unwrap(),
+            [(ActivationKind::Evaluated, false)]
+        );
+    }
+
+    async fn immutable_preflight_compute(
+        dice: &Arc<Dice>,
+        generation_root: &str,
+        instance_id: u64,
+        tracker: Arc<NonregistryPreflightTracker>,
+    ) -> HostNonregistryPackagePreflightValue {
+        let root_source =
+            "bazel_dep(name = 'dep', version = '1')\narchive_override(module_name = 'dep')\n";
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                            root_source.to_owned(),
+                        )),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceRawSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel.lock"),
+                        slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                    )])),
+                }),
+            )])
+            .unwrap();
+        let instance = PathObservationInstanceId::new(instance_id);
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                horizon_epoch(
+                    root_source,
+                    PathObservationNamespace::Materialization(instance),
+                    generation_root,
+                    None,
+                    None,
+                    None,
+                    &[("pkg", false)],
+                    &[],
+                    &[],
+                    &[("pkg/BUILD.bazel", Some(b"exports_files([])\n"))],
+                    &[],
+                    instance_id as i64,
+                ),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                immutable_material(generation_root, instance),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&nonregistry_preflight("pkg"))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn host_nonregistry_package_immutable_generation_aba() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        let a = immutable_preflight_compute(&dice, "/generation/41", 41, tracker.clone()).await;
+        let b = immutable_preflight_compute(&dice, "/generation/42", 42, tracker.clone()).await;
+        let restored =
+            immutable_preflight_compute(&dice, "/generation/41", 41, tracker.clone()).await;
+        for value in [&a, &b, &restored] {
+            assert!(matches!(value, SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::BuildDotBazel))));
+        }
+        assert!(HostNonregistryPackagePreflightKey::equality(&a, &restored));
+        let local = nonregistry_preflight_compute(
+            &dice,
+            None,
+            None,
+            Some(b"local\n"),
+            &[],
+            43,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        let category_b =
+            immutable_preflight_compute(&dice, "/generation/44", 44, tracker.clone()).await;
+        let local_restored = nonregistry_preflight_compute(
+            &dice,
+            None,
+            None,
+            Some(b"local\n"),
+            &[],
+            45,
+            false,
+            None,
+            PREFLIGHT_DEFAULT,
+        )
+        .await;
+        assert!(HostNonregistryPackagePreflightKey::equality(
+            &local,
+            &local_restored,
+        ));
+        assert!(
+            matches!(category_b, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::BuildDotBazel)))
+        );
+        assert!(
+            tracker
+                .preflight
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(kind, _)| *kind == ActivationKind::Evaluated)
+                .count()
+                >= 2
+        );
+    }
+    #[tokio::test]
+    async fn host_nonregistry_package_local_table_and_failure_recovery() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let a = local_preflight(&dice, Some(b"a\n"), 20).await;
+        let b = nonregistry_preflight_compute(
+            &dice,
+            None,
+            None,
+            None,
+            &[],
+            21,
+            false,
+            None,
+            ("pkg", None, false, false),
+        )
+        .await;
+        let restored = local_preflight(&dice, Some(b"a\n"), 22).await;
+        assert!(matches!(&b, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::NoBuildFile))));
+        assert!(HostNonregistryPackagePreflightKey::equality(&a, &restored));
+
+        for scenario in [
+            ("pkg", Some("BUILD"), false, false),
+            ("pkg", Some("BUILD"), false, true),
+        ] {
+            let value = nonregistry_preflight_compute(
+                &dice,
+                None,
+                None,
+                Some(b"fallback\n"),
+                &[],
+                23,
+                false,
+                None,
+                scenario,
+            )
+            .await;
+            assert!(matches!(value, SourcePreparationOutcome::Complete(value)
+                if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::Build))));
+        }
+
+        let invalid = nonregistry_preflight_compute(
+            &dice,
+            Some(b"not evaluated\n"),
+            None,
+            None,
+            &[],
+            24,
+            false,
+            None,
+            ("bad:name", None, false, false),
+        )
+        .await;
+        assert!(matches!(invalid, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::InvalidPackageName { .. }))));
+
+        let need = nonregistry_preflight_compute(
+            &dice,
+            None,
+            None,
+            None,
+            &[],
+            25,
+            false,
+            None,
+            ("pkg", None, true, false),
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        let recovered = local_preflight(&dice, Some(b"recovered\n"), 26).await;
+        assert!(
+            matches!(recovered, SourcePreparationOutcome::Complete(value)
+            if matches!(value.as_ref(), Ok(HostNonregistryPackagePreflight::BuildDotBazel)))
         );
     }
 }

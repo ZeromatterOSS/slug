@@ -32,12 +32,14 @@ use slug_workspace_v2::PathObservationKey;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOutcome;
 
+use crate::NonrootModuleKey;
 use crate::RootPackagePolicyProjectionError;
 use crate::RootRepositoryIgnoreInputsProjectionKey;
 use crate::RootRepositoryRoute;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileError;
+use crate::repo_file::HostNonregistryRepoFileKey;
 use crate::repo_file::HostRepoFileError;
 use crate::repo_file::HostRepoFileKey;
 use crate::repo_file::HostRouteRepoFileError;
@@ -45,6 +47,8 @@ use crate::repo_file::HostRouteRepoFileKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
+use crate::source_preparation::RepositorySourceFileKey;
+use crate::source_preparation::RepositorySourceFileValue;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
 /// A normalized slash-separated `.bazelignore` prefix.
@@ -148,6 +152,7 @@ fn is_component_prefix(prefix: &str, directory: &str) -> bool {
 pub(crate) enum HostRepositoryIgnoreError {
     RepoFile(HostRepoFileError),
     RouteRepoFile(HostRouteRepoFileError),
+    NonregistryRepoFile(HostRouteRepoFileError),
     PolicyProjection(RootPackagePolicyProjectionError),
     HostFile(HostFileError),
     RepositorySource(RepositorySourceFileError),
@@ -166,6 +171,7 @@ impl fmt::Display for HostRepositoryIgnoreError {
         match self {
             Self::RepoFile(error) => error.fmt(f),
             Self::RouteRepoFile(error) => error.fmt(f),
+            Self::NonregistryRepoFile(error) => error.fmt(f),
             Self::PolicyProjection(error) => error.fmt(f),
             Self::HostFile(error) => write!(f, "failed to read .bazelignore: {error:?}"),
             Self::RepositorySource(error) => {
@@ -894,6 +900,109 @@ impl Key for HostRepositoryIgnoreKey {
         }
 
         PathOutcome::Complete(Arc::new(Ok(RepositoryIgnoreMatcher::new(
+            prefixes,
+            repo.ignored_directories().iter().cloned(),
+        ))))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryRepositoryIgnoreKey {
+    workspace: NormalizedAbsolutePath,
+    module: NonrootModuleKey,
+}
+
+impl HostNonregistryRepositoryIgnoreKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, module: NonrootModuleKey) -> Self {
+        Self { workspace, module }
+    }
+}
+
+impl fmt::Display for HostNonregistryRepositoryIgnoreKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-nonregistry-repository-ignore:{}@{}",
+            self.module.name, self.module.version
+        )
+    }
+}
+
+#[async_trait]
+impl Key for HostNonregistryRepositoryIgnoreKey {
+    type Value =
+        SourcePreparationOutcome<Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let repo = match dice_invariant(
+            ctx.compute(&HostNonregistryRepoFileKey::new(
+                self.workspace.dupe(),
+                self.module.clone(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
+                Ok(value) => value.dupe(),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostRepositoryIgnoreError::NonregistryRepoFile(error.clone()),
+                    )));
+                }
+            },
+        };
+        let source = match dice_invariant(
+            ctx.compute(&RepositorySourceFileKey {
+                workspace: self.workspace.as_path().to_owned(),
+                module_name: self.module.name.clone(),
+                repo_relative_path: ".bazelignore".into(),
+            })
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent)) => None,
+            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes))) => {
+                let path = NormalizedAbsolutePath::new(
+                    self.workspace
+                        .as_path()
+                        .join(".slug-nonregistry")
+                        .join(self.module.name.as_str())
+                        .join(".bazelignore"),
+                )
+                .expect("joining a normalized workspace remains absolute");
+                Some((bytes, path))
+            }
+            SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
+                actual: PathNodeKind::Directory,
+                ..
+            })) => None,
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostRepositoryIgnoreError::RepositorySource(error),
+                )));
+            }
+        };
+        let mut prefixes = Vec::new();
+        if let Some((bytes, logical_path)) = source {
+            match parse_ignore_file(ctx, &logical_path, &bytes).await {
+                PathOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
+                }
+                PathOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
+                }
+                PathOutcome::Complete(Ok(values)) => prefixes = values,
+            }
+        }
+        SourcePreparationOutcome::Complete(Arc::new(Ok(RepositoryIgnoreMatcher::new(
             prefixes,
             repo.ignored_directories().iter().cloned(),
         ))))
