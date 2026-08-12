@@ -89,6 +89,7 @@ use crate::NonrootExtensionUsage;
 use crate::NonrootModuleBuilder;
 use crate::NonrootModuleKey;
 use crate::NonrootRepoImports;
+use crate::NonrootRepoOverride;
 use crate::VisibleLockfileRead;
 use crate::dice::CommandModuleOverrides;
 use crate::lockfile::bad_visible_lockfile_message;
@@ -918,10 +919,26 @@ pub struct EvaluatedRootModule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub(crate) struct RootExtensionUsage {
+    pub(crate) bzl_label: CompactString,
+    pub(crate) extension_name: CompactString,
+    pub(crate) proxies: Arc<[NonrootExtensionProxy]>,
+    pub(crate) tags: Arc<[NonrootExtensionTag]>,
+    pub(crate) repo_overrides: Arc<SmallMap<CompactString, NonrootRepoOverride>>,
+    pub(crate) isolation: Option<RootExtensionIsolationKey>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct RootExtensionIsolationKey {
+    pub(crate) exported_proxy_name: CompactString,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct RootModuleEvaluation {
     pub(crate) module: EvaluatedRootModule,
     pub(crate) module_file_paths: Arc<[PathBuf]>,
     pub(crate) overrides: RootModuleOverrides,
+    pub(crate) extension_usages: Arc<[RootExtensionUsage]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -930,6 +947,7 @@ pub struct RootModuleFiles {
     pub module_file_paths: Arc<[PathBuf]>,
     pub visible_lockfile: VisibleLockfileRead,
     pub overrides: RootModuleOverrides,
+    pub(crate) extension_usages: Arc<[RootExtensionUsage]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1498,6 +1516,7 @@ impl Key for RootModuleFilesKey {
             module_file_paths: evaluation.module_file_paths,
             visible_lockfile,
             overrides: evaluation.overrides,
+            extension_usages: evaluation.extension_usages,
         }))
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2032,9 +2051,24 @@ struct NonrootEvalState {
     module_called: bool,
     non_module_called: bool,
     builder: NonrootModuleBuilder,
+    extensions: ExtensionEvalState,
+}
+
+#[derive(Default)]
+struct ExtensionEvalState {
     usages: Vec<NonrootUsageDraft>,
     roots: Vec<NonrootRoot>,
     repo_names: SmallSet<CompactString>,
+}
+
+struct ExtensionEvalMeta {
+    logical_id: LogicalModuleFileId,
+    current_file: usize,
+    own_repo: CompactString,
+    module_name: CompactString,
+    module_version: CompactString,
+    ignore_dev_dependency: bool,
+    root_semantics: bool,
 }
 
 #[allow(dead_code)]
@@ -2045,6 +2079,7 @@ struct NonrootUsageDraft {
     isolated: bool,
     proxies: Vec<NonrootProxyDraft>,
     tags: Vec<NonrootTagDraft>,
+    repo_overrides: SmallMap<CompactString, NonrootRepoOverride>,
     exported_names: SmallSet<CompactString>,
 }
 
@@ -2100,11 +2135,70 @@ fn nonroot_span(
     })
 }
 
-fn nonroot_root_name(state: &NonrootEvalState, kind: &str) -> CompactString {
-    CompactString::new(format!("\0slug:nonroot:{kind}:{}", state.roots.len()))
+fn with_extension_state<T>(
+    eval: &Evaluator<'_, '_, '_>,
+    f: impl FnOnce(&mut ExtensionEvalState, ExtensionEvalMeta) -> anyhow::Result<T>,
+) -> anyhow::Result<T> {
+    if let Some(context) = eval
+        .extra
+        .and_then(|extra| extra.downcast_ref::<NonrootEvalContext>())
+    {
+        let mut state = context.state.borrow_mut();
+        let meta = ExtensionEvalMeta {
+            logical_id: state.logical_id.clone(),
+            current_file: state.current_file,
+            own_repo: state.builder.repo_name.clone(),
+            module_name: state.builder.declared_name.clone(),
+            module_version: state.builder.declared_version.clone(),
+            ignore_dev_dependency: true,
+            root_semantics: false,
+        };
+        return f(&mut state.extensions, meta);
+    }
+    if let Some(context) = eval
+        .extra
+        .and_then(|extra| extra.downcast_ref::<RootEvaluationContext>())
+    {
+        let mut state = context.state.borrow_mut();
+        let own_repo = state
+            .header
+            .as_ref()
+            .map(|header| {
+                header
+                    .repo_name
+                    .clone()
+                    .unwrap_or_else(|| header.name.clone())
+            })
+            .unwrap_or_default();
+        let module_name = state
+            .header
+            .as_ref()
+            .map(|header| header.name.clone())
+            .unwrap_or_default();
+        let module_version = state
+            .header
+            .as_ref()
+            .and_then(|header| header.version.clone())
+            .unwrap_or_default();
+        let meta = ExtensionEvalMeta {
+            logical_id: context.file_ids[state.current_file].clone(),
+            current_file: state.current_file,
+            own_repo,
+            module_name,
+            module_version,
+            ignore_dev_dependency: state.ignore_dev_dependency,
+            root_semantics: true,
+        };
+        return f(&mut state.extensions, meta);
+    }
+    anyhow::bail!("extension global invoked without MODULE evaluator context")
 }
 
-fn reserve_nonroot_repo_name(state: &mut NonrootEvalState, name: &str) -> anyhow::Result<()> {
+fn extension_root_name(state: &ExtensionEvalState, kind: &str) -> CompactString {
+    CompactString::new(format!("\0slug:extension:{kind}:{}", state.roots.len()))
+}
+
+fn reserve_extension_repo_name(state: &mut ExtensionEvalState, name: &str) -> anyhow::Result<()> {
     if !state.repo_names.insert(name.into()) {
         anyhow::bail!("repository name '{name}' is already defined");
     }
@@ -2171,19 +2265,19 @@ impl<'v> StarlarkValue<'v> for ModuleExtensionProxy {
         variable_name: &str,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> starlark::Result<()> {
-        let mut state = nonroot_context(eval)
-            .map_err(starlark::Error::new_other)?
-            .state
-            .borrow_mut();
-        let usage = &mut state.usages[self.usage];
-        let proxy = &mut usage.proxies[self.proxy];
-        if proxy.name.is_empty() {
-            proxy.name = variable_name.into();
-            if usage.isolated && !proxy.dev_dependency {
-                // The isolation key is constructed during finalization, after
-                // the actual source binding is known.
+        with_extension_state(eval, |state, _| {
+            let usage = &mut state.usages[self.usage];
+            let proxy = &mut usage.proxies[self.proxy];
+            if proxy.name.is_empty() {
+                proxy.name = variable_name.into();
+                if usage.isolated && !proxy.dev_dependency {
+                    // The isolation key is constructed during finalization,
+                    // after the actual source binding is known.
+                }
             }
-        }
+            Ok(())
+        })
+        .map_err(starlark::Error::new_other)?;
         Ok(())
     }
 
@@ -2229,37 +2323,37 @@ impl<'v> StarlarkValue<'v> for TagInvoker {
     ) -> starlark::Result<Value<'v>> {
         reject_positions(args, eval)?;
         let attributes = eval.heap().alloc(args.names_map()?);
-        let mut state = nonroot_context(eval)
-            .map_err(starlark::Error::new_other)?
-            .state
-            .borrow_mut();
-        let logical_id = state.logical_id.clone();
-        let span = nonroot_span(eval, &logical_id).map_err(starlark::Error::new_other)?;
-        let (active, dev_dependency) = {
-            let usage = &state.usages[self.usage];
-            (usage.active, usage.proxies[self.proxy].dev_dependency)
-        };
-        if !active {
-            return Ok(Value::new_none());
+        let root = with_extension_state(eval, |state, meta| {
+            let (active, dev_dependency) = {
+                let usage = &state.usages[self.usage];
+                (usage.active, usage.proxies[self.proxy].dev_dependency)
+            };
+            if !active {
+                return Ok(None);
+            }
+            let span = nonroot_span(eval, &meta.logical_id)?;
+            let root = extension_root_name(state, "tag");
+            let tag = state.usages[self.usage].tags.len();
+            state.usages[self.usage].tags.push(NonrootTagDraft {
+                tag_class: self.tag_class.clone(),
+                dev_dependency,
+                location: span,
+                attributes: None,
+            });
+            state.roots.push(NonrootRoot {
+                file: meta.current_file,
+                name: root.clone(),
+                kind: NonrootRootKind::Tag {
+                    usage: self.usage,
+                    tag,
+                },
+            });
+            Ok(Some(root))
+        })
+        .map_err(starlark::Error::new_other)?;
+        if let Some(root) = root {
+            eval.module().set(root.as_str(), attributes);
         }
-        let root = nonroot_root_name(&state, "tag");
-        eval.module().set(root.as_str(), attributes);
-        let tag = state.usages[self.usage].tags.len();
-        state.usages[self.usage].tags.push(NonrootTagDraft {
-            tag_class: self.tag_class.clone(),
-            dev_dependency,
-            location: span,
-            attributes: None,
-        });
-        let file = state.current_file;
-        state.roots.push(NonrootRoot {
-            file,
-            name: root,
-            kind: NonrootRootKind::Tag {
-                usage: self.usage,
-                tag,
-            },
-        });
         Ok(Value::new_none())
     }
 }
@@ -2305,51 +2399,49 @@ impl<'v> StarlarkValue<'v> for RepoRuleProxy {
             })
             .transpose()?
             .unwrap_or(false);
-        if dev_dependency {
-            return Ok(Value::new_none());
-        }
         let name_key = eval.heap().alloc_str("name");
         let name_value = eval.heap().alloc_str(name.as_str()).to_value();
         attributes.insert(name_key, name_value);
         let attrs = eval.heap().alloc(attributes);
-        let mut state = nonroot_context(eval)
-            .map_err(starlark::Error::new_other)?
-            .state
-            .borrow_mut();
-        reserve_nonroot_repo_name(&mut state, name.as_str()).map_err(starlark::Error::new_other)?;
-        if !state.usages[self.usage].exported_names.insert(name.clone()) {
-            return Err(starlark::Error::new_other(anyhow::anyhow!(
-                "extension import exports the same name twice"
-            )));
+        let root = with_extension_state(eval, |state, meta| {
+            if dev_dependency && meta.ignore_dev_dependency {
+                return Ok(None);
+            }
+            reserve_extension_repo_name(state, name.as_str())?;
+            if !state.usages[self.usage].exported_names.insert(name.clone()) {
+                anyhow::bail!("extension import exports the same name twice");
+            }
+            let span = nonroot_span(eval, &meta.logical_id)?;
+            let root = extension_root_name(state, "innate");
+            state.usages[self.usage].proxies.push(NonrootProxyDraft {
+                // This internal extension proxy is created inside the
+                // repo-rule invocation, so no source assignment exports it.
+                name: CompactString::new(""),
+                dev_dependency,
+                location: span.clone(),
+                imports: SmallMap::from_iter([(name.clone(), name)]),
+            });
+            let tag = state.usages[self.usage].tags.len();
+            state.usages[self.usage].tags.push(NonrootTagDraft {
+                tag_class: "repo".into(),
+                dev_dependency,
+                location: span,
+                attributes: None,
+            });
+            state.roots.push(NonrootRoot {
+                file: meta.current_file,
+                name: root.clone(),
+                kind: NonrootRootKind::Tag {
+                    usage: self.usage,
+                    tag,
+                },
+            });
+            Ok(Some(root))
+        })
+        .map_err(starlark::Error::new_other)?;
+        if let Some(root) = root {
+            eval.module().set(root.as_str(), attrs);
         }
-        let logical_id = state.logical_id.clone();
-        let span = nonroot_span(eval, &logical_id).map_err(starlark::Error::new_other)?;
-        let root = nonroot_root_name(&state, "innate");
-        eval.module().set(root.as_str(), attrs);
-        state.usages[self.usage].proxies.push(NonrootProxyDraft {
-            // This internal extension proxy is created inside the repo-rule
-            // invocation, so no source assignment ever exports it.
-            name: CompactString::new(""),
-            dev_dependency: false,
-            location: span.clone(),
-            imports: SmallMap::from_iter([(name.clone(), name)]),
-        });
-        let tag = state.usages[self.usage].tags.len();
-        state.usages[self.usage].tags.push(NonrootTagDraft {
-            tag_class: "repo".into(),
-            dev_dependency: false,
-            location: span,
-            attributes: None,
-        });
-        let file = state.current_file;
-        state.roots.push(NonrootRoot {
-            file,
-            name: root,
-            kind: NonrootRootKind::Tag {
-                usage: self.usage,
-                tag,
-            },
-        });
         Ok(Value::new_none())
     }
 }
@@ -2369,14 +2461,14 @@ fn proxy_from_value<'v>(value: Value<'v>) -> anyhow::Result<&'v ModuleExtensionP
 }
 
 fn register_import(
-    state: &mut NonrootEvalState,
+    state: &mut ExtensionEvalState,
     proxy: &ModuleExtensionProxy,
     local: &str,
     exported: &str,
 ) -> anyhow::Result<()> {
     validate_nonempty_repo_name(local)?;
     validate_nonempty_repo_name(exported)?;
-    reserve_nonroot_repo_name(state, local)?;
+    reserve_extension_repo_name(state, local)?;
     if !state.usages[proxy.usage]
         .exported_names
         .insert(exported.into())
@@ -2392,6 +2484,199 @@ fn register_import(
         anyhow::bail!("extension import local name is repeated");
     }
     Ok(())
+}
+
+fn module_use_extension<'v>(
+    bzl_file: &str,
+    extension_name: &str,
+    dev_dependency: bool,
+    isolate: bool,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<Value<'v>> {
+    if !valid_starlark_identifier(extension_name) {
+        anyhow::bail!("extension name is not a valid identifier: {extension_name}");
+    }
+    let (usage, proxy, root) = with_extension_state(eval, |state, meta| {
+        let bzl_file = normalize_nonroot_label(bzl_file, meta.own_repo.as_str())?;
+        let ignored = dev_dependency && meta.ignore_dev_dependency;
+        let usage = if !isolate && !ignored {
+            state
+                .usages
+                .iter()
+                .position(|usage| {
+                    usage.active
+                        && !usage.isolated
+                        && usage.bzl_label == bzl_file
+                        && usage.extension_name == extension_name
+                })
+                .unwrap_or_else(|| {
+                    state.usages.push(NonrootUsageDraft {
+                        bzl_label: bzl_file.clone(),
+                        extension_name: extension_name.into(),
+                        active: true,
+                        isolated: false,
+                        proxies: Vec::new(),
+                        tags: Vec::new(),
+                        repo_overrides: SmallMap::new(),
+                        exported_names: SmallSet::new(),
+                    });
+                    state.usages.len() - 1
+                })
+        } else {
+            state.usages.push(NonrootUsageDraft {
+                bzl_label: bzl_file,
+                extension_name: extension_name.into(),
+                active: !ignored,
+                isolated: isolate,
+                proxies: Vec::new(),
+                tags: Vec::new(),
+                repo_overrides: SmallMap::new(),
+                exported_names: SmallSet::new(),
+            });
+            state.usages.len() - 1
+        };
+        let proxy = state.usages[usage].proxies.len();
+        state.usages[usage].proxies.push(NonrootProxyDraft {
+            name: CompactString::new(""),
+            dev_dependency,
+            location: nonroot_span(eval, &meta.logical_id)?,
+            imports: SmallMap::new(),
+        });
+        let root = extension_root_name(state, "proxy");
+        state.roots.push(NonrootRoot {
+            file: meta.current_file,
+            name: root.clone(),
+            kind: NonrootRootKind::Proxy,
+        });
+        Ok((usage, proxy, root))
+    })?;
+    let value = eval.heap().alloc(ModuleExtensionProxy { usage, proxy });
+    // Keep every proxy reachable until deferred tag attributes are snapshotted.
+    eval.module().set(root.as_str(), value);
+    Ok(value)
+}
+
+fn module_use_repo<'v>(
+    proxy: Value<'v>,
+    repos: Value<'v>,
+    aliases: DictRef<'v>,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<NoneType> {
+    let proxy = proxy_from_value(proxy)?;
+    let repos = TupleRef::from_value(repos)
+        .context("use_repo positional arguments must be repository names")?;
+    with_extension_state(eval, |state, meta| {
+        let referenced_proxy = &state.usages[proxy.usage].proxies[proxy.proxy];
+        if meta.root_semantics && referenced_proxy.dev_dependency && meta.ignore_dev_dependency {
+            return Ok(NoneType);
+        }
+        for repo in repos.iter() {
+            let repo = repo
+                .unpack_str()
+                .context("repository names must be strings")?;
+            register_import(state, proxy, repo, repo)?;
+        }
+        for (local, exported) in aliases.iter() {
+            let local = local
+                .unpack_str()
+                .context("repository names must be strings")?;
+            let exported = exported
+                .unpack_str()
+                .context("repository names must be strings")?
+                .replace("{name}", meta.module_name.as_str())
+                .replace("{version}", meta.module_version.as_str());
+            register_import(state, proxy, local, exported.as_str())?;
+        }
+        Ok(NoneType)
+    })
+}
+
+fn module_repo_override<'v>(
+    proxy: Value<'v>,
+    repos: Value<'v>,
+    aliases: DictRef<'v>,
+    must_exist: bool,
+    eval: &mut Evaluator<'v, '_, '_>,
+) -> anyhow::Result<NoneType> {
+    let proxy = proxy_from_value(proxy)?;
+    with_extension_state(eval, |state, meta| {
+        let referenced_proxy = &state.usages[proxy.usage].proxies[proxy.proxy];
+        if !meta.root_semantics || (referenced_proxy.dev_dependency && meta.ignore_dev_dependency) {
+            return Ok(NoneType);
+        }
+        let repos = TupleRef::from_value(repos)
+            .context("repository override positional arguments must be repository names")?;
+        let mut insert = |overridden: &str, overriding: &str| -> anyhow::Result<()> {
+            validate_nonempty_repo_name(overridden)?;
+            validate_nonempty_repo_name(overriding)?;
+            let value = NonrootRepoOverride {
+                overriding_repo_name: overriding.into(),
+                must_exist,
+                location: nonroot_span(eval, &meta.logical_id)?,
+            };
+            if state.usages[proxy.usage]
+                .repo_overrides
+                .insert(overridden.into(), value)
+                .is_some()
+            {
+                anyhow::bail!("extension repository is overridden more than once");
+            }
+            Ok(())
+        };
+        for repo in repos.iter() {
+            let repo = repo
+                .unpack_str()
+                .context("repository names must be strings")?;
+            insert(repo, repo)?;
+        }
+        for (overridden, overriding) in aliases.iter() {
+            insert(
+                overridden
+                    .unpack_str()
+                    .context("repository names must be strings")?,
+                overriding
+                    .unpack_str()
+                    .context("repository names must be strings")?,
+            )?;
+        }
+        Ok(NoneType)
+    })
+}
+
+fn module_use_repo_rule(
+    bzl_file: &str,
+    rule_name: &str,
+    eval: &mut Evaluator,
+) -> anyhow::Result<RepoRuleProxy> {
+    with_extension_state(eval, |state, _meta| {
+        let extension_name = CompactString::new(format!("{bzl_file} {rule_name}"));
+        let usage = state
+            .usages
+            .iter()
+            .position(|usage| {
+                usage.active
+                    && !usage.isolated
+                    && usage.bzl_label == "//:MODULE.bazel"
+                    && usage.extension_name == extension_name
+            })
+            .unwrap_or_else(|| {
+                state.usages.push(NonrootUsageDraft {
+                    bzl_label: "//:MODULE.bazel".into(),
+                    extension_name: extension_name.clone(),
+                    active: true,
+                    isolated: false,
+                    proxies: Vec::new(),
+                    tags: Vec::new(),
+                    repo_overrides: SmallMap::new(),
+                    exported_names: SmallSet::new(),
+                });
+                state.usages.len() - 1
+            });
+        Ok(RepoRuleProxy {
+            usage,
+            rule_name: rule_name.into(),
+        })
+    })
 }
 
 #[derive(Debug)]
@@ -2497,7 +2782,7 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
             validate_bazel_compatibility(value)?;
         }
         state.module_called = true;
-        reserve_nonroot_repo_name(&mut state, repo_name)?;
+        reserve_extension_repo_name(&mut state.extensions, repo_name)?;
         state.builder.declared_name = name.into();
         state.builder.declared_version = version;
         state.builder.repo_name = repo_name.into();
@@ -2531,7 +2816,7 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         let mut state = nonroot_context(eval)?.state.borrow_mut();
         state.non_module_called = true;
         if !nodep {
-            reserve_nonroot_repo_name(&mut state, repo)?;
+            reserve_extension_repo_name(&mut state.extensions, repo)?;
         }
         if !dev_dependency {
             let dep = NonrootDependency::new(name, version);
@@ -2622,65 +2907,8 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(require = named, default = false)] isolate: bool,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<Value<'v>> {
-        let mut state = nonroot_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        if !valid_starlark_identifier(extension_name) {
-            anyhow::bail!("extension name is not a valid identifier: {extension_name}");
-        }
-        let bzl_file = normalize_nonroot_label(bzl_file, state.builder.repo_name.as_str())?;
-        let logical_id = state.logical_id.clone();
-        let location = nonroot_span(eval, &logical_id)?;
-        let usage = if !isolate && !dev_dependency {
-            state
-                .usages
-                .iter()
-                .position(|usage| {
-                    usage.active
-                        && !usage.isolated
-                        && usage.bzl_label == bzl_file
-                        && usage.extension_name == extension_name
-                })
-                .unwrap_or_else(|| {
-                    state.usages.push(NonrootUsageDraft {
-                        bzl_label: bzl_file.clone(),
-                        extension_name: extension_name.into(),
-                        active: true,
-                        isolated: false,
-                        proxies: Vec::new(),
-                        tags: Vec::new(),
-                        exported_names: SmallSet::new(),
-                    });
-                    state.usages.len() - 1
-                })
-        } else {
-            state.usages.push(NonrootUsageDraft {
-                bzl_label: bzl_file,
-                extension_name: extension_name.into(),
-                active: !dev_dependency,
-                isolated: isolate,
-                proxies: Vec::new(),
-                tags: Vec::new(),
-                exported_names: SmallSet::new(),
-            });
-            state.usages.len() - 1
-        };
-        let root = nonroot_root_name(&state, "proxy");
-        let proxy = state.usages[usage].proxies.len();
-        state.usages[usage].proxies.push(NonrootProxyDraft {
-            name: CompactString::new(""),
-            dev_dependency,
-            location,
-            imports: SmallMap::new(),
-        });
-        let file = state.current_file;
-        state.roots.push(NonrootRoot {
-            file,
-            name: root.clone(),
-            kind: NonrootRootKind::Proxy,
-        });
-        let value = eval.heap().alloc(ModuleExtensionProxy { usage, proxy });
-        eval.module().set(root.as_str(), value);
-        Ok(value)
+        nonroot_context(eval)?.state.borrow_mut().non_module_called = true;
+        module_use_extension(bzl_file, extension_name, dev_dependency, isolate, eval)
     }
 
     fn use_repo<'v>(
@@ -2689,52 +2917,27 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         #[starlark(kwargs)] aliases: DictRef<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        let proxy = proxy_from_value(proxy)?;
-        let repos = TupleRef::from_value(repos)
-            .context("use_repo positional arguments must be repository names")?;
-        let mut state = nonroot_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        let module_name = state.builder.declared_name.clone();
-        let module_version = state.builder.declared_version.clone();
-        for repo in repos.iter() {
-            let repo = repo
-                .unpack_str()
-                .context("repository names must be strings")?;
-            register_import(&mut state, proxy, repo, repo)?;
-        }
-        for (local, exported) in aliases.iter() {
-            let local = local
-                .unpack_str()
-                .context("repository names must be strings")?;
-            let exported = exported
-                .unpack_str()
-                .context("repository names must be strings")?
-                .replace("{name}", module_name.as_str())
-                .replace("{version}", module_version.as_str());
-            register_import(&mut state, proxy, local, exported.as_str())?;
-        }
-        Ok(NoneType)
+        nonroot_context(eval)?.state.borrow_mut().non_module_called = true;
+        module_use_repo(proxy, repos, aliases, eval)
     }
 
     fn override_repo<'v>(
         #[starlark(require = pos)] proxy: Value<'v>,
-        #[starlark(args)] _repos: Value<'v>,
-        #[starlark(kwargs)] _aliases: DictRef<'v>,
+        #[starlark(args)] repos: Value<'v>,
+        #[starlark(kwargs)] aliases: DictRef<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        let _ = proxy_from_value(proxy)?;
         nonroot_context(eval)?.state.borrow_mut().non_module_called = true;
-        Ok(NoneType)
+        module_repo_override(proxy, repos, aliases, true, eval)
     }
     fn inject_repo<'v>(
         #[starlark(require = pos)] proxy: Value<'v>,
-        #[starlark(args)] _repos: Value<'v>,
-        #[starlark(kwargs)] _aliases: DictRef<'v>,
+        #[starlark(args)] repos: Value<'v>,
+        #[starlark(kwargs)] aliases: DictRef<'v>,
         eval: &mut Evaluator<'v, '_, '_>,
     ) -> anyhow::Result<NoneType> {
-        let _ = proxy_from_value(proxy)?;
         nonroot_context(eval)?.state.borrow_mut().non_module_called = true;
-        Ok(NoneType)
+        module_repo_override(proxy, repos, aliases, false, eval)
     }
 
     fn use_repo_rule(
@@ -2742,34 +2945,8 @@ fn nonroot_module_globals(builder: &mut GlobalsBuilder) {
         rule_name: &str,
         eval: &mut Evaluator,
     ) -> anyhow::Result<RepoRuleProxy> {
-        let mut state = nonroot_context(eval)?.state.borrow_mut();
-        state.non_module_called = true;
-        let extension_name = CompactString::new(format!("{bzl_file} {rule_name}"));
-        let usage = state
-            .usages
-            .iter()
-            .position(|usage| {
-                usage.active
-                    && !usage.isolated
-                    && usage.bzl_label == "//:MODULE.bazel"
-                    && usage.extension_name == extension_name
-            })
-            .unwrap_or_else(|| {
-                state.usages.push(NonrootUsageDraft {
-                    bzl_label: "//:MODULE.bazel".into(),
-                    extension_name,
-                    active: true,
-                    isolated: false,
-                    proxies: Vec::new(),
-                    tags: Vec::new(),
-                    exported_names: SmallSet::new(),
-                });
-                state.usages.len() - 1
-            });
-        Ok(RepoRuleProxy {
-            usage,
-            rule_name: rule_name.into(),
-        })
+        nonroot_context(eval)?.state.borrow_mut().non_module_called = true;
+        module_use_repo_rule(bzl_file, rule_name, eval)
     }
 
     fn local_path_override(
@@ -3157,9 +3334,7 @@ fn evaluate_nonroot_module_closure(
             module_called: false,
             non_module_called: false,
             builder,
-            usages: Vec::new(),
-            roots: Vec::new(),
-            repo_names: SmallSet::new(),
+            extensions: ExtensionEvalState::default(),
         }),
         include_indices,
         file_ids,
@@ -3244,7 +3419,7 @@ fn evaluate_nonroot_module_closure(
             .context("print global is absent")?;
         let mut state = context.state.into_inner();
         let mut proxy_ids = SmallSet::new();
-        for root in &state.roots {
+        for root in &state.extensions.roots {
             if matches!(root.kind, NonrootRootKind::Proxy) {
                 proxy_ids.insert(
                     modules[root.file]
@@ -3256,6 +3431,7 @@ fn evaluate_nonroot_module_closure(
         }
         let identities = deferred_attribute_snapshot_identities(builtin_print, proxy_ids);
         let roots: Vec<_> = state
+            .extensions
             .roots
             .iter()
             .filter_map(|root| match root.kind {
@@ -3273,7 +3449,7 @@ fn evaluate_nonroot_module_closure(
             )
             .context("hidden tag root is not a dict")?;
             let values = snapshot_deferred_attribute_values(attrs, &identities)?;
-            state.usages[usage].tags[tag].attributes = Some(values);
+            state.extensions.usages[usage].tags[tag].attributes = Some(values);
         }
         finalize_nonroot_state(state)
     })()
@@ -3282,13 +3458,18 @@ fn evaluate_nonroot_module_closure(
 
 #[allow(dead_code)]
 fn finalize_nonroot_state(mut state: NonrootEvalState) -> anyhow::Result<EvaluatedNonrootModule> {
-    if state.builder.expected_key.name != "bazel_tools" && state.repo_names.contains("bazel_tools")
+    if state.builder.expected_key.name != "bazel_tools"
+        && state.extensions.repo_names.contains("bazel_tools")
     {
         anyhow::bail!("bazel_tools is a built-in dependency and its repo name is reserved");
     }
-    let usages = std::mem::take(&mut state.usages);
+    let usages = std::mem::take(&mut state.extensions.usages);
     for usage in usages {
-        if !usage.active {
+        if !usage.active
+            || (usage.proxies.is_empty()
+                && usage.tags.is_empty()
+                && usage.repo_overrides.is_empty())
+        {
             continue;
         }
         let isolation = if usage.isolated {
@@ -3342,11 +3523,93 @@ fn finalize_nonroot_state(mut state: NonrootEvalState) -> anyhow::Result<Evaluat
             extension_name: usage.extension_name.clone(),
             proxies,
             tags,
-            repo_overrides: Arc::new(SmallMap::new()),
+            repo_overrides: Arc::new(usage.repo_overrides),
             isolation,
         });
     }
     state.builder.build().map_err(anyhow::Error::msg)
+}
+
+fn finalize_root_extension_usages(
+    mut state: ExtensionEvalState,
+) -> anyhow::Result<Arc<[RootExtensionUsage]>> {
+    if state
+        .usages
+        .iter()
+        .filter(|usage| usage.active)
+        .any(|usage| {
+            usage
+                .proxies
+                .iter()
+                .any(|proxy| proxy.imports.contains_key("bazel_tools"))
+        })
+    {
+        anyhow::bail!("bazel_tools is a built-in dependency and its repo name is reserved");
+    }
+    state
+        .usages
+        .drain(..)
+        .filter(|usage| {
+            usage.active
+                && !(usage.proxies.is_empty()
+                    && usage.tags.is_empty()
+                    && usage.repo_overrides.is_empty())
+        })
+        .map(|usage| {
+            let isolation = if usage.isolated {
+                anyhow::ensure!(
+                    usage.proxies.len() == 1,
+                    "isolated extension must have exactly one proxy"
+                );
+                let proxy = usage
+                    .proxies
+                    .first()
+                    .context("isolated extension has no proxy")?;
+                if proxy.name.is_empty() {
+                    anyhow::bail!("isolated extension proxy must be assigned");
+                }
+                Some(RootExtensionIsolationKey {
+                    exported_proxy_name: proxy.name.clone(),
+                })
+            } else {
+                None
+            };
+            let proxies = usage
+                .proxies
+                .iter()
+                .map(|proxy| {
+                    Ok(NonrootExtensionProxy {
+                        proxy_name: proxy.name.clone(),
+                        containing_file: proxy.location.file.clone(),
+                        dev_dependency: proxy.dev_dependency,
+                        location: proxy.location.clone(),
+                        imports: NonrootRepoImports::from_local_to_exported(proxy.imports.clone())
+                            .map_err(anyhow::Error::msg)?,
+                    })
+                })
+                .collect::<anyhow::Result<Arc<_>>>()?;
+            let tags = usage
+                .tags
+                .into_iter()
+                .map(|tag| {
+                    Ok(NonrootExtensionTag {
+                        tag_class: tag.tag_class,
+                        attributes: Arc::new(tag.attributes.context("missing tag snapshot")?),
+                        dev_dependency: tag.dev_dependency,
+                        location: tag.location,
+                    })
+                })
+                .collect::<anyhow::Result<Arc<_>>>()?;
+            Ok(RootExtensionUsage {
+                bzl_label: usage.bzl_label,
+                extension_name: usage.extension_name,
+                proxies,
+                tags,
+                repo_overrides: Arc::new(usage.repo_overrides),
+                isolation,
+            })
+        })
+        .collect::<anyhow::Result<Arc<_>>>()
 }
 
 #[cfg(test)]
@@ -4194,6 +4457,7 @@ fn root_mapping(module: &EvaluatedRootModule) -> Result<RepositoryMapping, Compa
 struct RootEvaluationContext {
     state: RefCell<RecordedRootModule>,
     include_indices: SmallMap<CompactString, usize>,
+    file_ids: Vec<LogicalModuleFileId>,
 }
 
 struct RecordedRootModule {
@@ -4203,6 +4467,7 @@ struct RecordedRootModule {
     execution_platforms: Vec<ApparentLabel>,
     toolchains: Vec<ApparentLabel>,
     overrides: SmallMap<CompactString, RecordedRootModuleOverride>,
+    extensions: ExtensionEvalState,
     ignore_dev_dependency: bool,
     current_file: usize,
 }
@@ -4280,6 +4545,14 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         for value in bazel_compatibility.items {
             validate_bazel_compatibility(value)?;
         }
+        let apparent_repo_name = if repo_name.is_empty() {
+            name
+        } else {
+            repo_name
+        };
+        if !apparent_repo_name.is_empty() {
+            reserve_extension_repo_name(&mut state.extensions, apparent_repo_name)?;
+        }
         state.header = Some(RootModuleHeader {
             name: name.into(),
             version: (!version.is_empty()).then_some(version),
@@ -4322,7 +4595,7 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         if let Some(NoneOr::Other(repo_name)) = repo_name {
             validate_repo_name(repo_name)?;
         }
-        let (repo_name, nodep) = match repo_name {
+        let (repo_name, nodep): (Option<CompactString>, bool) = match repo_name {
             Some(NoneOr::None) => (None, true),
             Some(NoneOr::Other("")) | None => (Some(name.into()), false),
             Some(NoneOr::Other(repo_name)) => (Some(repo_name.into()), false),
@@ -4330,6 +4603,9 @@ fn module_globals(builder: &mut GlobalsBuilder) {
         let mut state = root_evaluation_context(eval)?.state.borrow_mut();
         state.non_module_called = true;
         if !dev_dependency || !state.ignore_dev_dependency {
+            if let Some(repo_name) = repo_name.as_ref() {
+                reserve_extension_repo_name(&mut state.extensions, repo_name.as_str())?;
+            }
             state.dependencies.push(RootModuleDependency {
                 name: name.into(),
                 version,
@@ -4365,6 +4641,66 @@ fn module_globals(builder: &mut GlobalsBuilder) {
             state.toolchains.extend(labels);
         }
         Ok(NoneType)
+    }
+    fn use_extension<'v>(
+        bzl_file: &str,
+        extension_name: &str,
+        #[starlark(require = named, default = false)] dev_dependency: bool,
+        #[starlark(require = named, default = false)] isolate: bool,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<Value<'v>> {
+        root_evaluation_context(eval)?
+            .state
+            .borrow_mut()
+            .non_module_called = true;
+        module_use_extension(bzl_file, extension_name, dev_dependency, isolate, eval)
+    }
+    fn use_repo<'v>(
+        #[starlark(require = pos)] proxy: Value<'v>,
+        #[starlark(args)] repos: Value<'v>,
+        #[starlark(kwargs)] aliases: DictRef<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        root_evaluation_context(eval)?
+            .state
+            .borrow_mut()
+            .non_module_called = true;
+        module_use_repo(proxy, repos, aliases, eval)
+    }
+    fn override_repo<'v>(
+        #[starlark(require = pos)] proxy: Value<'v>,
+        #[starlark(args)] repos: Value<'v>,
+        #[starlark(kwargs)] aliases: DictRef<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        root_evaluation_context(eval)?
+            .state
+            .borrow_mut()
+            .non_module_called = true;
+        module_repo_override(proxy, repos, aliases, true, eval)
+    }
+    fn inject_repo<'v>(
+        #[starlark(require = pos)] proxy: Value<'v>,
+        #[starlark(args)] repos: Value<'v>,
+        #[starlark(kwargs)] aliases: DictRef<'v>,
+        eval: &mut Evaluator<'v, '_, '_>,
+    ) -> anyhow::Result<NoneType> {
+        root_evaluation_context(eval)?
+            .state
+            .borrow_mut()
+            .non_module_called = true;
+        module_repo_override(proxy, repos, aliases, false, eval)
+    }
+    fn use_repo_rule(
+        bzl_file: &str,
+        rule_name: &str,
+        eval: &mut Evaluator,
+    ) -> anyhow::Result<RepoRuleProxy> {
+        root_evaluation_context(eval)?
+            .state
+            .borrow_mut()
+            .non_module_called = true;
+        module_use_repo_rule(bzl_file, rule_name, eval)
     }
     fn local_path_override(
         #[starlark(require = named)] module_name: &str,
@@ -4576,11 +4912,15 @@ fn evaluate_root_module_closure(
     module_file_paths: Arc<[PathBuf]>,
     print_capture: Option<&RootModulePrintCapture>,
 ) -> Result<RootModuleEvaluation, CompactString> {
+    let file_ids = files
+        .iter()
+        .map(|file| file._inspection.logical_id.clone())
+        .collect::<Vec<_>>();
     let asts = files
         .iter()
         .map(|file| {
             AstModule::parse(
-                &file.path.display().to_string(),
+                file._inspection.logical_id.0.as_str(),
                 file.source.as_str().to_owned(),
                 &nonroot_module_dialect(),
             )
@@ -4623,10 +4963,12 @@ fn evaluate_root_module_closure(
             execution_platforms: Vec::new(),
             toolchains: Vec::new(),
             overrides: SmallMap::new(),
+            extensions: ExtensionEvalState::default(),
             ignore_dev_dependency,
             current_file: 0,
         }),
         include_indices,
+        file_ids,
     };
     {
         let mut evaluator = Evaluator::new(&module);
@@ -4641,7 +4983,49 @@ fn evaluate_root_module_closure(
             .eval_prepared_module_index(0)
             .map_err(|error| CompactString::new(error.to_string()))?;
     }
-    let state = context.state.into_inner();
+    let modules: Vec<&Module> = std::iter::once(&module)
+        .chain(included_modules.iter().map(Box::as_ref))
+        .collect();
+    let mut state = context.state.into_inner();
+    let builtin_print = globals
+        .iter()
+        .find_map(|(name, value)| (name == "print").then_some(value.to_value().identity()))
+        .ok_or_else(|| CompactString::new("print global is absent"))?;
+    let mut proxy_ids = SmallSet::new();
+    for root in &state.extensions.roots {
+        if matches!(root.kind, NonrootRootKind::Proxy) {
+            proxy_ids.insert(
+                modules[root.file]
+                    .get(root.name.as_str())
+                    .ok_or_else(|| CompactString::new("missing hidden proxy root"))?
+                    .identity(),
+            );
+        }
+    }
+    let identities = deferred_attribute_snapshot_identities(builtin_print, proxy_ids);
+    let tag_roots = state
+        .extensions
+        .roots
+        .iter()
+        .filter_map(|root| match root.kind {
+            NonrootRootKind::Tag { usage, tag } => Some((root.file, root.name.clone(), usage, tag)),
+            NonrootRootKind::Proxy => None,
+        })
+        .collect::<Vec<_>>();
+    for (file, name, usage, tag) in tag_roots {
+        let attrs = DictRef::from_value(
+            modules[file]
+                .get(name.as_str())
+                .ok_or_else(|| CompactString::new("missing hidden tag root"))?,
+        )
+        .ok_or_else(|| CompactString::new("hidden tag root is not a dict"))?;
+        state.extensions.usages[usage].tags[tag].attributes = Some(
+            snapshot_deferred_attribute_values(attrs, &identities)
+                .map_err(|error| CompactString::new(error.to_string()))?,
+        );
+    }
+    let extension_usages = finalize_root_extension_usages(std::mem::take(&mut state.extensions))
+        .map_err(|error| CompactString::new(error.to_string()))?;
     let mut overrides = SmallMap::new();
     for (module_name, override_) in state.overrides {
         let override_ = materialize_override(&override_, state.header.as_ref())
@@ -4659,5 +5043,334 @@ fn evaluate_root_module_closure(
         },
         module_file_paths,
         overrides: RootModuleOverrides(Arc::new(overrides)),
+        extension_usages,
     })
+}
+
+#[cfg(test)]
+mod root_extension_usage_tests {
+    use dice::DetectCycles;
+    use dice::Dice;
+    use slug_workspace_v2::WorkspaceSnapshot;
+    use slug_workspace_v2::WorkspaceSnapshotKey;
+    use starlark_map::sorted_map::SortedMap;
+
+    use super::*;
+
+    fn source_file(logical_id: &str, source: &str) -> RootModuleSourceFile {
+        let logical_id = LogicalModuleFileId::new(logical_id);
+        RootModuleSourceFile {
+            path: PathBuf::from(logical_id.0.as_str()),
+            source: Arc::new(source.to_owned()),
+            _inspection: inspect_nonroot_module_file(logical_id, source.as_bytes()).unwrap(),
+        }
+    }
+
+    fn evaluate(
+        root: &str,
+        includes: &[(&str, &str, &str)],
+        ignore_dev_dependency: bool,
+    ) -> Result<RootModuleEvaluation, CompactString> {
+        let mut files = vec![source_file("/workspace/MODULE.bazel", root)];
+        let mut include_indices = SmallMap::new();
+        for (label, logical_id, source) in includes {
+            include_indices.insert((*label).into(), files.len());
+            files.push(source_file(logical_id, source));
+        }
+        evaluate_root_module_closure(
+            ignore_dev_dependency,
+            files,
+            include_indices,
+            Arc::from([]),
+            None,
+        )
+    }
+
+    async fn dice_evaluate(
+        dice: &Arc<Dice>,
+        source: &str,
+    ) -> Arc<Result<RootModuleEvaluation, CompactString>> {
+        let workspace = PathBuf::from("/root-extension-usage-dice");
+        let files = std::iter::once((
+            workspace.join("MODULE.bazel"),
+            WorkspaceFileValue::Present(Arc::new(source.to_owned())),
+        ))
+        .collect::<SortedMap<_, _>>();
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: workspace.clone(),
+                },
+                Arc::new(WorkspaceSnapshot {
+                    files: Arc::new(files),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RootModuleCommandPolicyKey {
+                    workspace: workspace.clone(),
+                },
+                RootModuleCommandPolicy::from(
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                ),
+            )])
+            .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&RootModuleEvaluationKey { workspace })
+            .await
+            .unwrap()
+    }
+
+    #[test]
+    fn retains_ordinary_isolated_override_and_innate_usages_across_include() {
+        let evaluated = evaluate(
+            r#"
+module(name = "root", version = "1.2.3", repo_name = "root_self")
+shared = use_extension("//:ext.bzl", "extension")
+shared.repo(order = 1)
+use_repo(shared, root_alias = "{name}-{version}")
+override_repo(shared, generated = "replacement")
+inject_repo(shared, injected = "direct")
+isolated = use_extension("//:ext.bzl", "extension", isolate = True)
+isolated.repo(order = 2)
+use_repo(isolated, "isolated_repo")
+repo = use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name = "direct", marker = "root")
+include("//:fragment.MODULE.bazel")
+"#,
+            &[(
+                "//:fragment.MODULE.bazel",
+                "/workspace/fragment.MODULE.bazel",
+                r#"
+fragment = use_extension("//:ext.bzl", "extension")
+fragment.repo(order = 3)
+use_repo(fragment, fragment_alias = "fragment_export")
+fragment_isolated = use_extension("//:ext.bzl", "extension", isolate = True)
+fragment_isolated.repo(order = 4)
+use_repo(fragment_isolated, fragment_isolated_alias = "fragment_isolated")
+"#,
+            )],
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(evaluated.extension_usages.len(), 4);
+        let ordinary = &evaluated.extension_usages[0];
+        assert_eq!(ordinary.bzl_label, "@root_self//:ext.bzl");
+        assert_eq!(ordinary.extension_name, "extension");
+        assert!(ordinary.isolation.is_none());
+        assert_eq!(ordinary.proxies.len(), 2);
+        assert_eq!(ordinary.proxies[0].proxy_name, "shared");
+        assert_eq!(ordinary.proxies[1].proxy_name, "fragment");
+        assert_eq!(ordinary.tags.len(), 2);
+        assert_eq!(ordinary.tags[0].location.file.0, "/workspace/MODULE.bazel");
+        assert_eq!(
+            ordinary.tags[1].location.file.0,
+            "/workspace/fragment.MODULE.bazel"
+        );
+        assert_eq!(
+            ordinary.proxies[0]
+                .imports
+                .local_to_exported
+                .get("root_alias")
+                .unwrap(),
+            "root-1.2.3"
+        );
+        assert_eq!(
+            ordinary.proxies[1]
+                .imports
+                .exported_to_local
+                .get("fragment_export")
+                .unwrap(),
+            "fragment_alias"
+        );
+        assert!(ordinary.repo_overrides.get("generated").unwrap().must_exist);
+        assert_eq!(
+            ordinary
+                .repo_overrides
+                .get("generated")
+                .unwrap()
+                .overriding_repo_name,
+            "replacement"
+        );
+        assert!(!ordinary.repo_overrides.get("injected").unwrap().must_exist);
+
+        assert_eq!(
+            evaluated.extension_usages[1]
+                .isolation
+                .as_ref()
+                .unwrap()
+                .exported_proxy_name,
+            "isolated"
+        );
+        let fragment_isolated = evaluated
+            .extension_usages
+            .iter()
+            .find(|usage| {
+                usage
+                    .isolation
+                    .as_ref()
+                    .map(|key| key.exported_proxy_name.as_str())
+                    == Some("fragment_isolated")
+            })
+            .unwrap();
+        assert_eq!(fragment_isolated.tags[0].tag_class, "repo");
+        let innate = evaluated
+            .extension_usages
+            .iter()
+            .find(|usage| usage.bzl_label == "//:MODULE.bazel")
+            .unwrap();
+        assert_eq!(innate.bzl_label, "//:MODULE.bazel");
+        assert_eq!(innate.extension_name, "//:repo.bzl simple_repo");
+        assert_eq!(innate.tags[0].tag_class, "repo");
+        assert_eq!(
+            innate.proxies[0]
+                .imports
+                .local_to_exported
+                .get("direct")
+                .unwrap(),
+            "direct"
+        );
+    }
+
+    #[test]
+    fn root_dev_policy_filters_effects_but_preserves_ordinary_behavior() {
+        let source = r#"
+module(name = "root", version = "1")
+dev = use_extension("//:dev.bzl", "dev", dev_dependency = True)
+dev.tag(value = 1)
+use_repo(dev, "dev_repo")
+repo = use_repo_rule("//:repo.bzl", "repo")
+repo(name = "dev_direct", dev_dependency = True)
+"#;
+        let retained = evaluate(source, &[], false).unwrap();
+        assert_eq!(retained.extension_usages.len(), 2);
+        assert!(retained.extension_usages[0].proxies[0].dev_dependency);
+        assert!(retained.extension_usages[0].tags[0].dev_dependency);
+        assert!(retained.extension_usages[1].proxies[0].dev_dependency);
+
+        let ignored = evaluate(source, &[], true).unwrap();
+        assert!(ignored.extension_usages.is_empty());
+    }
+
+    #[test]
+    fn root_dev_policy_filters_only_the_referenced_dev_proxy() {
+        let evaluated = evaluate(
+            r#"
+module(name = "root")
+ordinary = use_extension("//:ordinary.bzl", "ordinary")
+override_repo(ordinary, replaced = "replacement")
+inject_repo(ordinary, injected = "direct")
+dev = use_extension("//:dev.bzl", "dev", dev_dependency = True)
+use_repo(dev, "shared")
+override_repo(dev, ignored_override = "ignored")
+inject_repo(dev, ignored_inject = "ignored")
+kept = use_extension("//:kept.bzl", "kept")
+use_repo(kept, "shared")
+"#,
+            &[],
+            true,
+        )
+        .unwrap();
+
+        assert_eq!(evaluated.extension_usages.len(), 2);
+        let ordinary = &evaluated.extension_usages[0];
+        assert_eq!(ordinary.repo_overrides.len(), 2);
+        assert!(ordinary.repo_overrides.get("replaced").unwrap().must_exist);
+        assert!(!ordinary.repo_overrides.get("injected").unwrap().must_exist);
+        assert_eq!(
+            evaluated.extension_usages[1].proxies[0]
+                .imports
+                .local_to_exported
+                .get("shared")
+                .unwrap(),
+            "shared"
+        );
+        assert!(
+            evaluated
+                .extension_usages
+                .iter()
+                .all(|usage| usage.extension_name != "dev")
+        );
+    }
+
+    #[test]
+    fn rejects_unexported_isolation_and_conflicting_directives() {
+        let unexported = evaluate(
+            "module(name='root')\nuse_extension('//:ext.bzl', 'ext', isolate=True)",
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(unexported.contains("isolated extension proxy must be assigned"));
+
+        let duplicate_import = evaluate(
+            "module(name='root')\np=use_extension('//:ext.bzl','ext')\nuse_repo(p, a='same', b='same')",
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(duplicate_import.contains("exports the same name twice"));
+
+        let duplicate_override = evaluate(
+            "module(name='root')\np=use_extension('//:ext.bzl','ext')\noverride_repo(p, x='one')\ninject_repo(p, x='two')",
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(duplicate_override.contains("overridden more than once"));
+    }
+
+    #[test]
+    fn usage_identity_and_errors_restore_a_b_a() {
+        let source = |export: &str| {
+            format!(
+                "module(name='root')\np=use_extension('//:ext.bzl','ext')\np.tag(value='{export}')\nuse_repo(p, alias='{export}')"
+            )
+        };
+        let a = evaluate(source("a").as_str(), &[], false).unwrap();
+        let b = evaluate(source("b").as_str(), &[], false).unwrap();
+        let restored = evaluate(source("a").as_str(), &[], false).unwrap();
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+
+        let bad = evaluate(
+            "module(name='root')\np=use_extension('//:ext.bzl','ext')\np.tag(value=3.15)",
+            &[],
+            false,
+        )
+        .unwrap_err();
+        assert!(
+            bad.contains("unsupported deferred attribute float"),
+            "{bad}"
+        );
+        assert_eq!(a, evaluate(source("a").as_str(), &[], false).unwrap());
+    }
+
+    #[tokio::test]
+    async fn dice_usage_identity_restores_a_b_a_and_reuses_warm_values() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let source = |value: &str| {
+            format!(
+                "module(name='root')\np=use_extension('//:ext.bzl','ext')\np.tag(value='{value}')\nuse_repo(p, alias='{value}')"
+            )
+        };
+
+        let a = dice_evaluate(&dice, source("a").as_str()).await;
+        let warm_a = dice_evaluate(&dice, source("a").as_str()).await;
+        assert!(Arc::ptr_eq(&a, &warm_a));
+        let b = dice_evaluate(&dice, source("b").as_str()).await;
+        let restored_a = dice_evaluate(&dice, source("a").as_str()).await;
+
+        assert_ne!(a, b);
+        assert_eq!(a, restored_a);
+        assert_eq!(
+            a.as_ref().as_ref().unwrap().extension_usages,
+            restored_a.as_ref().as_ref().unwrap().extension_usages
+        );
+    }
 }
