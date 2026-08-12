@@ -133,9 +133,13 @@ Store one event batch only when capture is enabled and the wrapper completes.
 `Need` is invalid; complete values and errors compare structurally. Add no
 consumer.
 
-Cap formatted net growth at 190 production lines, 360 test lines, and 550
-total. Add no file, public export, Cargo/BUILD metadata, dependency, utility,
-lock, cache, interner, process-global state, fixture, or command behavior.
+The first formatted compile measured the typed one-file seam at 266 production
+lines; the original 190-line estimate omitted the complete error/provenance
+algebra and root-first DICE branching. Correct the cap to 290 production lines,
+360 test lines, and 650 total without changing scope or behavior.
+
+Add no file, public export, Cargo/BUILD metadata, dependency, utility, lock,
+cache, interner, process-global state, fixture, or command behavior.
 Focused tests must prove exact built-in and registry provenance, selected
 registry A/B/A, ordered absence/hash attempts, root-first explicit built-in
 override bypass through activation tracking, nonregistry/empty/include typed
