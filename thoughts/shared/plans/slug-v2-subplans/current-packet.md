@@ -1,38 +1,39 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-module-route-owner-design`
+Packet: `WP-5-host-selected-registry-repo-spec-owner-design`
 Milestone: cross-stage M7 prerequisite design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the first truthful post-selection Host repository
-identity/mapping/route owner over the accepted selected graph, or return
-`REPLAN` at the first missing prerequisite.
+Result: freeze the missing post-selection Host registry RepoSpec owner, or
+return `REPLAN` at the first smaller registry-policy/source prerequisite.
 
 ## Active design contract
 
-Audit one crate-private post-selection owner that can project the accepted
-`HostSelectedModuleGraph` into Host repository identities and contextual
-apparent-name mappings without activating loading. The audit must:
+Audit one crate-private post-selection registry RepoSpec owner over the
+accepted selected graph and registry I/O leaves. The audit must:
 
-- pin Bazel 9.2 canonical repository naming for the root, selected ordinary
-  modules, the empty-version built-in, registry modules, command/root
-  nonregistry overrides, multiple-version disambiguation, and collisions;
-- identify whether one selected-graph value contains every input needed to
-  derive root and nonroot contextual repository mappings, selected effective
-  RepoSpecs/routes, and exact dependency apparent-name ownership without
-  consulting the legacy `resolution.rs::ResolvedGraph`;
-- separate canonical repository identity, apparent mapping identity, source
-  provenance, effective override provenance, and physical materialization
-  identity, preserving every admitted field structurally in DICE equality;
-- decide the smallest future key/value/error seam and the integration boundary
-  with `RootRepositoryRouteKey`, while retaining current protected direct-local
-  and built-in behavior until a reviewed successor explicitly converts it;
-- classify extension-generated repositories, extension unique names and
-  overrides, source.json/selected RepoSpec work, lockfile products, package
-  loading, and public consumers as exact, Slug-native, or deferred rather than
-  inventing post-selection state; and
-- freeze a bounded implementation successor or return `REPLAN` if canonical
-  naming, selected RepoSpec derivation, mapping collision handling, or
-  contextual module identity requires another missing leaf.
+- pin Bazel 9.2 `RepoSpecKey`/`RepoSpecFunction` and `IndexRegistry` ordering,
+  source.json grammar, typed archive/local-path/Git projections, missing and
+  malformed diagnostics, registry fallback, and selected-only fetch behavior;
+- account structurally for the selected registry URL, ordered MODULE attempts
+  and winning MODULE hash, source.json bytes/hash/absence, lockfile mode and
+  expectation, registry URL resolution, command and registry mirrors,
+  bazel_registry.json mirrors/module-base-path, vendor/refresh policy, and the
+  selected module key without treating request generation as semantic state;
+- identify the exact root `single_version_override` patch/patch_cmd/strip
+  contribution applied after the remote RepoSpec, using only
+  `HostEffectiveModuleOverrideKey` and never re-merging root/command maps;
+- decide whether the existing `RegistryFileKey`,
+  `HostRegistryFunctionKey`, retained `RegistryModuleFileAttempt`, and exact
+  `RepoSpec` algebra are sufficient, and whether any legacy
+  `RegistrySourceCatalog` parser can be refactored without activating the
+  supplied-file registry graph or creating a second observation owner;
+- freeze the smallest leaf/aggregate key, value, typed error, DICE
+  equality/validity, batching, and Need/error-precedence seam that fetches
+  source state only for resolved registry entries; and
+- classify source types, overlay/remote-patch/module-file injection, registry
+  policy breadth, selected file hashes, lockfile products, materialization,
+  canonical mappings, route conversion, loading, and public consumers as
+  exact, Slug-native, or deferred.
 
 This design packet may edit only:
 
@@ -41,16 +42,59 @@ This design packet may edit only:
 - `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
 
 The root may inspect pinned Bazel 9.2 source and live Rust owners read-only.
-Cap net manifest growth at 380 lines, owner-plan growth at 320 lines,
-canonical growth at 40 lines, and 740 total. No Rust, Cargo/BUILD, public API,
-wire/schema, fixture/oracle, legacy graph activation, route conversion,
-mapping consumer, loading, command, analysis, execution, or JVM/Java work is
-authorized. Obtain fresh independent reserved-architecture review.
+Cap net manifest growth at 460 lines, owner-plan growth at 380 lines,
+canonical growth at 45 lines, and 885 total. No Rust, Cargo/BUILD, public API,
+wire/schema, fixture/oracle, legacy graph/catalog activation, registry I/O,
+RepoSpec parsing, route conversion, mapping consumer, materialization,
+loading, command, analysis, execution, or JVM/Java work is authorized. Obtain
+fresh independent reserved-architecture review.
 
-Return `REPLAN` on a missing semantic owner or required fourth file. Return
-`REVISE` on one bounded design correction; a second material correction is
-`REPLAN`. No post-selection production work may begin before independent
+Return `REPLAN` on an unresolved registry-policy/source prerequisite, a second
+observation owner, an incomplete RepoSpec algebra, source semantics requiring
+a fourth design file, or an implementation successor beyond three Rust files.
+Return `REVISE` on one bounded design correction; a second material correction
+is `REPLAN`. No registry RepoSpec production work may begin before independent
 `ACCEPT` and explicit successor activation.
+
+## Completed selected-module route audit
+
+The pinned Bazel 9.2.0 route audit is complete and returns `REPLAN` at one
+missing selected registry RepoSpec owner. This section records the result and
+grants no Rust or consumer authority.
+
+`ModuleKey` and `BazelDepGraphFunction` make canonical naming derivable from
+the accepted selected graph without source materialization. The root maps to
+the main repository; `bazel_tools` and `platforms` retain their well-known
+unversioned names; a name with one selected version uses `<name>+`; and every
+selected version of an MVO name uses `<name>+<normalized-version>`. Bazel
+constructs a canonical-name bi-map, so a well-known/MVO or other collision is
+terminal rather than silently disambiguated. Nonregistry empty versions are
+valid only on the version-elided path.
+
+The Bazel-dependency portion of each contextual mapping is also present. A
+root mapping includes the empty apparent name to main; a nonroot module maps
+its declared `repo_name` to its own canonical identity; and each resolved
+ordinary dependency's apparent name maps to the selected dependency's
+canonical identity. Nodep-only reachability is absent from the resolved graph.
+Extension imports, unique names, and repo overrides are a later additive
+mapping layer and remain deferred.
+
+Built-in `bazel_tools` needs no RepoSpec, while accepted nonregistry provenance
+already retains the effective exact `RepoSpec`. Registry provenance retains
+the winning registry and ordered MODULE attempts/hash, but no source.json
+bytes, selected remote RepoSpec, bazel_registry.json source policy, or final
+root single-version patch augmentation. Bazel fetches RepoSpecs only after
+selection, batches one `RepoSpecKey` per selected registry module, and only
+then constructs final modules and canonical mappings. Therefore a route owner
+cannot fill this gap without duplicating or inventing source state.
+
+Slug's public `RegistrySourceCatalog` is legacy supplied-file scaffolding. Its
+parser does not own Host/DICE observations and does not cover the pinned
+archive mirror/overlay/module-file injection, local-path module-base policy,
+Git projection, or final override patch composition. Activating it would
+create a second registry graph. `RootRepositoryRouteKey` must retain its
+accepted direct-local and built-in slice unchanged until the missing selected
+registry RepoSpec owner and the subsequent mapping/route owner are accepted.
 
 ## Accepted correction contract
 

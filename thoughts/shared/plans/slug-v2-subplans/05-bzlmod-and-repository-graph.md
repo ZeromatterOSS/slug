@@ -1656,3 +1656,36 @@ bounded future owner or return `REPLAN` at the first missing semantic leaf.
 No Rust, legacy graph activation, route conversion, loading consumer, mapping
 consumer, extension execution, or public API is authorized before independent
 design acceptance.
+
+### Selected module route owner design REPLAN (2026-08-12)
+
+Pinned Bazel 9.2 source and the live accepted graph prove that canonical module
+identities and Bazel-dependency contextual mappings are derivable without a
+new prerequisite. Root is main; `bazel_tools` and `platforms` are well-known;
+single selected versions use `<name>+`; MVO versions use
+`<name>+<normalized-version>`; and collisions remain terminal. Root/self and
+resolved ordinary-dependency apparent names are already retained. Extension
+imports and overrides remain a later additive mapping layer.
+
+The route itself stops at selected registry RepoSpec ownership. Built-in
+`bazel_tools` has no RepoSpec and accepted nonregistry provenance already owns
+one, but registry provenance retains only the selected registry plus ordered
+MODULE attempts/hash. Bazel fetches source.json for selected registry modules
+after selection, combines registry and command mirrors plus
+bazel_registry.json policy and the winning MODULE hash, projects an exact
+archive/local-path/Git RepoSpec, and finally applies root single-version patch
+fields. No accepted Host key owns that value or all of those dependencies.
+
+The legacy `RegistrySourceCatalog` is caller-supplied scaffolding with no
+Host/DICE observation edge and incomplete pinned semantics; activating it
+would create a second registry graph. `RootRepositoryRouteKey` therefore keeps
+its accepted built-in/direct-local behavior unchanged.
+
+Run next only `WP-5-host-selected-registry-repo-spec-owner-design`. Audit and
+freeze the smallest post-selection registry source/RepoSpec owner over
+`RegistryFileKey`, `HostRegistryFunctionKey`, retained MODULE provenance,
+`HostEffectiveModuleOverrideKey`, and the exact `RepoSpec` algebra, or return
+`REPLAN` at a smaller missing registry-policy/source leaf. No Rust, registry
+I/O, legacy catalog activation, mapping/route conversion, materialization,
+loading, lockfile production, public API, or consumer work is authorized
+before independent design acceptance.
