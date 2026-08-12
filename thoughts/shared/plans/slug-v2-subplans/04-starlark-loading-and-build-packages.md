@@ -2306,3 +2306,70 @@ isolation, and unowned root-usage member fails closed. Loader events stay with
 the Host-bzl key; invocation print/throw prefixes belong to and replay from the
 invocation key, while its semantic receipt stores no event batch or Starlark
 lifetime state.
+
+### Pure module-extension invocation implementation activated (2026-08-12)
+
+Independent review accepts the pinned ABI, lifetime, event, and fail-closed
+invocation design recorded in `db45d182`. Run only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation` in
+`bzl_module.rs`, `package.rs`, one new private `module_extension.rs`, and
+`lib.rs` solely for the private module declaration, plus the four bookkeeping
+plans. Cap Rust at 520 production/800 test/1,320 total formatted net lines
+against `db45d182`. Preserve every admitted field, forbidden-name probe,
+strict-None result, event replay, heap-absence, and terminal stop; obtain fresh
+independent implementation review.
+
+### Pure invocation production-cap REPLAN (2026-08-12)
+
+The first compiling four-path owner is 630 production lines against
+`db45d182`, before tests, so the frozen 520 cap fired. Independent review finds
+the ABI wrappers, typed DICE/error/event orchestration, and frozen-lifetime
+boundary irreducible by 110 safe lines. Retain the diff unaccepted and run only
+the docs-only
+`WP-4-5-host-pure-module-extension-invocation-owner-r2-cap-design` in the four
+plans. Freeze 720 production/800 test/1,520 total caps plus four required
+corrections: optional Label None allocation; all-request reacquisition/factor/
+identity preflight before any invocation; ephemeral context ownership checks
+for tag methods; and immutable list-valued `ctx.modules` and tag-class lists.
+No Rust resumes before independent correction acceptance and explicit r2
+activation. Preserve every prior ABI, event, proof, and terminal stop.
+
+### Pure invocation implementation r2 activated (2026-08-12)
+
+Independent review accepts the 720 production/800 test/1,520 total correction
+and all four bounded fixes. Resume only the same four Rust paths against
+`db45d182` as
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation-r2`.
+Implement optional Label None, complete preflight before any callable,
+ephemeral context ownership for tag methods, and immutable modules/tag-class
+lists; preserve every prior ABI/event/proof/stop and obtain fresh independent
+implementation review.
+
+### Pure invocation exact-Label REPLAN (2026-08-12)
+
+The r2 diff reaches the 720 production boundary and compiles with optional
+Label None, all-request preflight, context-owned tags, immutable lists, exact
+negative indexing, strict result/throw handling, and expanded lifecycle/ABI
+proof. Completing the required Label row exposes the first missing shared
+runtime seam: starlark-rust renders every non-string `str` and `%s` through
+`collect_repr`, so a typed Label cannot have canonical string rendering and
+`Label("...")` repr simultaneously. A loading-global override is insufficient
+because interpolation and format paths bypass it.
+
+Retain the four loading-path diff unaccepted and run only the docs-only
+`WP-4-starlark-custom-string-protocol-design` in canonical/current/Stage 4/
+Stage 5. Audit one default-preserving StarlarkValue string hook and every
+standard str consumer, with synthetic distinct-str/repr proof and a bounded
+future vendored-runtime allowlist/caps/stops. No Rust resumes before independent
+design acceptance. Do not add a Label-specific downcast, second formatter,
+JVM helper, or Slug loading divergence; exact admitted string/repr/interpolation
+semantics remain required.
+
+The audit finds one bounded seam: add a default-to-repr custom `collect_str`
+operation to the generated StarlarkValue vtable, route Value/global str/%s/
+format/print through it, and override it only on InvocationLabel. No derive
+crate edit, type downcast, loading-global shadow, or second formatter is
+needed. Freeze the exact eight Rust files and 90 production/220 test/310 total
+successor recorded in current, with synthetic default/override/nesting/cycle
+coverage and full Label str/repr/interpolation/format/print/DICE proof. Do not
+activate Rust before independent design acceptance.

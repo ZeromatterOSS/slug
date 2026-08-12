@@ -1,13 +1,154 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-pure-module-extension-invocation-owner-design`
-Milestone: M7 bounded module-extension invocation ownership design
+Packet: `WP-4-starlark-custom-string-protocol-design`
+Milestone: M7 custom Starlark stringification prerequisite design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the smallest Rust-native invocation leaf or `REPLAN` at its
-first missing prerequisite.
+Result: freeze the smallest reusable Rust Starlark stringification seam before
+pure module-extension invocation can resume.
 
-## Active design contract
+## Active docs-only REPLAN contract
+
+The r2 implementation stop fired while completing the exact Label ABI proof.
+The accepted slice requires `str(label)` and `%s` to render the canonical label
+while `repr(label)` and `%r` render `Label("@@repo//pkg:target")`. Live
+starlark-rust hardwires non-string `str` to `collect_repr` in
+`values/layout/value.rs`, the standard `str` global in
+`values/types/string/globals.rs`, and percent-string interpolation in
+`values/types/string/interpolation.rs`. A loading-only global override would
+not affect `%s` or the other shared formatting paths, while allocating Labels
+as strings would destroy type, repr, equality, and attribute semantics. The
+frozen exact surface is therefore not implementable in the active four Rust
+paths or 720 production lines.
+
+Retain the current four-path Rust diff as compiling but unaccepted evidence;
+it grants no implementation authority. Run only the docs/evidence packet
+`WP-4-starlark-custom-string-protocol-design`. Audit one backward-compatible
+starlark-rust protocol in which every value has a distinct custom `str`
+projection defaulting exactly to its existing `repr`, strings preserve their
+unquoted fast path, and custom values may override `str` without changing
+`repr`. Enumerate every standard formatting consumer that must use the same
+protocol, at minimum global `str`, `Value::to_str`, `ValueLike::collect_str`,
+`%s`, `str.format` default/`!s`, and print formatting; keep `%r`, global
+`repr`, debug/error rendering, hashing, equality, and type identity unchanged.
+Audit the generated StarlarkValue vtable/derive path rather than adding a
+Slug-only downcast or a second formatter. Require existing starlark-rust
+string/format suites plus a synthetic custom value proving distinct str/repr,
+and a later InvocationLabel row proving global str/repr, `%s`/`%r`, format,
+print, equality/hash, and warm DICE behavior.
+
+Compatibility is exact for the admitted formatting operations and unchanged
+existing values; the private hook name, vtable layout, and Rust diagnostics are
+Slug-native. Java UTF-16 edge behavior and all module-extension surfaces
+already deferred by the predecessor remain unsupported/deferred. This packet
+may edit exactly canonical, current, Stage 4, and Stage 5 under 45/220/180/100
+and 545 total documentation lines. It authorizes no Rust, Cargo, fixture,
+loading, Bzlmod, evaluator, or consumer edit before independent design
+acceptance and explicit successor activation. Freeze a future Rust allowlist,
+caps, tests, and stop conditions; `REPLAN` if exact semantics require a
+type-specific downcast, a second string formatter, public Slug API, non-Rust
+runtime, or unrelated Starlark behavior changes.
+
+### Completed owner audit and frozen successor
+
+The smallest implementation seam is one `StarlarkValue::collect_str` method
+whose default calls that value's existing `collect_repr`. The existing
+`starlark_value_vtable` derive automatically owns the new function pointer; no
+derive-crate edit or parallel registry is required. Add the erased dispatch in
+`values/layout/vtable.rs`, override `ValueLike::collect_str` in
+`values/layout/value.rs` to preserve the string fast path and repr-stack cycle
+guard while dispatching non-strings, and make `Value::to_str` use that shared
+operation. The standard `str` global, percent `%s`, and the optimized/default
+`str.format` paths must call the same operation. Existing `%r`, `repr`,
+`collect_repr_cycle`, type errors, `fail` framing, hashes, equality, and string
+allocation/interning remain unchanged. `print` already composes through
+`Value::to_str`; the general format `!s` path already composes through
+`ValueLike::collect_str` and receives only regression coverage.
+
+After independent acceptance, activate only
+`WP-4-starlark-custom-string-protocol-implementation` in exactly:
+
+- `starlark-rust/starlark/src/values/traits.rs`;
+- `starlark-rust/starlark/src/values/layout/vtable.rs`;
+- `starlark-rust/starlark/src/values/layout/value.rs`;
+- `starlark-rust/starlark/src/values/types/string/globals.rs`;
+- `starlark-rust/starlark/src/values/types/string/interpolation.rs`;
+- `starlark-rust/starlark/src/values/types/string/dot_format.rs`;
+- `app/slug_loading_v2/src/module_extension.rs`; and
+- `app/slug_loading_v2/src/bzl_module.rs` for focused invocation tests only,
+  plus canonical/current/Stage 4/Stage 5 bookkeeping.
+
+Cap the successor at 90 production, 220 tests, and 310 total formatted net
+lines against the eventual accepted design commit. Require the full existing
+starlark test suite and synthetic values proving default str==repr, overridden
+str!=repr, nested/list/cycle behavior, global str/repr, `%s`/`%r`, optimized and
+general format, and print. Require InvocationLabel canonical `str`, `%s`,
+format, and print alongside unchanged `Label("...")` repr/`%r`, type,
+attribute, equality, hash, and DICE success/error identity; prove cold/warm
+event lineage and source A/B/A. Structural scans must show one protocol, no
+Label downcast outside its override, and no retained Starlark value in DICE.
+Run full loading plus direct Bzlmod dependents, formatting, diff, and archive
+classification before independent implementation review.
+
+`REPLAN` on a ninth Rust file, derive-crate change, type-specific standard
+formatter branch, second protocol/registry, changed default output for any
+existing value, repr/hash/equality/type-error behavior change, retained heap or
+callable, public Slug API, non-Rust runtime, loading/Bzlmod semantic breadth, or
+90/220/310 excess. The retained pure-invocation diff remains unaccepted and
+must not resume in the same packet beyond the exact InvocationLabel override
+and tests needed to prove this prerequisite.
+
+## Accepted r2 correction contract
+
+This section is historical correction authority interpreted only through the
+active docs-only REPLAN contract above.
+
+The first compiling implementation is 630 production lines against `db45d182`
+before tests: 597 lines in the required private invocation/ABI owner and 33 in
+narrow existing-owner accessors plus the private module declaration. Independent
+review finds no credible 110-line mechanical reduction without collapsing
+distinct Starlark values, typed error/event orchestration, or lifetime
+boundaries. Retain that unaccepted four-path Rust diff unchanged while this
+docs-only packet corrects the future caps to 720 production, 800 tests, and
+1,520 total lines against `db45d182`. The margin is solely for the semantic
+corrections below, not another owner, field family, or behavior surface.
+
+Freeze four corrections for r2. First, optional Label attributes prepared as
+`CoercedAttributeValue::None` allocate Starlark `None`; no accepted prepared
+value reaches `unreachable!`. Second, reacquire and validate every exact Host
+module, factor set, manifest, export, and definition into ephemeral lifetime-
+only preflight rows before invoking any callable. Any Need or terminal during
+preflight performs zero user invocation and publishes zero invocation events;
+only a complete preflight invokes rows in encounter order. Third,
+`is_dev_dependency(tag)` and `tag_sort_key(tag)` accept only tags minted by that
+exact ephemeral context. Use an invocation-local nonsemantic ownership token;
+reject foreign/captured tags without retaining the token in DICE equality.
+Fourth, `ctx.modules` and every `module.tags.<class>` value are immutable
+Starlark lists with exact list iteration/index/length behavior; mutation such
+as `.append` fails closed. The module, tags structure, tag instances, Labels,
+and sort keys remain immutable as already frozen.
+
+Require omitted optional-Label `None`; two-request first-print/second-Need
+zero-invocation then restoration-order; cross-context and captured-tag
+rejection; and mutation negatives for both modules and tag-class lists. Keep
+all original ABI positives, every forbidden-name/captured-callable probe,
+strict-None/wrong-result/throw/print ordering, lifecycle/A-B-A, event replay,
+heap-absence, full-suite, cleanup, and independent-review proofs.
+
+This correction may edit exactly canonical, current, Stage 4, and Stage 5,
+under 30/150/120/120/420 docs caps. It authorizes no Rust, fixture, Cargo,
+BUILD, public API, or semantic implementation until independent acceptance and
+explicit r2 activation. Preserve the same future four Rust paths and every
+existing stop. `REPLAN` on production above 720, a fifth Rust path, retained
+heap/callable/token, a second loader/evaluator, public API, repository/global/
+I/O/generated-output breadth, or inability to make all preflight terminals
+side-effect-free.
+
+## Accepted design contract
+
+This section is historical design context only, grants no file, action, cap,
+or schedule authority, and is interpreted only through the active docs-only
+REPLAN contract above.
 
 Perform a read-only ownership audit for one callerless loading-owned DICE leaf
 that computes `HostPreparedModuleExtensionInputsKey`, reacquires each exact

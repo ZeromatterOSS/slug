@@ -2451,3 +2451,48 @@ second selected-input owner, environment/facts observation, repository rules,
 generated outputs, retained Starlark heap/callable, or any loading consumer
 breadth beyond the callerless receipt. No Rust or fixture is authorized before
 independent design acceptance.
+
+### Pure invocation implementation activated (2026-08-12)
+
+Independent review accepts the design in `db45d182`. Run only
+`WP-4-5-host-pure-module-extension-invocation-owner-implementation` under the
+four loading Rust paths and 520/800/1,320 caps frozen by current and Stage 4.
+Stage 5 production remains unchanged: the implementation may consume the
+accepted hidden selected/prepared inputs but may not mutate Bzlmod, add another
+projection, reverse dependencies, or widen the admitted root-main singleton
+slice. Preserve every repository-rule, generated-output, observation,
+lockfile, materializer, consumer, retained-heap, and JVM stop.
+
+### Pure invocation cap correction scheduled (2026-08-12)
+
+The 520 production stop fired at the first compiling 630-line loading-owned
+implementation. Retain the unaccepted Rust diff and run only the four-plan
+docs correction `WP-4-5-host-pure-module-extension-invocation-owner-r2-cap-design`.
+Freeze 720/800/1,520 against `db45d182` and the optional-None, complete
+preflight-before-invocation, foreign-tag rejection, and immutable-list fixes.
+Stage 5 production remains unchanged and no Rust, fixture, selected projection,
+or public surface resumes before independent acceptance and explicit r2
+activation.
+
+### Pure invocation implementation r2 activated (2026-08-12)
+
+Independent review accepts the correction. Resume only the four loading Rust
+paths under 720/800/1,520 against `db45d182`; Stage 5 production remains
+unchanged. Preserve the accepted hidden input boundary and every Bzlmod,
+repository, output, lockfile, materializer, consumer, public API, and JVM stop.
+
+### Pure invocation string-protocol prerequisite scheduled (2026-08-12)
+
+The loading implementation remains callerless and Stage 5 production remains
+unchanged. Exact Label ABI proof found that the shared Rust Starlark runtime has
+no custom `str` projection distinct from `repr`; this cannot be repaired in the
+four loading paths without leaving `%s` and other standard consumers wrong.
+Run only `WP-4-starlark-custom-string-protocol-design` in the four plans under
+45/220/180/100/545 documentation caps. Retain the unaccepted loading diff; no
+Bzlmod, selected-input, public, runtime, or loading Rust edit is authorized
+before independent design acceptance and explicit successor activation.
+
+The completed audit freezes only the shared StarlarkValue `collect_str`
+protocol and exact eight-file 90/220/310 future successor recorded in current.
+Stage 5 stays unchanged; no selected-input, Bzlmod, repository, or mapping edge
+is part of that successor.
