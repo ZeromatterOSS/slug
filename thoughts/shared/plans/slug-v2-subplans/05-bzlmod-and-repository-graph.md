@@ -2146,3 +2146,60 @@ The design may edit only canonical/current/this Stage 5 plan, under
 260/320/45/625 caps. No Rust, fixture, selected-owner mutation, evaluation,
 I/O/materializer, lockfile, loading/command consumer, public API, or JVM/Java
 work is authorized before independent acceptance.
+
+### Module-extension definition owner audit REPLAN (2026-08-12)
+
+The read-only audit stops at the first cross-crate ownership boundary. Pinned
+Bazel 9.2 `RegularRunnableExtension.load` first loads the canonical bzl label,
+then selects an exported `ModuleExtension`; `SingleExtensionEvalFunction`
+consumes that loaded definition before evaluation and generated repositories.
+Slug can preserve that order, but not inside the active private-only packet.
+
+The accepted `HostSelectedExtensionMappingsKey` and its complete value are
+private to `slug_bzlmod_v2`. The reusable `HostBzlModuleEvalKey`,
+`ExternalBzlModuleEvalKey`, `FrozenBzlModule`, and lifetime closure are private
+to `slug_loading_v2`, which already depends on Bzlmod. A definition key in
+Bzlmod would reverse that dependency or duplicate the loader. A definition
+key in loading cannot compute the selected mapping first without a narrow
+cross-crate request. The existing loading globals also contain no
+`module_extension` or `tag_class` definitions.
+
+The accepted loader's frozen modules are lifetime-only state whose semantic
+equality is the complete `BzlLoadManifest`; a later loading key can borrow that
+cached value, validate an export, and return a heap-independent definition
+projection without publishing a callable. That later step is blocked only by
+the missing selected request and extension globals, not by a need for a second
+loader.
+
+Run next only the docs-only
+`WP-5-host-selected-extension-definition-load-request-owner-design`. Freeze a
+narrow `#[doc(hidden)]` Bzlmod projection, computed from the private selected
+mapping owner, for the root-main, ordinary nonisolated extension slice. The
+projection must retain deterministic encounter order, exact extension ID,
+canonical bzl label, exported name, and the complete selected mapping context;
+it must preserve Need invalidity and completed predecessor errors. It owns no
+source/load observation, Starlark value, definition schema, execution,
+generated repository, or loading dependency.
+
+No Rust may begin before independent design acceptance. A future accepted
+implementation may touch only `selected_repo_spec.rs` and `lib.rs`, under 160
+production, 260 test, and 420 total net lines. Require pure and real-DICE
+ordering/equality/error/Need/A-B-A/reuse proof. Any broader public consumer,
+third file, definition/source work, isolation/MVO/innate/nonroot definition,
+generated-existence claim, loading dependency, or cap excess is `REPLAN`.
+
+### Selected extension definition-load request design accepted (2026-08-12)
+
+Independent architecture review accepts the hidden heap-independent request
+projection as the smallest cross-crate prerequisite. The selected mapping
+owner remains sole and private; loading receives only deterministic admitted
+requests and gains no generic graph, route, or mapping consumer.
+
+Run next only
+`WP-5-host-selected-extension-definition-load-request-owner-implementation`
+in `app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
+`app/slug_bzlmod_v2/src/lib.rs`, under 160 production, 260 test, and 420 total
+formatted net lines. Require the frozen pure/real-DICE identity, ordering,
+dedup, Need/error, warm reuse, and A/B/A proof. Add no third file, generic
+public consumer, source/load observation, loading dependency, Starlark value,
+definition/evaluation/generated-repository work, I/O, or JVM/Java surface.
