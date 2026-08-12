@@ -1,33 +1,74 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
-Milestone: M7 repository-rule definition/capture prerequisite implementation
+Packet: `WP-5-host-selected-extension-generated-namespace-request-design`
+Milestone: M7 selected extension namespace prerequisite design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted loading-owned `repository_rule`
-definition/export and module-extension call-capture protocol before RepoSpec
-construction or generated-repository existence validation.
+Result: freeze the smallest Bzlmod-owned hidden request projection that exposes
+the collision-sensitive selected extension namespace needed by later loading
+instantiation, without constructing RepoSpecs or validating existence.
 
-## Active implementation contract
+## Active docs-only design contract
 
-Independent design review accepts `7a49b5cd`. Implement only
-`WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
-against that base in `app/slug_loading_v2/src/package.rs`, existing private
-`module_extension.rs`, one new private
-`module_extension_repository_rule.rs`, and `lib.rs` solely for its private
-declaration, plus canonical/current/Stage 4/Stage 5 bookkeeping. Caps are 650
-production, 850 tests, and 1,500 total formatted net Rust lines. Preserve the
-complete owner, signature, schema, export, capture ordering, provenance,
-identity, lifetime, event, proof, exact/Slug-native/deferred, and REPLAN
-contract below. No fifth Rust path, new key/lock, retained Starlark lifetime,
-schema application, repository implementation/context, RepoSpec/generated
-state, I/O, materializer, lockfile, consumer/API/JVM breadth, or cap excess.
+Run only `WP-5-host-selected-extension-generated-namespace-request-design` in
+canonical/current/Stage 4/Stage 5. The exact docs allowlist and caps are 45
+canonical, 220 current, 180 Stage 4, 220 Stage 5, and 665 total changed lines.
+Authorize no Rust, Cargo, fixture, activation, loading mutation, RepoSpec,
+schema work, generated existence verdict, I/O, materializer, lockfile,
+consumer, public API, or JVM work before independent design acceptance.
+
+Accepted commit `b7c70a1b` owns ordered heap-free raw repository-rule calls in
+the sole loading invocation key; `f5d64085` makes the selected root input
+aggregate every matching ordinary usage. Pinned Bazel 9.2 `createRepos`
+constructs a namespace from the selected extension unique name, all generated
+repository names, and root overrides before `RepoRule.instantiate` resolves
+labels. Loading currently receives only the hidden definition load request's
+canonical bzl label, extension name, context repository, and final contextual
+mapping. It cannot derive the collision-suffixed unique prefix or the
+pre-override namespace from that final mapping without duplicating/fabricating
+the accepted selected-mapping owner.
+
+Audit only the existing
+`HostSelectedExtensionDefinitionLoadRequestsKey`/`selected_repo_spec.rs`
+producer. Freeze a narrow heap-independent widening of each admitted root-main
+ordinary nonisolated request with the exact selected extension unique canonical
+prefix and ordered override metadata for the same extension ID: generated
+apparent name, canonical replacement target, and structural `must_exist`.
+Retain the complete selected predecessor as today. The selected-mapping value
+must additionally retain its route-ordered no-overrides mappings before final
+substitution, and the admitted request projects the root no-overrides mapping
+alongside its existing final contextual mapping. This is structural semantic
+identity; never reverse-engineer it from final substituted mappings or replay
+the mapping algorithm in loading. Empty overrides succeed. Missing, duplicate,
+or mismatched namespace ownership fails closed before publication.
+
+The design freezes a future implementation no broader than
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs` plus `lib.rs` solely for the
+existing `#[doc(hidden)]` request/export accessor. Cap it at 180 production,
+300 tests, and 480 total formatted net Rust lines against the accepted design
+commit. Add no DICE key or second projection.
+Require pure zero/one/multiple ordered override joins and real-DICE unique-name
+collision, override target/`must_exist`, request order, mapping/source A/B/A,
+warm reuse, Need/completed-error precedence, unchanged loading dependents, and
+zero registry/materialization I/O for the admitted root fixture.
+
+Exact compatibility is limited to pinned selected-extension namespace identity
+and `createRepos` context assembly order. Private Rust layout, diagnostics, and
+DICE scheduling are Slug-native. Schema coercion/defaults/visibility,
+`LabelConverter`, generated call-name set, RepoSpec construction, repository
+implementation/context, existence and override/inject validation, final
+generated routes/mappings, I/O, materialization, lockfile, nonroot/MVO/
+isolation/innate breadth, consumers, public APIs, and JVM are deferred.
+`REPLAN` on deriving pre-override state from substituted mappings, accepting a
+receipt without exact extension-ID join, a loading-to-Bzlmod reverse edge,
+second graph/key/projection, generated-name or existence inference, RepoSpec or
+schema work, retained Starlark values, third future Rust file, or cap excess.
 
 ## Accepted docs-only design contract
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active implementation contract above.
+interpreted solely through the active docs-only design contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
@@ -84,8 +125,9 @@ prepared inputs, reacquires every exact frozen Host module, validates all
 requests before invoking any callable, owns invocation events, and publishes a
 heap-free receipt. Add no DICE key. During each extension invocation, install
 one evaluation-local `RepositoryRuleInvocationState` in `Evaluator.extra`.
-The state contains an ephemeral owner token and mutable scratch vector but no
-lock and no DICE computation; after the callable returns or throws, project it
+The state itself is the ephemeral invocation capability and owns a mutable
+scratch vector but no lock and no DICE computation; after the callable returns
+or throws, project it
 once into ordered immutable records carried by that extension's receipt or
 terminal prefix. Every preflight Need/error still performs zero invocation and
 zero capture.

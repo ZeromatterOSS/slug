@@ -2552,3 +2552,22 @@ order; ordered heap-free call/error identity; lifetime/event boundaries; the
 complete proof; and every generated-state, schema, I/O, public, and JVM stop.
 A fifth Rust path, new key/lock, retained Starlark value, RepoSpec or repository
 execution/context, behavior expansion, or cap excess is `REPLAN`.
+
+### Repository-rule call protocol accepted; namespace prerequisite REPLAN (2026-08-12)
+
+Independent implementation review accepts `b7c70a1b`. The shared loading
+global/export value, evaluator-local raw-call sink, ordered heap-free success
+and terminal prefixes, all-request preflight, lifetime/event boundaries, and
+full loading/Bzlmod proof are complete within 650/850/1,500. The related
+selected root input aggregation is accepted separately in `f5d64085`.
+
+Do not proceed directly to `RepoRule.instantiate`. Loading lacks the accepted
+selected extension's collision-sensitive unique prefix, pre-override namespace,
+and ordered override metadata; deriving them from the final request mapping
+would duplicate Bzlmod ownership. Run only the four-plan docs audit
+`WP-5-host-selected-extension-generated-namespace-request-design` under
+45/220/180/220/665. Stage 4 production remains unchanged. No loading Rust,
+schema/default/visibility processing, RepoSpec, generated existence/final
+mapping, repository implementation/context, I/O, consumer, public API, or JVM
+work is authorized before the prerequisite is independently accepted and
+explicitly activated.

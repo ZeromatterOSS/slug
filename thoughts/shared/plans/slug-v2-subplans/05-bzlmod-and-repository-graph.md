@@ -2595,3 +2595,34 @@ in the four loading paths plus canonical/current/Stage 4/Stage 5 under
 650/850/1,500. Stage 5 production remains unchanged. Preserve the accepted
 hidden prepared-input boundary and every no-Bzlmod-mutation, no-reverse-edge,
 no-generated-state, no-lockfile/materializer/consumer/API/JVM stop.
+
+### Raw repository-rule capture accepted; generated namespace prerequisite proposed (2026-08-12)
+
+Independent implementation review accepts loading-owned raw capture in
+`b7c70a1b`; `f5d64085` separately corrects the selected root input to
+concatenate all matching usage tags in source order. Neither commit owns the
+namespace Bazel later supplies to `RepoRule.instantiate`.
+
+The first missing owner is the existing private selected extension request
+projection, not a loading RepoSpec key. `HostSelectedExtensionMappingsKey`
+already owns collision-suffixed unique names and ordered root override
+projection, while the hidden definition-load request currently exposes only
+the contextual/final mapping. Run only the four-plan docs audit
+`WP-5-host-selected-extension-generated-namespace-request-design` under
+45/220/180/220/665. Freeze a future widening of the existing request with the
+exact unique canonical prefix and ordered `{generated name, canonical
+replacement, must_exist}` metadata for the same admitted extension ID. The
+selected value must retain the route-ordered no-overrides mappings before
+substitution and project the root entry beside the existing final request
+mapping; never derive it from substitutions or replay the algorithm in loading.
+
+The future ceiling is exactly `selected_repo_spec.rs` and `lib.rs` for the
+existing `#[doc(hidden)]` request/accessor, capped at 180 production/300
+test/480 total formatted net Rust lines against the accepted design commit,
+with no new key or second graph/projection. Require
+collision and override joins, empty/ordered overrides, identity A/B/A,
+Need/error/reuse and zero-I/O proof. RepoSpec/schema application, generated
+call names/set, existence/override validation, loading dependency, I/O,
+materialization, lockfile, consumer/API/JVM, third Rust file, or cap excess is
+`REPLAN`. No Rust resumes before independent design acceptance and explicit
+activation.
