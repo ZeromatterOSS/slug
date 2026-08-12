@@ -4070,3 +4070,39 @@ Independent design review returned `ACCEPT`: the bounded expression shape,
 configured-owner membership, actionless-support treatment, explicit
 Slug-native cross-owner order, fail-closed mixed/aspect boundaries, fixture
 discriminators, caps, and daemon A/B/A proof are source-backed and sufficient.
+
+## FileWrite aquery deps owner-set implementation replanned (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-deps-owner-set-oracle-implementation` is
+**REPLAN**. The shared expression-scope, closure selector, command/daemon
+plumbing, and ordinary diamond lifecycle implementation compiled and passed
+focused tests, and the expanded pinned Bazel 9.2 fixture proved root,
+transition, alias/generated, diamond, and action-bearing selected-toolchain
+membership. Those uncommitted changes were discarded after the required
+boundary failed.
+
+The first Slug fixture run showed that strict selected-toolchain validation
+rejected an implementation with actions/non-empty built-in `DefaultInfo`.
+The packet's one permitted material correction relaxed only that postguard
+while retaining exact topology, built-in `DefaultInfo` plus `ToolchainInfo`,
+and diagnostic constraints; its focused analysis test passed. The next Slug
+run reached a second independent gap: the retained action on that
+zero-toolchain owner has no selected execution platform, so the exact
+FileWrite semantic view fails with `configured FileWrite action requires a
+selected toolchain platform`.
+
+Bazel 9.2 emits that action with the selected execution platform. Assigning
+Slug's platform now would require a second material contract change—default
+execution-platform selection for zero-requirement owners or recursive
+toolchain selection by toolchain implementations. The packet forbids a second
+correction, action reconstruction, and silent scope narrowing, so no partial
+Rust, test, fixture, or expected-evidence changes are retained.
+
+Run next only
+`WP-8-m5-filewrite-aquery-zero-toolchain-platform-design`, design-only.
+Determine whether retained candidate-platform topology can give every
+zero-toolchain configured action, including an action-bearing selected
+toolchain implementation, a structural execution platform without toolchain
+recursion, reconstruction, or new DICE state. Freeze exact/Slug-native
+selection, configuration/identity participation, constraints and failures,
+A/B/A evidence, allowlist, and caps before choosing one successor.
