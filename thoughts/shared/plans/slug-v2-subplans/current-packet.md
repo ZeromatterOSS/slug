@@ -1,12 +1,43 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-registry-repo-spec-owner-design`
-Milestone: cross-stage M7 prerequisite design
+Packet: `WP-5-host-selected-registry-repo-spec-owner-implementation`
+Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the missing post-selection Host registry RepoSpec owner, or
-return `REPLAN` at the first smaller registry-policy/source prerequisite.
+Result: implement and prove the accepted callerless selected registry RepoSpec
+owner without activating routes, materialization, loading, or consumers.
 
-## Active design contract
+## Active implementation contract
+
+Implement exactly the independently accepted design in commit `1b4b4996`.
+This packet may edit only:
+
+- new `app/slug_bzlmod_v2/src/selected_repo_spec.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration.
+
+Cap formatted net growth at 780 production lines, 1,050 test lines, and 1,830
+total. Tests remain colocated. Implement the selected-only aggregate over
+`HostSelectedModuleGraphKey`, `HostRegistryFunctionKey`, `RegistryFileKey`,
+retained MODULE provenance, and `HostEffectiveModuleOverrideKey`, preserving
+the accepted typed observations, exact archive/local_path/git projections,
+RegistrySingle augmentation, complete-error-over-Need behavior, DICE validity,
+and structural equality.
+
+Run the frozen pure projection and real-DICE proof matrix, formatting/diff and
+scope/cap scans, the full `slug_bzlmod_v2` owner suite, direct dependents, and
+fresh independent implementation review. No third Rust file, public export,
+Cargo/BUILD change, legacy registry/catalog/resolution edit or activation,
+second I/O/policy owner, selected-graph mutation, raw filesystem/network,
+canonical mapping, route, materialization, lockfile publication, loading,
+command, analysis, execution, or consumer is authorized.
+
+Return `REPLAN` on any frozen stop, cap excess, or inability to retain exact
+selected file/policy identity. Return `REVISE` on one bounded implementation
+correction; a second material correction is `REPLAN`.
+
+## Accepted design contract
+
+This accepted design is historical context for the active implementation. It
+grants no separate file, action, cap, or scheduling authority.
 
 Audit one crate-private post-selection registry RepoSpec owner over the
 accepted selected graph and registry I/O leaves. The audit must:

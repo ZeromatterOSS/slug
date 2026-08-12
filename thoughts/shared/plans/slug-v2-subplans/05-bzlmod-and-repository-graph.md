@@ -1728,3 +1728,23 @@ implementation review. A third Rust file, public or RepoSpec-algebra widening,
 legacy catalog/graph edit, second I/O/policy owner, raw I/O, route,
 materialization, loading, lockfile publication, consumer, or cap excess is
 `REPLAN`.
+
+### Selected registry RepoSpec owner design accepted (2026-08-12)
+
+Pinned Bazel 9.2 source, the live registry/graph/override owner audit, compact
+representation review, and independent reserved-architecture review accept one
+callerless selected-only aggregate. It borrows the accepted selected graph,
+Host registry policy, registry-file observations, MODULE provenance, effective
+override, and recursive RepoSpec algebra without a second catalog, I/O owner,
+map merge, raw observation, route, or consumer.
+
+Run next only
+`WP-5-host-selected-registry-repo-spec-owner-implementation` in the new private
+`selected_repo_spec.rs` plus one private `lib.rs` declaration, under the frozen
+780 production/1,050 test/1,830 total caps. Require exact admitted archive,
+local_path, Git, mirror, registry-json, MODULE SRI, and RegistrySingle patch
+projection; selected-only file access; typed identity/error-over-Need; semantic
+A/B/A and lifecycle proof; full owner/dependent validation; structural scope;
+and independent implementation review. All frozen third-file, public, legacy,
+second-I/O, raw-I/O, route/materializer/loading/consumer, and cap stops remain
+terminal.
