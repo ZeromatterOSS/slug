@@ -1,12 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-mapping-owner-design-r3-correction`
-Milestone: cross-stage M7 prerequisite design correction
+Packet: `WP-5-root-extension-override-semantic-correction-implementation`
+Milestone: cross-stage M7 prerequisite implementation correction
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct the root override target-resolution phase before any selected
-extension-mapping Rust begins.
+Result: restore pinned root ignore-dev and override validation semantics before
+selected extension-mapping Rust resumes.
+
+## Active implementation contract
+
+Implement exactly the independently accepted first-prerequisite successor
+below. This packet may edit only
+`app/slug_bzlmod_v2/src/module_eval.rs`. Cap formatted net growth relative
+to `11be92b9` at 120 production lines, 220 test lines, and 340 total.
+Complete the frozen branch/error/A-B-A proof, protected evaluator/DICE/loading
+suites, formatting/diff/cap/scope checks, compact and cleanup audits, and
+independent implementation review.
+
+No second file, fixture mutation, public API, new key/evaluator, selected
+graph/route/mapping work, extension evaluation, I/O/materializer/loading/
+consumer edge, command, analysis, execution, or JVM/Java work is authorized.
+`REPLAN` on any stop or cap excess; one bounded defect is `REVISE`; a
+second material correction is `REPLAN`.
 
 ## Active design correction contract
+
+This design material is accepted historical context and grants no separate
+file, action, cap, or scheduling authority.
 
 The first implementation audit stopped before Rust because the accepted r2
 design described root override/inject targets as resolving through a deps-only

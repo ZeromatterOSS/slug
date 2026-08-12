@@ -2076,3 +2076,16 @@ No selected mapping Rust, second file, public/key/evaluator change, extension
 evaluation, I/O/materializer/loading/consumer edge, or JVM/Java work is
 authorized. Resume the two-phase r3 selected-mapping design only after this
 prerequisite is accepted.
+
+### Root extension override correction design accepted (2026-08-12)
+
+Independent pinned-source and reserved-architecture reviews accept the sole
+root-evaluator correction, 120/220/340 caps, proof matrix, and terminal stops.
+The prior per-proxy advice is explicitly superseded.
+
+Run next only
+`WP-5-root-extension-override-semantic-correction-implementation` in
+`app/slug_bzlmod_v2/src/module_eval.rs`. Add no second file, fixture, public
+API, key/evaluator, selected mapping work, extension evaluation, I/O/
+materializer/loading/consumer edge, or JVM/Java work. Obtain fresh independent
+implementation review before resuming the two-phase r3 mapping design.
