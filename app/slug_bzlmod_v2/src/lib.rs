@@ -262,6 +262,17 @@ pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequests;
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionEvaluationInput;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionEvaluationInputError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequests;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsKey;
+#[doc(hidden)]
 pub use source_preparation::HostRepositorySourceFileKey;
 pub use source_preparation::HostRepositorySourceFileValue;
 pub use source_preparation::ModuleSourcePreparation;

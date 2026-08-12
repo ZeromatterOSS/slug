@@ -1972,6 +1972,258 @@ impl Key for HostSelectedExtensionDefinitionLoadRequestsKey {
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionEvaluationInput {
+    load_request: HostSelectedExtensionDefinitionLoadRequest,
+    canonical_repo: CanonicalRepoName,
+    name: CompactString,
+    version: CompactString,
+    tags: Arc<[crate::NonrootExtensionTag]>,
+}
+
+impl HostSelectedExtensionEvaluationInput {
+    pub fn parts(
+        &self,
+    ) -> (
+        &HostSelectedExtensionDefinitionLoadRequest,
+        &CanonicalRepoName,
+        &str,
+        &str,
+        bool,
+        &[crate::NonrootExtensionTag],
+    ) {
+        (
+            &self.load_request,
+            &self.canonical_repo,
+            &self.name,
+            &self.version,
+            true,
+            &self.tags,
+        )
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionEvaluationInputRequests {
+    load_requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
+    requests: Arc<[HostSelectedExtensionEvaluationInput]>,
+}
+
+impl HostSelectedExtensionEvaluationInputRequests {
+    pub fn parts(
+        &self,
+    ) -> (
+        &HostSelectedExtensionDefinitionLoadRequests,
+        &[HostSelectedExtensionEvaluationInput],
+    ) {
+        (&self.load_requests, &self.requests)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostSelectedExtensionEvaluationInputRequestsError {
+    LoadRequests(HostSelectedExtensionDefinitionLoadRequestsError),
+    LoadRequestsCompute(CompactString),
+    AfterRequests {
+        load_requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
+        request: Option<HostSelectedExtensionDefinitionLoadRequest>,
+        error: HostSelectedExtensionEvaluationInputError,
+    },
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostSelectedExtensionEvaluationInputError {
+    RootFiles(CompactString),
+    RootFilesCompute(CompactString),
+    Invalid(CompactString),
+}
+
+fn selected_extension_evaluation_input_requests(
+    load_requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
+    root_files: &crate::module_eval::RootModuleFiles,
+) -> Result<
+    HostSelectedExtensionEvaluationInputRequests,
+    HostSelectedExtensionEvaluationInputRequestsError,
+> {
+    let invalid = |request: Option<&HostSelectedExtensionDefinitionLoadRequest>, message| {
+        HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+            load_requests: load_requests.clone(),
+            request: request.cloned(),
+            error: HostSelectedExtensionEvaluationInputError::Invalid(message),
+        }
+    };
+    let root_route = load_requests
+        .predecessor
+        .routes
+        .entries
+        .iter()
+        .find(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
+        .ok_or_else(|| invalid(None, "selected root route is absent".into()))?;
+    let header = root_files
+        .module
+        .header
+        .as_ref()
+        .ok_or_else(|| invalid(None, "root module header is absent".into()))?;
+    if header.name.is_empty() {
+        return Err(invalid(None, "root module name is empty".into()));
+    }
+    let version = crate::module_version::BazelModuleVersion::parse(
+        header.version.as_deref().unwrap_or_default(),
+    )
+    .map_err(|error| invalid(None, error.to_string().into()))?;
+    let requests = load_requests
+        .requests
+        .iter()
+        .map(|request| {
+            let mut matches = root_files.extension_usages.iter().filter(|usage| {
+                usage.isolation.is_none()
+                    && usage.extension_name == request.extension_name
+                    && resolve_extension_label(
+                        &HostGraphModuleKey::Root,
+                        usage.bzl_label.as_str(),
+                        &request.mapping,
+                    )
+                    .is_ok_and(|label| label == request.bzl_file)
+            });
+            let usage = matches.next().ok_or_else(|| {
+                invalid(
+                    Some(request),
+                    "definition request has no matching root usage".into(),
+                )
+            })?;
+            if matches.next().is_some() {
+                return Err(invalid(
+                    Some(request),
+                    "definition request matches multiple root usages".into(),
+                ));
+            }
+            Ok(HostSelectedExtensionEvaluationInput {
+                load_request: request.clone(),
+                canonical_repo: root_route.canonical_repo.clone(),
+                name: header.name.clone(),
+                version: version.normalized().into(),
+                tags: usage.tags.clone(),
+            })
+        })
+        .collect::<Result<Arc<_>, _>>()?;
+    Ok(HostSelectedExtensionEvaluationInputRequests {
+        load_requests,
+        requests,
+    })
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedExtensionEvaluationInputRequestsKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostSelectedExtensionEvaluationInputRequestsKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostSelectedExtensionEvaluationInputRequestsKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-selected-extension-evaluation-inputs:{}",
+            self.workspace
+        )
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedExtensionEvaluationInputRequestsKey {
+    type Value = SourcePreparationOutcome<
+        Arc<
+            Result<
+                HostSelectedExtensionEvaluationInputRequests,
+                HostSelectedExtensionEvaluationInputRequestsError,
+            >,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let load_requests = match ctx
+            .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
+                self.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(value) => Arc::new(value.clone()),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostSelectedExtensionEvaluationInputRequestsError::LoadRequests(
+                            error.clone(),
+                        ),
+                    )));
+                }
+            },
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostSelectedExtensionEvaluationInputRequestsError::LoadRequestsCompute(
+                        error.to_string().into(),
+                    ),
+                )));
+            }
+        };
+        let root_files = match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: self.workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Ok(value) => match value.as_ref() {
+                Ok(value) => value.clone(),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                            load_requests,
+                            request: None,
+                            error: HostSelectedExtensionEvaluationInputError::RootFiles(
+                                error.clone(),
+                            ),
+                        },
+                    )));
+                }
+            },
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                        load_requests,
+                        request: None,
+                        error: HostSelectedExtensionEvaluationInputError::RootFilesCompute(
+                            error.to_string().into(),
+                        ),
+                    },
+                )));
+            }
+        };
+        SourcePreparationOutcome::Complete(Arc::new(selected_extension_evaluation_input_requests(
+            load_requests,
+            &root_files,
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -2118,7 +2370,12 @@ mod tests {
                 ))),
             ),
         ];
-        for (index, name) in LOCAL_MODULES.iter().enumerate() {
+        for (index, name) in LOCAL_MODULES
+            .iter()
+            .copied()
+            .chain(std::iter::once("bazel_tools"))
+            .enumerate()
+        {
             let root = format!("{WORKSPACE}/{name}");
             let module = format!("{root}/MODULE.bazel");
             let id = 10 + index as i64 * 2;
@@ -2128,7 +2385,7 @@ mod tests {
                 (
                     observation(&module, PathObservationOperation::FileBytes),
                     PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
-                        if *name == "local" {
+                        if name == "local" {
                             b"module(name='local')\np=use_extension('//:local.bzl','shared')\nuse_repo(p,'generated')\n".to_vec()
                         } else {
                             format!("module(name='{name}')\n").into_bytes()
@@ -2189,10 +2446,23 @@ mod tests {
                 }),
             )])
             .unwrap();
+        let command_builtin_override = root.contains("# command_override_bazel_tools");
+        let command_policy = if command_builtin_override {
+            let override_value = format!("bazel_tools={WORKSPACE}/bazel_tools");
+            crate::BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                workspace.as_path(),
+                [override_value.as_str()],
+            )
+            .unwrap()
+        } else {
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap()
+        };
         crate::inject_root_module_request_inputs(
             &mut updater,
             workspace.as_path(),
-            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            command_policy,
             crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             crate::LockfileMode::Update,
         )
@@ -2252,39 +2522,49 @@ mod tests {
                 mirror_input,
             )])
             .unwrap();
-        let materializations = LOCAL_MODULES.iter().filter_map(|name| {
-            root.contains(&format!(
-                "local_path_override(module_name='{name}', path='{name}')"
-            ))
-            .then(|| {
-                let repo_spec = repo_spec(
-                    "@@bazel_tools//tools/build_defs/repo:local.bzl",
-                    "local_repository",
-                    SmallMap::from_iter([(
-                        CompactString::new("path"),
-                        OverrideAttributeValue::String((*name).into()),
-                    )]),
-                );
-                crate::RepositoryMaterializationEpochEntry {
-                    request: Arc::new(crate::RepositoryMaterializationRequest {
-                        id: crate::RepositoryMaterializationRequestId {
-                            workspace: workspace.dupe(),
-                            canonical_repo: CanonicalRepoName::new(format!("{name}+")).unwrap(),
-                        },
-                        repo_spec,
-                        kind: crate::RepositoryMaterializationKind::Local {
-                            logical_root: NormalizedAbsolutePath::new(format!(
-                                "{WORKSPACE}/{name}"
-                            ))
-                            .unwrap(),
-                        },
-                    }),
-                    result: crate::RepositoryMaterializationResult::Success(
-                        crate::RepositoryMaterializationSuccess::Local,
-                    ),
-                }
-            })
-        });
+        let materializations = LOCAL_MODULES
+            .iter()
+            .copied()
+            .chain(command_builtin_override.then_some("bazel_tools"))
+            .filter_map(|name| {
+                let command_override = command_builtin_override && name == "bazel_tools";
+                (command_override
+                    || root.contains(&format!(
+                        "local_path_override(module_name='{name}', path='{name}')"
+                    )))
+                .then(|| {
+                    let repo_spec = repo_spec(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                        "local_repository",
+                        SmallMap::from_iter([(
+                            CompactString::new("path"),
+                            OverrideAttributeValue::String(if command_override {
+                                format!("{WORKSPACE}/{name}").into()
+                            } else {
+                                name.into()
+                            }),
+                        )]),
+                    );
+                    crate::RepositoryMaterializationEpochEntry {
+                        request: Arc::new(crate::RepositoryMaterializationRequest {
+                            id: crate::RepositoryMaterializationRequestId {
+                                workspace: workspace.dupe(),
+                                canonical_repo: CanonicalRepoName::new(format!("{name}+")).unwrap(),
+                            },
+                            repo_spec,
+                            kind: crate::RepositoryMaterializationKind::Local {
+                                logical_root: NormalizedAbsolutePath::new(format!(
+                                    "{WORKSPACE}/{name}"
+                                ))
+                                .unwrap(),
+                            },
+                        }),
+                        result: crate::RepositoryMaterializationResult::Success(
+                            crate::RepositoryMaterializationSuccess::Local,
+                        ),
+                    }
+                })
+            });
         updater
             .changed_to(vec![(
                 crate::RepositoryMaterializationResultEpochKey {
@@ -2358,6 +2638,35 @@ mod tests {
             .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_real_evaluation_inputs(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        include_epoch: bool,
+    ) -> <HostSelectedExtensionEvaluationInputRequestsKey as Key>::Value {
+        real_transaction(dice, root, generation, &[], include_epoch)
+            .await
+            .compute(&HostSelectedExtensionEvaluationInputRequestsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_real_root_files(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+    ) -> Arc<Result<crate::module_eval::RootModuleFiles, CompactString>> {
+        real_transaction(dice, root, generation, &[], true)
+            .await
+            .compute(&RootModuleFilesKey {
+                workspace: Path::new(WORKSPACE).to_owned(),
+            })
             .await
             .unwrap()
     }
@@ -3667,11 +3976,11 @@ repo(name = "replacement")
         let dice = Arc::new(builder.build(DetectCycles::Enabled));
         let source = |reversed: bool| {
             let usages = if reversed {
-                "b=use_extension('//:b.bzl','b')\nuse_repo(b,b_alias='repo')\n\
-                 a=use_extension('//:a.bzl','a')\nuse_repo(a,a_alias='repo')"
+                "b=use_extension('//:b.bzl','b')\nb.beta(value='two')\nuse_repo(b,b_alias='repo')\n\
+                 a=use_extension('//:a.bzl','a')\na.alpha(value='one')\nuse_repo(a,a_alias='repo')"
             } else {
-                "a=use_extension('//:a.bzl','a')\nuse_repo(a,a_alias='repo')\n\
-                 b=use_extension('//:b.bzl','b')\nuse_repo(b,b_alias='repo')"
+                "a=use_extension('//:a.bzl','a')\na.alpha(value='one')\nuse_repo(a,a_alias='repo')\n\
+                 b=use_extension('//:b.bzl','b')\nb.beta(value='two')\nuse_repo(b,b_alias='repo')"
             };
             format!("module(name='bazel_tools', repo_name='root_self')\n{usages}\n")
         };
@@ -3754,6 +4063,223 @@ repo(name = "replacement")
             &a,
             &restored_again
         ));
+        assert!(io.calls().is_empty());
+
+        let inputs = compute_real_evaluation_inputs(&dice, &source(false), 46, true).await;
+        let warm_inputs = compute_real_evaluation_inputs(&dice, &source(false), 46, true).await;
+        assert!(HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &inputs,
+            &warm_inputs
+        ));
+        let SourcePreparationOutcome::Complete(inputs_value) = &inputs else {
+            panic!("evaluation inputs must complete")
+        };
+        let inputs_value = inputs_value.as_ref().as_ref().unwrap();
+        assert_eq!(inputs_value.parts().1.len(), 2);
+        let (load, canonical, name, version, is_root, tags) = inputs_value.parts().1[0].parts();
+        assert_eq!(load.parts().1, "a");
+        assert_eq!(canonical.as_str(), "");
+        assert_eq!((name, version, is_root), ("bazel_tools", "", true));
+        assert_eq!(tags.len(), 1);
+        assert_eq!(tags[0].tag_class, "alpha");
+        assert!(matches!(
+            tags[0].attributes.get("value"),
+            Some(crate::NonrootAttributeValue::String(value)) if value == "one"
+        ));
+        let reordered = compute_real_evaluation_inputs(&dice, &source(true), 47, true).await;
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &inputs, &reordered
+        ));
+        let restored_inputs = compute_real_evaluation_inputs(&dice, &source(false), 48, true).await;
+        assert!(HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &inputs,
+            &restored_inputs
+        ));
+
+        let versioned = compute_real_evaluation_inputs(
+            &dice,
+            "module(name='bazel_tools',version='1.2+ignored')\n\
+             a=use_extension('//:a.bzl','a')\na.alpha(value='one')\n",
+            49,
+            true,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(versioned_value) = &versioned else {
+            panic!("versioned root input must complete")
+        };
+        let (_, canonical, name, version, is_root, _) =
+            versioned_value.as_ref().as_ref().unwrap().parts().1[0].parts();
+        assert_eq!(canonical.as_str(), "");
+        assert_eq!((name, version, is_root), ("bazel_tools", "1.2", true));
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &inputs, &versioned
+        ));
+        let restored_fields = compute_real_evaluation_inputs(&dice, &source(false), 50, true).await;
+        assert!(HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &inputs,
+            &restored_fields
+        ));
+    }
+
+    #[tokio::test]
+    async fn real_evaluation_inputs_retain_fields_and_exclude_unrelated_root_state() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let source = |name: &str, dev: bool, blank_before_tag: bool| {
+            format!(
+                "module(name='{name}')\n\
+                 # command_override_bazel_tools\n\
+                 a=use_extension('//:a.bzl','a'{})\n{}a.alpha(value='one')\n",
+                if dev { ", dev_dependency=True" } else { "" },
+                if blank_before_tag { "\n" } else { "" },
+            )
+        };
+        let base_source = source("root_a", false, false);
+        let a = compute_real_evaluation_inputs(&dice, &base_source, 60, true).await;
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("root evaluation inputs must complete")
+        };
+        let a_value = a_value.as_ref().as_ref().unwrap();
+        let a_input = a_value.parts().1[0].clone();
+        assert_eq!(a_input.parts().2, "root_a");
+        assert!(!a_input.parts().5[0].dev_dependency);
+
+        let renamed =
+            compute_real_evaluation_inputs(&dice, &source("root_b", false, false), 61, true).await;
+        let SourcePreparationOutcome::Complete(renamed_value) = &renamed else {
+            panic!("renamed root evaluation input must complete")
+        };
+        assert_eq!(
+            renamed_value.as_ref().as_ref().unwrap().parts().1[0]
+                .parts()
+                .2,
+            "root_b"
+        );
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &a, &renamed
+        ));
+        let renamed_restored = compute_real_evaluation_inputs(&dice, &base_source, 62, true).await;
+        assert!(HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &a,
+            &renamed_restored
+        ));
+
+        let dev =
+            compute_real_evaluation_inputs(&dice, &source("root_a", true, false), 63, true).await;
+        let SourcePreparationOutcome::Complete(dev_value) = &dev else {
+            panic!("dev evaluation input must complete")
+        };
+        assert!(dev_value.as_ref().as_ref().unwrap().parts().1[0].parts().5[0].dev_dependency);
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &a, &dev
+        ));
+        let dev_restored = compute_real_evaluation_inputs(&dice, &base_source, 64, true).await;
+        assert!(HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &a,
+            &dev_restored
+        ));
+
+        let moved =
+            compute_real_evaluation_inputs(&dice, &source("root_a", false, true), 65, true).await;
+        let SourcePreparationOutcome::Complete(moved_value) = &moved else {
+            panic!("moved evaluation input must complete")
+        };
+        let moved_tag = &moved_value.as_ref().as_ref().unwrap().parts().1[0]
+            .parts()
+            .5[0];
+        assert_ne!(a_input.parts().5[0].location, moved_tag.location);
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &a, &moved
+        ));
+        let moved_restored = compute_real_evaluation_inputs(&dice, &base_source, 66, true).await;
+        assert!(HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &a,
+            &moved_restored
+        ));
+
+        let load_requests = Arc::new(a_value.parts().0.clone());
+        let root_files = compute_real_root_files(&dice, &base_source, 67)
+            .await
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .clone();
+        let projected =
+            selected_extension_evaluation_input_requests(load_requests.clone(), &root_files)
+                .unwrap();
+        for suffix in [
+            "bazel_dep(name='rules_license', version='1')\nlocal_path_override(module_name='rules_license', path='rules_license')\n",
+            "register_toolchains('//:toolchain')\n",
+            "single_version_override(module_name='unused', version='1')\n",
+        ] {
+            let changed =
+                compute_real_root_files(&dice, &format!("{base_source}{suffix}"), 68).await;
+            let changed = changed.as_ref().as_ref().unwrap();
+            assert_eq!(
+                projected.requests,
+                selected_extension_evaluation_input_requests(load_requests.clone(), changed)
+                    .unwrap()
+                    .requests
+            );
+        }
+        let mut path_and_lockfile = root_files.clone();
+        path_and_lockfile.module_file_paths =
+            Arc::from([Path::new("/unrelated/MODULE.bazel").to_owned()]);
+        path_and_lockfile.visible_lockfile = crate::VisibleLockfileRead::Ignored;
+        assert_eq!(
+            projected.requests,
+            selected_extension_evaluation_input_requests(
+                load_requests.clone(),
+                &path_and_lockfile,
+            )
+            .unwrap()
+            .requests
+        );
+
+        let module_view = |input: &HostSelectedExtensionEvaluationInput| {
+            (
+                input.canonical_repo.clone(),
+                input.name.clone(),
+                input.version.clone(),
+                input.tags.clone(),
+            )
+        };
+        let mut mapping_changed = a_input.clone();
+        mapping_changed.load_request.mapping.context_repo =
+            CanonicalRepoName::new("changed+").unwrap();
+        assert_ne!(a_input, mapping_changed);
+        assert_eq!(module_view(&a_input), module_view(&mapping_changed));
+        let mut canonical_changed = a_input.clone();
+        canonical_changed.canonical_repo = CanonicalRepoName::new("changed+").unwrap();
+        assert_ne!(a_input, canonical_changed);
+        assert_eq!(a_input.parts().4, canonical_changed.parts().4);
+        canonical_changed.canonical_repo = a_input.canonical_repo.clone();
+        assert_eq!(a_input, canonical_changed);
+
+        let mut unmatched_root_files = root_files;
+        unmatched_root_files.extension_usages = Arc::from([]);
+        let error_a = selected_extension_evaluation_input_requests(
+            load_requests.clone(),
+            &unmatched_root_files,
+        )
+        .unwrap_err();
+        let mut changed_load_requests = load_requests.as_ref().clone();
+        let mut changed_request = changed_load_requests.requests[0].clone();
+        changed_request.mapping.context_repo = CanonicalRepoName::new("changed+").unwrap();
+        changed_load_requests.requests = Arc::from([changed_request]);
+        let error_b = selected_extension_evaluation_input_requests(
+            Arc::new(changed_load_requests),
+            &unmatched_root_files,
+        )
+        .unwrap_err();
+        assert_ne!(error_a, error_b);
+        assert_eq!(
+            error_a,
+            selected_extension_evaluation_input_requests(load_requests, &unmatched_root_files)
+                .unwrap_err()
+        );
         assert!(io.calls().is_empty());
     }
 
@@ -3882,6 +4408,21 @@ repo(name = "replacement")
         assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
             &need, &need
         ));
+        let input_need = compute_real_evaluation_inputs(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n",
+            52,
+            false,
+        )
+        .await;
+        assert!(matches!(input_need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::validity(
+            &input_need
+        ));
+        assert!(!HostSelectedExtensionEvaluationInputRequestsKey::equality(
+            &input_need,
+            &input_need
+        ));
 
         let error = compute_real_definition_requests(
             &dice,
@@ -3907,6 +4448,21 @@ repo(name = "replacement")
                             )
                         )
                     )) if name == "missing"
+                )
+        ));
+        let input_error = compute_real_evaluation_inputs(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='missing', version='1')\n",
+            53,
+            true,
+        )
+        .await;
+        assert!(matches!(
+            input_error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostSelectedExtensionEvaluationInputRequestsError::LoadRequests(_))
                 )
         ));
     }

@@ -2241,3 +2241,25 @@ The 240 production cap fired when post-request terminals were corrected to
 retain full request/predecessor identity. Preserve the unaccepted Rust diff and
 run only the docs-only r2 cap correction at 280 production/360 test/640 total,
 same files and stops. Stage 4 remains inactive.
+
+### Raw evaluation inputs accepted; composition design active (2026-08-12)
+
+The Stage 5 r2 owner is independently accepted at 263 production/304 test/567
+total lines. It publishes only heap-free selected request, root identity, and
+source-order raw tag state, retains complete predecessor/error identity, and
+keeps schema coercion and execution absent. Full Bzlmod/loading suites pass.
+
+Run next only the docs-only
+`WP-4-5-host-module-extension-evaluation-input-composition-design`. Audit one
+callerless loading key that computes raw selected inputs before the accepted
+definition loader, joins by exact load request, and type-checks/defaults the
+admitted tags into heap-free module views. Freeze exact tag-class/attribute/
+label/error ordering and fail closed on every unprojected kind or option. The
+first slice is string, bool, i32 integer, and single label only; all containers,
+outputs, oversized/deferred values, and unprojected restrictions remain
+deferred. Supplied attributes use retained-map order before schema-order
+mandatory/default/visibility checks. A raw terminal performs zero bzl work; an
+invoked accepted loader keeps its normal event behavior. No
+callable, `module_ctx`, execution, I/O, generated repository, lockfile,
+materializer, consumer, second loader/evaluator, Bzlmod mutation, or Rust edit
+is authorized before independent design acceptance.

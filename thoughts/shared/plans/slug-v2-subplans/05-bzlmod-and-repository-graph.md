@@ -2397,3 +2397,24 @@ Retain the unaccepted two-file diff and freeze 280 production/360 test/640
 total against `a31cf3d9`, with identical semantics, proof, files, and stops.
 No Rust resumes before independent correction acceptance and explicit r2
 activation.
+
+### Evaluation-input implementation r2 activated (2026-08-12)
+
+Independent review accepts the cap correction. Resume only the same two Rust
+files under 280/360/640 against `a31cf3d9`, preserving every proof and stop.
+
+### Selected extension evaluation inputs accepted (2026-08-12)
+
+The r2 owner is accepted at 263 production, 304 test, and 567 total lines
+against `a31cf3d9`. It computes the accepted load-request aggregate before root
+files, retains full predecessor and exact-request context in every post-request
+terminal, and publishes only the exact heap-free root identity plus source-
+ordered raw tags. Field-by-field and exclusion A/B/A, Need/error, cold/warm,
+full Bzlmod/loading, formatting, scope, cleanup, and independent review pass.
+
+Run next only the cross-stage docs packet
+`WP-4-5-host-module-extension-evaluation-input-composition-design`. Stage 5
+owns no schema coercion, callable, `module_ctx`, execution, or consumer. The
+audit may consume this accepted hidden key from loading but may not mutate
+Bzlmod, introduce another raw owner, or authorize Rust before independent
+design acceptance.
