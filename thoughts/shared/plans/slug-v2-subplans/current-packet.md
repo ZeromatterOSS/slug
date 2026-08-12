@@ -1,66 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-8-m5-filewrite-aquery-root-local-order-oracle-implementation`
+Packet: `WP-8-m5-filewrite-aquery-deps-owner-set-design`
 Milestone: M5 expansion
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: admit declaration-ordered FileWrite actions owned by one literal root.
+Result: freeze a bounded `deps()` owner-set/order compatibility strategy or
+record `REPLAN`.
 
-## Observable slice
+## Design question
 
-Keep the accepted one main-repository literal request and public wire. For its
-sole analyzed requested target, emit one or more supported FileWrite actions in
-retained per-owner declaration order. Resolve each root action against the full
-build action closure, but exclude actions owned by dependencies or semantic
-support nodes. Format every block with exactly two trailing LF bytes and keep
-the accepted one-action output unchanged.
+Decide whether one `deps(<direct main-repository literal>)` expression can
+reuse the accepted raw-wire request, typed build DICE evaluation, retained
+configured action closure, resolved FileWrite views, and text formatter. Freeze
+the owner membership/deduplication boundary separately from output order:
+Bazel's configured-target owner set may be exact while Slug's deterministic
+cross-owner traversal order must remain explicitly Slug-native unless pinned
+source establishes a stronger contract.
 
-Exact behavior covers root-local action order, direct-literal dependency
-exclusion, action block shape, and per-block framing. Configuration/output-root
-and `SlugActionToken` bytes, progress silence, invalidation counts, and errors
-remain Slug-native. Cross-owner order, `deps()` activation, shared actions
-across distinct owners, aspects, other action kinds/formats, and Bazel identity
-bytes remain unsupported/deferred.
+## Read-only scope
 
-## Oracle and implementation
+Inspect the accepted aquery validator/command/wire, shared `QueryExpression`
+AST, build-command closure construction and configured-edge kinds, resolved
+FileWrite selection, the new root-order fixture's order-agnostic diamond row,
+and pinned Bazel 9.2 aquery/query-set ownership sources already cited by Stage
+8. Determine whether Slug's closure contains exactly the requested configured
+dependency owners or also semantic-support nodes that need a source-backed
+filter. Cover diamonds, aliases/generated files, toolchains, platforms,
+constraints, configured transitions, shared equivalent actions across distinct
+owners, and unsupported mixed action kinds.
 
-Add one five-file `filewrite-aquery-root-order` Bazel 9.2 fixture. Its root
-declares `z-root.txt` then `a-root.txt` and depends on left/right owners with
-a shared diamond leaf. Direct-literal A/B/A rows must prove declaration rather
-than lexical order and dependency exclusion. One oracle-only `deps(//:root)`
-row proves owner membership and single diamond ownership without asserting
-cross-owner order. Pinned formatter source plus raw oracle evidence own Bazel's
-two-LF fact; normalized patterns own order/exclusion.
+Classify owner membership, per-owner declaration order, block framing, and
+diagnostics as exact, Slug-native, or unsupported/deferred. Select at most one
+bounded evidence/implementation successor with explicit file allowlist, line
+caps, fail-closed boundaries, and one-shot/daemon A/B/A lifecycle proof. If the
+existing closure cannot separate query-visible dependency owners from semantic
+support without new retained state or wider query evaluation, record
+`REPLAN`.
 
-Implement root-only semantic view selection in the retained
-`BuildCommandEvaluation`; use the complete closure only for platform and
-constraint resolution. Format all root views without sorting. Fail closed for
-zero/multiple requested analyses, unsupported root actions, and every existing
-semantic integrity failure.
+## Validation
 
-## Allowlist and caps
+This packet is design-only. Confirm the accepted literal command and generated
+oracle evidence remain untouched. Run source/structure/diff checks and require
+independent design review. Cap bookkeeping at 220 lines.
 
-Only:
+## Stops
 
-- the five files in
-  `tests/v2_oracle/fixtures/filewrite-aquery-root-order/`: `fixture.toml`,
-  `workspace/MODULE.bazel`, `workspace/BUILD.bazel`, `workspace/defs.bzl`, and
-  `expected/oracle.json`;
-- `app/slug_core_v2/src/runtime/{dice.rs,file_write_aquery_text.rs}`;
-- focused `app/slug_cli_v2/tests/cli.rs`; and
-- bundled Stage 8/current/canonical bookkeeping.
-
-Caps: 70 production / 220 tests / 290 total Rust net lines; five fixture files /
-350 fixture text lines; bookkeeping excluded.
-
-## Validation and stops
-
-Run the new pinned Bazel 9.2 fixture and protected one-action evidence. Prove
-core root-only order/exclusion/full-closure resolution and CLI default/explicit,
-one-shot/daemon, framing, dependency exclusion, retained A/B/A restoration, and
-stable daemon PID. Run direct compile dependents, rustfmt, archive, and diff
-checks; clean stale `slugd`; require independent final review.
-
-Add no command/wire fields, query functions, cross-owner ordering, action
-reconstruction, DICE key/state, execution, file contents, other action
-kinds/formats, retained identity changes, exact Bazel identity bytes, JVM/Java,
-REAPI, or CI. One material correction maximum; a second is `REPLAN`.
+Add no Rust, tests, fixture/expected evidence, Bazel execution, command/wire
+fields, query-function activation, action reconstruction, DICE state, action
+execution, contents, other action kinds/formats, retained identity changes,
+exact Bazel identity bytes, JVM/Java, REAPI, or CI. One material correction
+maximum; a second is `REPLAN`.

@@ -49,11 +49,14 @@ pub fn format_file_write_aquery_text_output(
     evaluation: &BuildCommandEvaluation,
 ) -> Result<String, &'static str> {
     let views = evaluation.resolved_file_write_semantic_views()?;
-    let [view] = views.as_slice() else {
-        return Err("FileWrite aquery text requires exactly one resolved action");
-    };
-    let mut output = format_file_write_aquery_text(view)?;
-    output.push_str("\n\n");
+    if views.is_empty() {
+        return Err("FileWrite aquery text requires at least one resolved action");
+    }
+    let mut output = String::new();
+    for view in &views {
+        output.push_str(&format_file_write_aquery_text(view)?);
+        output.push_str("\n\n");
+    }
     Ok(output)
 }
 

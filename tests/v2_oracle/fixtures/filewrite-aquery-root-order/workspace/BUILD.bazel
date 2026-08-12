@@ -1,0 +1,18 @@
+load(":defs.bzl", "demo_toolchain_impl", "dependency_rule", "root_rule")
+
+platform(name = "platform")
+toolchain_type(name = "demo_type")
+demo_toolchain_impl(name = "demo_impl", marker = "demo")
+toolchain(
+    name = "demo_toolchain",
+    toolchain = ":demo_impl",
+    toolchain_type = ":demo_type",
+)
+
+dependency_rule(name = "shared")
+dependency_rule(name = "left", deps = [":shared"])
+dependency_rule(name = "right", deps = [":shared"])
+root_rule(
+    name = "root",
+    deps = [":left", ":right"],
+)

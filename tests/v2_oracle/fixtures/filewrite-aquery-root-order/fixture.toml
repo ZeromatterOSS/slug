@@ -1,0 +1,58 @@
+[fixture]
+name = "filewrite-aquery-root-order"
+description = "Bazel 9.2 direct-literal aquery retains FileWrite declaration order, two-LF block framing, and root-only ownership across A/B/A edits."
+comparison = "message_shape"
+oracle_notes = "Exact evidence is limited to the direct-literal text shape. The deps row proves owner membership and diamond deduplication only; concurrent query-set iteration does not support a cross-owner ordering claim."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphQueryEnvironment.java#getTargetsMatchingPattern",
+  "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java#processOutput",
+  "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java#writeText",
+  "src/main/java/com/google/devtools/build/lib/skyframe/RuleConfiguredTargetValue.java#getActions",
+  "src/main/java/com/google/devtools/build/lib/query2/engine/QueryUtil.java#ThreadSafeMutableKeyExtractorBackedSetImpl",
+]
+translation_notes = "The root registers z-root.txt before a-root.txt despite their reverse lexical order and depends on a left/right diamond with one shared leaf. A single retained Bazel server observes A/B/A source edits. Direct literal output must contain exactly the two root blocks in declaration order. deps(//:root) patterns count owners without coupling them to iteration order."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture filewrite-aquery-root-order --tool bazel --bazel /usr/bin/bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture filewrite-aquery-root-order --tool bazel --bazel /usr/bin/bazel"
+
+[[commands]]
+name = "literal_order_a"
+argv = ["aquery", "//:root", "--output=text"]
+expected_exit = 0
+stdout_patterns = ['''(?s)\Aaction 'Writing file z-root\.txt'\n  Mnemonic: FileWrite\n  Target: //:root\n  Configuration: [^\n]+\n  Execution platform: //:platform\n  ActionKey: [0-9a-f]{64}\n  Inputs: \[\]\n  Outputs: \[bazel-out/[^\n]+/bin/z-root\.txt\]\n  IsExecutable: false\n\naction 'Writing file a-root\.txt'\n  Mnemonic: FileWrite\n  Target: //:root\n  Configuration: [^\n]+\n  Execution platform: //:platform\n  ActionKey: [0-9a-f]{64}\n  Inputs: \[\]\n  Outputs: \[bazel-out/[^\n]+/bin/a-root\.txt\]\n  IsExecutable: false\Z''']
+
+[[commands]]
+name = "literal_order_b"
+argv = ["aquery", "//:root", "--output=text"]
+expected_exit = 0
+stdout_patterns = ['''(?s)\Aaction 'Writing file a-root\.txt'\n  Mnemonic: FileWrite\n  Target: //:root\n  Configuration: [^\n]+\n  Execution platform: //:platform\n  ActionKey: [0-9a-f]{64}\n  Inputs: \[\]\n  Outputs: \[bazel-out/[^\n]+/bin/a-root\.txt\]\n  IsExecutable: false\n\naction 'Writing file z-root\.txt'\n  Mnemonic: FileWrite\n  Target: //:root\n  Configuration: [^\n]+\n  Execution platform: //:platform\n  ActionKey: [0-9a-f]{64}\n  Inputs: \[\]\n  Outputs: \[bazel-out/[^\n]+/bin/z-root\.txt\]\n  IsExecutable: false\Z''']
+
+  [[commands.mutations]]
+  path = "defs.bzl"
+  find = 'ORDER = "za"'
+  replace = 'ORDER = "az"'
+
+[[commands]]
+name = "literal_order_restored_a"
+argv = ["aquery", "//:root", "--output=text"]
+expected_exit = 0
+stdout_patterns = ['''(?s)\Aaction 'Writing file z-root\.txt'\n  Mnemonic: FileWrite\n  Target: //:root\n  Configuration: [^\n]+\n  Execution platform: //:platform\n  ActionKey: [0-9a-f]{64}\n  Inputs: \[\]\n  Outputs: \[bazel-out/[^\n]+/bin/z-root\.txt\]\n  IsExecutable: false\n\naction 'Writing file a-root\.txt'\n  Mnemonic: FileWrite\n  Target: //:root\n  Configuration: [^\n]+\n  Execution platform: //:platform\n  ActionKey: [0-9a-f]{64}\n  Inputs: \[\]\n  Outputs: \[bazel-out/[^\n]+/bin/a-root\.txt\]\n  IsExecutable: false\Z''']
+
+  [[commands.mutations]]
+  path = "defs.bzl"
+  find = 'ORDER = "az"'
+  replace = 'ORDER = "za"'
+
+[[commands]]
+name = "deps_owner_membership_only"
+argv = ["aquery", "deps(//:root)", "--output=text"]
+expected_exit = 0
+stdout_patterns = [
+  '''(?s)\A(?:(?!  Target: //:root\n).)*  Target: //:root\n(?:(?!  Target: //:root\n).)*  Target: //:root\n(?:(?!  Target: //:root\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:left\n).)*  Target: //:left\n(?:(?!  Target: //:left\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:right\n).)*  Target: //:right\n(?:(?!  Target: //:right\n).)*\Z''',
+  '''(?s)\A(?:(?!  Target: //:shared\n).)*  Target: //:shared\n(?:(?!  Target: //:shared\n).)*\Z''',
+]

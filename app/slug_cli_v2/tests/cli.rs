@@ -5037,7 +5037,7 @@ fn explicit_label_output_matches_bazel_and_text_is_rejected() {
 }
 
 #[test]
-fn aquery_text_matches_one_shot_and_retained_daemon_content_restoration() {
+fn aquery_text_keeps_root_order_across_one_shot_and_retained_daemon_restoration() {
     let workspace = scratch("aquery-filewrite-text");
     write(
         workspace.join("MODULE.bazel"),
@@ -5057,13 +5057,27 @@ demo_toolchain_impl = rule(
     attrs = {"marker": attr.string(mandatory = True)},
 )
 
-def _probe_impl(ctx):
-    out = ctx.actions.declare_file("probe.txt")
-    ctx.actions.write(out, "content-A")
+def _dependency_impl(ctx):
+    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    ctx.actions.write(out, ctx.label.name)
     return [DefaultInfo(files = depset([out]))]
 
-probe_rule = rule(
-    implementation = _probe_impl,
+dependency_rule = rule(
+    implementation = _dependency_impl,
+    attrs = {"deps": attr.label_list()},
+    toolchains = ["//:demo_type"],
+)
+
+def _root_impl(ctx):
+    z = ctx.actions.declare_file("z-root.txt")
+    a = ctx.actions.declare_file("a-root.txt")
+    ctx.actions.write(z, "z")
+    ctx.actions.write(a, "a")
+    return [DefaultInfo(files = depset([z, a]))]
+
+root_rule = rule(
+    implementation = _root_impl,
+    attrs = {"deps": attr.label_list()},
     toolchains = ["//:demo_type"],
 )
 "#,
@@ -5071,7 +5085,7 @@ probe_rule = rule(
     let build = workspace.join("BUILD.bazel");
     write(
         &build,
-        r#"load(":defs.bzl", "demo_toolchain_impl", "probe_rule")
+        r#"load(":defs.bzl", "demo_toolchain_impl", "dependency_rule", "root_rule")
 
 platform(name = "platform")
 toolchain_type(name = "demo_type")
@@ -5081,7 +5095,10 @@ toolchain(
     toolchain = ":demo_impl",
     toolchain_type = ":demo_type",
 )
-probe_rule(name = "probe")
+dependency_rule(name = "shared")
+dependency_rule(name = "left", deps = [":shared"])
+dependency_rule(name = "right", deps = [":shared"])
+root_rule(name = "root", deps = [":left", ":right"])
 "#,
     );
 
@@ -5098,54 +5115,66 @@ probe_rule(name = "probe")
         String::from_utf8(output.stdout.clone()).unwrap()
     };
 
-    let one_shot = run(&["aquery", "//:probe"]);
+    let one_shot = run(&["aquery", "//:root"]);
     let one_shot_text = accepted(&one_shot);
-    let explicit = run(&["aquery", "//:probe", "--output=text"]);
+    let explicit = run(&["aquery", "//:root", "--output=text"]);
     assert_eq!(accepted(&explicit), one_shot_text);
-    assert!(one_shot_text.starts_with("action 'Writing file probe.txt'\n"));
-    assert!(one_shot_text.contains("  Mnemonic: FileWrite\n"));
-    assert!(one_shot_text.contains("  Target: //:probe\n"));
-    assert!(one_shot_text.contains("  Execution platform: //:platform\n"));
+    assert!(one_shot_text.starts_with("action 'Writing file z-root.txt'\n"));
+    assert!(one_shot_text.find("z-root.txt").unwrap() < one_shot_text.find("a-root.txt").unwrap());
+    assert_eq!(one_shot_text.matches("action '").count(), 2);
+    assert_eq!(one_shot_text.matches("  Target: //:root\n").count(), 2);
+    assert_eq!(
+        one_shot_text
+            .matches("  Execution platform: //:platform\n")
+            .count(),
+        2
+    );
+    for excluded in ["left.txt", "right.txt", "shared.txt"] {
+        assert!(!one_shot_text.contains(excluded), "{one_shot_text}");
+    }
+    assert_eq!(one_shot_text.matches("\n\n").count(), 2);
     assert!(one_shot_text.ends_with("  IsExecutable: false\n\n"));
     assert!(!one_shot_text.ends_with("\n\n\n"));
 
-    let daemon = run(&[output_base_arg.as_str(), "aquery", "//:probe"]);
+    let daemon = run(&[output_base_arg.as_str(), "aquery", "//:root"]);
     let baseline = accepted(&daemon);
     assert_eq!(baseline, one_shot_text);
     let baseline_pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
-    let token = |stdout: &str| {
+    let tokens = |stdout: &str| {
         stdout
             .lines()
-            .find_map(|line| line.strip_prefix("  SlugActionToken: "))
-            .unwrap()
-            .to_owned()
+            .filter_map(|line| line.strip_prefix("  SlugActionToken: "))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
     };
-    let baseline_token = token(&baseline);
+    let baseline_tokens = tokens(&baseline);
+    assert_eq!(baseline_tokens.len(), 2);
 
     let source = std::fs::read_to_string(&defs).unwrap();
-    write(
-        &defs,
-        &source.replace(
-            r#"ctx.actions.write(out, "content-A")"#,
-            r#"ctx.actions.write(out, "content-B")"#,
-        ),
-    );
+    let order_a = "    ctx.actions.write(z, \"z\")\n    ctx.actions.write(a, \"a\")";
+    let order_b = "    ctx.actions.write(a, \"a\")\n    ctx.actions.write(z, \"z\")";
+    assert!(source.contains(order_a));
+    write(&defs, &source.replace(order_a, order_b));
     let edited = accepted(&run(&[
         output_base_arg.as_str(),
         "aquery",
         "--output=text",
-        "//:probe",
+        "//:root",
     ]));
-    assert_ne!(token(&edited), baseline_token);
+    assert!(edited.find("a-root.txt").unwrap() < edited.find("z-root.txt").unwrap());
+    assert_eq!(
+        tokens(&edited),
+        vec![baseline_tokens[1].clone(), baseline_tokens[0].clone()]
+    );
     assert_eq!(
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         baseline_pid
     );
 
     write(&defs, &source);
-    let restored = accepted(&run(&[output_base_arg.as_str(), "aquery", "//:probe"]));
+    let restored = accepted(&run(&[output_base_arg.as_str(), "aquery", "//:root"]));
     assert_eq!(restored, baseline);
-    assert_eq!(token(&restored), baseline_token);
+    assert_eq!(tokens(&restored), baseline_tokens);
     assert_eq!(
         std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap(),
         baseline_pid

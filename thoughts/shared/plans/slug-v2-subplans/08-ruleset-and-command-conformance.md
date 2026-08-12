@@ -3933,3 +3933,55 @@ Independent design review returned `ACCEPT`: direct-literal root ownership and
 declaration-list order are source-backed, concurrent-map cross-owner order is
 correctly deferred, and the A/B/A plus diamond boundary evidence, caps,
 negative surface, and retained-daemon proof are sufficient.
+## FileWrite aquery root-local order implementation accepted (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-root-local-order-oracle-implementation` is
+**ACCEPT**. A direct main-repository literal now emits every supported
+FileWrite action owned by its sole requested analyzed target in retained
+declaration order. The selector reads that requested analysis separately from
+the build action closure; dependency and semantic-support actions remain
+unemitted, while each root action still resolves its selected platform and
+constraint facts through the complete closure. Zero or multiple requested
+analyses, zero root actions, unsupported root actions, and every existing
+semantic-integrity failure remain closed runtime errors.
+
+The text container appends the accepted formatter block and two LF bytes for
+each root action without sorting. The prior one-action output is byte-for-byte
+unchanged. Per-root declaration order, literal dependency exclusion, block
+shape, and framing are exact Bazel 9.2 behavior for this slice.
+Configuration/output-root and `SlugActionToken` bytes, progress silence,
+invalidation counts, and diagnostics remain Slug-native. Cross-owner order,
+`deps()` activation, aspects, multiple roots/configurations, other action
+kinds/formats, contents, and exact Bazel checksum/ActionKey bytes remain
+unsupported.
+
+The new five-file `filewrite-aquery-root-order` fixture passes on pinned Bazel
+9.2 and records retained-server A/B/A declaration order, exactly two literal
+root blocks, dependency exclusion, and order-agnostic diamond owner
+membership. The protected `action-query-identity-evidence` fixture also
+passes. Focused core and CLI tests prove root-only/full-closure selection,
+default/explicit and one-shot/daemon equality, per-block framing, dependency
+exclusion, A/B/A token/order restoration, and stable daemon PID. Direct
+`slug_commands_v2`, `slug_server_v2`, and `slug_cli_v2` compile checks,
+rustfmt, and diff checks pass with no stale `slugd`.
+
+Rust growth is 12 production, 73 tests, and 85 total net lines, within the
+70/220/290 caps. The fixture is exactly five files and 255 text lines, within
+the 350-line cap. Archive layout checks pass; the known checkout-baseline
+absence of the V1 archive tag, branch, and recorded commit remains unchanged.
+
+
+Independent final review returned `ACCEPT`: sole-root ownership and retained
+declaration order are preserved while semantic support resolves through the
+complete closure; the A/B/A and diamond evidence discriminates the claimed
+exact surface, and cross-owner `deps()` semantics remain correctly deferred.
+Run next only `WP-8-m5-filewrite-aquery-deps-owner-set-design`, design-only.
+Determine whether the existing query AST, configured action closure, and the
+accepted order-agnostic Bazel 9.2 diamond evidence can support an exact
+`deps()` FileWrite owner set with an explicitly Slug-native deterministic
+cross-owner order. Freeze query membership, semantic-support filtering,
+deduplication, order classification, errors, allowlist, caps, and lifecycle
+proof before selecting one successor. Add no Rust, fixture/expected evidence,
+Bazel execution, command/wire fields, action reconstruction, DICE state,
+execution, other action kinds/formats, identity-byte work, JVM/Java, REAPI, or
+CI.
