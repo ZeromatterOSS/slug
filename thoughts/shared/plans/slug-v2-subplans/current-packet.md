@@ -1,14 +1,33 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-repository-rule-call-protocol-design`
-Milestone: M7 repository-rule definition/capture prerequisite design
+Packet: `WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
+Milestone: M7 repository-rule definition/capture prerequisite implementation
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: design one loading-owned `repository_rule` definition/export and
-module-extension call-capture protocol before RepoSpec construction or
-generated-repository existence validation.
+Result: implement the accepted loading-owned `repository_rule`
+definition/export and module-extension call-capture protocol before RepoSpec
+construction or generated-repository existence validation.
 
-## Active docs-only design contract
+## Active implementation contract
+
+Independent design review accepts `7a49b5cd`. Implement only
+`WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
+against that base in `app/slug_loading_v2/src/package.rs`, existing private
+`module_extension.rs`, one new private
+`module_extension_repository_rule.rs`, and `lib.rs` solely for its private
+declaration, plus canonical/current/Stage 4/Stage 5 bookkeeping. Caps are 650
+production, 850 tests, and 1,500 total formatted net Rust lines. Preserve the
+complete owner, signature, schema, export, capture ordering, provenance,
+identity, lifetime, event, proof, exact/Slug-native/deferred, and REPLAN
+contract below. No fifth Rust path, new key/lock, retained Starlark lifetime,
+schema application, repository implementation/context, RepoSpec/generated
+state, I/O, materializer, lockfile, consumer/API/JVM breadth, or cap excess.
+
+## Accepted docs-only design contract
+
+This section and everything below are historical accepted design context only,
+grant no independent file, action, cap, or schedule authority, and are
+interpreted solely through the active implementation contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported

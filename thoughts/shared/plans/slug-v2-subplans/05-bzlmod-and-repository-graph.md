@@ -2588,3 +2588,10 @@ Stage 5 production remains unchanged. Schema application, generated canonical
 names/RepoSpecs/existence, override/inject finalization, selected mappings,
 lockfile, repository/materialization, consumer/API, and JVM work remain
 deferred, and no reverse dependency or second projection/key is authorized.
+
+Independent review accepts `7a49b5cd` and activates only
+`WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
+in the four loading paths plus canonical/current/Stage 4/Stage 5 under
+650/850/1,500. Stage 5 production remains unchanged. Preserve the accepted
+hidden prepared-input boundary and every no-Bzlmod-mutation, no-reverse-edge,
+no-generated-state, no-lockfile/materializer/consumer/API/JVM stop.

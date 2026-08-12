@@ -2538,3 +2538,17 @@ new key/lock, retained lifetime state, schema application, repository
 implementation/context, RepoSpec/generated existence/mapping, I/O,
 materialization, lockfile, consumer/API/JVM breadth, or cap excess is
 `REPLAN`.
+
+### Repository-rule call-protocol implementation activated (2026-08-12)
+
+Independent review accepts the completed design in `7a49b5cd`. Run only
+`WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
+against that base in `package.rs`, existing private `module_extension.rs`,
+one new private `module_extension_repository_rule.rs`, and `lib.rs` solely
+for its private declaration, plus four-plan bookkeeping. Caps are 650
+production/850 test/1,500 total. Preserve the existing sole invocation key and
+all-request preflight; the exact admitted definition/export/scalar-capture
+order; ordered heap-free call/error identity; lifetime/event boundaries; the
+complete proof; and every generated-state, schema, I/O, public, and JVM stop.
+A fifth Rust path, new key/lock, retained Starlark value, RepoSpec or repository
+execution/context, behavior expansion, or cap excess is `REPLAN`.
