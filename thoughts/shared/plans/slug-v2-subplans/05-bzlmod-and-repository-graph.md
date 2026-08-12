@@ -1188,3 +1188,14 @@ post-selection mappings/extensions/registrations/RepoSpecs/yanked/hashes,
 lockfile writing, package/Bzl, configured toolchains, commands, Test, and
 execution remain fail-closed/deferred. No Rust is authorized until this
 smaller design is independently accepted.
+
+### Host discovered-module owner design accepted (2026-08-12)
+
+Independent review accepts a single-file built-in/registry-only leaf.
+Root files and explicit override category are computed before embedded lookup;
+versioned registry preparation supplies selected bytes and complete ordered
+attempt/hash provenance to the existing evaluator. Nonregistry, command
+override, recursion/MVS, post-selection, and consumer breadth remain
+fail-closed/deferred. Implement next only
+`WP-5-host-discovered-module-owner-implementation` in
+`source_preparation.rs` under the canonical packet's caps and stops.

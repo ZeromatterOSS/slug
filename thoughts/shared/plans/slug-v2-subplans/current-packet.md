@@ -1,7 +1,7 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-discovered-module-owner-design`
-Milestone: cross-stage M7 prerequisite design
+Packet: `WP-5-host-discovered-module-owner-implementation`
+Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
 Result: freeze one Host per-module discovery/evaluation value for the embedded
 and registry-backed module categories before selected-graph ownership.
@@ -32,7 +32,7 @@ nonregistry, archive/Git, or explicit built-in override discovery. Normalized
 command `--override_module` state is also absent. Reusing the legacy
 handwritten `ResolvedGraph` remains forbidden.
 
-## Active design contract
+## Accepted design contract
 
 Freeze one crate-private Host discovered-module key/value that joins the
 complete evaluator with typed source provenance. Its key identity is a
@@ -107,3 +107,48 @@ the embedded leaf before override classification, invented nonregistry
 breadth, legacy `ResolvedGraph` reuse, root/selected graph or consumer edge,
 untracked IO, lock-held DICE compute, public surface, JVM/Java, fifth file, or
 cap excess.
+
+Independent source and latest-diff review accept the built-in/registry-only
+leaf. Existing source-preparation ownership already provides root-first
+override classification, selected-registry bytes and ordered attempt/hash
+provenance, the complete evaluator, event capture, and same-file DICE test
+infrastructure. No visibility or module-boundary widening is required.
+
+## Active implementation contract
+
+Implement only in `app/slug_bzlmod_v2/src/source_preparation.rs`. Add a
+crate-private `HostDiscoveredModuleKey` keyed by normalized workspace and
+`NonrootModuleKey`, a crate-private complete value, typed provenance, and
+typed errors. Compute `RootModuleFilesKey` first. For unoverridden
+`bazel_tools@<empty>`, compute the current `BuiltinBazelToolsModuleKey` and
+project its full value. For a versioned request with no nonregistry override,
+compute `ModuleSourcePreparationKey`; accept only its registry variant and
+evaluate the selected bytes with the existing complete closure evaluator and
+no includes. Preserve selected registry and all ordered attempts.
+
+Explicit `bazel_tools` overrides fail before the built-in key is computed.
+All nonregistry preparations, empty non-built-in versions, direct-local
+routes, and unsupported include/evaluation cases return typed terminals.
+Store one event batch only when capture is enabled and the wrapper completes.
+`Need` is invalid; complete values and errors compare structurally. Add no
+consumer.
+
+Cap formatted net growth at 190 production lines, 360 test lines, and 550
+total. Add no file, public export, Cargo/BUILD metadata, dependency, utility,
+lock, cache, interner, process-global state, fixture, or command behavior.
+Focused tests must prove exact built-in and registry provenance, selected
+registry A/B/A, ordered absence/hash attempts, root-first explicit built-in
+override bypass through activation tracking, nonregistry/empty/include typed
+failures, separately computed equality, cold `Evaluated` then warm `Reused`,
+event/no-event behavior, invalid Need, and structural absence of graph/MVS,
+mapping, lockfile-writer, package, or consumer edges.
+
+Run serially `cargo test -p slug_bzlmod_v2 host_discovered_module`, the full
+`slug_bzlmod_v2` suite, downstream `cargo check -p slug_loading_v2` and
+`cargo check -p slug_core_v2`, `cargo fmt --all -- --check`, and
+`git diff --check`. Also run exact-scope/cap, no-public-surface,
+credential-pattern, active-layout archive, and forbidden-edge scans. Obtain
+independent latest-diff implementation review before commit. Stop with
+`REPLAN` on evaluator semantic changes, lost provenance, built-in activation
+before root override classification, admitted nonregistry/command breadth,
+second graph, consumer, second file, or cap excess.

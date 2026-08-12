@@ -4656,3 +4656,8 @@ per-module discovery/evaluation value. Stage 8 stays parked while only
 `WP-5-host-discovered-module-owner-design` freezes the embedded/registry
 leaf. No nonregistry, graph/MVS, mapping, catalog, package/Bzl, toolchain,
 TestRunner, execution, result, coverage, or BEP behavior is authorized.
+
+The discovered-module design is accepted for one callerless embedded/registry
+leaf. Stage 8 continues to wait while
+`WP-5-host-discovered-module-owner-implementation` lands no package,
+toolchain, Test, execution, result, coverage, or BEP consumer.
