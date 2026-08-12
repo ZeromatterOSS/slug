@@ -1,10 +1,56 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-module-graph-owner-implementation-r2`
-Milestone: cross-stage M7 prerequisite implementation
+Packet: `WP-5-host-selected-module-route-owner-design`
+Milestone: cross-stage M7 prerequisite design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: complete and prove the accepted callerless selected-module graph owner
-within the corrected two-file boundary.
+Result: freeze the first truthful post-selection Host repository
+identity/mapping/route owner over the accepted selected graph, or return
+`REPLAN` at the first missing prerequisite.
+
+## Active design contract
+
+Audit one crate-private post-selection owner that can project the accepted
+`HostSelectedModuleGraph` into Host repository identities and contextual
+apparent-name mappings without activating loading. The audit must:
+
+- pin Bazel 9.2 canonical repository naming for the root, selected ordinary
+  modules, the empty-version built-in, registry modules, command/root
+  nonregistry overrides, multiple-version disambiguation, and collisions;
+- identify whether one selected-graph value contains every input needed to
+  derive root and nonroot contextual repository mappings, selected effective
+  RepoSpecs/routes, and exact dependency apparent-name ownership without
+  consulting the legacy `resolution.rs::ResolvedGraph`;
+- separate canonical repository identity, apparent mapping identity, source
+  provenance, effective override provenance, and physical materialization
+  identity, preserving every admitted field structurally in DICE equality;
+- decide the smallest future key/value/error seam and the integration boundary
+  with `RootRepositoryRouteKey`, while retaining current protected direct-local
+  and built-in behavior until a reviewed successor explicitly converts it;
+- classify extension-generated repositories, extension unique names and
+  overrides, source.json/selected RepoSpec work, lockfile products, package
+  loading, and public consumers as exact, Slug-native, or deferred rather than
+  inventing post-selection state; and
+- freeze a bounded implementation successor or return `REPLAN` if canonical
+  naming, selected RepoSpec derivation, mapping collision handling, or
+  contextual module identity requires another missing leaf.
+
+This design packet may edit only:
+
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest; and
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
+
+The root may inspect pinned Bazel 9.2 source and live Rust owners read-only.
+Cap net manifest growth at 380 lines, owner-plan growth at 320 lines,
+canonical growth at 40 lines, and 740 total. No Rust, Cargo/BUILD, public API,
+wire/schema, fixture/oracle, legacy graph activation, route conversion,
+mapping consumer, loading, command, analysis, execution, or JVM/Java work is
+authorized. Obtain fresh independent reserved-architecture review.
+
+Return `REPLAN` on a missing semantic owner or required fourth file. Return
+`REVISE` on one bounded design correction; a second material correction is
+`REPLAN`. No post-selection production work may begin before independent
+`ACCEPT` and explicit successor activation.
 
 ## Accepted correction contract
 
@@ -256,9 +302,12 @@ and unequal. Captured evaluation events remain owned by the computed root and
 discovered leaves; the selected graph stores no duplicate batch and introduces
 no consumer/publication edge.
 
-## Active implementation contract
+## Accepted implementation contract
 
-Resume the retained unaccepted implementation only in:
+This implementation contract is historical acceptance evidence only and
+grants no independent file, action, cap, or scheduling authority.
+
+The accepted predecessor implemented only in:
 
 - new `app/slug_bzlmod_v2/src/selected_graph.rs`; and
 - `app/slug_bzlmod_v2/src/lib.rs` for one private module declaration.

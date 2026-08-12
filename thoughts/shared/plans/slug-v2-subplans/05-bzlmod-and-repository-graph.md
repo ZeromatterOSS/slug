@@ -1623,3 +1623,36 @@ unaccepted Rust diff, apply the typed leaf-error correction, complete the
 frozen proof matrix, and obtain independent implementation review. All prior
 third-file, public, second-graph/merge, recursive-DICE, lock, raw-observation,
 post-selection, and cap stops remain terminal.
+
+### Selected module graph owner implementation accepted (2026-08-12)
+
+Commit `216a0be8` accepts the sole callerless Host discovery-to-MVS selected
+graph. The private owner composes root files, normalized command/effective
+overrides, exact `BazelModuleVersion` keys, and typed discovered-module leaves
+without a second merge, source-preparation path, recursive DICE graph, lock,
+raw observation, or public consumer. It retains roots-first resolved and
+unpruned Arc-backed entries, transformed and original ordered dependencies,
+fulfilled nodep edges, complete evaluated modules, and structural source
+provenance.
+
+The owner performs first-seen breadth-first horizons, complete typed
+error-over-Need precedence including incompatible Need unions, whole-graph
+nodep fixed points, highest-version selection, multiple-version existence and
+lowest-ceiling rewrites, validation including nodep, and final BFS excluding
+nodep reachability. Default built-in, command bypass, explicit-root failure,
+cycles/diamonds, requested-edge retention, normalized spelling, semantic
+A/B/A, Need invalidity, and cold/warm behavior are discriminated.
+
+Formatted growth is 907 production, 686 tests, and 1,593 total within the
+corrected 920/1,050/1,970 caps. Twelve focused tests, all 315 owner unit tests
+plus integrations/docs, the full loading suite, formatting/diff/scope scans,
+the known missing-V1-ref archive classification, AI cleanup, and independent
+implementation review pass.
+
+Run next only `WP-5-host-selected-module-route-owner-design`. Audit the first
+post-selection canonical repository identity, contextual mapping, selected
+route/RepoSpec, and `RootRepositoryRouteKey` composition boundary. Freeze a
+bounded future owner or return `REPLAN` at the first missing semantic leaf.
+No Rust, legacy graph activation, route conversion, loading consumer, mapping
+consumer, extension execution, or public API is authorized before independent
+design acceptance.
