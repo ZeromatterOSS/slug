@@ -1748,3 +1748,26 @@ A/B/A and lifecycle proof; full owner/dependent validation; structural scope;
 and independent implementation review. All frozen third-file, public, legacy,
 second-I/O, raw-I/O, route/materializer/loading/consumer, and cap stops remain
 terminal.
+
+### Selected registry RepoSpec implementation cap REPLAN (2026-08-12)
+
+The first compiling two-file implementation is retained but unaccepted at 980
+formatted production lines before tests, exceeding the frozen cap by 200.
+Independent architecture review found no safe mechanical reduction of that
+size: typed JSON validation, archive/local/Git RepoSpec construction, selected
+DICE orchestration, predecessor errors, and retained identity are materially
+separate.
+
+Two exact corrections are required before implementation acceptance. Pinned
+`IndexRegistry.grabJson` treats whitespace-only bazel_registry.json as absent.
+Pinned local_path projection lexically normalizes through PathFragment and
+anchors a relative module base to the decoded path of a file-registry URI; raw
+string concatenation and stripping a literal file:// prefix are insufficient.
+
+Run next only the docs-only
+`WP-5-host-selected-registry-repo-spec-owner-implementation-r2-cap-design`.
+Freeze the same two Rust files at 1,020 production/1,050 test/2,070 total caps,
+require whitespace/dot-separator/encoded-file-URI discriminators, and preserve
+every existing behavior, proof, and terminal stop. The retained Rust diff is
+unaccepted; no Rust may resume until independent correction acceptance and
+explicit r2 activation.

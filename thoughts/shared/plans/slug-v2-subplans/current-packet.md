@@ -1,12 +1,57 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-registry-repo-spec-owner-implementation`
-Milestone: cross-stage M7 prerequisite implementation
+Packet: `WP-5-host-selected-registry-repo-spec-owner-implementation-r2-cap-design`
+Milestone: cross-stage M7 prerequisite correction design
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement and prove the accepted callerless selected registry RepoSpec
-owner without activating routes, materialization, loading, or consumers.
+Result: correct the frozen production cap and two pinned local/registry JSON
+semantics before the selected registry RepoSpec implementation may resume.
 
-## Active implementation contract
+## Active correction contract
+
+The first compiling two-file implementation is retained but unaccepted at 979
+formatted production lines in `selected_repo_spec.rs` plus one `lib.rs`
+declaration: 980 production lines, 200 above the frozen 780-line cap before
+tests. Independent architecture review found no credible low-risk reduction of
+that size; the typed JSON projection, three RepoSpec builders, DICE
+aggregation, predecessor errors, and retained identities are distinct.
+
+This docs-only correction may edit only:
+
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest; and
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
+
+Freeze the same two-file implementation as
+`WP-5-host-selected-registry-repo-spec-owner-implementation-r2` at corrected
+formatted net caps of 1,020 production, 1,050 tests, and 2,070 total. The
+increase grants no third file, owner, policy, source type, consumer, or
+behavior family.
+
+Also freeze two bounded semantic corrections before r2 acceptance:
+
+- treat whitespace-only `bazel_registry.json` as absent, matching pinned
+  `IndexRegistry.grabJson` and not merely an empty byte slice; and
+- project local_path through pinned lexical `PathFragment.create(path).toString()`
+  semantics, and parse/decode the selected `file:` registry URI path before
+  anchoring a relative module base. Raw concatenation and
+  `strip_prefix("file://")` are forbidden.
+
+Require focused discriminators for blank/whitespace registry JSON,
+dot/repeated-separator local paths, and percent-encoded file-registry paths.
+All accepted source projection, identity, selected-only, error-over-Need,
+lifecycle, allowlist, and terminal stops remain unchanged.
+
+Cap this correction at 140 manifest lines, 100 owner-plan lines, 20 canonical
+lines, and 260 total. No Rust, test, Cargo/BUILD, registry I/O, route,
+materialization, loading, or consumer action is authorized until independent
+correction acceptance and explicit r2 activation. Return `REPLAN` on any
+semantic expansion or fourth doc; `REVISE` on one bounded bookkeeping
+correction; a second material correction is `REPLAN`.
+
+## Predecessor implementation contract
+
+This predecessor contract is historical context only. It grants no file,
+action, cap, or scheduling authority while the correction is active.
 
 Implement exactly the independently accepted design in commit `1b4b4996`.
 This packet may edit only:
