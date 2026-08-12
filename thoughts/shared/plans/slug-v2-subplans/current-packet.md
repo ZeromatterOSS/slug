@@ -1,10 +1,21 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-builtin-bazel-tools-typed-source-kind-design`
-Milestone: cross-stage M7 prerequisite design
+Packet: `WP-5-builtin-bazel-tools-repository-owner-implementation-retry`
+Milestone: cross-stage M7 prerequisite implementation retry
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the typed source-kind/error boundary for the immutable
+Result: implement the accepted file-only source-kind/error boundary for the immutable
 `@@bazel_tools` catalog before retrying its route/source owner.
+
+## Active implementation retry
+
+Implement exactly the accepted **Frozen source-kind decision** and
+**Reviewed retry contract** below. Their file/asset allowlist, caps, proof, and
+stops are the sole authorization. Independent Sol review accepted the file-only
+key: its type encodes expected File, a source-known directory is
+`WrongKind { actual: Directory }`, and no directory-success, missing, or
+generic expected-kind branch is admitted.
+
+Root owns all edits, serial validation, cleanup, integration, and commit.
 
 ## Predecessor REPLAN
 
@@ -81,3 +92,91 @@ review because this corrects a public DICE/source identity contract.
 One bounded correction is allowed; a second material miss is `REPLAN`. At
 `ACCEPT`, schedule only the reviewed retry implementation, commit, and
 continue.
+
+## Frozen source-kind decision
+
+Choose option 1, the file-only key. Every live consumer is file-specific:
+repository package loading requests a selected BUILD file; repo and ignore
+owners request `REPO.bazel` and `.bazelignore`; repository Bzl loading
+requests the label's source file; core requests an exported source file.
+Existing Host behavior already returns
+`RepositorySourceFileError::WrongKind { actual: Directory }` to these callers,
+and no live consumer asks this boundary to return a directory value.
+
+Therefore `BuiltinBazelToolsSourceFileKey(snapshot, path)` structurally means
+read this regular file; expected File is encoded by the key type and need not
+be a redundant field. Its public result algebra is:
+
+- `Ok(BuiltinBazelToolsSourceFileValue { path, bytes, sha256, executable })`
+  for a catalog file whose integrity metadata matches;
+- `InvalidPath` for invalid lexical paths;
+- `WrongKind { path, actual: Directory }` when the normalized path is a
+  source-known strict directory prefix;
+- `UnsupportedCatalog { path }` for every other normalized unlisted path; and
+- `Integrity { path, expected_sha256, actual_sha256 }` for a listed file
+  whose checked-in bytes disagree with the frozen metadata.
+
+There is no separate `Directory` terminal and no exact missing-file terminal.
+Precedence is invalid lexical path, exact catalog file plus integrity, known
+strict directory prefix, then unsupported catalog. Directory knowledge derives
+only from sorted catalog prefixes; there is no enumeration, directory value,
+Host observation, or filesystem lookup.
+
+Reject option 2. An `ExpectedKind` field and directory-success value would add
+a public identity branch with no consumer or observable result, invite false
+completeness claims for the partial catalog, and duplicate the file-specific
+type's expected kind. A future admitted directory consumer must design its own
+typed boundary rather than widen this key implicitly.
+
+The source key derives structural equality/hash from snapshot and normalized
+path. Complete successes and every typed terminal are valid and compare by
+their complete structural value; no Need is possible because the catalog is
+compiled immutable input. The returned Arc bytes, exact SHA-256, executable
+bit, and path all participate in equality. Manifest/snapshot identity remains
+on the structurally distinct `RootRepositorySource::BuiltinBazelTools` route.
+The route key still computes the root carrier first. Existing Host
+materialization/source code must return an explicit unsupported-owner error
+before any `repo_spec()`, Host observation, or materialization request.
+
+Use existing `CompactString`, immutable `Arc<[u8]>`, `Allocative`, and
+`Dupe` only where every field is cheap-clone. Do not derive `Dupe` across
+`CompactString`; ordinary Clone is correct for those values. No global cache,
+interner, weak identity hash, lock, or Stage 9 import is authorized.
+
+## Reviewed retry contract
+
+On `ACCEPT`, schedule only
+`WP-5-builtin-bazel-tools-repository-owner-implementation-retry`. It may edit:
+
+- `app/slug_bzlmod_v2/{BUILD.bazel,src/lib.rs,src/host_module.rs,
+  src/source_preparation.rs}`;
+- one new `app/slug_bzlmod_v2/src/builtin_repository.rs`;
+- one new `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`;
+- exactly the seven reviewed assets under
+  `app/slug_bzlmod_v2/builtin/bazel_tools/`; and
+- canonical/current and Stage 4/5/8 bookkeeping.
+
+Cap production Rust at 420 net lines, tests at 360, assets at seven files/64
+KiB, BUILD metadata at 20, and bookkeeping at 180. Add no generic directory
+key/value, built-in consumer dispatch, package/loading/core production edit,
+registry/materializer route, runtime source input, generated source, fixture,
+Cargo/dependency, schema/wire, command/Test/REAPI/BEP behavior, JVM/Java,
+Windows branch, second snapshot, Stage 9/10, or workspace file.
+
+Required proof is: exact SHA-256 and executable-state goldens for all seven
+files; golden manifest framing/digest; snapshot/route structural
+discrimination; reserved apparent-to-canonical routing after root success
+while root Need/error, unknown repo, and local override behavior remain
+unchanged; valid file, invalid path, source-known directory WrongKind,
+unsupported catalog, and exercised integrity failure; Host rejection before
+`repo_spec()` with no observation/materialization; two-workspace and root
+A/B/A byte invariance; focused owner tests; full `slug_bzlmod_v2`; direct
+`slug_loading_v2` and `slug_core_v2` tests with documented baseline
+classification; formatting, pinned-archive byte/mode comparison, archive
+active-layout, source/structure, credential, cap, and diff checks; cleanup
+review; and independent Sol final review.
+
+Stop and `REPLAN` rather than adding expected-kind identity, directory
+success, a distinct Directory error, missing semantics, consumer dispatch,
+Host reads, or package behavior. One bounded implementation correction is
+allowed; a second material miss is `REPLAN`.
