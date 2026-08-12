@@ -254,6 +254,14 @@ pub use root_bootstrap::RootModuleBootstrapApplyResult;
 pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequest;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequests;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsKey;
 pub use source_preparation::HostRepositorySourceFileKey;
 pub use source_preparation::HostRepositorySourceFileValue;
 pub use source_preparation::ModuleSourcePreparation;

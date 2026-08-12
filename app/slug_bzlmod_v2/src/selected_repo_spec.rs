@@ -1775,6 +1775,203 @@ impl Key for HostSelectedExtensionMappingsKey {
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionDefinitionLoadRequest {
+    bzl_file: CanonicalLabel,
+    extension_name: CompactString,
+    mapping: HostSelectedRepositoryMapping,
+}
+
+impl HostSelectedExtensionDefinitionLoadRequest {
+    pub fn parts(
+        &self,
+    ) -> (
+        &CanonicalLabel,
+        &str,
+        &CanonicalRepoName,
+        &SmallMap<ApparentRepoName, CanonicalRepoName>,
+    ) {
+        (
+            &self.bzl_file,
+            &self.extension_name,
+            &self.mapping.context_repo,
+            &self.mapping.entries,
+        )
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionDefinitionLoadRequests {
+    workspace: NormalizedAbsolutePath,
+    predecessor: Arc<HostSelectedExtensionMappings>,
+    requests: Arc<[HostSelectedExtensionDefinitionLoadRequest]>,
+}
+
+impl HostSelectedExtensionDefinitionLoadRequests {
+    pub fn parts(
+        &self,
+    ) -> (
+        &NormalizedAbsolutePath,
+        &[HostSelectedExtensionDefinitionLoadRequest],
+    ) {
+        (&self.workspace, &self.requests)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostSelectedExtensionDefinitionLoadRequestsErrorInner {
+    Mappings(HostSelectedExtensionMappingsError),
+    MappingsCompute(CompactString),
+    Unsupported {
+        owner: HostGraphModuleKey,
+        id: HostSelectedExtensionId,
+    },
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionDefinitionLoadRequestsError(
+    HostSelectedExtensionDefinitionLoadRequestsErrorInner,
+);
+
+impl fmt::Display for HostSelectedExtensionDefinitionLoadRequestsError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl std::error::Error for HostSelectedExtensionDefinitionLoadRequestsError {}
+
+fn selected_extension_definition_load_requests(
+    workspace: NormalizedAbsolutePath,
+    predecessor: Arc<HostSelectedExtensionMappings>,
+) -> Result<
+    HostSelectedExtensionDefinitionLoadRequests,
+    HostSelectedExtensionDefinitionLoadRequestsError,
+> {
+    let root_mapping = predecessor
+        .routes
+        .entries
+        .iter()
+        .position(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
+        .and_then(|index| predecessor.mappings.get(index))
+        .expect("selected extension mappings retain the root mapping");
+    let unsupported = predecessor.usages.iter().find(|usage| {
+        !matches!(usage.owner, HostGraphModuleKey::Root)
+            || usage.id.isolation.is_some()
+            || !usage.id.bzl_file.package().repo().is_root()
+            || usage.id.extension_name.split_ascii_whitespace().count() != 1
+    });
+    if let Some(usage) = unsupported {
+        return Err(HostSelectedExtensionDefinitionLoadRequestsError(
+            HostSelectedExtensionDefinitionLoadRequestsErrorInner::Unsupported {
+                owner: usage.owner.clone(),
+                id: usage.id.clone(),
+            },
+        ));
+    }
+    let mut seen = SmallSet::new();
+    let requests = predecessor
+        .usages
+        .iter()
+        .filter(|usage| seen.insert(usage.id.clone()))
+        .map(|usage| HostSelectedExtensionDefinitionLoadRequest {
+            bzl_file: usage.id.bzl_file.clone(),
+            extension_name: usage.id.extension_name.clone(),
+            mapping: root_mapping.clone(),
+        })
+        .collect::<Arc<_>>();
+    Ok(HostSelectedExtensionDefinitionLoadRequests {
+        workspace,
+        predecessor,
+        requests,
+    })
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostSelectedExtensionDefinitionLoadRequestsKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostSelectedExtensionDefinitionLoadRequestsKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostSelectedExtensionDefinitionLoadRequestsKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-selected-extension-definition-load-requests:{}",
+            self.workspace
+        )
+    }
+}
+
+type DefinitionLoadRequestsOutcome = SourcePreparationOutcome<
+    Arc<
+        Result<
+            HostSelectedExtensionDefinitionLoadRequests,
+            HostSelectedExtensionDefinitionLoadRequestsError,
+        >,
+    >,
+>;
+
+#[async_trait]
+impl Key for HostSelectedExtensionDefinitionLoadRequestsKey {
+    type Value = DefinitionLoadRequestsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let predecessor = match ctx
+            .compute(&HostSelectedExtensionMappingsKey::new(
+                self.workspace.dupe(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(value) => Arc::new(value.clone()),
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostSelectedExtensionDefinitionLoadRequestsError(
+                            HostSelectedExtensionDefinitionLoadRequestsErrorInner::Mappings(
+                                error.clone(),
+                            ),
+                        ),
+                    )));
+                }
+            },
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostSelectedExtensionDefinitionLoadRequestsError(
+                        HostSelectedExtensionDefinitionLoadRequestsErrorInner::MappingsCompute(
+                            error.to_string().into(),
+                        ),
+                    ),
+                )));
+            }
+        };
+        SourcePreparationOutcome::Complete(Arc::new(selected_extension_definition_load_requests(
+            self.workspace.dupe(),
+            predecessor,
+        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
@@ -2144,6 +2341,21 @@ mod tests {
         real_transaction(dice, root, generation, &[], include_epoch)
             .await
             .compute(&HostSelectedExtensionMappingsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_real_definition_requests(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        include_epoch: bool,
+    ) -> <HostSelectedExtensionDefinitionLoadRequestsKey as Key>::Value {
+        real_transaction(dice, root, generation, &[], include_epoch)
+            .await
+            .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             ))
             .await
@@ -3081,6 +3293,77 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn pure_definition_requests_deduplicate_and_fail_closed() {
+        let routes = Arc::new(
+            selected_routes(
+                &route_graph([route_root([], Some("root_self"))]),
+                &HostSelectedRegistryRepoSpecs {
+                    entries: Arc::from([]),
+                },
+            )
+            .unwrap(),
+        );
+        let ordinary = selected_extension_mappings(
+            routes.clone(),
+            Arc::from([
+                root_usage(
+                    "//:ext.bzl",
+                    "extension",
+                    test_proxy("one", [("one", "generated")]),
+                    false,
+                    [],
+                ),
+                root_usage(
+                    "//:ext.bzl",
+                    "extension",
+                    test_proxy("two", [("two", "generated")]),
+                    false,
+                    [],
+                ),
+            ]),
+        )
+        .unwrap();
+        let value = selected_extension_definition_load_requests(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            Arc::new(ordinary),
+        )
+        .unwrap();
+        assert_eq!(value.requests.len(), 1);
+        assert_eq!(value.requests[0].extension_name, "extension");
+        assert_eq!(value.requests[0].bzl_file.to_string(), "@@//:ext.bzl");
+        assert_eq!(value.requests[0].mapping.context_repo.as_str(), "");
+        assert!(value.requests[0].mapping.entries.contains_key("one"));
+        assert!(value.requests[0].mapping.entries.contains_key("two"));
+
+        let unsupported = selected_extension_mappings(
+            routes,
+            Arc::from([root_usage(
+                "//:ext.bzl",
+                "extension",
+                test_proxy("isolated", []),
+                true,
+                [],
+            )]),
+        )
+        .unwrap();
+        assert!(matches!(
+            selected_extension_definition_load_requests(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                Arc::new(unsupported),
+            ),
+            Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                HostSelectedExtensionDefinitionLoadRequestsErrorInner::Unsupported {
+                    owner: HostGraphModuleKey::Root,
+                    id: HostSelectedExtensionId {
+                        isolation: Some(_),
+                        ..
+                    },
+                }
+            ))
+        ));
+    }
+
     #[tokio::test]
     async fn real_aggregate_selected_only_lifecycle_and_reuse() {
         const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
@@ -3377,6 +3660,104 @@ repo(name = "replacement")
     }
 
     #[tokio::test]
+    async fn real_definition_requests_reuse_reorder_and_restore() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let source = |reversed: bool| {
+            let usages = if reversed {
+                "b=use_extension('//:b.bzl','b')\nuse_repo(b,b_alias='repo')\n\
+                 a=use_extension('//:a.bzl','a')\nuse_repo(a,a_alias='repo')"
+            } else {
+                "a=use_extension('//:a.bzl','a')\nuse_repo(a,a_alias='repo')\n\
+                 b=use_extension('//:b.bzl','b')\nuse_repo(b,b_alias='repo')"
+            };
+            format!("module(name='bazel_tools', repo_name='root_self')\n{usages}\n")
+        };
+
+        let a = compute_real_definition_requests(&dice, &source(false), 40, true).await;
+        let warm = compute_real_definition_requests(&dice, &source(false), 40, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &warm
+        ));
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::validity(&a));
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("definition requests must complete")
+        };
+        let a_value = a_value.as_ref().as_ref().unwrap();
+        assert_eq!(a_value.requests.len(), 2);
+        assert_eq!(a_value.requests[0].extension_name, "a");
+        assert_eq!(a_value.requests[1].extension_name, "b");
+        assert_eq!(a_value.workspace.as_path(), Path::new(WORKSPACE));
+        assert_eq!(
+            a_value.requests[0]
+                .mapping
+                .entries
+                .get("root_self")
+                .unwrap()
+                .as_str(),
+            ""
+        );
+
+        let b = compute_real_definition_requests(&dice, &source(true), 41, true).await;
+        let SourcePreparationOutcome::Complete(b_value) = &b else {
+            panic!("reordered requests must complete")
+        };
+        assert_eq!(
+            b_value.as_ref().as_ref().unwrap().requests[0].extension_name,
+            "b"
+        );
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &b
+        ));
+        let restored = compute_real_definition_requests(&dice, &source(false), 42, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &restored
+        ));
+        let absent = compute_real_definition_requests(
+            &dice,
+            "module(name='bazel_tools', repo_name='root_self')\n",
+            43,
+            true,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(absent_value) = &absent else {
+            panic!("absent requests must complete")
+        };
+        assert!(absent_value.as_ref().as_ref().unwrap().requests.is_empty());
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &absent
+        ));
+        let changed = compute_real_definition_requests(
+            &dice,
+            "module(name='bazel_tools', repo_name='root_self')\n\
+             c=use_extension('//:changed.bzl','changed')\n\
+             use_repo(c,changed_alias='repo')\n",
+            44,
+            true,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(changed_value) = &changed else {
+            panic!("changed requests must complete")
+        };
+        let changed_request = &changed_value.as_ref().as_ref().unwrap().requests[0];
+        assert_eq!(changed_request.parts().0.to_string(), "@@//:changed.bzl");
+        assert_eq!(changed_request.parts().1, "changed");
+        assert!(changed_request.parts().3.contains_key("changed_alias"));
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &changed
+        ));
+        let restored_again =
+            compute_real_definition_requests(&dice, &source(false), 45, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a,
+            &restored_again
+        ));
+        assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
     async fn real_selected_extensions_retain_nonroot_and_collision_order() {
         let io = Arc::new(TrackingRegistryIo::new([]));
         let mut builder = Dice::builder();
@@ -3472,6 +3853,58 @@ repo(name = "replacement")
                                 module: HostGraphModuleKey::Module { name, .. },
                                 ..
                             }
+                        )
+                    )) if name == "missing"
+                )
+        ));
+    }
+
+    #[tokio::test]
+    async fn real_definition_request_need_and_error_preserve_predecessor() {
+        let io = Arc::new(TrackingRegistryIo::new([(
+            "https://registry.invalid/modules/dep/1/MODULE.bazel",
+            b"module(name='dep', version='1')\n" as &[u8],
+        )]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let need = compute_real_definition_requests(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n",
+            50,
+            false,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::validity(
+            &need
+        ));
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &need, &need
+        ));
+
+        let error = compute_real_definition_requests(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='missing', version='1')\n",
+            51,
+            true,
+        )
+        .await;
+        assert!(matches!(
+            error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                        HostSelectedExtensionDefinitionLoadRequestsErrorInner::Mappings(
+                            HostSelectedExtensionMappingsError::Routes(
+                                HostSelectedModuleRoutesError::Graph(
+                                    HostSelectedModuleGraphError::DiscoveryLeaf {
+                                        module: HostGraphModuleKey::Module { name, .. },
+                                        ..
+                                    }
+                                )
+                            )
                         )
                     )) if name == "missing"
                 )
