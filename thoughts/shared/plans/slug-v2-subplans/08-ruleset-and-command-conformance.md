@@ -4106,3 +4106,84 @@ toolchain implementation, a structural execution platform without toolchain
 recursion, reconstruction, or new DICE state. Freeze exact/Slug-native
 selection, configuration/identity participation, constraints and failures,
 A/B/A evidence, allowlist, and caps before choosing one successor.
+
+## Zero-toolchain action execution-platform design accepted (2026-08-11)
+
+`WP-8-m5-filewrite-aquery-zero-toolchain-platform-design` is **ACCEPT** for
+one bounded prerequisite. Bazel 9.2's
+`ToolchainResolutionFunction#findExecutionPlatformForToolchains` selects an
+execution platform even when the requested toolchain-type set is empty.
+Slug does not retain candidate topology for an ordinary zero-toolchain rule,
+so that broader surface remains unsupported. A selected root toolchain
+implementation is different: `root_rule_execution_platforms` already retains
+the parent's ordered structural candidate configured keys on that
+zero-requirement owner, and the strict selected-topology postguard proves the
+candidate sequence exactly with selection `None`.
+
+Admit only an action-bearing selected toolchain implementation whose retained
+topology has exactly one candidate. Its configured FileWrite action view derives
+that sole configured platform key. This is exact for the one-candidate Bazel
+9.2 slice and adds no selection ambiguity. It does not fabricate a
+`ToolchainSelection`: toolchain type/declaration/implementation identity stays
+absent on the implementation owner, while action execution-platform identity is
+derived separately. Candidate topology already participates in configured-node
+equality, closure edges, configuration identity, invalidation, and platform/
+constraint semantic resolution, so no field, key, or reconstruction is added.
+
+Zero candidates, multiple candidates, missing topology, ordinary
+zero-toolchain action owners, external registrations, and mismatched
+platform/configuration facts remain fail-closed or unsupported. Multiple
+candidates are deferred because Bazel's suitability/filter/stable tie behavior
+is wider than Slug's admitted platform model. Target and transitioned
+configurations remain structurally distinct; shared equivalent actions owned by
+distinct configured owners stay deferred.
+
+Run next only
+`WP-8-m5-filewrite-aquery-deps-owner-set-platform-oracle-implementation`.
+Implement the previously accepted shared expression scope, raw-wire
+revalidation, closure-wide selector, and formatter plumbing. In
+`ConfiguredNodeResult::configured_file_write_actions`, prefer the existing
+selected platform; otherwise accept only the sole candidate of a retained
+selection-free topology. Relax selected-toolchain implementation validation to
+permit retained actions, declared outputs, and non-empty built-in
+`DefaultInfo`, while preserving exact topology, exactly built-in
+`DefaultInfo` plus `ToolchainInfo`, and no diagnostics.
+
+Extend only the existing five-file root-order fixture. Use one registered
+platform, one action-bearing selected implementation, an ordinary diamond,
+alias/generated producer, and transition owner. Give the transitioned action
+an actionless second toolchain so it has a platform without creating the
+deferred equivalent-action/distinct-configuration case. Keep direct literal
+output at exactly two root blocks and assert deps owner membership/framing
+without cross-owner order.
+
+The implementation allowlist is:
+
+- `app/slug_analysis_v2/src/{dice.rs,result.rs}` and existing analysis tests;
+- `app/slug_query_v2/src/{expr.rs,lib.rs}` and existing query tests;
+- `app/slug_commands_v2/src/aquery.rs` and existing command tests;
+- `app/slug_core_v2/src/runtime/{dice.rs,file_write_aquery_text.rs,mod.rs}`;
+- `app/slug_cli_v2/src/commands/aquery.rs` and existing CLI tests;
+- `app/slug_server_v2/src/{lib.rs,server.rs,tests.rs}`;
+- the existing five files under
+  `tests/v2_oracle/fixtures/filewrite-aquery-root-order/`; and
+- canonical/current-packet/Stage 8 bookkeeping.
+
+Cap Rust growth at 280 production, 380 tests, and 660 total net lines. Keep the
+fixture at five files and 420 text lines; cap bookkeeping at 180 lines. Require
+expanded pinned Bazel 9.2 plus protected literal evidence, focused analysis/
+query/commands/core/server/CLI tests, direct dependents, rebuilt CLI,
+stable-daemon A/B/A, rustfmt/archive/diff checks, and independent final review.
+
+Add no ordinary zero-toolchain action support, zero/multiple-candidate choice,
+depth/wrapper/general query breadth, command/wire field, recursive toolchain
+selection, new DICE state, action reconstruction/execution/contents, other
+aquery action kind/format, identity representation, exact Bazel identity bytes,
+JVM/Java artifact, REAPI reuse, or CI. One material correction maximum; a
+second is `REPLAN`.
+
+Independent design review returned `ACCEPT`: the sole-candidate derivation
+uses already retained configuration-bearing topology, keeps toolchain selection
+and action platform identity separate, fails closed on ambiguous/broader
+zero-toolchain shapes, and gives a bounded successor with discriminating
+oracle and lifecycle proof.
