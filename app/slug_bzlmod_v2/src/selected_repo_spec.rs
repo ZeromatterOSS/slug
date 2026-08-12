@@ -2042,6 +2042,29 @@ pub enum HostSelectedExtensionEvaluationInputError {
     Invalid(CompactString),
 }
 
+fn matching_root_extension_tags(
+    usages: &[crate::module_eval::RootExtensionUsage],
+    request: &HostSelectedExtensionDefinitionLoadRequest,
+) -> Option<Arc<[crate::NonrootExtensionTag]>> {
+    let mut matched = false;
+    let mut tags = Vec::new();
+    for usage in usages {
+        if usage.isolation.is_none()
+            && usage.extension_name == request.extension_name
+            && resolve_extension_label(
+                &HostGraphModuleKey::Root,
+                usage.bzl_label.as_str(),
+                &request.mapping,
+            )
+            .is_ok_and(|label| label == request.bzl_file)
+        {
+            matched = true;
+            tags.extend(usage.tags.iter().cloned());
+        }
+    }
+    matched.then(|| tags.into())
+}
+
 fn selected_extension_evaluation_input_requests(
     load_requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
     root_files: &crate::module_eval::RootModuleFiles,
@@ -2079,34 +2102,19 @@ fn selected_extension_evaluation_input_requests(
         .requests
         .iter()
         .map(|request| {
-            let mut matches = root_files.extension_usages.iter().filter(|usage| {
-                usage.isolation.is_none()
-                    && usage.extension_name == request.extension_name
-                    && resolve_extension_label(
-                        &HostGraphModuleKey::Root,
-                        usage.bzl_label.as_str(),
-                        &request.mapping,
+            let tags = matching_root_extension_tags(&root_files.extension_usages, request)
+                .ok_or_else(|| {
+                    invalid(
+                        Some(request),
+                        "definition request has no matching root usage".into(),
                     )
-                    .is_ok_and(|label| label == request.bzl_file)
-            });
-            let usage = matches.next().ok_or_else(|| {
-                invalid(
-                    Some(request),
-                    "definition request has no matching root usage".into(),
-                )
-            })?;
-            if matches.next().is_some() {
-                return Err(invalid(
-                    Some(request),
-                    "definition request matches multiple root usages".into(),
-                ));
-            }
+                })?;
             Ok(HostSelectedExtensionEvaluationInput {
                 load_request: request.clone(),
                 canonical_repo: root_route.canonical_repo.clone(),
                 name: header.name.clone(),
                 version: version.normalized().into(),
-                tags: usage.tags.clone(),
+                tags,
             })
         })
         .collect::<Result<Arc<_>, _>>()?;
@@ -3671,6 +3679,58 @@ mod tests {
                 }
             ))
         ));
+    }
+
+    #[test]
+    fn pure_evaluation_inputs_aggregate_matching_root_usages_in_source_order() {
+        let request = HostSelectedExtensionDefinitionLoadRequest {
+            bzl_file: CanonicalLabel::parse("@@root//:ext.bzl").unwrap(),
+            extension_name: "ext".into(),
+            mapping: HostSelectedRepositoryMapping {
+                context_repo: CanonicalRepoName::new("root").unwrap(),
+                entries: Arc::new(SmallMap::new()),
+            },
+        };
+        let tag = |name: &str, value: crate::NonrootAttributeValue| crate::NonrootExtensionTag {
+            tag_class: name.into(),
+            attributes: Arc::new(SmallMap::from_iter([(CompactString::from("raw"), value)])),
+            dev_dependency: false,
+            location: test_span(),
+        };
+        let mut first = root_usage("//:ext.bzl", "ext", test_proxy("a", []), false, []);
+        first.tags = Arc::from([
+            tag("one", crate::NonrootAttributeValue::None),
+            tag("two", crate::NonrootAttributeValue::String("raw".into())),
+        ]);
+        let empty = root_usage("//:ext.bzl", "ext", test_proxy("empty", []), false, []);
+        let mut last = root_usage("//:ext.bzl", "ext", test_proxy("b", []), false, []);
+        last.tags = Arc::from([tag("three", crate::NonrootAttributeValue::Bool(true))]);
+        let tags = matching_root_extension_tags(&[first, empty.clone(), last], &request).unwrap();
+        assert_eq!(
+            tags.iter()
+                .map(|tag| tag.tag_class.as_str())
+                .collect::<Vec<_>>(),
+            ["one", "two", "three"]
+        );
+        assert!(
+            matches!(tags[1].attributes.get("raw"), Some(crate::NonrootAttributeValue::String(value)) if value == "raw")
+        );
+        assert!(
+            matching_root_extension_tags(&[empty], &request)
+                .unwrap()
+                .is_empty()
+        );
+        assert!(
+            matching_root_extension_tags(
+                &[
+                    root_usage("//:other.bzl", "ext", test_proxy("other", []), false, []),
+                    root_usage("//:ext.bzl", "other", test_proxy("name", []), false, []),
+                    root_usage("//:ext.bzl", "ext", test_proxy("isolated", []), true, [])
+                ],
+                &request,
+            )
+            .is_none()
+        );
     }
 
     #[tokio::test]
