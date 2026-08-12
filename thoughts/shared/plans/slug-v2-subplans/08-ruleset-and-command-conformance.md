@@ -4700,3 +4700,9 @@ The route-independent package-preflight prerequisite is accepted in
 Stage 5 closure-preparation owner and its implementation boundary. No MODULE
 evaluation, graph, package/Bzl, toolchain, Test, execution, result, coverage,
 or BEP consumer is authorized.
+
+The closure resume design is accepted in `5757ea1d`. Stage 8 continues to
+wait while only `WP-5-host-nonregistry-module-closure-implementation` lands
+the callerless Stage 5 preparation owner. Evaluation, graph, package/Bzl,
+toolchain, Test, execution, result, coverage, and BEP consumers remain
+deferred.

@@ -1301,3 +1301,12 @@ Run next only `WP-5-host-nonregistry-module-closure-resume-design`. Reopen the
 closure design now that its sole package-preflight blocker is owned, and freeze
 one shared route-independent preparation core plus exact implementation bounds.
 No closure Rust, evaluation, graph, mapping, or consumer is yet authorized.
+
+### Nonregistry MODULE closure resume design accepted (2026-08-12)
+
+Commit `5757ea1d` accepts one route-independent closure key and shared
+parsing/BFS core, with direct-local owners retained as unchanged adapters.
+Run next only `WP-5-host-nonregistry-module-closure-implementation` in
+`source_preparation.rs` and the crate-private parser projection in
+`module_eval.rs`, under 420/480/900 caps and the canonical proof/stops. No
+evaluation, graph, mapping, loading, or command consumer is authorized.

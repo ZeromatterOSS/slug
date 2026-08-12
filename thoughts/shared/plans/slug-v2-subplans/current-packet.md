@@ -1,10 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-nonregistry-module-closure-resume-design`
-Milestone: cross-stage M7 prerequisite design
+Packet: `WP-5-host-nonregistry-module-closure-implementation`
+Milestone: cross-stage M7 prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: resume and freeze the route-independent nonregistry MODULE/include
-closure implementation after its package-preflight prerequisite landed.
+Result: implement the accepted route-independent nonregistry MODULE/include
+closure owner without activating evaluation or a graph consumer.
 
 ## Accepted predecessor boundary
 
@@ -31,9 +31,16 @@ and canonical `PackageIdentifier` cannot identify a transitive nonregistry
 override. The legacy supplied-file `ResolvedGraph` is still forbidden as a
 second production graph.
 
-## Active design contract
+## Accepted design review
 
-Freeze one future crate-private
+Commit `5757ea1d` and independent latest-diff review accept the resumed
+architecture: one route-independent closure key, a shared parsing/BFS core,
+the two-file allowlist, 420/480/900 caps, lifecycle/error/order proof, and
+fail-closed evaluation/graph boundaries.
+
+## Active implementation contract
+
+Implement one crate-private
 `HostNonregistryModuleClosureKey { workspace, module: NonrootModuleKey }`.
 It computes `RootModuleFilesKey` first, requires exactly the named
 `RootModuleOverride::NonRegistry(RepoSpec)`, projects a route-free semantic
@@ -50,7 +57,7 @@ names, canonical repository names, and request generations are operational
 and must not enter semantic closure equality. Immutable source identity and
 all exact content must remain structural.
 
-Freeze a shared route-independent preparation core rather than a second BFS.
+Use a shared route-independent preparation core rather than a second BFS.
 It must:
 
 1. inspect and validate the root source before include work;
@@ -74,8 +81,7 @@ parser projection in `module_eval.rs` may expose `PackagePath` plus
 `TargetName` directly if that is required to remove the current transient
 root-canonical wrapper; it may not widen accepted include syntax or public API.
 
-After independent design acceptance, successor
-`WP-5-host-nonregistry-module-closure-implementation` may edit only
+Edit only
 `app/slug_bzlmod_v2/src/source_preparation.rs` and
 `app/slug_bzlmod_v2/src/module_eval.rs`. The latter is limited to the
 crate-private route-free include parser projection and its colocated tests;
@@ -115,23 +121,10 @@ registrations, package/BUILD/Bzl loading, toolchains, Test, execution/results/
 BEP/coverage, unadmitted RepoSpecs, Windows, JVM/Java, and exact Bazel identity
 bytes.
 
-## Scope, proof, and stops
-
-Edit only:
-
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
-- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`;
-  and
-- `thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`.
-
-Cap formatted net documentation growth at 230 lines. Add no Rust, Cargo/BUILD
-metadata, fixture, asset, dependency, public surface, command behavior, or
-production representation. Validate diff/scope/cap, active archive layout,
-packet consistency, live owner citations, and independent latest-diff review.
+## Terminal stops
 
 Stop with `REPLAN` on route/apparent/canonical identity in the new owner,
 duplicate materialization/source/package ownership, direct filesystem IO,
 lost RepoSpec/category/content/include identity, changed direct-local
 semantics, lock-held compute, evaluation/graph/consumer activation, second
-graph, JVM/Java, fifth file, or cap excess.
+graph, JVM/Java, third file, or cap excess.
