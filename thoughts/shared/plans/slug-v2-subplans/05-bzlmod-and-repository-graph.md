@@ -2203,3 +2203,27 @@ formatted net lines. Require the frozen pure/real-DICE identity, ordering,
 dedup, Need/error, warm reuse, and A/B/A proof. Add no third file, generic
 public consumer, source/load observation, loading dependency, Starlark value,
 definition/evaluation/generated-repository work, I/O, or JVM/Java surface.
+
+### Selected extension definition-load request implementation cap REPLAN (2026-08-12)
+
+The first compiling two-file implementation is 205 production and 196 test
+lines, 401 total, measured against `0552dcf3`. It preserves the accepted
+projection and stops, but exceeds the 160 production cap by 45 lines. The
+necessary hidden key/value/error surface, read-only request access, typed
+predecessor routing, fail-closed unsupported terminal, and structural equality
+make a forced reduction unsafe.
+
+Run next only the docs-only
+`WP-5-host-selected-extension-definition-load-request-owner-implementation-r2-cap-design`.
+Retain the unaccepted Rust diff and freeze 220 production, 260 tests, and 480
+total caps with exactly the same two Rust files, semantics, proof, and stops.
+No Rust may resume before independent correction acceptance and explicit r2
+activation.
+
+### Selected extension definition-load request r2 activated (2026-08-12)
+
+Independent review accepts the cap-only correction. Resume only
+`WP-5-host-selected-extension-definition-load-request-owner-implementation-r2`
+in `selected_repo_spec.rs` and `lib.rs`, under 220 production, 260 tests, and
+480 total. Preserve the exact accepted semantics, proof, and every prior stop;
+obtain independent implementation review before acceptance.

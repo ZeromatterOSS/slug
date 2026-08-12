@@ -1,12 +1,45 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-definition-load-request-owner-implementation`
+Packet: `WP-5-host-selected-extension-definition-load-request-owner-implementation-r2`
 Milestone: M7 Bzlmod-to-loading prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted hidden selected definition-load request
-projection without widening source/load/evaluation ownership.
+Result: finish and validate the retained two-file request projection under
+independently accepted corrected caps.
 
 ## Active implementation contract
+
+Resume the exact retained implementation and historical contract below with
+corrected caps of 220 production, 260 tests, and 480 total. The only authorized
+Rust files remain `selected_repo_spec.rs` and `lib.rs`. Finish its frozen
+proof matrix, protected suites, cap/scope/compact/cleanup audits, bookkeeping,
+and independent implementation review.
+
+No third file, behavior family, source/load/evaluator work, generic public
+consumer, or scope expansion is authorized. Cap excess is `REPLAN`.
+
+## Accepted r2 cap correction
+
+The first compiling two-file implementation is 205 production and 196 test
+lines, 401 total, measured against `0552dcf3`. The 160 production-line stop
+has fired. The excess is the required hidden key/value/error boundary, public
+read-only accessors, typed predecessor routing, fail-closed unsupported value,
+and retained structural equality; forcing 45 lines out would obscure the
+cross-crate contract.
+
+Freeze corrected caps of 220 production, 260 tests, and 480 total. Retain the
+same two Rust files, semantics, proof matrix, and every prior stop. This packet
+may edit only canonical/current/Stage 5 bookkeeping. The live Rust diff is
+unaccepted until this r2 activation.
+
+No Rust/Cargo/fixture/source/load/evaluator/generated-repository/consumer work
+was authorized in that correction. Independent review accepted 220/260/480
+with no change to files, semantics, proof, or stops.
+
+## Accepted implementation contract
+
+This section is historical and grants no separate file, action, cap, or
+scheduling authority. After correction acceptance, r2 resumes the exact
+contract below with only its caps replaced by 220/260/480.
 
 Implement the accepted cross-crate input after commit `75a431d6`. The private
 selected-extension mapping owner in
