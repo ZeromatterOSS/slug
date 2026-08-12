@@ -1,79 +1,97 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-mapping-owner-design`
-Milestone: cross-stage M7 prerequisite design
+Packet: `WP-5-root-extension-usage-semantic-owner-design`
+Milestone: cross-stage M7 prerequisite design and oracle evidence
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: audit the first missing post-selection extension mapping owner over the
-accepted selected module routes.
+Result: freeze the missing root MODULE extension-usage semantic owner before
+selected extension mapping composition.
 
 ## Active design contract
 
-Perform one read-only ownership audit of Bazel 9.2 full repository mapping
-construction after the accepted Bazel-dependency-only selected routes. The audit
-must:
+Pin Bazel 9.2 root MODULE semantics for `use_extension`, extension proxy tag
+calls, `use_repo`, `override_repo`, `inject_repo`, and `use_repo_rule`
+across the complete accepted root include closure. The design must:
 
-- pin extension identifier resolution against each selected module's accepted
-  dependency mapping, isolation identity, and source locations;
-- pin collision-safe extension unique-name construction, imported generated
-  repository names, `override_repo`/`inject_repo` precedence, and contextual
-  mapping augmentation order;
-- inventory exactly which accepted root/nonroot evaluated extension usages,
-  proxies, imports, isolation keys, and repo overrides are already retained;
-- identify the smallest callerless DICE owner and compact structural identity,
-  or `REPLAN` at the first missing extension semantic leaf;
-- keep extension evaluation/generated repository creation, repository-rule
-  execution, materialization, lockfile/final-module publication, loading,
-  public route/mapping consumers, commands, analysis, and execution deferred;
-  and
-- freeze an explicit implementation allowlist, production/test/total caps,
-  discriminating pinned-source/oracle and DICE lifecycle proof, compatibility
-  classes, and terminal stops before any production work.
+- identify the sole root evaluator state/value that retains ordered extension
+  usages, proxy bindings and source locations, local/exported import
+  bijections, isolation identity, ordered tags, root-only repo overrides, and
+  innate repo-rule usages without duplicating the accepted nonroot algebra;
+- preserve root command-policy dev filtering and the accepted behavior that
+  nonroot override/inject calls validate and are ignored;
+- pin nonisolated aggregation, isolated identity, proxy export requirements,
+  use-repo aliases, override/inject precedence and must-exist behavior, and
+  directive error order against Bazel 9.2 source plus discriminating evidence;
+- define structural equality, complete-error/Need validity, event publication,
+  source/include identity, compact retained representation, and A/B/A reuse;
+- freeze one explicit implementation successor allowlist, production/test/
+  total caps, proof matrix, compatibility classes, and terminal stops; or
+  `REPLAN` at the first smaller missing evaluator prerequisite; and
+- leave extension identifier resolution against selected routes, unique-name
+  construction, extension evaluation, generated repositories, selected
+  extension mappings, materialization, lockfile/final-module publication,
+  loading, public consumers, commands, analysis, and execution deferred.
 
 This packet may edit only:
 
 - `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest; and
-- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`.
+- this manifest;
+- `thoughts/shared/plans/slug-v2-subplans/05-bzlmod-and-repository-graph.md`;
+- at most eight files under a new
+  `tests/v2_oracle/fixtures/root-extension-usage-semantics/` fixture:
+  `fixture.toml`, `expected/oracle.json`, and workspace `.bazelrc`,
+  `MODULE.bazel`, one included MODULE fragment, `BUILD.bazel`, `ext.bzl`, and
+  `repo.bzl`.
 
-The root may inspect pinned Bazel 9.2 source, the checked-in
-`repo-mapping-canonical-names` oracle, and live Rust owners read-only. Cap net
-growth at 320 manifest lines, 300 owner-plan lines, 45 canonical lines, and 665
-total. Obtain fresh independent reserved-architecture review.
+The root may inspect pinned Bazel 9.2 source, existing
+`module-extension-use-repo`, `module-repo-directives`,
+`module-extension-tags`, `module-use-repo-rule-dev-dependency`,
+`nonroot-module-extension-semantics`, and
+`repo-mapping-canonical-names` fixtures, and live Rust owners read-only.
+Reuse that evidence and add the new fixture only for the demonstrated isolation,
+alias, precedence/error-order, include, and restoration gaps.
 
-No Rust, Cargo/BUILD, public API, legacy graph/catalog, registry or filesystem
-I/O, route-source mutation, extension evaluation, repository rule,
-materialization, lockfile/final-module publication, loading, mapping/route
-consumer, command, analysis, execution, or JVM/Java work is authorized. Return
-`REPLAN` on a missing retained usage/isolation/override leaf, need for a second
-graph/route owner, extension evaluation or I/O, a future successor beyond three
-Rust files, or inability to freeze explicit scope/caps/stops. Return `REVISE`
-on one bounded design correction; a second material correction is `REPLAN`.
-No production representation may begin before independent `ACCEPT` and
-explicit implementation activation.
+Cap net growth at 320 manifest lines, 320 owner-plan lines, 45 canonical lines,
+350 fixture text lines, and 1,035 total. The new fixture is capped at eight
+files and must be hermetic, source-pinned to Bazel 9.2, and free of copied
+nondiscriminating assets. Obtain fresh independent reserved-architecture
+review.
 
-## Accepted predecessor evidence
+No Rust, Cargo/BUILD outside the fixture, public API, legacy graph/catalog,
+registry/network dependency, production filesystem I/O, selected mapping/route
+owner, extension implementation/evaluation in Slug, generated-repository
+materialization in Slug, lockfile/final-module publication, loading, consumer,
+command, analysis, execution, or JVM/Java work is authorized. Return `REPLAN`
+if exact root semantics require extension evaluation, a second root evaluator,
+public state, more than three future Rust files, or cannot reuse the accepted
+include/evaluator/event owners. Return `REVISE` on one bounded design/evidence
+correction; a second material correction is `REPLAN`. No production
+representation may begin before independent `ACCEPT` and explicit
+implementation activation.
+
+## REPLAN evidence
 
 This section is historical evidence only and grants no file, action, cap, or
 scheduling authority.
 
-Commit `6f72baaf` accepts the callerless private selected-module route owner at
-328 production, 439 tests, and 767 total formatted net lines, within the
-420/700/1,120 caps. It computes the accepted selected graph before the accepted
-selected registry RepoSpec aggregate and retains roots-first BFS entries with
-the shallow graph entry, exact canonical identity, compact context-bearing
-Bazel-dependency mapping, and optional whole selected registry RepoSpec.
+The selected-extension-mapping audit stopped at its first missing input.
+`EvaluatedRootModule` retains only header, dependencies, and registrations;
+`RecordedRootModule` and `root_module_globals` likewise have no extension
+directive state or globals. Therefore the accepted selected graph cannot
+structurally distinguish any root extension usage, proxy, import, isolation,
+tag, override, injection, or innate repo-rule declaration.
 
-Exact behavior covers root, well-known, unique-version, normalized MVO
-canonical names; canonical collisions; root-empty, self, and transformed
-ordinary dependency mappings; registry/nonregistry/built-in source
-classification; and whole predecessor identity. Need remains invalid;
-completed graph errors precede selected-source work. Slug-native error wording
-and deterministic completed-error selection remain explicit.
+The accepted nonroot evaluator already retains complete ordered
+`NonrootExtensionUsage` values, proxies, logical locations, import
+bijections, isolation keys, tags, and synthetic repo-rule usages. It
+deliberately stores an empty override map after validating nonroot
+`override_repo`/`inject_repo`, matching their ignored nonroot semantics.
+`HostSelectedModuleEntry` retains the complete root/discovered source, so no
+selected-graph widening is needed after the root leaf exists.
 
-One borrowed nonregistry RepoSpec projection reuses the retained closure source
-identity. Pure and real-DICE tests cover both MVO contexts, every mapping and
-registry mismatch terminal, root/built-in/nonregistry zero registry work,
-registry source A/B/A, warm reuse, Need, and graph-before-source precedence.
-The full owner and loading suites, formatting/diff/scope/cap checks, compact
-representation and AI-cleanup audits, and independent implementation review
-pass. The public root route and every consumer remain unchanged.
+The checked-in repository-mapping oracle proves one ordinary root import and
+generated canonical mapping, while existing directive fixtures prove basic
+success/rejection shapes. They do not discriminate nonisolated versus isolated
+identity, include/proxy export ownership, alias bijections, override versus
+inject precedence/must-exist errors, or restoration. A selected mapping owner
+before those inputs exist would silently omit configuration-affecting root
+semantics and is forbidden.

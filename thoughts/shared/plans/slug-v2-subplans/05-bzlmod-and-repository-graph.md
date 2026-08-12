@@ -1890,3 +1890,33 @@ first additive post-selection extension mapping owner over the accepted module
 routes. No Rust, extension evaluation, repository rule, materialization,
 lockfile/final-module publication, loading, public mapping/route consumer, or
 JVM/Java work is authorized before independent design acceptance.
+
+### Selected extension mapping owner audit replanned (2026-08-12)
+
+The read-only audit stops at the first missing semantic leaf.
+`EvaluatedRootModule` retains only header, dependencies, and registrations;
+`RecordedRootModule` and `root_module_globals` expose no root extension
+usage, proxy, import, isolation, tag, override/inject, or innate repo-rule
+state. The accepted selected graph retains that incomplete root value, so a
+selected extension mapping owner would omit configuration-affecting root
+semantics from equality and invalidation.
+
+The accepted nonroot evaluator already retains ordered
+`NonrootExtensionUsage` values, proxies and logical locations, import
+bijections, isolation keys, tags, and synthetic repo-rule usages. It
+deliberately validates then discards nonroot `override_repo`/`inject_repo`
+state. `HostSelectedModuleEntry` retains the whole discovered source, so the
+graph, selected route, and nonroot representation do not require widening.
+
+Existing extension directive fixtures prove basic success/rejection, and
+`repo-mapping-canonical-names` proves one ordinary root generated-repository
+mapping. They do not discriminate nonisolated versus isolated usage identity,
+proxy/include export ownership, alias bijections, root override versus inject
+precedence and must-exist errors, or restoration.
+
+Run next only `WP-5-root-extension-usage-semantic-owner-design`. Pin those
+root semantics and the smallest evaluator-owned retained value against Bazel
+9.2 source and bounded hermetic oracle evidence. No Rust, selected mapping
+owner, extension evaluation/materialization in Slug, lockfile/final-module
+publication, loading, public consumer, or JVM/Java work is authorized before
+independent design acceptance.
