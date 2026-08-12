@@ -4678,3 +4678,8 @@ marker lookup. Stage 8 remains parked while only
 `WP-5-host-nonregistry-package-preflight-design` audits that Stage 5 owner
 and its preselection deleted-package boundary. No package/Bzl evaluation,
 toolchain, Test, execution, result, coverage, or BEP behavior.
+
+The nonregistry package-preflight design is accepted. Stage 8 waits while only
+`WP-5-host-nonregistry-package-preflight-implementation` lands crate-private
+REPO/ignore/marker classification with no MODULE, package-loading, toolchain,
+Test, execution, result, coverage, or BEP consumer.

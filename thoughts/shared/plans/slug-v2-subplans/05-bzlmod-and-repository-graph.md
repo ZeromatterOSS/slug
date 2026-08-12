@@ -1260,3 +1260,16 @@ canonical repository identity is post-MVS; do not guess `name+` or a
 multiple-version suffix. Closure preparation, evaluation, command overrides,
 selection, mappings, and consumers remain deferred. No Rust is authorized
 before independent design acceptance.
+
+### Nonregistry package-preflight design accepted (2026-08-12)
+
+Independent review accepts the route-independent package-policy and
+BUILD-marker design. Implement next only
+`WP-5-host-nonregistry-package-preflight-implementation`: crate-private REPO
+and ignore keys reuse `RepositorySourceFileKey`; one package-preflight key
+preserves invalid/ignore/BUILD.bazel/BUILD/no-marker order and fails closed
+before source work for every nonempty canonical deleted-package set. This
+admits no guessed preselection canonical repository identity. The five-file
+Rust allowlist, caps, lifecycle/error/event proof, and stops are in the
+canonical packet. MODULE closure/evaluation, discovery/MVS, mapping, loading,
+and command/Test/execution consumers remain deferred.
