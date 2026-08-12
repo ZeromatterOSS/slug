@@ -57,6 +57,124 @@ callable, public/wire surface, Bzlmod mutation/reverse dependency, repository
 I/O, fifth Rust path, unresolved pinned order, unbounded attr/options, or cap
 excess.
 
+### Completed owner audit and frozen implementation successor
+
+The smallest cohesive owner is the existing callerless
+`HostPureModuleExtensionInvocationsKey`, extended in place. It already computes
+prepared inputs, reacquires every exact frozen Host module, validates all
+requests before invoking any callable, owns invocation events, and publishes a
+heap-free receipt. Add no DICE key. During each extension invocation, install
+one evaluation-local `RepositoryRuleInvocationState` in `Evaluator.extra`.
+The state contains an ephemeral owner token and mutable scratch vector but no
+lock and no DICE computation; after the callable returns or throws, project it
+once into ordered immutable records carried by that extension's receipt or
+terminal prefix. Every preflight Need/error still performs zero invocation and
+zero capture.
+
+The shared `repository_rule` global is available only while the sole Host bzl
+loader supplies `BzlEvaluationContext`. Its exact admitted signature is
+`implementation` (positional or named callable) plus optional `attrs=None`;
+`local` and `configure` must remain false, `environ` empty, and `doc` None.
+Pinned-default semantics do not expose flag-gated `remotable`. Callable arity
+is not checked at definition time. `attrs` may contain source-ordered public
+ASCII identifier names and only `attr.string`, `attr.bool`, `attr.int`, or
+`attr.label` descriptors with no explicit configurable policy, transition,
+or file restriction and with kind-correct scalar/None defaults. Reject the
+legacy built-in names `name`, `tags`, `deprecation`, and `visibility` in
+source order. Private attrs, containers, computed/late defaults, values/
+providers/executable/cfg/aspects/file restrictions, every other kind, nonempty
+environment, true local/configure, non-None doc, and remote-exec semantics are
+deferred. These rejections are fail-closed Slug terminals, not Bazel parity
+claims.
+
+`RepositoryRuleDefinitionGen<V>` retains the lifetime callable, canonical
+defining bzl label, source-ordered admitted schema, and optional exported name.
+Assignment uses `export_as`; anonymous values may freeze but fail only when
+called. A leading-underscore top-level rule remains internally exported and
+callable by its extension; the pinned `use_repo_rule` private-lookup rejection
+is external lookup behavior and remains deferred. Definition/export location
+is not retained because Bazel's `RepoRule` does not use it. The existing
+prepared predecessor already structurally owns the selected request/mapping,
+complete transitive `BzlLoadManifest`, source bytes, and extension definition,
+so the call record retains the compact repository-rule projection rather than
+duplicating a digest or frozen module.
+
+For an admitted call, preserve this order: Starlark argument formation;
+unexpected positional rejection; invocation-context lookup; exported-name
+check; ordered kwargs extraction; `name` default-to-None/type check; exact
+user-provided repository-name validation
+`[A-Za-z0-9][A-Za-z0-9_.-]*`; duplicate-name check within that extension;
+caller location and call-stack projection with the repository-rule native
+frame removed; then recursive-value projection and atomic append. The first
+slice admits `None`, bool, signed i32, valid-Unicode string, and the accepted
+canonical `InvocationLabel`; list, tuple, dict, big integer, function, context,
+tag, cycle, and every other value fail before append. Unknown or undeclared
+scalar kwargs are captured rather than schema-checked. Retain `name` both as
+the lookup key and in the ordered kwargs because later instantiation consumes
+the original map.
+
+Each `RepositoryRuleCallRecord` retains the projected definition, generated
+name, ordered `Arc<[(CompactString, RepositoryRuleCallValue)]>`, one
+heap-independent caller span, and ordered compact stack frames/spans.
+`Arc<[RepositoryRuleCallRecord]>` preserves source/call order. Do not use
+`SmallMap` equality for retained kwargs: it intentionally ignores insertion
+order, while Bazel's later supplied-attribute first-error order observes it.
+Use `CompactString`, typed `CanonicalLabel`, immutable `Arc` slices, cheap
+clones, and `Allocative`; scratch `Vec`/linear duplicate lookup is bounded to
+one invocation and is not retained. No interner, hash cache, global registry,
+or strong/content digest is warranted.
+
+An extension success still must return strict `None`; its receipt gains its
+ordered call slice. An invocation error retains the complete prepared
+predecessor, exact request, all earlier-extension receipts, and the current
+extension's captured prefix before its typed failure. Calls emit no events;
+existing loader batches remain loader-owned and prints/throws remain fresh
+invocation evaluation data outside equality. Complete structural values/errors
+participate in DICE equality and cutoff; Need remains invalid/non-self-equal.
+Warm reuse does not rerun callables or republish batches.
+
+After independent design acceptance, freeze
+`WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
+against the accepted design commit. It may edit exactly:
+
+- `app/slug_loading_v2/src/package.rs` for narrow descriptor projection and
+  shared-global registration only;
+- `app/slug_loading_v2/src/module_extension.rs` for preexisting invocation
+  state/receipt/error integration and a read-only canonical Label projection;
+- one new private
+  `app/slug_loading_v2/src/module_extension_repository_rule.rs` for the
+  definition value, schema, context/sink, raw projection, records, and focused
+  tests;
+- `app/slug_loading_v2/src/lib.rs` solely for the private module declaration;
+  and canonical/current/Stage 4/Stage 5 bookkeeping.
+
+Cap Rust at 650 production, 850 tests, and 1,500 total formatted net lines.
+Require pure definition rows for positional/named callable, wrong callable,
+anonymous/exported/private rules, exact option defaults/rejections, schema
+order/defaults, legacy collisions, and every deferred descriptor family.
+Require invocation rows for foreign context, positional/export/name/name
+syntax, one/two call order, duplicate before unsupported value, ordered kwargs,
+every scalar and deferred value, caller/stack provenance, internal private
+rule calls, empty calls, strict result, call-prefix-before-throw, and separate
+extension namespaces. Through the real key prove prepared/loader Need and
+terminal zero-call, definition/source/manifest/mapping/schema/export/name/
+value/order/location A/B/A, complete error-context A/B/A, cold/warm reuse,
+fresh print/error batches, and full loading/Bzlmod direct dependents. Run
+`cargo fmt --all -- --check`, archive/diff checks, and a structural scan for
+retained `Heap`, `Value`, `FrozenValue`, `FrozenModule`, token, event,
+`RepoSpec`, repository context, I/O, and second-key state.
+
+The exact slice is the admitted Bazel 9.2 global construction/export, internal
+callability, scalar capture, repository-name/duplicate validation, call and
+kwargs order, and provenance semantics. Private type names, compact layout,
+unsupported diagnostics, and DICE scheduling are Slug-native. Every deferred
+surface above remains unsupported. `REPLAN` on a fifth Rust path; a new DICE
+key or lock; callable/heap/event retention; schema checks during capture;
+repository implementation/context, RepoSpec, generated canonical name/
+existence/mapping, override/inject, I/O/materialization/lockfile/consumer/API/
+JVM work; loss of ordered identity; production over 650, tests over 850, or
+total over 1,500.
+
 ## Completed repository-rule definition owner audit
 
 This section and everything below are historical context only, grant no file,

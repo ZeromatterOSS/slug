@@ -2576,3 +2576,15 @@ through existing hidden loading seams. It may not mutate Bzlmod, reverse the
 dependency, infer generated names/RepoSpecs or override/inject existence, or
 add a second selected projection, graph, materializer, lockfile, consumer,
 public API, or JVM edge.
+
+The completed call-protocol design adds no Stage 5 owner or representation.
+The existing loading invocation key continues to consume the accepted hidden
+prepared predecessor, whose selected request, contextual mapping, root tags,
+and transitive definition manifest remain structural identity. Its new
+invocation-local repository-rule sink projects only definition identity and
+ordered scalar raw calls; no Bzlmod map is reread or recomputed. Future Rust is
+limited to the four loading paths and 650/850/1,500 caps frozen in current.
+Stage 5 production remains unchanged. Schema application, generated canonical
+names/RepoSpecs/existence, override/inject finalization, selected mappings,
+lockfile, repository/materialization, consumer/API, and JVM work remain
+deferred, and no reverse dependency or second projection/key is authorized.

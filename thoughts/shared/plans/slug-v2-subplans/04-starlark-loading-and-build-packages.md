@@ -2502,3 +2502,39 @@ declaration. No Rust resumes before independent design acceptance. RepoSpec,
 schema application, repository implementation/context, generated naming or
 existence, I/O, materialization, consumers, public API, and JVM remain
 deferred; a second loader/key or retained heap/callable is forbidden.
+
+### Repository-rule call-protocol design completed (2026-08-12)
+
+The completed audit keeps the existing
+`HostPureModuleExtensionInvocationsKey` as sole semantic owner and adds no
+DICE leaf. The accepted shape installs one ephemeral evaluator-extra sink per
+extension invocation, reuses the sole Host loader/frozen-module lifetime, and
+projects only ordered heap-free scalar call records into success receipts or
+typed terminal prefixes. All request/module/factor preflight remains before
+any invocation or capture; schema application and `RepoRule.instantiate`
+remain later.
+
+The admitted definition surface is callable implementation, optional
+source-ordered public scalar attrs, and default false/empty/None options.
+Definitions retain canonical defining label, ordered schema, optional exported
+name, and lifetime-only callable; anonymous values freeze but fail when called,
+while internally private top-level rules remain callable. Calls preserve
+positional/context/export/name/name-syntax/duplicate/provenance/raw-projection
+order and admit only None/bool/i32/string/accepted canonical Label. Retained
+kwargs and calls use ordered `Arc` slices, `CompactString`,
+`CanonicalLabel`, and `Allocative`; `SmallMap` is scratch only because its
+equality ignores insertion order. No new interner/cache/digest is warranted.
+
+After independent acceptance, implement only
+`WP-4-5-host-module-extension-repository-rule-call-protocol-implementation`
+in `package.rs`, existing private `module_extension.rs`, one new private
+`module_extension_repository_rule.rs`, and `lib.rs` solely for its private
+declaration, plus four-plan bookkeeping. Caps are 650 production/850 test/
+1,500 total. Require the complete definition, schema, context, error-order,
+scalar/deferred, call-prefix, provenance, A/B/A, Need, events, reuse, heap-
+absence, full loading/Bzlmod, formatting/archive/diff proof frozen in current.
+No Rust is authorized before acceptance and explicit activation. A fifth path,
+new key/lock, retained lifetime state, schema application, repository
+implementation/context, RepoSpec/generated existence/mapping, I/O,
+materialization, lockfile, consumer/API/JVM breadth, or cap excess is
+`REPLAN`.
