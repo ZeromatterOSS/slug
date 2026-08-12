@@ -1,11 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-evaluation-input-requests-design`
-Milestone: M7 module-extension evaluation-input prerequisite design
+Packet: `WP-5-host-selected-extension-evaluation-input-requests-implementation`
+Milestone: M7 module-extension evaluation-input prerequisite implementation
 Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the smallest heap-independent selected module/tag input owner.
+Result: implement the independently accepted selected module/tag input owner.
 
-## Active design contract
+## Active implementation contract
+
+Implement the accepted design below only in
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
+`app/slug_bzlmod_v2/src/lib.rs`, plus canonical/current/Stage 4/Stage 5
+bookkeeping. Caps are 240 production, 360 tests, and 600 total formatted net
+Rust lines measured against `a31cf3d9`. Complete the frozen pure/real-DICE
+proof, full Bzlmod/loading suites, scope/forbidden-edge/compact/cleanup audits,
+and independent implementation review.
+
+No loading dependency, generic public consumer, heap/callable,
+schema/evaluator/execution work, I/O, generated repository/lockfile/
+materializer/consumer edge, third Rust file, JVM/Java work, or behavior-family
+expansion is authorized. Cap excess or a missing owner is `REPLAN`.
+
+## Accepted design contract
+
+This section is historical design authority interpreted only through the
+active implementation contract above.
 
 Perform a read-only ownership design for one callerless Bzlmod key, keyed by
 normalized workspace, that publishes ordered module/tag inputs for a later

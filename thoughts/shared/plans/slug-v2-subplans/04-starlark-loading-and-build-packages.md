@@ -2227,3 +2227,10 @@ Stage 4 now waits on the Stage 5-owned heap-independent ordered module/tag
 projection. Do not publish a callable or add another loader. A later loading
 composition owner may validate those raw tags against the accepted schemas and
 reacquire the frozen export only at the execution boundary.
+
+### Selected extension evaluation-input implementation activated (2026-08-12)
+
+Independent review accepts the Stage 5 raw module/tag projection design. Run
+only its two-file implementation under 240 production/360 test/600 total caps
+relative to `a31cf3d9`. Stage 4 gains no loading consumer, callable, schema
+composition, evaluator, or execution authority.

@@ -2373,3 +2373,12 @@ test/600 total. Rust requires independent design acceptance first. Stop on a
 loading dependency, generic public consumer, heap/callable,
 schema/evaluator/execution, I/O, generated-repository/lockfile/materializer
 edge, third Rust file, JVM/Java work, or cap excess.
+
+### Selected extension evaluation-input design accepted (2026-08-12)
+
+Independent review accepts the exact root-view schema, source ownership,
+fail-closed joins, field exclusions, and proof matrix. Run next only
+`WP-5-host-selected-extension-evaluation-input-requests-implementation` in
+`selected_repo_spec.rs` and `lib.rs`, under 240 production/360 test/600
+total formatted net lines against `a31cf3d9`. Preserve every accepted stop
+and obtain independent implementation review.
