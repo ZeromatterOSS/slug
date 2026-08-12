@@ -1397,3 +1397,22 @@ command/request/server/runtime/DICE input owner, or REPLAN at the first smaller
 missing request/wire prerequisite. This is a three-document design packet. No
 Rust, wire/schema change, RepoSpec, filesystem/materialization observation,
 discovery, graph, mapping, or consumer is authorized.
+
+### Command module override owner design accepted (2026-08-12)
+
+Pinned Bazel 9.2 source and independent reserved-architecture review accept one
+normalized `--override_module` value inside the existing command policy.
+Client-owned parsing preserves raw occurrence/error order, folds the effective
+module-to-absolute-path map with replace/remove/re-add semantics, and normalizes
+the admitted workspace-root invocation without filesystem observation. The
+existing Root command policy retains that compact `SmallMap` separately from
+root-MODULE overrides; no merge, RepoSpec, discovery, or consumer is active.
+One serde-defaulted effective-map wire field is required because the current
+wire has no generic carrier; the daemon revalidates absolute paths/names and
+rejects duplicates rather than owning normalization.
+
+Run next only
+`WP-5-host-command-module-override-owner-implementation` under the exact
+17-file allowlist, 620/700/1,320 caps, lifecycle/DICE/wire proofs, and terminal
+stops frozen in the accepted manifest. After implementation acceptance, resume
+the selected-module graph owner design; do not activate that graph early.
