@@ -1815,3 +1815,48 @@ smallest canonical-name, contextual-mapping, and selected-route composition
 owner or return `REPLAN` at the first missing leaf. No Rust, route/mapping
 consumer, materialization, loading, legacy graph activation, public API, or
 JVM/Java work is authorized before independent design acceptance.
+### Selected module route owner r2 design proposed (2026-08-12)
+
+The post-selection audit now finds one bounded composition seam. Pinned Bazel
+9.2 constructs a canonical-name bi-map from the selected BFS graph before
+deriving root/self/resolved-dependency contextual mappings. The accepted Host
+selected graph already retains every required key, normalized version, apparent
+edge, self repo name, BFS order, and built-in/nonregistry provenance. Commit
+`e8ad58dd` supplies the sole selected registry RepoSpec aggregate.
+
+The future callerless `HostSelectedModuleRoutesKey` belongs in the existing
+private `selected_repo_spec.rs`. Its Arc-backed BFS entries retain the shallow
+selected graph entry, exact canonical identity, a private context-bearing
+compact dependency mapping, and an optional whole selected registry RepoSpec
+entry. A single borrowed RepoSpec accessor on
+`HostNonregistryPreparedClosure` avoids rereading overrides or
+materialization. Transient name/collision/match maps are not retained.
+
+Canonical root/well-known/unique/MVO naming, bi-map collision failure,
+root/self/resolved ordinary mappings, route source categories, RepoSpecs, and
+BFS order are exact. Deterministic Rust completed-error selection and wording
+are Slug-native. Extension mappings/routes, post-selection policy, lockfile/
+final-module publication, materialization, public root-route replacement,
+loading, and consumers remain deferred.
+
+After independent acceptance run only
+`WP-5-host-selected-module-route-owner-implementation` in
+`selected_repo_spec.rs` and `source_preparation.rs`, under 420 production,
+700 test, and 1,120 total formatted net lines. Require the frozen pure and
+real-DICE canonical/mapping/source/collision/A-B-A/Need/reuse matrix, full owner
+and loading validation, compact-representation and AI-cleanup audits, structural
+stops, and independent review. A third file, public API, predecessor mutation,
+second graph/I/O/override owner, extension breadth, materialization/loading/
+consumer edge, or cap excess is `REPLAN`.
+
+### Selected module route owner r2 design accepted (2026-08-12)
+
+Independent reserved-architecture review accepts the two-file callerless
+selected-route seam, exact/Slug-native/deferred classifications, 420/700/1,120
+caps, proof matrix, and terminal stops.
+
+Run next only `WP-5-host-selected-module-route-owner-implementation` in
+`selected_repo_spec.rs` and `source_preparation.rs`. Add no public API,
+predecessor mutation, second graph/I/O/override owner, extension breadth,
+materialization/loading/consumer edge, or third file. Obtain fresh independent
+implementation review before acceptance.
