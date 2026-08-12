@@ -1327,3 +1327,34 @@ the same two Rust files, complete retained diff, behavior, evidence, and stops
 under corrected 620/500/1,120 bounds. Account the production/test split exactly
 and use no margin for another owner, diagnostic, behavior, evaluator, graph
 consumer, or public surface.
+
+### Nonregistry MODULE closure accepted (2026-08-12)
+
+Commit `0231936f` accepts the callerless route-independent nonregistry closure
+under the independently corrected caps in `f5742c3e`. It computes root files
+and the exact nonregistry override before retained materialization/source/
+package work, shares one breadth-first core with unchanged direct-local
+adapters, and retains route-free `RepoSpec`/category/immutable-source identity,
+exact root and ordered repeated-fragment bytes/inspections/labels/spans, logical
+identities, and explicit cycle capability. Focused Host 2/2 and direct-adapter
+13/13 tests, the full owner suite, both downstream checks, formatting, exact
+587/468/1,055 accounting, structural scans, and independent review pass. No
+evaluation, graph, mapping, loading, or consumer landed.
+
+### Nonregistry discovered-module resume design accepted (2026-08-12)
+
+Independent review accepts the existing `HostDiscoveredModuleKey` as the sole
+composition seam. For an exact root `NonRegistry` override after the protected
+built-in branch, it must require Bazel's empty effective module version, borrow
+`HostNonregistryModuleClosureKey`, reject cycle capability before evaluation,
+adapt retained root/fragments to the existing evaluator, publish one captured
+event batch for complete evaluation, and retain the complete closure once as a
+new nonregistry provenance variant. The closure already owns all exact source
+identity and must not be duplicated.
+
+Run next only
+`WP-5-host-nonregistry-discovered-module-implementation` in
+`source_preparation.rs` under the canonical 220/500/720 caps and stops.
+Registry/built-in behavior is protected; recursion/MVS, command overrides,
+post-selection mappings, lockfile products, package/Bzl loading, configured
+toolchains, Test, execution, and every graph/consumer remain deferred.
