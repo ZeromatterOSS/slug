@@ -57,6 +57,69 @@ memory. Initial source families are:
   `ActionGraphQueryTest`, and `src/test/shell/integration/bazel_aquery_test.sh`;
 - execution: focused remote shell tests and REAPI proto identity fixtures.
 
+### Zabel-derived fixture-theme backlog (2026-08-12)
+
+Zabel commit `c7298478e2e56262a2f438e9c065325744c9f0fc` supplies
+fixture themes and differential-harness lessons, not acceptance output. Port
+each admitted theme into this harness, replace donor observations with the
+canonical Bazel 9.2 source/test anchor, and preserve the `fixture.toml`
+provenance and comparison-mode contract above. Record why any apparently
+relevant upstream test is skipped.
+
+Wave A is the first adoption packet after the active M7 packet reaches a
+terminal result. Keep it oracle-only and split it into bounded packets when one
+workspace or behavior family would obscure error precedence.
+
+| Theme | Required discrimination | Likely owner |
+|-------|-------------------------|--------------|
+| Starlark call and error order | callable lookup before/after argument evaluation, positional and named expansion, duplicate precedence, `*args`/`**kwargs`, dict/comprehension order, provider initializers, and `ctx.actions` calls | Stages 1/4/6 |
+| Provider schema and identity | ordered fields, missing versus `None`, large schemas, initializer results, immutable/hashable keys, forwarding, cross-owner identity, and depset topology | Stages 1/6 |
+| Action conflict/error precedence | analysis failure versus output conflict, duplicate returned providers, shareable identical actions, and execution-time argument failures | Stages 1/6 |
+| Structured aquery topology | artifact, depset, param-file, command-filter, quoting, and stable normalized ID relationships across all admitted formats | Stages 1/8 |
+| Toolchain negative and selection cases | zero requested toolchains must not activate broken registrations, direct-platform dedup, exec-config `config_setting`, dependency aspects, and native-test implicit inputs | Stages 1/6/8 |
+
+Wave B begins only after its Stage 5/7 owners exist:
+
+| Theme | Required discrimination | Likely owner |
+|-------|-------------------------|--------------|
+| REAPI concurrency and interoperability | concurrent Execute, input-upload coalescing, ByteStream reads, tree-artifact inputs, operation progress, cancellation, and exact evidence counts | Stages 1/7 |
+| Remote repository output lifecycle | alternative recorded inputs, mutation/reversion, missing CAS data, transport retry, dependent materialization, sparse control files and `.bzl` demand | Stages 1/5/7 |
+| Source symlink manifests | source path, target, executable metadata, digest identity, and materialized shape | Stages 1/3/7 |
+| Real-workspace ratchet | LLVM Support/Demangle first, then broader LLVM only after every mismatch receives a focused repo-owned fixture | Stages 1/8/10 |
+
+The donor theme index is recorded in
+[zabel-adoption-roadmap.md](./zabel-adoption-roadmap.md). Do not copy its shell
+scripts or checked-in output wholesale. In particular:
+
+- run the call-order matrix through pinned Bazel and Slug's `starlark-rust`
+  host so Java-versus-Rust evaluation-order differences are explicit;
+- compare action conflict and duplicate-provider diagnostics at the first
+  observable error, not merely eventual failure;
+- normalize aquery numeric ids only while preserving their graph topology;
+- drive REAPI fixtures through the configured backend and the ordinary Slug
+  executor boundary rather than a test-only action path; and
+- treat real workspaces as stress evidence, never replacements for focused
+  acceptance fixtures.
+
+### Fixture admission checklist
+
+A Zabel-derived fixture is ready only when:
+
+- [ ] the exact Bazel 9.2 source test, class/method, or shell test is named;
+- [ ] the translated workspace uses public BUILD, MODULE, Starlark, command, or
+      REAPI surfaces;
+- [ ] the manifest records the donor theme only as an adaptation note;
+- [ ] exact, message-shape, or semantic comparison preserves the
+      discriminating relationship;
+- [ ] expected output was generated and independently replayed from the pinned
+      Bazel baseline;
+- [ ] adjacent existing Slug fixtures were checked for duplication;
+- [ ] any skipped upstream case records unsupported phase,
+      implementation-detail assertion, obsolete behavior, or stronger
+      existing coverage; and
+- [ ] the packet remains oracle-only unless its current-packet manifest
+      separately authorizes implementation.
+
 ## Initial Fixture Classes
 
 - `version`, `help`, and incompatible pre-Bazel-9 configuration errors.

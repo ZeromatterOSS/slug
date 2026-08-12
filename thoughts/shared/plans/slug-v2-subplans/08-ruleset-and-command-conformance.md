@@ -166,6 +166,88 @@ execution gaps.
   valid checkout and the focused gates pass. It is not acceptance evidence and
   was incomplete during the 2026-07-22 review.
 
+### 8.5 Slug-native explain and watch extensions
+
+These are post-conformance Slug extensions, not Bazel parity gates. They may be
+scheduled only after the exact underlying query/configuration/action/execution
+facts are accepted and their Stage 2/6/7 prerequisites are present.
+
+#### Explain and provenance output
+
+Add a machine-readable core with a concise text renderer that can answer:
+
+- which configuration-affecting inputs and transitions produced a configured
+  target;
+- which default or named exec group, execution platform, toolchains, and merged
+  properties own an action;
+- which source certificate and repository/lockfile observations justify reuse;
+- whether a node was reused, recomputed, cache-hit, executed, or rematerialized,
+  and which changed dependency caused that choice; and
+- which semantic identity, display/path projection, Bazel checksum/ActionKey
+  projection, and REAPI/CAS digest domain a displayed token belongs to.
+
+The command reads retained producer facts and request-local trace observations;
+it does not install a second semantic graph, replay configuration or toolchain
+resolution, infer ownership from paths, or make instrumentation counters the
+correctness source. Diagnostic format and additional provenance are
+**Slug-native**. Any embedded Bazel-compatible labels/configuration/action
+facts retain their own exact or deferred classification.
+
+Progress and explain share producer observations only through a bounded
+presentation-neutral vocabulary. Neither is a DICE dependency or action-key
+input, and sanitized output must not expose remote headers, credentials, full
+private environment, or unrequested file contents.
+
+#### Dependency-driven watch
+
+Introduce `query --watch`, `cquery --watch`, and `build --watch` in that order:
+
+1. the initial iteration opens an ordinary immutable request overlay and emits
+   exactly the ordinary command result;
+2. its accepted source certificate becomes the watched dependency set;
+3. filesystem/backend notifications identify candidates only; overflow or
+   uncertainty forces conservative reobservation, not guessed invalidation;
+4. debounce coalesces presentation work but does not weaken exact final
+   validation;
+5. each iteration uses fresh command/output memory over the retained semantic
+   DICE graph;
+6. a changed input cancels an in-flight iteration only under an explicit
+   policy, then joins its tasks and retries from a new revision;
+7. stdout and diagnostics are published only after source-certificate and
+   provisional-value validation; and
+8. watched build outputs use Stage 7 atomic accepted/provisional generations
+   and repair damaged requested outputs.
+
+A watch packet must prove create/edit/delete/recreate, rename, directory/glob,
+transitive `.bzl`, MODULE/lockfile/repository mapping, relevant versus
+irrelevant environment, concurrent foreground request, event overflow,
+cancellation, failure/recovery, bounded retained memory, and clean shutdown.
+The watch dependency set follows actual producer observations rather than a
+workspace-wide recursive scan.
+
+Do not reproduce Zabel's custom event backend or large watch scheduler. Prefer
+the smallest cross-platform notification abstraction whose events merely
+wake the existing Buck2-DICE request/revision validation path.
+
+### 8.6 Real-workspace and measured-performance ratchet
+
+After focused public fixtures pass, promote real-workspace coverage gradually:
+LLVM Support/Demangle first, a broader LLVM slice next, and full workspaces only
+when their command/ruleset surface is admitted. A real-workspace mismatch must
+first become a focused repo-owned fixture. Stress success never upgrades an
+unsupported compatibility surface by itself.
+
+For demonstrated hot paths, use the plan-authoring performance discipline:
+exact output/RPC invariants, alternating control/candidate runs, predetermined
+thresholds, instructions, cycles, wall time, and RSS. Keep a compact ledger of
+accepted and rejected experiments. Do not replace `starlark-rust` with Zabel's
+runtime; use its call-order fixture themes and measurement method to optimize
+the retained Rust engine or Slug Host boundaries only when profiles identify
+them.
+
+This section does not change the active M7 packet, make watch a Bazel-exact
+claim, or authorize a command implementation without a separate packet.
+
 ## Exact Test Criteria
 
 - `rules-cc-basic` builds and tests a public `cc_test`; compile/link actions

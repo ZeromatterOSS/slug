@@ -995,6 +995,73 @@ single-`@` storage with unambiguous canonical label rules from Stage 3.
   `refresh` refreshes mutable registry state, and `error` rejects stale or
   unsupported entries.
 
+### 5.6A Repository semantic owner, materializer, and remote reuse contract
+
+Preserve a strict boundary between repository semantics and physical
+realization as Stage 5 broadens:
+
+- bzlmod and repository-rule producers own module/repository identities,
+  canonical mappings, semantic descriptors, recorded inputs, reproducibility,
+  immutable repository views, and lockfile participation;
+- repository materializers own archive/Git/local/rule realization, durable
+  roots, manifests, atomic publication, sparse physical projections, and
+  recovery; and
+- Stage 7 cache/CAS clients may accelerate physical realization but never own
+  semantic repository truth.
+
+A filesystem path, cache hit, marker file, materialized directory, or cache
+availability is not repository identity. Repository-rule keys structurally
+include the producing `.bzl` closure, canonical attrs, mapping, declared
+environment policy, watched file/directory/tree observations, process effects,
+downloads, and every other admitted semantic input. Unmodeled inputs fail
+closed.
+
+The evaluated `.bzl` producer should remain the natural owner of source
+selection, canonical identity, containing package, direct load resolution,
+child demands, evaluation, exports, and compact semantic facts. Parse trees,
+bytecode, evaluator heaps, and callable values are scratch or lifetime state,
+not independent semantic authorities. Before adding another bzl source/load
+key family, audit whether the existing evaluated-module key and narrow
+projection can own the fact without merging Host and external compatibility
+classes incorrectly.
+
+#### Deferred sparse remote repository-output cache
+
+After generated-repository execution, exact recorded inputs, manifests, and
+atomic physical publication are accepted, design a cross-process/workspace
+repository-output cache using REAPI ActionCache and CAS where practical.
+
+The cache contract must:
+
+- be a physical accelerator, never a DICE key or semantic authority;
+- authenticate a reproducible repository invocation and its ordered typed
+  recorded inputs;
+- revalidate current observations before accepting a hit;
+- bound lookup traversal, marker bytes, tree entries, demanded control bytes,
+  and alternatives;
+- retain metadata and fetch `MODULE.bazel`, included module files, `.bzl`,
+  `.scl`, `REPO.bazel`, and BUILD files only as their semantic producers demand
+  them, leaving ordinary source bytes in CAS until physical demand;
+- treat cache miss, missing CAS data, transport failure, malformed records,
+  mutation/reversion, and stale observations as explicit miss/rejection paths
+  with no semantic corruption;
+- publish a complete physical root atomically while preserving the prior
+  accepted generation on failure; and
+- prove cancellation, retry, cutoff, eviction, and shutdown release of sparse
+  and complete retained owners.
+
+Bazel has an experimental remote repository contents cache. Claim **exact**
+interoperability only after Slug reproduces the pinned Bazel 9.2 initial
+identity, ordered observation hashing, Action/ActionResult shape, marker, and
+Tree validation. Until then, any implementation and cache namespace are
+explicitly **Slug-native** while repository semantics, content digests, and
+recorded-input validation remain exact for Slug's admitted graph.
+
+The required mutation/reversion, alternative-input, missing-CAS, retry,
+dependent-materialization, sparse-control-file, and symlink fixture themes are
+owned by Stage 1's Zabel-derived Wave B backlog. This section is a future
+design constraint and does not widen the active module-extension packet.
+
 ### 5.7 V1 Guardrail Fixture Migration
 
 Mine `slug-v1-archive:tests/core/bzlmod/test_plan61_guardrails.py` for fixture

@@ -130,6 +130,100 @@ Their narrow `load-invalidation` result is a regression test, not acceptance of
 this gate; an implementation packet may replace them rather than preserve their
 shape.
 
+### 2.5A Request revisions, source certificates, and memory lifetimes
+
+The next M1 architecture packet after the active M7 work and its prerequisite
+oracle must replace coarse production snapshot authority with a Buck2-DICE-
+native request/revision contract. Zabel's versioned-session design is concept
+and test evidence only; do not port its custom engine, scheduler, token model,
+or source-certificate implementation.
+
+#### Required request contract
+
+One long-lived workspace runtime owns committed semantic state. Each command
+opens a request that owns:
+
+- an accepted base input revision and originating runtime identity;
+- one immutable complete request overlay containing normalized command options,
+  relevant client environment, cancellation/deadline state, and typed injected
+  roots;
+- narrow equality projections consumed by semantic producers, while command
+  expressions, output modes, diagnostics, profiles, and presentation remain
+  request-local;
+- lazy typed observations of exactly demanded files, directories, globs,
+  environment values, registry/lockfile inputs, repo mappings, repository-rule
+  inputs, and materialized immutable roots; and
+- a source certificate that is the union of those exact observations and
+  tracked semantic dependencies.
+
+Source-facing computations remain request-private until final validation:
+
+1. compute from immutable observed values in a provisional transaction or the
+   smallest equivalent Buck2 DICE primitive;
+2. retain dependency edges and the relevant option projection;
+3. reobserve every mutable source-certificate input before returning
+   user-visible output;
+4. atomically accept compatible values into a committed successor revision or
+   discard and retry from new observations; and
+5. release provisional publications, borrowed inputs, continuations, RPC
+   interests, and async-transfer ownership on retry, cancellation, failure, or
+   request teardown.
+
+Never return a result mixing observations from incompatible host epochs.
+Cross-request reuse is permitted only when key identity, relevant request
+projection, dependency publication, and effective revision are compatible.
+The host filesystem does not provide historical reads for unobserved paths;
+unsupported history must not be fabricated by a workspace-wide snapshot.
+Watcher events may accelerate dirtying but are only candidates. Exact
+reobservation and final validation are the correctness boundary.
+
+#### Memory-lifetime contract
+
+Packets that add retained or asynchronous runtime state classify every new
+allocation as one of:
+
+1. service/container memory;
+2. DICE-retained immutable semantic memory;
+3. service-retained nonsemantic cache memory;
+4. command-retained memory;
+5. phase, Starlark call, action, or RPC scratch; or
+6. transfer-owned asynchronous memory.
+
+For every applicable class, state publication, equality-cutoff, replacement,
+invalidation, eviction, command reset, cancellation, worker/task join, and
+shutdown release behavior. Retained values may borrow only authenticated
+retained dependency ownership, never evaluator heaps or command scratch.
+Dropping a nonsemantic cache must not remove semantic truth. Continue using
+`Allocative` and the Buck2-derived utility review for retained Rust data;
+custom arenas or allocator protocols are not implied by this taxonomy.
+
+#### Design packet proof and stops
+
+Before Rust changes, the design packet must:
+
+- audit Buck2 DICE transaction, projection, invalidation, cutoff, cancellation,
+  duplicate-work, and publication tests rather than infer an API from Zabel;
+- inventory current whole-workspace file/directory snapshots and every bzlmod,
+  environment, command-policy, lockfile, mapping, materialization, cquery, and
+  aquery input still outside the semantic spine;
+- choose the smallest vertical migration that proves two overlapping requests
+  with different relevant and irrelevant overlays, a file change during one
+  compute, atomic retry, and compatible warm reuse;
+- name the source-certificate representation and final-validation owner without
+  adding a global command lock or holding a lock across DICE work;
+- classify exact observable isolation/invalidation, Slug-native revision and
+  certificate identity, and unavailable historical snapshots as unsupported;
+  and
+- supply exact file allowlists, retained-memory accounting, cancellation proof,
+  growth caps, and `REPLAN` conditions.
+
+Stop on a second semantic graph, command-side input replay, mutable global
+options, manual semantic side store, source read outside a tracked producer,
+watcher events as proof of correctness, retained evaluator values, or a custom
+DICE scheduler. The existing coarse snapshots remain accepted scaffolding only
+until a separately scheduled packet replaces them; this section authorizes no
+runtime edit by itself.
+
 #### Reviewed next packet — `WP-2-m1-workspace-runtime` (2026-07-22)
 
 A Terra-medium source audit followed by Sol-low ownership review revised the

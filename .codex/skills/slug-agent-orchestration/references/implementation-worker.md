@@ -60,11 +60,22 @@ Add only what the task uses:
   behavior, invalidation/restoration, event storage, and dependent pruning.
   Cover applicable create/edit/delete/recreate, environment, repository
   mapping, lockfile, and materialized-output transitions.
+- **Request/revision:** immutable complete overlay and narrow semantic
+  projection, exact observed inputs/source certificate, overlapping-request
+  sharing rule, final validation/promotion or retry, and cancellation cleanup.
+- **Memory/lifetime:** service, retained semantic, nonsemantic cache, command,
+  scratch, and async-transfer classification plus publication, cutoff,
+  invalidation, eviction, join, and shutdown release where applicable.
 - **Reuse/representation:** matching Stage 9 row, Buck2/V1 candidates, selected
   utility boundary, memory/clone implications, and ledger disposition.
 - **Public/cross-crate:** downstream production wrapper and compile coverage.
 - **Platform/daemon:** exact platform evidence, lifecycle/process cleanup, and
   cross-target or same-daemon coverage.
+- **Fallback:** violated invariant, deletion condition, owning packet, and the
+  test that prevents permanence.
+- **Measured hot path:** exact control/candidate output and RPC invariants,
+  balanced run order, declared threshold, instructions/cycles/wall/RSS, and
+  accepted or rejected ledger result.
 
 An accepted discriminating Bazel 9.2 oracle is sufficient; do not add another
 fixture unless the packet names a missing behavior. Workers run focused tests.

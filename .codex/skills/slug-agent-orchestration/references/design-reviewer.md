@@ -33,6 +33,18 @@ Check only applicable risks:
     the claimed behavior?
 11. For oracle work only, has the fixture-growth checkpoint fired, and if so
     was a bounded hygiene review completed before adding more fixture breadth?
+12. For daemon/input work, are request projections, observed inputs, source
+    certificates, final validation, provisional cleanup, and overlapping
+    sessions complete without fabricated filesystem snapshots?
+13. For retained/cache/async work, are lifetime class, publication, cutoff,
+    invalidation, eviction, cancellation, join, and shutdown release explicit?
+14. Does every fallback name its violated invariant, deletion condition, owner,
+    and permanence-prevention test?
+15. If a touched module crosses the complexity trigger, does the packet either
+    split it or justify one cohesive owner without mixing semantic,
+    presentation, persistence, and transport concerns?
+16. For a claimed hot-path improvement, do balanced measurements preserve
+    exact outputs/RPCs and meet the declared metric threshold?
 
 Return exactly one verdict:
 

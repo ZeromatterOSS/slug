@@ -181,6 +181,69 @@ shape fits instead of default owned `String`, `Vec`, or std hash collections.
 - Stage 6 emits deterministic action descriptions only; it does not execute
   actions or decide CAS/AC policy.
 
+### 6.4A Immutable action-owner context
+
+Before Stage 6 admits another general action kind, named exec groups, applied
+aspect actions, or multi-platform selection, retain one immutable owner context
+at action registration. The target shape is:
+
+```text
+ActionOwnerContext {
+    configured_owner,
+    semantic_configuration_identity,
+    admitted_checksum_or_display_projection,
+    exec_group,
+    execution_platform,
+    exec_properties,
+    selected_toolchain_context,
+    aspect_provenance,
+}
+```
+
+The exact Rust representation may be smaller or split into authenticated
+projections, but every field that can affect action behavior must participate
+structurally in equality and invalidation. The default exec group is an
+explicit identity, not the absence of a context. An action retains the group-
+selected platform, combined platform/target/group execution properties, and
+selected toolchain context at creation time.
+
+Do not later reconstruct an action's platform or properties from only its
+label, the owner's current topology, a process-global current platform, or a
+new toolchain-resolution run. `aquery`, Stage 7 execution, Slug-native action
+provenance, progress observations, and future explain output must consume the
+same retained owner context and action row. Bazel checksum and ActionKey bytes
+remain separate M9 domains; admitting Slug-native internal bytes does not
+permit semantic inputs to be omitted.
+
+The design packet must audit the current `ConfiguredActionExecGroup::Default`
+and `ConfiguredActionView` topology-derived platform path, then prove:
+
+- default and named groups select and retain distinct contexts;
+- two actions of one owner may use different groups/platforms/properties;
+- `cfg = "exec"` dependencies use the group-selected exec configuration;
+- aspect-created actions retain their applicable aspect/owner context;
+- configuration, platform, property, registration, mapping, and toolchain
+  edits invalidate through named DICE dependencies;
+- aquery and REAPI projections are derived from the identical retained row;
+- conflicting-output and other diagnostics preserve Bazel's error precedence;
+  and
+- retained data is immutable, compact, `Allocative`, and released with the
+  owning analysis value.
+
+Compatibility classification:
+
+- selected platform/toolchain, exec-group behavior, property merging, and
+  action-visible provenance are **exact** for admitted Bazel 9.2 slices;
+- private Rust rows, compact identities, and added explain fields are
+  **Slug-native**; and
+- exact configuration checksum, configured output token, and Bazel ActionKey
+  bytes remain **deferred to M9**.
+
+Use the Stage 1 provider, action-conflict, aquery-topology, and toolchain
+fixture backlog before implementation. This section freezes a future owner
+contract; it does not modify the accepted bounded FileWrite action surface or
+widen the active M7 packet.
+
 ### 6.5 Toolchains and Platforms
 
 - Implement constraint values/settings, platform target analysis, registered

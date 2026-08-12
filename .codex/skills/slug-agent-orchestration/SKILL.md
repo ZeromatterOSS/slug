@@ -22,6 +22,11 @@ commits.
 5. Inspect agents/Cargo/`slugd` only before overlapping work, retries, or
    daemon-sensitive validation.
 
+Read `thoughts/shared/plans/slug-v2-plan-authoring-guide.md` before creating or
+materially revising a packet. Read
+`thoughts/shared/plans/slug-v2-subplans/zabel-adoption-roadmap.md` only when the
+current packet selects one of its workstreams; it never overrides Live Status.
+
 Read `references/routing-log.md` only when a recent analogous packet may change
 an unclear route. Read `references/parity-source-anchors.md` only when the
 packet touches one of its listed surfaces.
@@ -63,6 +68,13 @@ use `references/implementation-worker.md` and name:
 - focused validation and stop conditions; and
 - residual risk.
 
+A new or materially revised packet is not ready until it passes the
+plan-authoring checklist: learned facts and non-decisions, upstream Bazel and
+applicable Buck2 tests, exact/Slug-native/deferred classification, natural
+producer/key ownership, request/revision behavior, memory lifetime, fixture
+provenance, fallback deletion, complexity triggers, allowlist/caps, and stops.
+Use only the applicable items, but do not silently omit an applicable risk.
+
 Add conditional sections only when used: fixture growth/hygiene for oracle
 work; DICE identity/equality for semantic keys; Stage 9/Buck2/V1 reuse for
 representation changes; downstream coverage for public interfaces; platform
@@ -91,6 +103,14 @@ Check only applicable risks:
 - DICE-owned discovery without direct filesystem/fresh-graph bypass;
 - named-surface-only activation and compact retained representation; and
 - downstream behavior for changed interfaces.
+
+When a packet touches a demonstrated hot path, require exact output/RPC
+invariants and balanced control/candidate measurements with declared metrics
+and thresholds; record rejected experiments compactly. When a touched
+production file exceeds the guide's complexity trigger or mixes semantic,
+presentation, persistence, and transport ownership, require either a bounded
+split or a concrete cohesion decision. These are review gates, not automatic
+authorization for cleanup outside the packet.
 
 Use `references/design-reviewer.md` for reserved decisions or risky patches;
 require independent review for reserved architecture, DICE/ownership/identity,

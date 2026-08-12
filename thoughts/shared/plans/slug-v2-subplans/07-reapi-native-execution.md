@@ -199,6 +199,76 @@ Every REAPI execution fixture must record:
 - nonempty action digests and expected platform properties.
 - no `Local`, `LocalWorker`, `Worker`, or `WorkerInit` what-ran entries.
 
+### 7.9 Concurrency, transfer ownership, and operational extensions
+
+After broader Stage 6 actions and input trees are accepted, add a recording
+REAPI boundary that proves behavior under concurrency rather than only scalar
+requests. Stage 1 owns the fixture manifests; Stage 7 owns the client/runtime
+semantics.
+
+Required discriminators are:
+
+- simultaneous Execute operations with independent completion and cancellation;
+- content-addressed input upload coalescing without dropping either request's
+  interest or diagnostics;
+- ByteStream read interoperability, partial/chunked reads, digest/size
+  verification, and missing/corrupt blob behavior;
+- tree-artifact and generated-output input Merkle topology;
+- authenticated operation progress/metadata without inventing queued or
+  executing states the backend did not report;
+- retry, cancellation, timeout, transport failure, and shutdown release; and
+- exact action/cache/upload/materialization evidence counts with zero semantic
+  direct-local fallback.
+
+Every detached upload, download, Execute, materialization, and progress task is
+transfer-owned async memory under the plan-authoring lifetime taxonomy. The
+owning request or service retains explicit cancellation and join authority;
+workers may not borrow command memory after cancellation. Cross-request
+coalescing shares physical work only when digest, instance, headers/policy,
+backend authority, and relevant request projection are compatible.
+
+Remote-only execution remains the semantic rule. A missing remote capability,
+`no-remote` action, or backend failure must produce a targeted unsupported or
+execution error for the admitted surface; do not silently change semantics by
+running locally. A deliberately introduced future local executor requires its
+own architecture and compatibility class.
+
+### 7.10 Producer-owned truthful progress
+
+After stable producer observations exist, add a Slug-native progress layer:
+
+- repository, bzlmod, loading, analysis, action preparation, CAS, AC, Execute,
+  materialization, and watch producers publish bounded observations at their
+  actual ownership transitions;
+- one process/command presentation owner aggregates and renders those
+  observations on stderr according to TTY and command options;
+- stdout, query formats, aquery, BEP, profiles, and REAPI evidence remain
+  semantically independent;
+- progress never becomes a DICE key, action input/digest, provider, cache
+  entry, global current-command pointer, or source of build truth;
+- messages and labels are bounded and sanitized so arguments, headers,
+  credentials, and private paths do not leak; and
+- cancellation joins reporting work before releasing the command observer.
+
+Report only known counts and authenticated states. Do not guess action totals,
+queue position, execution stage, transfer completion, or remaining time. A
+redirected stream remains quiet by default unless the user explicitly selects
+plain progress; diagnostics retain exclusive, synchronized stderr ownership.
+
+### 7.11 Atomic output generations for future watch
+
+A future watched build must not expose outputs from an unvalidated source
+revision. Materialize requested outputs into a provisional generation, verify
+their digest/type/mode and the request source certificate, then atomically make
+the generation current or delete it on retry/failure. Keep complete accepted
+and provisional ownership bounded; never remove the accepted generation before
+the successor is validated. Detect damaged requested outputs and rebuild or
+rematerialize them through the ordinary action graph.
+
+These sections do not lift the current Stage 7 priority hold. They become
+eligible only through later bounded packets after immutable action-owner
+context and Stage 1's REAPI concurrency fixtures exist.
+
 ## Exact Test Criteria
 
 - `shell-action-reapi` executes one action through NativeLink with
