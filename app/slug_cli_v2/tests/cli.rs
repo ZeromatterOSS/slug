@@ -5232,3 +5232,120 @@ root_rule(name = "root", deps = [":left", ":right"])
         baseline_pid
     );
 }
+
+#[test]
+fn command_module_overrides_work_one_shot_and_isolate_in_one_daemon() {
+    let workspace = scratch("command-module-overrides");
+    write(
+        workspace.join("MODULE.bazel"),
+        r#"module(name = "command_overrides")"#,
+    );
+    write(
+        workspace.join("pkg/BUILD.bazel"),
+        r#"filegroup(name = "probe")"#,
+    );
+    let workspace = workspace.canonicalize().unwrap();
+
+    let one_shot_build = slug()
+        .current_dir(&workspace)
+        .args([
+            "build",
+            "--override_module=dep=deps/../deps/dep",
+            "//pkg:probe",
+        ])
+        .output()
+        .unwrap();
+    assert_eq!(one_shot_build.status.code(), Some(2), "{one_shot_build:?}");
+    assert!(
+        String::from_utf8_lossy(&one_shot_build.stderr)
+            .contains("\"error\":\"analysis_not_implemented\""),
+        "{one_shot_build:?}"
+    );
+
+    let one_shot_query = slug()
+        .current_dir(&workspace)
+        .args([
+            "query",
+            "--override_module=dep=%workspace%/deps/dep",
+            "//pkg:probe",
+        ])
+        .output()
+        .unwrap();
+    assert!(one_shot_query.status.success(), "{one_shot_query:?}");
+    assert_eq!(one_shot_query.stdout, b"//pkg:probe\n");
+    assert!(one_shot_query.stderr.is_empty(), "{one_shot_query:?}");
+
+    let run = slug()
+        .current_dir(&workspace)
+        .args(["run", "--override_module=dep=deps/dep", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert_eq!(run.status.code(), Some(2), "{run:?}");
+    let run_stderr = String::from_utf8(run.stderr).unwrap();
+    assert!(
+        run_stderr.contains("run requires --remote_executor"),
+        "{run_stderr}"
+    );
+    assert!(!run_stderr.contains("command_parse_error"), "{run_stderr}");
+
+    let output_base = scratch("command-module-overrides-output-base");
+    let _cleanup = DaemonCleanup(output_base.clone());
+    let output_base_arg = format!("--output_base={}", output_base.display());
+    let cases: &[(&str, &[&str])] = &[
+        ("a-build", &["build", "//pkg:probe"]),
+        (
+            "b-build",
+            &["build", "--override_module=dep=deps/dep", "//pkg:probe"],
+        ),
+        ("a-build-restored", &["build", "//pkg:probe"]),
+        ("a-query", &["query", "//pkg:probe"]),
+        (
+            "b-query",
+            &[
+                "query",
+                "--override_module=dep=/absolute/deps/dep",
+                "//pkg:probe",
+            ],
+        ),
+        ("a-query-restored", &["query", "//pkg:probe"]),
+    ];
+    let mut pid = None;
+    for (name, args) in cases {
+        let output = slug()
+            .current_dir(&workspace)
+            .arg(&output_base_arg)
+            .args(*args)
+            .output()
+            .unwrap();
+        if args[0] == "query" {
+            assert!(output.status.success(), "{name}: {output:?}");
+            assert_eq!(output.stdout, b"//pkg:probe\n", "{name}");
+            assert!(output.stderr.is_empty(), "{name}: {output:?}");
+        } else {
+            assert_eq!(output.status.code(), Some(2), "{name}: {output:?}");
+            assert!(output.stdout.is_empty(), "{name}: {output:?}");
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            assert!(
+                stderr.contains("\"error\":\"analysis_not_implemented\""),
+                "{name}: {stderr}"
+            );
+            assert!(
+                stderr.contains("\"runtime_mode\":\"daemon\""),
+                "{name}: {stderr}"
+            );
+        }
+        let current_pid = std::fs::read_to_string(slug_server_v2::pid_path(&output_base)).unwrap();
+        if let Some(pid) = &pid {
+            assert_eq!(&current_pid, pid, "{name}");
+        } else {
+            pid = Some(current_pid);
+        }
+    }
+
+    let subdirectory = slug()
+        .current_dir(workspace.join("pkg"))
+        .args(["query", "--override_module=dep=relative/dep", "//pkg:probe"])
+        .output()
+        .unwrap();
+    assert!(!subdirectory.status.success(), "{subdirectory:?}");
+}

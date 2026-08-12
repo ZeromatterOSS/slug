@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::path::Path;
+
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_query_v2::QueryOrder;
@@ -18,6 +20,7 @@ use crate::common::CommandParseError;
 use crate::common::ParsedFlag;
 use crate::common::QueryOutputFormat;
 use crate::common::bzlmod_command_policy;
+use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::output_format;
@@ -40,38 +43,50 @@ pub struct QueryRequest {
 
 impl QueryRequest {
     pub fn parse(args: &[impl AsRef<str>]) -> Result<Self, CommandParseError> {
-        parse_query_like(CommandKind::Query, args)
+        parse_query_like(CommandKind::Query, args, None)
+    }
+
+    pub fn parse_at_workspace(
+        args: &[impl AsRef<str>],
+        workspace: &Path,
+    ) -> Result<Self, CommandParseError> {
+        parse_query_like(CommandKind::Query, args, Some(workspace))
     }
 }
 
 pub(crate) fn parse_query_like(
     command: CommandKind,
     args: &[impl AsRef<str>],
+    workspace: Option<&Path>,
 ) -> Result<QueryRequest, CommandParseError> {
     let parsed = split_args(args);
     let expression = parse_query_expression_for(command, &parsed.positionals)?;
     let output = output_format(&parsed.flags);
-    let (order, graph_factored, policy, bzlmod_policy, lockfile_mode, registry_urls) =
-        if command == CommandKind::Query {
-            let (order, graph_factored, policy) = validate_query_flags(&parsed.flags)?;
-            (
-                order,
-                graph_factored,
-                policy,
-                bzlmod_command_policy(&[])?,
-                bzlmod_lockfile_mode(&[])?,
-                bzlmod_registry_urls(&parsed.flags)?,
-            )
-        } else {
-            (
-                QueryOrder::Auto,
-                true,
-                QueryPolicy::default(),
-                bzlmod_command_policy(&parsed.flags)?,
-                bzlmod_lockfile_mode(&parsed.flags)?,
-                bzlmod_registry_urls(&parsed.flags)?,
-            )
-        };
+    let (order, graph_factored, policy, bzlmod_policy, lockfile_mode, registry_urls) = if command
+        == CommandKind::Query
+    {
+        let (order, graph_factored, policy) = validate_query_flags(&parsed.flags)?;
+        (
+            order,
+            graph_factored,
+            policy,
+            match workspace {
+                Some(workspace) => bzlmod_command_policy_for_workspace(&parsed.flags, workspace)?,
+                None => bzlmod_command_policy(&parsed.flags)?,
+            },
+            bzlmod_lockfile_mode(&[])?,
+            bzlmod_registry_urls(&parsed.flags)?,
+        )
+    } else {
+        (
+            QueryOrder::Auto,
+            true,
+            QueryPolicy::default(),
+            bzlmod_command_policy(&parsed.flags)?,
+            bzlmod_lockfile_mode(&parsed.flags)?,
+            bzlmod_registry_urls(&parsed.flags)?,
+        )
+    };
     Ok(QueryRequest {
         expression,
         output,
@@ -129,6 +144,14 @@ fn validate_query_flags(
             }
             "registry" => {
                 required_query_flag_value(flag, "a non-empty registry URL")?;
+            }
+            "override_module" => {
+                flag.value
+                    .as_deref()
+                    .ok_or_else(|| CommandParseError::InvalidFlagValue {
+                        flag: flag.raw.clone(),
+                        message: "expected module-name=path".to_owned(),
+                    })?;
             }
             "graph:factored" => {
                 graph_factored = parse_bool_flag(flag, false)?;

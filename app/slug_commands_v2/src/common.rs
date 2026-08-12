@@ -238,6 +238,47 @@ pub(crate) fn parse_query_expression_for(
 pub(crate) fn bzlmod_command_policy(
     flags: &[ParsedFlag],
 ) -> Result<BzlmodCommandPolicyKey, CommandParseError> {
+    let (allow_yanked_versions, ignore_dev_dependency) = bzlmod_command_parts(flags)?;
+    if let Some(flag) = flags.iter().find(|flag| flag.name == "override_module") {
+        return Err(CommandParseError::InvalidFlagValue {
+            flag: flag.raw.clone(),
+            message: "--override_module requires a workspace-owned command path".to_owned(),
+        });
+    }
+    normalized_bzlmod_command_policy(allow_yanked_versions, ignore_dev_dependency)
+}
+
+pub(crate) fn bzlmod_command_policy_for_workspace(
+    flags: &[ParsedFlag],
+    workspace: &std::path::Path,
+) -> Result<BzlmodCommandPolicyKey, CommandParseError> {
+    let (allow_yanked_versions, ignore_dev_dependency) = bzlmod_command_parts(flags)?;
+    normalized_bzlmod_command_policy(allow_yanked_versions, ignore_dev_dependency)?;
+    let overrides = flags
+        .iter()
+        .filter(|flag| flag.name == "override_module")
+        .map(|flag| {
+            flag.value
+                .as_deref()
+                .ok_or_else(|| CommandParseError::InvalidFlagValue {
+                    flag: flag.raw.clone(),
+                    message: "expected module-name=path".to_owned(),
+                })
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        allow_yanked_versions,
+        ignore_dev_dependency,
+        workspace,
+        overrides,
+    )
+    .map_err(|message| CommandParseError::InvalidFlagValue {
+        flag: "--override_module".to_owned(),
+        message,
+    })
+}
+
+fn bzlmod_command_parts(flags: &[ParsedFlag]) -> Result<(Option<&str>, bool), CommandParseError> {
     let allow_yanked_versions = flags
         .iter()
         .rev()
@@ -262,7 +303,13 @@ pub(crate) fn bzlmod_command_policy(
         })
         .transpose()?
         .unwrap_or(false);
+    Ok((allow_yanked_versions, ignore_dev_dependency))
+}
 
+fn normalized_bzlmod_command_policy(
+    allow_yanked_versions: Option<&str>,
+    ignore_dev_dependency: bool,
+) -> Result<BzlmodCommandPolicyKey, CommandParseError> {
     BzlmodCommandPolicyKey::from_flags(allow_yanked_versions, ignore_dev_dependency).map_err(
         |message| CommandParseError::InvalidFlagValue {
             flag: "--allow_yanked_versions".to_owned(),
@@ -394,6 +441,7 @@ fn classify_flag(name: &str) -> FlagDisposition {
         | "ignore_dev_dependency"
         | "noignore_dev_dependency"
         | "lockfile_mode"
+        | "override_module"
         | "registry" => FlagDisposition::ParseOnly,
         "color" | "show_progress" | "noshow_progress" | "keep_going" => {
             FlagDisposition::IgnoredCompatible

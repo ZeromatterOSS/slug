@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::path::Path;
+
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
@@ -19,6 +21,7 @@ use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::ParsedFlag;
 use crate::common::bzlmod_command_policy;
+use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::parse_query_expression_for;
@@ -37,6 +40,20 @@ pub struct AqueryRequest {
 
 impl AqueryRequest {
     pub fn parse(args: &[impl AsRef<str>]) -> Result<Self, CommandParseError> {
+        Self::parse_impl(args, None)
+    }
+
+    pub fn parse_at_workspace(
+        args: &[impl AsRef<str>],
+        workspace: &Path,
+    ) -> Result<Self, CommandParseError> {
+        Self::parse_impl(args, Some(workspace))
+    }
+
+    fn parse_impl(
+        args: &[impl AsRef<str>],
+        workspace: Option<&Path>,
+    ) -> Result<Self, CommandParseError> {
         let parsed = split_args(args);
         if !parsed.passthrough.is_empty() {
             return Err(unsupported("-- is not supported by this aquery"));
@@ -88,6 +105,7 @@ impl AqueryRequest {
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
                 | "lockfile_mode"
+                | "override_module"
                 | "registry" => {}
                 _ => {
                     return Err(unsupported(&format!(
@@ -103,7 +121,10 @@ impl AqueryRequest {
             target,
             scope: spec.scope(),
             output_base,
-            bzlmod_policy: bzlmod_command_policy(&parsed.flags)?,
+            bzlmod_policy: match workspace {
+                Some(workspace) => bzlmod_command_policy_for_workspace(&parsed.flags, workspace)?,
+                None => bzlmod_command_policy(&parsed.flags)?,
+            },
             lockfile_mode: bzlmod_lockfile_mode(&parsed.flags)?,
             registry_urls: bzlmod_registry_urls(&parsed.flags)?,
         })

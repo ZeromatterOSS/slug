@@ -97,6 +97,8 @@ pub struct BzlmodRequestInputs {
     #[serde(default)]
     pub ignore_dev_dependency: bool,
     #[serde(default)]
+    pub command_module_overrides: Vec<(String, String)>,
+    #[serde(default)]
     pub environment_allow_yanked_versions: Option<String>,
     #[serde(default = "default_lockfile_mode")]
     pub lockfile_mode: String,
@@ -109,6 +111,7 @@ impl Default for BzlmodRequestInputs {
         Self {
             command_allow_yanked_versions: None,
             ignore_dev_dependency: false,
+            command_module_overrides: Vec::new(),
             environment_allow_yanked_versions: None,
             lockfile_mode: default_lockfile_mode(),
             registry_urls: Vec::new(),
@@ -127,6 +130,10 @@ impl BzlmodRequestInputs {
                 command.yanked_versions_policy(),
             ),
             ignore_dev_dependency: command.ignore_dev_dependency(),
+            command_module_overrides: command
+                .module_overrides()
+                .map(|(name, path)| (name.to_owned(), path.display().to_string()))
+                .collect(),
             environment_allow_yanked_versions: canonical_yanked_policy(
                 environment.yanked_versions_policy(),
             ),
@@ -158,9 +165,10 @@ impl BzlmodRequestInputs {
         String,
     > {
         Ok((
-            BzlmodCommandPolicyKey::from_flags(
+            BzlmodCommandPolicyKey::from_normalized_module_overrides(
                 self.command_allow_yanked_versions.as_deref(),
                 self.ignore_dev_dependency,
+                self.command_module_overrides.clone(),
             )?,
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(
                 self.environment_allow_yanked_versions.as_deref(),

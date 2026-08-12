@@ -18,7 +18,11 @@ use slug_core_v2::runtime::format_file_write_aquery_text_output_for_scope;
 use slug_server_v2::AqueryRequest as DaemonAqueryRequest;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    let request = match AqueryRequest::parse(&argv) {
+    let workspace = match std::env::current_dir() {
+        Ok(workspace) => workspace,
+        Err(error) => return emit_error(2, &error.to_string(), "one-shot"),
+    };
+    let request = match AqueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Aquery, argv, Err(error)),
     };
@@ -41,10 +45,6 @@ pub fn run(argv: Vec<String>) -> i32 {
         return run_daemon(&output_base, request, bzlmod);
     }
 
-    let workspace = match std::env::current_dir() {
-        Ok(workspace) => workspace,
-        Err(error) => return emit_error(2, &error.to_string(), "one-shot"),
-    };
     let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
         &workspace,
         std::slice::from_ref(&request.target),

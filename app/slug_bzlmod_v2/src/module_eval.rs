@@ -89,6 +89,7 @@ use crate::NonrootModuleBuilder;
 use crate::NonrootModuleKey;
 use crate::NonrootRepoImports;
 use crate::VisibleLockfileRead;
+use crate::dice::CommandModuleOverrides;
 use crate::lockfile::bad_visible_lockfile_message;
 use crate::lockfile::parse_visible_lockfile_bytes_for_mode;
 
@@ -826,13 +827,15 @@ enum RecordedRootModuleOverride {
 pub struct RootModuleCommandPolicy {
     yanked_versions_policy: Arc<str>,
     ignore_dev_dependency: bool,
+    command_module_overrides: CommandModuleOverrides,
 }
 
 impl From<BzlmodCommandPolicyKey> for RootModuleCommandPolicy {
     fn from(policy: BzlmodCommandPolicyKey) -> Self {
         Self {
-            yanked_versions_policy: Arc::from(policy.stable_serialize()),
+            yanked_versions_policy: Arc::from(policy.yanked_versions_stable_serialize()),
             ignore_dev_dependency: policy.ignore_dev_dependency(),
+            command_module_overrides: policy.command_module_overrides().clone(),
         }
     }
 }
@@ -840,6 +843,10 @@ impl From<BzlmodCommandPolicyKey> for RootModuleCommandPolicy {
 impl RootModuleCommandPolicy {
     pub fn ignore_dev_dependency(&self) -> bool {
         self.ignore_dev_dependency
+    }
+
+    pub fn command_module_overrides(&self) -> impl Iterator<Item = (&str, &Path)> {
+        self.command_module_overrides.iter()
     }
 }
 

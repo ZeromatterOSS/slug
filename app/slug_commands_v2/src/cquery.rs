@@ -7,6 +7,8 @@
  * You may select, at your option, one of the above-listed licenses.
  */
 
+use std::path::Path;
+
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
@@ -17,6 +19,7 @@ use slug_query_v2::validate_cquery_query;
 use crate::common::CommandKind;
 use crate::common::CommandParseError;
 use crate::common::bzlmod_command_policy;
+use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::parse_bool_flag;
@@ -49,6 +52,20 @@ pub struct CqueryRequest {
 
 impl CqueryRequest {
     pub fn parse(args: &[impl AsRef<str>]) -> Result<Self, CommandParseError> {
+        Self::parse_impl(args, None)
+    }
+
+    pub fn parse_at_workspace(
+        args: &[impl AsRef<str>],
+        workspace: &Path,
+    ) -> Result<Self, CommandParseError> {
+        Self::parse_impl(args, Some(workspace))
+    }
+
+    fn parse_impl(
+        args: &[impl AsRef<str>],
+        workspace: Option<&Path>,
+    ) -> Result<Self, CommandParseError> {
         let parsed = split_args(args);
         if !parsed.passthrough.is_empty() {
             return Err(unsupported("-- is not supported by this cquery"));
@@ -128,6 +145,7 @@ impl CqueryRequest {
                 | "ignore_dev_dependency"
                 | "noignore_dev_dependency"
                 | "lockfile_mode"
+                | "override_module"
                 | "registry" => {}
                 _ => {
                     return Err(unsupported(&format!(
@@ -172,7 +190,10 @@ impl CqueryRequest {
                 "--nograph:factored is supported only with --output=graph",
             ));
         }
-        let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
+        let bzlmod_policy = match workspace {
+            Some(workspace) => bzlmod_command_policy_for_workspace(&parsed.flags, workspace)?,
+            None => bzlmod_command_policy(&parsed.flags)?,
+        };
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
         Ok(Self {

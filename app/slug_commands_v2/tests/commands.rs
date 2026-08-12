@@ -963,3 +963,147 @@ fn help_summary_is_bazel_v2_command_surface_only() {
     assert!(!HELP_SUMMARY.contains("cell"));
     assert!(!HELP_SUMMARY.contains("out"));
 }
+
+#[test]
+fn command_module_overrides_normalize_fold_and_forward_for_active_commands() {
+    let workspace = std::path::Path::new("/workspace");
+    let flags = [
+        "--override_module=zed=relative/../zed",
+        "--override_module=a_mod=%workspace%/deps/a=with=equals",
+        "--override_module=zed=",
+        "--override_module=zed=/absolute/zed",
+        "--override_module=a=/a",
+        "--override_module=a.b-c_d9=relative/path",
+        "--override_module=replace=/one",
+        "--override_module=replace=/two",
+        "--override_module=gone=/gone",
+        "--override_module=gone=",
+    ];
+    let build_args = flags
+        .iter()
+        .copied()
+        .chain(["//pkg:bin"])
+        .collect::<Vec<_>>();
+    let build = BuildRequest::parse_at_workspace(&build_args, workspace).unwrap();
+    assert_eq!(
+        build
+            .bzlmod_policy
+            .module_overrides()
+            .map(|(name, path)| (name.to_owned(), path.display().to_string()))
+            .collect::<Vec<_>>(),
+        [
+            ("a".to_owned(), "/a".to_owned()),
+            ("a.b-c_d9".to_owned(), "/workspace/relative/path".to_owned()),
+            (
+                "a_mod".to_owned(),
+                "/workspace/deps/a=with=equals".to_owned()
+            ),
+            ("replace".to_owned(), "/two".to_owned()),
+            ("zed".to_owned(), "/absolute/zed".to_owned()),
+        ]
+    );
+    assert!(BuildRequest::parse(&build_args).is_err());
+
+    let reordered = BuildRequest::parse_at_workspace(
+        &[
+            "--override_module=zed=/absolute/zed",
+            "--override_module=a=/a",
+            "--override_module=replace=/two",
+            "--override_module=a_mod=/workspace/deps/a=with=equals",
+            "--override_module=a.b-c_d9=/workspace/relative/path",
+            "//pkg:bin",
+        ],
+        workspace,
+    )
+    .unwrap();
+    assert_eq!(build.bzlmod_policy, reordered.bzlmod_policy);
+    assert_eq!(
+        build.bzlmod_policy.stable_serialize(),
+        "allow_yanked=reject;ignore_dev_dependency=false;module_overrides=a=/a,a.b-c_d9=/workspace/relative/path,a_mod=/workspace/deps/a=with=equals,replace=/two,zed=/absolute/zed"
+    );
+    assert!(
+        QueryRequest::parse_at_workspace(
+            &["--override_module=dep=deps/dep", "//pkg:bin"],
+            workspace,
+        )
+        .unwrap()
+        .bzlmod_policy
+        .module_overrides()
+        .any(|(name, _)| name == "dep")
+    );
+    assert!(
+        AqueryRequest::parse_at_workspace(
+            &["--override_module=dep=deps/dep", "//pkg:bin"],
+            workspace,
+        )
+        .unwrap()
+        .bzlmod_policy
+        .module_overrides()
+        .any(|(name, _)| name == "dep")
+    );
+    assert!(
+        CqueryRequest::parse_at_workspace(
+            &["--override_module=dep=deps/dep", "//pkg:bin"],
+            workspace,
+        )
+        .unwrap()
+        .bzlmod_policy
+        .module_overrides()
+        .any(|(name, _)| name == "dep")
+    );
+}
+
+#[test]
+fn command_module_override_errors_follow_raw_argv_order() {
+    let workspace = std::path::Path::new("/workspace");
+    for (value, message) in [
+        ("bad", "module-name=path"),
+        ("=/dep", "invalid module name"),
+        ("Bad=/dep", "invalid module name"),
+        ("9bad=/dep", "invalid module name"),
+        ("a/b=/dep", "invalid module name"),
+        ("a.=/dep", "invalid module name"),
+        ("a_=/dep", "invalid module name"),
+    ] {
+        let flag = format!("--override_module={value}");
+        let error = BuildRequest::parse_at_workspace(&[flag.as_str(), "//pkg:bin"], workspace)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains(message), "{error}");
+    }
+
+    let missing_value =
+        BuildRequest::parse_at_workspace(&["--override_module", "//pkg:bin"], workspace)
+            .unwrap_err()
+            .to_string();
+    assert!(
+        missing_value.contains("expected module-name=path"),
+        "{missing_value}"
+    );
+
+    let nul_path = BuildRequest::parse_at_workspace(
+        &["--override_module=dep=/bad path", "//pkg:bin"],
+        workspace,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(nul_path.contains("must not contain NUL"), "{nul_path}");
+
+    let first = BuildRequest::parse_at_workspace(
+        &[
+            "--override_module=Bad=/dep",
+            "--override_module=also_bad",
+            "//pkg:bin",
+        ],
+        workspace,
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(first.contains("Bad"), "{first}");
+    assert!(
+        TestRequest::parse(&["--override_module=dep=/dep", "//pkg:probe_test"])
+            .unwrap_err()
+            .to_string()
+            .contains("workspace-owned command path")
+    );
+}

@@ -1690,3 +1690,298 @@ async fn root_package_policy_projections_prune_unrelated_changes_and_restore_a()
             .contains(&PackageIdentifier::parse_bazel_package_identifier("a").unwrap())
     );
 }
+
+#[test]
+fn command_module_override_policy_has_canonical_semantic_identity() {
+    let workspace = std::path::Path::new("/workspace");
+    let a = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        workspace,
+        ["zed=/deps/zed", "alpha=deps/alpha"],
+    )
+    .unwrap();
+    let b = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        workspace,
+        ["alpha=/workspace/deps/alpha", "zed=/deps/zed"],
+    )
+    .unwrap();
+    let changed = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        workspace,
+        ["alpha=/workspace/deps/other", "zed=/deps/zed"],
+    )
+    .unwrap();
+    assert_eq!(a, b);
+    assert_ne!(a, changed);
+    assert_eq!(hash(&a), hash(&b));
+    assert_ne!(hash(&a), hash(&changed));
+    assert_eq!(
+        a.module_overrides()
+            .map(|(name, path)| (name.to_owned(), path.display().to_string()))
+            .collect::<Vec<_>>(),
+        [
+            ("alpha".to_owned(), "/workspace/deps/alpha".to_owned()),
+            ("zed".to_owned(), "/deps/zed".to_owned()),
+        ]
+    );
+
+    let root: slug_bzlmod_v2::RootModuleCommandPolicy = a.clone().into();
+    assert_eq!(
+        root.command_module_overrides()
+            .map(|(name, path)| (name.to_owned(), path.display().to_string()))
+            .collect::<Vec<_>>(),
+        [
+            ("alpha".to_owned(), "/workspace/deps/alpha".to_owned()),
+            ("zed".to_owned(), "/deps/zed".to_owned()),
+        ]
+    );
+    assert!(a.module_overrides().any(|(name, _)| name == "zed"));
+    assert!(
+        BzlmodCommandPolicyKey::from_flags(None, false)
+            .unwrap()
+            .module_overrides()
+            .all(|(name, _)| name != "bazel_tools")
+    );
+}
+
+fn hash(value: &impl Hash) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    value.hash(&mut hasher);
+    hasher.finish()
+}
+
+#[derive(Debug, Clone, Allocative, Dupe)]
+struct CommandOverrideCounterKey {
+    workspace: NormalizedAbsolutePath,
+    #[allocative(skip)]
+    counter: Arc<AtomicUsize>,
+}
+
+impl PartialEq for CommandOverrideCounterKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.workspace == other.workspace && Arc::ptr_eq(&self.counter, &other.counter)
+    }
+}
+
+impl Eq for CommandOverrideCounterKey {}
+
+impl Hash for CommandOverrideCounterKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.workspace.hash(state);
+        Arc::as_ptr(&self.counter).hash(state);
+    }
+}
+
+impl fmt::Display for CommandOverrideCounterKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "command-module-override-counter:{}:{:p}",
+            self.workspace.as_path().display(),
+            Arc::as_ptr(&self.counter)
+        )
+    }
+}
+
+#[async_trait]
+impl Key for CommandOverrideCounterKey {
+    type Value = (usize, Arc<[(String, String)]>);
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let policy = ctx
+            .compute(&slug_bzlmod_v2::RootModuleCommandPolicyKey {
+                workspace: self.workspace.as_path().to_path_buf(),
+            })
+            .await
+            .unwrap();
+        (
+            self.counter.fetch_add(1, Ordering::SeqCst) + 1,
+            policy
+                .command_module_overrides()
+                .map(|(name, path)| (name.to_owned(), path.display().to_string()))
+                .collect::<Vec<_>>()
+                .into(),
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x == y
+    }
+}
+
+async fn inject_command_override_policy(
+    transaction: DiceTransaction,
+    workspace: &std::path::Path,
+    command: BzlmodCommandPolicyKey,
+    environment: Option<&str>,
+    lockfile_mode: LockfileMode,
+) -> DiceTransaction {
+    let mut updater = transaction.into_updater();
+    slug_bzlmod_v2::inject_root_module_request_inputs(
+        &mut updater,
+        workspace,
+        command,
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(environment).unwrap(),
+        lockfile_mode,
+    )
+    .unwrap();
+    updater.commit().await
+}
+
+#[tokio::test]
+async fn command_module_override_dice_input_reuses_and_invalidates_a_b_a() {
+    let workspace = normalized_path("/workspace");
+    let default = BzlmodCommandPolicyKey::from_flags(None, false).unwrap();
+    let override_a = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        workspace.as_path(),
+        ["zed=/deps/zed", "alpha=deps/alpha"],
+    )
+    .unwrap();
+    let override_b = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        workspace.as_path(),
+        ["alpha=/workspace/deps/alpha", "zed=/deps/zed"],
+    )
+    .unwrap();
+    assert_eq!(override_a, override_b);
+    let changed_path = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        workspace.as_path(),
+        ["alpha=/workspace/deps/changed", "zed=/deps/zed"],
+    )
+    .unwrap();
+
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater();
+    slug_bzlmod_v2::inject_root_module_request_inputs(
+        &mut updater,
+        workspace.as_path(),
+        default.clone(),
+        BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        LockfileMode::Update,
+    )
+    .unwrap();
+    let counter = Arc::new(AtomicUsize::new(0));
+    let key = CommandOverrideCounterKey {
+        workspace: workspace.dupe(),
+        counter: counter.clone(),
+    };
+    let mut transaction = updater.commit().await;
+
+    let a = transaction.compute(&key).await.unwrap();
+    assert_eq!(a.0, 1);
+    assert!(a.1.is_empty());
+    assert_eq!(transaction.compute(&key).await.unwrap(), a);
+
+    transaction = inject_command_override_policy(
+        transaction,
+        workspace.as_path(),
+        override_a,
+        None,
+        LockfileMode::Update,
+    )
+    .await;
+    let b = transaction.compute(&key).await.unwrap();
+    assert_eq!(b.0, 2);
+    assert_eq!(
+        b.1.as_ref(),
+        &[
+            ("alpha".to_owned(), "/workspace/deps/alpha".to_owned()),
+            ("zed".to_owned(), "/deps/zed".to_owned()),
+        ]
+    );
+
+    transaction = inject_command_override_policy(
+        transaction,
+        workspace.as_path(),
+        override_b.clone(),
+        Some("all"),
+        LockfileMode::Error,
+    )
+    .await;
+    assert_eq!(transaction.compute(&key).await.unwrap(), b);
+    assert_eq!(counter.load(Ordering::SeqCst), 2);
+
+    transaction = inject_command_override_policy(
+        transaction,
+        workspace.as_path(),
+        changed_path,
+        None,
+        LockfileMode::Update,
+    )
+    .await;
+    let changed = transaction.compute(&key).await.unwrap();
+    assert_eq!(changed.0, 3);
+    assert_eq!(changed.1[0].1, "/workspace/deps/changed");
+
+    transaction = inject_command_override_policy(
+        transaction,
+        workspace.as_path(),
+        override_b,
+        None,
+        LockfileMode::Update,
+    )
+    .await;
+    let path_restored = transaction.compute(&key).await.unwrap();
+    assert_eq!(path_restored.0, 4);
+    assert_eq!(path_restored.1, b.1);
+
+    transaction = inject_command_override_policy(
+        transaction,
+        workspace.as_path(),
+        default,
+        None,
+        LockfileMode::Update,
+    )
+    .await;
+    let restored = transaction.compute(&key).await.unwrap();
+    assert_eq!(restored.0, 5);
+    assert!(restored.1.is_empty());
+}
+
+#[test]
+fn command_override_precedence_projection_leaves_root_inputs_distinct() {
+    let root = BTreeMap::from([
+        ("bazel_tools", "/builtin/bazel_tools"),
+        ("dep", "/root/dep"),
+        ("root_only", "/root/only"),
+    ]);
+    let command = BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+        None,
+        false,
+        std::path::Path::new("/workspace"),
+        ["dep=/command/dep", "bazel_tools=/command/bazel_tools"],
+    )
+    .unwrap();
+    let effective = |name: &str| {
+        command
+            .module_overrides()
+            .find_map(|(candidate, path)| (candidate == name).then(|| path.display().to_string()))
+            .or_else(|| root.get(name).map(|path| (*path).to_owned()))
+    };
+    assert_eq!(effective("dep").as_deref(), Some("/command/dep"));
+    assert_eq!(
+        effective("bazel_tools").as_deref(),
+        Some("/command/bazel_tools")
+    );
+    assert_eq!(effective("root_only").as_deref(), Some("/root/only"));
+    assert_eq!(root["dep"], "/root/dep");
+    assert_eq!(root["bazel_tools"], "/builtin/bazel_tools");
+    assert!(
+        command
+            .module_overrides()
+            .any(|(name, _)| name == "bazel_tools")
+    );
+}

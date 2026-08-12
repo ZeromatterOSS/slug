@@ -20,7 +20,17 @@ use slug_reapi_v2::RemoteConfig;
 use slug_reapi_v2::RemoteMode;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    let request = match BuildRequest::parse(&argv) {
+    let workspace = match std::env::current_dir() {
+        Ok(workspace) => workspace,
+        Err(error) => {
+            eprintln!(
+                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
+                json_escape(&error.to_string())
+            );
+            return 2;
+        }
+    };
+    let request = match BuildRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Build, argv, Err(error)),
     };
@@ -45,17 +55,6 @@ pub fn run(argv: Vec<String>) -> i32 {
         );
         return run_daemon_build(&argv, &output_base, request, bzlmod);
     }
-
-    let workspace = match std::env::current_dir() {
-        Ok(workspace) => workspace,
-        Err(error) => {
-            eprintln!(
-                "{{\"error\":\"build_runtime_error\",\"command\":\"build\",\"message\":\"{}\",\"runtime_mode\":\"one-shot\"}}",
-                json_escape(&error.to_string())
-            );
-            return 2;
-        }
-    };
 
     let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
         &workspace,

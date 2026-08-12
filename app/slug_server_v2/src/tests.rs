@@ -117,6 +117,7 @@ fn daemon_bzlmod_inputs_are_request_local_default_override_default() {
         BzlmodRequestInputs {
             command_allow_yanked_versions: Some("all".to_owned()),
             ignore_dev_dependency: true,
+            command_module_overrides: Vec::new(),
             environment_allow_yanked_versions: Some("all".to_owned()),
             lockfile_mode: "off".to_owned(),
             registry_urls: vec!["https://registry.example/override/".to_owned()],
@@ -2005,8 +2006,15 @@ fn retained_cquery_formats_modes_and_restores_root_setting_projection() {
 #[test]
 fn bzlmod_protocol_is_primitive_canonical_and_backward_compatible() {
     let default_command = BzlmodCommandPolicyKey::from_flags(None, false).unwrap();
-    let override_command =
-        BzlmodCommandPolicyKey::from_flags(Some("zzz@2.0.0,yyy@1.0.0"), true).unwrap();
+    let override_command = BzlmodCommandPolicyKey::from_normalized_module_overrides(
+        Some("zzz@2.0.0,yyy@1.0.0"),
+        true,
+        [
+            ("zed".to_owned(), "/deps/zed".to_owned()),
+            ("alpha".to_owned(), "/deps/alpha".to_owned()),
+        ],
+    )
+    .unwrap();
     let default_environment =
         BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap();
     let override_environment =
@@ -2036,6 +2044,20 @@ fn bzlmod_protocol_is_primitive_canonical_and_backward_compatible() {
         Some("all")
     );
     assert!(override_inputs.ignore_dev_dependency);
+    assert_eq!(
+        override_inputs.command_module_overrides,
+        [
+            ("alpha".to_owned(), "/deps/alpha".to_owned()),
+            ("zed".to_owned(), "/deps/zed".to_owned()),
+        ]
+    );
+    assert_eq!(
+        serde_json::from_str::<BzlmodRequestInputs>(
+            &serde_json::to_string(&override_inputs).unwrap()
+        )
+        .unwrap(),
+        override_inputs
+    );
     assert_eq!(override_inputs.lockfile_mode, "error");
 
     let old: DaemonRequest = serde_json::from_str(
@@ -2073,6 +2095,16 @@ fn malformed_bzlmod_protocol_input_is_request_local() {
             r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"lockfile_mode":"invalid"}}}"#,
             2,
             "Not a valid Lockfile mode",
+        ),
+        (
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_module_overrides":[["dep","relative/dep"]]}}}"#,
+            2,
+            "must be absolute",
+        ),
+        (
+            r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_module_overrides":[["dep","/one"],["dep","/two"]]}}}"#,
+            2,
+            "duplicate normalized module override",
         ),
         (
             r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"registry_urls":["file://bad"]}}}"#,
@@ -2873,4 +2905,28 @@ fn retained_daemon_buildfiles_tracks_loaded_companion_priority_only() {
         "//app:BUILD.bazel\n//loaded:BUILD\n//loaded:defs.bzl\n"
     );
     assert_eq!(restored_fallback.invalidated_files, 1);
+}
+
+#[test]
+fn every_active_daemon_decoder_carries_command_module_overrides() {
+    let requests = [
+        r#"{"kind":"build","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[],"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"run","request":{"targets":["//pkg:probe"],"executor":null,"default_exec_properties":[],"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"query","request":{"expression":"//pkg:probe","order_output":"auto","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"aquery","request":{"expression":"//pkg:probe","bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+        r#"{"kind":"cquery","request":{"expression":"//pkg:probe","output":"label","root_string_setting":null,"bzlmod":{"command_module_overrides":[["dep","/deps/dep"]]}}}"#,
+    ];
+    for request in requests {
+        let request: DaemonRequest = serde_json::from_str(request).unwrap();
+        let inputs = match request {
+            DaemonRequest::Build(request) | DaemonRequest::Run(request) => request.bzlmod,
+            DaemonRequest::Query(request) => request.bzlmod,
+            DaemonRequest::Aquery(request) => request.bzlmod,
+            DaemonRequest::Cquery(request) => request.bzlmod,
+        };
+        assert_eq!(
+            inputs.command_module_overrides,
+            [("dep".to_owned(), "/deps/dep".to_owned())]
+        );
+    }
 }

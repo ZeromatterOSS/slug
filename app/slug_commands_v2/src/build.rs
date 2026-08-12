@@ -8,6 +8,8 @@
  * above-listed licenses.
  */
 
+use std::path::Path;
+
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_identity_v2::TargetPattern;
@@ -17,6 +19,7 @@ use crate::common::CommandParseError;
 use crate::common::CommandPlaceholderError;
 use crate::common::ParsedFlag;
 use crate::common::bzlmod_command_policy;
+use crate::common::bzlmod_command_policy_for_workspace;
 use crate::common::bzlmod_lockfile_mode;
 use crate::common::bzlmod_registry_urls;
 use crate::common::parse_target_patterns;
@@ -37,8 +40,25 @@ pub struct BuildRequest {
 
 impl BuildRequest {
     pub fn parse(args: &[impl AsRef<str>]) -> Result<Self, CommandParseError> {
+        Self::parse_impl(args, None)
+    }
+
+    pub fn parse_at_workspace(
+        args: &[impl AsRef<str>],
+        workspace: &Path,
+    ) -> Result<Self, CommandParseError> {
+        Self::parse_impl(args, Some(workspace))
+    }
+
+    fn parse_impl(
+        args: &[impl AsRef<str>],
+        workspace: Option<&Path>,
+    ) -> Result<Self, CommandParseError> {
         let parsed = split_args(args);
-        let bzlmod_policy = bzlmod_command_policy(&parsed.flags)?;
+        let bzlmod_policy = match workspace {
+            Some(workspace) => bzlmod_command_policy_for_workspace(&parsed.flags, workspace)?,
+            None => bzlmod_command_policy(&parsed.flags)?,
+        };
         let lockfile_mode = bzlmod_lockfile_mode(&parsed.flags)?;
         let registry_urls = bzlmod_registry_urls(&parsed.flags)?;
         let root_string_setting = build_flag_admission(&parsed.flags)?;
@@ -103,6 +123,7 @@ fn admitted_build_flag(name: &str) -> bool {
             | "ignore_dev_dependency"
             | "noignore_dev_dependency"
             | "lockfile_mode"
+            | "override_module"
             | "registry"
             // UI and output-base controls.
             | "color"

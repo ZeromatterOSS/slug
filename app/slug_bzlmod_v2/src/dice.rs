@@ -8,11 +8,22 @@
  * above-listed licenses.
  */
 
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::path::Path;
+use std::path::PathBuf;
+use std::sync::Arc;
 
+use allocative::Allocative;
+use compact_str::CompactString;
+use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use starlark_map::small_map::SmallMap;
 
 use crate::ModuleKey;
 use crate::YankedVersionPolicy;
@@ -671,10 +682,150 @@ impl fmt::Display for LockfileMode {
     }
 }
 
+impl PartialOrd for CommandModuleOverrides {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for CommandModuleOverrides {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.iter().cmp(other.iter())
+    }
+}
+
+impl Hash for CommandModuleOverrides {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.len().hash(state);
+        for (name, path) in self.iter() {
+            name.hash(state);
+            path.hash(state);
+        }
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative, Dupe)]
+pub(crate) struct CommandModuleOverrides(Arc<SmallMap<CompactString, NormalizedAbsolutePath>>);
+
+impl Default for CommandModuleOverrides {
+    fn default() -> Self {
+        Self(Arc::new(SmallMap::new()))
+    }
+}
+
+impl CommandModuleOverrides {
+    pub fn from_bazel_flag_values<'a>(
+        workspace: &Path,
+        values: impl IntoIterator<Item = &'a str>,
+    ) -> Result<Self, String> {
+        let workspace = NormalizedAbsolutePath::new(workspace.to_path_buf())
+            .map_err(|error| error.to_string())?;
+        let workspace_text = workspace
+            .as_path()
+            .to_str()
+            .ok_or_else(|| "workspace path must be valid Unicode".to_owned())?;
+        let mut effective = SmallMap::new();
+        for value in values {
+            let Some((module_name, raw_path)) = value.split_once('=') else {
+                return Err("Module overrides must be of the form 'module-name=path'".to_owned());
+            };
+            validate_module_name(module_name)?;
+            if raw_path.is_empty() {
+                effective.shift_remove(module_name);
+                continue;
+            }
+            if raw_path.contains('\0') {
+                return Err("module override path must not contain NUL".to_owned());
+            }
+            let expanded = raw_path.replace("%workspace%", workspace_text);
+            let path = PathBuf::from(expanded);
+            let absolute = if path.is_absolute() {
+                path
+            } else {
+                workspace.as_path().join(path)
+            };
+            let normalized =
+                NormalizedAbsolutePath::new(absolute).map_err(|error| error.to_string())?;
+            effective.insert(CompactString::new(module_name), normalized);
+        }
+        Ok(Self::from_effective(effective))
+    }
+
+    pub fn from_normalized_pairs(
+        pairs: impl IntoIterator<Item = (String, String)>,
+    ) -> Result<Self, String> {
+        let mut effective = SmallMap::new();
+        for (module_name, path) in pairs {
+            validate_module_name(&module_name)?;
+            if effective.contains_key(module_name.as_str()) {
+                return Err(format!(
+                    "duplicate normalized module override for {module_name}"
+                ));
+            }
+            if path.contains('\0') {
+                return Err("module override path must not contain NUL".to_owned());
+            }
+            let path = PathBuf::from(path);
+            if !path.is_absolute() {
+                return Err(format!(
+                    "normalized module override path must be absolute: {}",
+                    path.display()
+                ));
+            }
+            let normalized =
+                NormalizedAbsolutePath::new(path).map_err(|error| error.to_string())?;
+            effective.insert(CompactString::new(module_name), normalized);
+        }
+        Ok(Self::from_effective(effective))
+    }
+
+    fn from_effective(effective: SmallMap<CompactString, NormalizedAbsolutePath>) -> Self {
+        let mut entries = effective.into_iter().collect::<Vec<_>>();
+        entries.sort_by(|(left, _), (right, _)| left.cmp(right));
+        Self(Arc::new(SmallMap::from_iter(entries)))
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&str, &Path)> {
+        self.0
+            .iter()
+            .map(|(name, path)| (name.as_str(), path.as_path()))
+    }
+
+    fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    fn stable_serialize(&self) -> String {
+        self.iter()
+            .map(|(name, path)| format!("{name}={}", path.display()))
+            .collect::<Vec<_>>()
+            .join(",")
+    }
+}
+
+fn validate_module_name(name: &str) -> Result<(), String> {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return Err("invalid module name '': module name must not be empty".to_owned());
+    };
+    let last = name.chars().next_back().unwrap();
+    let valid_char = |c: char| c.is_ascii_lowercase() || c.is_ascii_digit() || ".-_".contains(c);
+    if !first.is_ascii_lowercase()
+        || !(last.is_ascii_lowercase() || last.is_ascii_digit())
+        || !name.chars().all(valid_char)
+    {
+        return Err(format!(
+            "invalid module name '{name}': valid names must only contain lowercase letters, digits, dots, hyphens, and underscores; begin with a lowercase letter; and end with a lowercase letter or digit"
+        ));
+    }
+    Ok(())
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodCommandPolicyKey {
     yanked_versions_policy: YankedVersionPolicy,
     ignore_dev_dependency: bool,
+    module_overrides: CommandModuleOverrides,
 }
 
 impl BzlmodCommandPolicyKey {
@@ -689,6 +840,7 @@ impl BzlmodCommandPolicyKey {
         Self {
             yanked_versions_policy,
             ignore_dev_dependency,
+            module_overrides: CommandModuleOverrides::default(),
         }
     }
 
@@ -706,20 +858,68 @@ impl BzlmodCommandPolicyKey {
         ))
     }
 
+    pub fn from_flags_with_module_overrides<'a>(
+        allow_yanked_versions: Option<&str>,
+        ignore_dev_dependency: bool,
+        workspace: &Path,
+        override_values: impl IntoIterator<Item = &'a str>,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            yanked_versions_policy: YankedVersionPolicy::from_flag_value(allow_yanked_versions)?,
+            ignore_dev_dependency,
+            module_overrides: CommandModuleOverrides::from_bazel_flag_values(
+                workspace,
+                override_values,
+            )?,
+        })
+    }
+
+    pub fn from_normalized_module_overrides(
+        allow_yanked_versions: Option<&str>,
+        ignore_dev_dependency: bool,
+        overrides: impl IntoIterator<Item = (String, String)>,
+    ) -> Result<Self, String> {
+        Ok(Self {
+            yanked_versions_policy: YankedVersionPolicy::from_flag_value(allow_yanked_versions)?,
+            ignore_dev_dependency,
+            module_overrides: CommandModuleOverrides::from_normalized_pairs(overrides)?,
+        })
+    }
+
     pub fn yanked_versions_policy(&self) -> &YankedVersionPolicy {
         &self.yanked_versions_policy
+    }
+
+    pub(crate) fn yanked_versions_stable_serialize(&self) -> String {
+        serialize_yanked_policy(&self.yanked_versions_policy)
     }
 
     pub fn ignore_dev_dependency(&self) -> bool {
         self.ignore_dev_dependency
     }
 
+    pub fn module_overrides(&self) -> impl Iterator<Item = (&str, &Path)> {
+        self.module_overrides.iter()
+    }
+
+    pub(crate) fn command_module_overrides(&self) -> &CommandModuleOverrides {
+        &self.module_overrides
+    }
+
     pub fn stable_serialize(&self) -> String {
-        format!(
+        let base = format!(
             "{};ignore_dev_dependency={}",
             serialize_yanked_policy(&self.yanked_versions_policy),
-            self.ignore_dev_dependency
-        )
+            self.ignore_dev_dependency,
+        );
+        if self.module_overrides.is_empty() {
+            base
+        } else {
+            format!(
+                "{base};module_overrides={}",
+                self.module_overrides.stable_serialize()
+            )
+        }
     }
 }
 
@@ -728,7 +928,6 @@ impl fmt::Display for BzlmodCommandPolicyKey {
         f.write_str(&self.stable_serialize())
     }
 }
-
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct BzlmodEnvironmentPolicyKey {
     yanked_versions_policy: YankedVersionPolicy,

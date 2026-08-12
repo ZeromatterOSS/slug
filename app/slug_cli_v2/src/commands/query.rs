@@ -19,7 +19,11 @@ use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::evaluate_workspace_query_command_with_policy_and_bzlmod_inputs_and_output_completion;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    let request = match QueryRequest::parse(&argv) {
+    let workspace = match std::env::current_dir() {
+        Ok(workspace) => workspace,
+        Err(error) => return emit_error(7, &error.to_string(), "one-shot"),
+    };
+    let request = match QueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Query, argv, Err(error)),
     };
@@ -41,10 +45,6 @@ pub fn run(argv: Vec<String>) -> i32 {
         );
         return run_daemon_query(&output_base, request, bzlmod);
     }
-    let workspace = match std::env::current_dir() {
-        Ok(workspace) => workspace,
-        Err(error) => return emit_error(7, &error.to_string(), "one-shot"),
-    };
     let completion = if request.output == QueryOutputFormat::LabelKind {
         QueryOutputCompletion::LabelKind
     } else {

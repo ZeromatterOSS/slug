@@ -14,6 +14,8 @@ use std::path::Path;
 use std::process::Command;
 
 use slug_commands_v2::CommandKind;
+use slug_commands_v2::CommandParseError;
+use slug_commands_v2::build::BuildRequest;
 use slug_commands_v2::normalize_bzlmod_environment_value;
 use slug_commands_v2::run::RunRequest;
 use slug_core_v2::error::json_escape;
@@ -25,7 +27,11 @@ use slug_server_v2::RUN_ENVIRONMENT_TO_CLEAR;
 use slug_server_v2::RunLaunchPlan;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    let request = match RunRequest::parse(&argv) {
+    let workspace = match std::env::current_dir() {
+        Ok(workspace) => workspace,
+        Err(error) => return run_error(&error.to_string(), "one-shot", 2),
+    };
+    let request = match parse_run_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Run, argv, Err(error)),
     };
@@ -53,10 +59,6 @@ pub fn run(argv: Vec<String>) -> i32 {
         );
         return run_daemon(&output_base, request, bzlmod, remote);
     }
-    let workspace = match std::env::current_dir() {
-        Ok(workspace) => workspace,
-        Err(error) => return run_error(&error.to_string(), "one-shot", 2),
-    };
     let accepted = match evaluate_workspace_build_command_with_bzlmod_inputs(
         &workspace,
         std::slice::from_ref(&request.target),
@@ -225,6 +227,55 @@ fn run_error_json(kind: &str, message: &str, runtime_mode: &str) -> String {
         json_escape(message),
         runtime_mode,
     )
+}
+
+fn parse_run_at_workspace(
+    argv: &[String],
+    workspace: &Path,
+) -> Result<RunRequest, CommandParseError> {
+    let has_override = argv
+        .iter()
+        .take_while(|arg| arg.as_str() != "--")
+        .any(|arg| matches!(flag_name(arg), Some("override_module")));
+    if !has_override {
+        return RunRequest::parse(argv);
+    }
+
+    let mut policy_args = Vec::new();
+    let mut run_args = Vec::with_capacity(argv.len());
+    let mut passthrough = false;
+    for arg in argv {
+        if arg == "--" {
+            passthrough = true;
+            run_args.push(arg.clone());
+            continue;
+        }
+        let name = (!passthrough).then(|| flag_name(arg)).flatten();
+        if matches!(
+            name,
+            Some(
+                "allow_yanked_versions"
+                    | "ignore_dev_dependency"
+                    | "noignore_dev_dependency"
+                    | "override_module"
+            )
+        ) {
+            policy_args.push(arg.clone());
+        }
+        if name != Some("override_module") {
+            run_args.push(arg.clone());
+        }
+    }
+    policy_args.push("//:__slug_override_policy__".to_owned());
+    let normalized = BuildRequest::parse_at_workspace(&policy_args, workspace)?;
+    let mut request = RunRequest::parse(&run_args)?;
+    request.bzlmod_policy = normalized.bzlmod_policy;
+    Ok(request)
+}
+
+fn flag_name(arg: &str) -> Option<&str> {
+    arg.strip_prefix("--")
+        .map(|flag| flag.split_once('=').map_or(flag, |(name, _)| name))
 }
 
 #[cfg(test)]

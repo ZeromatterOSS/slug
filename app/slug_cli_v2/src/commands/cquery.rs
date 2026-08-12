@@ -17,7 +17,11 @@ use slug_core_v2::runtime::TerminalOutput;
 use slug_core_v2::runtime::evaluate_workspace_cquery_command_with_bzlmod_inputs;
 
 pub fn run(argv: Vec<String>) -> i32 {
-    let request = match CqueryRequest::parse(&argv) {
+    let workspace = match std::env::current_dir() {
+        Ok(workspace) => workspace,
+        Err(error) => return emit_error(&error.to_string(), "one-shot"),
+    };
+    let request = match CqueryRequest::parse_at_workspace(&argv, &workspace) {
         Ok(request) => request,
         Err(error) => return super::emit_result(CommandKind::Cquery, argv, Err(error)),
     };
@@ -39,10 +43,6 @@ pub fn run(argv: Vec<String>) -> i32 {
         );
         return run_daemon(&output_base, request, bzlmod);
     }
-    let workspace = match std::env::current_dir() {
-        Ok(workspace) => workspace,
-        Err(error) => return emit_error(&error.to_string(), "one-shot"),
-    };
     let output_mode = request.output_mode;
     let accepted = match evaluate_workspace_cquery_command_with_bzlmod_inputs(
         &workspace,
