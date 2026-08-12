@@ -1,9 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-8-m7-filewrite-run-fixture-admission-design`
-Milestone: M7 fixture-boundary replan
+Packet: `WP-8-m7-filewrite-run-handoff-implementation-retry-2`
+Milestone: M7 implementation retry 2
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: freeze the complete POSIX source shape for `run-basic` on the already
+Result: activate the accepted FileWrite Run vertical using the reviewed
+endpoint injector and complete POSIX `run-basic` source shape on the already
 admitted Slug Starlark surface, without adding host-configuration semantics or
 changing the accepted production Run architecture.
 
@@ -17,7 +18,7 @@ reads `ctx.configuration.host_path_separator`, which Slug does not admit.
 Because that is separate from toolchain topology, the retry ends `REPLAN`
 without acceptance or commit.
 
-## Design scope
+## Accepted fixture amendment
 
 Audit the entire four-file `run-basic` workspace source against existing Slug
 loading/analysis capabilities. Freeze a POSIX-only fixture: add the existing
@@ -31,12 +32,12 @@ They do not change the pinned Bazel 9.2 Linux observable output and make no
 Windows or host-configuration compatibility claim. Windows, host-path context,
 other action producers, and broader Run surfaces remain unsupported/deferred.
 
-Edit only this manifest, canonical/Stage 8/routing bookkeeping. The successor
-may additionally edit the six existing `run-basic` files and resume the retry's
-production/harness allowlist and caps. Cap this design at 60 bookkeeping lines
-and the successor source correction at 20 fixture lines. Require pinned Bazel
+This retry may edit this manifest, canonical/Stage 8/routing bookkeeping, the
+six existing `run-basic` files, and resume the predecessor production/harness
+allowlist and caps. Cap the source correction at 20 fixture lines. Require pinned Bazel
 9.2 replay, Slug replay, source grep proving no `ctx.configuration`/Windows
-branch, and independent design review before implementation resumes.
+branch, the retained full validation contract, and independent final review.
+One material correction is allowed in this retry; a second is `REPLAN`.
 
 ## Concrete stop
 

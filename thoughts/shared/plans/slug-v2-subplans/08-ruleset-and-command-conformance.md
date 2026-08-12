@@ -4435,3 +4435,9 @@ That second scope miss ends the retry `REPLAN` without accepting or committing
 the retained production/harness diff. Run next only
 `WP-8-m7-filewrite-run-fixture-admission-design`: audit all four workspace
 sources and freeze one POSIX-only source reduction before another retry.
+
+Count-correction rereview returned `ACCEPT`. The full four-file workspace audit
+found no other unsupported construct beyond the cross-platform host-context
+branch. Run next only
+`WP-8-m7-filewrite-run-handoff-implementation-retry-2`, retaining the reviewed
+production/harness diff and applying only the accepted POSIX fixture reduction.
