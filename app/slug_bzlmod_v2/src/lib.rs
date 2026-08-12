@@ -35,6 +35,7 @@ mod repository_ignore;
 pub mod resolution;
 mod root_bootstrap;
 mod selected_graph;
+mod selected_repo_spec;
 pub mod source_preparation;
 
 pub use builtin_repository::BuiltinBazelToolsRouteIdentity;
