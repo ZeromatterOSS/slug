@@ -2465,3 +2465,15 @@ Final implementation review accepts the four-path owner at approximately
 event row, formatting, and diff checks pass. Retained state is heap/callable
 free; lifetime values remain local to preflight. Commit the exact authorized
 paths and no visibility, repository, output, I/O, consumer, or public breadth.
+
+### Repository-rule definition owner scheduled (2026-08-12)
+
+Pure invocation is accepted in `986ccebd`. Generated repositories do not come
+from an extension return value; they are repository-rule call side effects,
+and shared loading currently omits `repository_rule`. Run only the four-plan
+docs audit `WP-4-5-host-repository-rule-definition-owner-design` under
+45/240/200/120/605. Audit pinned definition parameters/defaults/errors,
+callable/schema/export/definition identity, frozen lifetime versus heap-free
+projection, and the smallest future loading-owned successor. No Rust, fixture,
+repository call, generated `RepoSpec`, context, I/O, materializer, consumer,
+public API, or JVM work is authorized before independent design acceptance.

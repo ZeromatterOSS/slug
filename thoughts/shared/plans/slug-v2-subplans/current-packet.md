@@ -1,13 +1,65 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4`
-Milestone: M7 pure module-extension invocation implementation r4
+Packet: `WP-4-5-host-repository-rule-definition-owner-design`
+Milestone: M7 repository-rule definition/loading prerequisite design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: land the complete pure invocation owner with the accepted DICE and
-command-effect event-lineage contract.
+Result: design the first missing loading-owned repository-rule definition leaf
+before generated-repository call capture or existence validation.
 
-## Active implementation contract
+## Active docs-only design contract
+
+Pure invocation is accepted in `986ccebd`. The next truthful leaf is not an
+extension result receipt: Bazel module-extension implementations return
+`None`, while generated repositories arise from repository-rule call side
+effects. Live shared loading globals deliberately omit `repository_rule`, so
+the sole accepted `HostBzlModuleEvalKey` cannot yet load an ordinary extension
+file that declares one. Run only
+`WP-4-5-host-repository-rule-definition-owner-design` in canonical/current/
+Stage 4/Stage 5 under 45/240/200/120/605 documentation lines. Authorize no
+Rust, Cargo, fixture, generated output, or activation before independent
+acceptance.
+
+Audit pinned Bazel 9.2 `repository_rule()` definition and export ownership:
+exact parameters/defaults and first-error order; callable implementation
+requirements; implicit `name`; ordered attribute schema and default identity;
+exported-name binding, definition label/location, doc/private behavior;
+`environ`, `configure`, `local`, `remotable`, and every identity-affecting
+option. Separate definition-time retained data from call-time name/kwargs,
+repository context, implementation execution, and heap lifetime. Reuse the
+existing shared loading globals and sole `HostBzlModuleEvalKey`; determine
+whether a frozen definition stays lifetime-owned by `FrozenBzlModule` while a
+heap-free projection owns DICE equality. Do not assume a scalar subset until
+pinned sources establish its complete semantics and fail-closed boundary.
+
+Freeze a future implementation successor only if the audit proves one bounded
+owner. The likely ceiling is `package.rs`, `bzl_module.rs`, one new private
+`repository_rule.rs`, and `lib.rs` solely for its private declaration, but the
+design must choose the smallest cohesive subset and explicit production/test/
+total caps. Require definition/global/export/schema positives, every admitted
+field A/B/A, unsupported option/type first errors, private/missing/wrong-kind
+exports, transitive manifest changes, Need/error precedence, complete-only
+equality, cold/warm loading events, and structural absence of a second loader,
+retained heap/callable in semantic projection, repository calls, generated
+rows, `RepoSpec`, context, or I/O.
+
+Compatibility is exact for the eventually admitted Bazel 9.2 definition/load/
+export surface; private Rust layout, compact containers, diagnostic framing,
+and DICE scheduling are Slug-native. Repository-rule invocation,
+`repository_ctx`, environment/filesystem/network/watch/download/execute,
+generated names/RepoSpecs, materialization, override/inject existence,
+mappings, lockfile, nonroot/MVO/isolation/innate breadth, commands, public API,
+and JVM are unsupported/deferred. `REPLAN` on execution or generated state in
+this packet, a second loader/evaluator/graph, retained heap/callable outside
+the accepted frozen-module lifetime, public/wire surface, repository I/O,
+unresolved pinned option/error order, more than four future Rust paths, or an
+unbounded schema.
+
+## Accepted pure-invocation implementation evidence
+
+This section and everything below are historical context only, grant no file,
+action, cap, or schedule authority, and are interpreted solely through the
+active docs-only design contract above.
 
 Independent review accepts the event correction in `f36ec593`. Implement only
 `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the

@@ -2556,3 +2556,12 @@ repository, output, public, and JVM stops.
 Independent implementation review accepts the callerless loading owner and
 full loading/Bzlmod evidence at approximately 724/846/1,570. Stage 5 remains
 unchanged; commit no Bzlmod or command-consumer Rust.
+
+Pure invocation is accepted in `986ccebd`, but generated-repository capture is
+not yet truthful because the sole shared loader has no `repository_rule`
+definition owner. Run only the four-plan docs audit
+`WP-4-5-host-repository-rule-definition-owner-design` under
+45/240/200/120/605. Stage 5 remains unchanged. Do not infer generated names,
+RepoSpecs, override/inject existence, mappings, lockfile products, or any
+repository/materialization/consumer edge before this definition prerequisite
+is independently accepted and explicitly activated.
