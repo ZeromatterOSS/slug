@@ -2373,3 +2373,24 @@ needed. Freeze the exact eight Rust files and 90 production/220 test/310 total
 successor recorded in current, with synthetic default/override/nesting/cycle
 coverage and full Label str/repr/interpolation/format/print/DICE proof. Do not
 activate Rust before independent design acceptance.
+
+### Custom string protocol implementation activated (2026-08-12)
+
+Independent review accepts the single-vtable protocol in `73b22cec`. Run only
+`WP-4-starlark-custom-string-protocol-implementation` in the exact eight Rust
+files and four plans frozen by current, under 90 production/220 test/310 total
+lines against `73b22cec`. Preserve every shared consumer, default behavior,
+Label proof, and stop; the retained invocation owner remains unaccepted beyond
+the Label override and focused tests authorized by this prerequisite.
+
+### Custom string implementation scope correction (2026-08-12)
+
+Independent implementation review rejects that Git boundary: the two app paths
+cannot land without also committing the retained unaccepted invocation owner.
+Run only the four-plan docs correction
+`WP-4-starlark-custom-string-protocol-implementation-r2-scope-design`.
+Freeze the successor to the six shared starlark-rust files under the same
+90/220/310 caps against `73b22cec`, require the complete synthetic global
+str/repr/interpolation/format/print/nesting/cycle matrix, and defer exact Label
+and loading/DICE proof to the invocation packet. No Rust resumes before
+independent correction acceptance and explicit r2 activation.

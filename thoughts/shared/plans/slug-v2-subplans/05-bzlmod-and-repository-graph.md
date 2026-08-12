@@ -2496,3 +2496,16 @@ The completed audit freezes only the shared StarlarkValue `collect_str`
 protocol and exact eight-file 90/220/310 future successor recorded in current.
 Stage 5 stays unchanged; no selected-input, Bzlmod, repository, or mapping edge
 is part of that successor.
+
+Independent review accepts and activates
+`WP-4-starlark-custom-string-protocol-implementation` against `73b22cec` under
+the exact eight-file 90/220/310 boundary frozen in current. Stage 5 production
+remains unchanged; only the four bookkeeping plans are authorized here.
+
+Implementation review finds the two app paths inseparable from the unaccepted
+invocation owner. Run only the four-plan docs correction
+`WP-4-starlark-custom-string-protocol-implementation-r2-scope-design`, freezing
+a six-file shared-runtime successor under unchanged 90/220/310 caps against
+`73b22cec` and moving Label/loading/DICE proof back to the invocation packet.
+Stage 5 production remains unchanged and no Rust resumes before acceptance and
+explicit r2 activation.

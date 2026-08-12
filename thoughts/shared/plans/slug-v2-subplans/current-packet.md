@@ -1,13 +1,53 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-starlark-custom-string-protocol-design`
-Milestone: M7 custom Starlark stringification prerequisite design
+Packet: `WP-4-starlark-custom-string-protocol-implementation-r2-scope-design`
+Milestone: M7 custom Starlark stringification prerequisite scope correction
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the smallest reusable Rust Starlark stringification seam before
-pure module-extension invocation can resume.
+Result: correct the implementation boundary so the shared runtime protocol can
+land without committing the retained unaccepted invocation owner.
 
-## Active docs-only REPLAN contract
+## Active docs-only scope-correction contract
+
+Independent implementation review found the six shared runtime files sound but
+rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly
+new retained invocation owner and `bzl_module.rs` carries its retained lifecycle
+tests, so landing the authorized Label override/tests would also land production
+that this packet explicitly keeps unaccepted. Record only the bounded correction
+`WP-4-starlark-custom-string-protocol-implementation-r2-scope-design` in
+canonical/current/Stage 4/Stage 5. It may edit exactly those four plans under
+30/120/100/80/330 documentation lines and authorizes no Rust, Cargo, fixture, or
+commit before independent acceptance and explicit r2 activation.
+
+Freeze the r2 implementation to the first six vendored starlark-rust files in
+the successor list below, keeping 90 production/220 test/310 total caps against
+`73b22cec`. Require the synthetic custom value to prove default and overridden
+global `str`/`repr`, `%s`/`%r`, optimized/default and general format, print,
+nested-container repr, and recursive-cycle fallback. Defer InvocationLabel and
+all loading/DICE proof until the invocation packet legitimately lands. Preserve
+every existing protocol semantic and stop. `REPLAN` on any app Rust file,
+seventh Rust file, derive edit, reduced shared-consumer proof, public API, second
+protocol, changed default behavior, or cap excess.
+
+## Superseded initial implementation activation
+
+This section is historical only and grants no file, action, cap, or schedule
+authority; it is interpreted solely through the active docs-only correction.
+
+Independent design review accepts the protocol owner frozen in `73b22cec`.
+Implement only `WP-4-starlark-custom-string-protocol-implementation` in the
+exact eight Rust files named below plus canonical/current/Stage 4/Stage 5
+bookkeeping. Caps are 90 production, 220 tests, and 310 total formatted net
+lines against `73b22cec`. Preserve the single default-to-repr vtable protocol,
+all shared consumer proofs, the exact InvocationLabel str/repr boundary, and
+every stop. A ninth Rust file, derive-crate change, public Slug API, behavior
+expansion, or cap excess requires `REPLAN`.
+
+## Accepted docs-only REPLAN contract
+
+This section is historical design context only, grants no file, action, cap,
+or schedule authority, and is interpreted only through the active docs-only
+scope-correction contract above.
 
 The r2 implementation stop fired while completing the exact Label ABI proof.
 The accepted slice requires `str(label)` and `%s` to render the canonical label
@@ -100,8 +140,9 @@ and tests needed to prove this prerequisite.
 
 ## Accepted r2 correction contract
 
-This section is historical correction authority interpreted only through the
-active docs-only REPLAN contract above.
+This section is historical correction context only, grants no file, action,
+cap, or schedule authority, and is interpreted only through the active
+docs-only scope-correction contract above.
 
 The first compiling implementation is 630 production lines against `db45d182`
 before tests: 597 lines in the required private invocation/ABI owner and 33 in
@@ -148,7 +189,7 @@ side-effect-free.
 
 This section is historical design context only, grants no file, action, cap,
 or schedule authority, and is interpreted only through the active docs-only
-REPLAN contract above.
+scope-correction contract above.
 
 Perform a read-only ownership audit for one callerless loading-owned DICE leaf
 that computes `HostPreparedModuleExtensionInputsKey`, reacquires each exact
