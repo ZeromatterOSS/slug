@@ -6,6 +6,7 @@ package(default_visibility = ["//visibility:public"])
 rust_library(
     name = "slug_bzlmod_v2",
     srcs = glob(["src/**/*.rs"]),
+    compile_data = glob(["builtin/**"]),
     aliases = aliases(),
     edition = crate_edition(),
     deps = all_crate_deps(normal = True) + [
@@ -46,6 +47,19 @@ rust_test(
         "//dice/dice",
         "//dice/dice_futures",
         "//gazebo/dupe",
+    ],
+)
+
+rust_test(
+    name = "builtin_bazel_tools_test",
+    srcs = ["tests/builtin_bazel_tools.rs"],
+    data = glob(["builtin/**"]),
+    edition = crate_edition(),
+    size = "small",
+    visibility = ["//visibility:private"],
+    deps = crate_deps(["hex", "tokio"]) + [
+        ":slug_bzlmod_v2",
+        "//dice/dice",
     ],
 )
 

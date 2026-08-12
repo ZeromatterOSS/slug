@@ -2100,6 +2100,11 @@ fn request_kind(
 fn host_repository_materialization_request(
     route: &RootRepositoryRoute,
 ) -> Result<Arc<RepositoryMaterializationRequest>, RepositoryMaterializationError> {
+    if route.is_builtin_bazel_tools() {
+        return Err(RepositoryMaterializationError::Spec(
+            "built-in bazel_tools source requires its immutable source owner".into(),
+        ));
+    }
     Ok(Arc::new(RepositoryMaterializationRequest {
         id: RepositoryMaterializationRequestId {
             workspace: route.workspace().dupe(),
@@ -3568,6 +3573,15 @@ mod tests {
 
     fn local_route() -> RootRepositoryRoute {
         local_route_with_path("dep")
+    }
+
+    #[test]
+    fn builtin_route_fails_before_host_materialization() {
+        let route = RootRepositoryRoute::builtin_for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+        );
+        let error = host_repository_materialization_request(&route).unwrap_err();
+        assert!(matches!(error, RepositoryMaterializationError::Spec(_)));
     }
 
     fn immutable_route() -> RootRepositoryRoute {

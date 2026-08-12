@@ -33,6 +33,8 @@ use slug_workspace_v2::PathOutcome;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
+use crate::BuiltinBazelToolsRouteIdentity;
+use crate::BuiltinBazelToolsSnapshot;
 use crate::EvaluatedRootModule;
 use crate::LogicalModuleFileId;
 use crate::LogicalSpan;
@@ -475,13 +477,19 @@ impl Key for RootModuleLoadingAnchorKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum RootRepositorySource {
+    DirectLocal(RepoSpec),
+    BuiltinBazelTools(BuiltinBazelToolsRouteIdentity),
+}
+
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct RootRepositoryRoute {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     module_name: CompactString,
     canonical_repo: CanonicalRepoName,
-    repo_spec: RepoSpec,
+    source: RootRepositorySource,
 }
 
 fn hash_override_attribute_value<H: Hasher>(value: &OverrideAttributeValue, state: &mut H) {
@@ -538,13 +546,23 @@ fn hash_repo_spec<H: Hasher>(spec: &RepoSpec, state: &mut H) {
     entry_hashes.hash(state);
 }
 
+impl Hash for RootRepositorySource {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::DirectLocal(spec) => hash_repo_spec(spec, state),
+            Self::BuiltinBazelTools(identity) => identity.hash(state),
+        }
+    }
+}
+
 impl Hash for RootRepositoryRoute {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.workspace.hash(state);
         self.apparent_repo.hash(state);
         self.module_name.hash(state);
         self.canonical_repo.hash(state);
-        hash_repo_spec(&self.repo_spec, state);
+        self.source.hash(state);
     }
 }
 
@@ -574,8 +592,21 @@ impl RootRepositoryRoute {
         &self.workspace
     }
 
+    pub fn source(&self) -> &RootRepositorySource {
+        &self.source
+    }
+
+    pub fn is_builtin_bazel_tools(&self) -> bool {
+        matches!(self.source, RootRepositorySource::BuiltinBazelTools(_))
+    }
+
     pub(crate) fn repo_spec(&self) -> &RepoSpec {
-        &self.repo_spec
+        match &self.source {
+            RootRepositorySource::DirectLocal(spec) => spec,
+            RootRepositorySource::BuiltinBazelTools(_) => {
+                panic!("built-in bazel_tools has no RepoSpec")
+            }
+        }
     }
 
     #[cfg(test)]
@@ -591,7 +622,22 @@ impl RootRepositoryRoute {
             apparent_repo,
             module_name,
             canonical_repo,
-            repo_spec,
+            source: RootRepositorySource::DirectLocal(repo_spec),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn builtin_for_test(workspace: NormalizedAbsolutePath) -> Self {
+        Self {
+            workspace,
+            apparent_repo: ApparentRepoName::new("bazel_tools")
+                .expect("built-in apparent name is valid"),
+            module_name: CompactString::new("bazel_tools"),
+            canonical_repo: CanonicalRepoName::new("bazel_tools")
+                .expect("built-in canonical name is valid"),
+            source: RootRepositorySource::BuiltinBazelTools(
+                BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+            ),
         }
     }
 }
@@ -707,6 +753,18 @@ impl Key for RootRepositoryRouteKey {
                 kind: RootRepositoryRouteErrorKind::Root(error.clone()),
             }),
             Ok(root) => {
+                if self.apparent_repo.as_str() == "bazel_tools" {
+                    return SourcePreparationOutcome::Complete(Arc::new(Ok(RootRepositoryRoute {
+                        workspace: self.workspace.dupe(),
+                        apparent_repo: self.apparent_repo.clone(),
+                        module_name: CompactString::new("bazel_tools"),
+                        canonical_repo: CanonicalRepoName::new("bazel_tools")
+                            .expect("built-in repository name is canonical"),
+                        source: RootRepositorySource::BuiltinBazelTools(
+                            BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+                        ),
+                    })));
+                }
                 let dependency = root.module.dependencies.iter().find(|dependency| {
                     !dependency.nodep
                         && dependency
@@ -747,7 +805,7 @@ impl Key for RootRepositoryRouteKey {
                             apparent_repo: self.apparent_repo.clone(),
                             module_name: dependency.name.clone(),
                             canonical_repo,
-                            repo_spec,
+                            source: RootRepositorySource::DirectLocal(repo_spec),
                         })
                     }
                 }
@@ -812,7 +870,9 @@ mod tests {
     use super::RootModuleLoadingAnchor;
     use super::RootModuleLoadingAnchorError;
     use super::RootModuleLoadingAnchorKey;
+    use super::RootRepositoryRoute;
     use super::RootRepositoryRouteKey;
+    use super::RootRepositorySource;
     use crate::BzlmodCommandPolicyKey;
     use crate::BzlmodEnvironmentPolicyKey;
     use crate::EvaluatedRootModule;
@@ -1265,12 +1325,35 @@ mod tests {
             state.finish()
         };
         let mut changed_spec = route.clone();
-        Arc::make_mut(&mut changed_spec.repo_spec.attributes).insert(
+        let RootRepositorySource::DirectLocal(spec) = &mut changed_spec.source else {
+            panic!("test route is direct local");
+        };
+        Arc::make_mut(&mut spec.attributes).insert(
             "path".into(),
             crate::OverrideAttributeValue::String("other-dep".into()),
         );
         assert_ne!(route, &changed_spec);
         assert_ne!(hash(route), hash(&changed_spec));
+
+        let builtin =
+            observed_route(&dice, EpochBuilder::root(source, 1).build(), "bazel_tools").await;
+        let SourcePreparationOutcome::Complete(builtin) = builtin else {
+            panic!("complete root module returned Need");
+        };
+        let builtin = builtin.as_ref().as_ref().unwrap();
+        assert_eq!(builtin.canonical_repo().as_str(), "bazel_tools");
+        assert_eq!(builtin.module_name(), "bazel_tools");
+        let RootRepositorySource::BuiltinBazelTools(identity) = builtin.source() else {
+            panic!("reserved route must use built-in source identity");
+        };
+        assert_eq!(
+            identity.snapshot(),
+            crate::BuiltinBazelToolsSnapshot::Bazel9_2
+        );
+        assert_eq!(
+            hex::encode(identity.manifest_sha256()),
+            "95b4af7c011047d34f6c469d23efdd523c56ce4892791e49f9d2159353262897"
+        );
 
         let unknown = observed_route(&dice, EpochBuilder::root(source, 1).build(), "missing").await;
         let SourcePreparationOutcome::Complete(unknown) = unknown else {
@@ -1317,6 +1400,49 @@ mod tests {
                 .to_string()
                 .contains("is not a direct local_path_override")
         );
+    }
+
+    #[tokio::test]
+    async fn builtin_route_root_edit_restore_keeps_immutable_source_identity() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let route = |value: <RootRepositoryRouteKey as Key>::Value| {
+            let SourcePreparationOutcome::Complete(value) = value else {
+                panic!("complete root module returned Need");
+            };
+            value.as_ref().as_ref().unwrap().clone()
+        };
+        let first = route(
+            observed_route(
+                &dice,
+                EpochBuilder::root("module(name = \"first\")\n", 1).build(),
+                "bazel_tools",
+            )
+            .await,
+        );
+        let middle = route(
+            observed_route(
+                &dice,
+                EpochBuilder::root("module(name = \"middle\")\n", 2).build(),
+                "bazel_tools",
+            )
+            .await,
+        );
+        let restored = route(
+            observed_route(
+                &dice,
+                EpochBuilder::root("module(name = \"first\")\n", 3).build(),
+                "bazel_tools",
+            )
+            .await,
+        );
+        assert_eq!(first.source(), middle.source());
+        assert_eq!(first, restored);
+
+        let other_workspace = RootRepositoryRoute::builtin_for_test(
+            NormalizedAbsolutePath::new("/other-workspace").unwrap(),
+        );
+        assert_ne!(first, other_workspace);
+        assert_eq!(first.source(), other_workspace.source());
     }
 
     #[tokio::test]

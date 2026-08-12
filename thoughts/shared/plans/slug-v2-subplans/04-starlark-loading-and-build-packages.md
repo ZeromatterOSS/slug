@@ -2128,3 +2128,11 @@ rules_shell and reaches platforms/config/toolchain/filegroup surfaces. Do not
 prune or synthesize that package. Stage 4 next depends only on a Stage 5-owned
 immutable canonical repository/source route; package and Bzl evaluation remain
 deferred until that source owner is accepted.
+
+### Built-in bazel_tools source owner accepted (2026-08-12)
+
+Stage 5 now owns the canonical immutable route and seven exact pinned source
+files without activating loading consumers. Stage 4 package and Bzl loading
+remain deferred. The active closure design must enumerate the complete
+`@@bazel_tools//tools/test` source/package dependency boundary before any
+consumer dispatch or catalog expansion.

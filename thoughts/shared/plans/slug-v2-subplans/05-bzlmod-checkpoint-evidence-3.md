@@ -19153,3 +19153,38 @@ The next packet pivots to the canonical configured-graph chain rather than
 adding another unconfigured external build kind:
 `WP-6-m2-root-configured-target-command-boundary-design`. The remaining named
 M1 gaps stay at their accepted terminal unsupported/`REPLAN` boundaries.
+
+### WP-5 built-in bazel_tools repository/source owner (2026-08-12)
+
+**Status: ACCEPTED.** `BuiltinBazelToolsSourceFileKey(snapshot, path)`
+structurally encodes expected File. Invalid lexical paths fail first; exact
+catalog files validate SHA-256 and return immutable Arc bytes plus executable
+state; source-known strict prefixes return
+`WrongKind { actual: Directory }`; every other normalized path is
+`UnsupportedCatalog`. No missing-file or directory-success claim exists.
+
+`RootRepositoryRouteKey` still computes the root carrier before reserving
+`bazel_tools -> bazel_tools`. The route carries snapshot plus manifest digest
+instead of a fabricated `RepoSpec`. The shared Host materialization request
+choke point rejects this source before `repo_spec()`, so both materialization
+and Host source-file provenance remain inactive. Root A/B/A and distinct
+workspace routes preserve identical immutable source identity.
+
+All seven checked-in files match pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, their recorded SHA-256 values,
+and archive mode 755. The manifest digest is
+`95b4af7c011047d34f6c469d23efdd523c56ce4892791e49f9d2159353262897`.
+Focused owner tests pass 4/4; full `slug_bzlmod_v2` passes 471 tests and
+`slug_loading_v2` passes 136. `slug_core_v2` is 173/174 only on the
+documented unchanged external-visibility wording baseline. Formatting,
+content/mode, credential, cap, diff, process-cleanup, and active V2 archive
+layout checks pass; the archive script retains only its known absent V1
+refs/record baseline.
+
+Final independent review returned `ACCEPT`. Production Rust is 372 net lines
+excluding test-only code, tests are 261, assets are seven files/about 33 KiB,
+and BUILD growth is 14, all within the frozen caps. Exact claims remain
+confined to pinned bytes/modes/hashes, path kind, canonical routing, and
+content/repository identity. Snapshot framing, diagnostics, and compact
+storage are Slug-native; package/Bzl dispatch and the complete embedded closure
+remain deferred.

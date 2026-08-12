@@ -8,6 +8,7 @@
  * above-listed licenses.
  */
 
+mod builtin_repository;
 pub mod dice;
 mod host_file;
 mod host_include;
@@ -34,6 +35,12 @@ pub mod resolution;
 mod root_bootstrap;
 pub mod source_preparation;
 
+pub use builtin_repository::BuiltinBazelToolsRouteIdentity;
+pub use builtin_repository::BuiltinBazelToolsSnapshot;
+pub use builtin_repository::BuiltinBazelToolsSourceFileError;
+pub use builtin_repository::BuiltinBazelToolsSourceFileKey;
+pub use builtin_repository::BuiltinBazelToolsSourceFileValue;
+pub use builtin_repository::BuiltinBazelToolsSourceKind;
 pub use dice::BzlmodCommandPolicyKey;
 pub use dice::BzlmodDiceInputs;
 pub use dice::BzlmodEnvironmentPolicyKey;
@@ -65,6 +72,7 @@ pub use host_module::RootModuleLoadingAnchorKey;
 pub use host_module::RootRepositoryRoute;
 pub use host_module::RootRepositoryRouteError;
 pub use host_module::RootRepositoryRouteKey;
+pub use host_module::RootRepositorySource;
 pub use host_package::RepositoryPackageSource;
 pub use host_package::RepositoryPackageSourceError;
 pub use host_package::RepositoryPackageSourceKey;

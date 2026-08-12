@@ -1108,3 +1108,18 @@ directory/wrong-kind contract, and the sole correction had already been used
 by the pre-`RepoSpec` Host guard. Design the typed kind/error algebra before
 retrying Rust or verbatim assets. No implementation from the failed packet is
 retained.
+
+### Built-in bazel_tools repository/source owner accepted (2026-08-12)
+
+The accepted file-only owner adds a structurally distinct
+`RootRepositorySource::BuiltinBazelTools` route after the root carrier
+succeeds. Its versioned partial catalog owns seven verbatim Bazel 9.2 archive
+files, exact SHA-256 and executable state, a domain-separated manifest, and
+typed invalid-path, wrong-directory-kind, unsupported-catalog, and integrity
+terminals. The source key has immutable complete-only DICE equality/validity.
+
+Both Host materialization paths fail before `repo_spec()`; no Host
+observation, install scan, runtime source choice, package evaluation, or
+consumer dispatch is admitted. The active cross-stage closure design must
+freeze the complete embedded test-tools dependency graph before widening the
+catalog or routing existing package/Bzl consumers.

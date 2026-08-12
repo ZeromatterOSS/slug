@@ -4561,3 +4561,15 @@ The immutable built-in owner implementation is not accepted. Before returning
 to embedded test-tools closure, Stage 5 must freeze whether the partial catalog
 uses a file-only wrong-kind terminal or a general expected-kind key. No route,
 catalog, package, or Test activation from the failed attempt is retained.
+
+### Immutable bazel_tools source owner accepted (2026-08-12)
+
+The Stage 5 prerequisite now owns the canonical route and reviewed seven-file
+partial source catalog with no Host fallback or package activation. This does
+not yet make `@@bazel_tools//tools/test` loadable and admits no TestProvider,
+TestRunner, runfiles, execution, result, or BEP semantics.
+
+Run next only `WP-4-6-8-bazel-tools-test-closure-design`: audit the complete
+pinned Bazel 9.2 repository/source/package/config/toolchain closure, freeze its
+DICE ownership and exact catalog expansion, and schedule no production
+representation before independent design acceptance.

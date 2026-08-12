@@ -1,182 +1,78 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-builtin-bazel-tools-repository-owner-implementation-retry`
-Milestone: cross-stage M7 prerequisite implementation retry
-Owner: `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted file-only source-kind/error boundary for the immutable
-`@@bazel_tools` catalog before retrying its route/source owner.
+Packet: `WP-4-6-8-bazel-tools-test-closure-design`
+Milestone: cross-stage M7 prerequisite design
+Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
+Result: freeze the complete pinned Bazel 9.2 source and ownership closure needed
+before Slug can load `@@bazel_tools//tools/test`.
 
-## Active implementation retry
+## Active design contract
 
-Implement exactly the accepted **Frozen source-kind decision** and
-**Reviewed retry contract** below. Their file/asset allowlist, caps, proof, and
-stops are the sole authorization. Independent Sol review accepted the file-only
-key: its type encodes expected File, a source-known directory is
-`WrongKind { actual: Directory }`, and no directory-success, missing, or
-generic expected-kind branch is admitted.
+The immutable built-in repository owner is accepted. It owns a versioned,
+canonical `bazel_tools` route and the exact bytes, SHA-256, archive executable
+state, and typed lookup terminals for a reviewed seven-file partial catalog.
+It deliberately does not dispatch package, BUILD, or Bzl consumers.
 
-Root owns all edits, serial validation, cleanup, integration, and commit.
+Audit pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a` and the live Slug graph to
+freeze the smallest complete repository/source/package boundary that can load
+`@@bazel_tools//tools/test` without pruning, synthesizing, or reading a Host
+Bazel install. Trace the embedded MODULE registrations and all ordinary module,
+repository-mapping, package, Bzl, label, config-setting, toolchain, filegroup,
+rules_shell, platforms, and generated-source dependencies reached by that
+package. Separate immutable built-in bytes from registry/resolution-owned
+external repositories and name the DICE owner and invalidation edge for every
+admitted input.
 
-## Predecessor REPLAN
+Decide whether one bounded implementation can reuse the existing route,
+repository package/Bzl loaders, and configured-analysis representation. Freeze
+the exact catalog expansion, source lookup/consumer dispatch, repository
+mapping, Need/error ordering, equality/validity, lifecycle, and fail-closed
+boundary. If no bounded Rust-native slice exists, record `REPLAN` rather than
+inventing content or a parallel graph.
 
-`WP-5-builtin-bazel-tools-repository-owner-implementation` ends `REPLAN`.
-The accepted route/snapshot/catalog design required directory and wrong-kind
-as distinct terminals, but the attempted
-`BuiltinBazelToolsSourceFileKey(snapshot, path)` carried no expected-kind
-identity and its public error enum had no wrong-kind variant. Its focused test
-therefore proved directory versus unsupported-catalog only. The packet had
-already consumed its sole correction on the required pre-`RepoSpec` Host
-guard, so this second material contract miss cannot be corrected in place.
+## Compatibility
 
-The entire unaccepted Rust, BUILD metadata, tests, and seven copied assets were
-discarded. Retained evidence only: all seven pinned Bazel 9.2 archive files
-matched their recorded SHA-256 values and archive mode 755; focused 4/4,
-bzlmod 470/470, and loading 136/136 passed; core remained at its documented
-173/174 external-visibility diagnostic baseline. None of that evidence
-authorizes production or source assets until this design is accepted.
+Exact: verbatim pinned-source bytes and modes, content hashes, source-known
+file/directory distinction, canonical labels/repository mappings, and admitted
+package/Bzl/config/toolchain relationships. Slug-native: snapshot/manifest and
+DICE type names, diagnostics, compact storage, path/configuration/action
+identity bytes, and any cross-owner iteration order not guaranteed by Bazel.
+Unsupported/deferred: TestProvider, TestRunnerAction, runfiles-tree
+materialization, test execution/result analysis, BEP, coverage, unreviewed
+embedded-tools packages, Windows, JVM/Java, and exact Bazel identity bytes.
 
-## Active decision contract
+## Scope, proof, and stops
 
-Audit the existing repository package, Bzl, repo/ignore, and source-file
-consumers to determine whether Slug needs:
+This design packet may edit only:
 
-1. a file-only immutable source key, where a source-known directory is exactly
-   `WrongKind { expected: File, actual: Directory }` and no separate
-   directory-success surface exists yet; or
-2. a general typed immutable entry key whose structural key includes
-   `ExpectedKind::{File, Directory}`, with file bytes/mode/digest only on
-   File success and explicit kind mismatch.
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md` and
+  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/04-starlark-loading-and-build-packages.md`,
+  `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
+  and
+  `thoughts/shared/plans/slug-v2-subplans/08-ruleset-and-command-conformance.md`;
+- `thoughts/shared/plans/slug-v2-subplans/09-v1-extraction-ledger.md` only if
+  the final reuse decision changes an existing extraction row; and
+- only if pinned Bazel evidence exposes a demonstrated checked-in oracle gap,
+  these six existing fixture files:
+  `tests/v2_oracle/fixtures/test-basic/fixture.toml`,
+  `tests/v2_oracle/fixtures/test-basic/expected/oracle.json`,
+  `tests/v2_oracle/fixtures/test-basic/workspace/MODULE.bazel`,
+  `tests/v2_oracle/fixtures/test-basic/workspace/BUILD.bazel`,
+  `tests/v2_oracle/fixtures/test-basic/workspace/pkg/BUILD.bazel`, and
+  `tests/v2_oracle/fixtures/test-basic/workspace/pkg/defs.bzl`.
 
-Choose the smallest observable boundary that can later dispatch existing
-package/Bzl file consumers without false exact claims. Freeze key identity,
-value/error algebra, equality/validity, normalized-path precedence,
-partial-catalog unsupported semantics, integrity ordering, and how the Host
-source path fails closed before `RepoSpec`. No lock may cross a DICE compute.
+Cap bookkeeping at 240 net lines and any fixture correction at 180 net lines;
+add no file or dependency. No Rust, Cargo/BUILD metadata, DICE key, package or
+analysis implementation, command/Test/TestRunner, REAPI, BEP, JVM/Java,
+Windows branch, generated source, second graph, Host observation, or runtime
+source selection is authorized.
 
-The versioned snapshot, seven-file verbatim catalog, manifest framing, exact
-file SHA-256/archive mode, canonical `bazel_tools` route, root-carrier
-Need/error ordering, and absence of Host/runtime source selection remain as
-accepted in the predecessor design. Do not broaden them while deciding kind.
-
-## Compatibility and stops
-
-Exact: source-known File versus Directory kind, normalized path lookup,
-verbatim bytes, file SHA-256/archive executable state, and canonical built-in
-repo name. Slug-native: typed key/value/error names, snapshot identity,
-manifest framing/digest, diagnostics, and compact storage. Deferred:
-out-of-catalog missing claims, directory enumeration, symlinks/special nodes,
-complete embedded tools, package/Bzl evaluation, external MODULE mappings,
-rules_shell/platforms/coverage, Test semantics/execution/BEP, Windows,
-JVM/Java, and exact Bazel identity bytes.
-
-Stop and `REPLAN` on a generic filesystem abstraction, Host observation,
-runtime source selection, invented missing-file semantics, package activation,
-a second repository graph, or an expected-kind field that does not affect key
-identity and tests.
-
-## Scope and proof
-
-This design-only packet may edit canonical/current, Stage 4/5/8 bookkeeping,
-and the routing log. Add no Rust, BUILD/Cargo/dependency, source asset, fixture,
-DICE key, package/loading/core/query/command code, schema/wire, Test/REAPI/BEP,
-JVM/Java, Windows branch, Stage 9/10, or workspace file. Cap bookkeeping at
-180 net lines.
-
-Require: a complete live-consumer audit; one selected algebra with rejected
-alternative; exact path/kind/error precedence; structural equality/validity
-and compact storage decision; an explicit successor file/asset allowlist,
-caps, focused owner and direct-dependent tests, and stops; source/structure,
-archive active-layout, credential, cap, and diff checks; and independent Sol
-review because this corrects a public DICE/source identity contract.
-
-One bounded correction is allowed; a second material miss is `REPLAN`. At
-`ACCEPT`, schedule only the reviewed retry implementation, commit, and
-continue.
-
-## Frozen source-kind decision
-
-Choose option 1, the file-only key. Every live consumer is file-specific:
-repository package loading requests a selected BUILD file; repo and ignore
-owners request `REPO.bazel` and `.bazelignore`; repository Bzl loading
-requests the label's source file; core requests an exported source file.
-Existing Host behavior already returns
-`RepositorySourceFileError::WrongKind { actual: Directory }` to these callers,
-and no live consumer asks this boundary to return a directory value.
-
-Therefore `BuiltinBazelToolsSourceFileKey(snapshot, path)` structurally means
-read this regular file; expected File is encoded by the key type and need not
-be a redundant field. Its public result algebra is:
-
-- `Ok(BuiltinBazelToolsSourceFileValue { path, bytes, sha256, executable })`
-  for a catalog file whose integrity metadata matches;
-- `InvalidPath` for invalid lexical paths;
-- `WrongKind { path, actual: Directory }` when the normalized path is a
-  source-known strict directory prefix;
-- `UnsupportedCatalog { path }` for every other normalized unlisted path; and
-- `Integrity { path, expected_sha256, actual_sha256 }` for a listed file
-  whose checked-in bytes disagree with the frozen metadata.
-
-There is no separate `Directory` terminal and no exact missing-file terminal.
-Precedence is invalid lexical path, exact catalog file plus integrity, known
-strict directory prefix, then unsupported catalog. Directory knowledge derives
-only from sorted catalog prefixes; there is no enumeration, directory value,
-Host observation, or filesystem lookup.
-
-Reject option 2. An `ExpectedKind` field and directory-success value would add
-a public identity branch with no consumer or observable result, invite false
-completeness claims for the partial catalog, and duplicate the file-specific
-type's expected kind. A future admitted directory consumer must design its own
-typed boundary rather than widen this key implicitly.
-
-The source key derives structural equality/hash from snapshot and normalized
-path. Complete successes and every typed terminal are valid and compare by
-their complete structural value; no Need is possible because the catalog is
-compiled immutable input. The returned Arc bytes, exact SHA-256, executable
-bit, and path all participate in equality. Manifest/snapshot identity remains
-on the structurally distinct `RootRepositorySource::BuiltinBazelTools` route.
-The route key still computes the root carrier first. Existing Host
-materialization/source code must return an explicit unsupported-owner error
-before any `repo_spec()`, Host observation, or materialization request.
-
-Use existing `CompactString`, immutable `Arc<[u8]>`, `Allocative`, and
-`Dupe` only where every field is cheap-clone. Do not derive `Dupe` across
-`CompactString`; ordinary Clone is correct for those values. No global cache,
-interner, weak identity hash, lock, or Stage 9 import is authorized.
-
-## Reviewed retry contract
-
-On `ACCEPT`, schedule only
-`WP-5-builtin-bazel-tools-repository-owner-implementation-retry`. It may edit:
-
-- `app/slug_bzlmod_v2/{BUILD.bazel,src/lib.rs,src/host_module.rs,
-  src/source_preparation.rs}`;
-- one new `app/slug_bzlmod_v2/src/builtin_repository.rs`;
-- one new `app/slug_bzlmod_v2/tests/builtin_bazel_tools.rs`;
-- exactly the seven reviewed assets under
-  `app/slug_bzlmod_v2/builtin/bazel_tools/`; and
-- canonical/current and Stage 4/5/8 bookkeeping.
-
-Cap production Rust at 420 net lines, tests at 360, assets at seven files/64
-KiB, BUILD metadata at 20, and bookkeeping at 180. Add no generic directory
-key/value, built-in consumer dispatch, package/loading/core production edit,
-registry/materializer route, runtime source input, generated source, fixture,
-Cargo/dependency, schema/wire, command/Test/REAPI/BEP behavior, JVM/Java,
-Windows branch, second snapshot, Stage 9/10, or workspace file.
-
-Required proof is: exact SHA-256 and executable-state goldens for all seven
-files; golden manifest framing/digest; snapshot/route structural
-discrimination; reserved apparent-to-canonical routing after root success
-while root Need/error, unknown repo, and local override behavior remain
-unchanged; valid file, invalid path, source-known directory WrongKind,
-unsupported catalog, and exercised integrity failure; Host rejection before
-`repo_spec()` with no observation/materialization; two-workspace and root
-A/B/A byte invariance; focused owner tests; full `slug_bzlmod_v2`; direct
-`slug_loading_v2` and `slug_core_v2` tests with documented baseline
-classification; formatting, pinned-archive byte/mode comparison, archive
-active-layout, source/structure, credential, cap, and diff checks; cleanup
-review; and independent Sol final review.
-
-Stop and `REPLAN` rather than adding expected-kind identity, directory
-success, a distinct Directory error, missing semantics, consumer dispatch,
-Host reads, or package behavior. One bounded implementation correction is
-allowed; a second material miss is `REPLAN`.
+Require pinned-source and embedded-archive provenance, a complete transitive
+closure ledger, repository-routing and DICE ownership diagrams in prose,
+explicit accepted/rejected reuse decisions, exact/Slug-native/deferred
+classification, a successor file allowlist/caps/tests/stops, source/structure,
+credential, archive active-layout, fixture (if changed), and diff checks, plus
+independent review. One bounded correction is allowed; a second material miss
+is `REPLAN`. At `ACCEPT`, schedule only the reviewed successor.
