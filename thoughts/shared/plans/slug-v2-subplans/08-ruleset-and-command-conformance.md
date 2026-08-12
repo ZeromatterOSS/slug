@@ -4683,3 +4683,9 @@ The nonregistry package-preflight design is accepted. Stage 8 waits while only
 `WP-5-host-nonregistry-package-preflight-implementation` lands crate-private
 REPO/ignore/marker classification with no MODULE, package-loading, toolchain,
 Test, execution, result, coverage, or BEP consumer.
+
+Stage 8 remains waiting during
+`WP-5-host-nonregistry-package-preflight-cap-replan`. The cap correction does
+not activate a package, graph, command, Test, or execution consumer; it only
+preserves the accepted route-independent prerequisite ownership and schedules
+the same implementation with truthful measured bounds.

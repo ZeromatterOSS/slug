@@ -1273,3 +1273,11 @@ admits no guessed preselection canonical repository identity. The five-file
 Rust allowlist, caps, lifecycle/error/event proof, and stops are in the
 canonical packet. MODULE closure/evaluation, discovery/MVS, mapping, loading,
 and command/Test/execution consumers remain deferred.
+
+The first package-preflight implementation attempt ended `REPLAN` on its
+explicit production-line cap: the accepted three-key ownership model requires
+about 440 formatted production lines, while the frozen cap was 360. The
+uncommitted diff passes the full owner suite and independent review found no
+semantic defect. `WP-5-host-nonregistry-package-preflight-cap-replan` may
+correct only that cap and evidence budget before the same five-file
+implementation resumes.
