@@ -1,13 +1,66 @@
 # Current Slug V2 Packet
 
-Packet: `WP-8-m7-filewrite-run-handoff-implementation`
-Milestone: M7 implementation
+Packet: `WP-8-m7-filewrite-run-handoff-implementation-retry`
+Milestone: M7 implementation retry
 Owner: `slug-v2-subplans/08-ruleset-and-command-conformance.md`
-Result: activate one executable FileWrite `run` vertical through the accepted
-REAPI executor and client-owned process launch, including a bounded daemon
-launch-intent wire, without inventing runfiles or direct-local build actions.
+Result: activate the accepted FileWrite Run vertical while using the reviewed
+smallest oracle-harness amendment to supply
+the already-started NativeLink endpoint and default execution properties to the
+accepted `run-basic` Slug command, without changing production semantics or
+silently widening the exhausted implementation packet.
 
-## Scope
+## Concrete stop
+
+The predecessor implementation and all focused Rust validation reached the
+fixture replay. Pinned Bazel 9.2 passed, but every Slug command stopped before
+evaluation with `run requires --remote_executor`. Source inspection found the
+cause in `tools/v2_oracle_lib/runner.py::_slug_reapi_argv`: the harness starts
+NativeLink for any Slug fixture declaring `reapi.remote_executor = true`, but
+returns unchanged argv unless the command verb is exactly `build`.
+
+The predecessor allowlist explicitly excluded harness edits and had already
+used its one material correction. Treating the one-line verb gate as implicit
+would violate the reviewed scope and correction budget, so that packet ended
+`REPLAN` without acceptance or commit.
+
+## Accepted oracle amendment
+
+Audit only the existing endpoint injector, command argv construction, REAPI
+evidence extraction, and the `run-basic` command shape. Freeze whether
+`_slug_reapi_argv` may admit exactly `build` and `run`. Build retains its
+current append behavior. Run inserts the generated endpoint and default
+properties immediately before the first standalone `--`, or appends them when
+there is no `--`, so program arguments remain untouched. Successful Run must
+also use the existing extracted REAPI evidence requirement already applied to
+successful Build. Do not change the production
+wire, CLI parsing, NativeLink lifecycle, evidence schema, fixture expectation,
+or any other command verb.
+
+Classify dynamic endpoint/default-property injection as Slug-oracle-native
+scaffolding. It is not Bazel behavior and makes no compatibility claim. The
+already accepted executable/provider/FileWrite/REAPI/run relations remain
+exact or Slug-native as previously classified; all broader run and REAPI
+surfaces remain unsupported/deferred.
+
+## Allowlist and validation
+
+The retry may edit this manifest, canonical/Stage 8 bookkeeping, and the
+predecessor allowlist. It may additionally edit
+`tools/v2_oracle_lib/{runner.py,compare.py}` plus existing focused oracle
+tests, then resume the predecessor's explicit implementation allowlist and
+validation contract. The harness delta is at most 20 production and 60 test
+lines; combined bookkeeping remains capped at 130 lines. Add no new
+file, dependency, schema, fixture, command verb beyond `run`, or fallback
+endpoint source.
+
+Require focused regressions proving Build remains unchanged; Run with `--`
+inserts endpoint/properties before it; Run without `--` appends them; a
+successful remote Run requires the already extracted evidence; and
+Query/Aquery/Cquery receive neither flags nor an evidence requirement. Require
+independent final review after the complete retry evidence. One new material
+correction is allowed in this retry; a second is `REPLAN`.
+
+## Retained implementation contract
 
 Implement only the admitted POSIX `run-basic` shape frozen in Stage 8. Add one
 request-local `ResolvedRunSemanticView<'a>` owned by
@@ -72,6 +125,8 @@ constructs the same plan locally and uses the same launcher.
 Edit only:
 
 - `app/slug_commands_v2/src/run.rs` and existing command tests;
+- `app/slug_analysis_v2/src/starlark_rule.rs` and existing focused tests, only
+  to forward Bazel's optional `ctx.actions.write(..., is_executable)` boolean;
 - `app/slug_cli_v2/src/commands/run.rs` and existing CLI tests;
 - `app/slug_core_v2/src/runtime/{dice.rs,mod.rs}` and existing focused tests;
 - `app/slug_reapi_v2/src/{executor.rs,lib.rs}` and existing focused tests;
@@ -79,8 +134,10 @@ Edit only:
 - all six existing files under `tests/v2_oracle/fixtures/run-basic/`; and
 - canonical/current-packet/Stage 8 bookkeeping.
 
-Cap formatted net Rust growth at 270 production, 340 tests, and 610 total.
-Cap fixture growth at 150 lines and bookkeeping at 120. Add no new file,
+The packet's single correction replaces the pre-implementation cap after the
+formatted public-wire/client-boundary measurement: cap net Rust growth at 660
+production, 280 tests, and 940 total. Cap fixture growth at 150 lines and
+bookkeeping at 130. Add no new file,
 dependency, DICE state/key, direct-local/raw build executor, runfiles
 materializer/tree, JVM artifact, other action kind, broad run flag, Stage 9
 change, workspace dependency, or CI. One material correction maximum; a second

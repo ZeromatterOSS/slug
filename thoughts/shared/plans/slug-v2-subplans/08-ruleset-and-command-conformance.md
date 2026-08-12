@@ -4392,3 +4392,32 @@ Rust module/test surface. The reviewer found the borrowed semantic-view
 ownership, resolved FileWrite executor reuse, daemon/client launch boundary,
 no-secret wire, path/mode guards, compatibility classification, exit
 classification, and discriminating evidence plan sound. Implementation is now
+replanned before acceptance.
+
+### Run oracle endpoint injection replan (2026-08-11)
+
+The implementation reached `run-basic` replay after focused Rust tests and a
+passing pinned Bazel 9.2 refresh. Slug stopped before evaluation because
+`_slug_reapi_argv` starts from an explicit build-only verb guard, so the
+already-started NativeLink endpoint and default execution properties never
+reach a Run command. This is oracle scaffolding, not production behavior.
+
+The implementation allowlist excluded `tools/v2_oracle_lib/runner.py` and its
+single correction had already admitted the Starlark executable-write boolean.
+The second independent scope miss therefore ends that packet `REPLAN`; its
+unaccepted production diff is retained in the worktree while the design
+boundary is corrected. Run next only
+`WP-8-m7-filewrite-run-oracle-endpoint-design`: freeze an exact Build/Run-only
+injector boundary and focused negative regression before implementation resumes.
+
+Design review required one bounded correction: Run flags belong immediately
+before the first standalone `--`, not after program arguments. The corrected
+successor also applies the existing successful-remote evidence requirement to
+Run while leaving Build append order and Query/Aquery/Cquery untouched; it
+permits only runner/comparison helpers and existing focused tests.
+
+Correction-only rereview returned `ACCEPT`. The oracle amendment is bounded to
+Build/Run endpoint placement and the existing evidence schema; no production,
+wire, lifecycle, fixture-schema, or other-verb behavior changes. Run next only
+`WP-8-m7-filewrite-run-handoff-implementation-retry`, retaining the existing
+production diff and adding the reviewed runner/comparison regressions.
