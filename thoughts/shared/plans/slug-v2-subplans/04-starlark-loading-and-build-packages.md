@@ -2621,3 +2621,14 @@ private declaration, under mandatory 480/700/1,180 caps after independent
 acceptance and explicit activation. `must_exist` remains structural: pinned
 `SingleExtensionFunction`, not `createRepos`, owns later override/inject
 existence validation. Preserve all no-execution/I/O/lifetime/public/JVM stops.
+
+### Repository-rule instantiation implementation activated (2026-08-12)
+
+Independent review accepts `7616136f`. Run only
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation`
+in existing `module_extension_repository_rule.rs`, one new private
+`module_extension_repository_instantiation.rs`, and `lib.rs` solely for its
+private declaration, plus four-plan bookkeeping. Caps are mandatory
+480/700/1,180 against `7616136f`. Preserve exact same-index joins, namespace
+then schema order, explicit-only RepoSpec attributes, atomic prefixes, complete
+proof, and every no-execution/I/O/existence/public/JVM stop.

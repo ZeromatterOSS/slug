@@ -2682,3 +2682,12 @@ but defers existence validation and final routes. Future Rust is limited to the
 three loading paths and mandatory 480/700/1,180 caps frozen in current. Stage 5
 production, graph, mappings, materialization, lockfile, consumers, API, and JVM
 remain unchanged.
+
+### Loading instantiation implementation activated (2026-08-12)
+
+Independent review accepts `7616136f`. Run only the three loading Rust paths
+and four plan ledgers under mandatory 480/700/1,180 caps. Stage 5 production
+remains unchanged. Loading may consume the accepted hidden request embedded in
+the raw invocation receipt, but may not mutate Bzlmod, reconstruct selected
+state, add a reverse edge, validate existence/final routes, or add repository
+execution, I/O, materialization, lockfile, consumer/API, or JVM breadth.

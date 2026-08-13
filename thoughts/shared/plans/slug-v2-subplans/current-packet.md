@@ -1,22 +1,29 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-repository-rule-instantiation-owner-design`
-Milestone: M7 repository-rule instantiation projection design
+Packet: `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation`
+Milestone: M7 repository-rule instantiation projection implementation
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: design the smallest loading-owned heap-free composition of accepted raw
+Result: implement the accepted loading-owned heap-free composition of raw
 repository-rule calls and selected extension namespaces into semantic RepoSpecs,
 without executing repository implementations or performing repository I/O.
 
-## Active docs-only design contract
+## Active implementation contract
 
-Run only
-`WP-4-5-host-module-extension-repository-rule-instantiation-owner-design`
-in canonical/current/Stage 4/Stage 5. The exact docs allowlist and caps are 45
-canonical, 260 current, 240 Stage 4, 220 Stage 5, and 765 total changed lines.
-Authorize no Rust, Cargo, fixture, implementation activation, Bzlmod mutation,
-repository implementation/context, I/O, materializer, lockfile, consumer,
-public API, or JVM work before independent design acceptance.
+Independent review accepts `7616136f`. Run only
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation`
+in existing
+`app/slug_loading_v2/src/module_extension_repository_rule.rs`, one new private
+`module_extension_repository_instantiation.rs`, and `lib.rs` solely for its
+private declaration, plus canonical/current/Stage 4/Stage 5 bookkeeping. Caps
+are 480 production, 700 tests, and 1,180 total formatted net Rust lines against
+`7616136f`. Preserve the complete exact/Slug-native/deferred design, proof,
+and terminal-stop contract below. No fourth Rust file, Bzlmod mutation, second
+loader or additional DICE key beyond
+`HostInstantiatedModuleExtensionRepositoriesKey`, retained Starlark lifetime,
+repository implementation/context,
+I/O, materializer, existence/final-route validation, lockfile, consumer,
+public API, JVM, or cap excess.
 
 Accepted `b7c70a1b` owns ordered raw calls, exact definition/schema identity,
 generated apparent names, kwargs, and caller provenance in the sole loading
@@ -123,7 +130,7 @@ future Rust path, or cap excess.
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active docs-only design contract above.
+interpreted solely through the active implementation contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
