@@ -2953,3 +2953,19 @@ ledgers, under mandatory 180/380/560 against `1d8758d5`. Preserve sole-key
 no-copy semantics, opaque errors, proof, compatibility, and stops. Stage 4
 production remains unchanged; no third Rust file, loading/core/server edit,
 route/source/materializer/I/O, stable public API, or JVM work is authorized.
+
+### Selected publication accepted; absence-signal design scheduled (2026-08-12)
+
+Independent review accepts hidden selected-module publication `bc822520` at
+131 production/83 tests/214 total against design `1d8758d5`. Core composition
+cannot distinguish selected-domain absence from the opaque route, compute,
+duplicate, and builtin terminals without one smaller typed signal.
+
+Run only four-ledger docs packet
+`WP-5-host-canonical-selected-module-definition-absence-signal-design` under
+mandatory 35/180/140/140/495 documentation caps. Freeze only a hidden Copy/Eq
+`Missing | Terminal` disposition and opaque-error accessor over the existing
+Bzlmod key/error; future Rust is exactly `selected_repo_spec.rs` plus `lib.rs`
+hidden re-export under mandatory 50/120/170. Stage 4 production remains
+unchanged. No payload leak, new key/store, core/loading/server edit, route,
+source/materializer/I/O, stable API, or JVM work is authorized.

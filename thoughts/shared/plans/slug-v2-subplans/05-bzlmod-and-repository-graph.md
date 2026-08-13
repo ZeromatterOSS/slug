@@ -3013,3 +3013,20 @@ mapping/original RepoSpec, proof, compatibility, and stops. Stage 5 production
 remains otherwise unchanged; no new key/store, third file, loading/core/server
 edit, route/source/materializer/I/O, stable API, consumer, or JVM work is
 authorized.
+
+### Selected publication accepted; absence-signal design scheduled (2026-08-12)
+
+Independent review accepts hidden selected-module publication `bc822520`.
+Before core can compose selected and generated canonical definitions, it must
+fall through only the selected-domain Missing terminal without parsing or
+exposing the otherwise opaque error payload.
+
+Run only four-ledger docs packet
+`WP-5-host-canonical-selected-module-definition-absence-signal-design` under
+mandatory 35/180/140/140/495 documentation caps. Freeze a hidden Copy/Eq
+`Missing | Terminal` disposition and accessor on the existing error wrapper;
+future Rust is limited to `selected_repo_spec.rs` and `lib.rs` hidden re-export
+under mandatory 50/120/170. Keep Routes, RoutesCompute, Duplicate, and
+BuiltinDeferred terminal; Need has no disposition. No new key/store,
+core/loading/server edit, selected/generated composition, builtin precedence,
+route/source/materializer/I/O, stable API, or JVM work is authorized.
