@@ -3132,3 +3132,14 @@ override/inject/builtin, terminal, A/B/A, reuse, no-copy, and zero downstream
 activation proof. Authorize exactly one hidden projection key over the existing
 sole mapping producer and no additional key/store; core/loading/server, routes,
 source, materialization, commands, execution/I/O, and public API remain deferred.
+
+### Root repository-mapping publication implementation activated (2026-08-13)
+
+Independent review accepts design `d624dc5b`. Run only
+`WP-5-host-root-repository-mapping-publication-implementation` in existing
+`selected_repo_spec.rs` plus `lib.rs` hidden re-exports under 180/420/600.
+Implement the one projection key over the sole selected-extension mapping
+producer with predecessor-plus-Root ordinal identity, borrowed exact map view,
+opaque terminals, Need/equality/lifecycle proof, compatibility, and stops.
+No third file, second producer/store, additional key, core/loading/server edit,
+route/source/materializer/I/O, consumer, or stable public API is authorized.

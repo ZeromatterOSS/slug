@@ -3066,3 +3066,13 @@ under 180/420/600. Authorize exactly one hidden projection key over the sole
 existing mapping producer, and no additional key/store. Stage 4 production
 remains unchanged; core consumption,
 routes, source/materialization, commands, I/O, and adjacent Rust are deferred.
+
+### Root repository-mapping publication implementation activated (2026-08-13)
+
+Independent review accepts design `d624dc5b`. Implement only the hidden
+`HostRootRepositoryMappingKey` projection in Bzlmod `selected_repo_spec.rs` and
+`lib.rs` re-exports under 180/420/600 against that design. Preserve the sole
+mapping producer, predecessor-plus-Root-ordinal certificate, borrowed exact
+iterator, opaque errors, proof, compatibility, and stops. Stage 4 production
+remains unchanged; no core/loading/server, route/source/materialization, I/O,
+third Rust file, or additional key/store is authorized.
