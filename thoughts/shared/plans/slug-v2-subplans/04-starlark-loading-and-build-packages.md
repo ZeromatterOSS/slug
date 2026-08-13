@@ -2980,3 +2980,15 @@ enum re-export and four ledgers, under mandatory 50/120/170 against
 proof, and stops. Stage 4 production remains unchanged; no new key/store,
 third Rust file, core/loading/server edit, composition, route,
 source/materializer/I/O, stable API, or JVM work is authorized.
+
+### Selected absence accepted; core definition composition design scheduled (2026-08-12)
+
+Independent review accepts selected absence signal `35ff14f7`. Run only
+four-ledger docs packet
+`WP-4-5-6-host-canonical-repository-definition-composition-owner-design` under
+mandatory 40/260/220/200/720 documentation caps. Freeze one private core key
+that computes selected first, falls through only on typed Missing, then computes
+generated, retaining original certificates without copies. Future Rust is only
+existing core `generated_repository_definition.rs` under 260/520/780. Stage 4
+production remains unchanged; no Bzlmod/loading/server Rust, second file,
+route/source/materializer/I/O, public API, or JVM work is authorized.

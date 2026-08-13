@@ -3042,3 +3042,16 @@ Need/nonpublication, proof, compatibility, and stops. Stage 5 production
 remains otherwise unchanged; no new key/store, third Rust file,
 core/loading/server edit, composition, builtin precedence, route,
 source/materializer/I/O, stable API, or JVM work is authorized.
+
+### Selected absence accepted; core definition composition design scheduled (2026-08-12)
+
+Independent review accepts selected absence signal `35ff14f7`. Run only
+four-ledger docs packet
+`WP-4-5-6-host-canonical-repository-definition-composition-owner-design` under
+mandatory 40/260/220/200/720 documentation caps. Freeze the private core
+selected-before-generated owner: selected success/Terminal blocks generated,
+only Missing falls through, and success/errors retain original certificates
+without copies. Future Rust is only existing core
+`generated_repository_definition.rs` under 260/520/780. Stage 5 production
+remains unchanged; no Bzlmod/loading/server Rust, second file, builtin
+precedence, route/source/materializer/I/O, public API, or JVM work is authorized.

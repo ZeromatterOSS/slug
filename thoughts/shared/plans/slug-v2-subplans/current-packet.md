@@ -1,12 +1,85 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-canonical-selected-module-definition-absence-signal-implementation`
-Milestone: M7 canonical selected-module definition lookup
+Packet: `WP-4-5-6-host-canonical-repository-definition-composition-owner-design`
+Milestone: M7 canonical repository-definition composition
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted minimal hidden absence signal.
+Result: freeze the private core selected-before-generated composition owner.
 
-## Active implementation contract
+## Active docs-only design contract
+
+Independent review accepts selected absence signal `35ff14f7`. Core already
+depends on Bzlmod and loading, owns the private generated-definition key, and
+is the first layer that can compose both canonical definition domains without
+a reverse edge. No semantic prerequisite remains; route and materialization
+work still do.
+
+Run only
+`WP-4-5-6-host-canonical-repository-definition-composition-owner-design` in
+canonical, this manifest, Stage 4, and Stage 5 under mandatory
+40/260/220/200/720 formatted net documentation lines. Authorize no Rust,
+fixture, Cargo, activation, Bzlmod/loading/server edit, route/source,
+materializer/I/O, command/API, lockfile, or JVM work.
+
+Freeze private callerless `HostCanonicalRepositoryDefinitionKey { workspace,
+canonical_repo }` in existing core `runtime/generated_repository_definition.rs`.
+Validate the canonical request, then compute only
+`HostCanonicalSelectedModuleDefinitionKey`. Selected Need returns Need;
+selected success publishes Selected immediately and must not activate generated
+lookup; selected completed Terminal is retained as a typed terminal and must
+not activate generated lookup. Only selected Missing computes private
+`HostGeneratedRepositoryDefinitionKey` for the identical workspace/canonical.
+Generated Need returns Need; generated success publishes Generated; generated
+Missing becomes combined Missing; every other generated error remains terminal.
+Never parse Display or eagerly compute both domains.
+
+Freeze success as one private structural enum retaining exactly either the
+published selected certificate or the existing generated certificate; copy no
+route, row, map, RepoSpec, catalog, target, or string identity. A borrowed Copy
+view is exactly Selected(existing selected view) or Generated(existing generated
+view), with kind Root/SelectedRegistry/SelectedNonregistry/Generated and the
+original canonical, identity/internal name, RepoSpec, mapping context/order/value
+available only through the retained predecessor. Create no common flattened map
+or public route algebra.
+
+Freeze `SourcePreparationOutcome<Arc<Result<...>>>` with complete structural
+errors retaining canonical request and exact predecessors: selected terminal;
+generated terminal plus selected-Missing evidence; combined Missing with both
+absence certificates; and DICE compute wrappers. Need is invalid and
+self-unequal; Complete uses `complete_eq`; the key owns no events or I/O.
+
+Freeze future implementation in exactly existing
+`app/slug_core_v2/src/runtime/generated_repository_definition.rs` with
+colocated tests plus four ledgers; `runtime/mod.rs` remains unchanged. Set
+mandatory 260 production/520 tests/780 total formatted net Rust caps against
+the accepted design commit. No Bzlmod/loading/server Rust or second Rust file.
+
+Require pure order proof for selected success, selected Terminal, selected
+Missing to generated success, both Missing, generated terminal, and both Need
+positions. Require same-canonical synthetic selected/generated precedence with
+zero generated-key activation on selected success/Terminal; real root/registry/
+nonregistry selected and generated-only success; builtin/route/duplicate block;
+complete borrowed identity/RepoSpec/mapping proof; selected/generated field and
+order A/B/A; Evaluated-to-Reused/no events; warmed predecessors add no
+registry/source/filesystem activation; zero RootRepositoryRoute/materialization/
+execution; full core/loading/Bzlmod/server dependents; structural no copied
+store or new dependency edge.
+
+Exact compatibility is the admitted Bazel 9.2 selected-domain-before-generated
+canonical ownership and preservation of original definition/mapping association.
+Private types, diagnostics, and DICE scheduling are Slug-native. Builtin
+precedence, apparent/root routing, public route algebra, source preparation,
+repository execution/context, materialization, BUILD loading, lockfile,
+commands/API, nonroot/MVO/isolation/innate breadth, stable public ABI, and JVM
+remain unsupported/deferred. `REPLAN` on eager generated compute, treating
+Terminal as absence, Display parsing, copied retained state, a second Rust file,
+route/source/materializer/I/O work, public API, or cap excess.
+
+## Accepted predecessor implementation contract
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
 
 Independent review accepts design `c466d864`. Run only
 `WP-5-host-canonical-selected-module-definition-absence-signal-implementation`
@@ -26,7 +99,7 @@ excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts hidden selected-module publication `bc822520` at
 131 production, 83 net tests, and 214 total formatted Rust lines against
