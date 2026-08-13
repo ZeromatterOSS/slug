@@ -3290,3 +3290,13 @@ publish it through the hidden selected-definition view. Future Rust is exactly
 under 220/450/670. Stage 4 production remains unchanged; no new edge/key/store,
 core/loading/capability/request/source/materialization edit, inference, public
 API, I/O, or JVM breadth is authorized.
+
+### Selected local-path policy retention implementation activated (2026-08-13)
+
+Independent review accepts design `fda0032e`. Implement only existing Bzlmod
+`source_preparation.rs`, `selected_repo_spec.rs`, and `lib.rs` hidden export
+under 220/450/670. Preserve the exact WorkspaceRelative/CommandAbsolute/
+LocalUnsupported provenance, existing dependency order, required closure
+field, hidden selected-definition accessor, proof, and all no-core/loading/
+capability/request/source/materialization/command/public/I/O/JVM stops. Stage 4
+production remains unchanged.

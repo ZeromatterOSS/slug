@@ -3355,3 +3355,13 @@ Future Rust is exactly `source_preparation.rs`, `selected_repo_spec.rs`, and
 generated/core capability and request projection remain deferred, with no new
 edge/key/store, inference, source/materialization/I/O, command/public API,
 lockfile, wire, or JVM.
+
+### Selected local-path policy retention implementation activated (2026-08-13)
+
+Independent review accepts design `fda0032e`. Implement only existing
+`source_preparation.rs`, `selected_repo_spec.rs`, and `lib.rs` hidden export
+under 220/450/670. Preserve the sole effective-override producer, compact
+required closure field, Root/Registry/Nonregistry hidden publication, exact
+identity proof, and every no-new-edge/key/store/core/loading/capability/request/
+source/materialization/command/public/I/O/JVM stop. Stage 5 production remains
+unchanged.
