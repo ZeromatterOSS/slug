@@ -2830,3 +2830,12 @@ opaque hidden success/error wrappers. Borrowed iteration exposes only
 store. Only a later higher `slug_server_v2` composition owner may consume both
 loading and Bzlmod. Exact three-file 220/420/640 limits and all no-route,
 no-materialization, no-execution/I/O, no-public-API/JVM stops remain.
+
+### Loading hidden generated-spec publication implementation activated (2026-08-12)
+
+Independent review accepts design `433badeb`. Loading may implement only
+`WP-4-5-host-validated-generated-repository-spec-publication-implementation`
+in the exact three loading paths plus four ledgers under 220/420/640.
+Stage 5 production remains unchanged. No Bzlmod dependency on loading, new key,
+copied store, route/mapping publication, materialization, execution/I/O,
+lockfile, consumer/API, or JVM breadth is authorized.

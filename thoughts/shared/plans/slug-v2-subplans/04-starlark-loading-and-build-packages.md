@@ -2768,3 +2768,14 @@ certificate; the error wrapper exposes no private terminal fields. A later
 Bzlmod reverse dependency is permitted. Future Rust is exactly the validation,
 narrow instantiation-accessor, and hidden `lib.rs` export files under
 mandatory 220/420/640; all existing route/execution/I/O/public stops remain.
+
+### Validated generated-spec hidden publication implementation activated (2026-08-12)
+
+Independent review accepts design `433badeb`. Run only
+`WP-4-5-host-validated-generated-repository-spec-publication-implementation`
+in the existing validation module, instantiation module for narrow borrowed
+canonical-name/`RepoSpec` accessors, and `lib.rs` solely for exact hidden
+exports, plus four ledgers, under mandatory 220/420/640 against `433badeb`.
+Preserve the existing sole DICE key/store, opaque error wrapper, unchanged
+eval-only rows including overridden rows, server-above-both dependency
+direction, and all no-route/materialization/execution/I/O/public/JVM stops.
