@@ -2704,6 +2704,25 @@ independent acceptance plus explicit r2 activation. All no-Bzlmod-mutation,
 no-reconstruction, no-existence, no-I/O/materializer/lockfile/consumer/API/JVM
 stops remain.
 
+### Selected validation-request projection proposed (2026-08-12)
+
+Independent review accepts loading instantiation in `d50f02a2`. Pinned Bazel
+checks source-ordered `use_repo` imports before override/inject polarity, but
+the existing hidden request drops exported import names and proxy/override
+locations. Run only the four-plan docs packet
+`WP-5-host-selected-extension-validation-request-projection-design` under
+40/220/180/180/620.
+
+Freeze a future widening of the existing request in
+`selected_repo_spec.rs` plus `lib.rs` accessors only, capped at mandatory
+220 production/380 tests/600 total against the accepted design commit. Reuse
+the selected owner, `CompactString`, `LogicalSpan`, immutable `Arc`
+slices, `SmallMap` source order, and `Allocative`; aggregate every exact-ID
+matching usage/proxy/import in encounter order and retain override locations.
+No new key/graph/map owner, loading dependency, validation/generated set,
+routes, I/O/materializer/lockfile/consumer/API/JVM breadth, third Rust file, or
+cap excess.
+
 ### Loading instantiation r2 activated (2026-08-12)
 
 Independent review accepts `7cf2e45f`. Resume only the same three loading

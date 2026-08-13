@@ -2657,3 +2657,18 @@ in the same three Rust paths plus four ledgers, under corrected mandatory
 namespace precedence, predecessor Need/zero-event, completed/current prefix,
 and field-specific A/B/A proof without production growth or semantic breadth.
 All prior stops remain.
+
+### Repository instantiation accepted; validation-input prerequisite scheduled (2026-08-12)
+
+Independent review accepts `d50f02a2` at 474 production/799 tests/1,273 total.
+Pinned `SingleExtensionFunction` validates imported generated repositories
+before override/inject polarity, but loading's exact hidden request does not
+expose exported import names or proxy/override locations. Stage 4 production
+remains unchanged.
+
+Run only the four-plan docs packet
+`WP-5-host-selected-extension-validation-request-projection-design` under
+40/220/180/180/620. Design an existing-request-only ordered import/location
+and override-location projection; no loading Rust, validation, generated
+publication/routes, repository execution/context, I/O, materialization,
+lockfile, consumer/API, or JVM work resumes before acceptance and activation.

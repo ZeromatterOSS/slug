@@ -1,13 +1,79 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
-Milestone: M7 repository-rule instantiation projection implementation r2
+Packet: `WP-5-host-selected-extension-validation-request-projection-design`
+Milestone: M7 selected extension validation-input prerequisite design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: complete the retained loading-owned instantiation projection and its
-full frozen proof under the accepted corrected caps.
+Result: design the smallest existing-request widening that exposes exact
+source-ordered import and override-location inputs for post-evaluation
+SingleExtensionFunction validation, without implementing validation or routes.
 
-## Active implementation contract
+## Active docs-only design contract
+
+Independent review accepts repository-rule instantiation in `d50f02a2` at
+474 production, 799 tests, and 1,273 total within 480/900/1,380; full loading
+and Bzlmod suites pass. Pinned Bazel 9.2
+`SingleExtensionFunction` validates every `use_repo` import before scanning
+override/inject polarity. The accepted hidden request exposes ordered
+override/inject names and `must_exist` but drops the import exported name and
+proxy location, and drops override locations. A loading validator now would
+silently omit exact import failures and diagnostic identity.
+
+Run only the four-plan docs packet
+`WP-5-host-selected-extension-validation-request-projection-design` in
+canonical/current/Stage 4/Stage 5, capped at 40/220/180/180/620 formatted net
+documentation lines. Authorize no Rust, fixture, Cargo, loading validator,
+route, materializer, lockfile, consumer, or JVM work. Freeze a successor or
+REPLAN after independent acceptance.
+
+The natural prerequisite widens the existing
+`HostSelectedExtensionDefinitionLoadRequest`; it adds no key, graph, map
+owner, or loading dependency. Retain one ordered immutable import row per
+admitted root proxy import with local apparent name, exported generated name,
+and exact `LogicalSpan`, aggregated across every usage matching the exact
+extension ID in root source order, proxy order, and retained `SmallMap`
+iteration order. Retain the existing generated canonical identity only once
+through mappings/predecessor state; do not fabricate it from string slicing.
+Add the exact `LogicalSpan` to each ordered override/inject projection.
+Repeated equal extension IDs deduplicate the request only after all matching
+imports are concatenated; empty imports/overrides succeed. Missing, duplicate,
+or mismatched ID/namespace joins fail closed before publication.
+
+Use `CompactString`, `LogicalSpan`, immutable `Arc` slices, existing
+source-ordered `SmallMap` iteration, and `Allocative`; introduce no
+`HashMap`, interner, cache, digest, or duplicated retained map. Structural
+equality includes the complete selected predecessor plus ordered import names,
+locations, overrides, locations, targets, and polarity. Need remains invalid
+and completed predecessor errors remain typed.
+
+Freeze a future implementation in exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs` and `lib.rs` solely for the
+existing `#[doc(hidden)]` request/export accessors, with mandatory caps of
+220 production, 380 tests, and 600 total formatted net Rust lines against the
+accepted design commit. Required proof: pure empty/one/multiple usage and
+proxy/import order; duplicate-ID aggregation; local/exported spelling and
+location; empty/ordered override locations and polarity; mismatch fail-closed;
+real DICE import/name/order/location and override-location A/B/A, Need/error,
+warm reuse, unchanged loading dependents, and zero registry/materialization
+I/O. Structural scans must prove no new key/graph/loading edge and compact
+retained ownership.
+
+Exact compatibility is limited to the admitted root-main ordinary nonisolated
+input identity and pinned usage/proxy/import/override encounter order.
+Compact/private Rust representation, diagnostics, and DICE scheduling are
+Slug-native. Import existence, suggestions, override/inject polarity,
+generated result publication, routes, repository execution/context,
+filesystem/network/environment/materialization, lockfile, nonroot/MVO/
+isolation/innate breadth, public consumers/APIs, and JVM remain deferred.
+`REPLAN` on a third Rust file, new key/graph/projection, duplicated map,
+loading dependency/reverse edge, generated-set inference, validation/routes,
+I/O/materializer/lockfile/consumer/API/JVM work, or cap excess.
+
+## Accepted predecessor implementation contract
+
+This section and everything below it are historical context only, grant no
+file, action, cap, or schedule authority, and are interpreted only through the
+active docs-only design contract above.
 
 Independent review accepts the cap correction in `7cf2e45f`. Run only
 `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
