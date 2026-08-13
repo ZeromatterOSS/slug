@@ -3300,3 +3300,21 @@ LocalUnsupported provenance, existing dependency order, required closure
 field, hidden selected-definition accessor, proof, and all no-core/loading/
 capability/request/source/materialization/command/public/I/O/JVM stops. Stage 4
 production remains unchanged.
+
+### Selected local-path policy retained; capability threading designed next (2026-08-13)
+
+Independent review accepts `63de458b` at 43 production, 64 tests, and 107
+total formatted net Rust lines. Full Bzlmod/loading/server suites pass; core
+retains only its unchanged deferred external-visibility assertion. Run only
+four-ledger docs packet
+`WP-4-5-6-host-repository-source-capability-policy-threading-design` under
+40/280/220/220/760 documentation caps. Freeze one four-file, borrowed-view
+chain from the accepted selected policy into capability identity: DirectLocal
+and root-origin SelectedNonregistry use WorkspaceRelative, command-origin selected uses CommandAbsolute,
+Registry/Generated use LocalUnsupported, and Main/Builtin carry none. Future
+Rust is exactly `host_module.rs`, `generated_repository_definition.rs`,
+`root_apparent_repository_definition.rs`, and
+`root_apparent_repository_route.rs` under 320/700/1,020 and physical ceilings
+3,000/2,450/1,040/1,100. Stage 4 production remains unchanged; no request,
+source/package/materialization, loading/server/command, new key/store, path/rule
+inference, public API, I/O, or JVM work is authorized.

@@ -3365,3 +3365,22 @@ required closure field, Root/Registry/Nonregistry hidden publication, exact
 identity proof, and every no-new-edge/key/store/core/loading/capability/request/
 source/materialization/command/public/I/O/JVM stop. Stage 5 production remains
 unchanged.
+
+### Selected local-path policy retained; source-capability policy chain designed (2026-08-13)
+
+Independent review accepts `63de458b` at 43/64/107. Full Bzlmod/loading/server
+suites pass; core retains only the unchanged deferred external-visibility
+assertion. Run only four-ledger docs packet
+`WP-4-5-6-host-repository-source-capability-policy-threading-design` under
+40/280/220/220/760 documentation caps. Freeze explicit policy in the existing
+Bzlmod RepoSpec capability identity and thread it through existing borrowed
+core definition/route views without new retained state: legacy DirectLocal and
+root-origin SelectedNonregistry are WorkspaceRelative, command-origin selected is CommandAbsolute,
+Registry/Generated are LocalUnsupported, Main/Builtin have none. Future Rust is
+exactly `host_module.rs`, `generated_repository_definition.rs`,
+`root_apparent_repository_definition.rs`, and
+`root_apparent_repository_route.rs` under 320/700/1,020 and ceilings
+3,000/2,450/1,040/1,100. Stage 5 production stays unchanged; `request_kind`,
+materialization request/Need/I/O, package/source/loading/command consumers,
+policy inference, new keys/stores, public API, lockfile, wire, and JVM remain
+deferred.
