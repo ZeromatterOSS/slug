@@ -1369,7 +1369,7 @@ proof, compatibility, and stop contract below.
 ## Accepted docs-only REPLAN contract
 
 This section is historical context only, grants no independent file, action,
-cap, or schedule authority, and is interpreted only through the active docs-only design contract above.
+cap, or schedule authority, and is interpreted only through the active implementation contract above.
 
 The first compiling request widening adds 108 production/test lines in
 `selected_repo_spec.rs` and two hidden `lib.rs` exports, but its required
@@ -1502,7 +1502,7 @@ I/O/materializer/lockfile/consumer/API/JVM work, or cap excess.
 
 This section and everything below it are historical context only, grant no
 file, action, cap, or schedule authority, and are interpreted only through the
-active docs-only design contract above.
+active implementation contract above.
 
 Independent review accepts the cap correction in `7cf2e45f`. Run only
 `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
@@ -1665,7 +1665,7 @@ future Rust path, or cap excess.
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active docs-only design contract above.
+interpreted solely through the active implementation contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
@@ -1837,7 +1837,7 @@ total over 1,500.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active docs-only design contract above.
+active implementation contract above.
 
 The audit uses Bazel 9.2 tag commit `8220c619`:
 `RepositoryModuleApi.repository_rule`,
@@ -1866,7 +1866,7 @@ stopping before instantiation.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active docs-only design contract above.
+active implementation contract above.
 
 Independent review accepts the event correction in `f36ec593`. Implement only
 `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the
@@ -1894,7 +1894,7 @@ architecture, ABI, errors, events, scope, caps, and all stops.
 ## Accepted docs-only event-contract correction
 
 This section is historical correction context only, grants no file, action,
-cap, or schedule authority, and is interpreted solely through the active docs-only design contract above.
+cap, or schedule authority, and is interpreted solely through the active implementation contract above.
 
 Final implementation review accepts the invocation architecture but rejects
 the phrase that the invocation key itself replays its batch on warm reuse.
@@ -1938,7 +1938,7 @@ consumer/JVM breadth, or cap excess.
 ## Accepted docs-only cap-correction contract
 
 This section is historical correction context only, grants no file, action,
-cap, or schedule authority, and is interpreted solely through the active docs-only design contract above.
+cap, or schedule authority, and is interpreted solely through the active implementation contract above.
 
 The frozen 720/800/1,520 stop fired after the complete required proof was
 formatted: the exact four-path diff measures approximately 724 production, 846
@@ -1963,7 +1963,7 @@ the passing complete proof.
 ## Superseded r2 implementation activation
 
 This section is historical context only, grants no file, action, cap, or
-schedule authority, and is interpreted solely through the active docs-only design contract above.
+schedule authority, and is interpreted solely through the active implementation contract above.
 
 The shared string prerequisite is accepted in `40def0e7`. Resume only
 `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r2` in
@@ -1984,7 +1984,7 @@ and earlier stops remain forbidden.
 ## Accepted string-protocol prerequisite
 
 This section is historical accepted evidence only, grants no independent file,
-action, cap, or schedule authority, and is interpreted through the active docs-only design contract above.
+action, cap, or schedule authority, and is interpreted through the active implementation contract above.
 
 Independent review accepts the scope correction recorded in `6215fe03`.
 Implement only `WP-4-starlark-custom-string-protocol-implementation-r2` in the
@@ -2012,7 +2012,7 @@ remain unaccepted and unstaged.
 ## Accepted docs-only scope-correction contract
 
 This section is historical correction context only, grants no file, action,
-cap, or schedule authority, and is interpreted solely through the active docs-only design contract above.
+cap, or schedule authority, and is interpreted solely through the active implementation contract above.
 
 Independent implementation review found the six shared runtime files sound but
 rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly
@@ -2146,7 +2146,7 @@ and tests needed to prove this prerequisite.
 ## Accepted r2 correction contract
 
 This section is historical correction context only, grants no file, action,
-cap, or schedule authority, and is interpreted only through the active docs-only design contract above.
+cap, or schedule authority, and is interpreted only through the active implementation contract above.
 
 The first compiling implementation is 630 production lines against `db45d182`
 before tests: 597 lines in the required private invocation/ABI owner and 33 in
