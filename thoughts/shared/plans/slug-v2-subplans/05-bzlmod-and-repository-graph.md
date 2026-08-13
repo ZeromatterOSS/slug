@@ -2975,3 +2975,15 @@ identity, typed builtin fail-closed handling, and warmed-predecessor
 zero-additional-source proof under mandatory future 220/500/720 caps. Stage 5 production remains
 unchanged; no loading/core/server Rust, public export, new graph, root route,
 source/materializer/I/O, lockfile, consumer/API, or JVM work is authorized.
+
+### Canonical selected-module lookup implementation activated (2026-08-12)
+
+Independent review accepts design `dd8ca159`. Run only
+`WP-5-host-canonical-selected-module-definition-owner-implementation` in
+existing `selected_repo_spec.rs` with colocated tests and four ledgers, under
+mandatory 220/500/720 against `dd8ca159`. Preserve the sole selected-routes
+dependency, complete canonical scan, predecessor+ordinal borrowed result,
+builtin fail-closed terminal, proof, compatibility, and stops. Stage 5
+production remains otherwise unchanged; no `lib.rs`, second Rust file, new
+graph owner, loading/core/server edit, public route/source/materializer/I/O,
+execution, lockfile, consumer/API, or JVM work is authorized.

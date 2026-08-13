@@ -2919,3 +2919,14 @@ predecessor zero-additional-source proof, future one-file 220/500/720 caps,
 proof, and stops. Stage 4 production remains unchanged; no core/loading Rust, route,
 repository execution/context, source/materializer I/O, public API, or JVM work
 is authorized.
+
+### Canonical selected-module lookup implementation activated (2026-08-12)
+
+Independent review accepts design `dd8ca159`. Run only
+`WP-5-host-canonical-selected-module-definition-owner-implementation` in
+existing Bzlmod `selected_repo_spec.rs` with colocated tests and four ledgers,
+under mandatory 220/500/720 against `dd8ca159`. Preserve exhaustive uniqueness,
+predecessor+ordinal/no-copy access, typed builtin deferral, proof,
+compatibility, and stops. Stage 4 production remains unchanged; no second Rust
+file, public export, loading/core/server edit, route/source/materializer/I/O,
+execution, or JVM work is authorized.
