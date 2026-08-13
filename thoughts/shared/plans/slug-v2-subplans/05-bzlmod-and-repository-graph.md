@@ -3143,3 +3143,12 @@ producer with predecessor-plus-Root ordinal identity, borrowed exact map view,
 opaque terminals, Need/equality/lifecycle proof, compatibility, and stops.
 No third file, second producer/store, additional key, core/loading/server edit,
 route/source/materializer/I/O, consumer, or stable public API is authorized.
+
+### Root mapping publication REPLANs only its cap (2026-08-13)
+
+The exact hidden ABI and typed projection require 211 production lines before
+proof, so the 180 cap stops implementation. Run only four-ledger docs packet
+`WP-5-host-root-repository-mapping-publication-r2-cap-design`, authorizing no
+Rust and preserving the retained diff plus every semantic/proof/stop. Freeze
+only a future 240 production/420 tests/660 total successor against `d624dc5b`;
+require acceptance and explicit r2 activation before implementation resumes.

@@ -3076,3 +3076,11 @@ mapping producer, predecessor-plus-Root-ordinal certificate, borrowed exact
 iterator, opaque errors, proof, compatibility, and stops. Stage 4 production
 remains unchanged; no core/loading/server, route/source/materialization, I/O,
 third Rust file, or additional key/store is authorized.
+
+### Root mapping publication hits its production cap (2026-08-13)
+
+The retained two-file implementation needs 211 production lines for the frozen
+ABI and typed projection before tests, exceeding 180. Run only docs packet
+`WP-5-host-root-repository-mapping-publication-r2-cap-design`; authorize no
+Rust. Preserve all semantics/proofs/stops and change only the future caps to
+240/420/660 against `d624dc5b`, pending acceptance and explicit r2 activation.
