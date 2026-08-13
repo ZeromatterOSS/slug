@@ -3318,3 +3318,15 @@ Rust is exactly `host_module.rs`, `generated_repository_definition.rs`,
 3,000/2,450/1,040/1,100. Stage 4 production remains unchanged; no request,
 source/package/materialization, loading/server/command, new key/store, path/rule
 inference, public API, I/O, or JVM work is authorized.
+
+### Repository source-capability policy threading implementation activated (2026-08-13)
+
+Independent review accepts design `c5853ecf`. Implement only existing
+`host_module.rs`, `generated_repository_definition.rs`,
+`root_apparent_repository_definition.rs`, and
+`root_apparent_repository_route.rs` plus four ledgers under 320/700/1,020 and
+physical ceilings 3,000/2,450/1,040/1,100. Preserve exact constructor and
+borrowed policy accessors, structural capability identity/hash, strict
+Main/Builtin/Registry/Nonregistry/Generated polarity, proof, and all no-fifth-
+file/key/store/request/source/materialization/loading/command/public/I/O/JVM
+stops. Stage 4 production remains unchanged.

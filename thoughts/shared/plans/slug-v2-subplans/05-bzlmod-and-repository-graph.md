@@ -3384,3 +3384,15 @@ exactly `host_module.rs`, `generated_repository_definition.rs`,
 materialization request/Need/I/O, package/source/loading/command consumers,
 policy inference, new keys/stores, public API, lockfile, wire, and JVM remain
 deferred.
+
+### Repository source-capability policy threading implementation activated (2026-08-13)
+
+Independent review accepts design `c5853ecf`. Implement only existing Bzlmod
+`host_module.rs` and core `generated_repository_definition.rs`,
+`root_apparent_repository_definition.rs`, and
+`root_apparent_repository_route.rs` plus four ledgers under 320/700/1,020 and
+ceilings 3,000/2,450/1,040/1,100. Preserve the explicit policy-bearing
+capability identity, exact borrowed view accessors, DirectLocal/root/command/
+registry/generated polarity, proof, and every no-new-key/store/request/source/
+materialization/loading/command/public/I/O/JVM stop. Stage 5 production remains
+unchanged.
