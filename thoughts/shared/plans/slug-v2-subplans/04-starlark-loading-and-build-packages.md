@@ -3451,3 +3451,16 @@ Preserve route-only Need ordering, exact retained predecessor, Main-or-Input
 success, four typed terminal kinds, one Bzlmod certificate projection, proof,
 and every no-path/result/source/loading/command/public/I/O/JVM stop. Stage 4
 behavior remains unchanged.
+
+### Root-apparent source input accepted; path/source ownership audited next (2026-08-13)
+
+Independent review accepts `e4292de7`: the private core owner forwards route
+Need, retains the exact completed predecessor, validates full source
+association, and constructs one accepted Bzlmod input certificate. Run only
+four-ledger docs packet
+`WP-4-5-6-host-repository-source-path-consumer-owner-audit` under
+40/300/240/240/820. Map the exact Builtin/request path, result, source, package,
+legacy-demand, and command boundaries and choose one smallest dependency-safe
+successor or prerequisite REPLAN. Authorize no Rust, consumer migration,
+key/store, materialization/source/package/I/O, public/command/server,
+reverse-edge, or JVM work. Stage 4 behavior remains unchanged.

@@ -3520,3 +3520,16 @@ and completion ledgers under 320/650/970 with route/new-file ceilings
 retention, Main or accepted Bzlmod Input disposition, typed errors, proof, and
 all path/result/source/package/loading/command/public/I/O/reverse-edge/JVM
 stops. Stage 5 remains unchanged.
+
+### Root-apparent source input accepted; path/source ownership audited next (2026-08-13)
+
+Independent review accepts `e4292de7`: the private core owner forwards route
+Need, retains and validates the exact completed predecessor, and constructs one
+accepted Bzlmod source-input certificate. Run only four-ledger docs packet
+`WP-4-5-6-host-repository-source-path-consumer-owner-audit` under
+40/300/240/240/820. Map Builtin/request path validation, first result Need,
+source bytes, package loading, legacy demand scope, and command visibility;
+select one dependency-safe successor or prerequisite REPLAN. Authorize no Rust,
+new key/store, consumer migration, materialization/source/package/I/O,
+public/command/server, reverse-edge, lockfile/wire, or JVM work. Stage 5 remains
+unchanged.
