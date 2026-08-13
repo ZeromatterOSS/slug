@@ -3002,3 +3002,18 @@ four ledgers under 260/520/780 against `e05a0dfc`. Preserve selected-first,
 Missing-only generated fallback, original certificates, proof, and stops.
 Stage 4 production remains unchanged; no second Rust file, Bzlmod/loading/server
 edit, route/source/materializer/I/O, public API, or JVM work is authorized.
+
+### Canonical definition composition proof REPLANs at the hidden registry ABI (2026-08-12)
+
+Independent review finds the retained core production diff sound, but its
+design demanded a real core SelectedRegistry fixture even though the inputs
+needed to construct that selected certificate remain crate-private to Bzlmod.
+Do not widen the ABI or add a Bzlmod test hook for duplicate proof.
+
+Run only four-ledger docs packet
+`WP-4-5-6-host-canonical-repository-definition-composition-proof-correction-design`
+under 30/180/120/120/450 caps. Inherit SelectedRegistry proof from the accepted
+external-style Bzlmod key/view suite; require core real Root,
+SelectedNonregistry, Generated, terminal/Need/fallback/lifecycle proof plus a
+pure exhaustive same-canonical branch matrix. Retain the one-file r2 successor
+and 260/520/780 caps. Authorize no Rust until acceptance and r2 activation.

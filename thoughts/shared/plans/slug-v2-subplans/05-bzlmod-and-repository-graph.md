@@ -3066,3 +3066,18 @@ short-circuiting, Missing-only generated fallback, retained original
 certificates, proof, compatibility, and stops. Stage 5 production remains
 unchanged; no second Rust file, Bzlmod/loading/server edit, builtin precedence,
 route/source/materializer/I/O, public API, or JVM work is authorized.
+
+### Canonical definition composition proof REPLANs at the hidden registry ABI (2026-08-12)
+
+The retained one-file core implementation is not yet accepted. Its production
+order and no-copy ownership pass review, but a real core SelectedRegistry test
+cannot be constructed without Bzlmod's deliberately private mirror/policy
+inputs. Exposing or reconstructing them would violate the accepted boundary.
+
+Run only four-ledger docs packet
+`WP-4-5-6-host-canonical-repository-definition-composition-proof-correction-design`
+under 30/180/120/120/450 caps. Inherit SelectedRegistry content/view proof from
+the accepted Bzlmod publication suite; require core real Root,
+SelectedNonregistry, Generated, terminal/Need/fallback/lifecycle proof and a
+pure same-canonical branch matrix. Keep the one-file r2 successor at
+260/520/780. Authorize no Rust before acceptance and explicit activation.
