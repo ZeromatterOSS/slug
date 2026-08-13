@@ -2691,3 +2691,15 @@ remains unchanged. Loading may consume the accepted hidden request embedded in
 the raw invocation receipt, but may not mutate Bzlmod, reconstruct selected
 state, add a reverse edge, validate existence/final routes, or add repository
 execution, I/O, materialization, lockfile, consumer/API, or JVM breadth.
+
+### Loading instantiation proof-cap correction scheduled (2026-08-12)
+
+Independent review leaves Stage 5 production accepted and unchanged, but the
+loading implementation still owes exact join/namespace/lifecycle/A-B-A proof.
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-r2-cap-design`
+with the same three future loading paths and semantics, corrected mandatory
+480/900/1,380 caps against `7616136f`, and no Rust authority before
+independent acceptance plus explicit r2 activation. All no-Bzlmod-mutation,
+no-reconstruction, no-existence, no-I/O/materializer/lockfile/consumer/API/JVM
+stops remain.

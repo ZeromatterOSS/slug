@@ -2632,3 +2632,18 @@ private declaration, plus four-plan bookkeeping. Caps are mandatory
 480/700/1,180 against `7616136f`. Preserve exact same-index joins, namespace
 then schema order, explicit-only RepoSpec attributes, atomic prefixes, complete
 proof, and every no-execution/I/O/existence/public/JVM stop.
+
+### Repository-rule instantiation proof-cap correction scheduled (2026-08-12)
+
+Independent implementation review accepts the production topology but finds
+the frozen proof incomplete. The retained, unaccepted diff measures 474
+production, 572 tests, and 1,046 total against `7616136f`; exact join
+corruption, substituted namespace precedence, predecessor Need/zero-event
+lifecycle, complete error prefixes, and field-specific A/B/A rows cannot
+credibly fit the remaining 128 test lines.
+
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-r2-cap-design`.
+Retain the same three Rust paths and all semantics/stops, correct only the
+future caps to 480 production/900 tests/1,380 total, and authorize no Rust
+until independent acceptance and explicit r2 activation.
