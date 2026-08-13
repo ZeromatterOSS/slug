@@ -1,13 +1,90 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-extension-import-order-identity-owner-implementation`
-Milestone: M7 extension import source-order identity prerequisite implementation
+Packet: `WP-4-5-host-module-extension-generated-repository-validation-owner-design`
+Milestone: M7 post-evaluation extension repository validation owner design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted compact shared import-order spine and resume the
-hidden validation-request projection in the same bounded three-file packet.
+Result: freeze the smallest loading-owned import/existence validator after the
+accepted instantiation and validation-request owners; authorize no Rust.
 
-## Active implementation contract
+## Active docs-only design contract
+
+Independent review accepts `ff55dcbf`: one compact local-name order spine now
+owns root/nonroot import source order, and hidden requests retain aggregated
+local/exported names plus import and override spans. Together with accepted
+`d50f02a2` instantiated repository rows, no prerequisite remains for pinned
+Bazel 9.2 `SingleExtensionFunction` validation.
+
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-generated-repository-validation-owner-design`
+in canonical/current/Stage 4/Stage 5 under 40/220/180/180/620 formatted net
+documentation lines. Authorize no Rust, fixture, Cargo, activation, Bzlmod
+mutation, route, materializer, lockfile, consumer/API, or JVM work. Freeze a
+successor or REPLAN only after independent acceptance.
+
+Freeze one callerless private
+`HostValidatedModuleExtensionRepositoriesKey { workspace }` in loading. It
+computes only `HostInstantiatedModuleExtensionRepositoriesKey`, propagates
+Need as invalid/non-self-equal, and propagates a completed predecessor error
+before validation. Exact-join instantiated rows to their
+embedded requests by count, encounter order, and full equality; corruption is
+a typed complete terminal.
+
+For each request in encounter order, build one transient compact membership set
+of that request's generated apparent names. Validate in pinned order: first
+scan every aggregated import row in retained usage/proxy/import order, accepting
+its exported generated name only when present in that generated set or as a key
+in the request's override/inject table; otherwise fail at the import span.
+Then scan overrides/injects in retained order: `must_exist=true` fails when
+the generated name is absent, while `must_exist=false` fails when it is
+present, at the override span. Local import spelling is diagnostic identity,
+not the membership key. Empty rows succeed. Advance the validated-prior-request count only after all of
+its validation completes; retain no scratch set or duplicate generated map.
+
+Success retains only the complete
+`Arc<HostInstantiatedModuleExtensionRepositories>` predecessor; successful
+key completion is the validation certificate, with no second retained row
+view. A typed terminal retains the complete predecessor, the validated prior
+request count, exact current instantiated per-request row, exact current hidden
+request, offending import or override including span,
+and missing-import/override-missing/inject-collision category. Events and I/O
+are absent from this owner and from semantic equality.
+
+Freeze a future implementation in exactly existing
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs` for
+narrow crate-private borrowed accessors, new private
+`module_extension_repository_validation.rs`, and `lib.rs` solely for its
+private declaration, plus the four ledgers. Mandatory caps are 320 production,
+650 tests, and 970 total formatted net Rust lines against the accepted design
+commit.
+
+Require pure and real-DICE proof for empty/one/multiple generated names;
+generated and override-backed imports; missing import and local-vs-exported
+name discrimination; import-before-polarity precedence; override present/
+missing and inject absent/collision; request isolation and exact-join
+corruption; completed/current prefixes and spans; predecessor Need/error;
+generated set, import name/order/location, override name/order/target/location/
+polarity A/B/A; Evaluated-to-Reused behavior with zero key event data; zero
+extra Bzl/registry/fs/materializer activation; full loading/Bzlmod suites; and
+structural absence of retained Starlark lifetimes, scratch maps, route,
+execution, I/O, or reverse dependency.
+
+Exact compatibility is limited to the admitted pinned post-evaluation import
+and override/inject predicates and their encounter order. Private compact
+representation, diagnostics/suggestions, and DICE scheduling are Slug-native.
+Generated route/mapping publication, replacement RepoSpec selection,
+repository implementation/context, source preparation/materialization,
+lockfile, public consumers/API, nonroot/MVO/isolation/innate breadth, and JVM
+remain deferred. `REPLAN` on any Bzlmod production edit/reverse edge, second
+loader/evaluator or additional DICE predecessor, retained lifetime/scratch
+set, events/I/O, route/materialization/publication claim, fourth Rust file, or
+cap excess.
+
+## Accepted predecessor implementation contract
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
 
 Independent review accepts the REPLAN design in `f14d3d7a`. Run only
 `WP-5-extension-import-order-identity-owner-implementation` in
@@ -21,7 +98,7 @@ proof, compatibility, and stop contract below.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 The first compiling request widening adds 108 production/test lines in
 `selected_repo_spec.rs` and two hidden `lib.rs` exports, but its required
@@ -76,7 +153,7 @@ consumer/API/JVM work, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts the design in `533a9453`. Run only
 `WP-5-host-selected-extension-validation-request-projection-implementation`
@@ -90,7 +167,7 @@ representation, compatibility, and stop contract below.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts repository-rule instantiation in `d50f02a2` at
 474 production, 799 tests, and 1,273 total within 480/900/1,380; full loading
@@ -155,7 +232,7 @@ I/O/materializer/lockfile/consumer/API/JVM work, or cap excess.
 
 This section and everything below it are historical context only, grant no
 file, action, cap, or schedule authority, and are interpreted only through the
-active implementation contract above.
+active docs-only design contract above.
 
 Independent review accepts the cap correction in `7cf2e45f`. Run only
 `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
@@ -172,7 +249,7 @@ remain.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted through the active
-implementation contract above.
+docs-only design contract above.
 
 The first compiling implementation is 474 production, 572 tests, and 1,046
 total formatted net Rust lines against `7616136f`. Production is within the
@@ -318,7 +395,7 @@ future Rust path, or cap excess.
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active implementation contract above.
+interpreted solely through the active docs-only design contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
@@ -490,7 +567,7 @@ total over 1,500.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active implementation contract above.
+active docs-only design contract above.
 
 The audit uses Bazel 9.2 tag commit `8220c619`:
 `RepositoryModuleApi.repository_rule`,
@@ -519,7 +596,7 @@ stopping before instantiation.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active implementation contract above.
+active docs-only design contract above.
 
 Independent review accepts the event correction in `f36ec593`. Implement only
 `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the
@@ -548,7 +625,7 @@ architecture, ABI, errors, events, scope, caps, and all stops.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-implementation contract above.
+docs-only design contract above.
 
 Final implementation review accepts the invocation architecture but rejects
 the phrase that the invocation key itself replays its batch on warm reuse.
@@ -593,7 +670,7 @@ consumer/JVM breadth, or cap excess.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-implementation contract above.
+docs-only design contract above.
 
 The frozen 720/800/1,520 stop fired after the complete required proof was
 formatted: the exact four-path diff measures approximately 724 production, 846
@@ -670,7 +747,7 @@ remain unaccepted and unstaged.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent implementation review found the six shared runtime files sound but
 rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly

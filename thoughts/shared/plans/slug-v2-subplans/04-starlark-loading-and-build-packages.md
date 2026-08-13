@@ -2705,3 +2705,21 @@ Independent review accepts `f14d3d7a`. Run only
 accessors plus four ledgers, under 260/450/710. Stage 4 production remains
 unchanged; no validator/routes/execution/I/O/materializer/lockfile/consumer/
 API/JVM breadth.
+
+### Import identity accepted; generated-repository validation design scheduled (2026-08-12)
+
+Independent review accepts `ff55dcbf`: the selected request now retains exact
+aggregated import and override rows, order, and spans. Together with accepted
+`d50f02a2` instantiation, loading owns every input required by the admitted
+pinned post-evaluation validation slice.
+
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-generated-repository-validation-owner-design`
+under 40/220/180/180/620. Freeze one private loading key over the instantiation
+owner: exact-join requests, build only transient per-request generated-name
+membership, validate imports first against generated names or override keys,
+then validate override/inject polarity in retained order. Freeze a three-file
+successor in the instantiation file for narrow accessors, new private validation
+module, and `lib.rs` declaration under mandatory 320/650/970. No Rust resumes
+before acceptance/activation; no Bzlmod mutation, route/publication, repository
+execution/context, events/I/O/materializer/lockfile/consumer/API/JVM breadth.

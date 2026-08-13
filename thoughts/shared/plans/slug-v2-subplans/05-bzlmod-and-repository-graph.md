@@ -2774,3 +2774,20 @@ existing maps as sole lookup/bijection owners, and complete the validation
 request projection/proof. No fourth file, new key/map/interner/cache/digest,
 loading edge, validation/routes, I/O/materializer/lockfile/consumer/API/JVM
 breadth, or cap excess.
+
+### Extension import identity accepted; loading validator design scheduled (2026-08-12)
+
+Independent review accepts `ff55dcbf`: one compact local-name spine preserves
+root/nonroot import order while the hidden request retains aggregated import
+and override locations. Stage 5 production is complete for the admitted
+validation-input seam and remains unchanged in the next packet.
+
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-generated-repository-validation-owner-design`
+under 40/220/180/180/620. Loading may design one private validator over the
+accepted instantiation predecessor: imports first against generated apparent
+names or override keys, then override/inject polarity. Freeze only the existing
+instantiation accessor file, new private validation module, and private
+`lib.rs` declaration under mandatory 320/650/970. No Bzlmod edit/reverse edge,
+generated route/publication, execution/context, I/O/materializer/lockfile/
+consumer/API/JVM work resumes.
