@@ -18,7 +18,6 @@ use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionError;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionKey;
-use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionView;
 use slug_bzlmod_v2::HostRootRepositoryMapping;
 use slug_bzlmod_v2::HostRootRepositoryMappingError;
 use slug_bzlmod_v2::HostRootRepositoryMappingKey;
@@ -235,12 +234,12 @@ enum HostCanonicalRepositoryDefinitionSource {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostCanonicalRepositoryDefinition {
+pub(super) struct HostCanonicalRepositoryDefinition {
     source: HostCanonicalRepositoryDefinitionSource,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HostCanonicalRepositoryDefinitionKind {
+pub(super) enum HostCanonicalRepositoryDefinitionKind {
     Root,
     SelectedRegistry,
     SelectedNonregistry,
@@ -248,63 +247,82 @@ enum HostCanonicalRepositoryDefinitionKind {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum HostCanonicalRepositoryDefinitionView<'a> {
-    Selected(HostCanonicalSelectedModuleDefinitionView<'a>),
-    Generated(HostGeneratedRepositoryDefinitionView<'a>),
+pub(super) struct HostCanonicalRepositoryDefinitionView<'a> {
+    kind: HostCanonicalRepositoryDefinitionKind,
+    canonical_repo: &'a CanonicalRepoName,
+    mapping_context: &'a CanonicalRepoName,
+    repo_spec: Option<&'a RepoSpec>,
 }
 
 impl HostCanonicalRepositoryDefinition {
-    fn view(&self) -> Option<HostCanonicalRepositoryDefinitionView<'_>> {
+    pub(super) fn view(&self) -> Option<HostCanonicalRepositoryDefinitionView<'_>> {
+        let (kind, canonical_repo, mapping_context, repo_spec) = match &self.source {
+            HostCanonicalRepositoryDefinitionSource::Selected(value) => {
+                let view = value.view();
+                let kind = match view.kind() {
+                    slug_bzlmod_v2::HostCanonicalSelectedModuleKind::Root => {
+                        HostCanonicalRepositoryDefinitionKind::Root
+                    }
+                    slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedRegistry => {
+                        HostCanonicalRepositoryDefinitionKind::SelectedRegistry
+                    }
+                    slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedNonregistry => {
+                        HostCanonicalRepositoryDefinitionKind::SelectedNonregistry
+                    }
+                };
+                (
+                    kind,
+                    view.canonical_repo(),
+                    view.mapping_context(),
+                    view.repo_spec(),
+                )
+            }
+            HostCanonicalRepositoryDefinitionSource::Generated(value) => {
+                let view = value.view()?;
+                (
+                    HostCanonicalRepositoryDefinitionKind::Generated,
+                    view.canonical_name,
+                    view.mapping.context_repo(),
+                    Some(view.repo_spec),
+                )
+            }
+        };
+        Some(HostCanonicalRepositoryDefinitionView {
+            kind,
+            canonical_repo,
+            mapping_context,
+            repo_spec,
+        })
+    }
+
+    fn mapping_target(&self, apparent_repo: &ApparentRepoName) -> Option<&CanonicalRepoName> {
         match &self.source {
-            HostCanonicalRepositoryDefinitionSource::Selected(value) => Some(
-                HostCanonicalRepositoryDefinitionView::Selected(value.view()),
-            ),
-            HostCanonicalRepositoryDefinitionSource::Generated(value) => value
+            HostCanonicalRepositoryDefinitionSource::Selected(value) => value
                 .view()
-                .map(HostCanonicalRepositoryDefinitionView::Generated),
+                .mapping()
+                .find_map(|(apparent, canonical)| (apparent == apparent_repo).then_some(canonical)),
+            HostCanonicalRepositoryDefinitionSource::Generated(value) => {
+                value.view()?.mapping.entries().get(apparent_repo)
+            }
         }
     }
 }
 
 impl<'a> HostCanonicalRepositoryDefinitionView<'a> {
-    fn kind(self) -> HostCanonicalRepositoryDefinitionKind {
-        match self {
-            Self::Selected(view) => match view.kind() {
-                slug_bzlmod_v2::HostCanonicalSelectedModuleKind::Root => {
-                    HostCanonicalRepositoryDefinitionKind::Root
-                }
-                slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedRegistry => {
-                    HostCanonicalRepositoryDefinitionKind::SelectedRegistry
-                }
-                slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedNonregistry => {
-                    HostCanonicalRepositoryDefinitionKind::SelectedNonregistry
-                }
-            },
-            Self::Generated(_) => HostCanonicalRepositoryDefinitionKind::Generated,
-        }
+    pub(super) fn kind(self) -> HostCanonicalRepositoryDefinitionKind {
+        self.kind
     }
 
-    fn canonical_repo(self) -> &'a CanonicalRepoName {
-        match self {
-            Self::Selected(view) => view.canonical_repo(),
-            Self::Generated(view) => view.canonical_name,
-        }
+    pub(super) fn canonical_repo(self) -> &'a CanonicalRepoName {
+        self.canonical_repo
     }
 
-    fn mapping_context(self) -> &'a CanonicalRepoName {
-        match self {
-            Self::Selected(view) => view.mapping_context(),
-            Self::Generated(view) => view.mapping.context_repo(),
-        }
+    pub(super) fn mapping_context(self) -> &'a CanonicalRepoName {
+        self.mapping_context
     }
 
-    fn mapping_target(self, apparent_repo: &ApparentRepoName) -> Option<&'a CanonicalRepoName> {
-        match self {
-            Self::Selected(view) => view
-                .mapping()
-                .find_map(|(apparent, canonical)| (apparent == apparent_repo).then_some(canonical)),
-            Self::Generated(view) => view.mapping.entries().get(apparent_repo),
-        }
+    pub(super) fn repo_spec(self) -> Option<&'a RepoSpec> {
+        self.repo_spec
     }
 }
 
@@ -327,9 +345,18 @@ enum HostCanonicalRepositoryDefinitionErrorKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostCanonicalRepositoryDefinitionError {
+pub(super) struct HostCanonicalRepositoryDefinitionError {
     canonical_repo: CanonicalRepoName,
     kind: HostCanonicalRepositoryDefinitionErrorKind,
+}
+
+impl HostCanonicalRepositoryDefinitionError {
+    pub(super) fn is_missing(&self) -> bool {
+        matches!(
+            self.kind,
+            HostCanonicalRepositoryDefinitionErrorKind::Missing { .. }
+        )
+    }
 }
 
 impl fmt::Display for HostCanonicalRepositoryDefinitionError {
@@ -344,18 +371,21 @@ impl fmt::Display for HostCanonicalRepositoryDefinitionError {
 
 impl std::error::Error for HostCanonicalRepositoryDefinitionError {}
 
-type HostCanonicalRepositoryDefinitionOutcome = SourcePreparationOutcome<
+pub(super) type HostCanonicalRepositoryDefinitionOutcome = SourcePreparationOutcome<
     Arc<Result<HostCanonicalRepositoryDefinition, HostCanonicalRepositoryDefinitionError>>,
 >;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostCanonicalRepositoryDefinitionKey {
+pub(super) struct HostCanonicalRepositoryDefinitionKey {
     workspace: NormalizedAbsolutePath,
     canonical_repo: CanonicalRepoName,
 }
 
 impl HostCanonicalRepositoryDefinitionKey {
-    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        canonical_repo: CanonicalRepoName,
+    ) -> Self {
         Self {
             workspace,
             canonical_repo,
@@ -477,20 +507,20 @@ impl Key for HostCanonicalRepositoryDefinitionKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostCanonicalRepositoryApparentMapping {
+pub(super) struct HostCanonicalRepositoryApparentMapping {
     predecessor: ApparentMappingPredecessor,
     apparent_repo: ApparentRepoName,
 }
 
 impl HostCanonicalRepositoryApparentMapping {
-    fn resolved_target(&self) -> Option<&CanonicalRepoName> {
+    pub(super) fn resolved_target(&self) -> Option<&CanonicalRepoName> {
         match &self.predecessor {
             ApparentMappingPredecessor::Root(predecessor) => predecessor
                 .view()?
                 .mapping()
                 .find_map(|(name, target)| (name == &self.apparent_repo).then_some(target)),
             ApparentMappingPredecessor::Canonical(predecessor) => {
-                predecessor.view()?.mapping_target(&self.apparent_repo)
+                predecessor.mapping_target(&self.apparent_repo)
             }
         }
     }
@@ -531,7 +561,7 @@ enum HostCanonicalRepositoryApparentMappingErrorKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostCanonicalRepositoryApparentMappingError {
+pub(super) struct HostCanonicalRepositoryApparentMappingError {
     context_repo: CanonicalRepoName,
     apparent_repo: ApparentRepoName,
     kind: HostCanonicalRepositoryApparentMappingErrorKind,
@@ -549,21 +579,21 @@ impl fmt::Display for HostCanonicalRepositoryApparentMappingError {
 
 impl std::error::Error for HostCanonicalRepositoryApparentMappingError {}
 
-type HostCanonicalRepositoryApparentMappingOutcome = SourcePreparationOutcome<
+pub(super) type HostCanonicalRepositoryApparentMappingOutcome = SourcePreparationOutcome<
     Arc<
         Result<HostCanonicalRepositoryApparentMapping, HostCanonicalRepositoryApparentMappingError>,
     >,
 >;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostCanonicalRepositoryApparentMappingKey {
+pub(super) struct HostCanonicalRepositoryApparentMappingKey {
     workspace: NormalizedAbsolutePath,
     context_repo: CanonicalRepoName,
     apparent_repo: ApparentRepoName,
 }
 
 impl HostCanonicalRepositoryApparentMappingKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         context_repo: CanonicalRepoName,
         apparent_repo: ApparentRepoName,
@@ -700,10 +730,9 @@ impl Key for HostCanonicalRepositoryApparentMappingKey {
                 ApparentMappingPredecessor::Root(value) => value.view().is_some_and(|view| {
                     view.mapping().any(|(name, _)| name == &self.apparent_repo)
                 }),
-                ApparentMappingPredecessor::Canonical(value) => value
-                    .view()
-                    .and_then(|view| view.mapping_target(&self.apparent_repo))
-                    .is_some(),
+                ApparentMappingPredecessor::Canonical(value) => {
+                    value.mapping_target(&self.apparent_repo).is_some()
+                }
             }
         }) {
             MappingLookupStatus::ContextMismatch => {
@@ -736,7 +765,7 @@ impl Key for HostCanonicalRepositoryApparentMappingKey {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::cell::Cell;
     use std::sync::Mutex;
 
@@ -782,9 +811,9 @@ mod tests {
 
     use super::*;
 
-    const WORKSPACE: &str = "/generated-repository-definition";
-    const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first', second='second')\n";
-    const EXTENSION_A: &str = r#"
+    pub(in crate::runtime) const WORKSPACE: &str = "/generated-repository-definition";
+    pub(in crate::runtime) const MODULE: &str = "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\nuse_repo(e, first='first', second='second')\n";
+    pub(in crate::runtime) const EXTENSION_A: &str = r#"
 repo=repository_rule(implementation=lambda ctx: None, attrs={'value':attr.string(), 'target':attr.label()})
 def impl(ctx):
     repo(name='first', value='one', target=':local')
@@ -877,7 +906,7 @@ ext=module_extension(implementation=impl)
         }
     }
 
-    async fn transaction(
+    pub(in crate::runtime) async fn transaction(
         dice: &Arc<Dice>,
         module: &str,
         extension: &str,
@@ -1098,7 +1127,7 @@ ext=module_extension(implementation=impl)
         updater.commit().await
     }
 
-    async fn validated(
+    pub(in crate::runtime) async fn validated(
         transaction: &mut dice::DiceTransaction,
     ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction
@@ -1109,7 +1138,9 @@ ext=module_extension(implementation=impl)
             .unwrap()
     }
 
-    fn names(value: &HostValidatedGeneratedRepositorySpecsOutcome) -> Vec<CanonicalRepoName> {
+    pub(in crate::runtime) fn names(
+        value: &HostValidatedGeneratedRepositorySpecsOutcome,
+    ) -> Vec<CanonicalRepoName> {
         let SourcePreparationOutcome::Complete(value) = value else {
             panic!("validation must complete")
         };
@@ -1312,14 +1343,18 @@ ext=module_extension(implementation=impl)
         let SourcePreparationOutcome::Complete(root_value) = &root else {
             panic!("root definition must complete")
         };
-        let root_view = root_value.as_ref().as_ref().unwrap().view().unwrap();
+        let root_definition = root_value.as_ref().as_ref().unwrap();
+        let root_view = root_definition.view().unwrap();
         assert_eq!(
             root_view.kind(),
             HostCanonicalRepositoryDefinitionKind::Root
         );
-        let HostCanonicalRepositoryDefinitionView::Selected(root_view) = root_view else {
+        let HostCanonicalRepositoryDefinitionSource::Selected(root_certificate) =
+            &root_definition.source
+        else {
             panic!("root must be selected")
         };
+        let root_view = root_certificate.view();
         assert_eq!(root_view.canonical_repo(), &CanonicalRepoName::root());
         assert!(root_view.repo_spec().is_none());
         assert!(tracker.lookup.lock().unwrap().is_empty());
@@ -1373,15 +1408,18 @@ ext=module_extension(implementation=impl)
         let SourcePreparationOutcome::Complete(value) = &generated_value else {
             panic!("generated definition must complete")
         };
-        let generated_view = value.as_ref().as_ref().unwrap().view().unwrap();
+        let generated_definition = value.as_ref().as_ref().unwrap();
+        let generated_view = generated_definition.view().unwrap();
         assert_eq!(
             generated_view.kind(),
             HostCanonicalRepositoryDefinitionKind::Generated
         );
-        let HostCanonicalRepositoryDefinitionView::Generated(generated_view) = generated_view
+        let HostCanonicalRepositoryDefinitionSource::Generated(generated_certificate) =
+            &generated_definition.source
         else {
             panic!("generated repository must use generated domain")
         };
+        let generated_view = generated_certificate.view().unwrap();
         assert_eq!(generated_view.canonical_name, &generated[0]);
         assert_eq!(generated_view.internal_name, "first");
         assert_eq!(generated_view.repo_spec.rule_id.rule_name, "repo");
@@ -1563,11 +1601,12 @@ ext=module_extension(implementation=impl)
         let SourcePreparationOutcome::Complete(local) = &local else {
             panic!("local definition must complete: {local:?}")
         };
-        let HostCanonicalRepositoryDefinitionView::Selected(local_view) =
-            local.as_ref().as_ref().unwrap().view().unwrap()
+        let HostCanonicalRepositoryDefinitionSource::Selected(local) =
+            &local.as_ref().as_ref().unwrap().source
         else {
             panic!("local definition must be selected")
         };
+        let local_view = local.view();
         assert_eq!(
             local_view.kind(),
             slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedNonregistry
@@ -1968,11 +2007,12 @@ ext=module_extension(implementation=impl)
         else {
             panic!("overridden mapping must retain canonical predecessor")
         };
-        let HostCanonicalRepositoryDefinitionView::Generated(overridden_view) =
-            overridden_predecessor.view().unwrap()
+        let HostCanonicalRepositoryDefinitionSource::Generated(overridden_certificate) =
+            &overridden_predecessor.source
         else {
             panic!("overridden generated definition must stay generated")
         };
+        let overridden_view = overridden_certificate.view().unwrap();
         assert_eq!(overridden_view.repo_spec.rule_id.rule_name.as_str(), "repo");
         assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
             &self_mapping,
