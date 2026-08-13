@@ -3211,3 +3211,17 @@ core composition module, minimal sibling predecessor seam, and private module
 declaration under 340/700/1,040 and 2,400/900 ceilings. Stage 5 production stays
 unchanged; no reverse edge, route/source/materialization/I/O, command/public API,
 or JVM work is authorized.
+
+### Core root apparent-definition proof boundary REPLAN (2026-08-13)
+
+Retain the unaccepted implementation diff but authorize no Rust. Run only
+docs packet
+`WP-4-5-6-host-root-apparent-repository-definition-owner-r2-proof-design`.
+Real Root mapping success already completes the selected/generated closure for
+the identical definition target, so defensive downstream Need/Missing/terminal
+and context corruption use pure plus inherited proof rather than contradictory
+fixtures. Real consumer proof remains short circuits, admitted success,
+identity/reuse/no-copy, and zero additional transport/filesystem/materialization
+after warming. Preserve exact three paths, 340/700/1,040, 2,400/900, semantics,
+and all reverse-edge/route/source/public stops; require acceptance and explicit
+r2 activation before Rust resumes.

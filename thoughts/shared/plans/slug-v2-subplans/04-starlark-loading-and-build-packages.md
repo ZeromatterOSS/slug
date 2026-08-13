@@ -3145,3 +3145,17 @@ seam in `generated_repository_definition.rs`, and the private `runtime/mod.rs`
 declaration under 340/700/1,040 and 2,400/900 old/new module ceilings. Preserve
 mapping-first order, Root/builtin short-circuiting, borrowed predecessor identity,
 proof, and every route/source/materializer/command/public/I/O/JVM stop.
+
+### Root apparent-definition proof boundary REPLAN (2026-08-13)
+
+Implementation review retains the unaccepted three-file diff but authorizes no
+Rust. Run only docs packet
+`WP-4-5-6-host-root-apparent-repository-definition-owner-r2-proof-design`.
+After real Root mapping success, the identical selected/generated definition is
+already owned by that complete closure; prove defensive second-position Need,
+Missing, terminal, and context mismatch purely plus inherited predecessor
+evidence, not fabricated graph state. Real consumer proof remains mapping
+failures/short circuits, admitted successes, A/B/A, reuse/no-copy, and zero
+additional registry/filesystem/materialization work after warming. Preserve
+340/700/1,040, 2,400/900, scope, semantics, and all stops. Require acceptance
+and explicit r2 activation before Rust resumes.
