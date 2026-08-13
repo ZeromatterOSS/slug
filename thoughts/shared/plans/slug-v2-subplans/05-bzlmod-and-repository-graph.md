@@ -3114,3 +3114,21 @@ four ledgers under 240/520/760 against `706da25d`. Replace the generated-only
 owner with one canonical-definition mapping consumer; preserve borrowed
 identity, proof, compatibility, complexity gate, and stops. Stage 5 production
 remains unchanged; no Bzlmod/loading/server or adjacent Rust is authorized.
+
+### Post-extension root-mapping publication design follows canonical mapping (2026-08-13)
+
+Canonical apparent mapping `fd8a7582` is accepted. The exact final root mapping
+including generated `use_repo` aliases and ordered override/inject substitutions
+exists only in private `HostSelectedExtensionMappingsKey`; the selected Root
+view and definition-load requests cannot truthfully replace it.
+
+Run only four-ledger docs packet
+`WP-5-host-root-repository-mapping-publication-design` under
+40/240/180/200/660 caps. Audit and freeze a hidden certificate over the existing
+key, retaining its predecessor plus unique Root ordinal and borrowing the exact
+ordered final map. Future implementation is exactly `selected_repo_spec.rs` and
+hidden `lib.rs` exports under 180/420/600, with empty/selected/generated/
+override/inject/builtin, terminal, A/B/A, reuse, no-copy, and zero downstream
+activation proof. Authorize exactly one hidden projection key over the existing
+sole mapping producer and no additional key/store; core/loading/server, routes,
+source, materialization, commands, execution/I/O, and public API remain deferred.

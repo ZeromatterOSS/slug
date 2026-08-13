@@ -3048,3 +3048,21 @@ in existing core `generated_repository_definition.rs` with colocated tests and
 four ledgers under 240/520/760 against `706da25d`. Delete the generated-only
 mapping owner; preserve the sole canonical predecessor, borrowed lookup, proof,
 compatibility, complexity gate, and stops. Stage 4 production remains unchanged.
+
+### Canonical apparent mapping accepted; root-mapping publication scheduled (2026-08-13)
+
+Independent review accepts canonical apparent mapping `fd8a7582`. Core cannot
+yet resolve root-visible generated aliases: the complete post-extension root
+mapping is retained only by Bzlmod's private selected-extension mapping owner,
+and replaying it in core would duplicate its exact producer.
+
+Run only four-ledger docs packet
+`WP-5-host-root-repository-mapping-publication-design` under
+40/240/180/200/660 caps. Freeze a hidden, borrowed Bzlmod publication over the
+existing owner, including empty-extension roots, selected deps, generated
+imports, ordered override/inject substitutions, Need/error/equality and no-copy
+proof. Future Rust is only `selected_repo_spec.rs` plus hidden `lib.rs` exports
+under 180/420/600. Authorize exactly one hidden projection key over the sole
+existing mapping producer, and no additional key/store. Stage 4 production
+remains unchanged; core consumption,
+routes, source/materialization, commands, I/O, and adjacent Rust are deferred.
