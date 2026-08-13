@@ -2779,3 +2779,20 @@ exports, plus four ledgers, under mandatory 220/420/640 against `433badeb`.
 Preserve the existing sole DICE key/store, opaque error wrapper, unchanged
 eval-only rows including overridden rows, server-above-both dependency
 direction, and all no-route/materialization/execution/I/O/public/JVM stops.
+
+### Validated spec publication accepted; generated-route boundary audit scheduled (2026-08-12)
+
+Independent review accepts `d2ed6ad3`: the sole loading validation key now
+publishes a hidden no-copy borrowed view of request/call-ordered generated
+canonical names and original `RepoSpec` rows, including overridden rows. No
+route, copied catalog, second key, materialization request, I/O, or stable
+public API entered loading.
+
+Run next only the four-plan docs packet
+`WP-4-5-host-generated-repository-route-boundary-design` under
+45/260/220/220/745 documentation caps. Audit pinned Bazel 9.2 post-validation
+result/route construction and the live loading/Bzlmod/server dependency graph;
+freeze a bounded owner, exact compatibility slice, implementation allowlist,
+mandatory Rust caps, proof, and stops or `REPLAN`. Stage 4 production remains
+unchanged. Do not authorize route publication, repository execution/context,
+source preparation/materialization, lockfile, command/API, or JVM work.

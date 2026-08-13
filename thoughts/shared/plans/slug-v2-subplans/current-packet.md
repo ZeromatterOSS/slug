@@ -1,28 +1,77 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-validated-generated-repository-spec-publication-implementation`
-Milestone: M7 validated generated-repository specification publication boundary
+Packet: `WP-4-5-host-generated-repository-route-boundary-design`
+Milestone: M7 generated-repository route ownership boundary
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted dependency-safe hidden publication seam.
+Result: audit and freeze the first dependency-safe generated-route owner.
 
-## Active implementation contract
+## Active docs-only design contract
 
-Independent review accepts design `433badeb`. Run only
-`WP-4-5-host-validated-generated-repository-spec-publication-implementation`
-in `module_extension_repository_validation.rs`,
-`module_extension_repository_instantiation.rs` for narrow borrowed
-canonical-name/`RepoSpec` accessors, and `lib.rs` solely for the exact
-hidden exports, plus the four ledgers. Mandatory caps are 220 production, 420
-tests, and 640 total formatted net Rust lines against `433badeb`. Preserve
-the exact sole-key/no-copy ABI, opaque error, server-above-both direction,
-proof, compatibility boundaries, and every stop below.
+Independent review accepts `d2ed6ad3`: loading now publishes a hidden,
+heap-independent, no-copy view of validated generated canonical names and
+their original `RepoSpec` rows from the sole validation key. Bzlmod owns
+`RootRepositoryRouteKey`, repository package-source preparation, and
+materialization, but cannot depend back on loading. `slug_server_v2` already
+depends on both owner crates. Run only
+`WP-4-5-host-generated-repository-route-boundary-design` in the canonical
+plan, this manifest, Stage 4, and Stage 5 under 45/260/220/220/745 formatted
+net documentation lines. Authorize no Rust, fixture, Cargo, activation,
+route, mapping, materializer, lockfile, command/API, or JVM work.
+
+Audit pinned Bazel 9.2 `SingleExtensionFunction` and `SingleExtensionValue`
+result construction after validation, including generated canonical route
+membership, extension/call encounter order, override and inject effects on
+the effective routed `RepoSpec`, and the complete per-generated-repository
+mapping/context. Audit live `RootRepositoryRoute`,
+`RepositoryPackageSourceKey`, and materialization consumers and the actual
+crate dependency graph. Decide whether the natural bounded successor is a
+loading-owned private generated-route value consumed later by a higher crate,
+or a neutral shared route algebra that does not reverse Bzlmod's dependency.
+Do not assume that the existing root-only route key or the validated hidden
+iterator is itself a final route certificate.
+
+The completed design must name the sole producer/key/value for each retained
+route fact, exact request/Need/error/event ordering, equality and invalidation,
+compact lifetime ownership, collision and join behavior, and whether
+overridden generated rows publish their original or replacement `RepoSpec`.
+It must freeze exact implementation files, mandatory production/test/total
+caps, discriminating pure and real-DICE proof, direct-dependent validation,
+and terminal stops or `REPLAN` at the first missing semantic input.
+
+Exact compatibility is limited to the admitted Bazel 9.2 generated route
+membership, mapping, effective `RepoSpec`, and encounter order proved by the
+audit. Private Rust representation, diagnostics, and DICE scheduling are
+Slug-native. Repository-rule implementation/context, source preparation and
+materialization, BUILD/package loading through generated repositories,
+lockfile replay/write, command consumers, stable public API, nonroot/MVO/
+isolation/innate breadth, and JVM remain deferred. `REPLAN` on guessed
+override publication, reconstructed selected mappings or canonical names,
+Bzlmod-to-loading dependency reversal, a second loader/evaluator or semantic
+row store, public `RootRepositoryRouteKey` widening, materialization/I/O,
+retained Starlark lifetime, more than four future Rust paths, or inability to
+freeze a bounded successor.
+
+## Accepted predecessor implementation contract
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
+
+Independent review accepts `d2ed6ad3`. The existing validation key now exposes
+only a hidden success certificate and borrowed exact-size iterator over the
+original request/call-ordered `(CanonicalRepoName, RepoSpec)` rows; its opaque
+error preserves private typed identity. Overridden rows retain their original
+canonical identity and `RepoSpec`. The implementation added no key, copied row
+store, route, materialization request, I/O, or stable public API, stayed within
+220/420/640 against `433badeb`, and passed full loading and Bzlmod all-target
+suites plus independent ABI/proof review.
 
 ## Accepted docs-only design contract
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts `b2a153aa`: loading now owns a complete
 heap-independent validation certificate over exact request-ordered generated
@@ -95,7 +144,7 @@ fourth Rust file, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts `b2a153aa` at approximately 295 production, 612
 tests, and 907 total formatted net Rust lines. It computes only the accepted
@@ -188,7 +237,7 @@ cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts the REPLAN design in `f14d3d7a`. Run only
 `WP-5-extension-import-order-identity-owner-implementation` in
@@ -202,7 +251,7 @@ proof, compatibility, and stop contract below.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 The first compiling request widening adds 108 production/test lines in
 `selected_repo_spec.rs` and two hidden `lib.rs` exports, but its required
@@ -257,7 +306,7 @@ consumer/API/JVM work, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent review accepts the design in `533a9453`. Run only
 `WP-5-host-selected-extension-validation-request-projection-implementation`
@@ -270,8 +319,8 @@ representation, compatibility, and stop contract below.
 ## Accepted docs-only design contract
 
 This section is historical context only, grants no independent file, action,
-cap, or schedule authority, and is interpreted through the active
-implementation contract above.
+cap, or schedule authority, and is interpreted through the active docs-only
+design contract above.
 
 Independent review accepts repository-rule instantiation in `d50f02a2` at
 474 production, 799 tests, and 1,273 total within 480/900/1,380; full loading
@@ -352,8 +401,8 @@ remain.
 ## Accepted r2 cap correction
 
 This section is historical context only, grants no independent file, action,
-cap, or schedule authority, and is interpreted through the active
-implementation contract above.
+cap, or schedule authority, and is interpreted through the active docs-only
+design contract above.
 
 The first compiling implementation is 474 production, 572 tests, and 1,046
 total formatted net Rust lines against `7616136f`. Production is within the
@@ -729,7 +778,7 @@ architecture, ABI, errors, events, scope, caps, and all stops.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-implementation contract above.
+docs-only design contract above.
 
 Final implementation review accepts the invocation architecture but rejects
 the phrase that the invocation key itself replays its batch on warm reuse.
@@ -774,7 +823,7 @@ consumer/JVM breadth, or cap excess.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-implementation contract above.
+docs-only design contract above.
 
 The frozen 720/800/1,520 stop fired after the complete required proof was
 formatted: the exact four-path diff measures approximately 724 production, 846
@@ -851,7 +900,7 @@ remain unaccepted and unstaged.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-implementation contract above.
+docs-only design contract above.
 
 Independent implementation review found the six shared runtime files sound but
 rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly

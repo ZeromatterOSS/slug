@@ -2839,3 +2839,21 @@ in the exact three loading paths plus four ledgers under 220/420/640.
 Stage 5 production remains unchanged. No Bzlmod dependency on loading, new key,
 copied store, route/mapping publication, materialization, execution/I/O,
 lockfile, consumer/API, or JVM breadth is authorized.
+
+### Generated-route ownership audit follows validated spec publication (2026-08-12)
+
+Independent review accepts loading publication `d2ed6ad3`. The hidden
+certificate exposes original validated generated canonical-name/`RepoSpec`
+rows without copying them. Bzlmod still owns `RootRepositoryRouteKey`, package
+source preparation, and materialization and must not reverse-depend on
+loading; `slug_server_v2` is the existing higher crate that depends on both.
+
+Run next only the four-plan docs packet
+`WP-4-5-host-generated-repository-route-boundary-design` under
+45/260/220/220/745 documentation caps. Audit pinned Bazel 9.2 effective
+generated-route membership, override/inject `RepoSpec` selection, complete
+per-repository mapping/context, collision and error order, then freeze one
+dependency-safe bounded successor or `REPLAN`. Stage 5 production remains
+unchanged. Do not widen `RootRepositoryRouteKey`, reconstruct selected state,
+add a Bzlmod-to-loading edge, or authorize materialization/I/O/lockfile/
+consumer/public/JVM work.
