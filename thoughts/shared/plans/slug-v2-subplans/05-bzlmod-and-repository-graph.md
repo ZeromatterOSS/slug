@@ -3546,3 +3546,12 @@ relative-path checker; future Rust is only `source_preparation.rs` and hidden
 request/source-input, materialization/source/package/I/O,
 core/loading/command/public/wire/JVM work is authorized. Stage 5 remains
 unchanged.
+
+### Repository relative-path owner implementation activated (2026-08-13)
+
+Independent review accepts design `4d96d094`. Implement only Bzlmod
+`source_preparation.rs`, hidden `lib.rs` exports, and completion ledgers under
+100/240/340 with 11,540/380 ceilings. Preserve the pure path value/error ABI,
+sole checker, post-validation Arc allocation, proof, and every no-caller/key/
+source/materialization/I/O/core/loading/command/public/wire/JVM stop. Stage 5
+remains unchanged.
