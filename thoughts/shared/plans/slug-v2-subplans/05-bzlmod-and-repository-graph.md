@@ -3486,3 +3486,12 @@ plus Builtin identity or request Arc; future Rust is only
 `source_preparation.rs` and hidden `lib.rs` under 140/320/460 and 11,400/390.
 No path/result/Need/source/package/loading/core/command/public/I/O/lockfile/wire/
 JVM behavior or new key/store is authorized. Stage 5 stays unchanged.
+
+### Repository source-input certificate implementation activated (2026-08-13)
+
+Independent review accepts design `b9cffe52`. Implement only existing Bzlmod
+`source_preparation.rs`, hidden `lib.rs` exports, and four ledgers under
+140/320/460 and ceilings 11,400/390. Preserve the one-pass projection, exact
+owned capability/disposition and borrowed view, proof, and every no-path/result/
+Need/source/package/loading/core/command/public/I/O/JVM stop. Stage 5 stays
+unchanged.

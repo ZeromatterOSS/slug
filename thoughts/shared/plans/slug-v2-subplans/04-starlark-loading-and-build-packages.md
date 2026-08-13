@@ -3418,3 +3418,11 @@ retaining exact capability plus Builtin identity or request Arc; future Rust is
 only `source_preparation.rs` and hidden `lib.rs` under 140/320/460 and
 11,400/390. Authorize no Rust/key/path/result/source/materialization/consumer/
 core/loading/command/public/I/O/JVM work. Stage 4 stays unchanged.
+
+### Repository source-input certificate implementation activated (2026-08-13)
+
+Independent review accepts design `b9cffe52`. Implement only existing Bzlmod
+`source_preparation.rs`, hidden `lib.rs` exports, and four ledgers under
+140/320/460 and ceilings 11,400/390. Preserve the sole projection, exact owned
+capability/disposition, borrowed view, proof, and all no-key/path/result/source/
+consumer/materialization stops. Stage 4 stays unchanged.
