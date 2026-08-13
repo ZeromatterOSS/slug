@@ -43,10 +43,52 @@ pub(crate) struct HostInstantiatedModuleExtensionRepositories {
     extensions: Arc<[HostInstantiatedModuleExtensionRepositoriesForRequest]>,
 }
 
+impl HostInstantiatedModuleExtensionRepositories {
+    pub(crate) fn parts(
+        &self,
+    ) -> (
+        &Arc<HostPureModuleExtensionInvocations>,
+        &[HostInstantiatedModuleExtensionRepositoriesForRequest],
+    ) {
+        (&self.predecessor, &self.extensions)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_truncated_extensions_for_test(&self) -> Self {
+        Self {
+            predecessor: self.predecessor.clone(),
+            extensions: self.extensions[..self.extensions.len() - 1].into(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_swapped_requests_for_test(&self) -> Self {
+        let mut extensions = self.extensions.to_vec();
+        let first = extensions[0].request.clone();
+        extensions[0].request = extensions[1].request.clone();
+        extensions[1].request = first;
+        Self {
+            predecessor: self.predecessor.clone(),
+            extensions: extensions.into(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostInstantiatedModuleExtensionRepositoriesForRequest {
     request: HostSelectedExtensionDefinitionLoadRequest,
     repositories: Arc<[HostInstantiatedModuleExtensionRepository]>,
+}
+
+impl HostInstantiatedModuleExtensionRepositoriesForRequest {
+    pub(crate) fn parts(
+        &self,
+    ) -> (
+        &HostSelectedExtensionDefinitionLoadRequest,
+        &[HostInstantiatedModuleExtensionRepository],
+    ) {
+        (&self.request, &self.repositories)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -55,6 +97,12 @@ pub(crate) struct HostInstantiatedModuleExtensionRepository {
     canonical_name: CanonicalRepoName,
     call: RepositoryRuleCallRecord,
     repo_spec: RepoSpec,
+}
+
+impl HostInstantiatedModuleExtensionRepository {
+    pub(crate) fn generated_name(&self) -> &str {
+        &self.generated_name
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -472,7 +520,7 @@ fn ensure_visible(
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -758,7 +806,7 @@ mod tests {
         }
     }
 
-    const WORKSPACE: &str = "/module-extension-repository-instantiation";
+    pub(crate) const WORKSPACE: &str = "/module-extension-repository-instantiation";
 
     #[derive(Default)]
     struct InstantiationTracker(Mutex<Vec<(ActivationKind, bool)>>);
@@ -800,12 +848,12 @@ mod tests {
         module_source: &str,
         extension_source: &str,
         extension_present: bool,
-        tracker: Option<Arc<InstantiationTracker>>,
+        tracker: Option<Arc<dyn ActivationTracker>>,
     ) -> dice::DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let user_data = UserComputationData {
             cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
-            activation_tracker: tracker.map(|value| value as Arc<dyn ActivationTracker>),
+            activation_tracker: tracker,
             ..Default::default()
         };
         let mut updater = dice.updater_with_data(user_data);
@@ -971,6 +1019,39 @@ mod tests {
             )])
             .unwrap();
         updater.commit().await
+    }
+
+    pub(crate) async fn transaction_untracked(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+    ) -> dice::DiceTransaction {
+        transaction(
+            dice,
+            module_source,
+            extension_source,
+            extension_present,
+            None,
+        )
+        .await
+    }
+
+    pub(crate) async fn transaction_with_tracker(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        extension_present: bool,
+        tracker: Arc<dyn ActivationTracker>,
+    ) -> dice::DiceTransaction {
+        transaction(
+            dice,
+            module_source,
+            extension_source,
+            extension_present,
+            Some(tracker),
+        )
+        .await
     }
 
     async fn compute(

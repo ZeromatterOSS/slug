@@ -20,6 +20,7 @@ pub mod load_label;
 mod module_extension;
 mod module_extension_repository_instantiation;
 mod module_extension_repository_rule;
+mod module_extension_repository_validation;
 pub mod package;
 #[doc(hidden)]
 pub mod provider;
