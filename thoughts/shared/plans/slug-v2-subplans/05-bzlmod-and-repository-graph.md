@@ -3510,3 +3510,13 @@ under 320/650/970 with 1,100/800 ceilings. Defer paths, legacy demand scope,
 materialization results, Builtin bytes, source/package/loading/command/public
 behavior, I/O, custom/generated rule admission, reverse dependencies, and JVM
 work. Stage 5 remains unchanged.
+
+### Root-apparent repository source-input owner implementation activated (2026-08-13)
+
+Independent review accepts design `e659b0e3`. Implement exactly the new
+private core source-input owner, minimal sibling route seam, private mod line,
+and completion ledgers under 320/650/970 with route/new-file ceilings
+1,100/800. Preserve sole route predecessor ordering, exact complete Arc
+retention, Main or accepted Bzlmod Input disposition, typed errors, proof, and
+all path/result/source/package/loading/command/public/I/O/reverse-edge/JVM
+stops. Stage 5 remains unchanged.

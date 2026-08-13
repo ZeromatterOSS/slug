@@ -3441,3 +3441,13 @@ input exactly once. Future Rust is only the new cohesive core owner, a minimal
 1,100/800 physical ceilings. No path/result/source/package/loading/command,
 public API, I/O, reverse dependency, second lookup/store, or JVM work is
 authorized. Stage 4 behavior remains unchanged.
+
+### Root-apparent repository source-input owner implementation activated (2026-08-13)
+
+Independent review accepts design `e659b0e3`. Implement only the new private
+core source-input module, minimal `pub(super)` route-carrier seam, private mod
+line, and completion ledgers under 320/650/970 with 1,100/800 ceilings.
+Preserve route-only Need ordering, exact retained predecessor, Main-or-Input
+success, four typed terminal kinds, one Bzlmod certificate projection, proof,
+and every no-path/result/source/loading/command/public/I/O/JVM stop. Stage 4
+behavior remains unchanged.
