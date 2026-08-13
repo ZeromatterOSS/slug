@@ -3266,3 +3266,15 @@ source, and package inputs; freeze the smallest dependency-safe successor or
 REPLAN prerequisite. Stage 5 production stays unchanged. Do not widen
 `RootRepositoryRoute`, reverse dependencies, copy retained data, or authorize
 source/materialization/I/O, command/server/public API, lockfile, wire, or JVM.
+
+### Consumer audit selects owned source-capability input design (2026-08-13)
+
+Independent review accepts audit `5cd3c4ab`. Run only four-ledger docs packet
+`WP-4-5-host-repository-source-capability-input-design` under
+40/220/180/180/620 caps. Freeze the hidden computation-free Bzlmod identity
+value and exact legacy DirectLocal/Builtin projection; future Rust is only
+`host_module.rs` and `lib.rs` under 180/320/500. Stage 5 production stays
+unchanged. Defer core conversion, consumer migration, source classification,
+materialization request/Need, route replacement, commands/public API, I/O,
+lockfile, wire, and JVM; forbid reverse edges, new keys/stores, and copies per
+Clone.

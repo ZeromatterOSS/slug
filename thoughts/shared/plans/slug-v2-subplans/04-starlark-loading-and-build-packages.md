@@ -3203,3 +3203,14 @@ freeze one dependency-safe successor or a precise prerequisite before any
 route/source/package/materialization or command work. Stage 4 production stays
 unchanged; forbid reverse edges, duplicate lookups/stores, copied RepoSpec or
 mapping state, public API, execution/I/O, lockfile, wire, and JVM breadth.
+
+### Consumer audit selects Bzlmod source-capability prerequisite (2026-08-13)
+
+Independent review accepts audit `5cd3c4ab`. Run only four-ledger docs packet
+`WP-4-5-host-repository-source-capability-input-design` under
+40/220/180/180/620 caps. Freeze a hidden computation-free Bzlmod value carrying
+workspace/apparent/canonical plus builtin identity or one shared `Arc<RepoSpec>`,
+with exact legacy-route projection and no module name. Future Rust is only
+`host_module.rs` and `lib.rs` under 180/320/500. Stage 4 production remains
+unchanged; no key/store, core/loading/server edit, source/package/materializer,
+command/public API, reverse edge, I/O, or JVM is authorized.

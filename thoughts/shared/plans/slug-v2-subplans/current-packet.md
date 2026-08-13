@@ -1,11 +1,73 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-6-host-repository-route-consumer-boundary-design`
+Packet: `WP-4-5-host-repository-source-capability-input-design`
 Milestone: M7 canonical repository routing prerequisites
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-Result: freeze the dependency-safe consumer boundary after the accepted private carrier.
+Result: freeze the owned lower-layer source capability required by later consumers.
 
 ## Active docs-only design contract
+
+The accepted consumer audit at `5cd3c4ab` proves the first downstream package
+and source DICE keys must own stable input across awaits. They cannot borrow
+core's private carrier or depend on core, while legacy `RootRepositoryRoute`
+and `RepositoryMaterializationKey` are DirectLocal/Builtin and root-override/
+module-name shaped. Run only docs packet
+`WP-4-5-host-repository-source-capability-input-design` in canonical, this
+manifest, Stage 4, and Stage 5 under mandatory 40/220/180/180/620 formatted net
+documentation lines. Authorize no Rust, Cargo, fixture, DICE key, source,
+package, materialization, execution/I/O, core/loading/server/command, public
+stable API, or JVM work.
+
+Freeze one Bzlmod-owned hidden, computation-free
+`HostRepositorySourceCapability` with structural identity exactly
+`{ workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName,
+canonical_repo: CanonicalRepoName, source }`, where the closed source is
+`Builtin(BuiltinBazelToolsRouteIdentity) | RepoSpec(Arc<RepoSpec>)`. Main has no
+source capability in this slice. Freeze hidden constructors for exact builtin
+and spec-backed inputs, borrowed workspace/apparent/canonical/source accessors,
+and a hidden `RootRepositoryRoute::source_capability()` projection preserving
+current DirectLocal/Builtin content. Constructor validation rejects root
+apparent names, root canonical for spec-backed input, builtin polarity/name
+mismatch, and empty/invalid identities before publication. Expose no fields,
+module name, route error, materialization kind/request, or mutation.
+
+The capability owns exactly one shared RepoSpec allocation at its boundary;
+its Clone clones only Arcs, and access returns `&RepoSpec`. Derive/freeze
+`Debug/Clone/PartialEq/Eq/Allocative`; implement `Hash` manually by reusing the
+existing RepoSpec structural hashing semantics, including the source
+discriminant and every request/source field. Add no DICE
+key, catalog, mapping, lookup, validation replay, or I/O. Existing
+`RootRepositoryRoute` remains unchanged and root-only. Core conversion,
+consumer-key migration, source classification, RepoSpec-to-materialization
+request validation, and retirement of legacy module-name rederivation are
+separate successors.
+
+Future implementation is exactly existing
+`app/slug_bzlmod_v2/src/host_module.rs` and `app/slug_bzlmod_v2/src/lib.rs` only
+for named `#[doc(hidden)]` exports, plus four ledgers, under mandatory 180
+production/320 tests/500 total formatted net Rust lines against the accepted
+design commit. Prefer colocated tests; STOP on a third Rust path or Cargo edge.
+
+Required proof: exact DirectLocal and Builtin projection; hidden constructor
+success and every fail-closed polarity row; complete workspace/apparent/
+canonical/source/RepoSpec content and hash/Eq A/B/A; `Arc::ptr_eq` across
+capability clones and accessor-to-capability borrowed RepoSpec pointer
+provenance after the one authorized route-projection allocation; external-style
+hidden ABI use; zero DICE/events/registry/source/package/materialization/
+filesystem activation; and full Bzlmod/loading/core/server dependents. Exact is
+the admitted Bazel 9.2 repository identity and original RepoSpec association.
+Arc ownership, hidden ABI, hash framing, and diagnostics are Slug-native.
+Registry/generated source policy, core conversion, package/source keys,
+materialization request/Need, route replacement, commands, lockfile, stable
+API, wire, execution/I/O, and JVM are deferred. REPLAN on module-name
+synthesis, RepoSpec deep-copy per Clone, a new key/store, guessed custom-rule
+classification, source/materializer work, reverse edge, cap, or file excess.
+
+## Accepted consumer-boundary audit
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
 
 Independent review accepts private carrier implementation `36d01305` at 318
 production, 493 tests, and 811 total formatted net Rust lines against design
@@ -28,23 +90,6 @@ canonical-definition lookup. Decide whether a neutral lower-crate borrowed
 carrier, a core-owned adapter consumed above both owners, or a smaller
 publication prerequisite is natural; REPLAN rather than reverse the existing
 core -> Bzlmod/loading dependency direction.
-
-The audit must pin carrier/key/value ownership; exact apparent/canonical/kind/
-original-RepoSpec association; Main and builtin precedence; registry,
-nonregistry, and generated source-capability classification; package-load and
-source-file consumer inputs; the first legitimate materialization Need;
-complete error/equality/order/lifetime semantics; and the smallest future file
-allowlist/caps. Preserve no-copy retained identity. Classify admitted Bazel 9.2
-repository ownership and source association as exact, private representation,
-diagnostics, and DICE scheduling as Slug-native, and command visibility,
-package/source preparation, materialization, execution/I/O, lockfile, stable
-API, wire, and JVM as deferred.
-
-Required output is one bounded successor or a precise REPLAN prerequisite with
-producer/consumer direction, exact/native/deferred split, proof, files, caps,
-and stops. STOP on widening `RootRepositoryRoute` by guess, copying RepoSpec or
-mapping state, adding a second lookup/store, reversing dependencies, public or
-command behavior, source/materializer work, a fifth ledger, or docs cap excess.
 
 ## Superseded implementation activation
 
