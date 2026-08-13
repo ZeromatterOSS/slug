@@ -3474,3 +3474,15 @@ smaller source-certificate prerequisite; loading remains last. Authorize no
 Rust, new key/store, duplicate request/catalog, inference, source/package/
 materialization/command/public/I/O/lockfile/wire/JVM breadth. Stage 5 remains
 unchanged.
+
+### Source consumer audit selects owned input certificate (2026-08-13)
+
+Audit rejects immediate route-shaped path migration because Builtin has no
+materialization request/path and the legacy path key owns module-name demand
+scope. Run only docs packet
+`WP-4-5-host-repository-source-input-certificate-design` in four ledgers under
+40/260/220/220/740. Freeze a hidden pure Bzlmod owner retaining exact capability
+plus Builtin identity or request Arc; future Rust is only
+`source_preparation.rs` and hidden `lib.rs` under 140/320/460 and 11,400/390.
+No path/result/Need/source/package/loading/core/command/public/I/O/lockfile/wire/
+JVM behavior or new key/store is authorized. Stage 5 stays unchanged.

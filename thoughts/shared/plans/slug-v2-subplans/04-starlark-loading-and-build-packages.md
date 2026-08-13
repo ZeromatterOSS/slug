@@ -3406,3 +3406,15 @@ Resume only retained Bzlmod `source_preparation.rs`, hidden `lib.rs` exports,
 and four ledgers under 180/420/600 and ceilings 11,240/380. Preserve the exact
 production ABI/order and corrected proof matrix with every prior no-consumer/
 materialization breadth stop. Stage 4 behavior remains unchanged.
+
+### Source consumer audit selects owned input certificate (2026-08-13)
+
+Audit rejects immediate `HostRepositoryPathKey` migration: Builtin is
+catalog-backed rather than `ResolvedPath`, and the legacy key publishes a
+module-name demand scope absent from the accepted capability. Run only
+four-ledger docs packet `WP-4-5-host-repository-source-input-certificate-design`
+under 40/260/220/220/740. Freeze a computation-free hidden Bzlmod certificate
+retaining exact capability plus Builtin identity or request Arc; future Rust is
+only `source_preparation.rs` and hidden `lib.rs` under 140/320/460 and
+11,400/390. Authorize no Rust/key/path/result/source/materialization/consumer/
+core/loading/command/public/I/O/JVM work. Stage 4 stays unchanged.
