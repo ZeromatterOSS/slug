@@ -311,6 +311,8 @@ pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsKey;
 #[doc(hidden)]
+pub use source_preparation::HostRepositoryLocalPathPolicy;
+#[doc(hidden)]
 pub use source_preparation::HostRepositorySourceFileKey;
 pub use source_preparation::HostRepositorySourceFileValue;
 pub use source_preparation::ModuleSourcePreparation;

@@ -82,6 +82,7 @@ use crate::host_package::HostBuildFileName;
 use crate::host_package::invalid_package_name;
 use crate::module_eval::DirectNonregistryEvaluationError;
 use crate::module_eval::DirectNonregistryIncludeFile;
+use crate::module_eval::HostEffectiveModuleOverride;
 use crate::module_eval::HostEffectiveModuleOverrideKey;
 use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
@@ -508,6 +509,22 @@ pub(crate) enum HostDiscoveredModuleProvenance {
     NonRegistry {
         closure: HostNonregistryPreparedClosure,
     },
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative)]
+pub enum HostRepositoryLocalPathPolicy {
+    WorkspaceRelative,
+    CommandAbsolute,
+    LocalUnsupported,
+}
+
+fn local_path_policy(effective: &HostEffectiveModuleOverride) -> HostRepositoryLocalPathPolicy {
+    if effective.is_command() {
+        HostRepositoryLocalPathPolicy::CommandAbsolute
+    } else {
+        HostRepositoryLocalPathPolicy::WorkspaceRelative
+    }
 }
 
 #[allow(dead_code)]
@@ -1621,6 +1638,7 @@ pub(crate) struct HostNonregistryModuleRoot {
 pub(crate) struct HostNonregistryPreparedClosure {
     module: NonrootModuleKey,
     source_identity: HostNonregistryModuleSourceIdentity,
+    local_path_policy: HostRepositoryLocalPathPolicy,
     root: HostNonregistryModuleRoot,
     fragments: Arc<[NonregistryPreparedFragment]>,
 }
@@ -1631,6 +1649,10 @@ impl HostNonregistryPreparedClosure {
             HostNonregistryModuleSourceIdentity::Local { repo_spec }
             | HostNonregistryModuleSourceIdentity::Immutable { repo_spec, .. } => repo_spec,
         }
+    }
+
+    pub(crate) fn local_path_policy(&self) -> HostRepositoryLocalPathPolicy {
+        self.local_path_policy
     }
 }
 
@@ -4246,6 +4268,7 @@ impl Key for HostNonregistryModuleClosureKey {
                 ),
             ));
         }
+        let local_path_policy = local_path_policy(effective);
 
         let materialization = match ctx
             .compute(&RepositoryMaterializationKey {
@@ -4368,6 +4391,7 @@ impl Key for HostNonregistryModuleClosureKey {
         let closure = HostNonregistryPreparedClosure {
             module: self.module.clone(),
             source_identity,
+            local_path_policy,
             root,
             fragments,
         };
@@ -9430,6 +9454,10 @@ mod tests {
                 override_: RootModuleOverride::NonRegistry(_),
             })
         ));
+        assert_eq!(
+            local_path_policy(root_a.as_ref().as_ref().unwrap()),
+            HostRepositoryLocalPathPolicy::WorkspaceRelative
+        );
         let command = command_b.as_ref().as_ref().unwrap();
         let HostEffectiveModuleOverride::Command { path, override_ } = command else {
             panic!("command must win over the root declaration")
@@ -9447,6 +9475,22 @@ mod tests {
             repo_spec.attributes.get("path"),
             Some(OverrideAttributeValue::String(path)) if path == "/workspace/dep"
         ));
+        assert_eq!(
+            local_path_policy(command),
+            HostRepositoryLocalPathPolicy::CommandAbsolute
+        );
+        let same_spec_root = HostEffectiveModuleOverride::Root {
+            override_: override_.clone(),
+        };
+        assert_eq!(same_spec_root.override_(), command.override_());
+        assert_ne!(
+            local_path_policy(&same_spec_root),
+            local_path_policy(command)
+        );
+        assert_eq!(
+            local_path_policy(&same_spec_root),
+            HostRepositoryLocalPathPolicy::WorkspaceRelative
+        );
         let root_error = compute_host_effective(
             &dice,
             "module(name = \"root\")\n",
@@ -10484,6 +10528,23 @@ mod tests {
         assert!(!HostDiscoveredModuleKey::equality(&a, &category_b));
         assert!(HostDiscoveredModuleKey::equality(&a, &restored));
         assert!(HostDiscoveredModuleKey::equality(&restored, &warm));
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("expected complete discovered module")
+        };
+        let HostDiscoveredModuleProvenance::NonRegistry { closure } =
+            &a_value.as_ref().as_ref().unwrap().provenance
+        else {
+            panic!("expected nonregistry provenance")
+        };
+        assert_eq!(
+            closure.local_path_policy(),
+            HostRepositoryLocalPathPolicy::WorkspaceRelative
+        );
+        let mut command_identity = closure.clone();
+        command_identity.local_path_policy = HostRepositoryLocalPathPolicy::CommandAbsolute;
+        assert_ne!(closure, &command_identity);
+        command_identity.local_path_policy = HostRepositoryLocalPathPolicy::WorkspaceRelative;
+        assert_eq!(closure, &command_identity);
         assert!(
             matches!(a, SourcePreparationOutcome::Complete(value) if matches!(
                 value.as_ref(), Ok(HostDiscoveredModule {

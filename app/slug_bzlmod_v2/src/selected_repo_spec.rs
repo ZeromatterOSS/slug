@@ -1490,6 +1490,23 @@ impl<'a> HostCanonicalSelectedModuleDefinitionView<'a> {
             },
         }
     }
+
+    pub fn local_path_policy(self) -> Option<crate::HostRepositoryLocalPathPolicy> {
+        match &self.route.entry.source {
+            HostGraphModuleSource::Root(_) => None,
+            HostGraphModuleSource::Discovered(module) => match &module.provenance {
+                HostDiscoveredModuleProvenance::Registry { .. } => {
+                    Some(crate::HostRepositoryLocalPathPolicy::LocalUnsupported)
+                }
+                HostDiscoveredModuleProvenance::NonRegistry { closure } => {
+                    Some(closure.local_path_policy())
+                }
+                HostDiscoveredModuleProvenance::BuiltinBazelTools { .. } => {
+                    unreachable!("builtin selected routes are not published")
+                }
+            },
+        }
+    }
 }
 
 #[doc(hidden)]
@@ -3014,6 +3031,7 @@ mod tests {
         mapping_context: String,
         mapping: Vec<(String, String)>,
         repo_rule: Option<(String, String, Vec<String>)>,
+        local_path_policy: Option<crate::HostRepositoryLocalPathPolicy>,
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -3073,6 +3091,7 @@ mod tests {
             mapping_context: view.mapping_context().as_str().to_owned(),
             mapping,
             repo_rule,
+            local_path_policy: view.local_path_policy(),
         }
     }
 
@@ -5309,6 +5328,7 @@ mod tests {
         expected_root_mapping.push(("bazel_tools".into(), "bazel_tools".into()));
         assert_eq!(root_snapshot.mapping, expected_root_mapping);
         assert!(root_snapshot.repo_rule.is_none());
+        assert_eq!(root_snapshot.local_path_policy, None);
         assert_eq!(io.calls(), calls_after_routes);
 
         let registry = compute_real_selected_definition(&dice, &root, 1, "dep+", true).await;
@@ -5337,6 +5357,10 @@ mod tests {
         assert!(bzl_file.ends_with("//tools/build_defs/repo:http.bzl"));
         assert_eq!(rule_name, "http_archive");
         assert!(!attributes.is_empty());
+        assert_eq!(
+            registry_snapshot.local_path_policy,
+            Some(crate::HostRepositoryLocalPathPolicy::LocalUnsupported)
+        );
 
         let local = compute_real_selected_definition(&dice, &root, 1, "local+", true).await;
         let SourcePreparationOutcome::Complete(local) = &local else {
@@ -5351,6 +5375,10 @@ mod tests {
         assert_eq!(local_snapshot.identity, Some(("local".into(), "".into())));
         assert_eq!(local_snapshot.canonical_repo, "local+");
         assert_eq!(local_snapshot.repo_rule.unwrap().1, "local_repository");
+        assert_eq!(
+            local_snapshot.local_path_policy,
+            Some(crate::HostRepositoryLocalPathPolicy::WorkspaceRelative)
+        );
 
         let builtin = compute_real_selected_definition(&dice, &root, 1, "bazel_tools", true).await;
         assert!(matches!(
@@ -5500,6 +5528,22 @@ mod tests {
                     }) if predecessor.as_ref().is_err()
                 )
         ));
+
+        let command_root = format!("{root}# command_override_bazel_tools\n");
+        let command =
+            compute_real_selected_definition(&dice, &command_root, 11, "bazel_tools", true).await;
+        let SourcePreparationOutcome::Complete(command) = &command else {
+            panic!("command override definition must complete")
+        };
+        let command = external_style_snapshot(command.as_ref().as_ref().unwrap());
+        assert_eq!(
+            command.kind,
+            HostCanonicalSelectedModuleKind::SelectedNonregistry
+        );
+        assert_eq!(
+            command.local_path_policy,
+            Some(crate::HostRepositoryLocalPathPolicy::CommandAbsolute)
+        );
     }
 
     #[tokio::test]
