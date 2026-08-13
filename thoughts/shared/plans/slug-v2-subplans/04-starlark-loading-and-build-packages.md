@@ -2944,3 +2944,12 @@ plus borrowed kind/module/version/canonical/mapping/original-RepoSpec view, a
 two-file hidden successor under 180/380/560, proof, and stops. Stage 4
 production remains unchanged; no loading/core/server Rust, route,
 source/materializer/I/O, public stable API, or JVM work is authorized.
+
+### Selected-module hidden publication implementation activated (2026-08-12)
+
+Independent review accepts design `1d8758d5`. Run only the exact hidden ABI
+in existing `selected_repo_spec.rs` and `lib.rs` hidden re-exports plus four
+ledgers, under mandatory 180/380/560 against `1d8758d5`. Preserve sole-key
+no-copy semantics, opaque errors, proof, compatibility, and stops. Stage 4
+production remains unchanged; no third Rust file, loading/core/server edit,
+route/source/materializer/I/O, stable public API, or JVM work is authorized.

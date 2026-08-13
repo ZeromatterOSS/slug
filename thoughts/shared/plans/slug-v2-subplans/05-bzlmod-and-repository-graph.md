@@ -3002,3 +3002,14 @@ mapping and original selected RepoSpec view, future exact two-file 180/380/560
 scope, proof, and stops. Stage 5 production remains unchanged; no new key/store,
 loading/core/server Rust, route/source/materializer/I/O, lockfile, public stable
 API, consumer, or JVM work is authorized.
+
+### Selected-module hidden publication implementation activated (2026-08-12)
+
+Independent review accepts design `1d8758d5`. Run only the exact hidden ABI
+in existing `selected_repo_spec.rs` and `lib.rs` hidden re-exports plus four
+ledgers, under mandatory 180/380/560 against `1d8758d5`. Preserve the existing
+key/store, predecessor+ordinal certificate, opaque errors, borrowed ordered
+mapping/original RepoSpec, proof, compatibility, and stops. Stage 5 production
+remains otherwise unchanged; no new key/store, third file, loading/core/server
+edit, route/source/materializer/I/O, stable API, consumer, or JVM work is
+authorized.
