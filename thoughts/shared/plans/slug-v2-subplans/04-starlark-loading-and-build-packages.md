@@ -3373,3 +3373,15 @@ Independent review accepts design `9df81032`. Implement only existing Bzlmod
 ABI, policy/classifier/error order, renamed legacy wrapper and parity, compact
 RepoSpec shell clone, proof, and all no-third-file/key/store/Need/consumer/
 source/materialization/command/public/I/O/JVM stops. Stage 4 stays unchanged.
+
+### Repository materialization-request projection proof correction scheduled (2026-08-13)
+
+Retain the unaccepted two-file implementation over design `9df81032`, but
+authorize no Rust. Run only four-ledger docs packet
+`WP-4-5-host-repository-source-capability-materialization-request-projection-r2-proof-design`
+under 40/260/220/220/740 documentation caps. Production ABI and ordering pass;
+the required absolute-local, malformed-attribute, path-shape, exact-identity,
+apparent-exclusion, and A/B/A proof does not fit the prior 11,080 source ceiling.
+Freeze future ceilings 11,240/380 while retaining 180/420/600 and every prior
+scope and no-consumer/materialization stop. Require acceptance and explicit r2
+activation before Rust resumes. Stage 4 behavior remains unchanged.
