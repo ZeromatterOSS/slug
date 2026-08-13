@@ -259,6 +259,8 @@ pub use selected_repo_spec::HostCanonicalSelectedModuleDefinition;
 #[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionError;
 #[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionErrorDisposition;
+#[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionKey;
 #[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionOutcome;

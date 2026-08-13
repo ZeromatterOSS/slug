@@ -1402,6 +1402,24 @@ pub struct HostCanonicalSelectedModuleDefinitionError {
     inner: PrivateCanonicalSelectedModuleDefinitionError,
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostCanonicalSelectedModuleDefinitionErrorDisposition {
+    Missing,
+    Terminal,
+}
+
+impl HostCanonicalSelectedModuleDefinitionError {
+    pub fn disposition(&self) -> HostCanonicalSelectedModuleDefinitionErrorDisposition {
+        match &self.inner {
+            PrivateCanonicalSelectedModuleDefinitionError::Missing { .. } => {
+                HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing
+            }
+            _ => HostCanonicalSelectedModuleDefinitionErrorDisposition::Terminal,
+        }
+    }
+}
+
 impl fmt::Display for HostCanonicalSelectedModuleDefinitionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.inner)
@@ -2833,6 +2851,12 @@ mod tests {
     }
 
     fn assert_external_error<T: std::error::Error + Clone + Eq + Allocative>() {}
+
+    fn external_disposition(
+        error: &crate::HostCanonicalSelectedModuleDefinitionError,
+    ) -> crate::HostCanonicalSelectedModuleDefinitionErrorDisposition {
+        error.disposition()
+    }
     const LOCAL_MODULES: &[&str] = &[
         "local",
         "rules_license",
@@ -4202,6 +4226,42 @@ mod tests {
             &error("a+"),
             &error("a+")
         ));
+        let predecessor = Arc::new(Ok(routes.clone()));
+        let disposition =
+            |inner| external_disposition(&HostCanonicalSelectedModuleDefinitionError { inner });
+        assert_eq!(
+            disposition(PrivateCanonicalSelectedModuleDefinitionError::Missing {
+                predecessor: predecessor.clone(),
+                canonical_repo: CanonicalRepoName::new("missing+").unwrap(),
+            }),
+            crate::HostCanonicalSelectedModuleDefinitionErrorDisposition::Missing
+        );
+        for terminal in [
+            PrivateCanonicalSelectedModuleDefinitionError::Routes(
+                failed,
+                CanonicalRepoName::new("route+").unwrap(),
+            ),
+            PrivateCanonicalSelectedModuleDefinitionError::RoutesCompute(
+                "compute".into(),
+                CanonicalRepoName::new("compute+").unwrap(),
+            ),
+            PrivateCanonicalSelectedModuleDefinitionError::Duplicate {
+                predecessor: predecessor.clone(),
+                canonical_repo: CanonicalRepoName::new("duplicate+").unwrap(),
+                first_ordinal: 0,
+                conflicting_ordinal: 1,
+            },
+            PrivateCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
+                predecessor,
+                ordinal: 1,
+                canonical_repo: CanonicalRepoName::new("bazel_tools").unwrap(),
+            },
+        ] {
+            assert_eq!(
+                disposition(terminal),
+                crate::HostCanonicalSelectedModuleDefinitionErrorDisposition::Terminal
+            );
+        }
     }
 
     #[test]
