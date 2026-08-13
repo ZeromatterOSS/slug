@@ -3385,3 +3385,11 @@ apparent-exclusion, and A/B/A proof does not fit the prior 11,080 source ceiling
 Freeze future ceilings 11,240/380 while retaining 180/420/600 and every prior
 scope and no-consumer/materialization stop. Require acceptance and explicit r2
 activation before Rust resumes. Stage 4 behavior remains unchanged.
+
+### Repository materialization-request projection r2 activated (2026-08-13)
+
+Independent review accepts proof correction `6a8353d7` over design `9df81032`.
+Resume only retained Bzlmod `source_preparation.rs`, hidden `lib.rs` exports,
+and four ledgers under 180/420/600 and ceilings 11,240/380. Preserve the exact
+production ABI/order and corrected proof matrix with every prior no-consumer/
+materialization breadth stop. Stage 4 behavior remains unchanged.
