@@ -4287,6 +4287,49 @@ fn checked_relative_path(path: &Path) -> Result<&Path, CompactString> {
     Ok(path)
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostRepositoryRelativePath(Arc<PathBuf>);
+impl HostRepositoryRelativePath {
+    pub fn as_path(&self) -> &Path {
+        self.0.as_path()
+    }
+    pub fn path_arc(&self) -> &Arc<PathBuf> {
+        &self.0
+    }
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRepositoryRelativePathError {
+    requested_path: Arc<PathBuf>,
+}
+impl HostRepositoryRelativePathError {
+    pub fn requested_path(&self) -> &Path {
+        self.requested_path.as_path()
+    }
+}
+impl fmt::Display for HostRepositoryRelativePathError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "invalid repository-relative path: {}",
+            self.requested_path.display()
+        )
+    }
+}
+impl std::error::Error for HostRepositoryRelativePathError {}
+#[doc(hidden)]
+pub fn host_repository_relative_path(
+    requested_path: PathBuf,
+) -> Result<HostRepositoryRelativePath, HostRepositoryRelativePathError> {
+    match checked_relative_path(&requested_path) {
+        Ok(_) => Ok(HostRepositoryRelativePath(Arc::new(requested_path))),
+        Err(_) => Err(HostRepositoryRelativePathError {
+            requested_path: Arc::new(requested_path),
+        }),
+    }
+}
+
 pub fn source_identity(bytes: &[u8]) -> Arc<str> {
     Arc::from(hex::encode(Sha256::digest(bytes)))
 }
@@ -11393,5 +11436,76 @@ mod tests {
                     RepositorySourceFileError::WrongKind { .. }
                 )))
         ));
+    }
+
+    #[test]
+    fn repository_relative_path_owns_the_exact_checked_shape() {
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        let valid = [
+            "dep",
+            "nested/BUILD.bazel",
+            "two/ordered/components",
+            "dep/./file",
+            "dep//file",
+            "dep/",
+        ];
+        for raw in valid {
+            let path = PathBuf::from(raw);
+            assert_eq!(checked_relative_path(&path).unwrap(), path.as_path());
+            let owned = crate::host_repository_relative_path(path.clone()).unwrap();
+            assert_eq!(owned.as_path(), path.as_path());
+            assert_eq!(owned.path_arc().as_ref(), &path);
+            let cloned = owned.clone();
+            assert!(Arc::ptr_eq(owned.path_arc(), cloned.path_arc()));
+        }
+        for path in [
+            PathBuf::new(),
+            PathBuf::from("."),
+            PathBuf::from("./dep"),
+            PathBuf::from(".."),
+            PathBuf::from("dep/../other"),
+            PathBuf::from("/"),
+            PathBuf::from("/absolute"),
+        ] {
+            assert!(checked_relative_path(&path).is_err());
+            let error = crate::host_repository_relative_path(path.clone()).unwrap_err();
+            assert_eq!(error.requested_path(), path.as_path());
+            assert!(error.to_string().contains(&path.display().to_string()));
+        }
+        let a = crate::host_repository_relative_path(PathBuf::from("a/b")).unwrap();
+        let b = crate::host_repository_relative_path(PathBuf::from("a/c")).unwrap();
+        let restored = crate::host_repository_relative_path(PathBuf::from("a/b")).unwrap();
+        assert_ne!(a, b);
+        assert_eq!(a, restored);
+        let hash = |value: &HostRepositoryRelativePath| {
+            let mut hasher = DefaultHasher::new();
+            value.hash(&mut hasher);
+            hasher.finish()
+        };
+        assert_eq!(hash(&a), hash(&restored));
+        assert_ne!(hash(&a), hash(&b));
+        let source = include_str!("source_preparation.rs");
+        let constructor = source
+            .split("pub fn host_repository_relative_path")
+            .nth(1)
+            .unwrap()
+            .split("pub fn source_identity")
+            .next()
+            .unwrap();
+        assert_eq!(constructor.matches("checked_relative_path(").count(), 1);
+        for forbidden in [
+            ".compute(",
+            "impl Key",
+            "std::fs",
+            "Materialization",
+            "SourceFile",
+        ] {
+            assert!(
+                !constructor.contains(forbidden),
+                "forbidden edge: {forbidden}"
+            );
+        }
     }
 }
