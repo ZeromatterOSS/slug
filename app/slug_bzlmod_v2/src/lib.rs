@@ -255,6 +255,22 @@ pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
 #[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinition;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionOutcome;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleDefinitionView;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleIdentity;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleKind;
+#[doc(hidden)]
+pub use selected_repo_spec::HostCanonicalSelectedModuleMappingIter;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionImport;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequest;

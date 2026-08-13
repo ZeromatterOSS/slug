@@ -1332,21 +1332,23 @@ impl Key for HostSelectedModuleRoutesKey {
     }
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HostCanonicalSelectedModuleKind {
+pub enum HostCanonicalSelectedModuleKind {
     Root,
     SelectedRegistry,
     SelectedNonregistry,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostCanonicalSelectedModuleDefinition {
+#[doc(hidden)]
+pub struct HostCanonicalSelectedModuleDefinition {
     routes: RetainedSelectedRoutes,
     ordinal: usize,
 }
 
 impl HostCanonicalSelectedModuleDefinition {
-    fn view(&self) -> (HostCanonicalSelectedModuleKind, &HostSelectedModuleRoute) {
+    pub fn view(&self) -> HostCanonicalSelectedModuleDefinitionView<'_> {
         let routes = self
             .routes
             .as_ref()
@@ -1367,12 +1369,12 @@ impl HostCanonicalSelectedModuleDefinition {
                 }
             },
         };
-        (kind, route)
+        HostCanonicalSelectedModuleDefinitionView { kind, route }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostCanonicalSelectedModuleDefinitionError {
+enum PrivateCanonicalSelectedModuleDefinitionError {
     Routes(RetainedSelectedRoutes, CanonicalRepoName),
     RoutesCompute(CompactString, CanonicalRepoName),
     Missing {
@@ -1393,6 +1395,109 @@ enum HostCanonicalSelectedModuleDefinitionError {
 }
 
 type RetainedSelectedRoutes = Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostCanonicalSelectedModuleDefinitionError {
+    inner: PrivateCanonicalSelectedModuleDefinitionError,
+}
+
+impl fmt::Display for HostCanonicalSelectedModuleDefinitionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
+impl std::error::Error for HostCanonicalSelectedModuleDefinitionError {}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HostCanonicalSelectedModuleIdentity<'a> {
+    Root,
+    Module {
+        name: &'a str,
+        normalized_version: &'a str,
+    },
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub struct HostCanonicalSelectedModuleDefinitionView<'a> {
+    kind: HostCanonicalSelectedModuleKind,
+    route: &'a HostSelectedModuleRoute,
+}
+
+impl<'a> HostCanonicalSelectedModuleDefinitionView<'a> {
+    pub fn kind(self) -> HostCanonicalSelectedModuleKind {
+        self.kind
+    }
+    pub fn identity(self) -> HostCanonicalSelectedModuleIdentity<'a> {
+        match &self.route.entry.key {
+            HostGraphModuleKey::Root => HostCanonicalSelectedModuleIdentity::Root,
+            HostGraphModuleKey::Module { name, version } => {
+                HostCanonicalSelectedModuleIdentity::Module {
+                    name,
+                    normalized_version: version.normalized(),
+                }
+            }
+        }
+    }
+    pub fn canonical_repo(self) -> &'a CanonicalRepoName {
+        &self.route.canonical_repo
+    }
+    pub fn mapping_context(self) -> &'a CanonicalRepoName {
+        &self.route.mapping.context_repo
+    }
+    pub fn mapping(self) -> HostCanonicalSelectedModuleMappingIter<'a> {
+        HostCanonicalSelectedModuleMappingIter {
+            order: self.route.mapping.order.iter(),
+            entries: &self.route.mapping.entries,
+        }
+    }
+    pub fn repo_spec(self) -> Option<&'a RepoSpec> {
+        match &self.route.entry.source {
+            HostGraphModuleSource::Root(_) => None,
+            HostGraphModuleSource::Discovered(module) => match &module.provenance {
+                HostDiscoveredModuleProvenance::Registry { .. } => self
+                    .route
+                    .registry_repo_spec
+                    .as_ref()
+                    .map(|spec| &spec.repo_spec),
+                HostDiscoveredModuleProvenance::NonRegistry { closure } => {
+                    Some(closure.repo_spec())
+                }
+                HostDiscoveredModuleProvenance::BuiltinBazelTools { .. } => {
+                    unreachable!("builtin selected routes are not published")
+                }
+            },
+        }
+    }
+}
+
+#[doc(hidden)]
+pub struct HostCanonicalSelectedModuleMappingIter<'a> {
+    order: std::slice::Iter<'a, ApparentRepoName>,
+    entries: &'a SmallMap<ApparentRepoName, CanonicalRepoName>,
+}
+
+impl<'a> Iterator for HostCanonicalSelectedModuleMappingIter<'a> {
+    type Item = (&'a ApparentRepoName, &'a CanonicalRepoName);
+    fn next(&mut self) -> Option<Self::Item> {
+        self.order.next().map(|name| {
+            (
+                name,
+                self.entries
+                    .get(name)
+                    .expect("retained mapping order is valid"),
+            )
+        })
+    }
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.order.size_hint()
+    }
+}
+
+impl ExactSizeIterator for HostCanonicalSelectedModuleMappingIter<'_> {}
 
 enum CanonicalRouteMatch {
     Missing,
@@ -1430,13 +1535,14 @@ fn find_canonical_route_ordinal<'a>(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostCanonicalSelectedModuleDefinitionKey {
+#[doc(hidden)]
+pub struct HostCanonicalSelectedModuleDefinitionKey {
     workspace: NormalizedAbsolutePath,
     canonical_repo: CanonicalRepoName,
 }
 
 impl HostCanonicalSelectedModuleDefinitionKey {
-    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
+    pub fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
         Self {
             workspace,
             canonical_repo,
@@ -1454,13 +1560,22 @@ impl fmt::Display for HostCanonicalSelectedModuleDefinitionKey {
     }
 }
 
-type CanonicalSelectedDefinitionOutcome = SourcePreparationOutcome<
+#[doc(hidden)]
+pub type HostCanonicalSelectedModuleDefinitionOutcome = SourcePreparationOutcome<
     Arc<Result<HostCanonicalSelectedModuleDefinition, HostCanonicalSelectedModuleDefinitionError>>,
 >;
 
+fn selected_definition_error(
+    inner: PrivateCanonicalSelectedModuleDefinitionError,
+) -> HostCanonicalSelectedModuleDefinitionOutcome {
+    SourcePreparationOutcome::Complete(Arc::new(Err(HostCanonicalSelectedModuleDefinitionError {
+        inner,
+    })))
+}
+
 #[async_trait]
 impl Key for HostCanonicalSelectedModuleDefinitionKey {
-    type Value = CanonicalSelectedDefinitionOutcome;
+    type Value = HostCanonicalSelectedModuleDefinitionOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let predecessor = match ctx
@@ -1472,48 +1587,48 @@ impl Key for HostCanonicalSelectedModuleDefinitionKey {
             }
             Ok(SourcePreparationOutcome::Complete(predecessor)) => predecessor,
             Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostCanonicalSelectedModuleDefinitionError::RoutesCompute(
+                return selected_definition_error(
+                    PrivateCanonicalSelectedModuleDefinitionError::RoutesCompute(
                         error.to_string().into(),
                         self.canonical_repo.clone(),
                     ),
-                )));
+                );
             }
         };
         let routes = match predecessor.as_ref() {
             Ok(routes) => routes,
             Err(_) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostCanonicalSelectedModuleDefinitionError::Routes(
+                return selected_definition_error(
+                    PrivateCanonicalSelectedModuleDefinitionError::Routes(
                         predecessor,
                         self.canonical_repo.clone(),
                     ),
-                )));
+                );
             }
         };
         let ordinal =
             match find_canonical_route_ordinal(&self.canonical_repo, routes.entries.iter()) {
                 CanonicalRouteMatch::Missing => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostCanonicalSelectedModuleDefinitionError::Missing {
+                    return selected_definition_error(
+                        PrivateCanonicalSelectedModuleDefinitionError::Missing {
                             predecessor,
                             canonical_repo: self.canonical_repo.clone(),
                         },
-                    )));
+                    );
                 }
                 CanonicalRouteMatch::Unique(ordinal) => ordinal,
                 CanonicalRouteMatch::Duplicate {
                     first_ordinal,
                     conflicting_ordinal,
                 } => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostCanonicalSelectedModuleDefinitionError::Duplicate {
+                    return selected_definition_error(
+                        PrivateCanonicalSelectedModuleDefinitionError::Duplicate {
                             predecessor,
                             canonical_repo: self.canonical_repo.clone(),
                             first_ordinal,
                             conflicting_ordinal,
                         },
-                    )));
+                    );
                 }
             };
         if matches!(
@@ -1524,13 +1639,13 @@ impl Key for HostCanonicalSelectedModuleDefinitionKey {
                     HostDiscoveredModuleProvenance::BuiltinBazelTools { .. }
                 )
         ) {
-            return SourcePreparationOutcome::Complete(Arc::new(Err(
-                HostCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
+            return selected_definition_error(
+                PrivateCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
                     predecessor,
                     ordinal,
                     canonical_repo: self.canonical_repo.clone(),
                 },
-            )));
+            );
         }
         SourcePreparationOutcome::Complete(Arc::new(Ok(HostCanonicalSelectedModuleDefinition {
             routes: predecessor,
@@ -2671,6 +2786,53 @@ mod tests {
 
     const WORKSPACE: &str = "/selected-repo-spec-test";
     const REGISTRY: &str = "https://registry.invalid";
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ExternalSelectedModuleSnapshot {
+        kind: crate::HostCanonicalSelectedModuleKind,
+        identity: Option<(String, String)>,
+        canonical_repo: String,
+        mapping_context: String,
+        mapping: Vec<(String, String)>,
+        repo_rule: Option<(String, String, Vec<String>)>,
+    }
+
+    fn external_style_snapshot(
+        definition: &crate::HostCanonicalSelectedModuleDefinition,
+    ) -> ExternalSelectedModuleSnapshot {
+        let view: crate::HostCanonicalSelectedModuleDefinitionView<'_> = definition.view();
+        let identity = match view.identity() {
+            crate::HostCanonicalSelectedModuleIdentity::Root => None,
+            crate::HostCanonicalSelectedModuleIdentity::Module {
+                name,
+                normalized_version,
+            } => Some((name.to_owned(), normalized_version.to_owned())),
+        };
+        let mut mapping: crate::HostCanonicalSelectedModuleMappingIter<'_> = view.mapping();
+        let mapping_len = mapping.len();
+        let mapping = mapping
+            .by_ref()
+            .map(|(name, target)| (name.as_str().to_owned(), target.as_str().to_owned()))
+            .collect::<Vec<_>>();
+        assert_eq!(mapping.len(), mapping_len);
+        let repo_rule = view.repo_spec().map(|spec| {
+            (
+                spec.rule_id.bzl_file.to_string(),
+                spec.rule_id.rule_name.to_string(),
+                spec.attributes.keys().map(ToString::to_string).collect(),
+            )
+        });
+        ExternalSelectedModuleSnapshot {
+            kind: view.kind(),
+            identity,
+            canonical_repo: view.canonical_repo().as_str().to_owned(),
+            mapping_context: view.mapping_context().as_str().to_owned(),
+            mapping,
+            repo_rule,
+        }
+    }
+
+    fn assert_external_error<T: std::error::Error + Clone + Eq + Allocative>() {}
     const LOCAL_MODULES: &[&str] = &[
         "local",
         "rules_license",
@@ -3104,10 +3266,10 @@ mod tests {
         generation: u64,
         canonical_repo: &str,
         include_epoch: bool,
-    ) -> CanonicalSelectedDefinitionOutcome {
+    ) -> crate::HostCanonicalSelectedModuleDefinitionOutcome {
         real_transaction(dice, root, generation, &[], include_epoch)
             .await
-            .compute(&HostCanonicalSelectedModuleDefinitionKey::new(
+            .compute(&crate::HostCanonicalSelectedModuleDefinitionKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
                 if canonical_repo.is_empty() {
                     CanonicalRepoName::root()
@@ -3996,8 +4158,7 @@ mod tests {
                 .as_ref()
                 .unwrap()
                 .view()
-                .1
-                .canonical_repo
+                .canonical_repo()
                 .as_str(),
             ""
         );
@@ -4025,10 +4186,12 @@ mod tests {
         }));
         let error = |name| {
             SourcePreparationOutcome::Complete(Arc::new(Err(
-                HostCanonicalSelectedModuleDefinitionError::Routes(
-                    failed.clone(),
-                    CanonicalRepoName::new(name).unwrap(),
-                ),
+                HostCanonicalSelectedModuleDefinitionError {
+                    inner: PrivateCanonicalSelectedModuleDefinitionError::Routes(
+                        failed.clone(),
+                        CanonicalRepoName::new(name).unwrap(),
+                    ),
+                },
             )))
         };
         assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
@@ -4803,16 +4966,35 @@ mod tests {
             panic!("root definition must complete")
         };
         let root_value = root_value.as_ref().as_ref().unwrap();
-        let (kind, root_view) = root_value.view();
-        assert_eq!(kind, HostCanonicalSelectedModuleKind::Root);
-        assert_eq!(
-            root_view.mapping.entries.get("root_self").unwrap().as_str(),
-            ""
-        );
-        assert_eq!(
-            root_view.mapping.entries.get("dep_alias").unwrap().as_str(),
-            "dep+"
-        );
+        assert_external_error::<crate::HostCanonicalSelectedModuleDefinitionError>();
+        let root_snapshot = external_style_snapshot(root_value);
+        assert_eq!(root_snapshot.kind, HostCanonicalSelectedModuleKind::Root);
+        assert_eq!(root_snapshot.identity, None);
+        assert_eq!(root_snapshot.canonical_repo, "");
+        assert_eq!(root_snapshot.mapping_context, "");
+        let mut expected_root_mapping = vec![
+            ("".to_owned(), "".to_owned()),
+            ("root_self".to_owned(), "".to_owned()),
+            ("dep_alias".to_owned(), "dep+".to_owned()),
+        ];
+        expected_root_mapping.extend(LOCAL_MODULES.iter().map(|name| {
+            (
+                if *name == "local" {
+                    "local_alias"
+                } else {
+                    name
+                }
+                .to_string(),
+                if matches!(*name, "platforms" | "bazel_tools") {
+                    name.to_string()
+                } else {
+                    format!("{name}+")
+                },
+            )
+        }));
+        expected_root_mapping.push(("bazel_tools".into(), "bazel_tools".into()));
+        assert_eq!(root_snapshot.mapping, expected_root_mapping);
+        assert!(root_snapshot.repo_rule.is_none());
         assert_eq!(io.calls(), calls_after_routes);
 
         let registry = compute_real_selected_definition(&dice, &root, 1, "dep+", true).await;
@@ -4820,31 +5002,41 @@ mod tests {
             panic!("registry definition must complete")
         };
         let registry = registry.as_ref().as_ref().unwrap();
-        let (kind, registry_view) = registry.view();
-        assert_eq!(kind, HostCanonicalSelectedModuleKind::SelectedRegistry);
+        let registry_view = registry.view();
+        assert_eq!(
+            registry_view.kind(),
+            HostCanonicalSelectedModuleKind::SelectedRegistry
+        );
         assert!(matches!(
-            &registry_view.entry.key,
-            HostGraphModuleKey::Module { name, .. } if name == "dep"
+            registry_view.identity(),
+            HostCanonicalSelectedModuleIdentity::Module { name, .. } if name == "dep"
         ));
         assert_eq!(
-            registry_view
-                .registry_repo_spec
-                .as_ref()
-                .unwrap()
-                .repo_spec
-                .rule_id
-                .rule_name,
+            registry_view.repo_spec().unwrap().rule_id.rule_name,
             "http_archive"
         );
+        let registry_snapshot = external_style_snapshot(registry);
+        assert_eq!(registry_snapshot.identity, Some(("dep".into(), "1".into())));
+        assert_eq!(registry_snapshot.canonical_repo, "dep+");
+        assert_eq!(registry_snapshot.mapping_context, "dep+");
+        let (bzl_file, rule_name, attributes) = registry_snapshot.repo_rule.unwrap();
+        assert!(bzl_file.ends_with("//tools/build_defs/repo:http.bzl"));
+        assert_eq!(rule_name, "http_archive");
+        assert!(!attributes.is_empty());
 
         let local = compute_real_selected_definition(&dice, &root, 1, "local+", true).await;
         let SourcePreparationOutcome::Complete(local) = &local else {
             panic!("nonregistry definition must complete")
         };
+        let local = local.as_ref().as_ref().unwrap();
+        let local_snapshot = external_style_snapshot(local);
         assert_eq!(
-            local.as_ref().as_ref().unwrap().view().0,
+            local_snapshot.kind,
             HostCanonicalSelectedModuleKind::SelectedNonregistry
         );
+        assert_eq!(local_snapshot.identity, Some(("local".into(), "".into())));
+        assert_eq!(local_snapshot.canonical_repo, "local+");
+        assert_eq!(local_snapshot.repo_rule.unwrap().1, "local_repository");
 
         let builtin = compute_real_selected_definition(&dice, &root, 1, "bazel_tools", true).await;
         assert!(matches!(
@@ -4852,10 +5044,12 @@ mod tests {
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
-                        ordinal,
-                        canonical_repo,
-                        predecessor,
+                    Err(HostCanonicalSelectedModuleDefinitionError {
+                        inner: PrivateCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
+                            ordinal,
+                            canonical_repo,
+                            predecessor,
+                        }
                     }) if *ordinal > 0
                         && canonical_repo.as_str() == "bazel_tools"
                         && predecessor.as_ref().as_ref().unwrap().entries[*ordinal]
@@ -4869,9 +5063,11 @@ mod tests {
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostCanonicalSelectedModuleDefinitionError::Missing {
-                        canonical_repo,
-                        ..
+                    Err(HostCanonicalSelectedModuleDefinitionError {
+                        inner: PrivateCanonicalSelectedModuleDefinitionError::Missing {
+                            canonical_repo,
+                            ..
+                        }
                     }) if canonical_repo.as_str() == "missing+"
                 )
         ));
@@ -4982,10 +5178,12 @@ mod tests {
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostCanonicalSelectedModuleDefinitionError::Routes(
-                        predecessor,
-                        _
-                    )) if predecessor.as_ref().is_err()
+                    Err(HostCanonicalSelectedModuleDefinitionError {
+                        inner: PrivateCanonicalSelectedModuleDefinitionError::Routes(
+                            predecessor,
+                            _
+                        )
+                    }) if predecessor.as_ref().is_err()
                 )
         ));
     }
