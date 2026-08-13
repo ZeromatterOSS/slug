@@ -3192,3 +3192,14 @@ the sole-predecessor five-domain carrier, opaque Main/Builtin projection,
 fail-closed consistency, retained Arc/request identity, proof, and all no-route/
 source/materialization/command/public/I/O/JVM stops. Stage 4 production remains
 unchanged.
+
+### Private repository carrier accepted; consumer-boundary audit scheduled (2026-08-13)
+
+Independent review accepts the private five-domain carrier at 318 production,
+493 tests, 811 total, and 954/778 physical lines. Run only four-ledger docs
+packet `WP-4-5-6-host-repository-route-consumer-boundary-design` under
+40/240/200/200/680 documentation caps. Audit core/Bzlmod/loading ownership and
+freeze one dependency-safe successor or a precise prerequisite before any
+route/source/package/materialization or command work. Stage 4 production stays
+unchanged; forbid reverse edges, duplicate lookups/stores, copied RepoSpec or
+mapping state, public API, execution/I/O, lockfile, wire, and JVM breadth.

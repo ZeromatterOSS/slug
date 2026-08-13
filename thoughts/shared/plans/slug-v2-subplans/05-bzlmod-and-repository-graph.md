@@ -3255,3 +3255,14 @@ declaration under 320/650/970 and 960/800 ceilings. Stage 5 production remains
 unchanged. Preserve full predecessor/request identity, borrowed five-domain
 views, fail-closed consistency, proof, and every reverse-edge/owned-route/
 source/materialization/command/public/I/O/JVM stop.
+
+### Private repository carrier accepted; consumer direction audit follows (2026-08-13)
+
+Independent review accepts the private five-domain carrier at 318/493/811 and
+954/778 physical lines. Run only four-ledger docs packet
+`WP-4-5-6-host-repository-route-consumer-boundary-design` under
+40/240/200/200/680 caps. Audit the live core consumer and Bzlmod/loading route,
+source, and package inputs; freeze the smallest dependency-safe successor or
+REPLAN prerequisite. Stage 5 production stays unchanged. Do not widen
+`RootRepositoryRoute`, reverse dependencies, copy retained data, or authorize
+source/materialization/I/O, command/server/public API, lockfile, wire, or JVM.
