@@ -22,6 +22,7 @@ mod registry_io;
 mod repository_io;
 mod root_apparent_repository_definition;
 mod root_apparent_repository_route;
+mod root_apparent_repository_source_input;
 mod root_bootstrap;
 pub mod starlark;
 

@@ -39,7 +39,7 @@ enum HostRootApparentRepositoryRouteKind {
     Generated,
 }
 #[derive(Debug, Clone, Copy)]
-struct HostRootApparentRepositoryRouteView<'a> {
+pub(super) struct HostRootApparentRepositoryRouteView<'a> {
     apparent_repo: &'a ApparentRepoName,
     canonical_repo: &'a CanonicalRepoName,
     kind: HostRootApparentRepositoryRouteKind,
@@ -47,10 +47,10 @@ struct HostRootApparentRepositoryRouteView<'a> {
     local_path_policy: Option<HostRepositoryLocalPathPolicy>,
 }
 impl<'a> HostRootApparentRepositoryRouteView<'a> {
-    fn apparent_repo(self) -> &'a ApparentRepoName {
+    pub(super) fn apparent_repo(self) -> &'a ApparentRepoName {
         self.apparent_repo
     }
-    fn canonical_repo(self) -> &'a CanonicalRepoName {
+    pub(super) fn canonical_repo(self) -> &'a CanonicalRepoName {
         self.canonical_repo
     }
     fn kind(self) -> HostRootApparentRepositoryRouteKind {
@@ -171,24 +171,39 @@ fn invalid_predecessor(
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositoryRoute {
+pub(super) struct HostRootApparentRepositoryRoute {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     predecessor: Arc<DefinitionResult>,
 }
 impl HostRootApparentRepositoryRoute {
-    fn view(&self) -> Option<HostRootApparentRepositoryRouteView<'_>> {
+    pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+
+    pub(super) fn view(&self) -> Option<HostRootApparentRepositoryRouteView<'_>> {
         let view = predecessor_view(self.predecessor.as_ref())?;
         view_is_consistent(&self.apparent_repo, view).then_some(view)
     }
 
-    fn source_capability(&self) -> Option<HostRootApparentRepositorySourceDisposition> {
+    pub(super) fn source_capability(&self) -> Option<HostRootApparentRepositorySourceDisposition> {
         source_capability_from_view(&self.workspace, self.view()?)
+    }
+
+    pub(super) fn source_capability_matches(
+        &self,
+        capability: &HostRepositorySourceCapability,
+    ) -> bool {
+        matches!(
+            self.source_capability(),
+            Some(HostRootApparentRepositorySourceDisposition::Capability(expected))
+                if &expected == capability
+        )
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-enum HostRootApparentRepositorySourceDisposition {
+pub(super) enum HostRootApparentRepositorySourceDisposition {
     Main,
     Capability(HostRepositorySourceCapability),
 }
@@ -230,7 +245,7 @@ enum HostRootApparentRepositoryRouteErrorKind {
     Compute(Arc<str>),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositoryRouteError {
+pub(super) struct HostRootApparentRepositoryRouteError {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     kind: HostRootApparentRepositoryRouteErrorKind,
@@ -243,18 +258,22 @@ impl fmt::Display for HostRootApparentRepositoryRouteError {
 
 impl std::error::Error for HostRootApparentRepositoryRouteError {}
 
-type HostRootApparentRepositoryRouteOutcome = SourcePreparationOutcome<
-    Arc<Result<HostRootApparentRepositoryRoute, HostRootApparentRepositoryRouteError>>,
->;
+pub(super) type HostRootApparentRepositoryRouteResult =
+    Result<HostRootApparentRepositoryRoute, HostRootApparentRepositoryRouteError>;
+pub(super) type HostRootApparentRepositoryRouteOutcome =
+    SourcePreparationOutcome<Arc<HostRootApparentRepositoryRouteResult>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositoryRouteKey {
+pub(super) struct HostRootApparentRepositoryRouteKey {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
 }
 
 impl HostRootApparentRepositoryRouteKey {
-    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self {
             workspace,
             apparent_repo,
