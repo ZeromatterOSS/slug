@@ -3574,3 +3574,16 @@ source-path-input module, minimal source-input seam, private mod line, and
 ledgers under 340/700/1,040 with 840/850 ceilings. Preserve path-before-await,
 exact path/predecessor ownership, ABI/proof, and every no-result/source/loading/
 command/public/wire/I/O/JVM stop. Stage 5 remains unchanged.
+
+### Source-path input accepted; source observation ownership audited next (2026-08-13)
+
+Independent review accepts `bd337622` within 340/700/1,040 and 840/850;
+focused proof passes and core has only the accepted unrelated deferred-message
+baseline. Run only four-ledger docs packet
+`WP-4-5-6-host-root-repository-source-observation-consumer-owner-audit` under
+40/320/240/240/840. Map exact Builtin catalog-byte ownership and request-backed
+materialization/path/file observation, the first legitimate Need, private key
+visibility, legacy module-name demand scope, and choose one smallest
+dependency-safe successor or prerequisite REPLAN. Authorize no Rust,
+consumer/key/store, materialization/source/package/loading/command/public/
+wire/I/O/reverse-edge/JVM work. Stage 5 behavior remains unchanged.
