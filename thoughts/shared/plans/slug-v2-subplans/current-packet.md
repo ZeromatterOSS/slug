@@ -1,69 +1,80 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-6-host-repository-source-path-consumer-owner-audit`
+Packet: `WP-4-5-host-repository-relative-path-owner-design`
 Milestone: M7 repository source consumer prerequisites
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: choose the smallest dependency-safe owner for path validation and the
-first Builtin-or-request source consumer.
+Result: design the computation-free shared relative-path prerequisite.
 
 ## Active docs-only design contract
 
-Independent review accepts implementation `e4292de7`: the private core owner
-computes only the accepted root-apparent route carrier, forwards Need exactly,
-retains every completed predecessor Arc, and constructs the accepted Bzlmod
-source-input certificate once for Builtin and spec-backed domains. Main remains
-request-free. The production-used association gate compares the complete route
-capability before publication. Focused proof passes; full core is 192/193 only
-because the accepted unrelated external-visibility assertion still expects a
-broader deferred diagnostic. The new module is exactly 800/800 physical lines,
-the route carrier is 1,088/1,100, formatted accounting is 263 production/537
-tests plus the bounded route seam, and three independent final reviews accept.
+The accepted audit maps the live branch as route/capability projection followed
+by `HostRepositoryPathKey` relative-path validation, private materialization
+result Need, resolved path, source bytes, and legacy module-name demand scope;
+Builtin bytes instead belong to `BuiltinBazelToolsSourceFileKey`. Immediate
+source-input/path composition cannot preserve the legacy invalid-path-before-
+request-projection order because `HostRepositorySourceInput` has already
+projected. Migrating the existing Bzlmod path key would also mix demand-scope
+and consumer behavior. REPLAN to the smaller pure validator value.
 
-Run only docs packet
-`WP-4-5-6-host-repository-source-path-consumer-owner-audit` in canonical, this
-manifest, Stage 4, and Stage 5 under mandatory 40/300/240/240/820 documentation
-caps. Authorize no Rust yet. Inspect read-only the accepted core source-input
-owner, Bzlmod `HostRepositoryPathKey` and `HostRepositorySourceFileKey`, loading
-package input, and the core demand/source call sites. Produce one exact
-dependency-and-call map from the five-domain carrier through path validation,
-the first materialization-result Need, Builtin catalog bytes, source-file bytes,
-package load, legacy `RepositorySourceScope`, and command visibility.
+Run only docs packet `WP-4-5-host-repository-relative-path-owner-design` in the
+four ledgers under mandatory 40/240/200/200/680 documentation caps. Authorize no
+Rust yet. Natural owner is existing Bzlmod `source_preparation.rs`, which already
+owns the sole `checked_relative_path` semantics. Freeze hidden computation-free
+`HostRepositoryRelativePath` with one private `Arc<PathBuf>` field and structural
+Debug/Clone/PartialEq/Eq/Hash/Allocative. Freeze exact constructor
+`host_repository_relative_path(requested_path: PathBuf) ->
+Result<HostRepositoryRelativePath, HostRepositoryRelativePathError>` and borrowed
+accessors `as_path(&self) -> &Path` and `path_arc(&self) -> &Arc<PathBuf>`.
 
-Choose exactly one smallest implementation successor or a precise prerequisite
-REPLAN. Compare at least: a private core path-input owner over the accepted
-Need-aware source-input key; a computation-free Bzlmod source-path certificate
-later owned by core; and an atomic source-file owner that dispatches Builtin to
-its pinned catalog owner and Request to the existing result/path branch. The
-choice must preserve nonempty normalized repository-relative path validation
-before the first materialization-result compute/Need and before any path,
-source, or Builtin-byte observation. Audit the legacy fact that
-`HostRepositoryPathKey` validates before request projection and decide whether
-exact preservation requires a combined capability+path prerequisite or a
-path-first core owner. Explicitly REPLAN any downstream source-input certificate
-whose already-completed pure projection makes the invalid-path versus projection
-error order untruthful. Never fabricate a Builtin request or `ResolvedPath`, or
-infer module name/legacy demand scope from apparent/canonical spelling.
+The constructor calls existing `checked_relative_path` exactly once without an
+additional allocation before validation, then performs exactly one Arc
+allocation on either success or error. It retains one exact normalized relative
+path Arc and does no capability/request projection. Freeze opaque hidden error
+`HostRepositoryRelativePathError { requested_path: Arc<PathBuf> }`, deriving
+Debug/Clone/PartialEq/Eq/Allocative and implementing Display plus
+`std::error::Error`, with borrowed `requested_path(&self) -> &Path`; Display
+framing is Slug-native and must not parse the existing diagnostic. Empty,
+absolute, root, `.`, `..`, parent,
+prefix/non-normal components fail exactly as the current checker on the host;
+every nonempty all-Normal relative path succeeds byte-for-byte. No lexical
+rewriting, joining, filesystem normalization, module/repository inference, or
+platform conversion occurs.
 
-Freeze for the chosen successor: natural crate/module ownership and dependency
-direction; complete owned input and borrowed view; Builtin versus Request/Main
-dispositions; exact predecessor/request/catalog identity and first legitimate
-Need; path/error ordering; DICE equality, validity, events, lifecycle, and A/B/A;
-the disposition of legacy `RepositorySourceScope`; an exact Rust allowlist,
-production/test/total caps, physical ceilings, proof matrix, compatibility
-classification, and REPLAN stops. Exact compatibility is limited to the already
-accepted repository selection, relative-path validation, Builtin identity, and
-local/http/git request association. Private certificate/key/error/lifetime and
-scheduling shape are Slug-native. Package/source/loading migration, materializer
-execution, commands, public API/wire, arbitrary generated/custom repositories,
-and I/O remain unsupported/deferred unless a later accepted packet admits them.
+Future Rust is exactly existing
+`app/slug_bzlmod_v2/src/source_preparation.rs` plus hidden exports in existing
+`app/slug_bzlmod_v2/src/lib.rs`; mandatory caps are 100 production/240 tests/340
+total, with physical ceilings 11,540/380. Proof must cover the exhaustive
+constructible path-shape table and exact requested-path retention; valid byte
+and component order; path A/B/A; Eq/Hash consistency; Arc sharing across clone;
+external-style hidden ABI; zero DICE/Need/events/key/source/materialization/
+filesystem activation; and direct colocated parity against the private checker.
+No existing production caller changes in this packet.
 
-STOP on any Rust/Cargo/lockfile edit, new key/store, consumer migration, path or
-source compute, result-key activation, Builtin byte read, materialization, I/O,
-copied request/RepoSpec/catalog/mapping state, module-name synthesis, path/rule
-inference, reverse dependency, public API, command/server behavior, JVM work, or
-more than one successor. Require independent acceptance of the audit before any
-activation.
+Exact compatibility is the existing relative-path admission and retained path
+bytes. Hidden value/error/accessor/Arc representation is Slug-native. Core path
+owner, capability/source-input composition, projection-error ordering,
+materialization result/Need, Builtin bytes, ResolvedPath, legacy demand scope,
+source/package/loading/command/public behavior, arbitrary generated/custom
+repositories, and all I/O remain unsupported/deferred.
+
+STOP on a third Rust file, new DICE key/store, editing core/loading/server/
+commands/Cargo/lockfile, changing existing key/caller behavior, request or
+source-input construction, `ResolvedPath`, materialization/source/package/I/O,
+path rewriting/inference, copied request/RepoSpec/catalog/mapping state, public
+stable API/wire, JVM work, cap/ceiling excess, or a second path validator.
+Require independent acceptance and explicit activation before Rust.
+
+## Accepted docs-only audit contract
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
+
+The accepted `WP-4-5-6-host-repository-source-path-consumer-owner-audit`
+selected this bounded path-owner prerequisite after proving that downstream use
+of the already-projected source-input certificate cannot preserve legacy error
+precedence. Implementation `e4292de7` remains accepted and unchanged.
 
 ## Accepted implementation contract
 

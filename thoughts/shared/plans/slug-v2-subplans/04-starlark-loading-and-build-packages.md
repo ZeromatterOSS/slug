@@ -3464,3 +3464,16 @@ legacy-demand, and command boundaries and choose one smallest dependency-safe
 successor or prerequisite REPLAN. Authorize no Rust, consumer migration,
 key/store, materialization/source/package/I/O, public/command/server,
 reverse-edge, or JVM work. Stage 4 behavior remains unchanged.
+
+### Source-path audit selects shared relative-path prerequisite (2026-08-13)
+
+The audit rejects downstream path composition because the accepted source input
+has already projected, and rejects immediate path-key migration because legacy
+demand scope is still module-name-shaped. Run only four-ledger docs packet
+`WP-4-5-host-repository-relative-path-owner-design` under 40/240/200/200/680.
+Freeze one computation-free hidden Bzlmod value using the sole existing
+relative-path checker; future Rust is only `source_preparation.rs` and hidden
+`lib.rs` exports under 100/240/340 and 11,540/380. No Rust/key/store, consumer,
+request/source-input, path result, source/package/materialization/I/O,
+core/loading/command/public/reverse-edge/JVM work is authorized. Stage 4
+behavior remains unchanged.
