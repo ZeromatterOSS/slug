@@ -3027,3 +3027,15 @@ four ledgers under 260/520/780 against `e05a0dfc`. Preserve the corrected
 inherited-registry/core-real proof split, selected-first Missing-only behavior,
 no-copy ownership, compatibility, and stops. Stage 4 production remains
 unchanged; no second Rust file or adjacent breadth is authorized.
+
+### Canonical apparent-mapping replacement design scheduled (2026-08-12)
+
+Independent review accepts canonical composition `7ab6c615`. Run only
+four-ledger docs packet
+`WP-4-5-6-host-canonical-repository-apparent-mapping-composition-owner-design`
+under 40/260/220/220/740 caps. Freeze one private core replacement over the
+canonical definition key, deleting the callerless generated-only mapping key;
+future Rust is only existing `generated_repository_definition.rs` under
+240/520/760 with no material size/responsibility growth. Keep root mapping
+fail-closed and route/source/materialization/public breadth deferred. Stage 4
+production remains unchanged; no second key/file or adjacent Rust is authorized.

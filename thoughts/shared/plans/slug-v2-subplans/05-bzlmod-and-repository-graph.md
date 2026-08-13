@@ -3092,3 +3092,15 @@ inherited SelectedRegistry proof, real core branch/lifecycle proof,
 selected-first Missing-only semantics, certificates, compatibility, and stops.
 Stage 5 production remains unchanged; no Bzlmod/loading/server edit or second
 Rust file is authorized.
+
+### Canonical apparent-mapping replacement design scheduled (2026-08-12)
+
+Independent review accepts canonical composition `7ab6c615`. Run only
+four-ledger docs packet
+`WP-4-5-6-host-canonical-repository-apparent-mapping-composition-owner-design`
+under 40/260/220/220/740 caps. Freeze one private core mapping key that consumes
+only the canonical definition predecessor and borrows Selected or Generated
+retained mappings; delete the callerless generated-only owner. Future Rust is
+only existing core `generated_repository_definition.rs` under 240/520/760.
+Stage 5 production remains unchanged; root/public routing, source preparation,
+materialization/I/O, and second-key/file breadth remain deferred.
