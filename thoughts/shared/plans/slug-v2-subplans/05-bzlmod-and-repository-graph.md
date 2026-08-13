@@ -3203,3 +3203,11 @@ minimal `pub(super)` predecessor seam in `generated_repository_definition.rs`,
 and the private `runtime/mod.rs` declaration under 340/700/1,040 and 2,400/900
 old/new module ceilings. Stage 5 production remains unchanged; no reverse edge,
 route/source, materialization/I/O, public/command API, or JVM breadth is authorized.
+
+### Core root apparent-definition composition implementation activated (2026-08-13)
+
+Independent review accepts design `512e40ed`. Run only the cohesive private
+core composition module, minimal sibling predecessor seam, and private module
+declaration under 340/700/1,040 and 2,400/900 ceilings. Stage 5 production stays
+unchanged; no reverse edge, route/source/materialization/I/O, command/public API,
+or JVM work is authorized.

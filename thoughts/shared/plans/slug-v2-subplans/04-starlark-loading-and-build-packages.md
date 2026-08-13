@@ -3136,3 +3136,12 @@ definition and retains both predecessors without copied target/map/RepoSpec.
 Future Rust is exactly those three paths under 340/700/1,040, with 2,400/900
 physical ceilings for the old/new modules. Stage 4 production remains unchanged;
 no route/source/materializer/command/public/I/O/JVM breadth is authorized.
+
+### Root apparent-definition composition implementation activated (2026-08-13)
+
+Independent review accepts design `512e40ed`. Implement only new private
+`root_apparent_repository_definition.rs`, the minimal `pub(super)` predecessor
+seam in `generated_repository_definition.rs`, and the private `runtime/mod.rs`
+declaration under 340/700/1,040 and 2,400/900 old/new module ceilings. Preserve
+mapping-first order, Root/builtin short-circuiting, borrowed predecessor identity,
+proof, and every route/source/materializer/command/public/I/O/JVM stop.
