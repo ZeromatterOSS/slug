@@ -1017,6 +1017,7 @@ impl Key for HostSelectedRegistryRepoSpecsKey {
 struct HostSelectedRepositoryMapping {
     context_repo: CanonicalRepoName,
     entries: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    order: Arc<[ApparentRepoName]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1253,6 +1254,7 @@ fn selected_routes_with_canonicals(
             canonical_repo: canonical.clone(),
             mapping: HostSelectedRepositoryMapping {
                 context_repo: canonical,
+                order: mapping.keys().cloned().collect(),
                 entries: Arc::new(mapping),
             },
             registry_repo_spec,
@@ -1319,6 +1321,221 @@ impl Key for HostSelectedModuleRoutesKey {
             }
         };
         SourcePreparationOutcome::Complete(Arc::new(selected_routes(&graph, &repo_specs)))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum HostCanonicalSelectedModuleKind {
+    Root,
+    SelectedRegistry,
+    SelectedNonregistry,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostCanonicalSelectedModuleDefinition {
+    routes: RetainedSelectedRoutes,
+    ordinal: usize,
+}
+
+impl HostCanonicalSelectedModuleDefinition {
+    fn view(&self) -> (HostCanonicalSelectedModuleKind, &HostSelectedModuleRoute) {
+        let routes = self
+            .routes
+            .as_ref()
+            .as_ref()
+            .expect("a selected-module definition retains complete routes");
+        let route = &routes.entries[self.ordinal];
+        let kind = match &route.entry.source {
+            HostGraphModuleSource::Root(_) => HostCanonicalSelectedModuleKind::Root,
+            HostGraphModuleSource::Discovered(module) => match &module.provenance {
+                HostDiscoveredModuleProvenance::Registry { .. } => {
+                    HostCanonicalSelectedModuleKind::SelectedRegistry
+                }
+                HostDiscoveredModuleProvenance::NonRegistry { .. } => {
+                    HostCanonicalSelectedModuleKind::SelectedNonregistry
+                }
+                HostDiscoveredModuleProvenance::BuiltinBazelTools { .. } => {
+                    unreachable!("builtin selected routes fail before publication")
+                }
+            },
+        };
+        (kind, route)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostCanonicalSelectedModuleDefinitionError {
+    Routes(RetainedSelectedRoutes, CanonicalRepoName),
+    RoutesCompute(CompactString, CanonicalRepoName),
+    Missing {
+        predecessor: Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>,
+        canonical_repo: CanonicalRepoName,
+    },
+    Duplicate {
+        predecessor: Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>,
+        canonical_repo: CanonicalRepoName,
+        first_ordinal: usize,
+        conflicting_ordinal: usize,
+    },
+    BuiltinDeferred {
+        predecessor: Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>,
+        ordinal: usize,
+        canonical_repo: CanonicalRepoName,
+    },
+}
+
+type RetainedSelectedRoutes = Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>;
+
+enum CanonicalRouteMatch {
+    Missing,
+    Unique(usize),
+    Duplicate {
+        first_ordinal: usize,
+        conflicting_ordinal: usize,
+    },
+}
+
+fn find_canonical_route_ordinal<'a>(
+    canonical_repo: &CanonicalRepoName,
+    routes: impl Iterator<Item = &'a HostSelectedModuleRoute>,
+) -> CanonicalRouteMatch {
+    let mut first = None;
+    let mut conflicting = None;
+    for (ordinal, route) in routes.enumerate() {
+        if &route.canonical_repo != canonical_repo {
+            continue;
+        }
+        if first.is_none() {
+            first = Some(ordinal);
+        } else if conflicting.is_none() {
+            conflicting = Some(ordinal);
+        }
+    }
+    match (first, conflicting) {
+        (None, _) => CanonicalRouteMatch::Missing,
+        (Some(ordinal), None) => CanonicalRouteMatch::Unique(ordinal),
+        (Some(first_ordinal), Some(conflicting_ordinal)) => CanonicalRouteMatch::Duplicate {
+            first_ordinal,
+            conflicting_ordinal,
+        },
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostCanonicalSelectedModuleDefinitionKey {
+    workspace: NormalizedAbsolutePath,
+    canonical_repo: CanonicalRepoName,
+}
+
+impl HostCanonicalSelectedModuleDefinitionKey {
+    fn new(workspace: NormalizedAbsolutePath, canonical_repo: CanonicalRepoName) -> Self {
+        Self {
+            workspace,
+            canonical_repo,
+        }
+    }
+}
+
+impl fmt::Display for HostCanonicalSelectedModuleDefinitionKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-canonical-selected-module-definition:{}:{}",
+            self.workspace, self.canonical_repo
+        )
+    }
+}
+
+type CanonicalSelectedDefinitionOutcome = SourcePreparationOutcome<
+    Arc<Result<HostCanonicalSelectedModuleDefinition, HostCanonicalSelectedModuleDefinitionError>>,
+>;
+
+#[async_trait]
+impl Key for HostCanonicalSelectedModuleDefinitionKey {
+    type Value = CanonicalSelectedDefinitionOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let predecessor = match ctx
+            .compute(&HostSelectedModuleRoutesKey::new(self.workspace.dupe()))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(predecessor)) => predecessor,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostCanonicalSelectedModuleDefinitionError::RoutesCompute(
+                        error.to_string().into(),
+                        self.canonical_repo.clone(),
+                    ),
+                )));
+            }
+        };
+        let routes = match predecessor.as_ref() {
+            Ok(routes) => routes,
+            Err(_) => {
+                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                    HostCanonicalSelectedModuleDefinitionError::Routes(
+                        predecessor,
+                        self.canonical_repo.clone(),
+                    ),
+                )));
+            }
+        };
+        let ordinal =
+            match find_canonical_route_ordinal(&self.canonical_repo, routes.entries.iter()) {
+                CanonicalRouteMatch::Missing => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostCanonicalSelectedModuleDefinitionError::Missing {
+                            predecessor,
+                            canonical_repo: self.canonical_repo.clone(),
+                        },
+                    )));
+                }
+                CanonicalRouteMatch::Unique(ordinal) => ordinal,
+                CanonicalRouteMatch::Duplicate {
+                    first_ordinal,
+                    conflicting_ordinal,
+                } => {
+                    return SourcePreparationOutcome::Complete(Arc::new(Err(
+                        HostCanonicalSelectedModuleDefinitionError::Duplicate {
+                            predecessor,
+                            canonical_repo: self.canonical_repo.clone(),
+                            first_ordinal,
+                            conflicting_ordinal,
+                        },
+                    )));
+                }
+            };
+        if matches!(
+            &routes.entries[ordinal].entry.source,
+            HostGraphModuleSource::Discovered(module)
+                if matches!(
+                    &module.provenance,
+                    HostDiscoveredModuleProvenance::BuiltinBazelTools { .. }
+                )
+        ) {
+            return SourcePreparationOutcome::Complete(Arc::new(Err(
+                HostCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
+                    predecessor,
+                    ordinal,
+                    canonical_repo: self.canonical_repo.clone(),
+                },
+            )));
+        }
+        SourcePreparationOutcome::Complete(Arc::new(Ok(HostCanonicalSelectedModuleDefinition {
+            routes: predecessor,
+            ordinal,
+        })))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1724,6 +1941,7 @@ fn selected_extension_mappings(
         .zip(no_overrides.iter())
         .map(|(route, entries)| HostSelectedRepositoryMapping {
             context_repo: route.mapping.context_repo.clone(),
+            order: entries.keys().cloned().collect(),
             entries: Arc::new(entries.clone()),
         })
         .collect::<Arc<_>>();
@@ -1739,6 +1957,7 @@ fn selected_extension_mappings(
             }
             HostSelectedRepositoryMapping {
                 context_repo: route.mapping.context_repo.clone(),
+                order: entries.keys().cloned().collect(),
                 entries: Arc::new(entries),
             }
         })
@@ -2403,6 +2622,7 @@ impl Key for HostSelectedExtensionEvaluationInputRequestsKey {
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
     use std::collections::BTreeMap;
     use std::path::Path;
     use std::sync::Arc;
@@ -2410,9 +2630,15 @@ mod tests {
 
     use async_trait::async_trait;
     use compact_str::CompactString;
+    use dice::ActivationData;
+    use dice::ActivationKind;
+    use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
+    use dice::DynKey;
     use dice::Key;
+    use dice::RichActivation;
+    use dice::UserComputationData;
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NormalizedAbsolutePath;
@@ -2466,6 +2692,71 @@ mod tests {
     struct TrackingRegistryIo {
         files: Mutex<BTreeMap<String, Arc<[u8]>>>,
         calls: Mutex<Vec<String>>,
+    }
+
+    #[derive(Default)]
+    struct SelectedDefinitionTracker {
+        selected: Mutex<Vec<(ActivationKind, bool)>>,
+        forbidden: Mutex<Vec<&'static str>>,
+    }
+
+    impl SelectedDefinitionTracker {
+        fn take(&self) -> Vec<(ActivationKind, bool)> {
+            std::mem::take(&mut *self.selected.lock().unwrap())
+        }
+
+        fn forbidden(&self) -> Vec<&'static str> {
+            self.forbidden.lock().unwrap().clone()
+        }
+    }
+
+    impl ActivationTracker for SelectedDefinitionTracker {
+        fn key_activated(
+            &self,
+            _key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key
+                .downcast_ref::<HostCanonicalSelectedModuleDefinitionKey>()
+                .is_some()
+            {
+                self.selected
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), activation.evaluation_data().is_none()));
+            }
+            let forbidden = if key
+                .downcast_ref::<crate::RootRepositoryRouteKey>()
+                .is_some()
+            {
+                Some("root route")
+            } else if key
+                .downcast_ref::<crate::RepositoryMaterializationKey>()
+                .is_some()
+            {
+                Some("materialization")
+            } else if key
+                .downcast_ref::<crate::RepositorySourceFileKey>()
+                .is_some()
+            {
+                Some("repository source")
+            } else if key.downcast_ref::<RegistryFileKey>().is_some() {
+                Some("registry")
+            } else {
+                None
+            };
+            if let Some(forbidden) = forbidden {
+                self.forbidden.lock().unwrap().push(forbidden);
+            }
+        }
     }
 
     impl TrackingRegistryIo {
@@ -2718,9 +3009,14 @@ mod tests {
             .chain(command_builtin_override.then_some("bazel_tools"))
             .filter_map(|name| {
                 let command_override = command_builtin_override && name == "bazel_tools";
+                let path = if name == "local" && root.contains("path='local/.'") {
+                    "local/."
+                } else {
+                    name
+                };
                 (command_override
                     || root.contains(&format!(
-                        "local_path_override(module_name='{name}', path='{name}')"
+                        "local_path_override(module_name='{name}', path='{path}')"
                     )))
                 .then(|| {
                     let repo_spec = repo_spec(
@@ -2731,7 +3027,7 @@ mod tests {
                             OverrideAttributeValue::String(if command_override {
                                 format!("{WORKSPACE}/{name}").into()
                             } else {
-                                name.into()
+                                path.into()
                             }),
                         )]),
                     );
@@ -2744,7 +3040,7 @@ mod tests {
                             repo_spec,
                             kind: crate::RepositoryMaterializationKind::Local {
                                 logical_root: NormalizedAbsolutePath::new(format!(
-                                    "{WORKSPACE}/{name}"
+                                    "{WORKSPACE}/{path}"
                                 ))
                                 .unwrap(),
                             },
@@ -2797,6 +3093,27 @@ mod tests {
             .await
             .compute(&HostSelectedModuleRoutesKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_real_selected_definition(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        canonical_repo: &str,
+        include_epoch: bool,
+    ) -> CanonicalSelectedDefinitionOutcome {
+        real_transaction(dice, root, generation, &[], include_epoch)
+            .await
+            .compute(&HostCanonicalSelectedModuleDefinitionKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                if canonical_repo.is_empty() {
+                    CanonicalRepoName::root()
+                } else {
+                    CanonicalRepoName::new(canonical_repo).unwrap()
+                },
             ))
             .await
             .unwrap()
@@ -3570,6 +3887,161 @@ mod tests {
     }
 
     #[test]
+    fn pure_canonical_selected_definition_exhausts_and_retains_identity() {
+        let dep = route_key("dep", "1");
+        let routes = selected_routes(
+            &route_graph([
+                route_root([("alias", dep.clone())], Some("root_self")),
+                route_module("dep", "1", "dep", true),
+            ]),
+            &HostSelectedRegistryRepoSpecs {
+                entries: Arc::from([route_spec(dep)]),
+            },
+        )
+        .unwrap();
+        let mut corrupted = routes.entries.to_vec();
+        corrupted.push(corrupted[1].clone());
+        let consumed = Cell::new(0);
+        assert!(matches!(
+            find_canonical_route_ordinal(
+                &CanonicalRepoName::new("dep+").unwrap(),
+                corrupted
+                    .iter()
+                    .inspect(|_| consumed.set(consumed.get() + 1)),
+            ),
+            CanonicalRouteMatch::Duplicate {
+                first_ordinal: 1,
+                conflicting_ordinal: 2,
+            }
+        ));
+        assert_eq!(consumed.get(), corrupted.len());
+        assert!(matches!(
+            find_canonical_route_ordinal(
+                &CanonicalRepoName::new("missing+").unwrap(),
+                corrupted.iter(),
+            ),
+            CanonicalRouteMatch::Missing
+        ));
+
+        let outcome = |routes: HostSelectedModuleRoutes, ordinal| {
+            SourcePreparationOutcome::Complete(Arc::new(Ok(
+                HostCanonicalSelectedModuleDefinition {
+                    routes: Arc::new(Ok(routes)),
+                    ordinal,
+                },
+            )))
+        };
+        let a = outcome(routes.clone(), 0);
+        let restored = outcome(routes.clone(), 0);
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a, &restored
+        ));
+
+        let mutate = |route: HostSelectedModuleRoute| {
+            let mut entries = routes.entries.to_vec();
+            entries[0] = route;
+            HostSelectedModuleRoutes {
+                entries: entries.into(),
+            }
+        };
+        let mut route = routes.entries[0].clone();
+        route.canonical_repo = CanonicalRepoName::new("changed+").unwrap();
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a,
+            &outcome(mutate(route), 0),
+        ));
+
+        let mut route = routes.entries[0].clone();
+        route.mapping.context_repo = CanonicalRepoName::new("context+").unwrap();
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a,
+            &outcome(mutate(route), 0),
+        ));
+
+        let mut route = routes.entries[0].clone();
+        let mut mapping = (*route.mapping.entries).clone();
+        mapping.insert(
+            ApparentRepoName::new("alias").unwrap(),
+            CanonicalRepoName::new("other+").unwrap(),
+        );
+        route.mapping.entries = Arc::new(mapping);
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a,
+            &outcome(mutate(route), 0),
+        ));
+
+        let mut route = routes.entries[0].clone();
+        let map_before = route.mapping.entries.clone();
+        route.mapping.order = route.mapping.order.iter().rev().cloned().collect();
+        assert_eq!(route.mapping.entries, map_before);
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a,
+            &outcome(mutate(route), 0),
+        ));
+
+        let mut reordered = routes.entries.to_vec();
+        reordered.swap(0, 1);
+        let reordered = outcome(
+            HostSelectedModuleRoutes {
+                entries: reordered.into(),
+            },
+            1,
+        );
+        let SourcePreparationOutcome::Complete(reordered_value) = &reordered else {
+            unreachable!()
+        };
+        assert_eq!(
+            reordered_value
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .view()
+                .1
+                .canonical_repo
+                .as_str(),
+            ""
+        );
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a, &reordered
+        ));
+
+        let mut changed_spec = routes.clone();
+        let mut rows = changed_spec.entries.to_vec();
+        rows[1]
+            .registry_repo_spec
+            .as_mut()
+            .unwrap()
+            .repo_spec
+            .rule_id
+            .rule_name = "changed_rule".into();
+        changed_spec.entries = rows.into();
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &a,
+            &outcome(changed_spec, 0),
+        ));
+        let failed = Arc::new(Err(HostSelectedModuleRoutesError::Invalid {
+            module: HostGraphModuleKey::Root,
+            message: "failed".into(),
+        }));
+        let error = |name| {
+            SourcePreparationOutcome::Complete(Arc::new(Err(
+                HostCanonicalSelectedModuleDefinitionError::Routes(
+                    failed.clone(),
+                    CanonicalRepoName::new(name).unwrap(),
+                ),
+            )))
+        };
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &error("a+"),
+            &error("b+")
+        ));
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &error("a+"),
+            &error("a+")
+        ));
+    }
+
+    #[test]
     fn pure_extension_ids_group_isolate_collide_and_map_mvo_contexts() {
         let v1 = route_key("dep", "1");
         let v2 = route_key("dep", "2");
@@ -4049,10 +4521,12 @@ mod tests {
             unique_name: CanonicalRepoName::new("root+ext").unwrap(),
             base_mapping: HostSelectedRepositoryMapping {
                 context_repo: CanonicalRepoName::new("root").unwrap(),
+                order: Arc::from([]),
                 entries: Arc::new(SmallMap::new()),
             },
             mapping: HostSelectedRepositoryMapping {
                 context_repo: CanonicalRepoName::new("root").unwrap(),
+                order: Arc::from([]),
                 entries: Arc::new(SmallMap::new()),
             },
             imports: Arc::from([]),
@@ -4282,6 +4756,238 @@ mod tests {
         io.replace(SOURCE_URL, SOURCE_A);
         let restored = compute_real_routes(&dice, root, 3, &[], true).await;
         assert!(HostSelectedModuleRoutesKey::equality(&a, &restored));
+    }
+
+    #[tokio::test]
+    async fn real_canonical_selected_definition_classifies_and_reuses() {
+        const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+        const MODULE_2_URL: &str = "https://registry.invalid/modules/dep/2/MODULE.bazel";
+        const SOURCE_URL: &str = "https://registry.invalid/modules/dep/1/source.json";
+        const SOURCE_2_URL: &str = "https://registry.invalid/modules/dep/2/source.json";
+        const SOURCE_A: &[u8] = br#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a"}"#;
+        const SOURCE_B: &[u8] = br#"{"url":"https://origin.test/b.tgz","integrity":"sha256-b"}"#;
+        let io = Arc::new(TrackingRegistryIo::new([
+            (MODULE_URL, b"module(name='dep', version='1')\n" as &[u8]),
+            (MODULE_2_URL, b"module(name='dep', version='2')\n" as &[u8]),
+            (SOURCE_URL, SOURCE_A),
+            (SOURCE_2_URL, SOURCE_A),
+            (
+                "https://registry.invalid/bazel_registry.json",
+                b"{}" as &[u8],
+            ),
+        ]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let mut root = "module(name='root', repo_name='root_self')\n\
+                        bazel_dep(name='dep', version='1', repo_name='dep_alias')\n"
+            .to_owned();
+        for name in LOCAL_MODULES {
+            root.push_str(&format!(
+                "local_path_override(module_name='{name}', path='{name}')\n\
+                 bazel_dep(name='{name}', version='1'{} )\n",
+                if *name == "local" {
+                    ", repo_name='local_alias'"
+                } else {
+                    ""
+                }
+            ));
+        }
+
+        let routes = compute_real_routes(&dice, &root, 1, &[], true).await;
+        assert!(matches!(routes, SourcePreparationOutcome::Complete(_)));
+        let calls_after_routes = io.calls();
+
+        let root_value = compute_real_selected_definition(&dice, &root, 1, "", true).await;
+        let SourcePreparationOutcome::Complete(root_value) = &root_value else {
+            panic!("root definition must complete")
+        };
+        let root_value = root_value.as_ref().as_ref().unwrap();
+        let (kind, root_view) = root_value.view();
+        assert_eq!(kind, HostCanonicalSelectedModuleKind::Root);
+        assert_eq!(
+            root_view.mapping.entries.get("root_self").unwrap().as_str(),
+            ""
+        );
+        assert_eq!(
+            root_view.mapping.entries.get("dep_alias").unwrap().as_str(),
+            "dep+"
+        );
+        assert_eq!(io.calls(), calls_after_routes);
+
+        let registry = compute_real_selected_definition(&dice, &root, 1, "dep+", true).await;
+        let SourcePreparationOutcome::Complete(registry) = &registry else {
+            panic!("registry definition must complete")
+        };
+        let registry = registry.as_ref().as_ref().unwrap();
+        let (kind, registry_view) = registry.view();
+        assert_eq!(kind, HostCanonicalSelectedModuleKind::SelectedRegistry);
+        assert!(matches!(
+            &registry_view.entry.key,
+            HostGraphModuleKey::Module { name, .. } if name == "dep"
+        ));
+        assert_eq!(
+            registry_view
+                .registry_repo_spec
+                .as_ref()
+                .unwrap()
+                .repo_spec
+                .rule_id
+                .rule_name,
+            "http_archive"
+        );
+
+        let local = compute_real_selected_definition(&dice, &root, 1, "local+", true).await;
+        let SourcePreparationOutcome::Complete(local) = &local else {
+            panic!("nonregistry definition must complete")
+        };
+        assert_eq!(
+            local.as_ref().as_ref().unwrap().view().0,
+            HostCanonicalSelectedModuleKind::SelectedNonregistry
+        );
+
+        let builtin = compute_real_selected_definition(&dice, &root, 1, "bazel_tools", true).await;
+        assert!(matches!(
+            builtin,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostCanonicalSelectedModuleDefinitionError::BuiltinDeferred {
+                        ordinal,
+                        canonical_repo,
+                        predecessor,
+                    }) if *ordinal > 0
+                        && canonical_repo.as_str() == "bazel_tools"
+                        && predecessor.as_ref().as_ref().unwrap().entries[*ordinal]
+                            .canonical_repo.as_str() == "bazel_tools"
+                )
+        ));
+
+        let missing = compute_real_selected_definition(&dice, &root, 1, "missing+", true).await;
+        assert!(matches!(
+            missing,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostCanonicalSelectedModuleDefinitionError::Missing {
+                        canonical_repo,
+                        ..
+                    }) if canonical_repo.as_str() == "missing+"
+                )
+        ));
+
+        let tracker = Arc::new(SelectedDefinitionTracker::default());
+        let data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let mut transaction = dice.updater_with_data(data).commit().await;
+        let warm = transaction
+            .compute(&HostCanonicalSelectedModuleDefinitionKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::new("dep+").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &SourcePreparationOutcome::Complete(Arc::new(Ok(registry.clone()))),
+            &warm,
+        ));
+        assert_eq!(tracker.take(), [(ActivationKind::Reused, true)]);
+        assert!(tracker.forbidden().is_empty());
+        assert_eq!(io.calls(), calls_after_routes);
+        drop(transaction);
+
+        io.replace(SOURCE_URL, SOURCE_B);
+        let source_b = compute_real_selected_definition(&dice, &root, 2, "dep+", true).await;
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &SourcePreparationOutcome::Complete(Arc::new(Ok(registry.clone()))),
+            &source_b,
+        ));
+        io.replace(SOURCE_URL, SOURCE_A);
+        let restored = compute_real_selected_definition(&dice, &root, 3, "dep+", true).await;
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &SourcePreparationOutcome::Complete(Arc::new(Ok(registry.clone()))),
+            &restored,
+        ));
+
+        let mapping_b = compute_real_selected_definition(
+            &dice,
+            &root.replace("repo_name='dep_alias'", "repo_name='other_alias'"),
+            4,
+            "dep+",
+            true,
+        )
+        .await;
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &restored, &mapping_b
+        ));
+        let mapping_a = compute_real_selected_definition(&dice, &root, 5, "dep+", true).await;
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &restored, &mapping_a
+        ));
+
+        let version_b = compute_real_selected_definition(
+            &dice,
+            &root.replace("name='dep', version='1'", "name='dep', version='2'"),
+            6,
+            "dep+",
+            true,
+        )
+        .await;
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &mapping_a, &version_b
+        ));
+        let version_a = compute_real_selected_definition(&dice, &root, 7, "dep+", true).await;
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &mapping_a, &version_a
+        ));
+
+        let local_a = compute_real_selected_definition(&dice, &root, 7, "local+", true).await;
+        let local_b = compute_real_selected_definition(
+            &dice,
+            &root.replace("path='local'", "path='local/.'"),
+            8,
+            "local+",
+            true,
+        )
+        .await;
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &local_a, &local_b
+        ));
+        let local_restored =
+            compute_real_selected_definition(&dice, &root, 9, "local+", true).await;
+        assert!(HostCanonicalSelectedModuleDefinitionKey::equality(
+            &local_a,
+            &local_restored,
+        ));
+
+        let need = compute_real_selected_definition(&dice, &root, 10, "dep+", false).await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::validity(&need));
+        assert!(!HostCanonicalSelectedModuleDefinitionKey::equality(
+            &need, &need
+        ));
+
+        let graph_error = compute_real_selected_definition(
+            &dice,
+            "module(name='root')\nbazel_dep(name='missing', version='1')\n",
+            7,
+            "",
+            true,
+        )
+        .await;
+        assert!(matches!(
+            graph_error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostCanonicalSelectedModuleDefinitionError::Routes(
+                        predecessor,
+                        _
+                    )) if predecessor.as_ref().is_err()
+                )
+        ));
     }
 
     #[tokio::test]
