@@ -1,49 +1,74 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-repository-source-capability-consumer-order-design`
+Packet: `WP-4-5-host-repository-local-path-policy-owner-design`
 Milestone: M7 canonical repository routing prerequisites
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-Result: audit and freeze the first dependency-safe capability consumer.
+Result: freeze the provenance-owned local-path policy before request projection.
 
 ## Active docs-only design contract
 
-Independent review accepts core projection `0cba8fb8` over capability
-`3faa90dd`. Run only docs packet
-`WP-4-5-host-repository-source-capability-consumer-order-design` in canonical,
-this manifest, Stage 4, and Stage 5 under mandatory 40/240/180/180/640 formatted
-net documentation lines. Authorize no Rust, Cargo, fixture, DICE key/store,
-source/package/materialization, command/server, public API, execution/I/O,
-lockfile, wire, or JVM work.
+Independent review accepts consumer audit `1cd140a6`, which selects a pure
+Bzlmod materialization-request projection before loading migration but proves
+one lower input is missing. Run only docs packet
+`WP-4-5-host-repository-local-path-policy-owner-design` in canonical, this
+manifest, Stage 4, and Stage 5 under mandatory 40/260/200/200/700 formatted net
+documentation lines. Authorize no Rust, Cargo, fixture, DICE key/store,
+request projection, source/package/materialization, command/server, public API,
+execution/I/O, lockfile, wire, or JVM work.
 
-Audit exactly the accepted core projection in
-`app/slug_core_v2/src/runtime/root_apparent_repository_route.rs`, Bzlmod's
-existing `RepositoryMaterializationRequest`/`request_kind` ownership in
-`source_preparation.rs`, Bzlmod `RepositoryPackageSourceKey` in
-`host_package.rs`, and loading `RepositoryPackageLoadKey` in `bzl_module.rs`.
-Choose the smallest dependency-safe successor: either a computation-free
-RepoSpec-to-existing-materialization-request projection in Bzlmod must precede
-consumer migration, or one capability-owned package-load input can be frozen
-without guessing source policy. Do not combine both. Record why the rejected
-order would duplicate classification, retain a borrowed input across await,
-reverse core-to-Bzlmod/loading dependencies, or preserve the legacy module-name/
-root-override rederivation.
+Live `request_kind(workspace, repo_spec, allow_absolute_local_path)` derives its
+exact Local policy from `HostEffectiveModuleOverride::is_command()`: root/local
+overrides require normalized workspace-relative paths; command overrides
+require normalized absolute paths. That provenance is discarded before
+`HostNonregistryPreparedClosure`, the hidden selected-definition view, the
+private core carrier, and `HostRepositorySourceCapability`. Inferring policy
+from the RepoSpec path shape would let spelling replace semantic provenance.
+Package loading is later because it first needs the exact projected request and
+its legitimate Need boundary.
 
-Freeze in the successor contract: natural owner and exact dependency direction;
-owned request/capability identity across awaits; Main and Builtin disposition;
-SelectedRegistry/SelectedNonregistry/Generated RepoSpec association; exact
-local/http/git admitted rule and error ordering if classification is selected;
-explicit workspace-relative local-path policy rather than inference; first
-legitimate Need boundary; structural equality/invalidation; error and lifetime
-ownership; exact Rust allowlist, formatted caps, proof matrix, and stops. Exact
-compatibility is limited to admitted Bazel 9.2 repository identity, original
-RepoSpec association, and any already-accepted request-kind classification.
-Private ABI, Arc ownership, diagnostics, and DICE scheduling are Slug-native.
-Custom repository-rule execution, source/package preparation, materialization,
-route replacement, commands/public API, execution/I/O, lockfile, wire, and JVM
-remain deferred unless the selected bounded successor explicitly admits only a
-computation-free projection. REPLAN on reverse edges, copied RepoSpec/catalog,
-new semantic store, legacy module-name synthesis, guessed custom-rule support,
-or inability to name one bounded successor.
+Audit exactly `HostEffectiveModuleOverride` in `module_eval.rs`, nonregistry
+materialization and `HostNonregistryModuleSourceIdentity` in
+`source_preparation.rs`, the hidden selected-definition RepoSpec view in
+`selected_repo_spec.rs`, generated RepoSpec ownership in loading validation,
+the Bzlmod capability in `host_module.rs`, and core's computation-free
+projection in `root_apparent_repository_route.rs`. Freeze one compact owned
+policy algebra and its sole exact producer chain. It must distinguish at least
+workspace-relative root/local override provenance, command-absolute override
+provenance, and a fail-closed nonlocal/unsupported-local case for registry and
+extension-generated RepoSpecs until pinned semantics prove otherwise. Builtin
+remains outside RepoSpec policy. Do not infer any variant from path spelling,
+rule name, materialized logical root, or post-materialization source kind.
+
+The design must decide the smallest implementation boundary: whether Bzlmod
+retains policy once in its existing nonregistry closure and hidden definition
+ABI before core copies only the compact enum into the owned capability, or
+whether a smaller capability constructor input can preserve the same exact
+provenance without a parallel catalog. Freeze every named hidden type/accessor,
+dependency direction, allocation/clone/equality/hash semantics, exact Rust
+allowlist and caps, and proof. Proof must discriminate identical RepoSpec/path
+content under root versus command provenance, relative/absolute spellings that
+must not self-classify, registry/generated fail-closed behavior, legacy root
+projection, policy/content/hash A/B/A, lifecycle/no events, and zero request/
+source/package/materialization/filesystem activation. Exact is only the pinned
+Bazel 9.2 local-path provenance distinction and admitted repository identity;
+private enum/ABI and Arc storage are Slug-native. Request-kind projection,
+custom/generated rule execution, package/source migration, materialization,
+commands/public API, I/O, lockfile, wire, and JVM remain deferred. REPLAN on
+path-shape inference, reverse edges, copied RepoSpec/catalog, a new DICE key or
+semantic store, public ABI, guessed generated-local semantics, or inability to
+retain provenance before it is discarded.
+
+## Accepted consumer-order audit
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
+
+Independent review accepts audit `1cd140a6`: pure Bzlmod materialization-request
+projection must precede loading package-key migration, because loading cannot
+classify RepoSpecs or name the first Need without duplicating Bzlmod policy.
+However the accepted capability lacks root-versus-command local-path provenance,
+so request projection is not yet exact. Path spelling cannot supply that input.
 
 ## Accepted source-capability publication implementation
 

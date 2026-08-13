@@ -3264,3 +3264,16 @@ prerequisite before any consumer migration. Stage 4 production remains
 unchanged. Forbid reverse edges, copied RepoSpec/state, new stores, legacy
 module-name rederivation, source/package/materialization/I/O, command/public
 API, and JVM breadth.
+
+### Consumer audit selects local-path provenance prerequisite (2026-08-13)
+
+Independent review accepts audit `1cd140a6`: pure Bzlmod request projection
+precedes loading migration, but the capability lacks the exact root-relative
+versus command-absolute provenance consumed by `request_kind`. Run only
+four-ledger docs packet `WP-4-5-host-repository-local-path-policy-owner-design`
+under 40/260/200/200/700 documentation caps. Trace effective override policy
+through Bzlmod nonregistry/selected ownership, generated RepoSpecs, the owned
+capability, and core projection; freeze one compact fail-closed policy and one
+dependency-safe producer chain. Stage 4 production remains unchanged. Forbid
+path-shape inference, request/source/package/materialization work, new keys/
+stores, copied state, reverse edges, command/public API, I/O, and JVM breadth.

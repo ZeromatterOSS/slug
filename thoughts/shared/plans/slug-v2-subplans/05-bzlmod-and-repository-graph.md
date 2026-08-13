@@ -3328,3 +3328,16 @@ policy. Select one bounded successor and freeze its owner, identity, Need/error
 boundary, allowlist, caps, proof, and stops. Stage 5 production stays unchanged;
 no reverse edge, copied state, module-name synthesis, source/package/
 materialization/I/O, command/public API, lockfile, wire, or JVM is authorized.
+
+### Consumer audit REPLANs to provenance-owned local-path policy (2026-08-13)
+
+Independent review accepts audit `1cd140a6`. Bzlmod's pure request projection
+must precede loading package-key migration, but `request_kind` needs semantic
+root-versus-command local-path provenance that the current capability drops.
+Run only four-ledger docs packet
+`WP-4-5-host-repository-local-path-policy-owner-design` under
+40/260/200/200/700 documentation caps. Freeze the compact policy algebra and
+sole producer chain before provenance disappears, including fail-closed
+registry/generated behavior. Stage 5 production stays unchanged; no path-shape
+inference, request/materialization/source/package implementation, new key/store,
+reverse edge, copied state, public/command API, I/O, lockfile, wire, or JVM.
