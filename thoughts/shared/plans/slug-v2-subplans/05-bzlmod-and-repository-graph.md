@@ -2645,3 +2645,40 @@ Need/error/reuse, unchanged loading dependents, and zero repository I/O. No
 third file, new key/graph/projection, loading edge, reconstructed mapping,
 generated call set/existence, schema/RepoSpec, I/O, materializer, lockfile,
 consumer/API/JVM breadth, or cap excess.
+
+### Selected namespace request accepted; loading instantiation design scheduled (2026-08-12)
+
+Independent implementation review accepts `c7c55b17` at 106 production/205
+tests/311 total within 180/300/480. The selected owner now retains route-ordered
+pre-substitution mappings separately from final mappings and projects the root
+base context, exact unique prefix, and ordered exact-ID override/inject metadata
+through the existing hidden request. Same-ID mismatch, distinct-ID duplicate
+namespace ownership, and missing root/base/final context fail with typed
+complete errors. Full Bzlmod and loading suites pass; zero registry I/O is
+proved.
+
+The next owner is loading-side composition, not another Stage 5 projection.
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-design`
+under 45/260/240/220/765. Stage 5 production remains unchanged. The audit may
+consume only the accepted hidden request and raw invocation receipt; it may not
+mutate Bzlmod, replay namespace construction, add a reverse dependency, infer
+existence/final routes, execute a repository implementation, or add I/O,
+materializer, lockfile, consumer/API, or JVM breadth.
+
+### Loading instantiation boundary frozen (2026-08-12)
+
+No further Stage 5 prerequisite is required. The accepted request in
+`c7c55b17` carries the exact root base mapping, final mapping, unique prefix,
+and ordered substitutions inside each raw invocation receipt. Loading must
+exact-join the full embedded request in encounter order, build the base plus all
+generated names plus substitutions namespace, and never reconstruct selected
+state or reread a Stage 5 owner.
+
+Pinned Bazel performs no `must_exist` verdict in `createRepos`; the later
+`SingleExtensionFunction` validates override-missing/inject-collision only
+after eval-only RepoSpecs exist. The successor therefore retains `must_exist`
+but defers existence validation and final routes. Future Rust is limited to the
+three loading paths and mandatory 480/700/1,180 caps frozen in current. Stage 5
+production, graph, mappings, materialization, lockfile, consumers, API, and JVM
+remain unchanged.

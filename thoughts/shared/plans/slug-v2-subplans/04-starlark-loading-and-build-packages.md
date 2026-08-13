@@ -2582,3 +2582,42 @@ existing hidden accessor, plus four-plan bookkeeping, under mandatory
 retain and project selected namespace inputs only; loading, schema/RepoSpec,
 existence, repository execution/context, I/O, consumers, APIs, and JVM remain
 deferred.
+
+### Generated namespace accepted; repository-rule instantiation design proposed (2026-08-12)
+
+Independent implementation review accepts the selected namespace request in
+`c7c55b17`; raw repository-rule calls remain accepted in `b7c70a1b`.
+Together they supply the exact hidden request, unique prefix, root base/final
+mappings, ordered override metadata, definition/schema, generated names, raw
+kwargs, and provenance required to audit `createRepos` and
+`RepoRule.instantiate`.
+
+Run only the four-plan docs packet
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-design`
+under 45/260/240/220/765. Stage 4 production remains unchanged. Design one
+loading-owned heap-free projection over the accepted invocation receipt, with
+full namespace assembly before scalar schema/default/Label/visibility work and
+atomic ordered RepoSpec publication. No Rust, repository implementation/context,
+I/O, materialization, lockfile, consumer/API, or JVM work resumes before
+independent design acceptance and explicit activation.
+
+### Repository-rule instantiation owner audit completed (2026-08-12)
+
+Pinned Bazel 9.2 freezes the loading-owned successor without another
+prerequisite. Compute the accepted raw invocation owner first; exact-join its
+embedded requests in encounter order; assemble base mapping, all generated
+`unique_prefix + "+" + name` entries, then ordered substitutions; and only
+then type-check and instantiate calls. `RepoRule.instantiate` ignores the four
+legacy names, validates supplied kwargs before declaration-order mandatory/
+default/visibility, and stores only explicitly supplied non-None nonlegacy
+attributes in kwargs order. No implicit `name` or default is stored.
+
+The future owner is private
+`HostInstantiatedModuleExtensionRepositoriesKey` with heap-free success/error
+values and atomic completed/current prefixes. Implement only in existing
+`module_extension_repository_rule.rs`, one new private
+`module_extension_repository_instantiation.rs`, and `lib.rs` solely for its
+private declaration, under mandatory 480/700/1,180 caps after independent
+acceptance and explicit activation. `must_exist` remains structural: pinned
+`SingleExtensionFunction`, not `createRepos`, owns later override/inject
+existence validation. Preserve all no-execution/I/O/lifetime/public/JVM stops.

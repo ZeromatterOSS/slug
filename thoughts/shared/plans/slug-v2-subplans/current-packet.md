@@ -1,79 +1,129 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-selected-extension-generated-namespace-request-implementation`
-Milestone: M7 selected extension namespace prerequisite implementation
+Packet: `WP-4-5-host-module-extension-repository-rule-instantiation-owner-design`
+Milestone: M7 repository-rule instantiation projection design
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: implement the accepted Bzlmod-owned hidden request projection that exposes
-the collision-sensitive selected extension namespace needed by later loading
-instantiation, without constructing RepoSpecs or validating existence.
+Result: design the smallest loading-owned heap-free composition of accepted raw
+repository-rule calls and selected extension namespaces into semantic RepoSpecs,
+without executing repository implementations or performing repository I/O.
 
-## Active implementation contract
+## Active docs-only design contract
 
-Independent design review accepts `fff82ecd`. Run only
-`WP-5-host-selected-extension-generated-namespace-request-implementation`.
-The exact Rust allowlist is
-`app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
-`app/slug_bzlmod_v2/src/lib.rs` solely for the existing
-`#[doc(hidden)]` request/export accessor, plus canonical/current/Stage 4/
-Stage 5 bookkeeping. Caps are 180 production, 300 tests, and 480 total
-formatted net Rust lines against `fff82ecd`. Authorize no third Rust file,
-new key or second projection, loading mutation, RepoSpec, schema work,
-generated call-name set or existence verdict, I/O, materializer, lockfile,
-consumer, generic public API, or JVM work.
+Run only
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-design`
+in canonical/current/Stage 4/Stage 5. The exact docs allowlist and caps are 45
+canonical, 260 current, 240 Stage 4, 220 Stage 5, and 765 total changed lines.
+Authorize no Rust, Cargo, fixture, implementation activation, Bzlmod mutation,
+repository implementation/context, I/O, materializer, lockfile, consumer,
+public API, or JVM work before independent design acceptance.
 
-Accepted commit `b7c70a1b` owns ordered heap-free raw repository-rule calls in
-the sole loading invocation key; `f5d64085` makes the selected root input
-aggregate every matching ordinary usage. Pinned Bazel 9.2 `createRepos`
-constructs a namespace from the selected extension unique name, all generated
-repository names, and root overrides before `RepoRule.instantiate` resolves
-labels. Loading currently receives only the hidden definition load request's
-canonical bzl label, extension name, context repository, and final contextual
-mapping. It cannot derive the collision-suffixed unique prefix or the
-pre-override namespace from that final mapping without duplicating/fabricating
-the accepted selected-mapping owner.
+Accepted `b7c70a1b` owns ordered raw calls, exact definition/schema identity,
+generated apparent names, kwargs, and caller provenance in the sole loading
+invocation receipt. Accepted `c7c55b17` exposes, through the same exact hidden
+load request, the selected unique prefix, root pre-substitution mapping, final
+mapping, and ordered override/inject metadata. This closes the namespace
+prerequisite but owns no call-name set, RepoSpec, schema application, or
+generated existence verdict.
 
-Audit only the existing
-`HostSelectedExtensionDefinitionLoadRequestsKey`/`selected_repo_spec.rs`
-producer. Freeze a narrow heap-independent widening of each admitted root-main
-ordinary nonisolated request with the exact selected extension unique canonical
-prefix and ordered override metadata for the same extension ID: generated
-apparent name, canonical replacement target, and structural `must_exist`.
-Retain the complete selected predecessor as today. The selected-mapping value
-must additionally retain its route-ordered no-overrides mappings before final
-substitution, and the admitted request projects the root no-overrides mapping
-alongside its existing final contextual mapping. This is structural semantic
-identity; never reverse-engineer it from final substituted mappings or replay
-the mapping algorithm in loading. Empty overrides succeed. Missing, duplicate,
-or mismatched namespace ownership fails closed before publication.
+Pinned Bazel 9.2 `ModuleExtensionEvalStarlarkThreadContext.createRepos`,
+`RepoRule.instantiate`, `AttributeUtils.typeCheckAttrValues`, and
+`SingleExtensionFunction` freeze one loading-owned callerless DICE projection
+that computes the complete raw invocation owner first, joins each receipt to
+the exact selected request, constructs the full generated-repository mapping
+for every call before schema work, applies ordered root substitutions only
+after base entries and generated names, then instantiates admitted scalar
+attributes atomically in extension/call encounter order. The semantic result
+must be heap-independent and retain complete predecessors, exact request and
+definition identity, generated apparent/canonical names, caller provenance,
+and the existing Bzlmod `RepoRuleId`/`RepoSpec` algebra without running the
+repository implementation.
 
-The design freezes a future implementation no broader than
-`app/slug_bzlmod_v2/src/selected_repo_spec.rs` plus `lib.rs` solely for the
-existing `#[doc(hidden)]` request/export accessor. Cap it at 180 production,
-300 tests, and 480 total formatted net Rust lines against the accepted design
-commit. Add no DICE key or second projection.
-Require pure zero/one/multiple ordered override joins and real-DICE unique-name
-collision, override target/`must_exist`, request order, mapping/source A/B/A,
-warm reuse, Need/completed-error precedence, unchanged loading dependents, and
-zero registry/materialization I/O for the admitted root fixture.
+The exact namespace algorithm is request/receipt encounter order; start from
+the request's root base mapping; add every call name as
+`unique_prefix + "+" + generated_name`; apply the request's ordered override/
+inject substitutions last with keep-last semantics; and only then instantiate
+calls in encounter order. The exact request object embedded in each invocation
+receipt must equal the same-index prepared input request; count/order or full
+equality mismatch is terminal. No label/export-only join is permitted. The
+request's final mapping remains structural predecessor identity and may be used
+as an integrity discriminator, but namespace assembly never derives from it.
 
-Exact compatibility is limited to pinned selected-extension namespace identity
-and `createRepos` context assembly order. Private Rust layout, diagnostics, and
-DICE scheduling are Slug-native. Schema coercion/defaults/visibility,
-`LabelConverter`, generated call-name set, RepoSpec construction, repository
-implementation/context, existence and override/inject validation, final
-generated routes/mappings, I/O, materialization, lockfile, nonroot/MVO/
-isolation/innate breadth, consumers, public APIs, and JVM are deferred.
-`REPLAN` on deriving pre-override state from substituted mappings, accepting a
-receipt without exact extension-ID join, a loading-to-Bzlmod reverse edge,
-second graph/key/projection, generated-name or existence inference, RepoSpec or
-schema work, retained Starlark values, third future Rust file, or cap excess.
+Pinned `RepoRule.instantiate` removes `name`, `tags`, `deprecation`, and
+`visibility` before type checking and never stores them. In supplied raw
+kwargs order, ignore those four and `None`; otherwise fail first unknown
+attribute, scalar conversion, or Label conversion/allowed-value error. Then in
+definition declaration order fail the first missing mandatory attribute,
+select declared or intrinsic defaults for validation, and visibility-check the
+final value. Defaults are not re-resolved and omitted/defaulted values are not
+stored. The resulting `RepoSpec.attributes` contains only explicitly supplied
+non-None, nonlegacy user attributes in raw kwargs order after conversion; no
+built-in field is present. `name` is retained separately as the generated
+apparent name. `RepoRuleId` is the definition's canonical bzl label plus
+exported rule name.
+
+For Label attrs, a supplied String resolves relative to the defining bzl
+label's canonical package using the complete generated-then-substituted
+mapping. A captured canonical Label is not rebound. A declared canonical Label
+default is not reparsed or rebound, but must be visible from the defining
+context or among the complete mapping's canonical values. Admit only the
+already captured root-main ordinary nonisolated empty-factor String/Bool/i32/
+Label slice. Every container/output/big-int/function/context/tag/cycle,
+configurable/transition, allowed-values, file/provider/executable restriction,
+repository implementation factor, or unmodeled descriptor fails closed.
+
+The private owner is
+`HostInstantiatedModuleExtensionRepositoriesKey { workspace }` returning a
+complete-only
+`HostInstantiatedModuleExtensionRepositories` or typed
+`HostInstantiatedModuleExtensionRepositoriesError` through the existing
+`SourcePreparationOutcome`. Success retains the complete raw invocation
+predecessor plus extension/call-ordered immutable rows containing exact request,
+raw call/provenance, generated apparent/canonical name, and `RepoSpec`.
+Namespace/join failures precede all schema work. A failing call publishes no
+partial row; its terminal retains the complete predecessor, all completed
+extensions, the current extension's completed rows, and the exact failing raw
+call/request/definition/mapping context. An upstream invocation Need remains
+invalid and an upstream completed error yields no instantiation rows.
+
+Pinned `createRepos` applies override/inject substitutions without checking
+`must_exist`. Pinned `SingleExtensionFunction` validates override-missing and
+inject-collision only after the eval-only generated RepoSpecs exist. Therefore
+this packet retains ordered `must_exist` structurally but performs no existence
+verdict; that later validator and final generated routes/mappings remain
+deferred.
+
+The future implementation is exactly existing
+`app/slug_loading_v2/src/module_extension_repository_rule.rs`, one new private
+`module_extension_repository_instantiation.rs`, and `lib.rs` solely for its
+private declaration. Caps are 480 production, 700 tests, and 1,180 total
+formatted net Rust lines against the accepted design commit; no fourth Rust
+file or Bzlmod production edit. Require pure empty/one/multiple-call namespace,
+collision-prefix, cross-call visibility, substitution/`must_exist`, exact
+stored field/order, two-phase coercion/default/visibility, and atomic-prefix
+tables; real-key predecessor Need/error,
+mapping/schema/default/name/value/order/provenance A/B/A, cold/warm reuse,
+zero events and zero I/O; full loading/Bzlmod dependents; and structural
+absence of Heap/Value/FrozenValue/callable/context from retained state.
+
+Exact compatibility is limited to the admitted pinned `createRepos` namespace
+assembly and `RepoRule.instantiate` semantic projection. Private Rust
+representation, diagnostics, and DICE scheduling are Slug-native. Repository
+implementation/`repository_ctx`, environment/OS/facts, filesystem/network/
+watch/download/execute, materialization, final generated routes, override/
+inject existence validation/publication, lockfile, nonroot/MVO/isolation/
+innate breadth, commands, public APIs, and JVM remain deferred. `REPLAN` on
+Bzlmod mutation or
+reverse dependency, reconstructing selected namespace state, a second loader,
+retained Starlark lifetime, order-insensitive attributes, guessed built-ins,
+repository execution/I/O, generated existence/final-route claims, a fourth
+future Rust path, or cap excess.
 
 ## Accepted docs-only design contract
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active implementation contract above.
+interpreted solely through the active docs-only design contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
