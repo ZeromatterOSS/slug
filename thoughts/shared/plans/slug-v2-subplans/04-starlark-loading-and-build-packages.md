@@ -2875,3 +2875,19 @@ certificate-plus-ordinal no-copy result, every field/order/lifecycle proof,
 compatibility boundary, and stop. Stage 4 production remains unchanged; no
 third Rust file, loading/Bzlmod/server, route, execution, source/materializer
 I/O, public API, or JVM work is authorized.
+
+### Canonical lookup accepted; apparent mapping design scheduled (2026-08-12)
+
+Independent review accepts core canonical generated-definition lookup
+`daefe6fc`. Pinned Bazel 9.2 next resolves a nonroot apparent name through the
+selected generated repository's complete shared mapping before any repository
+rule load, route, source, or materializer work.
+
+Run only four-ledger docs packet
+`WP-4-5-6-host-generated-repository-apparent-mapping-owner-design` under
+40/240/200/180/660 documentation caps. Freeze a private core key that computes
+only the accepted definition key, validates canonical/mapping context, and
+borrows the post-substitution target without copying. Future Rust is limited to
+the existing definition module under mandatory 220/450/670. Stage 4 production
+remains unchanged; root mapping, public route, repository execution/context,
+source/materializer/I/O, lockfile, command/API, and JVM work remain forbidden.

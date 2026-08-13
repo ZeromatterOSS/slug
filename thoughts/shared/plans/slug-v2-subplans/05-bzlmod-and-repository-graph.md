@@ -2930,3 +2930,20 @@ complete scan, certificate-plus-ordinal/no-copy result, full proof, and every
 no-route/no-materialization stop. Stage 5 production remains unchanged; no
 Bzlmod/loading/server edit, reverse edge, public API, execution/I/O, lockfile,
 materializer, consumer, or JVM work is authorized.
+
+### Core apparent generated-repository mapping design scheduled (2026-08-12)
+
+Independent review accepts canonical lookup `daefe6fc`. The accepted loading
+certificate already retains the exact host/generated/substitution mapping per
+generated context; the next leaf is a private core direct lookup, not a Bzlmod
+route or reverse dependency.
+
+Run only four-ledger docs packet
+`WP-4-5-6-host-generated-repository-apparent-mapping-owner-design` under
+40/240/200/180/660 documentation caps. Freeze a key over only the accepted
+definition key, nonroot apparent input, exact context validation, borrowed
+post-substitution target, complete structural errors/equality, and one-file
+future 220/450/670 limits. Stage 5 production remains unchanged; root mapping,
+`RootRepositoryRoute`, generated definition publication, source/materializer,
+execution/I/O, lockfile, consumer/API, reverse edge, and JVM work remain
+forbidden.
