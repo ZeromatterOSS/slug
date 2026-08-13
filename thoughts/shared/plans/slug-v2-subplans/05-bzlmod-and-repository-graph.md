@@ -3408,3 +3408,12 @@ pure vertical table plus real Generated/Nonregistry/Main/Builtin consumer rows
 prove core propagation. The root-apparent definition must reject wrong policy
 before publishing its view. Preserve 320/700/1,020, all physical ceilings,
 scope, semantics, and stops; require acceptance and explicit r2 activation.
+
+### Repository source-capability policy threading r2 activated (2026-08-13)
+
+Independent review accepts proof correction `5e88f2ad` over `c5853ecf`.
+Resume only the retained Bzlmod `host_module.rs` and three named core files
+under 320/700/1,020 and ceilings 3,000/2,450/1,040/1,100. Preserve inherited
+real Registry evidence, real Generated/Nonregistry/Main/Builtin consumer rows,
+production-used pure vertical corruption proof, root-definition rejection,
+ABI, semantics, and all no-consumer/materialization breadth stops.

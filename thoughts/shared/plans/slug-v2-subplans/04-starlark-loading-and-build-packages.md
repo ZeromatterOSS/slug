@@ -3341,3 +3341,11 @@ Generated, root/command Nonregistry, Main, and Builtin; production-used pure
 tables exhaust Registry and corrupt vertical polarity. Core cannot inject the
 private Bzlmod mirror-policy input solely for proof. Preserve all paths, caps,
 ceilings, semantics, and stops; require acceptance plus explicit r2 activation.
+
+### Repository source-capability policy threading r2 activated (2026-08-13)
+
+Independent review accepts correction `5e88f2ad` over design `c5853ecf`.
+Resume only the retained exact four-file implementation under 320/700/1,020
+and ceilings 3,000/2,450/1,040/1,100. Preserve the corrected Bzlmod-real,
+core-real, and production-used-pure proof split, root-definition fail-closed
+policy boundary, semantics, ABI, and all prior stops. Stage 4 stays unchanged.
