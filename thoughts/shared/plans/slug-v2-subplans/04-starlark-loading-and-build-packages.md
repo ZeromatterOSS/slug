@@ -3167,3 +3167,17 @@ Resume only the retained three-path core implementation under 340/700/1,040
 and 2,400/900. Use the corrected pure/inherited/real proof split; preserve the
 opaque sibling seam, no-map view, mapping-first/short-circuit semantics, and all
 route/source/materializer/command/public/I/O/JVM stops.
+
+### Root apparent definition accepted; route-carrier ownership audit scheduled (2026-08-13)
+
+Independent review accepts composition `7c0c0e48` at 327 production, 610 tests,
+937 total, and 2,373/897 physical lines. Run only four-ledger docs packet
+`WP-4-5-6-host-root-apparent-repository-route-carrier-owner-design` under
+40/260/220/200/720 documentation caps. Freeze a private core carrier over only
+the accepted composition key, promoting opaque Main/Builtin deferred outcomes
+and retaining admitted selected/generated definitions without copied state.
+Future Rust is exactly a new cohesive route module, minimal composition seam,
+and private mod declaration under 320/650/970 with 960/800 old/new ceilings.
+Stage 4 production remains unchanged; no reverse edge, duplicate lookup/store,
+owned Bzlmod route, source/package/materialization/I/O, command/public API, or
+JVM work is authorized.

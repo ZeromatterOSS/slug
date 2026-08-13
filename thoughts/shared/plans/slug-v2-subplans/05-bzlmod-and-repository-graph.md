@@ -3233,3 +3233,16 @@ Resume only the retained private core composition module, opaque predecessor
 seam, and private module declaration under 340/700/1,040 and 2,400/900. Stage 5
 production stays unchanged; use the corrected proof split and preserve every
 reverse-edge/route/source/materialization/public/I/O/JVM stop.
+
+### Canonical route-carrier ownership audit follows accepted composition (2026-08-13)
+
+Core root apparent-to-definition composition `7c0c0e48` is independently
+accepted at 327/610/937. Run only docs packet
+`WP-4-5-6-host-root-apparent-repository-route-carrier-owner-design` under
+40/260/220/200/720 caps. Freeze the core-private five-domain carrier over only
+the accepted composition key, with an opaque Main/Builtin deferred projection
+and borrowed original RepoSpec. Future Rust is exactly new route module,
+minimal composition seam, and private mod declaration under 320/650/970 and
+960/800 ceilings. Stage 5 production remains unchanged; forbid a Bzlmod-to-core
+or loading reverse edge, duplicate lookup/catalog, copied state, owned
+`RootRepositoryRoute`, source/materialization/I/O, command/public API, and JVM.
