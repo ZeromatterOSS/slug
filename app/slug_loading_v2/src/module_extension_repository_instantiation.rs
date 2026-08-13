@@ -77,6 +77,7 @@ impl HostInstantiatedModuleExtensionRepositories {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct HostInstantiatedModuleExtensionRepositoriesForRequest {
     request: HostSelectedExtensionDefinitionLoadRequest,
+    mapping_entries: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     repositories: Arc<[HostInstantiatedModuleExtensionRepository]>,
 }
 
@@ -88,6 +89,10 @@ impl HostInstantiatedModuleExtensionRepositoriesForRequest {
         &[HostInstantiatedModuleExtensionRepository],
     ) {
         (&self.request, &self.repositories)
+    }
+
+    pub(crate) fn mapping_entries(&self) -> &Arc<SmallMap<ApparentRepoName, CanonicalRepoName>> {
+        &self.mapping_entries
     }
 }
 
@@ -311,6 +316,7 @@ fn instantiate_repositories(
         }
         completed.push(HostInstantiatedModuleExtensionRepositoriesForRequest {
             request: receipt.request.clone(),
+            mapping_entries: mapping.1.clone(),
             repositories: current.into(),
         });
     }
@@ -332,7 +338,7 @@ fn namespace_mapping(
 ) -> Result<
     (
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
     CompactString,
 > {
@@ -347,14 +353,14 @@ fn namespace_mapping(
         let apparent = ApparentRepoName::new(generated).map_err(CompactString::from)?;
         entries.insert(apparent, replacement.clone());
     }
-    Ok((context_repo.clone(), entries))
+    Ok((context_repo.clone(), Arc::new(entries)))
 }
 
 fn instantiate_call(
     call: &RepositoryRuleCallRecord,
     mapping: &(
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<RepoSpec, CompactString> {
     let mut converted = SmallMap::new();
@@ -407,7 +413,7 @@ fn convert_supplied(
     defining_label: &CanonicalLabel,
     mapping: &(
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<OverrideAttributeValue, CompactString> {
     match (attribute.kind, raw) {
@@ -441,7 +447,7 @@ fn validate_default(
     defining_label: &CanonicalLabel,
     mapping: &(
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<(), CompactString> {
     match (attribute.kind, default) {
@@ -465,7 +471,7 @@ fn resolve_label(
     defining_label: &CanonicalLabel,
     mapping: &(
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<CanonicalLabel, CompactString> {
     let defining_package = defining_label.package().package().as_str();
@@ -505,7 +511,7 @@ fn ensure_visible(
     defining_label: &CanonicalLabel,
     mapping: &(
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ),
 ) -> Result<(), CompactString> {
     let repository = label.package().repo();
@@ -602,14 +608,14 @@ pub(crate) mod tests {
 
     fn mapping() -> (
         CanonicalRepoName,
-        SmallMap<ApparentRepoName, CanonicalRepoName>,
+        Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
     ) {
         (
             CanonicalRepoName::root(),
-            SmallMap::from_iter([(
+            Arc::new(SmallMap::from_iter([(
                 ApparentRepoName::new("dep").unwrap(),
                 CanonicalRepoName::new("dep+").unwrap(),
-            )]),
+            )])),
         )
     }
 
@@ -793,7 +799,7 @@ pub(crate) mod tests {
             &self,
             mapping: &(
                 CanonicalRepoName,
-                SmallMap<ApparentRepoName, CanonicalRepoName>,
+                Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
             ),
         ) -> RepoSpec;
     }
@@ -803,7 +809,7 @@ pub(crate) mod tests {
             &self,
             mapping: &(
                 CanonicalRepoName,
-                SmallMap<ApparentRepoName, CanonicalRepoName>,
+                Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
             ),
         ) -> RepoSpec {
             instantiate_call(self, mapping).unwrap()

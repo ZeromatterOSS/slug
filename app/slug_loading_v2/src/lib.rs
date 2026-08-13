@@ -53,6 +53,8 @@ pub use cycle_detector::bzl_load_cycle_detector;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
 #[doc(hidden)]
+pub use module_extension_repository_validation::HostGeneratedRepositoryMapping;
+#[doc(hidden)]
 pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecs;
 #[doc(hidden)]
 pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecsError;

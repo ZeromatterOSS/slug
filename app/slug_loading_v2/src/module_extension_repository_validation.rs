@@ -18,7 +18,10 @@ use dice_futures::cancellation::CancellationContext;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionImport;
 use slug_bzlmod_v2::HostSelectedExtensionDefinitionOverride;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_identity_v2::ApparentRepoName;
+use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositories;
@@ -38,6 +41,23 @@ struct GeneratedSpecIter<'a> {
     remaining: usize,
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub struct HostGeneratedRepositoryMapping<'a> {
+    context_repo: &'a CanonicalRepoName,
+    entries: &'a SmallMap<ApparentRepoName, CanonicalRepoName>,
+}
+
+impl<'a> HostGeneratedRepositoryMapping<'a> {
+    pub fn context_repo(&self) -> &'a CanonicalRepoName {
+        self.context_repo
+    }
+
+    pub fn entries(&self) -> &'a SmallMap<ApparentRepoName, CanonicalRepoName> {
+        self.entries
+    }
+}
+
 impl HostValidatedGeneratedRepositorySpecs {
     pub fn iter(
         &self,
@@ -45,6 +65,8 @@ impl HostValidatedGeneratedRepositorySpecs {
         Item = (
             &slug_identity_v2::CanonicalRepoName,
             &slug_bzlmod_v2::RepoSpec,
+            &str,
+            HostGeneratedRepositoryMapping<'_>,
         ),
     > {
         let extensions = self.predecessor.parts().1;
@@ -64,6 +86,8 @@ impl<'a> Iterator for GeneratedSpecIter<'a> {
     type Item = (
         &'a slug_identity_v2::CanonicalRepoName,
         &'a slug_bzlmod_v2::RepoSpec,
+        &'a str,
+        HostGeneratedRepositoryMapping<'a>,
     );
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -71,7 +95,16 @@ impl<'a> Iterator for GeneratedSpecIter<'a> {
             if let Some(repository) = extension.parts().1.get(self.repository) {
                 self.repository += 1;
                 self.remaining -= 1;
-                return Some(repository.spec_parts());
+                let (canonical_name, repo_spec) = repository.spec_parts();
+                return Some((
+                    canonical_name,
+                    repo_spec,
+                    repository.generated_name(),
+                    HostGeneratedRepositoryMapping {
+                        context_repo: canonical_name,
+                        entries: extension.mapping_entries().as_ref(),
+                    },
+                ));
             }
             self.extension += 1;
             self.repository = 0;
@@ -401,8 +434,10 @@ ext=module_extension(implementation=impl)
     ) -> Vec<(String, String)> {
         let rows = value.iter();
         assert_eq!(rows.len(), rows.size_hint().0);
-        rows.map(|(name, spec)| (name.as_str().to_owned(), spec.rule_id.rule_name.to_string()))
-            .collect()
+        rows.map(|(name, spec, _, _)| {
+            (name.as_str().to_owned(), spec.rule_id.rule_name.to_string())
+        })
+        .collect()
     }
 
     #[tokio::test]
@@ -502,13 +537,23 @@ ext=module_extension(implementation=impl)
     #[tokio::test]
     async fn public_view_retains_overridden_rows_full_specs_and_request_order() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-        let module = |swap: bool, generated: &str| {
+        let module = |swap: bool, generated: &str, injected: &str, target: &str, swap_ops: bool| {
             let alpha = format!(
-                "a=use_extension('//:ext.bzl','alpha')\noverride_repo(a, {generated}='bazel_tools')\n"
+                "a=use_extension('//:ext.bzl','alpha')\nuse_repo(a, first_alias='first')\noverride_repo(a, {generated}='root_alias')\n{}{}",
+                if swap_ops {
+                    "inject_repo(a, other='root_alias')\n".to_owned()
+                } else {
+                    format!("inject_repo(a, {injected}='{target}')\n")
+                },
+                if swap_ops {
+                    format!("inject_repo(a, {injected}='{target}')\n")
+                } else {
+                    "inject_repo(a, other='root_alias')\n".to_owned()
+                },
             );
             let beta = "b=use_extension('//:ext.bzl','beta')\n";
             format!(
-                "module(name='bazel_tools')\n{}{}",
+                "module(name='bazel_tools', repo_name='root_alias')\n{}{}",
                 if swap { beta } else { &alpha },
                 if swap { &alpha } else { beta },
             )
@@ -532,7 +577,7 @@ beta=module_extension(implementation=beta_impl)
 "#
             )
         };
-        let baseline_module = module(false, "first");
+        let baseline_module = module(false, "first", "injected", "root_alias", false);
         let baseline_source = source("alpha_rule", "text", "one", "@second//:item", false);
         let a = compute_with_extension(&dice, &baseline_module, &baseline_source).await;
         let SourcePreparationOutcome::Complete(value) = &a else {
@@ -543,6 +588,90 @@ beta=module_extension(implementation=beta_impl)
         assert!(rows[0].0.as_str().ends_with("+first"));
         assert!(rows[1].0.as_str().ends_with("+second"));
         assert!(rows[2].0.as_str().ends_with("+third"));
+        assert_eq!(rows[0].2, "first");
+        assert_eq!(rows[1].2, "second");
+        assert_eq!(rows[2].2, "third");
+        assert_eq!(rows[0].3.context_repo(), rows[0].0);
+        assert_eq!(rows[1].3.context_repo(), rows[1].0);
+        assert_eq!(rows[2].3.context_repo(), rows[2].0);
+        assert!(std::ptr::eq(rows[0].3.entries(), rows[1].3.entries()));
+        assert!(!std::ptr::eq(rows[1].3.entries(), rows[2].3.entries()));
+        let first = ApparentRepoName::new("first").unwrap();
+        let second = ApparentRepoName::new("second").unwrap();
+        let third = ApparentRepoName::new("third").unwrap();
+        let root_alias = ApparentRepoName::new("root_alias").unwrap();
+        let injected = ApparentRepoName::new("injected").unwrap();
+        let other = ApparentRepoName::new("other").unwrap();
+        assert_eq!(
+            rows[0].3.entries().get(&root_alias),
+            Some(&CanonicalRepoName::root())
+        );
+        assert_eq!(
+            rows[0].3.entries().get(&first),
+            Some(&CanonicalRepoName::root())
+        );
+        assert_eq!(rows[0].3.entries().get(&second), Some(rows[1].0));
+        assert_eq!(rows[2].3.entries().get(&third), Some(rows[2].0));
+        assert_eq!(
+            rows[0].3.entries().get(&injected),
+            Some(&CanonicalRepoName::root())
+        );
+        assert_eq!(
+            rows[0].3.entries().get(&other),
+            Some(&CanonicalRepoName::root())
+        );
+        let alpha_names = rows[0]
+            .3
+            .entries()
+            .keys()
+            .filter_map(|name| {
+                matches!(
+                    name.as_str(),
+                    "root_alias" | "first" | "second" | "injected" | "other"
+                )
+                .then_some(name.as_str())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            alpha_names,
+            ["root_alias", "first", "second", "injected", "other"]
+        );
+        let swapped_mapping = compute_with_extension(
+            &dice,
+            &module(false, "first", "injected", "root_alias", true),
+            &baseline_source,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(swapped_value) = &swapped_mapping else {
+            panic!("swapped mapping must complete")
+        };
+        let swapped_rows = swapped_value
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .iter()
+            .collect::<Vec<_>>();
+        assert_eq!(
+            swapped_rows[0]
+                .3
+                .entries()
+                .keys()
+                .filter_map(|name| {
+                    matches!(name.as_str(), "injected" | "other").then_some(name.as_str())
+                })
+                .collect::<Vec<_>>(),
+            ["other", "injected"]
+        );
+        assert!(!HostValidatedModuleExtensionRepositoriesKey::equality(
+            &a,
+            &swapped_mapping
+        ));
+        let restored_mapping =
+            compute_with_extension(&dice, &baseline_module, &baseline_source).await;
+        assert!(HostValidatedModuleExtensionRepositoriesKey::equality(
+            &a,
+            &restored_mapping
+        ));
         assert_eq!(rows[0].1.rule_id.rule_name, "alpha_rule");
         assert_eq!(rows[2].1.rule_id.rule_name, "beta_rule");
         assert!(
@@ -574,7 +703,7 @@ beta=module_extension(implementation=beta_impl)
 
         let variants = [
             (
-                module(false, "renamed"),
+                module(false, "renamed", "injected", "root_alias", false),
                 source("alpha_rule", "text", "one", "@second//:item", false)
                     .replace("name='first'", "name='renamed'"),
             ),
@@ -599,7 +728,18 @@ beta=module_extension(implementation=beta_impl)
                 baseline_module.clone(),
                 source("alpha_rule", "text", "one", "@first//:item", false),
             ),
-            (module(true, "first"), baseline_source.clone()),
+            (
+                module(true, "first", "injected", "root_alias", false),
+                baseline_source.clone(),
+            ),
+            (
+                module(false, "first", "other", "root_alias", false),
+                baseline_source.clone(),
+            ),
+            (
+                module(false, "first", "injected", "first_alias", false),
+                baseline_source.clone(),
+            ),
         ];
         for (variant_module, variant_source) in variants {
             let changed = compute_with_extension(&dice, &variant_module, &variant_source).await;
