@@ -3396,3 +3396,15 @@ capability identity, exact borrowed view accessors, DirectLocal/root/command/
 registry/generated polarity, proof, and every no-new-key/store/request/source/
 materialization/loading/command/public/I/O/JVM stop. Stage 5 production remains
 unchanged.
+
+### Repository source-capability policy proof boundary corrected (2026-08-13)
+
+Retain the unaccepted four-file implementation over design `c5853ecf`, but
+authorize no Rust. Run only docs packet
+`WP-4-5-6-host-repository-source-capability-policy-threading-r2-proof-design`.
+SelectedRegistry remains real at the accepted Bzlmod predecessor ABI because
+core cannot name the private injected mirror-policy input; the production-used
+pure vertical table plus real Generated/Nonregistry/Main/Builtin consumer rows
+prove core propagation. The root-apparent definition must reject wrong policy
+before publishing its view. Preserve 320/700/1,020, all physical ceilings,
+scope, semantics, and stops; require acceptance and explicit r2 activation.

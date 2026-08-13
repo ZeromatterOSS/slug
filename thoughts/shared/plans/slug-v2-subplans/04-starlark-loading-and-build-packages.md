@@ -3330,3 +3330,14 @@ borrowed policy accessors, structural capability identity/hash, strict
 Main/Builtin/Registry/Nonregistry/Generated polarity, proof, and all no-fifth-
 file/key/store/request/source/materialization/loading/command/public/I/O/JVM
 stops. Stage 4 production remains unchanged.
+
+### Repository source-capability policy proof boundary corrected (2026-08-13)
+
+Retain the unaccepted four-file implementation over `c5853ecf`, but authorize
+no Rust. Run only four-ledger docs packet
+`WP-4-5-6-host-repository-source-capability-policy-threading-r2-proof-design`.
+Real Bzlmod proof owns SelectedRegistry policy; real core proof owns
+Generated, root/command Nonregistry, Main, and Builtin; production-used pure
+tables exhaust Registry and corrupt vertical polarity. Core cannot inject the
+private Bzlmod mirror-policy input solely for proof. Preserve all paths, caps,
+ceilings, semantics, and stops; require acceptance plus explicit r2 activation.
