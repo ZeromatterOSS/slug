@@ -3566,3 +3566,11 @@ key and retains exact path/predecessor identity. Future Rust is a new cohesive
 module, minimal source-input seam, and mod line under 340/700/1,040 with
 840/850 ceilings. Defer materialization result/ResolvedPath/Builtin bytes,
 source/package/loading/command/public/wire/I/O/JVM behavior.
+
+### Root-apparent source-path input owner implementation activated (2026-08-13)
+
+Independent review accepts design `68349398`. Implement exactly the new core
+source-path-input module, minimal source-input seam, private mod line, and
+ledgers under 340/700/1,040 with 840/850 ceilings. Preserve path-before-await,
+exact path/predecessor ownership, ABI/proof, and every no-result/source/loading/
+command/public/wire/I/O/JVM stop. Stage 5 remains unchanged.
