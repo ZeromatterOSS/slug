@@ -28,26 +28,26 @@ use super::generated_repository_definition::HostCanonicalRepositoryDefinitionKey
 use super::generated_repository_definition::HostCanonicalRepositoryDefinitionKind;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositoryDefinition {
+pub(super) struct HostRootApparentRepositoryDefinition {
     mapping: HostCanonicalRepositoryApparentMapping,
     definition: HostCanonicalRepositoryDefinition,
     apparent_repo: ApparentRepoName,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum HostRootApparentRepositoryDefinitionKind {
+pub(super) enum HostRootApparentRepositoryDefinitionKind {
     SelectedRegistry,
     SelectedNonregistry,
     Generated,
 }
 #[derive(Debug, Clone, Copy)]
-struct HostRootApparentRepositoryDefinitionView<'a> {
+pub(super) struct HostRootApparentRepositoryDefinitionView<'a> {
     apparent_repo: &'a ApparentRepoName,
     canonical_repo: &'a CanonicalRepoName,
     kind: HostRootApparentRepositoryDefinitionKind,
     repo_spec: Option<&'a RepoSpec>,
 }
 impl HostRootApparentRepositoryDefinition {
-    fn view(&self) -> Option<HostRootApparentRepositoryDefinitionView<'_>> {
+    pub(super) fn view(&self) -> Option<HostRootApparentRepositoryDefinitionView<'_>> {
         let definition = self.definition.view()?;
         let kind = match definition.kind() {
             HostCanonicalRepositoryDefinitionKind::Root => return None,
@@ -70,16 +70,16 @@ impl HostRootApparentRepositoryDefinition {
     }
 }
 impl<'a> HostRootApparentRepositoryDefinitionView<'a> {
-    fn apparent_repo(&self) -> &'a ApparentRepoName {
+    pub(super) fn apparent_repo(&self) -> &'a ApparentRepoName {
         self.apparent_repo
     }
-    fn canonical_repo(&self) -> &'a CanonicalRepoName {
+    pub(super) fn canonical_repo(&self) -> &'a CanonicalRepoName {
         self.canonical_repo
     }
-    fn kind(&self) -> HostRootApparentRepositoryDefinitionKind {
+    pub(super) fn kind(&self) -> HostRootApparentRepositoryDefinitionKind {
         self.kind
     }
-    fn repo_spec(&self) -> Option<&'a RepoSpec> {
+    pub(super) fn repo_spec(&self) -> Option<&'a RepoSpec> {
         self.repo_spec
     }
 }
@@ -111,9 +111,56 @@ enum HostRootApparentRepositoryDefinitionErrorKind {
     },
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositoryDefinitionError {
+pub(super) struct HostRootApparentRepositoryDefinitionError {
     apparent_repo: ApparentRepoName,
     kind: HostRootApparentRepositoryDefinitionErrorKind,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum HostRootApparentRepositoryDeferredKind {
+    Main,
+    Builtin,
+}
+#[derive(Debug, Clone, Copy)]
+pub(super) struct HostRootApparentRepositoryDeferredView<'a> {
+    apparent_repo: &'a ApparentRepoName,
+    canonical_repo: &'a CanonicalRepoName,
+    kind: HostRootApparentRepositoryDeferredKind,
+}
+impl HostRootApparentRepositoryDefinitionError {
+    pub(super) fn is_deferred(&self) -> bool {
+        matches!(
+            self.kind,
+            HostRootApparentRepositoryDefinitionErrorKind::MainDeferred { .. }
+                | HostRootApparentRepositoryDefinitionErrorKind::BuiltinDeferred { .. }
+        )
+    }
+    pub(super) fn deferred_view(&self) -> Option<HostRootApparentRepositoryDeferredView<'_>> {
+        let (mapping, kind) = match &self.kind {
+            HostRootApparentRepositoryDefinitionErrorKind::MainDeferred { mapping } => {
+                (mapping, HostRootApparentRepositoryDeferredKind::Main)
+            }
+            HostRootApparentRepositoryDefinitionErrorKind::BuiltinDeferred { mapping } => {
+                (mapping, HostRootApparentRepositoryDeferredKind::Builtin)
+            }
+            _ => return None,
+        };
+        Some(HostRootApparentRepositoryDeferredView {
+            apparent_repo: &self.apparent_repo,
+            canonical_repo: mapping.resolved_target()?,
+            kind,
+        })
+    }
+}
+impl<'a> HostRootApparentRepositoryDeferredView<'a> {
+    pub(super) fn apparent_repo(self) -> &'a ApparentRepoName {
+        self.apparent_repo
+    }
+    pub(super) fn canonical_repo(self) -> &'a CanonicalRepoName {
+        self.canonical_repo
+    }
+    pub(super) fn kind(self) -> HostRootApparentRepositoryDeferredKind {
+        self.kind
+    }
 }
 impl fmt::Display for HostRootApparentRepositoryDefinitionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -125,16 +172,19 @@ impl fmt::Display for HostRootApparentRepositoryDefinitionError {
     }
 }
 impl std::error::Error for HostRootApparentRepositoryDefinitionError {}
-type HostRootApparentRepositoryDefinitionOutcome = SourcePreparationOutcome<
+pub(super) type HostRootApparentRepositoryDefinitionOutcome = SourcePreparationOutcome<
     Arc<Result<HostRootApparentRepositoryDefinition, HostRootApparentRepositoryDefinitionError>>,
 >;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositoryDefinitionKey {
+pub(super) struct HostRootApparentRepositoryDefinitionKey {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
 }
 impl HostRootApparentRepositoryDefinitionKey {
-    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self {
             workspace,
             apparent_repo,
@@ -296,7 +346,7 @@ impl Key for HostRootApparentRepositoryDefinitionKey {
     }
 }
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -599,6 +649,14 @@ mod tests {
         }
         outcome
     }
+    pub(in crate::runtime) async fn prepare_builtin(
+        dice: &Arc<Dice>,
+        workspace: &NormalizedAbsolutePath,
+    ) {
+        let outcome =
+            builtin_outcome(dice, workspace, Arc::new(CompositionTracker::default())).await;
+        assert!(matches!(outcome, SourcePreparationOutcome::Complete(_)));
+    }
     #[tokio::test]
     async fn real_generated_selected_and_deferred_domains_are_structural() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -711,12 +769,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(matches!(
-            main,
-            SourcePreparationOutcome::Complete(value)
-                if matches!(value.as_ref().as_ref().unwrap_err().kind,
-                    HostRootApparentRepositoryDefinitionErrorKind::MainDeferred { .. })
-        ));
+        let SourcePreparationOutcome::Complete(main) = main else {
+            unreachable!()
+        };
+        assert!(main.as_ref().as_ref().unwrap_err().is_deferred());
         let tracker = Arc::new(CompositionTracker::default());
         let builtin = builtin_outcome(&dice, &workspace, tracker.clone()).await;
         assert!(
@@ -726,7 +782,7 @@ mod tests {
                     if matches!(
                         &value.as_ref().as_ref().unwrap_err().kind,
                         HostRootApparentRepositoryDefinitionErrorKind::BuiltinDeferred { .. }
-                    )
+                    ) && value.as_ref().as_ref().unwrap_err().is_deferred()
             ),
             "builtin outcome: {builtin:?}"
         );
@@ -878,6 +934,7 @@ mod tests {
         };
         let error = error.as_ref().as_ref().unwrap_err();
         assert_eq!(error.apparent_repo.as_str(), "absent");
+        assert!(!error.is_deferred());
         assert!(matches!(
             error.kind,
             HostRootApparentRepositoryDefinitionErrorKind::Mapping(_)
