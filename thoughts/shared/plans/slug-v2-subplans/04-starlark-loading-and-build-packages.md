@@ -3108,3 +3108,14 @@ targets. Future Rust is only existing `generated_repository_definition.rs`
 under 180/420/600 and a 2,600-line cohesion ceiling. Stage 4 production remains
 unchanged. No new key/file, copied map, route/RepoSpec/source/materializer,
 public API, I/O, command/server, or JVM work is authorized.
+
+### Root apparent-mapping composition implementation activated (2026-08-13)
+
+Independent review accepts design `57ef6bf1`. Implement only the in-place Root
+branch of core's existing private canonical apparent-mapping key in
+`generated_repository_definition.rs`, with colocated tests, under 180/420/600
+and a 2,600-line final cohesion ceiling. Preserve exclusive Root versus
+nonroot predecessor dispatch, borrowed targets, typed order/errors, proof, and
+all stops. Stage 4 production remains unchanged; no new key/file, Bzlmod/
+loading/server/Cargo, route/RepoSpec/source/materializer/I/O/public/JVM breadth
+is authorized.

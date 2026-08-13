@@ -3179,3 +3179,13 @@ only to the accepted canonical-definition predecessor. Future Rust is one
 existing core file under 180/420/600 and a 2,600-line cohesion ceiling. No new
 key/store/file, Bzlmod/loading/server edit, route/RepoSpec/source/materializer,
 I/O, public/command API, or JVM work is authorized.
+
+### Core Root apparent-mapping composition implementation activated (2026-08-13)
+
+Independent review accepts design `57ef6bf1`. Run only the existing private
+core apparent-mapping owner in `generated_repository_definition.rs` under
+180/420/600 and a 2,600-line cohesion ceiling. Root dispatch computes only the
+accepted hidden Root mapping; nonroot dispatch retains only canonical
+definition; success borrows its target. No Bzlmod or Stage 5 Rust changes, new
+key/file/store, route/RepoSpec/source/materialization/I/O/public/JVM breadth is
+authorized.
