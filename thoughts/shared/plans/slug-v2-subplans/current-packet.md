@@ -1,12 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-host-canonical-selected-module-definition-absence-signal-design`
+Packet: `WP-5-host-canonical-selected-module-definition-absence-signal-implementation`
 Milestone: M7 canonical selected-module definition lookup
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the minimal hidden absence signal required by core composition.
+Result: implement the accepted minimal hidden absence signal.
 
-## Active docs-only design contract
+## Active implementation contract
+
+Independent review accepts design `c466d864`. Run only
+`WP-5-host-canonical-selected-module-definition-absence-signal-implementation`
+in existing `app/slug_bzlmod_v2/src/selected_repo_spec.rs` and
+`app/slug_bzlmod_v2/src/lib.rs` solely for the hidden enum re-export, plus four
+ledgers, under mandatory 50 production/120 tests/170 total formatted net Rust
+lines against `c466d864`.
+
+Implement exactly the hidden Copy/Eq `Missing | Terminal` disposition and
+opaque-error accessor frozen below. Preserve every existing key/value/store,
+certificate/view, opaque error payload/Eq/Display, Need, external proof,
+compatibility classification, and no-new-owner/no-route/no-core-composition
+stop. `REPLAN` on any payload leak, third Rust file, behavior breadth, or cap
+excess.
+
+## Accepted docs-only design contract
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+implementation contract above.
 
 Independent review accepts hidden selected-module publication `bc822520` at
 131 production, 83 net tests, and 214 total formatted Rust lines against

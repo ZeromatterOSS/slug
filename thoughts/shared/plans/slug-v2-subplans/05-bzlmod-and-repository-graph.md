@@ -3030,3 +3030,15 @@ under mandatory 50/120/170. Keep Routes, RoutesCompute, Duplicate, and
 BuiltinDeferred terminal; Need has no disposition. No new key/store,
 core/loading/server edit, selected/generated composition, builtin precedence,
 route/source/materializer/I/O, stable API, or JVM work is authorized.
+
+### Selected-module absence-signal implementation activated (2026-08-12)
+
+Independent review accepts design `c466d864`. Run only
+`WP-5-host-canonical-selected-module-definition-absence-signal-implementation`
+in existing `selected_repo_spec.rs` plus `lib.rs` solely for the hidden enum
+re-export and four ledgers, under mandatory 50/120/170 against `c466d864`.
+Preserve Missing-only fallthrough classification, opaque terminal payloads,
+Need/nonpublication, proof, compatibility, and stops. Stage 5 production
+remains otherwise unchanged; no new key/store, third Rust file,
+core/loading/server edit, composition, builtin precedence, route,
+source/materializer/I/O, stable API, or JVM work is authorized.

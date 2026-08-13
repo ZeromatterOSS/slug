@@ -2969,3 +2969,14 @@ Bzlmod key/error; future Rust is exactly `selected_repo_spec.rs` plus `lib.rs`
 hidden re-export under mandatory 50/120/170. Stage 4 production remains
 unchanged. No payload leak, new key/store, core/loading/server edit, route,
 source/materializer/I/O, stable API, or JVM work is authorized.
+
+### Selected-module absence-signal implementation activated (2026-08-12)
+
+Independent review accepts design `c466d864`. Run only
+`WP-5-host-canonical-selected-module-definition-absence-signal-implementation`
+in existing Bzlmod `selected_repo_spec.rs` plus `lib.rs` solely for the hidden
+enum re-export and four ledgers, under mandatory 50/120/170 against
+`c466d864`. Preserve the exact Missing-versus-Terminal accessor, opacity,
+proof, and stops. Stage 4 production remains unchanged; no new key/store,
+third Rust file, core/loading/server edit, composition, route,
+source/materializer/I/O, stable API, or JVM work is authorized.
