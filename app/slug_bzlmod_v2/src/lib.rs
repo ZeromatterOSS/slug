@@ -273,6 +273,18 @@ pub use selected_repo_spec::HostCanonicalSelectedModuleKind;
 #[doc(hidden)]
 pub use selected_repo_spec::HostCanonicalSelectedModuleMappingIter;
 #[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMapping;
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingIter;
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingKey;
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingOutcome;
+#[doc(hidden)]
+pub use selected_repo_spec::HostRootRepositoryMappingView;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionImport;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequest;

@@ -2753,6 +2753,207 @@ impl Key for HostSelectedExtensionEvaluationInputRequestsKey {
     }
 }
 
+type RetainedExtensionMappings =
+    Arc<Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError>>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRootRepositoryMapping {
+    predecessor: RetainedExtensionMappings,
+    root_ordinal: usize,
+}
+
+impl HostRootRepositoryMapping {
+    pub fn view(&self) -> Option<HostRootRepositoryMappingView<'_>> {
+        let predecessor = self.predecessor.as_ref().as_ref().ok()?;
+        predecessor
+            .mappings
+            .get(self.root_ordinal)
+            .map(|mapping| HostRootRepositoryMappingView { mapping })
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub struct HostRootRepositoryMappingView<'a> {
+    mapping: &'a HostSelectedRepositoryMapping,
+}
+
+impl<'a> HostRootRepositoryMappingView<'a> {
+    pub fn canonical_repo(self) -> &'a CanonicalRepoName {
+        &self.mapping.context_repo
+    }
+    pub fn mapping_context(self) -> &'a CanonicalRepoName {
+        &self.mapping.context_repo
+    }
+    pub fn mapping(self) -> HostRootRepositoryMappingIter<'a> {
+        HostRootRepositoryMappingIter {
+            order: self.mapping.order.iter(),
+            entries: &self.mapping.entries,
+        }
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone)]
+pub struct HostRootRepositoryMappingIter<'a> {
+    order: std::slice::Iter<'a, ApparentRepoName>,
+    entries: &'a SmallMap<ApparentRepoName, CanonicalRepoName>,
+}
+
+impl<'a> Iterator for HostRootRepositoryMappingIter<'a> {
+    type Item = (&'a ApparentRepoName, &'a CanonicalRepoName);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let name = self.order.next()?;
+        Some((name, self.entries.get(name).expect("valid mapping order")))
+    }
+}
+
+impl ExactSizeIterator for HostRootRepositoryMappingIter<'_> {
+    fn len(&self) -> usize {
+        self.order.len()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum PrivateRootRepositoryMappingError {
+    Predecessor(RetainedExtensionMappings),
+    Compute(CompactString),
+    Invalid {
+        predecessor: RetainedExtensionMappings,
+        reason: RootMappingInvalid,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum RootMappingInvalid {
+    Missing,
+    Duplicate { first: usize, conflicting: usize },
+    Context { ordinal: usize },
+}
+
+fn root_mapping_ordinal(
+    mappings: &HostSelectedExtensionMappings,
+) -> Result<usize, RootMappingInvalid> {
+    let (mut root, mut conflicting) = (None, None);
+    for (ordinal, route) in mappings.routes.entries.iter().enumerate() {
+        if matches!(route.entry.key, HostGraphModuleKey::Root) {
+            if root.is_none() {
+                root = Some(ordinal);
+            } else if conflicting.is_none() {
+                conflicting = Some(ordinal);
+            }
+        }
+    }
+    let root = root.ok_or(RootMappingInvalid::Missing)?;
+    if let Some(conflicting) = conflicting {
+        return Err(RootMappingInvalid::Duplicate {
+            first: root,
+            conflicting,
+        });
+    }
+    mappings
+        .mappings
+        .get(root)
+        .filter(|mapping| mapping.context_repo == CanonicalRepoName::root())
+        .map(|_| root)
+        .ok_or(RootMappingInvalid::Context { ordinal: root })
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRootRepositoryMappingError {
+    workspace: NormalizedAbsolutePath,
+    inner: PrivateRootRepositoryMappingError,
+}
+
+impl fmt::Display for HostRootRepositoryMappingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", self.inner)
+    }
+}
+
+impl std::error::Error for HostRootRepositoryMappingError {}
+
+#[doc(hidden)]
+pub type HostRootRepositoryMappingOutcome = SourcePreparationOutcome<
+    Arc<Result<HostRootRepositoryMapping, HostRootRepositoryMappingError>>,
+>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostRootRepositoryMappingKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostRootRepositoryMappingKey {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostRootRepositoryMappingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "host-root-repository-mapping:{}", self.workspace)
+    }
+}
+
+#[async_trait]
+impl Key for HostRootRepositoryMappingKey {
+    type Value = HostRootRepositoryMappingOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let terminal = |inner| {
+            SourcePreparationOutcome::Complete(Arc::new(Err(HostRootRepositoryMappingError {
+                workspace: self.workspace.clone(),
+                inner,
+            })))
+        };
+        let predecessor = match ctx
+            .compute(&HostSelectedExtensionMappingsKey::new(
+                self.workspace.clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Err(error) => {
+                return terminal(PrivateRootRepositoryMappingError::Compute(
+                    error.to_string().into(),
+                ));
+            }
+        };
+        if predecessor.as_ref().is_err() {
+            return terminal(PrivateRootRepositoryMappingError::Predecessor(predecessor));
+        }
+        let mappings = predecessor.as_ref().as_ref().expect("checked above");
+        let root_ordinal = match root_mapping_ordinal(mappings) {
+            Ok(root) => root,
+            Err(reason) => {
+                return terminal(PrivateRootRepositoryMappingError::Invalid {
+                    predecessor,
+                    reason,
+                });
+            }
+        };
+        SourcePreparationOutcome::Complete(Arc::new(Ok(HostRootRepositoryMapping {
+            predecessor,
+            root_ordinal,
+        })))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
@@ -2813,6 +3014,31 @@ mod tests {
         mapping_context: String,
         mapping: Vec<(String, String)>,
         repo_rule: Option<(String, String, Vec<String>)>,
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct ExternalRootMappingSnapshot {
+        canonical_repo: String,
+        mapping_context: String,
+        mapping: Vec<(String, String)>,
+    }
+
+    fn external_root_mapping_snapshot(
+        mapping: &crate::HostRootRepositoryMapping,
+    ) -> ExternalRootMappingSnapshot {
+        let view: crate::HostRootRepositoryMappingView<'_> = mapping.view().unwrap();
+        let mut entries: crate::HostRootRepositoryMappingIter<'_> = view.mapping();
+        let len = entries.len();
+        let mapping = entries
+            .by_ref()
+            .map(|(name, target)| (name.as_str().to_owned(), target.as_str().to_owned()))
+            .collect::<Vec<_>>();
+        assert_eq!(mapping.len(), len);
+        ExternalRootMappingSnapshot {
+            canonical_repo: view.canonical_repo().as_str().to_owned(),
+            mapping_context: view.mapping_context().as_str().to_owned(),
+            mapping,
+        }
     }
 
     fn external_style_snapshot(
@@ -2883,6 +3109,7 @@ mod tests {
     #[derive(Default)]
     struct SelectedDefinitionTracker {
         selected: Mutex<Vec<(ActivationKind, bool)>>,
+        root_mapping: Mutex<Vec<(ActivationKind, bool)>>,
         forbidden: Mutex<Vec<&'static str>>,
     }
 
@@ -2893,6 +3120,10 @@ mod tests {
 
         fn forbidden(&self) -> Vec<&'static str> {
             self.forbidden.lock().unwrap().clone()
+        }
+
+        fn take_root_mapping(&self) -> Vec<(ActivationKind, bool)> {
+            std::mem::take(&mut *self.root_mapping.lock().unwrap())
         }
     }
 
@@ -2919,6 +3150,12 @@ mod tests {
                     .unwrap()
                     .push((activation.kind(), activation.evaluation_data().is_none()));
             }
+            if key.downcast_ref::<HostRootRepositoryMappingKey>().is_some() {
+                self.root_mapping
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), activation.evaluation_data().is_none()));
+            }
             let forbidden = if key
                 .downcast_ref::<crate::RootRepositoryRouteKey>()
                 .is_some()
@@ -2936,6 +3173,8 @@ mod tests {
                 Some("repository source")
             } else if key.downcast_ref::<RegistryFileKey>().is_some() {
                 Some("registry")
+            } else if key.downcast_ref::<PathObservationEpochKey>().is_some() {
+                Some("filesystem")
             } else {
                 None
             };
@@ -3314,6 +3553,21 @@ mod tests {
         real_transaction(dice, root, generation, &[], include_epoch)
             .await
             .compute(&HostSelectedExtensionMappingsKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    async fn compute_real_root_mapping(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        include_epoch: bool,
+    ) -> crate::HostRootRepositoryMappingOutcome {
+        real_transaction(dice, root, generation, &[], include_epoch)
+            .await
+            .compute(&crate::HostRootRepositoryMappingKey::new(
                 NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
             ))
             .await
@@ -5357,6 +5611,301 @@ repo(name = "replacement")
         let restored = compute_real_extensions(&dice, &source("plain_a"), 3, true).await;
         assert!(HostSelectedExtensionMappingsKey::equality(&a, &restored));
         assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn root_mapping_publication_is_exact_borrowed_and_structural() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let source = |first: &str, reversed: bool, extension_order: bool, operation_order: bool| {
+            let imports = if reversed {
+                format!("second_alias='plain_b', first_alias='{first}'")
+            } else {
+                format!("first_alias='{first}', second_alias='plain_b'")
+            };
+            let extensions = if extension_order {
+                format!(
+                    "three=use_extension(\"//:three.bzl\", \"third\")\n\
+                     use_repo(three, visible_alias=\"visible\")\n\
+                     p=use_extension(\"//:ext.bzl\", \"extension\")\n\
+                     use_repo(p, {imports}, overridden_alias=\"overridden\")"
+                )
+            } else {
+                format!(
+                    "p=use_extension(\"//:ext.bzl\", \"extension\")\n\
+                     use_repo(p, {imports}, overridden_alias=\"overridden\")\n\
+                     three=use_extension(\"//:three.bzl\", \"third\")\n\
+                     use_repo(three, visible_alias=\"visible\")"
+                )
+            };
+            let operations = if operation_order {
+                "inject_repo(three, injected=\"replacement\")\noverride_repo(p, overridden=\"replacement\")"
+            } else {
+                "override_repo(p, overridden=\"replacement\")\ninject_repo(three, injected=\"replacement\")"
+            };
+            format!(
+                r#"
+module(name="bazel_tools", repo_name="root_self")
+local_path_override(module_name='local', path='local')
+bazel_dep(name='local', version='1', repo_name='local_alias')
+{extensions}
+{operations}
+repo=use_repo_rule("//:repo.bzl", "simple_repo")
+repo(name="replacement")
+"#
+            )
+        };
+
+        let baseline = source("plain_a", false, false, false);
+        let predecessor = compute_real_extensions(&dice, &baseline, 80, true).await;
+        assert!(matches!(predecessor, SourcePreparationOutcome::Complete(_)));
+        let tracker = Arc::new(SelectedDefinitionTracker::default());
+        let data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let key = crate::HostRootRepositoryMappingKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let a = dice
+            .updater_with_data(data)
+            .commit()
+            .await
+            .compute(&key)
+            .await
+            .unwrap();
+        assert_eq!(
+            tracker.take_root_mapping(),
+            [(ActivationKind::Evaluated, true)]
+        );
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("root mapping must complete")
+        };
+        let a_value = a_value.as_ref().as_ref().unwrap();
+        let snapshot = external_root_mapping_snapshot(a_value);
+        assert_eq!(
+            (
+                snapshot.canonical_repo.as_str(),
+                snapshot.mapping_context.as_str()
+            ),
+            ("", "")
+        );
+        assert_eq!(
+            snapshot.mapping,
+            [
+                ("", ""),
+                ("root_self", ""),
+                ("local_alias", "local+"),
+                ("first_alias", "+extension+plain_a"),
+                ("second_alias", "+extension+plain_b"),
+                ("overridden_alias", "+simple_repo+replacement"),
+                ("visible_alias", "+third+visible"),
+                ("replacement", "+simple_repo+replacement"),
+            ]
+            .map(|(name, target)| (name.to_owned(), target.to_owned()))
+        );
+        let view = a_value.view().unwrap();
+        let (name, target) = view
+            .mapping()
+            .find(|(name, _)| name.as_str() == "first_alias")
+            .unwrap();
+        let retained = a_value.predecessor.as_ref().as_ref().unwrap();
+        assert!(
+            retained
+                .overrides
+                .iter()
+                .any(|row| row.generated_name == "injected" && !row.must_exist)
+        );
+        assert!(snapshot.mapping.iter().all(|(name, _)| name != "injected"));
+        let retained_mapping = &retained.mappings[a_value.root_ordinal];
+        assert!(std::ptr::eq(
+            target,
+            retained_mapping.entries.get(name).unwrap()
+        ));
+        assert_external_error::<crate::HostRootRepositoryMappingError>();
+
+        let data = UserComputationData {
+            activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let warm = dice
+            .updater_with_data(data)
+            .commit()
+            .await
+            .compute(&key)
+            .await
+            .unwrap();
+        assert!(HostRootRepositoryMappingKey::equality(&a, &warm));
+        assert_eq!(
+            tracker.take_root_mapping(),
+            [(ActivationKind::Reused, true)]
+        );
+        assert!(tracker.forbidden().is_empty());
+
+        let target_b =
+            compute_real_root_mapping(&dice, &source("plain_c", false, false, false), 81, true)
+                .await;
+        assert!(!HostRootRepositoryMappingKey::equality(&a, &target_b));
+        let target_a = compute_real_root_mapping(&dice, &baseline, 82, true).await;
+        assert!(HostRootRepositoryMappingKey::equality(&a, &target_a));
+        let order_b =
+            compute_real_root_mapping(&dice, &source("plain_a", true, false, false), 83, true)
+                .await;
+        let SourcePreparationOutcome::Complete(order_b_value) = &order_b else {
+            panic!("reordered mapping must complete")
+        };
+        assert_eq!(
+            external_root_mapping_snapshot(order_b_value.as_ref().as_ref().unwrap()).mapping[3..5]
+                .iter()
+                .map(|(name, _)| name.as_str())
+                .collect::<Vec<_>>(),
+            ["second_alias", "first_alias"]
+        );
+        assert!(!HostRootRepositoryMappingKey::equality(&a, &order_b));
+        let order_a = compute_real_root_mapping(&dice, &baseline, 84, true).await;
+        assert!(HostRootRepositoryMappingKey::equality(&a, &order_a));
+
+        for (generation, changed) in [
+            (85, source("plain_a", false, true, false)),
+            (87, source("plain_a", false, false, true)),
+            (
+                89,
+                baseline.replace("injected=\"replacement\"", "other=\"replacement\""),
+            ),
+            (
+                91,
+                baseline.replace("repo_name=\"root_self\"", "repo_name=\"other_root\""),
+            ),
+        ] {
+            let b = compute_real_root_mapping(&dice, &changed, generation, true).await;
+            assert!(!HostRootRepositoryMappingKey::equality(&a, &b));
+            let restored = compute_real_root_mapping(&dice, &baseline, generation + 1, true).await;
+            assert!(HostRootRepositoryMappingKey::equality(&a, &restored));
+        }
+
+        let mut empty_source = "module(name='root', repo_name='root_self')\n".to_owned();
+        for name in LOCAL_MODULES {
+            empty_source.push_str(&format!(
+                "local_path_override(module_name='{name}', path='{name}')\n\
+                 bazel_dep(name='{name}', version='1')\n"
+            ));
+        }
+        let empty = compute_real_root_mapping(&dice, &empty_source, 93, true).await;
+        let SourcePreparationOutcome::Complete(empty) = empty else {
+            panic!("empty-extension root mapping must complete")
+        };
+        let empty = external_root_mapping_snapshot(empty.as_ref().as_ref().unwrap());
+        assert_eq!(
+            &empty.mapping[..2],
+            &[("".into(), "".into()), ("root_self".into(), "".into())]
+        );
+        assert!(
+            empty
+                .mapping
+                .iter()
+                .any(|(name, target)| name == "bazel_tools" && target == "bazel_tools")
+        );
+        assert!(
+            empty
+                .mapping
+                .iter()
+                .all(|(_, target)| !target.contains("+extension+"))
+        );
+        assert!(io.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn root_mapping_rejects_corruption_and_preserves_predecessor_terminals() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let outcome = compute_real_extensions(
+            &dice,
+            "module(name='bazel_tools')\nlocal_path_override(module_name='local', path='local')\nbazel_dep(name='local', version='1')\n",
+            90,
+            true,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(value) = outcome else {
+            panic!("mapping predecessor must complete")
+        };
+        let original = value.as_ref().as_ref().unwrap();
+        let root = root_mapping_ordinal(original).unwrap();
+
+        let mut missing = original.clone();
+        missing.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: missing
+                .routes
+                .entries
+                .iter()
+                .filter(|route| !matches!(route.entry.key, HostGraphModuleKey::Root))
+                .cloned()
+                .collect(),
+        });
+        assert_eq!(
+            root_mapping_ordinal(&missing),
+            Err(RootMappingInvalid::Missing)
+        );
+
+        let mut duplicate = original.clone();
+        let mut duplicate_routes = duplicate.routes.entries.to_vec();
+        duplicate_routes.push(duplicate_routes[root].clone());
+        duplicate.routes = Arc::new(HostSelectedModuleRoutes {
+            entries: duplicate_routes.into(),
+        });
+        assert_eq!(
+            root_mapping_ordinal(&duplicate),
+            Err(RootMappingInvalid::Duplicate {
+                first: root,
+                conflicting: duplicate.routes.entries.len() - 1,
+            })
+        );
+
+        let mut context = original.clone();
+        let mut mappings = context.mappings.to_vec();
+        mappings[root].context_repo = CanonicalRepoName::new("wrong+").unwrap();
+        context.mappings = mappings.into();
+        assert_eq!(
+            root_mapping_ordinal(&context),
+            Err(RootMappingInvalid::Context { ordinal: root })
+        );
+
+        let need_io = Arc::new(TrackingRegistryIo::new([(
+            "https://registry.invalid/modules/dep/1/MODULE.bazel",
+            b"module(name='dep', version='1')\n" as &[u8],
+        )]));
+        let mut need_builder = Dice::builder();
+        crate::install_registry_io(&mut need_builder, need_io);
+        let need_dice = Arc::new(need_builder.build(DetectCycles::Enabled));
+        let need = compute_real_root_mapping(
+            &need_dice,
+            "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n",
+            91,
+            false,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostRootRepositoryMappingKey::validity(&need));
+        assert!(!HostRootRepositoryMappingKey::equality(&need, &need));
+        let error = compute_real_root_mapping(
+            &dice,
+            "module(name='bazel_tools')\nbazel_dep(name='missing', version='1')\n",
+            92,
+            true,
+        )
+        .await;
+        assert!(matches!(
+            error,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    &value.as_ref().as_ref().unwrap_err().inner,
+                    PrivateRootRepositoryMappingError::Predecessor(predecessor)
+                        if predecessor.as_ref().is_err()
+                )
+        ));
     }
 
     #[tokio::test]
