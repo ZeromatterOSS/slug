@@ -26,13 +26,68 @@ use crate::module_extension_repository_instantiation::HostInstantiatedModuleExte
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesForRequest;
 use crate::module_extension_repository_instantiation::HostInstantiatedModuleExtensionRepositoriesKey;
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) struct HostValidatedModuleExtensionRepositories {
+pub struct HostValidatedGeneratedRepositorySpecs {
     predecessor: Arc<HostInstantiatedModuleExtensionRepositories>,
 }
+struct GeneratedSpecIter<'a> {
+    extensions: &'a [HostInstantiatedModuleExtensionRepositoriesForRequest],
+    extension: usize,
+    repository: usize,
+    remaining: usize,
+}
+
+impl HostValidatedGeneratedRepositorySpecs {
+    pub fn iter(
+        &self,
+    ) -> impl ExactSizeIterator<
+        Item = (
+            &slug_identity_v2::CanonicalRepoName,
+            &slug_bzlmod_v2::RepoSpec,
+        ),
+    > {
+        let extensions = self.predecessor.parts().1;
+        GeneratedSpecIter {
+            extensions,
+            extension: 0,
+            repository: 0,
+            remaining: extensions
+                .iter()
+                .map(|extension| extension.parts().1.len())
+                .sum(),
+        }
+    }
+}
+
+impl<'a> Iterator for GeneratedSpecIter<'a> {
+    type Item = (
+        &'a slug_identity_v2::CanonicalRepoName,
+        &'a slug_bzlmod_v2::RepoSpec,
+    );
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Some(extension) = self.extensions.get(self.extension) {
+            if let Some(repository) = extension.parts().1.get(self.repository) {
+                self.repository += 1;
+                self.remaining -= 1;
+                return Some(repository.spec_parts());
+            }
+            self.extension += 1;
+            self.repository = 0;
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+
+impl ExactSizeIterator for GeneratedSpecIter<'_> {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-pub(crate) enum HostValidatedModuleExtensionRepositoriesError {
+pub(crate) enum PrivateValidationError {
     Instantiation(HostInstantiatedModuleExtensionRepositoriesError),
     InstantiationCompute(CompactString),
     Join {
@@ -61,21 +116,28 @@ pub(crate) enum HostModuleExtensionValidationError {
     InjectCollision,
 }
 
-impl fmt::Display for HostValidatedModuleExtensionRepositoriesError {
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostValidatedGeneratedRepositorySpecsError {
+    inner: PrivateValidationError,
+}
+
+impl fmt::Display for HostValidatedGeneratedRepositorySpecsError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{self:?}")
+        write!(f, "{:?}", self.inner)
     }
 }
 
-impl std::error::Error for HostValidatedModuleExtensionRepositoriesError {}
+impl std::error::Error for HostValidatedGeneratedRepositorySpecsError {}
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-pub(crate) struct HostValidatedModuleExtensionRepositoriesKey {
+pub struct HostValidatedModuleExtensionRepositoriesKey {
     workspace: NormalizedAbsolutePath,
 }
 
 impl HostValidatedModuleExtensionRepositoriesKey {
-    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self { workspace }
     }
 }
@@ -90,27 +152,23 @@ impl fmt::Display for HostValidatedModuleExtensionRepositoriesKey {
     }
 }
 
-type ValidationOutcome = SourcePreparationOutcome<
-    Arc<
-        Result<
-            HostValidatedModuleExtensionRepositories,
-            HostValidatedModuleExtensionRepositoriesError,
-        >,
-    >,
+#[doc(hidden)]
+pub type HostValidatedGeneratedRepositorySpecsOutcome = SourcePreparationOutcome<
+    Arc<Result<HostValidatedGeneratedRepositorySpecs, HostValidatedGeneratedRepositorySpecsError>>,
 >;
 
 fn complete(
     value: Result<
-        HostValidatedModuleExtensionRepositories,
-        HostValidatedModuleExtensionRepositoriesError,
+        HostValidatedGeneratedRepositorySpecs,
+        HostValidatedGeneratedRepositorySpecsError,
     >,
-) -> ValidationOutcome {
+) -> HostValidatedGeneratedRepositorySpecsOutcome {
     SourcePreparationOutcome::Complete(Arc::new(value))
 }
 
 #[async_trait]
 impl Key for HostValidatedModuleExtensionRepositoriesKey {
-    type Value = ValidationOutcome;
+    type Value = HostValidatedGeneratedRepositorySpecsOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
         let predecessor = match ctx
@@ -125,20 +183,21 @@ impl Key for HostValidatedModuleExtensionRepositoriesKey {
             Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
                 Ok(value) => Arc::new(value.clone()),
                 Err(error) => {
-                    return complete(Err(
-                        HostValidatedModuleExtensionRepositoriesError::Instantiation(error.clone()),
-                    ));
+                    return complete(Err(HostValidatedGeneratedRepositorySpecsError {
+                        inner: PrivateValidationError::Instantiation(error.clone()),
+                    }));
                 }
             },
             Err(error) => {
-                return complete(Err(
-                    HostValidatedModuleExtensionRepositoriesError::InstantiationCompute(
-                        error.to_string().into(),
-                    ),
-                ));
+                return complete(Err(HostValidatedGeneratedRepositorySpecsError {
+                    inner: PrivateValidationError::InstantiationCompute(error.to_string().into()),
+                }));
             }
         };
-        complete(validate_repositories(predecessor))
+        complete(
+            validate_repositories(predecessor)
+                .map_err(|inner| HostValidatedGeneratedRepositorySpecsError { inner }),
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -152,11 +211,10 @@ impl Key for HostValidatedModuleExtensionRepositoriesKey {
 
 fn validate_repositories(
     predecessor: Arc<HostInstantiatedModuleExtensionRepositories>,
-) -> Result<HostValidatedModuleExtensionRepositories, HostValidatedModuleExtensionRepositoriesError>
-{
+) -> Result<HostValidatedGeneratedRepositorySpecs, PrivateValidationError> {
     let (invocations, extensions) = predecessor.parts();
     if invocations.invoked.len() != extensions.len() {
-        return Err(HostValidatedModuleExtensionRepositoriesError::Join {
+        return Err(PrivateValidationError::Join {
             predecessor,
             message: "invoked and instantiated extension counts differ".into(),
         });
@@ -170,7 +228,7 @@ fn validate_repositories(
     {
         let (request, repositories) = current.parts();
         if receipt.request != *request {
-            return Err(HostValidatedModuleExtensionRepositoriesError::Join {
+            return Err(PrivateValidationError::Join {
                 predecessor,
                 message: "invoked and instantiated extension requests differ".into(),
             });
@@ -219,7 +277,7 @@ fn validate_repositories(
         }
     }
 
-    Ok(HostValidatedModuleExtensionRepositories { predecessor })
+    Ok(HostValidatedGeneratedRepositorySpecs { predecessor })
 }
 
 fn validation_error(
@@ -228,8 +286,8 @@ fn validation_error(
     current: &HostInstantiatedModuleExtensionRepositoriesForRequest,
     offender: HostModuleExtensionValidationOffender,
     error: HostModuleExtensionValidationError,
-) -> HostValidatedModuleExtensionRepositoriesError {
-    HostValidatedModuleExtensionRepositoriesError::Validation {
+) -> PrivateValidationError {
+    PrivateValidationError::Validation {
         predecessor,
         validated,
         current: current.clone(),
@@ -252,6 +310,7 @@ mod tests {
     use dice::Key;
     use dice::RichActivation;
     use dice::UserComputationData;
+    use slug_bzlmod_v2::OverrideAttributeValue;
     use slug_bzlmod_v2::RegistryFileKey;
     use slug_bzlmod_v2::RepositoryMaterializationKey;
     use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -306,7 +365,10 @@ ext=module_extension(implementation=impl)
         }
     }
 
-    async fn compute(dice: &Arc<Dice>, module: &str) -> ValidationOutcome {
+    async fn compute(
+        dice: &Arc<Dice>,
+        module: &str,
+    ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction_untracked(dice, module, EXTENSION, true)
             .await
             .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
@@ -319,7 +381,7 @@ ext=module_extension(implementation=impl)
         dice: &Arc<Dice>,
         module: &str,
         extension: &str,
-    ) -> ValidationOutcome {
+    ) -> HostValidatedGeneratedRepositorySpecsOutcome {
         transaction_untracked(dice, module, extension, true)
             .await
             .compute(&HostValidatedModuleExtensionRepositoriesKey::new(
@@ -334,6 +396,14 @@ ext=module_extension(implementation=impl)
             "module(name='bazel_tools')\ne=use_extension('//:ext.bzl','ext')\n{imports}\n{directive}\n"
         )
     }
+    fn external_style_view(
+        value: &crate::HostValidatedGeneratedRepositorySpecs,
+    ) -> Vec<(String, String)> {
+        let rows = value.iter();
+        assert_eq!(rows.len(), rows.size_hint().0);
+        rows.map(|(name, spec)| (name.as_str().to_owned(), spec.rule_id.rule_name.to_string()))
+            .collect()
+    }
 
     #[tokio::test]
     async fn real_validation_orders_imports_before_polarity_and_restores() {
@@ -346,6 +416,14 @@ ext=module_extension(implementation=impl)
         ));
         assert!(HostValidatedModuleExtensionRepositoriesKey::validity(&a));
         assert!(matches!(a, SourcePreparationOutcome::Complete(ref value) if value.is_ok()));
+        let SourcePreparationOutcome::Complete(value) = &a else {
+            panic!("validation must complete")
+        };
+        let rows = external_style_view(value.as_ref().as_ref().unwrap());
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().all(|(_, rule)| rule == "repo"));
+        assert!(rows[0].0.ends_with("+first"));
+        assert!(rows[1].0.ends_with("+second"));
 
         let missing = compute(
             &dice,
@@ -360,10 +438,10 @@ ext=module_extension(implementation=impl)
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                    Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                         error: HostModuleExtensionValidationError::MissingImport,
                         ..
-                    })
+                    } })
                 )
         ));
 
@@ -380,10 +458,10 @@ ext=module_extension(implementation=impl)
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                    Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                         error: HostModuleExtensionValidationError::MissingOverride,
                         ..
-                    })
+                    } })
                 )
         ));
 
@@ -394,10 +472,10 @@ ext=module_extension(implementation=impl)
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                    Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                         error: HostModuleExtensionValidationError::MissingOverride,
                         ..
-                    })
+                    } })
                 )
         ));
 
@@ -408,10 +486,10 @@ ext=module_extension(implementation=impl)
             SourcePreparationOutcome::Complete(value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                    Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                         error: HostModuleExtensionValidationError::InjectCollision,
                         ..
-                    })
+                    } })
                 )
         ));
 
@@ -421,6 +499,119 @@ ext=module_extension(implementation=impl)
         ));
     }
 
+    #[tokio::test]
+    async fn public_view_retains_overridden_rows_full_specs_and_request_order() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let module = |swap: bool, generated: &str| {
+            let alpha = format!(
+                "a=use_extension('//:ext.bzl','alpha')\noverride_repo(a, {generated}='bazel_tools')\n"
+            );
+            let beta = "b=use_extension('//:ext.bzl','beta')\n";
+            format!(
+                "module(name='bazel_tools')\n{}{}",
+                if swap { beta } else { &alpha },
+                if swap { &alpha } else { beta },
+            )
+        };
+        let source = |rule: &str, attr: &str, value: &str, target: &str, target_first: bool| {
+            let kwargs = if target_first {
+                format!("target='{target}', {attr}='{value}'")
+            } else {
+                format!("{attr}='{value}', target='{target}'")
+            };
+            format!(
+                r#"alpha_rule=repository_rule(lambda ctx: None, attrs={{'{attr}':attr.string(),'target':attr.label()}})
+beta_rule=repository_rule(lambda ctx: None, attrs={{'count':attr.int(),'target':attr.label()}})
+def alpha_impl(ctx):
+    {rule}(name='first', {kwargs})
+    {rule}(name='second', {attr}='two', target='@first//:item')
+def beta_impl(ctx):
+    beta_rule(name='third', count=3, target='@third//:item')
+alpha=module_extension(implementation=alpha_impl)
+beta=module_extension(implementation=beta_impl)
+"#
+            )
+        };
+        let baseline_module = module(false, "first");
+        let baseline_source = source("alpha_rule", "text", "one", "@second//:item", false);
+        let a = compute_with_extension(&dice, &baseline_module, &baseline_source).await;
+        let SourcePreparationOutcome::Complete(value) = &a else {
+            panic!("publication must complete")
+        };
+        let rows = value.as_ref().as_ref().unwrap().iter().collect::<Vec<_>>();
+        assert_eq!(rows.len(), 3);
+        assert!(rows[0].0.as_str().ends_with("+first"));
+        assert!(rows[1].0.as_str().ends_with("+second"));
+        assert!(rows[2].0.as_str().ends_with("+third"));
+        assert_eq!(rows[0].1.rule_id.rule_name, "alpha_rule");
+        assert_eq!(rows[2].1.rule_id.rule_name, "beta_rule");
+        assert!(
+            rows[0]
+                .1
+                .rule_id
+                .bzl_file
+                .to_string()
+                .ends_with("//:ext.bzl")
+        );
+        assert_eq!(
+            rows[0]
+                .1
+                .attributes
+                .keys()
+                .map(|name| name.as_str())
+                .collect::<Vec<_>>(),
+            ["text", "target"]
+        );
+        assert_eq!(
+            rows[0].1.attributes.get("text"),
+            Some(&OverrideAttributeValue::String("one".into()))
+        );
+        assert!(matches!(
+            rows[0].1.attributes.get("target"),
+            Some(OverrideAttributeValue::Label(label))
+                if label.to_string().contains("+second//:item")
+        ));
+
+        let variants = [
+            (
+                module(false, "renamed"),
+                source("alpha_rule", "text", "one", "@second//:item", false)
+                    .replace("name='first'", "name='renamed'"),
+            ),
+            (
+                baseline_module.clone(),
+                source("renamed_rule", "text", "one", "@second//:item", false)
+                    .replace("alpha_rule=", "renamed_rule="),
+            ),
+            (
+                baseline_module.clone(),
+                source("alpha_rule", "message", "one", "@second//:item", false),
+            ),
+            (
+                baseline_module.clone(),
+                source("alpha_rule", "text", "changed", "@second//:item", false),
+            ),
+            (
+                baseline_module.clone(),
+                source("alpha_rule", "text", "one", "@second//:item", true),
+            ),
+            (
+                baseline_module.clone(),
+                source("alpha_rule", "text", "one", "@first//:item", false),
+            ),
+            (module(true, "first"), baseline_source.clone()),
+        ];
+        for (variant_module, variant_source) in variants {
+            let changed = compute_with_extension(&dice, &variant_module, &variant_source).await;
+            assert!(!HostValidatedModuleExtensionRepositoriesKey::equality(
+                &a, &changed
+            ));
+            let restored = compute_with_extension(&dice, &baseline_module, &baseline_source).await;
+            assert!(HostValidatedModuleExtensionRepositoriesKey::equality(
+                &a, &restored
+            ));
+        }
+    }
     #[tokio::test]
     async fn success_boundaries_and_structural_identity_restore() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
@@ -469,11 +660,11 @@ ext=module_extension(implementation=impl)
                 SourcePreparationOutcome::Complete(value)
                     if matches!(
                         value.as_ref(),
-                        Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                        Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                             offender: HostModuleExtensionValidationOffender::Import(import),
                             error: HostModuleExtensionValidationError::MissingImport,
                             ..
-                        }) if import.parts().0 == expected
+                        } }) if import.parts().0 == expected
                     )
             ));
         }
@@ -546,12 +737,12 @@ ext=module_extension(implementation=impl)
                 SourcePreparationOutcome::Complete(value)
                     if matches!(
                         value.as_ref(),
-                        Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                        Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                             validated: 0,
                             offender: HostModuleExtensionValidationOffender::Import(import),
                             error: HostModuleExtensionValidationError::MissingImport,
                             ..
-                        }) if import.parts().0 == "local"
+                        } }) if import.parts().0 == "local"
                             && import.parts().1 == exported
                             && import.parts().2.start_column == column
                     )
@@ -606,12 +797,12 @@ ext=module_extension(implementation=impl)
                 SourcePreparationOutcome::Complete(value)
                     if matches!(
                         value.as_ref(),
-                        Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                        Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                             validated: 0,
                             offender: HostModuleExtensionValidationOffender::Override(row),
                             error: HostModuleExtensionValidationError::MissingOverride,
                             ..
-                        }) if row.parts().0 == name
+                        } }) if row.parts().0 == name
                             && row.parts().2
                             && row.location().start_line == line
                     )
@@ -640,11 +831,11 @@ ext=module_extension(implementation=impl)
             SourcePreparationOutcome::Complete(ref value)
                 if matches!(
                     value.as_ref(),
-                    Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+                    Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                         offender: HostModuleExtensionValidationOffender::Override(row),
                         error: HostModuleExtensionValidationError::InjectCollision,
                         ..
-                    }) if row.parts().0 == "first" && !row.parts().2
+                    } }) if row.parts().0 == "first" && !row.parts().2
                 )
         ));
         assert!(!HostValidatedModuleExtensionRepositoriesKey::equality(
@@ -699,12 +890,12 @@ second=module_extension(implementation=impl)
         };
         assert!(matches!(
             value.as_ref(),
-            Err(HostValidatedModuleExtensionRepositoriesError::Validation {
+            Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Validation {
                 validated: 1,
                 offender: HostModuleExtensionValidationOffender::Import(import),
                 error: HostModuleExtensionValidationError::MissingImport,
                 ..
-            }) if import.parts().0 == "bad" && import.parts().1 == "missing"
+            } }) if import.parts().0 == "bad" && import.parts().1 == "missing"
         ));
         let reused = transaction.compute(&key).await.unwrap();
         assert!(HostValidatedModuleExtensionRepositoriesKey::equality(
@@ -747,14 +938,14 @@ second=module_extension(implementation=impl)
             validate_repositories(Arc::new(predecessor.with_truncated_extensions_for_test()));
         assert!(matches!(
             count,
-            Err(HostValidatedModuleExtensionRepositoriesError::Join { ref message, .. })
+            Err(PrivateValidationError::Join { ref message, .. })
                 if message.contains("counts differ")
         ));
 
         let request = validate_repositories(Arc::new(predecessor.with_swapped_requests_for_test()));
         assert!(matches!(
             request,
-            Err(HostValidatedModuleExtensionRepositoriesError::Join { ref message, .. })
+            Err(PrivateValidationError::Join { ref message, .. })
                 if message.contains("requests differ")
         ));
     }
@@ -818,7 +1009,7 @@ second=module_extension(implementation=impl)
             SourcePreparationOutcome::Complete(result)
                 if matches!(
                     result.as_ref(),
-                    Err(HostValidatedModuleExtensionRepositoriesError::Instantiation(_))
+                    Err(HostValidatedGeneratedRepositorySpecsError { inner: PrivateValidationError::Instantiation(_) })
                 )
         ));
     }

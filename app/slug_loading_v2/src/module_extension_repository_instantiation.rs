@@ -103,6 +103,10 @@ impl HostInstantiatedModuleExtensionRepository {
     pub(crate) fn generated_name(&self) -> &str {
         &self.generated_name
     }
+
+    pub(crate) fn spec_parts(&self) -> (&CanonicalRepoName, &RepoSpec) {
+        (&self.canonical_name, &self.repo_spec)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]

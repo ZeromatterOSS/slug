@@ -52,6 +52,14 @@ pub use bzl_module::discover_build_file_companion;
 pub use cycle_detector::bzl_load_cycle_detector;
 pub use glob::GlobSpec;
 pub use glob::PackageListing;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecs;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecsError;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostValidatedGeneratedRepositorySpecsOutcome;
+#[doc(hidden)]
+pub use module_extension_repository_validation::HostValidatedModuleExtensionRepositoriesKey;
 pub use package::LoadedPackage;
 pub use package::NativeTargetAttributes;
 pub use package::PackageTarget;
