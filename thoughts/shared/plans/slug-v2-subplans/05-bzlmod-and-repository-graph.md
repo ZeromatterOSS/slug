@@ -2800,3 +2800,33 @@ in the accepted three loading paths plus four ledgers under 320/650/970.
 Stage 5 production remains unchanged; no Bzlmod edit/reverse edge, route,
 publication, execution/context, I/O/materializer/lockfile/consumer/API/JVM
 breadth.
+
+### Loading validation accepted; generated-spec publication boundary scheduled (2026-08-12)
+
+Independent review accepts loading commit `b2a153aa`. Stage 5 production is
+unchanged: Bzlmod continues to own selected mappings, repository routes, and
+materialization and may not depend back on loading.
+
+Run only the four-plan docs packet
+`WP-4-5-host-validated-generated-repository-spec-publication-design` under
+40/240/200/180/660. Audit a hidden heap-independent borrowed view of loading's
+validated canonical-name/`RepoSpec` certificate so a later dependency-neutral
+consumer can compose it with Bzlmod routes. No Bzlmod Rust, new DICE key, copied
+row store, route/mapping publication, source preparation/materialization,
+repository execution/I/O, lockfile, consumer/API, or JVM work resumes. Any
+future successor is limited to the three loading files under mandatory
+220/420/640 only after independent design acceptance and activation.
+
+### Hidden generated-spec boundary frozen without Stage 5 mutation (2026-08-12)
+
+Pinned validation returns eval-only generated `RepoSpec` rows unchanged;
+override/inject substitutions affect later mappings and lookup, not the
+generated row or its canonical prefix-plus-name identity. Stage 5 remains
+unchanged and may not depend on loading.
+
+The future loading-only successor exports the existing validation key plus
+opaque hidden success/error wrappers. Borrowed iteration exposes only
+`(&CanonicalRepoName, &RepoSpec)` in request/call order and duplicates no
+store. Only a later higher `slug_server_v2` composition owner may consume both
+loading and Bzlmod. Exact three-file 220/420/640 limits and all no-route,
+no-materialization, no-execution/I/O, no-public-API/JVM stops remain.

@@ -2733,3 +2733,38 @@ module, and private lib.rs declaration plus four ledgers, under mandatory
 320/650/970. Preserve import-before-polarity order, predecessor-only success,
 typed exact terminals, zero events/I/O, and every route/materialization/public
 boundary.
+
+### Generated-repository validation accepted; hidden spec publication design scheduled (2026-08-12)
+
+Independent review accepts `b2a153aa` within 320/650/970. The private loading
+owner computes only instantiation, exact-joins requests, validates aggregated
+imports before override/inject polarity, retains predecessor-only success and
+typed contextual terminals, and activates no registry or materializer key.
+Full all-target loading and Bzlmod suites pass.
+
+Run only the four-plan docs packet
+`WP-4-5-host-validated-generated-repository-spec-publication-design` under
+40/240/200/180/660. Audit a `#[doc(hidden)]` borrowed projection over the
+existing validation certificate and retained canonical-name/`RepoSpec` rows.
+Freeze at most the validation module, instantiation module for narrow borrowed
+accessors, and `lib.rs` hidden exports under mandatory 220/420/640. Add no
+new key, copied catalog, Bzlmod edit/reverse edge, route, mapping publication,
+repository execution/context, I/O/materialization, lockfile, consumer/API, or
+JVM breadth. REPLAN if pinned override publication or callable lifetime cannot
+be separated from routing/execution.
+
+### Validated generated-spec hidden ABI frozen (2026-08-12)
+
+Pinned `SingleExtensionFunction` returns the eval-only value unchanged after
+validation; generated rows, including overridden rows, retain their original
+generated canonical identity and `RepoSpec`. Override substitutions remain a
+later mapping/lookup concern. Freeze the existing validation key as the sole
+hidden public key with success wrapper
+`HostValidatedGeneratedRepositorySpecs` and opaque
+`HostValidatedGeneratedRepositorySpecsError`. Success borrows exact
+`(&CanonicalRepoName, &RepoSpec)` rows in request/call order from the private
+certificate; the error wrapper exposes no private terminal fields. A later
+`slug_server_v2` owner may depend on both loading and Bzlmod; no lower-core or
+Bzlmod reverse dependency is permitted. Future Rust is exactly the validation,
+narrow instantiation-accessor, and hidden `lib.rs` export files under
+mandatory 220/420/640; all existing route/execution/I/O/public stops remain.
