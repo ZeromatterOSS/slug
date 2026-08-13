@@ -2883,3 +2883,18 @@ mandatory 280/520/800. Stage 5 production remains unchanged. No
 `RootRepositoryRoute` widening, selected-state reconstruction, Bzlmod/server
 edit, route/materializer, I/O, lockfile, consumer/API, or JVM work is
 authorized.
+
+### Canonical generated-definition lookup moves to core design (2026-08-12)
+
+Loading publication `b9a4a3fc` now carries every exact canonical definition
+fact needed before route lookup. Core already depends on both loading and
+Bzlmod and owns workspace DICE/materialization orchestration; locating this
+semantic key in server would strand one-shot consumers and mix graph ownership
+with transport.
+
+Run only `WP-4-5-6-host-generated-repository-definition-lookup-owner-design`
+in four plans under 45/260/220/220/745 caps. Freeze a private core key in one
+new runtime module plus private `runtime/mod.rs` declaration under future
+mandatory 260/480/740 after acceptance/activation. Stage 5 production remains
+unchanged. No Bzlmod/loading/server edit, apparent route, `RootRepositoryRoute`,
+source/materializer/I/O, lockfile, consumer/API, or JVM work is authorized.

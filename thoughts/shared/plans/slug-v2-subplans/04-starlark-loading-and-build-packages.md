@@ -2824,3 +2824,20 @@ exports and four ledgers, under mandatory 280/520/800 against `9e12fe58`.
 Preserve one shared mapping-entry allocation per request, row-specific context,
 the no-copy hidden iterator, original generated `RepoSpec`, all proof, and all
 no-route/Bzlmod/server/execution/I/O/materialization/public/JVM stops.
+
+### Generated mapping accepted; core definition-lookup design scheduled (2026-08-12)
+
+Independent review accepts loading mapping publication `b9a4a3fc`. The hidden
+certificate now provides canonical/internal identity, original `RepoSpec`, and
+exact shared mapping/context without copying. The next owner is core, which
+already depends on loading and Bzlmod and owns workspace DICE; server remains
+the daemon/wire adapter.
+
+Run only the four-plan docs packet
+`WP-4-5-6-host-generated-repository-definition-lookup-owner-design` under
+45/260/220/220/745 documentation caps. Freeze a private core canonical lookup
+over the sole validation key with a future exact two-file 260/480/740 ceiling,
+complete-scan uniqueness, borrowed no-copy result, proof, and stops. Stage 4
+production remains unchanged; apparent routing, repository execution/context,
+source/materialization/I/O, lockfile, command/wire API, and JVM remain
+forbidden.
