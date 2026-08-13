@@ -3495,3 +3495,18 @@ Independent review accepts design `b9cffe52`. Implement only existing Bzlmod
 owned capability/disposition and borrowed view, proof, and every no-path/result/
 Need/source/package/loading/core/command/public/I/O/JVM stop. Stage 5 stays
 unchanged.
+
+### Repository source input accepted; core five-domain owner designed (2026-08-13)
+
+Independent review accepts `f7566280` at 70/145/215 formatted Rust lines and
+11,397/361 physical lines; focused proof and full Bzlmod/loading validation
+pass. Run only four-ledger docs packet
+`WP-4-5-6-host-root-apparent-repository-source-input-owner-design` under
+40/300/220/220/780. Freeze a private Need-aware core owner over the accepted
+root-apparent carrier and accepted Bzlmod certificate, retaining the complete
+predecessor and projecting Main or Input once. Future Rust is exactly a new
+cohesive core module, minimal `pub(super)` carrier seam, and private mod line
+under 320/650/970 with 1,100/800 ceilings. Defer paths, legacy demand scope,
+materialization results, Builtin bytes, source/package/loading/command/public
+behavior, I/O, custom/generated rule admission, reverse dependencies, and JVM
+work. Stage 5 remains unchanged.
