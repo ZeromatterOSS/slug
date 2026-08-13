@@ -3017,3 +3017,13 @@ external-style Bzlmod key/view suite; require core real Root,
 SelectedNonregistry, Generated, terminal/Need/fallback/lifecycle proof plus a
 pure exhaustive same-canonical branch matrix. Retain the one-file r2 successor
 and 260/520/780 caps. Authorize no Rust until acceptance and r2 activation.
+
+### Corrected canonical definition composition implementation activated (2026-08-12)
+
+Independent review accepts proof correction `63fedad6`. Run only
+`WP-4-5-6-host-canonical-repository-definition-composition-owner-implementation-r2`
+in existing core `generated_repository_definition.rs` with colocated tests and
+four ledgers under 260/520/780 against `e05a0dfc`. Preserve the corrected
+inherited-registry/core-real proof split, selected-first Missing-only behavior,
+no-copy ownership, compatibility, and stops. Stage 4 production remains
+unchanged; no second Rust file or adjacent breadth is authorized.
