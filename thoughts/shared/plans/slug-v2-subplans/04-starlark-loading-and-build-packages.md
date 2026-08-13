@@ -2696,3 +2696,12 @@ Run only the four-plan docs packet
 corrected three-file successor under 260/450/710. No loading Rust, validator,
 routes, execution/I/O/materialization/lockfile/consumer/API/JVM work resumes
 before independent acceptance and activation.
+
+### Extension import-order identity implementation activated (2026-08-12)
+
+Independent review accepts `f14d3d7a`. Run only
+`WP-5-extension-import-order-identity-owner-implementation` in
+`interim_module.rs`, `selected_repo_spec.rs`, and hidden `lib.rs`
+accessors plus four ledgers, under 260/450/710. Stage 4 production remains
+unchanged; no validator/routes/execution/I/O/materializer/lockfile/consumer/
+API/JVM breadth.

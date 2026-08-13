@@ -1354,6 +1354,7 @@ struct HostSelectedExtensionUsage {
     id: HostSelectedExtensionId,
     unique_name: CanonicalRepoName,
     imports: Arc<SmallMap<ApparentRepoName, CanonicalRepoName>>,
+    validation_imports: Arc<[HostSelectedExtensionDefinitionImport]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1362,6 +1363,7 @@ struct HostSelectedExtensionOverride {
     generated_name: CompactString,
     replacement: CanonicalRepoName,
     must_exist: bool,
+    location: crate::LogicalSpan,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -1623,8 +1625,27 @@ fn selected_extension_mappings(
             .position(|candidate| candidate.entry.key == *input.owner)
             .expect("selected owner route index exists");
         let mut imports = SmallMap::new();
+        let mut validation_imports = Vec::new();
         for proxy in input.proxies {
-            for (local, exported) in proxy.imports.local_to_exported.iter() {
+            if proxy.imports.local_order.len() != proxy.imports.local_to_exported.len() {
+                return Err(extension_invalid(
+                    input.owner,
+                    "extension import order and mapping differ",
+                ));
+            }
+            for (index, local) in proxy.imports.local_order.iter().enumerate() {
+                if proxy.imports.local_order[..index].contains(local) {
+                    return Err(extension_invalid(
+                        input.owner,
+                        "extension import order contains a duplicate local name",
+                    ));
+                }
+                let exported = proxy.imports.local_to_exported.get(local).ok_or_else(|| {
+                    extension_invalid(
+                        input.owner,
+                        "extension import order references a missing mapping",
+                    )
+                })?;
                 let canonical = generated_repo(input.owner, &unique_name, exported)?;
                 insert_mapping(
                     input.owner,
@@ -1636,6 +1657,11 @@ fn selected_extension_mappings(
                 let apparent = ApparentRepoName::new(local.as_str())
                     .map_err(|message| extension_invalid(input.owner, message))?;
                 imports.insert(apparent, canonical);
+                validation_imports.push(HostSelectedExtensionDefinitionImport {
+                    local_name: local.clone(),
+                    generated_name: exported.clone(),
+                    location: proxy.location.clone(),
+                });
             }
         }
         if input.root {
@@ -1653,6 +1679,7 @@ fn selected_extension_mappings(
             id,
             unique_name,
             imports: Arc::new(imports),
+            validation_imports: validation_imports.into(),
         });
     }
     drop(route_by_owner);
@@ -1688,6 +1715,7 @@ fn selected_extension_mappings(
             generated_name: generated,
             replacement: target,
             must_exist: replacement.must_exist,
+            location: replacement.location,
         });
     }
     let base_mappings = routes
@@ -1794,7 +1822,22 @@ pub struct HostSelectedExtensionDefinitionLoadRequest {
     unique_name: CanonicalRepoName,
     base_mapping: HostSelectedRepositoryMapping,
     mapping: HostSelectedRepositoryMapping,
+    imports: Arc<[HostSelectedExtensionDefinitionImport]>,
     overrides: Arc<[HostSelectedExtensionDefinitionOverride]>,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionDefinitionImport {
+    local_name: CompactString,
+    generated_name: CompactString,
+    location: crate::LogicalSpan,
+}
+
+impl HostSelectedExtensionDefinitionImport {
+    pub fn parts(&self) -> (&str, &str, &crate::LogicalSpan) {
+        (&self.local_name, &self.generated_name, &self.location)
+    }
 }
 
 #[doc(hidden)]
@@ -1803,11 +1846,16 @@ pub struct HostSelectedExtensionDefinitionOverride {
     generated_name: CompactString,
     replacement: CanonicalRepoName,
     must_exist: bool,
+    location: crate::LogicalSpan,
 }
 
 impl HostSelectedExtensionDefinitionOverride {
     pub fn parts(&self) -> (&str, &CanonicalRepoName, bool) {
         (&self.generated_name, &self.replacement, self.must_exist)
+    }
+
+    pub fn location(&self) -> &crate::LogicalSpan {
+        &self.location
     }
 }
 
@@ -1842,6 +1890,15 @@ impl HostSelectedExtensionDefinitionLoadRequest {
             &self.base_mapping.entries,
             &self.overrides,
         )
+    }
+
+    pub fn validation_parts(
+        &self,
+    ) -> (
+        &[HostSelectedExtensionDefinitionImport],
+        &[HostSelectedExtensionDefinitionOverride],
+    ) {
+        (&self.imports, &self.overrides)
     }
 }
 
@@ -1968,6 +2025,12 @@ fn selected_extension_definition_load_requests(
             continue;
         }
         seen.insert(usage.id.clone(), usage.unique_name.clone());
+        let imports = predecessor
+            .usages
+            .iter()
+            .filter(|candidate| candidate.id == usage.id)
+            .flat_map(|candidate| candidate.validation_imports.iter().cloned())
+            .collect::<Arc<_>>();
         let overrides = predecessor
             .overrides
             .iter()
@@ -1976,6 +2039,7 @@ fn selected_extension_definition_load_requests(
                 generated_name: candidate.generated_name.clone(),
                 replacement: candidate.replacement.clone(),
                 must_exist: candidate.must_exist,
+                location: candidate.location.clone(),
             })
             .collect::<Arc<_>>();
         requests.push(HostSelectedExtensionDefinitionLoadRequest {
@@ -1984,6 +2048,7 @@ fn selected_extension_definition_load_requests(
             unique_name: usage.unique_name.clone(),
             base_mapping: root_base_mapping.clone(),
             mapping: root_mapping.clone(),
+            imports,
             overrides,
         });
     }
@@ -2454,7 +2519,7 @@ mod tests {
         )
     }
 
-    fn host_epoch() -> PathObservationEpoch {
+    fn host_epoch(local_module: Option<&str>) -> PathObservationEpoch {
         let lock = format!("{WORKSPACE}/MODULE.bazel.lock");
         let lstat = |path: &str, kind, id| {
             (
@@ -2498,7 +2563,9 @@ mod tests {
                     observation(&module, PathObservationOperation::FileBytes),
                     PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
                         if name == "local" {
-                            b"module(name='local')\np=use_extension('//:local.bzl','shared')\nuse_repo(p,'generated')\n".to_vec()
+                            local_module.unwrap_or(
+                                "module(name='local')\np=use_extension('//:local.bzl','shared')\nuse_repo(p,'generated')\n",
+                            ).as_bytes().to_vec()
                         } else {
                             format!("module(name='{name}')\n").into_bytes()
                         },
@@ -2599,8 +2666,19 @@ mod tests {
         )
         .unwrap();
         if include_epoch {
+            let local_module = if root.contains("# ordered_nonroot_imports") {
+                Some(
+                    "module(name='local')\np=use_extension('//:local.bzl','shared')\nuse_repo(p, first='generated_one', second='generated_two')\n",
+                )
+            } else if root.contains("# reversed_nonroot_imports") {
+                Some(
+                    "module(name='local')\np=use_extension('//:local.bzl','shared')\nuse_repo(p, second='generated_two', first='generated_one')\n",
+                )
+            } else {
+                None
+            };
             updater
-                .changed_to(vec![(PathObservationEpochKey, host_epoch())])
+                .changed_to(vec![(PathObservationEpochKey, host_epoch(local_module))])
                 .unwrap();
         } else {
             updater
@@ -3712,6 +3790,38 @@ mod tests {
                 message,
             }) if message == "root route is absent"
         ));
+
+        let mut missing = test_proxy("missing", [("one", "generated")]);
+        missing.imports.local_order = Arc::from([CompactString::from("absent")]);
+        assert!(matches!(
+            error(Arc::from([root_usage(
+                "@root//:one.bzl",
+                "ext",
+                missing,
+                false,
+                [],
+            )])),
+            HostSelectedExtensionMappingsError::Invalid { message, .. }
+                if message == "extension import order references a missing mapping"
+        ));
+
+        let mut duplicate = test_proxy(
+            "duplicate",
+            [("one", "generated_one"), ("two", "generated_two")],
+        );
+        duplicate.imports.local_order =
+            Arc::from([CompactString::from("one"), CompactString::from("one")]);
+        assert!(matches!(
+            error(Arc::from([root_usage(
+                "@root//:one.bzl",
+                "ext",
+                duplicate,
+                false,
+                [],
+            )])),
+            HostSelectedExtensionMappingsError::Invalid { message, .. }
+                if message == "extension import order contains a duplicate local name"
+        ));
     }
 
     #[test]
@@ -3758,6 +3868,23 @@ mod tests {
         assert!(value.requests[0].mapping.entries.contains_key("two"));
         assert_eq!(value.requests[0].unique_name.as_str(), "+extension");
         assert!(value.requests[0].overrides.is_empty());
+        assert_eq!(
+            value.requests[0]
+                .validation_parts()
+                .0
+                .iter()
+                .map(HostSelectedExtensionDefinitionImport::parts)
+                .map(|(local, generated, _)| (local, generated))
+                .collect::<Vec<_>>(),
+            [("one", "generated"), ("two", "generated")]
+        );
+        assert!(
+            value.requests[0]
+                .validation_parts()
+                .0
+                .iter()
+                .all(|import| import.parts().2 == &test_span())
+        );
 
         let namespaced = selected_extension_mappings(
             Arc::new(
@@ -3831,6 +3958,11 @@ mod tests {
                     true
                 ),
             ]
+        );
+        assert!(
+            overrides
+                .iter()
+                .all(|override_value| override_value.location() == &test_span())
         );
 
         let mut invalid = namespaced.predecessor.as_ref().clone();
@@ -3923,6 +4055,7 @@ mod tests {
                 context_repo: CanonicalRepoName::new("root").unwrap(),
                 entries: Arc::new(SmallMap::new()),
             },
+            imports: Arc::from([]),
             overrides: Arc::from([]),
         };
         let tag = |name: &str, value: crate::NonrootAttributeValue| crate::NonrootExtensionTag {
@@ -4421,18 +4554,39 @@ repo(name = "replacement")
         let mut builder = Dice::builder();
         crate::install_registry_io(&mut builder, io.clone());
         let dice = Arc::new(builder.build(DetectCycles::Enabled));
-        let source = |target: &str| {
+        let variant = |target: &str,
+                       local: &str,
+                       exported: &str,
+                       move_override: bool,
+                       inject: bool,
+                       overridden: &str| {
             format!(
                 r#"
 module(name = "bazel_tools", repo_name = "root_self")
 one = use_extension("//:one.bzl", "shared")
 use_repo(one, target = "replacement", other_target = "other")
 two = use_extension("//:two.bzl", "shared")
-use_repo(two, overridden_alias = "generated")
-override_repo(two, generated = "{target}")
+use_repo(two, {local} = "{exported}")
+{}{operation}(two, {overridden} = "{target}")
 three = use_extension("//:three.bzl", "third")
 inject_repo(three, injected = "target")
-"#
+"#,
+                if move_override { "\n" } else { "" },
+                operation = if inject {
+                    "inject_repo"
+                } else {
+                    "override_repo"
+                },
+            )
+        };
+        let source = |target: &str| {
+            variant(
+                target,
+                "overridden_alias",
+                "generated",
+                false,
+                false,
+                "generated",
             )
         };
 
@@ -4462,10 +4616,29 @@ inject_repo(three, injected = "target")
         assert_eq!(overrides[0].parts().0, "generated");
         assert_eq!(overrides[0].parts().1.as_str(), "+shared+replacement");
         assert!(overrides[0].parts().2);
+        assert_eq!(overrides[0].location().start_line, 7);
+        assert_eq!(
+            a_value.requests[0]
+                .validation_parts()
+                .0
+                .iter()
+                .map(HostSelectedExtensionDefinitionImport::parts)
+                .map(|(local, generated, location)| { (local, generated, location.start_line) })
+                .collect::<Vec<_>>(),
+            [("target", "replacement", 3), ("other_target", "other", 3)]
+        );
+        let (local, generated, location) = a_value.requests[1].validation_parts().0[0].parts();
+        assert_eq!((local, generated), ("overridden_alias", "generated"));
+        assert_eq!(
+            location.file,
+            crate::LogicalModuleFileId::new("/selected-repo-spec-test/MODULE.bazel")
+        );
+        assert_eq!((location.start_line, location.start_column), (5, 20));
         let third = a_value.requests[2].namespace_parts().3;
         assert_eq!(third.len(), 1);
         assert_eq!(third[0].parts().0, "injected");
         assert!(!third[0].parts().2);
+        assert_eq!(third[0].location().start_line, 9);
 
         let b = compute_real_definition_requests(&dice, &source("other_target"), 71, true).await;
         let SourcePreparationOutcome::Complete(b_value) = &b else {
@@ -4486,6 +4659,139 @@ inject_repo(three, injected = "target")
         let restored = compute_real_definition_requests(&dice, &source("target"), 72, true).await;
         assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
             &a, &restored
+        ));
+
+        for (index, changed_source) in [
+            variant(
+                "target",
+                "changed_alias",
+                "generated",
+                false,
+                false,
+                "generated",
+            ),
+            variant(
+                "target",
+                "overridden_alias",
+                "changed_generated",
+                false,
+                false,
+                "generated",
+            ),
+            variant(
+                "target",
+                "overridden_alias",
+                "generated",
+                true,
+                false,
+                "generated",
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let changed = compute_real_definition_requests(
+                &dice,
+                &changed_source,
+                80 + index as u64 * 2,
+                true,
+            )
+            .await;
+            let SourcePreparationOutcome::Complete(changed_value) = &changed else {
+                panic!("field variant must complete")
+            };
+            let changed_value = changed_value.as_ref().as_ref().unwrap();
+            match index {
+                0 => assert_eq!(
+                    changed_value.requests[1].validation_parts().0[0].parts().0,
+                    "changed_alias"
+                ),
+                1 => assert_eq!(
+                    changed_value.requests[1].validation_parts().0[0].parts().1,
+                    "changed_generated"
+                ),
+                2 => assert_eq!(
+                    changed_value.requests[1].namespace_parts().3[0]
+                        .location()
+                        .start_line,
+                    8
+                ),
+                _ => unreachable!(),
+            }
+            assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+                &a, &changed
+            ));
+            let restored_field = compute_real_definition_requests(
+                &dice,
+                &source("target"),
+                81 + index as u64 * 2,
+                true,
+            )
+            .await;
+            assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+                &a,
+                &restored_field
+            ));
+        }
+
+        let polarity_a_source = variant(
+            "target",
+            "overridden_alias",
+            "generated",
+            false,
+            false,
+            "unimported",
+        );
+        let polarity_b_source = variant(
+            "target",
+            "overridden_alias",
+            "generated",
+            false,
+            true,
+            "unimported",
+        );
+        let polarity_a =
+            compute_real_definition_requests(&dice, &polarity_a_source, 90, true).await;
+        let polarity_b =
+            compute_real_definition_requests(&dice, &polarity_b_source, 91, true).await;
+        let SourcePreparationOutcome::Complete(polarity_b_value) = &polarity_b else {
+            panic!("injection polarity variant must complete")
+        };
+        assert!(
+            !polarity_b_value.as_ref().as_ref().unwrap().requests[1]
+                .namespace_parts()
+                .3[0]
+                .parts()
+                .2
+        );
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &polarity_a,
+            &polarity_b,
+        ));
+        let polarity_restored =
+            compute_real_definition_requests(&dice, &polarity_a_source, 92, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &polarity_a,
+            &polarity_restored,
+        ));
+        let reordered_source = source("target").replace(
+            "target = \"replacement\", other_target = \"other\"",
+            "other_target = \"other\", target = \"replacement\"",
+        );
+        let reordered = compute_real_definition_requests(&dice, &reordered_source, 73, true).await;
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &reordered
+        ));
+        let moved_source = source("target").replace("two = use_extension", "\ntwo = use_extension");
+        let moved = compute_real_definition_requests(&dice, &moved_source, 74, true).await;
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &moved
+        ));
+        let restored_again =
+            compute_real_definition_requests(&dice, &source("target"), 75, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a,
+            &restored_again
         ));
         assert!(io.calls().is_empty());
     }
@@ -4707,6 +5013,41 @@ inject_repo(three, injected = "target")
 
         let restored = compute_real_extensions(&dice, &source(false), 22, true).await;
         assert!(HostSelectedExtensionMappingsKey::equality(&a, &restored));
+
+        let ordered_source = format!("{}\n# ordered_nonroot_imports\n", source(false));
+        let ordered = compute_real_extensions(&dice, &ordered_source, 23, true).await;
+        let SourcePreparationOutcome::Complete(ordered_value) = &ordered else {
+            panic!("ordered nonroot imports must complete")
+        };
+        assert_eq!(
+            ordered_value.as_ref().as_ref().unwrap().usages[2]
+                .validation_imports
+                .iter()
+                .map(|import| (import.local_name.as_str(), import.generated_name.as_str()))
+                .collect::<Vec<_>>(),
+            [("first", "generated_one"), ("second", "generated_two"),]
+        );
+        let reversed_source = format!("{}\n# reversed_nonroot_imports\n", source(false));
+        let reversed = compute_real_extensions(&dice, &reversed_source, 24, true).await;
+        let SourcePreparationOutcome::Complete(reversed_value) = &reversed else {
+            panic!("reversed nonroot imports must complete")
+        };
+        assert_eq!(
+            reversed_value.as_ref().as_ref().unwrap().usages[2]
+                .validation_imports
+                .iter()
+                .map(|import| import.local_name.as_str())
+                .collect::<Vec<_>>(),
+            ["second", "first"]
+        );
+        assert!(!HostSelectedExtensionMappingsKey::equality(
+            &ordered, &reversed
+        ));
+        let restored_nonroot = compute_real_extensions(&dice, &ordered_source, 25, true).await;
+        assert!(HostSelectedExtensionMappingsKey::equality(
+            &ordered,
+            &restored_nonroot
+        ));
         assert!(io.calls().is_empty());
     }
 

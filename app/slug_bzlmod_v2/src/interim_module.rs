@@ -274,6 +274,7 @@ pub struct NonrootExtensionProxy {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub struct NonrootRepoImports {
+    pub local_order: Arc<[CompactString]>,
     pub local_to_exported: Arc<SmallMap<CompactString, CompactString>>,
     pub exported_to_local: Arc<SmallMap<CompactString, CompactString>>,
 }
@@ -285,6 +286,7 @@ impl NonrootRepoImports {
     pub fn from_local_to_exported(
         local_to_exported: SmallMap<CompactString, CompactString>,
     ) -> Result<Self, CompactString> {
+        let local_order = local_to_exported.keys().cloned().collect::<Arc<_>>();
         let mut exported_to_local = SmallMap::with_capacity(local_to_exported.len());
         let mut seen_exports = SmallSet::with_capacity(local_to_exported.len());
         for (local, exported) in local_to_exported.iter() {
@@ -296,6 +298,7 @@ impl NonrootRepoImports {
             exported_to_local.insert(exported.clone(), local.clone());
         }
         Ok(Self {
+            local_order,
             local_to_exported: Arc::new(local_to_exported),
             exported_to_local: Arc::new(exported_to_local),
         })

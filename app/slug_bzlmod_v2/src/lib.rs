@@ -255,6 +255,8 @@ pub use root_bootstrap::RootModuleBootstrapCreateError;
 pub use root_bootstrap::RootModuleBootstrapRequest;
 pub use root_bootstrap::RootModuleBootstrapWarning;
 #[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionImport;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequest;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequests;

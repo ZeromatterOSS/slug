@@ -1,13 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-5-extension-import-order-identity-owner-design`
-Milestone: M7 extension import source-order identity prerequisite design
+Packet: `WP-5-extension-import-order-identity-owner-implementation`
+Milestone: M7 extension import source-order identity prerequisite implementation
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct the first missing retained import-order owner before resuming
-the hidden validation-request projection; authorize no Rust in this packet.
+Result: implement the accepted compact shared import-order spine and resume the
+hidden validation-request projection in the same bounded three-file packet.
 
-## Active docs-only REPLAN contract
+## Active implementation contract
+
+Independent review accepts the REPLAN design in `f14d3d7a`. Run only
+`WP-5-extension-import-order-identity-owner-implementation` in
+`app/slug_bzlmod_v2/src/interim_module.rs`, `selected_repo_spec.rs`, and
+`lib.rs` solely for hidden import/request accessors, plus four ledgers.
+Caps are 260 production, 450 tests, and 710 total formatted net Rust lines
+against `f14d3d7a`. Preserve the compact order-spine, complete projection,
+proof, compatibility, and stop contract below.
+
+## Accepted docs-only REPLAN contract
+
+This section is historical context only, grants no independent file, action,
+cap, or schedule authority, and is interpreted only through the active
+implementation contract above.
 
 The first compiling request widening adds 108 production/test lines in
 `selected_repo_spec.rs` and two hidden `lib.rs` exports, but its required
@@ -62,7 +76,7 @@ consumer/API/JVM work, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only REPLAN contract above.
+implementation contract above.
 
 Independent review accepts the design in `533a9453`. Run only
 `WP-5-host-selected-extension-validation-request-projection-implementation`
@@ -141,7 +155,7 @@ I/O/materializer/lockfile/consumer/API/JVM work, or cap excess.
 
 This section and everything below it are historical context only, grant no
 file, action, cap, or schedule authority, and are interpreted only through the
-active docs-only REPLAN contract above.
+active implementation contract above.
 
 Independent review accepts the cap correction in `7cf2e45f`. Run only
 `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
@@ -304,7 +318,7 @@ future Rust path, or cap excess.
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active docs-only REPLAN contract above.
+interpreted solely through the active implementation contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
@@ -476,7 +490,7 @@ total over 1,500.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active docs-only REPLAN contract above.
+active implementation contract above.
 
 The audit uses Bazel 9.2 tag commit `8220c619`:
 `RepositoryModuleApi.repository_rule`,
@@ -505,7 +519,7 @@ stopping before instantiation.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active docs-only REPLAN contract above.
+active implementation contract above.
 
 Independent review accepts the event correction in `f36ec593`. Implement only
 `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the

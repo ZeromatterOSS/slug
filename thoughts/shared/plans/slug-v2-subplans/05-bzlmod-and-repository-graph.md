@@ -2762,3 +2762,15 @@ is exactly `interim_module.rs`, `selected_repo_spec.rs`, and hidden
 `lib.rs` accessors under mandatory 260/450/710. No new key/map/interner/
 cache/digest, loading edge, validation/routes, I/O/materializer/lockfile/
 consumer/API/JVM breadth, fourth Rust file, or cap excess.
+
+### Extension import-order identity implementation activated (2026-08-12)
+
+Independent review accepts `f14d3d7a`. Run only
+`WP-5-extension-import-order-identity-owner-implementation` in
+`interim_module.rs`, `selected_repo_spec.rs`, and hidden `lib.rs`
+accessors plus four ledgers, under mandatory 260 production/450 tests/710
+total against `f14d3d7a`. Add the compact local-name order spine, preserve
+existing maps as sole lookup/bijection owners, and complete the validation
+request projection/proof. No fourth file, new key/map/interner/cache/digest,
+loading edge, validation/routes, I/O/materializer/lockfile/consumer/API/JVM
+breadth, or cap excess.
