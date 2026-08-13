@@ -30,19 +30,19 @@ enum HostRootApparentRepositorySourceInputDisposition {
     Input(HostRepositorySourceInput),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositorySourceInput {
+pub(super) struct HostRootApparentRepositorySourceInput {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     predecessor: Arc<HostRootApparentRepositoryRouteResult>,
     disposition: HostRootApparentRepositorySourceInputDisposition,
 }
 #[derive(Debug, Clone, Copy)]
-enum HostRootApparentRepositorySourceInputDispositionView<'a> {
+pub(super) enum HostRootApparentRepositorySourceInputDispositionView<'a> {
     Main,
     Input(&'a HostRepositorySourceInput),
 }
 #[derive(Debug, Clone, Copy)]
-struct HostRootApparentRepositorySourceInputView<'a> {
+pub(super) struct HostRootApparentRepositorySourceInputView<'a> {
     apparent_repo: &'a ApparentRepoName,
     canonical_repo: &'a CanonicalRepoName,
     disposition: HostRootApparentRepositorySourceInputDispositionView<'a>,
@@ -82,7 +82,10 @@ fn association_is_valid(
     }
 }
 impl HostRootApparentRepositorySourceInput {
-    fn view(&self) -> Option<HostRootApparentRepositorySourceInputView<'_>> {
+    pub(super) fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+    pub(super) fn view(&self) -> Option<HostRootApparentRepositorySourceInputView<'_>> {
         let route = self.predecessor.as_ref().as_ref().ok()?;
         let route_view = route.view()?;
         let disposition = match &self.disposition {
@@ -107,13 +110,13 @@ impl HostRootApparentRepositorySourceInput {
     }
 }
 impl<'a> HostRootApparentRepositorySourceInputView<'a> {
-    fn apparent_repo(self) -> &'a ApparentRepoName {
+    pub(super) fn apparent_repo(self) -> &'a ApparentRepoName {
         self.apparent_repo
     }
-    fn canonical_repo(self) -> &'a CanonicalRepoName {
+    pub(super) fn canonical_repo(self) -> &'a CanonicalRepoName {
         self.canonical_repo
     }
-    fn disposition(self) -> HostRootApparentRepositorySourceInputDispositionView<'a> {
+    pub(super) fn disposition(self) -> HostRootApparentRepositorySourceInputDispositionView<'a> {
         self.disposition
     }
 }
@@ -128,7 +131,7 @@ enum HostRootApparentRepositorySourceInputErrorKind {
     Compute(Arc<str>),
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositorySourceInputError {
+pub(super) struct HostRootApparentRepositorySourceInputError {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     kind: HostRootApparentRepositorySourceInputErrorKind,
@@ -139,16 +142,20 @@ impl fmt::Display for HostRootApparentRepositorySourceInputError {
     }
 }
 impl std::error::Error for HostRootApparentRepositorySourceInputError {}
-type HostRootApparentRepositorySourceInputOutcome = SourcePreparationOutcome<
-    Arc<Result<HostRootApparentRepositorySourceInput, HostRootApparentRepositorySourceInputError>>,
->;
+pub(super) type HostRootApparentRepositorySourceInputResult =
+    Result<HostRootApparentRepositorySourceInput, HostRootApparentRepositorySourceInputError>;
+pub(super) type HostRootApparentRepositorySourceInputOutcome =
+    SourcePreparationOutcome<Arc<HostRootApparentRepositorySourceInputResult>>;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositorySourceInputKey {
+pub(super) struct HostRootApparentRepositorySourceInputKey {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
 }
 impl HostRootApparentRepositorySourceInputKey {
-    fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
+    pub(super) fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self {
             workspace,
             apparent_repo,
@@ -262,7 +269,7 @@ impl Key for HostRootApparentRepositorySourceInputKey {
     }
 }
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use std::sync::Mutex;
 
     use dice::ActivationData;
@@ -354,7 +361,7 @@ mod tests {
             self.forbidden.lock().unwrap().clear();
         }
     }
-    async fn complete_local(
+    pub(in crate::runtime) async fn complete_local(
         dice: &Arc<Dice>,
         workspace: &NormalizedAbsolutePath,
         key: &HostRootApparentRepositorySourceInputKey,
@@ -432,13 +439,20 @@ mod tests {
         assert!(tracker.forbidden.lock().unwrap().is_empty());
         owner
     }
-    fn value(
+    pub(in crate::runtime) fn value(
         outcome: &HostRootApparentRepositorySourceInputOutcome,
     ) -> &HostRootApparentRepositorySourceInput {
         let SourcePreparationOutcome::Complete(value) = outcome else {
             panic!("source input must complete: {outcome:?}")
         };
         value.as_ref().as_ref().unwrap()
+    }
+    pub(in crate::runtime) fn corrupt_workspace(
+        value: &HostRootApparentRepositorySourceInput,
+    ) -> HostRootApparentRepositorySourceInput {
+        let mut corrupt = value.clone();
+        corrupt.workspace = NormalizedAbsolutePath::new("/other").unwrap();
+        corrupt
     }
     #[test]
     fn key_shape_is_fail_closed() {
