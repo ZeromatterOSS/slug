@@ -2908,3 +2908,13 @@ accepted hidden loading validation key and borrows its no-copy certificate;
 no Bzlmod/loading/server edit, reverse edge, apparent route,
 `RootRepositoryRoute`, repository execution/context, source/materializer/I/O,
 lockfile, consumer/API, or JVM work is authorized.
+
+### Core generated-definition proof cap correction scheduled (2026-08-12)
+
+The two-file core lookup retains the sole loading-certificate dependency and
+all no-route/no-materialization stops, but its complete proof measures
+222/541/763 against `6678f54f`. Run only docs-only
+`WP-4-5-6-host-generated-repository-definition-lookup-owner-r2-cap-design`;
+authorize no Rust and change only future caps to 260/550/800. Stage 5
+production remains unchanged. Rust resumes only after acceptance and explicit
+r2 activation.

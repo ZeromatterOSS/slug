@@ -2853,3 +2853,13 @@ the retained certificate-plus-ordinal/no-copy result, proof, compatibility,
 and stops. Stage 4 production remains unchanged; no loading/Bzlmod/server,
 route, execution, source/materializer/I/O, lockfile, public API, or JVM work is
 authorized.
+
+### Generated-definition lookup proof cap correction scheduled (2026-08-12)
+
+The retained core lookup is 222 production, 541 tests, and 763 total formatted
+Rust lines against `6678f54f`; required full-scan and field/order A/B/A proof
+exceeds only the old test/total caps. Run only the four-ledger docs packet
+`WP-4-5-6-host-generated-repository-definition-lookup-owner-r2-cap-design`.
+Authorize no Rust. Preserve the exact two files, behavior, proof, compatibility,
+and stops; correct only future caps to 260/550/800. Stage 4 production remains
+unchanged until independent acceptance and explicit r2 activation.
