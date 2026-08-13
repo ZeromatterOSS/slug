@@ -2891,3 +2891,14 @@ borrows the post-substitution target without copying. Future Rust is limited to
 the existing definition module under mandatory 220/450/670. Stage 4 production
 remains unchanged; root mapping, public route, repository execution/context,
 source/materializer/I/O, lockfile, command/API, and JVM work remain forbidden.
+
+### Generated-repository apparent mapping implementation activated (2026-08-12)
+
+Independent review accepts design `0af55eff`. Run only
+`WP-4-5-6-host-generated-repository-apparent-mapping-owner-implementation` in
+the existing core generated-definition module with colocated tests and four
+ledgers, under mandatory 220/450/670 against `0af55eff`. Preserve the sole
+definition-key dependency, nonroot/context validation, borrowed effective
+target, full proof, compatibility, and stops. Stage 4 production remains
+unchanged; no second Rust file, root mapping, route, execution,
+source/materializer I/O, public API, or JVM work is authorized.

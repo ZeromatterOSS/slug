@@ -2947,3 +2947,14 @@ future 220/450/670 limits. Stage 5 production remains unchanged; root mapping,
 `RootRepositoryRoute`, generated definition publication, source/materializer,
 execution/I/O, lockfile, consumer/API, reverse edge, and JVM work remain
 forbidden.
+
+### Core generated-repository apparent mapping implementation activated (2026-08-12)
+
+Independent review accepts design `0af55eff`. Run only
+`WP-4-5-6-host-generated-repository-apparent-mapping-owner-implementation` in
+the existing core generated-definition module with colocated tests and four
+ledgers, under mandatory 220/450/670 against `0af55eff`. Preserve direct
+retained-map lookup, exact context identity, no-copy target access, proof, and
+all no-route/no-materialization stops. Stage 5 production remains unchanged;
+no Bzlmod/loading/server edit, second Rust file, reverse edge, source/I/O,
+consumer/public API, lockfile, materializer, or JVM work is authorized.
