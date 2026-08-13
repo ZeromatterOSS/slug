@@ -3251,3 +3251,16 @@ fail-closed `Option<Disposition>` projection, unchanged carrier state/equality,
 per-call allocation and Arc-only clone proof, and all no-key/second-file/source/
 materialization/consumer/command/public/I/O/JVM stops. Stage 4 production
 remains unchanged.
+
+### Core source-capability publication accepted; consumer order audited next (2026-08-13)
+
+Independent review accepts `0cba8fb8` at 42/111/153 and 931/960 physical
+lines. Run only four-ledger docs packet
+`WP-4-5-host-repository-source-capability-consumer-order-design` under
+40/240/180/180/640 documentation caps. Audit the core projection, Bzlmod
+materialization-request classifier and package-source owner, and loading
+package-load owner; freeze exactly one computation-free successor or precise
+prerequisite before any consumer migration. Stage 4 production remains
+unchanged. Forbid reverse edges, copied RepoSpec/state, new stores, legacy
+module-name rederivation, source/package/materialization/I/O, command/public
+API, and JVM breadth.

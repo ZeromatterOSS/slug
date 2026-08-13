@@ -3315,3 +3315,16 @@ fail-closed owned disposition, unchanged carrier state/equality/DICE behavior,
 allocation and pointer-sharing proof, and every no-second-file/key/store/
 source/materialization/loading-consumer/command/public/I/O/JVM stop. Stage 5
 production remains unchanged.
+
+### Core capability publication accepted; first consumer prerequisite audited (2026-08-13)
+
+Independent review accepts `0cba8fb8` at 42/111/153 and 931/960. Run only
+four-ledger docs packet
+`WP-4-5-host-repository-source-capability-consumer-order-design` under
+40/240/180/180/640 documentation caps. Audit whether Bzlmod's pure existing
+materialization-request projection must precede loading package-key migration,
+or whether one capability-owned package input is already exact without source
+policy. Select one bounded successor and freeze its owner, identity, Need/error
+boundary, allowlist, caps, proof, and stops. Stage 5 production stays unchanged;
+no reverse edge, copied state, module-name synthesis, source/package/
+materialization/I/O, command/public API, lockfile, wire, or JVM is authorized.
