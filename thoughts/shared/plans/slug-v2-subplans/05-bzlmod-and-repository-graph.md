@@ -3305,3 +3305,13 @@ Stage 5 production stays unchanged. Defer materialization classification,
 generic request construction, loading consumer migration, package/source work,
 commands/public API, execution/I/O, lockfile, wire, and JVM; forbid new keys,
 stores, reverse edges, copied retained state, and second-file breadth.
+
+### Private core source-capability publication implementation activated (2026-08-13)
+
+Independent review accepts design `7b6484ee` over capability `3faa90dd`.
+Implement only existing private `root_apparent_repository_route.rs` with
+colocated tests under 180/360/540 and the 960-line ceiling. Preserve the exact
+fail-closed owned disposition, unchanged carrier state/equality/DICE behavior,
+allocation and pointer-sharing proof, and every no-second-file/key/store/
+source/materialization/loading-consumer/command/public/I/O/JVM stop. Stage 5
+production remains unchanged.

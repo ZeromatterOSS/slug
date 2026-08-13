@@ -3241,3 +3241,13 @@ does not store duplicate derived state or change carrier equality.
 Stage 4 production remains unchanged; no new key/store, Bzlmod/loading/server/
 command edit, source/package/materialization/I/O, public API, reverse edge, or
 JVM breadth is authorized.
+
+### Core repository source-capability publication implementation activated (2026-08-13)
+
+Independent review accepts design `7b6484ee` over capability `3faa90dd`.
+Implement only existing private `root_apparent_repository_route.rs` with
+colocated tests under 180/360/540 and the 960-line ceiling. Preserve the exact
+fail-closed `Option<Disposition>` projection, unchanged carrier state/equality,
+per-call allocation and Arc-only clone proof, and all no-key/second-file/source/
+materialization/consumer/command/public/I/O/JVM stops. Stage 4 production
+remains unchanged.
