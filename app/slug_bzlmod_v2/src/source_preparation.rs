@@ -2948,6 +2948,66 @@ pub fn host_repository_materialization_request(
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRepositorySourceInput {
+    capability: HostRepositorySourceCapability,
+    disposition: HostRepositoryMaterializationDisposition,
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostRepositorySourceInputError {
+    Projection(RepositoryMaterializationError),
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub enum HostRepositorySourceInputDispositionView<'a> {
+    Builtin(&'a BuiltinBazelToolsRouteIdentity),
+    Request(&'a Arc<RepositoryMaterializationRequest>),
+}
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub struct HostRepositorySourceInputView<'a> {
+    capability: &'a HostRepositorySourceCapability,
+    disposition: HostRepositorySourceInputDispositionView<'a>,
+}
+impl HostRepositorySourceInput {
+    #[doc(hidden)]
+    pub fn view(&self) -> HostRepositorySourceInputView<'_> {
+        let disposition = match &self.disposition {
+            HostRepositoryMaterializationDisposition::Builtin(identity) => {
+                HostRepositorySourceInputDispositionView::Builtin(identity)
+            }
+            HostRepositoryMaterializationDisposition::Request(request) => {
+                HostRepositorySourceInputDispositionView::Request(request)
+            }
+        };
+        HostRepositorySourceInputView {
+            capability: &self.capability,
+            disposition,
+        }
+    }
+}
+impl<'a> HostRepositorySourceInputView<'a> {
+    pub fn capability(self) -> &'a HostRepositorySourceCapability {
+        self.capability
+    }
+    pub fn disposition(self) -> HostRepositorySourceInputDispositionView<'a> {
+        self.disposition
+    }
+}
+#[doc(hidden)]
+pub fn host_repository_source_input(
+    capability: HostRepositorySourceCapability,
+) -> Result<HostRepositorySourceInput, HostRepositorySourceInputError> {
+    let disposition = host_repository_materialization_request(&capability)
+        .map_err(HostRepositorySourceInputError::Projection)?;
+    Ok(HostRepositorySourceInput {
+        capability,
+        disposition,
+    })
+}
+
 fn root_repository_materialization_request(
     route: &RootRepositoryRoute,
 ) -> Result<Arc<RepositoryMaterializationRequest>, RepositoryMaterializationError> {
@@ -5110,6 +5170,151 @@ mod tests {
         ] {
             assert_ne!(a, b);
             assert_eq!(a, project(&baseline, WorkspaceRelative));
+        }
+    }
+
+    #[test]
+    fn repository_source_input_owns_one_exact_projection() {
+        use HostRepositoryLocalPathPolicy::CommandAbsolute;
+        use HostRepositoryLocalPathPolicy::LocalUnsupported;
+        use HostRepositoryLocalPathPolicy::WorkspaceRelative;
+
+        use crate::HostRepositorySourceInputDispositionView as InputView;
+        let builtin_capability = RootRepositoryRoute::builtin_for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+        )
+        .source_capability();
+        let builtin = crate::host_repository_source_input(builtin_capability.clone()).unwrap();
+        assert_eq!(builtin.view().capability(), &builtin_capability);
+        let InputView::Builtin(identity) = builtin.view().disposition() else {
+            panic!("builtin capability must retain the builtin disposition");
+        };
+        let expected_builtin = BuiltinBazelToolsSnapshot::CURRENT.route_identity();
+        assert_eq!(identity, &expected_builtin);
+        let route = local_route();
+        let capability = route.source_capability();
+        let input = crate::host_repository_source_input(capability.clone()).unwrap();
+        let InputView::Request(request) = input.view().disposition() else {
+            panic!("RepoSpec capability must retain the request disposition");
+        };
+        assert_eq!(input.view().capability(), &capability);
+        assert_eq!(&request.id.workspace, capability.workspace());
+        assert_eq!(&request.id.canonical_repo, capability.canonical_repo());
+        assert_eq!(&request.repo_spec, capability.repo_spec().unwrap());
+        assert!(Arc::ptr_eq(
+            &request.repo_spec.attributes,
+            &capability.repo_spec().unwrap().attributes,
+        ));
+        assert_eq!(
+            request.kind,
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+            }
+        );
+        let cloned = input.clone();
+        let InputView::Request(cloned_request) = cloned.view().disposition() else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(request, cloned_request));
+        let repeated = crate::host_repository_source_input(capability).unwrap();
+        assert_eq!(input, repeated);
+        let rejected = crate::HostRepositorySourceCapability::from_repo_spec(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+            CanonicalRepoName::new("dep+").unwrap(),
+            local_route().repo_spec(),
+            LocalUnsupported,
+        )
+        .unwrap();
+        assert_eq!(
+            crate::host_repository_source_input(rejected).unwrap_err(),
+            crate::HostRepositorySourceInputError::Projection(
+                RepositoryMaterializationError::Spec(
+                    "local_repository is unsupported for this repository source".into(),
+                ),
+            )
+        );
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let baseline_spec = immutable_route().repo_spec().clone();
+        let make = |workspace: &NormalizedAbsolutePath,
+                    apparent: &str,
+                    canonical: &str,
+                    spec: &RepoSpec,
+                    policy| {
+            crate::host_repository_source_input(
+                crate::HostRepositorySourceCapability::from_repo_spec(
+                    workspace.dupe(),
+                    ApparentRepoName::new(apparent).unwrap(),
+                    CanonicalRepoName::new(canonical).unwrap(),
+                    spec,
+                    policy,
+                )
+                .unwrap(),
+            )
+            .unwrap()
+        };
+        let a = make(
+            &workspace,
+            "dep_alias",
+            "dep+",
+            &baseline_spec,
+            WorkspaceRelative,
+        );
+        let mut changed_spec = baseline_spec.clone();
+        Arc::make_mut(&mut changed_spec.attributes).insert(
+            CompactString::new("integrity"),
+            OverrideAttributeValue::String("changed".into()),
+        );
+        let other_workspace = NormalizedAbsolutePath::new("/other").unwrap();
+        for b in [
+            make(
+                &other_workspace,
+                "dep_alias",
+                "dep+",
+                &baseline_spec,
+                WorkspaceRelative,
+            ),
+            make(
+                &workspace,
+                "other_alias",
+                "dep+",
+                &baseline_spec,
+                WorkspaceRelative,
+            ),
+            make(
+                &workspace,
+                "dep_alias",
+                "other+",
+                &baseline_spec,
+                WorkspaceRelative,
+            ),
+            make(
+                &workspace,
+                "dep_alias",
+                "dep+",
+                &baseline_spec,
+                CommandAbsolute,
+            ),
+            make(
+                &workspace,
+                "dep_alias",
+                "dep+",
+                &changed_spec,
+                WorkspaceRelative,
+            ),
+            builtin,
+        ] {
+            assert_ne!(a, b);
+            assert_eq!(
+                a,
+                make(
+                    &workspace,
+                    "dep_alias",
+                    "dep+",
+                    &baseline_spec,
+                    WorkspaceRelative,
+                )
+            );
         }
     }
 

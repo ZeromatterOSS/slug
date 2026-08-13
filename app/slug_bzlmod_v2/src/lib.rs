@@ -317,6 +317,14 @@ pub use source_preparation::HostRepositoryMaterializationDisposition;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceFileKey;
 pub use source_preparation::HostRepositorySourceFileValue;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceInput;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceInputDispositionView;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceInputError;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceInputView;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;
@@ -347,5 +355,7 @@ pub use source_preparation::SourcePreparationOutcome;
 pub use source_preparation::SourcePreparationResult;
 #[doc(hidden)]
 pub use source_preparation::host_repository_materialization_request;
+#[doc(hidden)]
+pub use source_preparation::host_repository_source_input;
 pub use source_preparation::install_repository_io;
 pub use source_preparation::source_identity;
