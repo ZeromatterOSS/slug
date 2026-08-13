@@ -155,6 +155,25 @@ execution gaps.
   planned, never silently accepted as behavior.
 - Output paths in command output should be Bazel-shaped, not V1 `buck-out`.
 
+### 8.3A M7A, M8, and M7B scheduling
+
+The command order above is a semantic dependency order, not a requirement to
+finish every Stage 8 surface before bootstrap. Divide the remaining work at the
+observable bootstrap closure:
+
+- **M7A** admits only the repository sources, rules_rust/provider/toolchain
+  semantics, action/input-tree/aquery shapes, `build` behavior, and REAPI
+  execution/materialization required to analyze and build Slug through the
+  ordinary graph;
+- **M8** starts Stage 10.3 analysis and Stage 10.4 fixed-point bootstrap as soon
+  as that closure passes its focused Bazel 9.2 and REAPI fixtures; and
+- **M7B** resumes `run`, `test`, BEP, unrelated public rulesets, query/action
+  formats, and command breadth not required by the accepted bootstrap closure.
+
+Do not delay M8 for M7B completeness, and do not hide an M7A semantic gap in a
+bootstrap-only command, precomputed graph, Cargo/Bazel delegation, or local
+execution fallback.
+
 ### 8.4 Stress and Regression Policy
 
 - Public real-world projects are stress evidence only.

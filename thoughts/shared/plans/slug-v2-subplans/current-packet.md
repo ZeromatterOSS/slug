@@ -7,6 +7,14 @@ Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 Result: choose the first private core consumer of the accepted observation
 owner without combining loading or command migration.
 
+Scheduling boundary: this audit remains unchanged by the cross-stage reorder.
+Its selected successor may design and implement only the first private core
+source-observation consumer, including a smaller prerequisite `REPLAN` if
+required. Acceptance of that implementation is the canonical source-consumer
+cutover. At that point scheduling pivots to the focused M1 request-revision
+oracle and DICE audit; it does not continue into package, loading, command, or
+public source migration.
+
 ## Active docs-only audit contract
 
 Implementation `cbc44e43` accepts the hidden Bzlmod observation owner. Audit

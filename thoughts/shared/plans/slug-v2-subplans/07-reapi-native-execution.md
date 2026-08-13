@@ -201,6 +201,15 @@ Every REAPI execution fixture must record:
 
 ### 7.9 Concurrency, transfer ownership, and operational extensions
 
+This work is part of M7A only for the action kinds, input trees, transfers, and
+interoperability exercised by the bootstrap closure. Split Stage 1 evidence by
+that selected owner and run each subset immediately before its implementation;
+the whole Wave B catalog is not one gate. M8 begins when the bootstrap REAPI
+slice is accepted. Remaining backend breadth, progress presentation, and watch
+output generations stay in M7B or later product packets unless the bootstrap
+closure directly demonstrates a prerequisite. M9 identity bytes remain
+separate.
+
 After broader Stage 6 actions and input trees are accepted, add a recording
 REAPI boundary that proves behavior under concurrency rather than only scalar
 requests. Stage 1 owns the fixture manifests; Stage 7 owns the client/runtime

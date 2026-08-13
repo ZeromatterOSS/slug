@@ -10,11 +10,18 @@ graph and declared outputs reach a self-hosted fixed point.
 
 This stage has two tracks with different gates:
 
-1. The Bazel developer graph may start immediately and progress alongside
-   M1-M5. It accelerates Rust builds/tests and supplies a first-party query and
-   aquery corpus.
-2. Slug self-hosting starts only after Stage 8 exact `aquery` and Stage 7 REAPI
-   execution/materialization are accepted for the bootstrap action set.
+1. The Bazel developer graph is accepted and may continue to accelerate Rust
+   builds/tests and supply a first-party query/aquery corpus.
+2. Stage 10.3 analysis and Stage 10.4 self-hosting begin immediately after M7A
+   accepts the bootstrap action closure: its repository sources,
+   rules_rust/provider/toolchain semantics, action kinds and input trees,
+   normalized aquery, and Stage 7 REAPI execution/materialization.
+
+The bounded M2, M5, and M6 slices are accepted prerequisites but do not alone
+cover the bootstrap action set. Conversely, M8 does not wait for M7B run/test/
+BEP, unrelated public-ruleset, or command-format breadth. M9 exact Bazel
+configuration/output/ActionKey bytes are not a bootstrap prerequisite; the
+reviewed Slug-native opaque-token comparison remains the M8 boundary.
 
 A Bazel-built `slug` binary is not self-hosting evidence. A passing self-build
 is not enough unless the stage1/stage2 action graphs and declared output
@@ -2500,12 +2507,12 @@ is `9ae19e6b3cfb218033a633c630967e70161c4acd47b435c3f446e76e7cc93de5`.
 Those records are sufficient local developer-gate evidence and do not require
 routine remote reruns.
 
-This accepts and parks only the M8 developer-graph slice. Stage 10.3 analysis
-and Stage 10.4 self-hosting remain gated in dependency order behind the terminal
-M2 configuration-input boundaries, M5 exact aquery, and M6 REAPI execution and
-materialization. No further implementation packet is currently schedulable
-without a new architecture or scope decision for M2; this is not a Stage 10 or
-M8 completion claim.
+This accepts and parks only the M8 developer-graph slice. The historical gate
+at acceptance time named M2, M5, and M6; those bounded milestones are now
+accepted. Current scheduling is controlled by this plan's Ordering section and
+the canonical Live Status: Stage 10.3/10.4 wait only for the remaining M7A
+bootstrap action closure, not M7B breadth. This remains developer-gate evidence,
+not a Stage 10 or M8 completion claim.
 
 The execution-only fixed-stage probe is accepted in `9b5c1180…` at 107 library,
 17 CLI, 101 test, and 225 total lines. Its five focused and 45 related tests

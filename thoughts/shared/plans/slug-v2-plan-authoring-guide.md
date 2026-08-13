@@ -118,6 +118,14 @@ chronology into capped companion evidence files or Git history. A stage owner
 should describe current architecture and reusable decisions; it should not be
 the only archive of every worker turn.
 
+On packet rollover, replace the manifest with the new active contract plus at
+most one compact immediate-predecessor summary; do not prepend another contract
+to an unbounded historical tail. Existing oversized history is cleaned only by
+a bounded docs-only compaction that preserves Git reachability and cannot alter
+milestone state, packet authority, compatibility, evidence, or the selected
+successor. Document compaction never delays an otherwise ready semantic packet
+unless the active contract itself is ambiguous.
+
 ## Performance decision discipline
 
 Apply performance gates only to a demonstrated hot path or retained-memory

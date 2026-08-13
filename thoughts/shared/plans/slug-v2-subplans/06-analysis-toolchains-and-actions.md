@@ -183,9 +183,17 @@ shape fits instead of default owned `String`, `Vec`, or std hash collections.
 
 ### 6.4A Immutable action-owner context
 
+Schedule this owner after the first M1 request-revision/source-certificate
+vertical and the just-in-time action/toolchain oracle subset, but before any
+M7A packet admits broader action registration. Acceptance of the immutable
+owner context is therefore an M7A entry gate. It is not blocked on the complete
+Wave A fixture catalog, M8 bootstrap, M7B command breadth, or M9 exact identity
+bytes. The current M7 repository source-consumer audit and its fixed cutover
+remain unchanged.
+
 Before Stage 6 admits another general action kind, named exec groups, applied
-aspect actions, or multi-platform selection, retain one immutable owner context
-at action registration. The target shape is:
+aspect actions, or multi-platform selection, retain one immutable owner
+context at action registration. The target shape is:
 
 ```text
 ActionOwnerContext {

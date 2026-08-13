@@ -24,14 +24,14 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial, parked** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | External Starlark test-base/tools closure and JVM-dependent registry directory transport remain unsupported; native-Windows byte-glob ordering remains `REPLAN` | preserve accepted boundaries while the configured-graph chain advances |
+| M1: one semantic spine | **partial; next architecture gate after the M7 source-consumer cutover** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | production still depends on coarse whole-workspace snapshots and lacks request-private source certificates, final reobservation, atomic revision acceptance, and overlapping-request proof; external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than M1 blockers | after the first private core repository source-observation consumer is accepted, run the focused mutation/concurrency oracle plus Buck2 DICE audit, then implement the smallest request-revision/source-certificate vertical |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, and multi-platform choice are later breadth | preserve the admitted FileWrite boundary |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
 | M7: command/ruleset breadth | **active (root source-observation dispatch audit)** | hidden Bzlmod observation owner `cbc44e43` accepted | freeze the first private core caller and owned-certificate boundary | WP-4-5-6-host-root-repository-source-observation-consumer-audit |
-| M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
+| M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
@@ -638,13 +638,37 @@ execution, progress, explain, watch, complexity, and performance follow-ups.
 The [plan-authoring guide](./slug-v2-plan-authoring-guide.md) is the readiness
 contract for new and materially revised packets.
 
-Neither document widens the active M7 packet. After that packet reaches a
-terminal result, schedule adoption work only as bounded packets: first the
-Bazel-derived Starlark/provider/action/toolchain oracle wave; then Stage 2
-request revisions and source certificates; then Stage 6 immutable action-owner
-context; then Stage 7 REAPI concurrency/interoperability evidence. Schedule
-repository-output caching, progress, explain, and watch only after their named
-semantic owners and lifecycle prerequisites exist.
+Neither document widens the active M7 packet. Finish the current
+source-observation consumer audit and, if it selects a bounded successor,
+complete only the design and implementation needed to accept the first private
+core consumer. If the audit returns `REPLAN`, complete only the smallest
+prerequisite needed to reach that same consumer. Acceptance of that consumer is
+the fixed **source-consumer cutover**; merely finishing whichever packet happens
+to be active is not the cutover, and package/loading/command migration is not
+part of it.
+
+After the source-consumer cutover, schedule the remaining work as bounded
+packets in this order:
+
+1. run only the M1 mutation/concurrent-request oracle prerequisite and the
+   applicable Buck2 DICE transaction/publication audit;
+2. implement the smallest M1 request-revision/source-certificate vertical with
+   final reobservation and atomic compatible publication;
+3. add each Bazel-derived Starlark/provider/action/aquery/toolchain oracle
+   subset just before the semantic owner it discriminates, rather than making
+   one monolithic oracle wave block M1;
+4. install Stage 6 immutable action-owner context before broader action
+   registration;
+5. complete **M7A**, only the repository, rules_rust, toolchain, action/input
+   tree, aquery, and Stage 7 REAPI breadth required by the bootstrap closure;
+6. run M8 Stage 10.3 analysis and Stage 10.4 fixed-point bootstrap as soon as
+   M7A is accepted; then
+7. resume **M7B** run/test/BEP, unrelated public-ruleset and command breadth,
+   followed by repository-output caching, progress, explain, and watch only
+   after their named semantic owners and lifecycle prerequisites exist.
+
+M7A and M7B are scheduling gates within M7, not new compatibility milestones.
+M9 exact Bazel identity-byte work remains after the functional bootstrap path.
 
 Zabel remains a pinned donor of design lessons and fixture themes, never the
 compatibility oracle. Exact claims still require Bazel 9.2 source or generated
@@ -871,14 +895,15 @@ order. Use this overlay for scheduling new packets:
 | Milestone | Required result | Owning stages | Exit gate |
 |-----------|-----------------|---------------|-----------|
 | M0: archive and baseline health | V1 refs and clean-root checker are truthful; Bazel/Buck2/actiond sources are pinned | 0, 1, 9 | Archive status is green and every new fixture carries immutable provenance. |
-| M1: one semantic spine | One daemon-owned DICE instance and explicit create/edit/delete inputs serve loading, bzlmod, analysis, and commands | 2, 4, 5 | Same-daemon tests explain invalidation without a fallback scanner or fresh per-request graph. |
+| M1: one semantic spine | One daemon-owned DICE instance, immutable request overlays, lazy typed observations, and source certificates serve loading, bzlmod, analysis, and commands | 2, 4, 5 | Two overlapping requests, mutation during computation, final reobservation, atomic retry/publication, create/edit/delete/recreate, and compatible warm reuse pass without a fallback scanner or fresh per-request graph. |
 | M2: analysis graph | Recursive configured targets return real providers and deterministic declared actions without execution | 3, 4, 5, 6 | Admitted inputs have complete structural identity/invalidation; named Slug-native ID bytes are explicit. |
 | M3: `query` | Bazel 9 unconfigured query semantics evaluate the loading graph | 8, 9 | Admitted non-regex semantics are exact; named regex functions follow the reviewed Slug-native valid-Unicode contract. |
 | M4: `cquery` | Configured query reads the same configured-target graph as analysis | 6, 8 | Transitions/providers/graph semantics match; provisional configuration ID bytes are explicitly Slug-native. |
 | M5: `aquery` | Action query reads the same Stage 6 action graph and implements Bazel 9.2.0's formatter shapes | 6, 8 | Graph/content/platform relationships match after only configuration/path/ActionKey opaque-token normalization. |
 | M6: execution and caching | Stage 6 actions execute and replay only through REAPI | 7 | BuildBuddy and local actiond evidence prove upload, execute, AC, and materialization with zero direct-local actions. |
-| M7: command/ruleset breadth | `build`, `run`, `test`, BEP, and public rulesets use the accepted graph and executor | 8 | Focused public fixtures match; stress projects remain supplemental. |
-| M8: bootstrap | Bazel-built Slug builds Slug and reaches a self-hosted fixed point | 10 | Stage1 and stage2 action graphs and declared outputs match. |
+| M7A: bootstrap-critical command/ruleset breadth | The exact repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, aquery shapes, and REAPI behavior needed by the Slug bootstrap closure use the accepted graph and executor | 4, 5, 6, 7, 8 | Focused bootstrap-closure fixtures match and Stage 10.3 can compare the ordinary Slug graph without a bootstrap-only path. |
+| M8: bootstrap | Bazel-built Slug builds Slug and reaches a self-hosted fixed point | 10 | Stage1 and stage2 action graphs and declared outputs match after only admitted normalization. |
+| M7B: remaining command/ruleset breadth | `run`, `test`, BEP, unrelated public rulesets, and command formats not required by the bootstrap closure use the accepted graph and executor | 8 | Focused public fixtures match; stress projects remain supplemental. |
 | M9: exact Bazel identity bytes | Reproduce Bazel configuration, configured-output, and ActionKey byte algorithms in Rust | 6, 8 | Existing four-domain evidence and new source audits prove exact bytes without JVM production code. |
 
 M3 progress: implementation commit `61ca25db` lands the first accepted

@@ -14,20 +14,42 @@ layout.
 
 This roadmap is a cross-stage adoption checklist, not Stage 11 and not a new
 scheduling authority. The canonical Live Status and compact current-packet
-manifest remain authoritative. Finish the active M7 packet without widening
-it; select the work below only through a later bounded packet.
+manifest remain authoritative. Do not widen the active M7 audit. The fixed
+handoff is acceptance of the first private core repository source-observation
+consumer, including any smallest prerequisite selected by the audit. This
+**source-consumer cutover** does not include package, loading, command, or
+public migration and does not move merely because a new packet becomes active.
+
+## Ordered adoption gates
+
+After the source-consumer cutover:
+
+1. run the focused M1 mutation/concurrent-request oracle and Buck2 DICE
+   transaction/publication audit;
+2. implement the smallest request-revision/source-certificate vertical;
+3. add Starlark, provider, action, aquery, and toolchain oracle subsets just in
+   time for the semantic owner each subset discriminates;
+4. install immutable action-owner context before broader action registration;
+5. complete only M7A bootstrap-critical repository, rules_rust, toolchain,
+   action/input-tree, aquery, and REAPI breadth;
+6. run M8 Stage 10.3/10.4 immediately after M7A; and
+7. resume M7B command/ruleset breadth before the later cache, progress,
+   explain, and watch workstreams whose prerequisites are then satisfied.
+
+M7A and M7B are scheduling gates within M7, not new milestones. M9 remains
+after the functional bootstrap path.
 
 ## Adoption matrix
 
 | Workstream | Owner | Compatibility | Prerequisite | Status |
 |------------|-------|---------------|--------------|--------|
 | Plan/prompt readiness guide | canonical/orchestration | Slug-native process | none | adopted in planning |
-| Starlark/provider/action/toolchain oracle wave | Stage 1 with Stages 4/6/8 | exact observable behavior | Bazel 9.2 provenance | planned |
-| Immutable request overlays, source certificates, and provisional publication | Stage 2/M1 | exact isolation/invalidation; Slug-native representation | accepted mutation oracle plus Buck2 DICE audit | planned |
+| Just-in-time Starlark/provider/action/aquery/toolchain oracle subsets | Stage 1 with Stages 4/6/8 | exact observable behavior | Bazel 9.2 provenance and a selected semantic owner | planned as bounded prerequisites, never one M1-blocking wave |
+| Immutable request overlays, source certificates, and provisional publication | Stage 2/M1 | exact isolation/invalidation; Slug-native representation | source-consumer cutover, focused mutation/concurrency oracle, and Buck2 DICE audit | scheduled first after the cutover |
 | Six-class memory-lifetime review | all stages | Slug-native architecture | packet touches retained/cache/async state | adopted in planning |
-| Natural evaluated `.bzl` producer and repository owner/materializer split | Stages 4/5 | exact semantics; Slug-native Rust boundaries | active M7 graph owners | planned audit |
-| Immutable action-owner context | Stage 6 | exact platform/exec-group semantics; Slug-native storage | broader action registration | planned |
-| REAPI concurrency/interoperability oracle wave | Stage 7 | exact REAPI behavior | broader action kinds/input trees | planned |
+| Natural evaluated `.bzl` producer and repository owner/materializer split | Stages 4/5 | exact semantics; Slug-native Rust boundaries | accepted graph owners and first private source-observation consumer | in progress through the fixed cutover |
+| Immutable action-owner context | Stage 6 | exact platform/exec-group semantics; Slug-native storage | M1 request-revision vertical and relevant oracle subset | planned before broader action registration |
+| REAPI concurrency/interoperability oracle wave | Stage 7 | exact REAPI behavior | M7A action kinds/input trees | planned before bootstrap execution |
 | Sparse AC/CAS repository-output cache | Stages 5/7 | exact only after Bazel-compatible initial identity; otherwise Slug-native | generated-repository owner and recorded inputs | deferred |
 | Producer-owned truthful progress | Stages 7/8 | Slug-native presentation | stable execution observations | deferred |
 | Explain/provenance command | Stages 6/8 | Slug-native diagnostic format | immutable action owner and revision provenance | deferred |
@@ -49,14 +71,20 @@ it; select the work below only through a later bounded packet.
       and measured rejected-experiment discipline.
 - [x] Record all agreed architecture, fixture, product, and non-adoption items
       in their owning stage plans.
-- [x] Keep the active M7 packet unchanged.
+- [x] Keep the active M7 audit unchanged and name its first-consumer acceptance
+      as the fixed cutover.
 
 ## Fixture adoption checklist
 
 Translate fixture themes into the Slug oracle harness. Zabel output is design
 evidence only; generate acceptance results from the pinned Bazel 9.2 oracle.
 
-### Wave A: before broader analysis/action work
+Wave A is a catalog, not one schedulable packet or a prerequisite for M1. Split
+it by natural owner and add only the subset that discriminates the next
+semantic implementation. The M1 request-revision packet instead uses its own
+focused mutation/concurrent-request oracle and Buck2 DICE evidence.
+
+### Wave A: just in time before the relevant analysis/action owner
 
 - [ ] Port the Starlark call/error-order matrix: callable lookup, positional
       and named expansion, duplicate/error precedence, `*args`/`**kwargs`,
@@ -86,6 +114,13 @@ evidence only; generate acceptance results from the pinned Bazel 9.2 oracle.
 ## Architecture adoption checklist
 
 ### Request revisions and source certificates
+
+Repository capability, path, source-input, and source-observation certificates
+accepted before the cutover are producer-owned leaf facts. They are not the M1
+request-level source certificate until one request unions every demanded
+observation and tracked dependency, reobserves mutable inputs, and atomically
+accepts or retries one compatible effective revision. Do not mark this
+workstream complete from the presence of a type named `Certificate`.
 
 - [ ] Define a complete immutable request overlay with narrow projections;
       command-local expressions and output modes never become semantic keys.

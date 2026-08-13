@@ -132,11 +132,18 @@ shape.
 
 ### 2.5A Request revisions, source certificates, and memory lifetimes
 
-The next M1 architecture packet after the active M7 work and its prerequisite
-oracle must replace coarse production snapshot authority with a Buck2-DICE-
-native request/revision contract. Zabel's versioned-session design is concept
-and test evidence only; do not port its custom engine, scheduler, token model,
-or source-certificate implementation.
+The next M1 architecture packet is scheduled immediately after the fixed M7
+source-consumer cutover: acceptance of the first private core repository
+source-observation consumer, including only any smallest prerequisite selected
+by the current audit. Its only advance evidence gate is the focused
+mutation/concurrent-request oracle plus the applicable Buck2 DICE transaction
+and publication audit. Unrelated Starlark/provider/action/toolchain oracle
+subsets do not block M1.
+
+That packet must replace coarse production snapshot authority with a
+Buck2-DICE-native request/revision contract. Zabel's versioned-session design
+is concept and test evidence only; do not port its custom engine, scheduler,
+token model, or source-certificate implementation.
 
 #### Required request contract
 
@@ -155,6 +162,12 @@ opens a request that owns:
   inputs, and materialized immutable roots; and
 - a source certificate that is the union of those exact observations and
   tracked semantic dependencies.
+
+The repository capability, path, source-input, and source-observation
+certificates accepted before this packet are leaf producer facts. They do not
+satisfy this request-level certificate contract until a request unions all
+demanded observations and tracked dependencies, performs final reobservation,
+and accepts or retries one compatible effective revision.
 
 Source-facing computations remain request-private until final validation:
 
