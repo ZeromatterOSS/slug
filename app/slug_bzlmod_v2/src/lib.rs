@@ -329,6 +329,18 @@ pub use source_preparation::HostRepositorySourceInputDispositionView;
 pub use source_preparation::HostRepositorySourceInputError;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceInputView;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservation;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationError;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationKey;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationOutcome;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationResult;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceObservationView;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;

@@ -58,6 +58,9 @@ use starlark_map::small_set::SmallSet;
 
 use crate::BuiltinBazelToolsRouteIdentity;
 use crate::BuiltinBazelToolsSnapshot;
+use crate::BuiltinBazelToolsSourceFileError;
+use crate::BuiltinBazelToolsSourceFileKey;
+use crate::BuiltinBazelToolsSourceFileValue;
 use crate::EvaluatedNonrootModule;
 use crate::HostRepositorySourceCapability;
 use crate::HostRepositorySourceCapabilitySource;
@@ -3008,6 +3011,205 @@ pub fn host_repository_source_input(
     })
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostRepositorySourceObservation {
+    Builtin(BuiltinBazelToolsSourceFileValue),
+    Request(HostRepositorySourceFileValue),
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Copy)]
+pub enum HostRepositorySourceObservationView<'a> {
+    Builtin(&'a BuiltinBazelToolsSourceFileValue),
+    Request(&'a HostRepositorySourceFileValue),
+}
+
+impl HostRepositorySourceObservation {
+    #[doc(hidden)]
+    pub fn view(&self) -> HostRepositorySourceObservationView<'_> {
+        match self {
+            Self::Builtin(value) => HostRepositorySourceObservationView::Builtin(value),
+            Self::Request(value) => HostRepositorySourceObservationView::Request(value),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostRepositorySourceObservationErrorKind {
+    BuiltinPath,
+    Builtin(BuiltinBazelToolsSourceFileError),
+    BuiltinCompute(Arc<str>),
+    Request(RepositorySourceFileError),
+    RequestCompute(Arc<str>),
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRepositorySourceObservationError {
+    input: HostRepositorySourceInput,
+    relative_path: HostRepositoryRelativePath,
+    kind: HostRepositorySourceObservationErrorKind,
+}
+
+impl HostRepositorySourceObservationError {
+    #[doc(hidden)]
+    pub fn input(&self) -> &HostRepositorySourceInput {
+        &self.input
+    }
+
+    #[doc(hidden)]
+    pub fn relative_path(&self) -> &HostRepositoryRelativePath {
+        &self.relative_path
+    }
+}
+
+impl fmt::Display for HostRepositorySourceObservationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
+}
+
+impl std::error::Error for HostRepositorySourceObservationError {}
+
+#[doc(hidden)]
+pub type HostRepositorySourceObservationResult =
+    Result<HostRepositorySourceObservation, HostRepositorySourceObservationError>;
+#[doc(hidden)]
+pub type HostRepositorySourceObservationOutcome =
+    SourcePreparationOutcome<Arc<HostRepositorySourceObservationResult>>;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRepositorySourceObservationKey {
+    input: HostRepositorySourceInput,
+    relative_path: HostRepositoryRelativePath,
+}
+
+impl HostRepositorySourceObservationKey {
+    #[doc(hidden)]
+    pub fn new(
+        input: HostRepositorySourceInput,
+        relative_path: HostRepositoryRelativePath,
+    ) -> Self {
+        Self {
+            input,
+            relative_path,
+        }
+    }
+}
+
+impl Hash for HostRepositorySourceObservationKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.input.capability.hash(state);
+        std::mem::discriminant(&self.input.disposition).hash(state);
+        if let HostRepositoryMaterializationDisposition::Request(request) = &self.input.disposition
+        {
+            request.id.hash(state);
+        }
+        self.relative_path.path_arc().hash(state);
+    }
+}
+
+impl fmt::Display for HostRepositorySourceObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-repository-source-observation:{}:{}",
+            self.input.capability.canonical_repo(),
+            self.relative_path.as_path().display()
+        )
+    }
+}
+
+fn source_observation_complete(
+    value: HostRepositorySourceObservationResult,
+) -> HostRepositorySourceObservationOutcome {
+    SourcePreparationOutcome::Complete(Arc::new(value))
+}
+
+#[async_trait]
+impl Key for HostRepositorySourceObservationKey {
+    type Value = HostRepositorySourceObservationOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let terminal = |kind| {
+            source_observation_complete(Err(HostRepositorySourceObservationError {
+                input: self.input.clone(),
+                relative_path: self.relative_path.clone(),
+                kind,
+            }))
+        };
+        match self.input.view().disposition() {
+            HostRepositorySourceInputDispositionView::Builtin(identity) => {
+                let Some(path) = self.relative_path.as_path().to_str() else {
+                    return terminal(HostRepositorySourceObservationErrorKind::BuiltinPath);
+                };
+                match ctx
+                    .compute(&BuiltinBazelToolsSourceFileKey::new(
+                        identity.snapshot(),
+                        path,
+                    ))
+                    .await
+                {
+                    Ok(value) => match value.as_ref() {
+                        Ok(value) => source_observation_complete(Ok(
+                            HostRepositorySourceObservation::Builtin(value.clone()),
+                        )),
+                        Err(error) => terminal(HostRepositorySourceObservationErrorKind::Builtin(
+                            error.clone(),
+                        )),
+                    },
+                    Err(error) => {
+                        terminal(HostRepositorySourceObservationErrorKind::BuiltinCompute(
+                            error.to_string().into(),
+                        ))
+                    }
+                }
+            }
+            HostRepositorySourceInputDispositionView::Request(request) => {
+                let materialization = match ctx
+                    .compute(&RepositoryMaterializationResultKey {
+                        request: request.clone(),
+                    })
+                    .await
+                {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return terminal(HostRepositorySourceObservationErrorKind::RequestCompute(
+                            error.to_string().into(),
+                        ));
+                    }
+                };
+                let outcome = observed_repository_source_file_from_materialization(
+                    ctx,
+                    materialization,
+                    self.relative_path.as_path(),
+                    self.relative_path.path_arc().clone(),
+                )
+                .await;
+                match host_repository_source_file_value(outcome) {
+                    SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                    SourcePreparationOutcome::Complete(Ok(value)) => source_observation_complete(
+                        Ok(HostRepositorySourceObservation::Request(value)),
+                    ),
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        terminal(HostRepositorySourceObservationErrorKind::Request(error))
+                    }
+                }
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 fn root_repository_materialization_request(
     route: &RootRepositoryRoute,
 ) -> Result<Arc<RepositoryMaterializationRequest>, RepositoryMaterializationError> {
@@ -4635,6 +4837,63 @@ mod tests {
     }
 
     #[derive(Default)]
+    struct SourceObservationTracker {
+        observation: Mutex<Vec<(ActivationKind, bool)>>,
+        builtin: Mutex<Vec<ActivationKind>>,
+        result: Mutex<Vec<ActivationKind>>,
+        forbidden: Mutex<Vec<String>>,
+    }
+
+    impl ActivationTracker for SourceObservationTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let kind = activation.kind();
+            if key
+                .downcast_ref::<HostRepositorySourceObservationKey>()
+                .is_some()
+            {
+                self.observation
+                    .lock()
+                    .unwrap()
+                    .push((kind, activation.evaluation_data().is_none()));
+            } else if key
+                .downcast_ref::<BuiltinBazelToolsSourceFileKey>()
+                .is_some()
+            {
+                self.builtin.lock().unwrap().push(kind);
+            } else if key
+                .downcast_ref::<RepositoryMaterializationResultKey>()
+                .is_some()
+            {
+                self.result.lock().unwrap().push(kind);
+            } else if key.downcast_ref::<HostRepositoryPathKey>().is_some()
+                || key.downcast_ref::<HostRepositorySourceFileKey>().is_some()
+                || key.downcast_ref::<RepositorySourceFileKey>().is_some()
+                || key.downcast_ref::<RepositoryMaterializationKey>().is_some()
+                || key
+                    .downcast_ref::<RepositoryMaterializationGenerationKey>()
+                    .is_some()
+                || key.downcast_ref::<RootRepositoryRouteKey>().is_some()
+                || key
+                    .downcast_ref::<crate::RepositoryPackageSourceKey>()
+                    .is_some()
+                || key.downcast_ref::<crate::RootPackageSourceKey>().is_some()
+            {
+                self.forbidden.lock().unwrap().push(key.to_string());
+            }
+        }
+    }
+
+    #[derive(Default)]
     struct DirectTracker(Mutex<Vec<(ActivationKind, bool)>>);
     impl ActivationTracker for DirectTracker {
         fn key_activated(
@@ -5357,6 +5616,483 @@ mod tests {
                     &baseline_spec,
                     WorkspaceRelative,
                 )
+            );
+        }
+    }
+
+    fn source_observation_key(
+        input: HostRepositorySourceInput,
+        path: &str,
+    ) -> HostRepositorySourceObservationKey {
+        HostRepositorySourceObservationKey::new(
+            input,
+            host_repository_relative_path(path.into()).unwrap(),
+        )
+    }
+
+    #[tokio::test]
+    async fn source_observation_builtin_is_lossless_and_scope_free() {
+        let input = host_repository_source_input(
+            RootRepositoryRoute::builtin_for_test(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+            )
+            .source_capability(),
+        )
+        .unwrap();
+        let key = source_observation_key(input.clone(), "MODULE.bazel");
+        assert_eq!(
+            DynKey::from_key(key.clone()).request_value::<RepositorySourceScope>(),
+            None
+        );
+        let tracker = Arc::new(SourceObservationTracker::default());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        };
+        let mut tx = dice.updater_with_data(user_data).commit().await;
+        let outcome = tx.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(value) = &outcome else {
+            unreachable!()
+        };
+        let HostRepositorySourceObservationView::Builtin(value) =
+            value.as_ref().as_ref().unwrap().view()
+        else {
+            unreachable!()
+        };
+        assert_eq!(value.path(), "MODULE.bazel");
+        assert_eq!(
+            value.sha256().as_slice(),
+            Sha256::digest(value.bytes()).as_slice()
+        );
+        assert!(!value.bytes().is_empty());
+        assert!(value.executable());
+        assert!(HostRepositorySourceObservationKey::equality(
+            &tx.compute(&key).await.unwrap(),
+            &outcome,
+        ));
+        assert_eq!(
+            tracker.observation.lock().unwrap().as_slice(),
+            &[
+                (ActivationKind::Evaluated, true),
+                (ActivationKind::Reused, true)
+            ]
+        );
+        assert_eq!(
+            tracker.builtin.lock().unwrap().as_slice(),
+            &[ActivationKind::Evaluated]
+        );
+        assert!(tracker.forbidden.lock().unwrap().is_empty());
+        let unsupported = source_observation_key(input.clone(), "not/in/catalog");
+        let SourcePreparationOutcome::Complete(error) = dice
+            .updater()
+            .commit()
+            .await
+            .compute(&unsupported)
+            .await
+            .unwrap()
+        else {
+            unreachable!()
+        };
+        let error = error.as_ref().as_ref().unwrap_err();
+        assert_eq!(error.input(), &input);
+        assert_eq!(error.relative_path().as_path(), Path::new("not/in/catalog"));
+        assert!(matches!(
+            error.kind,
+            HostRepositorySourceObservationErrorKind::Builtin(
+                BuiltinBazelToolsSourceFileError::UnsupportedCatalog { .. }
+            )
+        ));
+        let directory = source_observation_key(input.clone(), "tools");
+        let SourcePreparationOutcome::Complete(error) = dice
+            .updater()
+            .commit()
+            .await
+            .compute(&directory)
+            .await
+            .unwrap()
+        else {
+            unreachable!()
+        };
+        assert!(matches!(
+            error.as_ref().as_ref().unwrap_err().kind,
+            HostRepositorySourceObservationErrorKind::Builtin(
+                BuiltinBazelToolsSourceFileError::WrongKind { .. }
+            )
+        ));
+        assert!(HostRepositorySourceObservationKey::equality(
+            &outcome, &outcome
+        ));
+        let mut a = DefaultHasher::new();
+        key.hash(&mut a);
+        let mut b = DefaultHasher::new();
+        source_observation_key(input, "other").hash(&mut b);
+        assert_ne!(a.finish(), b.finish());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn source_observation_builtin_rejects_non_utf8_without_catalog_compute() {
+        use std::os::unix::ffi::OsStringExt;
+
+        let input = host_repository_source_input(
+            RootRepositoryRoute::builtin_for_test(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+            )
+            .source_capability(),
+        )
+        .unwrap();
+        let path = PathBuf::from(std::ffi::OsString::from_vec(vec![b'x', 0xff]));
+        let key = HostRepositorySourceObservationKey::new(
+            input,
+            host_repository_relative_path(path).unwrap(),
+        );
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let SourcePreparationOutcome::Complete(value) =
+            dice.updater().commit().await.compute(&key).await.unwrap()
+        else {
+            unreachable!()
+        };
+        assert!(matches!(
+            value.as_ref().as_ref().unwrap_err().kind,
+            HostRepositorySourceObservationErrorKind::BuiltinPath
+        ));
+    }
+
+    #[tokio::test]
+    async fn source_observation_request_forwards_first_need_and_shares_input() {
+        let route = local_route();
+        let input = host_repository_source_input(route.source_capability()).unwrap();
+        let key = source_observation_key(input.clone(), "BUILD.bazel");
+        let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+        else {
+            unreachable!()
+        };
+        let retained_request = request.clone();
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    [],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        let mut tx = updater.commit().await;
+        let need = tx.compute(&key).await.unwrap();
+        assert!(!HostRepositorySourceObservationKey::validity(&need));
+        assert!(!HostRepositorySourceObservationKey::equality(&need, &need));
+        let SourcePreparationOutcome::Need(need) = need else {
+            unreachable!()
+        };
+        assert_eq!(
+            need.repository_materializations().values().next().unwrap(),
+            request
+        );
+        assert!(Arc::ptr_eq(request, &retained_request));
+        let cloned = key.clone();
+        let HostRepositorySourceInputDispositionView::Request(cloned_request) =
+            cloned.input.view().disposition()
+        else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(request, cloned_request));
+        assert!(Arc::ptr_eq(
+            key.relative_path.path_arc(),
+            cloned.relative_path.path_arc()
+        ));
+    }
+
+    fn observation_hash(key: &HostRepositorySourceObservationKey) -> u64 {
+        let mut state = DefaultHasher::new();
+        key.hash(&mut state);
+        state.finish()
+    }
+
+    #[test]
+    fn source_observation_identity_hash_and_errors_are_structural() {
+        let route = immutable_route();
+        let spec = route.repo_spec().clone();
+        let make = |workspace: &str,
+                    apparent: &str,
+                    canonical: &str,
+                    spec: &RepoSpec,
+                    policy: HostRepositoryLocalPathPolicy,
+                    path: &str| {
+            source_observation_key(
+                host_repository_source_input(
+                    HostRepositorySourceCapability::from_repo_spec(
+                        NormalizedAbsolutePath::new(workspace).unwrap(),
+                        ApparentRepoName::new(apparent).unwrap(),
+                        CanonicalRepoName::new(canonical).unwrap(),
+                        spec,
+                        policy,
+                    )
+                    .unwrap(),
+                )
+                .unwrap(),
+                path,
+            )
+        };
+        macro_rules! make_key {
+            ($workspace:expr, $apparent:expr, $canonical:expr, $spec:expr, $policy:expr, $path:expr) => {
+                make($workspace, $apparent, $canonical, $spec, $policy, $path)
+            };
+        }
+        #[rustfmt::skip]
+        let baseline = make_key!("/workspace", "dep_alias", "dep+", &spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "BUILD.bazel");
+        let mut changed_spec = spec.clone();
+        changed_spec.attributes = Arc::new(SmallMap::from_iter([(
+            CompactString::new("urls"),
+            OverrideAttributeValue::String("https://example.test/archive.tgz".into()),
+        )]));
+        #[rustfmt::skip]
+        let variants = [
+            (make_key!("/other", "dep_alias", "dep+", &spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "BUILD.bazel"), false),
+            (make_key!("/workspace", "other_alias", "dep+", &spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "BUILD.bazel"), true),
+            (make_key!("/workspace", "dep_alias", "other+", &spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "BUILD.bazel"), false),
+            (make_key!("/workspace", "dep_alias", "dep+", &changed_spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "BUILD.bazel"), true),
+            (make_key!("/workspace", "dep_alias", "dep+", &spec, HostRepositoryLocalPathPolicy::CommandAbsolute, "BUILD.bazel"), true),
+            (source_observation_key(host_repository_source_input(local_route().source_capability()).unwrap(), "BUILD.bazel"), true),
+            (make_key!("/workspace", "dep_alias", "dep+", &spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "other"), true),
+        ];
+        let HostRepositorySourceInputDispositionView::Request(baseline_request) =
+            baseline.input.view().disposition()
+        else {
+            unreachable!()
+        };
+        for (variant, same_id) in &variants {
+            assert_ne!(&baseline, variant);
+            assert_ne!(observation_hash(&baseline), observation_hash(variant));
+            if *same_id {
+                let HostRepositorySourceInputDispositionView::Request(request) =
+                    variant.input.view().disposition()
+                else {
+                    unreachable!()
+                };
+                assert_eq!(request.id, baseline_request.id);
+            }
+            #[rustfmt::skip]
+            let restored = make_key!("/workspace", "dep_alias", "dep+", &spec, HostRepositoryLocalPathPolicy::WorkspaceRelative, "BUILD.bazel");
+            assert_eq!(restored, baseline);
+            assert_eq!(observation_hash(&restored), observation_hash(&baseline));
+        }
+        #[rustfmt::skip]
+        let builtin = source_observation_key(host_repository_source_input(RootRepositoryRoute::builtin_for_test(NormalizedAbsolutePath::new("/workspace").unwrap()).source_capability()).unwrap(), "BUILD.bazel");
+        assert_ne!(baseline, builtin);
+        assert_ne!(observation_hash(&baseline), observation_hash(&builtin));
+
+        #[rustfmt::skip]
+        let integrity = HostRepositorySourceObservationError { input: builtin.input.clone(), relative_path: builtin.relative_path.clone(), kind: HostRepositorySourceObservationErrorKind::Builtin(BuiltinBazelToolsSourceFileError::Integrity { path: "BUILD.bazel".into(), expected_sha256: "expected".into(), actual_sha256: "actual".into() }) };
+        #[rustfmt::skip]
+        let builtin_compute = HostRepositorySourceObservationError { kind: HostRepositorySourceObservationErrorKind::BuiltinCompute("compute".into()), ..integrity.clone() };
+        #[rustfmt::skip]
+        let request_observation = HostRepositorySourceObservationError { input: baseline.input.clone(), relative_path: baseline.relative_path.clone(), kind: HostRepositorySourceObservationErrorKind::Request(RepositorySourceFileError::Observation { repo_relative_path: baseline.relative_path.path_arc().clone(), operation: PathObservationOperation::FileBytes, error: PathObservationError::NotALink }) };
+        #[rustfmt::skip]
+        let request_compute = HostRepositorySourceObservationError { kind: HostRepositorySourceObservationErrorKind::RequestCompute("compute".into()), ..request_observation.clone() };
+        assert_ne!(integrity, builtin_compute);
+        assert_ne!(request_observation, request_compute);
+        #[rustfmt::skip]
+        let same_path = Arc::ptr_eq(request_observation.relative_path().path_arc(), baseline.relative_path.path_arc());
+        assert!(same_path);
+        assert_eq!(request_observation.input(), &baseline.input);
+    }
+
+    async fn observation_transaction(
+        dice: &Arc<Dice>,
+        tracker: Arc<SourceObservationTracker>,
+        materialization: RepositoryMaterializationResultEpoch,
+        observations: PathObservationEpoch,
+    ) -> dice::DiceTransaction {
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                materialization,
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[tokio::test]
+    async fn source_observation_request_local_immutable_errors_recover_and_reuse() {
+        let input = host_repository_source_input(local_route().source_capability()).unwrap();
+        let key = source_observation_key(input.clone(), "BUILD.bazel");
+        let tracker = Arc::new(SourceObservationTracker::default());
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut tx = observation_transaction(
+            &dice,
+            tracker.clone(),
+            material("dep"),
+            host_path_epoch(
+                PathObservationNamespace::Host,
+                "/workspace/dep/BUILD.bazel",
+                Some(PathNodeKind::RegularFile),
+                Some(b"local"),
+            ),
+        )
+        .await;
+        let a = tx.compute(&key).await.unwrap();
+        let SourcePreparationOutcome::Complete(value) = &a else {
+            unreachable!()
+        };
+        assert!(matches!(
+            value.as_ref().as_ref().unwrap().view(),
+            HostRepositorySourceObservationView::Request(
+                HostRepositorySourceFileValue::Present { bytes, logical_path }
+            ) if bytes.as_ref() == b"local"
+                && logical_path.as_path() == Path::new("/workspace/dep/BUILD.bazel")
+        ));
+        assert!(HostRepositorySourceObservationKey::equality(
+            &tx.compute(&key).await.unwrap(),
+            &a,
+        ));
+        #[rustfmt::skip]
+        let expected_lifecycle = [(ActivationKind::Evaluated, true), (ActivationKind::Reused, true)];
+        assert_eq!(
+            tracker.observation.lock().unwrap().as_slice(),
+            &expected_lifecycle
+        );
+        assert_eq!(
+            *tracker.result.lock().unwrap(),
+            vec![ActivationKind::Evaluated]
+        );
+        assert!(tracker.forbidden.lock().unwrap().is_empty());
+
+        let mut updater = tx.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                host_path_epoch(
+                    PathObservationNamespace::Host,
+                    "/workspace/dep/BUILD.bazel",
+                    Some(PathNodeKind::Directory),
+                    None,
+                ),
+            )])
+            .unwrap();
+        tx = updater.commit().await;
+        let SourcePreparationOutcome::Complete(error) = tx.compute(&key).await.unwrap() else {
+            unreachable!()
+        };
+        let error = error.as_ref().as_ref().unwrap_err();
+        assert_eq!(error.input(), &input);
+        assert!(Arc::ptr_eq(
+            error.relative_path().path_arc(),
+            key.relative_path.path_arc()
+        ));
+        assert!(matches!(
+            error.kind,
+            HostRepositorySourceObservationErrorKind::Request(
+                RepositorySourceFileError::WrongKind {
+                    actual: PathNodeKind::Directory,
+                    ..
+                }
+            )
+        ));
+
+        let HostRepositorySourceInputDispositionView::Request(request) = input.view().disposition()
+        else {
+            unreachable!()
+        };
+        let mut updater = tx.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    [RepositoryMaterializationEpochEntry {
+                        request: request.clone(),
+                        result: RepositoryMaterializationResult::SpecError("bad spec".into()),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        tx = updater.commit().await;
+        let SourcePreparationOutcome::Complete(error) = tx.compute(&key).await.unwrap() else {
+            unreachable!()
+        };
+        assert!(matches!(
+            error.as_ref().as_ref().unwrap_err().kind,
+            HostRepositorySourceObservationErrorKind::Request(
+                RepositorySourceFileError::Materialization { .. }
+            )
+        ));
+
+        #[rustfmt::skip]
+        let mut restored = observation_transaction(&dice, Arc::new(SourceObservationTracker::default()), material("dep"), host_path_epoch(PathObservationNamespace::Host, "/workspace/dep/BUILD.bazel", Some(PathNodeKind::RegularFile), Some(b"local"))).await;
+        #[rustfmt::skip]
+        let restored_matches = HostRepositorySourceObservationKey::equality(&restored.compute(&key).await.unwrap(), &a);
+        assert!(restored_matches);
+
+        let immutable_input =
+            host_repository_source_input(immutable_route().source_capability()).unwrap();
+        let immutable_key = source_observation_key(immutable_input, "BUILD.bazel");
+        let immutable_instance = PathObservationInstanceId::new(17);
+        #[rustfmt::skip]
+        let mut immutable_tx = observation_transaction(&dice, Arc::new(SourceObservationTracker::default()), immutable_material("/generation", immutable_instance), host_path_epoch(PathObservationNamespace::Materialization(immutable_instance), "/generation/BUILD.bazel", Some(PathNodeKind::RegularFile), Some(b"immutable"))).await;
+        let SourcePreparationOutcome::Complete(value) =
+            immutable_tx.compute(&immutable_key).await.unwrap()
+        else {
+            unreachable!()
+        };
+        assert!(matches!(
+            value.as_ref().as_ref().unwrap().view(),
+            HostRepositorySourceObservationView::Request(
+                HostRepositorySourceFileValue::Present { bytes, logical_path }
+            ) if bytes.as_ref() == b"immutable"
+                && logical_path.as_path() == Path::new("/generation/BUILD.bazel")
+        ));
+        #[rustfmt::skip]
+        let mut absent_tx = observation_transaction(&dice, Arc::new(SourceObservationTracker::default()), immutable_material("/generation", immutable_instance), host_path_epoch(PathObservationNamespace::Materialization(immutable_instance), "/generation/BUILD.bazel", None, None)).await;
+        #[rustfmt::skip]
+        let is_absent = matches!(absent_tx.compute(&immutable_key).await.unwrap(), SourcePreparationOutcome::Complete(value) if matches!(value.as_ref().as_ref().unwrap().view(), HostRepositorySourceObservationView::Request(HostRepositorySourceFileValue::Absent)));
+        assert!(is_absent);
+    }
+
+    #[test]
+    fn source_observation_production_has_no_legacy_or_second_result_owner() {
+        let source = include_str!("source_preparation.rs");
+        let start = source
+            .find("pub struct HostRepositorySourceObservationKey")
+            .unwrap();
+        let end = source[start..]
+            .find("fn root_repository_materialization_request")
+            .unwrap()
+            + start;
+        let production = &source[start..end];
+        assert_eq!(
+            production
+                .matches("RepositoryMaterializationResultKey")
+                .count(),
+            1
+        );
+        for forbidden in [
+            "HostRepositoryPathKey",
+            "HostRepositorySourceFileKey",
+            "RepositorySourceScope",
+            "RootRepositoryRoute",
+        ] {
+            assert!(
+                !production.contains(forbidden),
+                "forbidden edge: {forbidden}"
             );
         }
     }
