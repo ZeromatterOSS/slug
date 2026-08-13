@@ -3092,3 +3092,19 @@ root-mapping publication implementation under 240/420/660 against `d624dc5b`.
 Complete the frozen proof without production or scope widening. Stage 4 remains
 unchanged; no third file, extra key/store, consumer, route/source/materializer,
 I/O, loading/core/server/Cargo, stable API, or JVM work is authorized.
+
+### Root mapping accepted; root apparent-composition design scheduled (2026-08-13)
+
+Independent review accepts root mapping publication `927c00af` at
+201 production/360 tests/561 total lines with full Bzlmod/loading/server proof
+and only the unchanged core external-visibility boundary. Run only four-ledger
+docs packet `WP-4-5-6-host-root-apparent-mapping-composition-owner-design`
+under 40/260/220/220/740 documentation caps.
+
+Freeze an in-place Root branch on core's existing private canonical apparent
+mapping key: Root computes only the accepted hidden root mapping; nonroot keeps
+the existing canonical-definition predecessor; both borrow their exact retained
+targets. Future Rust is only existing `generated_repository_definition.rs`
+under 180/420/600 and a 2,600-line cohesion ceiling. Stage 4 production remains
+unchanged. No new key/file, copied map, route/RepoSpec/source/materializer,
+public API, I/O, command/server, or JVM work is authorized.

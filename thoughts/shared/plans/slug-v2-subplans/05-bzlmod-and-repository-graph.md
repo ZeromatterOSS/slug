@@ -3162,3 +3162,20 @@ Independent review accepts cap correction `054f70f7`. Run only
 ordinal ABI, opaque terminals, exact proof, compatibility, and all stops. No
 additional key/store/file, consumer, route/source/materialization, I/O, or
 loading/core/server/Cargo/public/JVM breadth is authorized.
+
+### Root mapping accepted; core root apparent consumer designed next (2026-08-13)
+
+Root mapping publication `927c00af` is independently accepted at
+201 production/360 tests/561 total lines. It preserves the sole selected-
+extension producer, publishes the exact final ordered Root mapping by borrowed
+view, and passes full Bzlmod/loading/server validation with only the unchanged
+core external-visibility boundary.
+
+Run only docs packet
+`WP-4-5-6-host-root-apparent-mapping-composition-owner-design` under
+40/260/220/220/740 caps. Freeze core's existing private apparent-mapping key to
+dispatch Root contexts only to the hidden Root publication and nonroot contexts
+only to the accepted canonical-definition predecessor. Future Rust is one
+existing core file under 180/420/600 and a 2,600-line cohesion ceiling. No new
+key/store/file, Bzlmod/loading/server edit, route/RepoSpec/source/materializer,
+I/O, public/command API, or JVM work is authorized.
