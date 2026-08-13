@@ -16,12 +16,14 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalRepoName;
 use slug_loading_v2::HostGeneratedRepositoryMapping;
 use slug_loading_v2::HostValidatedGeneratedRepositorySpecs;
 use slug_loading_v2::HostValidatedGeneratedRepositorySpecsError;
 use slug_loading_v2::HostValidatedModuleExtensionRepositoriesKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use starlark_map::small_map::SmallMap;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct HostGeneratedRepositoryDefinition {
@@ -219,6 +221,209 @@ impl Key for HostGeneratedRepositoryDefinitionKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostGeneratedRepositoryApparentMapping {
+    predecessor: HostGeneratedRepositoryDefinition,
+    apparent_repo: ApparentRepoName,
+}
+
+impl HostGeneratedRepositoryApparentMapping {
+    fn resolved_target(&self) -> Option<&CanonicalRepoName> {
+        self.predecessor
+            .view()?
+            .mapping
+            .entries()
+            .get(&self.apparent_repo)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostGeneratedRepositoryApparentMappingErrorKind {
+    RootContext,
+    RootApparent,
+    Definition(HostGeneratedRepositoryDefinitionError),
+    DefinitionCompute(Arc<str>),
+    ContextMismatch {
+        predecessor: HostGeneratedRepositoryDefinition,
+    },
+    Missing {
+        predecessor: HostGeneratedRepositoryDefinition,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+struct HostGeneratedRepositoryApparentMappingError {
+    context_repo: CanonicalRepoName,
+    apparent_repo: ApparentRepoName,
+    kind: HostGeneratedRepositoryApparentMappingErrorKind,
+}
+
+impl fmt::Display for HostGeneratedRepositoryApparentMappingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "generated repository '{}' apparent mapping '{}': {:?}",
+            self.context_repo, self.apparent_repo, self.kind
+        )
+    }
+}
+
+impl std::error::Error for HostGeneratedRepositoryApparentMappingError {}
+
+type HostGeneratedRepositoryApparentMappingOutcome = SourcePreparationOutcome<
+    Arc<
+        Result<HostGeneratedRepositoryApparentMapping, HostGeneratedRepositoryApparentMappingError>,
+    >,
+>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct HostGeneratedRepositoryApparentMappingKey {
+    workspace: NormalizedAbsolutePath,
+    context_repo: CanonicalRepoName,
+    apparent_repo: ApparentRepoName,
+}
+
+impl HostGeneratedRepositoryApparentMappingKey {
+    fn new(
+        workspace: NormalizedAbsolutePath,
+        context_repo: CanonicalRepoName,
+        apparent_repo: ApparentRepoName,
+    ) -> Self {
+        Self {
+            workspace,
+            context_repo,
+            apparent_repo,
+        }
+    }
+}
+
+impl fmt::Display for HostGeneratedRepositoryApparentMappingKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "host-generated-repository-apparent-mapping:{}:{}:{}",
+            self.workspace, self.context_repo, self.apparent_repo
+        )
+    }
+}
+
+fn complete_mapping(
+    value: Result<
+        HostGeneratedRepositoryApparentMapping,
+        HostGeneratedRepositoryApparentMappingError,
+    >,
+) -> HostGeneratedRepositoryApparentMappingOutcome {
+    SourcePreparationOutcome::Complete(Arc::new(value))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MappingLookupError {
+    Context,
+    Missing,
+}
+
+fn mapping_target<'a>(
+    requested_context: &CanonicalRepoName,
+    selected_context: &CanonicalRepoName,
+    mapping_context: &CanonicalRepoName,
+    entries: &'a SmallMap<ApparentRepoName, CanonicalRepoName>,
+    apparent_repo: &ApparentRepoName,
+) -> Result<&'a CanonicalRepoName, MappingLookupError> {
+    if selected_context != requested_context || mapping_context != requested_context {
+        return Err(MappingLookupError::Context);
+    }
+    entries
+        .get(apparent_repo)
+        .ok_or(MappingLookupError::Missing)
+}
+
+#[async_trait]
+impl Key for HostGeneratedRepositoryApparentMappingKey {
+    type Value = HostGeneratedRepositoryApparentMappingOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let terminal = |kind| {
+            complete_mapping(Err(HostGeneratedRepositoryApparentMappingError {
+                context_repo: self.context_repo.clone(),
+                apparent_repo: self.apparent_repo.clone(),
+                kind,
+            }))
+        };
+        if self.context_repo.is_root() {
+            return terminal(HostGeneratedRepositoryApparentMappingErrorKind::RootContext);
+        }
+        if self.apparent_repo.is_root() {
+            return terminal(HostGeneratedRepositoryApparentMappingErrorKind::RootApparent);
+        }
+
+        let predecessor = match ctx
+            .compute(&HostGeneratedRepositoryDefinitionKey::new(
+                self.workspace.clone(),
+                self.context_repo.clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                Ok(value) => value.clone(),
+                Err(error) => {
+                    return terminal(HostGeneratedRepositoryApparentMappingErrorKind::Definition(
+                        error.clone(),
+                    ));
+                }
+            },
+            Err(error) => {
+                return terminal(
+                    HostGeneratedRepositoryApparentMappingErrorKind::DefinitionCompute(
+                        error.to_string().into(),
+                    ),
+                );
+            }
+        };
+
+        let Some(view) = predecessor.view() else {
+            return terminal(
+                HostGeneratedRepositoryApparentMappingErrorKind::ContextMismatch { predecessor },
+            );
+        };
+        match mapping_target(
+            &self.context_repo,
+            view.canonical_name,
+            view.mapping.context_repo(),
+            view.mapping.entries(),
+            &self.apparent_repo,
+        ) {
+            Err(MappingLookupError::Context) => {
+                return terminal(
+                    HostGeneratedRepositoryApparentMappingErrorKind::ContextMismatch {
+                        predecessor,
+                    },
+                );
+            }
+            Err(MappingLookupError::Missing) => {
+                return terminal(HostGeneratedRepositoryApparentMappingErrorKind::Missing {
+                    predecessor,
+                });
+            }
+            Ok(_) => {}
+        }
+        complete_mapping(Ok(HostGeneratedRepositoryApparentMapping {
+            predecessor,
+            apparent_repo: self.apparent_repo.clone(),
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Mutex;
@@ -245,6 +450,7 @@ mod tests {
     use slug_bzlmod_v2::RepositoryPackageSourceKey;
     use slug_bzlmod_v2::RepositorySourceFileKey;
     use slug_bzlmod_v2::RootPackagePolicyInputs;
+    use slug_bzlmod_v2::RootRepositoryRouteKey;
     use slug_loading_v2::HostValidatedGeneratedRepositorySpecsOutcome;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -281,6 +487,7 @@ ext=module_extension(implementation=impl)
     #[derive(Default)]
     struct LookupTracker {
         lookup: Mutex<Vec<(ActivationKind, bool)>>,
+        apparent: Mutex<Vec<(ActivationKind, bool)>>,
         forbidden: Mutex<Vec<&'static str>>,
     }
 
@@ -306,6 +513,16 @@ ext=module_extension(implementation=impl)
                     .lock()
                     .unwrap()
                     .push((activation.kind(), activation.evaluation_data().is_some()));
+            } else if key
+                .downcast_ref::<HostGeneratedRepositoryApparentMappingKey>()
+                .is_some()
+            {
+                self.apparent
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), activation.evaluation_data().is_some()));
+            } else if key.downcast_ref::<RootRepositoryRouteKey>().is_some() {
+                self.forbidden.lock().unwrap().push("root-route");
             } else if key.downcast_ref::<RegistryFileKey>().is_some() {
                 self.forbidden.lock().unwrap().push("registry");
             } else if key.downcast_ref::<RepositoryMaterializationKey>().is_some() {
@@ -552,6 +769,19 @@ ext=module_extension(implementation=impl)
         ]
     }
 
+    fn target(value: &HostGeneratedRepositoryApparentMappingOutcome) -> CanonicalRepoName {
+        let SourcePreparationOutcome::Complete(value) = value else {
+            panic!("mapping must complete")
+        };
+        value
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .resolved_target()
+            .unwrap()
+            .clone()
+    }
+
     #[test]
     fn complete_scan_rejects_missing_and_duplicate() {
         use std::cell::Cell;
@@ -581,6 +811,31 @@ ext=module_extension(implementation=impl)
             })
         );
         assert_eq!(consumed.get(), names.len());
+    }
+
+    #[test]
+    fn mapping_lookup_validates_context_and_missing_entries() {
+        let selected = CanonicalRepoName::new("selected").unwrap();
+        let other = CanonicalRepoName::new("other").unwrap();
+        let apparent = ApparentRepoName::new("visible").unwrap();
+        let missing = ApparentRepoName::new("missing").unwrap();
+        let entries = SmallMap::from_iter([(apparent.clone(), other.clone())]);
+        assert_eq!(
+            mapping_target(&selected, &selected, &selected, &entries, &apparent),
+            Ok(&other)
+        );
+        assert_eq!(
+            mapping_target(&other, &selected, &selected, &entries, &apparent),
+            Err(MappingLookupError::Context)
+        );
+        assert_eq!(
+            mapping_target(&selected, &selected, &other, &entries, &apparent),
+            Err(MappingLookupError::Context)
+        );
+        assert_eq!(
+            mapping_target(&selected, &selected, &selected, &entries, &missing),
+            Err(MappingLookupError::Missing)
+        );
     }
 
     #[tokio::test]
@@ -723,6 +978,272 @@ ext=module_extension(implementation=impl)
     }
 
     #[tokio::test]
+    async fn real_apparent_mapping_borrows_effective_target_and_restores() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(LookupTracker::default());
+        let mut tx = transaction(&dice, MODULE, EXTENSION_A, true, Some(tracker.clone())).await;
+        let generated = names(&validated(&mut tx).await);
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let definition_key =
+            HostGeneratedRepositoryDefinitionKey::new(workspace.clone(), generated[0].clone());
+        tx.compute(&definition_key).await.unwrap();
+        tracker.lookup.lock().unwrap().clear();
+        tracker.forbidden.lock().unwrap().clear();
+
+        let key = |context: CanonicalRepoName, apparent: &str| {
+            HostGeneratedRepositoryApparentMappingKey::new(
+                workspace.clone(),
+                context,
+                ApparentRepoName::new(apparent).unwrap(),
+            )
+        };
+        let self_key = key(generated[0].clone(), "first");
+        let sibling_key = key(generated[0].clone(), "second");
+        let host_key = key(generated[0].clone(), "bazel_tools");
+        let self_mapping = tx.compute(&self_key).await.unwrap();
+        let sibling_mapping = tx.compute(&sibling_key).await.unwrap();
+        let host_mapping = tx.compute(&host_key).await.unwrap();
+        let warm = tx.compute(&self_key).await.unwrap();
+        assert_eq!(target(&self_mapping), generated[0]);
+        assert_eq!(target(&sibling_mapping), generated[1]);
+        assert_eq!(target(&host_mapping), CanonicalRepoName::root());
+        assert!(!HostGeneratedRepositoryApparentMappingKey::equality(
+            &self_mapping,
+            &sibling_mapping,
+        ));
+        assert!(HostGeneratedRepositoryApparentMappingKey::equality(
+            &self_mapping,
+            &warm,
+        ));
+        assert_eq!(
+            *tracker.apparent.lock().unwrap(),
+            [
+                (ActivationKind::Evaluated, false),
+                (ActivationKind::Evaluated, false),
+                (ActivationKind::Evaluated, false),
+                (ActivationKind::Reused, false),
+            ]
+        );
+        assert_eq!(
+            *tracker.lookup.lock().unwrap(),
+            [
+                (ActivationKind::Reused, false),
+                (ActivationKind::Reused, false),
+                (ActivationKind::Reused, false),
+            ]
+        );
+        assert!(tracker.forbidden.lock().unwrap().is_empty());
+
+        let missing = tx
+            .compute(&key(generated[0].clone(), "missing"))
+            .await
+            .unwrap();
+        assert!(matches!(
+            missing,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostGeneratedRepositoryApparentMappingError {
+                        kind: HostGeneratedRepositoryApparentMappingErrorKind::Missing { .. },
+                        ..
+                    })
+                )
+        ));
+        let predecessor_activations = tracker.lookup.lock().unwrap().len();
+        let root_apparent = tx
+            .compute(&HostGeneratedRepositoryApparentMappingKey::new(
+                workspace.clone(),
+                generated[0].clone(),
+                ApparentRepoName::root(),
+            ))
+            .await
+            .unwrap();
+        let root_context = tx
+            .compute(&HostGeneratedRepositoryApparentMappingKey::new(
+                workspace.clone(),
+                CanonicalRepoName::root(),
+                ApparentRepoName::new("first").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(
+            tracker.lookup.lock().unwrap().len(),
+            predecessor_activations
+        );
+        assert!(matches!(
+            root_apparent,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostGeneratedRepositoryApparentMappingError {
+                        kind: HostGeneratedRepositoryApparentMappingErrorKind::RootApparent,
+                        ..
+                    })
+                )
+        ));
+        assert!(matches!(
+            root_context,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostGeneratedRepositoryApparentMappingError {
+                        kind: HostGeneratedRepositoryApparentMappingErrorKind::RootContext,
+                        ..
+                    })
+                )
+        ));
+
+        async fn resolve(
+            dice: &Arc<Dice>,
+            module: &str,
+            apparent: &str,
+        ) -> HostGeneratedRepositoryApparentMappingOutcome {
+            let mut tx = transaction(dice, module, EXTENSION_A, true, None).await;
+            let context = names(&validated(&mut tx).await).remove(0);
+            tx.compute(&HostGeneratedRepositoryApparentMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                context,
+                ApparentRepoName::new(apparent).unwrap(),
+            ))
+            .await
+            .unwrap()
+        }
+
+        let override_module = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
+        let overridden = resolve(&dice, &override_module, "first").await;
+        assert_eq!(target(&overridden), CanonicalRepoName::root());
+        let SourcePreparationOutcome::Complete(overridden_value) = &overridden else {
+            panic!("override mapping must complete")
+        };
+        assert_eq!(
+            overridden_value
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .predecessor
+                .view()
+                .unwrap()
+                .repo_spec
+                .rule_id
+                .rule_name
+                .as_str(),
+            "repo"
+        );
+        assert!(!HostGeneratedRepositoryApparentMappingKey::equality(
+            &self_mapping,
+            &overridden,
+        ));
+        assert!(HostGeneratedRepositoryApparentMappingKey::equality(
+            &self_mapping,
+            &resolve(&dice, MODULE, "first").await,
+        ));
+
+        let injected = resolve(
+            &dice,
+            &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
+            "injected",
+        )
+        .await;
+        assert_eq!(target(&injected), CanonicalRepoName::root());
+        let injected_context = {
+            let SourcePreparationOutcome::Complete(value) = &injected else {
+                panic!("injected mapping must complete")
+            };
+            value
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .predecessor
+                .view()
+                .unwrap()
+                .canonical_name
+                .clone()
+        };
+        let invalid_override_module = format!("{MODULE}override_repo(e, injected='bazel_tools')\n");
+        let mut invalid_override_tx =
+            transaction(&dice, &invalid_override_module, EXTENSION_A, true, None).await;
+        let invalid_override = invalid_override_tx
+            .compute(&HostGeneratedRepositoryApparentMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                injected_context,
+                ApparentRepoName::new("injected").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            &invalid_override,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostGeneratedRepositoryApparentMappingError {
+                        kind: HostGeneratedRepositoryApparentMappingErrorKind::Definition(_),
+                        ..
+                    })
+                )
+        ));
+        assert!(!HostGeneratedRepositoryApparentMappingKey::equality(
+            &injected,
+            &invalid_override,
+        ));
+        assert!(HostGeneratedRepositoryApparentMappingKey::equality(
+            &injected,
+            &resolve(
+                &dice,
+                &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
+                "injected",
+            )
+            .await,
+        ));
+
+        let inject_a = format!(
+            "{MODULE}inject_repo(e, injected='bazel_tools')\ninject_repo(e, other='bazel_tools')\n"
+        );
+        let inject_b = format!(
+            "{MODULE}inject_repo(e, other='bazel_tools')\ninject_repo(e, injected='bazel_tools')\n"
+        );
+        let order_a = resolve(&dice, &inject_a, "injected").await;
+        let order_b = resolve(&dice, &inject_b, "injected").await;
+        assert_eq!(target(&order_a), target(&order_b));
+        assert!(!HostGeneratedRepositoryApparentMappingKey::equality(
+            &order_a, &order_b,
+        ));
+        assert!(HostGeneratedRepositoryApparentMappingKey::equality(
+            &order_a,
+            &resolve(&dice, &inject_a, "injected").await,
+        ));
+
+        let multi_extension = EXTENSION_A.replace(
+            "ext=module_extension(implementation=impl)",
+            "first=module_extension(implementation=impl)\nsecond=module_extension(implementation=impl)",
+        );
+        let multi_module = "module(name='bazel_tools')\na=use_extension('//:ext.bzl','first')\nuse_repo(a, first_a='first')\nb=use_extension('//:ext.bzl','second')\nuse_repo(b, first_b='first')\n";
+        let mut multi_tx = transaction(&dice, multi_module, &multi_extension, true, None).await;
+        let contexts = names(&validated(&mut multi_tx).await);
+        let first_context = HostGeneratedRepositoryApparentMappingKey::new(
+            workspace.clone(),
+            contexts[0].clone(),
+            ApparentRepoName::new("first").unwrap(),
+        );
+        let second_context = HostGeneratedRepositoryApparentMappingKey::new(
+            workspace,
+            contexts[2].clone(),
+            ApparentRepoName::new("first").unwrap(),
+        );
+        let isolated_a = multi_tx.compute(&first_context).await.unwrap();
+        let isolated_b = multi_tx.compute(&second_context).await.unwrap();
+        assert_eq!(target(&isolated_a), contexts[0]);
+        assert_eq!(target(&isolated_b), contexts[2]);
+        assert!(!HostGeneratedRepositoryApparentMappingKey::equality(
+            &isolated_a,
+            &isolated_b,
+        ));
+        assert!(HostGeneratedRepositoryApparentMappingKey::equality(
+            &isolated_a,
+            &multi_tx.compute(&first_context).await.unwrap(),
+        ));
+    }
+
+    #[tokio::test]
     async fn predecessor_need_and_error_precede_lookup() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let mut initial = transaction(&dice, MODULE, EXTENSION_A, true, None).await;
@@ -742,12 +1263,27 @@ ext=module_extension(implementation=impl)
                 PathObservationEpoch::new([]).unwrap(),
             )])
             .unwrap();
-        let need = updater.commit().await.compute(&key).await.unwrap();
+        let mut need_tx = updater.commit().await;
+        let need = need_tx.compute(&key).await.unwrap();
         assert!(!HostGeneratedRepositoryDefinitionKey::validity(&need));
         assert!(!HostGeneratedRepositoryDefinitionKey::equality(
             &need, &need
         ));
         assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+
+        let mapping_key = HostGeneratedRepositoryApparentMappingKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            generated[0].clone(),
+            ApparentRepoName::new("first").unwrap(),
+        );
+        let mapping_need = need_tx.compute(&mapping_key).await.unwrap();
+        assert!(!HostGeneratedRepositoryApparentMappingKey::validity(
+            &mapping_need
+        ));
+        assert!(!HostGeneratedRepositoryApparentMappingKey::equality(
+            &mapping_need,
+            &mapping_need,
+        ));
 
         let mut missing_source = transaction(&dice, MODULE, EXTENSION_A, false, None).await;
         let terminal = missing_source.compute(&key).await.unwrap();
@@ -759,6 +1295,18 @@ ext=module_extension(implementation=impl)
                     value.as_ref(),
                     Err(HostGeneratedRepositoryDefinitionError {
                         kind: HostGeneratedRepositoryDefinitionErrorKind::Loading(_),
+                        ..
+                    })
+                )
+        ));
+        let mapping_terminal = missing_source.compute(&mapping_key).await.unwrap();
+        assert!(matches!(
+            mapping_terminal,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostGeneratedRepositoryApparentMappingError {
+                        kind: HostGeneratedRepositoryApparentMappingErrorKind::Definition(_),
                         ..
                     })
                 )
