@@ -3278,3 +3278,12 @@ unchanged. Defer core conversion, consumer migration, source classification,
 materialization request/Need, route replacement, commands/public API, I/O,
 lockfile, wire, and JVM; forbid reverse edges, new keys/stores, and copies per
 Clone.
+
+### Owned repository source-capability implementation activated (2026-08-13)
+
+Independent review accepts design `538b5231`. Implement only Bzlmod
+`host_module.rs`, `lib.rs` hidden exports, and four ledgers under 180/320/500.
+Preserve computation-free identity, strict polarity, manual RepoSpec hashing,
+exact legacy route projection, shared allocation proof, and every no-key/store/
+consumer/source/materialization/command/public/I/O/JVM stop. Stage 5 production
+remains unchanged.

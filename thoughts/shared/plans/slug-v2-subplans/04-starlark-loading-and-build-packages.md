@@ -3214,3 +3214,12 @@ with exact legacy-route projection and no module name. Future Rust is only
 `host_module.rs` and `lib.rs` under 180/320/500. Stage 4 production remains
 unchanged; no key/store, core/loading/server edit, source/package/materializer,
 command/public API, reverse edge, I/O, or JVM is authorized.
+
+### Repository source-capability implementation activated (2026-08-13)
+
+Independent review accepts design `538b5231`. Implement only existing Bzlmod
+`host_module.rs`, `lib.rs` hidden exports, and four ledgers under 180/320/500.
+Preserve the computation-free owned identity, strict builtin/spec polarity,
+manual structural hash, exact legacy projection, Arc-only clones, proof, and
+all no-key/core-loading/source/materialization/command/public/I/O/JVM stops.
+Stage 4 production remains unchanged.
