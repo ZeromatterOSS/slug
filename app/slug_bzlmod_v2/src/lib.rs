@@ -69,6 +69,10 @@ pub use dice::digest_registry_policy;
 pub use dice::digest_registry_source_specs;
 pub use dice::digest_repo_mapping_entries;
 pub use dice::digest_repo_mappings;
+#[doc(hidden)]
+pub use host_module::HostRepositorySourceCapability;
+#[doc(hidden)]
+pub use host_module::HostRepositorySourceCapabilitySource;
 pub use host_module::RootModuleLoadingAnchor;
 pub use host_module::RootModuleLoadingAnchorError;
 pub use host_module::RootModuleLoadingAnchorKey;

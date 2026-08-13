@@ -483,6 +483,71 @@ pub enum RootRepositorySource {
     BuiltinBazelTools(BuiltinBazelToolsRouteIdentity),
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostRepositorySourceCapabilitySource {
+    Builtin(BuiltinBazelToolsRouteIdentity),
+    RepoSpec(Arc<RepoSpec>),
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostRepositorySourceCapability {
+    workspace: NormalizedAbsolutePath,
+    apparent_repo: ApparentRepoName,
+    canonical_repo: CanonicalRepoName,
+    source: HostRepositorySourceCapabilitySource,
+}
+
+impl HostRepositorySourceCapability {
+    #[doc(hidden)]
+    pub fn from_repo_spec(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+        canonical_repo: CanonicalRepoName,
+        repo_spec: &RepoSpec,
+    ) -> Option<Self> {
+        (!apparent_repo.is_root()
+            && !canonical_repo.is_root()
+            && canonical_repo.as_str() != "bazel_tools")
+            .then(|| Self {
+                workspace,
+                apparent_repo,
+                canonical_repo,
+                source: HostRepositorySourceCapabilitySource::RepoSpec(Arc::new(repo_spec.clone())),
+            })
+    }
+
+    #[doc(hidden)]
+    pub fn builtin(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+        canonical_repo: CanonicalRepoName,
+        identity: BuiltinBazelToolsRouteIdentity,
+    ) -> Option<Self> {
+        (apparent_repo.as_str() == "bazel_tools" && canonical_repo.as_str() == "bazel_tools")
+            .then_some(Self {
+                workspace,
+                apparent_repo,
+                canonical_repo,
+                source: HostRepositorySourceCapabilitySource::Builtin(identity),
+            })
+    }
+
+    pub fn workspace(&self) -> &NormalizedAbsolutePath {
+        &self.workspace
+    }
+    pub fn apparent_repo(&self) -> &ApparentRepoName {
+        &self.apparent_repo
+    }
+    pub fn canonical_repo(&self) -> &CanonicalRepoName {
+        &self.canonical_repo
+    }
+    pub fn source(&self) -> &HostRepositorySourceCapabilitySource {
+        &self.source
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Allocative)]
 pub struct RootRepositoryRoute {
     workspace: NormalizedAbsolutePath,
@@ -556,6 +621,25 @@ impl Hash for RootRepositorySource {
     }
 }
 
+impl Hash for HostRepositorySourceCapabilitySource {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Builtin(identity) => identity.hash(state),
+            Self::RepoSpec(spec) => hash_repo_spec(spec, state),
+        }
+    }
+}
+
+impl Hash for HostRepositorySourceCapability {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.workspace.hash(state);
+        self.apparent_repo.hash(state);
+        self.canonical_repo.hash(state);
+        self.source.hash(state);
+    }
+}
+
 impl Hash for RootRepositoryRoute {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.workspace.hash(state);
@@ -576,6 +660,29 @@ impl fmt::Debug for RootRepositoryRoute {
 }
 
 impl RootRepositoryRoute {
+    #[doc(hidden)]
+    pub fn source_capability(&self) -> HostRepositorySourceCapability {
+        match &self.source {
+            RootRepositorySource::DirectLocal(spec) => {
+                HostRepositorySourceCapability::from_repo_spec(
+                    self.workspace.dupe(),
+                    self.apparent_repo.clone(),
+                    self.canonical_repo.clone(),
+                    spec,
+                )
+            }
+            RootRepositorySource::BuiltinBazelTools(identity) => {
+                HostRepositorySourceCapability::builtin(
+                    self.workspace.dupe(),
+                    self.apparent_repo.clone(),
+                    self.canonical_repo.clone(),
+                    identity.clone(),
+                )
+            }
+        }
+        .expect("a RootRepositoryRoute has a valid source-capability polarity")
+    }
+
     pub fn apparent_repo(&self) -> &ApparentRepoName {
         &self.apparent_repo
     }
@@ -847,6 +954,7 @@ mod tests {
     use slug_events_v2::EvaluationEvent;
     use slug_events_v2::EventBatch;
     use slug_identity_v2::ApparentRepoName;
+    use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::NormalizedAbsolutePath;
     use slug_workspace_v2::PathLstat;
@@ -890,6 +998,20 @@ mod tests {
 
     fn workspace() -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new("/workspace").unwrap()
+    }
+
+    fn external_source_capability_snapshot(
+        route: &crate::RootRepositoryRoute,
+    ) -> (String, String, bool) {
+        let capability: crate::HostRepositorySourceCapability = route.source_capability();
+        (
+            capability.apparent_repo().as_str().to_owned(),
+            capability.canonical_repo().as_str().to_owned(),
+            matches!(
+                capability.source(),
+                crate::HostRepositorySourceCapabilitySource::RepoSpec(_)
+            ),
+        )
     }
 
     fn empty_value() -> HostRootModuleFileValue {
@@ -1335,6 +1457,32 @@ mod tests {
         assert_ne!(route, &changed_spec);
         assert_ne!(hash(route), hash(&changed_spec));
 
+        let capability = route.source_capability();
+        assert_eq!(capability.workspace(), route.workspace());
+        assert_eq!(capability.apparent_repo(), route.apparent_repo());
+        assert_eq!(capability.canonical_repo(), route.canonical_repo());
+        let crate::HostRepositorySourceCapabilitySource::RepoSpec(spec) = capability.source()
+        else {
+            panic!("direct-local route must project its RepoSpec");
+        };
+        assert_eq!(spec.as_ref(), route.repo_spec());
+        let cloned = capability.clone();
+        let crate::HostRepositorySourceCapabilitySource::RepoSpec(cloned_spec) = cloned.source()
+        else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(spec, cloned_spec));
+        let capability_hash = |value: &crate::HostRepositorySourceCapability| {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        };
+        assert_eq!(capability_hash(&capability), capability_hash(&cloned));
+        assert_eq!(
+            external_source_capability_snapshot(route),
+            ("dep_alias".into(), "dep+".into(), true)
+        );
+
         let builtin =
             observed_route(&dice, EpochBuilder::root(source, 1).build(), "bazel_tools").await;
         let SourcePreparationOutcome::Complete(builtin) = builtin else {
@@ -1350,6 +1498,113 @@ mod tests {
             identity.snapshot(),
             crate::BuiltinBazelToolsSnapshot::Bazel9_2
         );
+        let builtin_capability = builtin.source_capability();
+        assert!(matches!(
+            builtin_capability.source(),
+            crate::HostRepositorySourceCapabilitySource::Builtin(projected)
+                if projected == identity
+        ));
+        assert_eq!(builtin_capability.apparent_repo().as_str(), "bazel_tools");
+        assert_eq!(builtin_capability.canonical_repo().as_str(), "bazel_tools");
+        for (apparent, canonical) in [
+            (ApparentRepoName::root(), route.canonical_repo().clone()),
+            (route.apparent_repo().clone(), CanonicalRepoName::root()),
+            (
+                route.apparent_repo().clone(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ),
+        ] {
+            assert!(
+                crate::HostRepositorySourceCapability::from_repo_spec(
+                    workspace(),
+                    apparent,
+                    canonical,
+                    route.repo_spec(),
+                )
+                .is_none()
+            );
+        }
+        let apparent_builtin_spec = crate::HostRepositorySourceCapability::from_repo_spec(
+            workspace(),
+            ApparentRepoName::new("bazel_tools").unwrap(),
+            route.canonical_repo().clone(),
+            route.repo_spec(),
+        )
+        .unwrap();
+        assert!(matches!(
+            apparent_builtin_spec.source(),
+            crate::HostRepositorySourceCapabilitySource::RepoSpec(_)
+        ));
+        for (apparent, canonical) in [
+            (
+                ApparentRepoName::root(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("bazel_tools").unwrap(),
+                CanonicalRepoName::root(),
+            ),
+            (
+                route.apparent_repo().clone(),
+                CanonicalRepoName::new("bazel_tools").unwrap(),
+            ),
+            (
+                ApparentRepoName::new("bazel_tools").unwrap(),
+                route.canonical_repo().clone(),
+            ),
+        ] {
+            assert!(
+                crate::HostRepositorySourceCapability::builtin(
+                    workspace(),
+                    apparent,
+                    canonical,
+                    identity.clone(),
+                )
+                .is_none()
+            );
+        }
+
+        let variants = [
+            crate::HostRepositorySourceCapability::from_repo_spec(
+                NormalizedAbsolutePath::new("/other-workspace").unwrap(),
+                route.apparent_repo().clone(),
+                route.canonical_repo().clone(),
+                route.repo_spec(),
+            )
+            .unwrap(),
+            crate::HostRepositorySourceCapability::from_repo_spec(
+                workspace(),
+                ApparentRepoName::new("other").unwrap(),
+                route.canonical_repo().clone(),
+                route.repo_spec(),
+            )
+            .unwrap(),
+            crate::HostRepositorySourceCapability::from_repo_spec(
+                workspace(),
+                route.apparent_repo().clone(),
+                CanonicalRepoName::new("other+").unwrap(),
+                route.repo_spec(),
+            )
+            .unwrap(),
+            crate::HostRepositorySourceCapability::from_repo_spec(
+                workspace(),
+                route.apparent_repo().clone(),
+                route.canonical_repo().clone(),
+                changed_spec.repo_spec(),
+            )
+            .unwrap(),
+            apparent_builtin_spec,
+            builtin_capability.clone(),
+        ];
+        for variant in variants {
+            assert_ne!(capability, variant);
+            assert_ne!(capability_hash(&capability), capability_hash(&variant));
+            assert_eq!(capability, route.source_capability());
+            assert_eq!(
+                capability_hash(&capability),
+                capability_hash(&route.source_capability())
+            );
+        }
         assert_eq!(
             hex::encode(identity.manifest_sha256()),
             "95b4af7c011047d34f6c469d23efdd523c56ce4892791e49f9d2159353262897"
