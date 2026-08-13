@@ -3432,3 +3432,13 @@ its attribute Arc. Future Rust is exactly `source_preparation.rs` and hidden
 `lib.rs` exports under 180/420/600. No new key/store/request layout, consumer
 migration, Need/DICE, source/materialization, command/public API, I/O, lockfile,
 wire, or JVM work is authorized.
+
+### Repository materialization-request projection implementation activated (2026-08-13)
+
+Independent review accepts design `9df81032`. Implement only existing
+`source_preparation.rs`, hidden `lib.rs` exports, and four ledgers under
+180/420/600 and ceilings 11,080/380. Preserve the computation-free
+Builtin-or-request disposition, explicit policy and exact errors, renamed
+legacy wrapper/caller parity, compact-shell clone boundary, proof, and every
+no-third-file/key/store/Need/consumer/source/materialization/command/public/
+I/O/lockfile/wire/JVM stop. Stage 5 behavior stays unchanged.

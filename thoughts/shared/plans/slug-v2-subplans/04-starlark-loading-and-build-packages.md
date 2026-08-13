@@ -3364,3 +3364,12 @@ compact shell and shares the Arc attribute graph. Future Rust is exactly
 `source_preparation.rs` and hidden `lib.rs` exports under 180/420/600; Stage 4
 behavior stays unchanged. No DICE/Need, consumer migration, package/source,
 materialization, command, public wire, I/O, or JVM work is authorized.
+
+### Repository materialization-request projection implementation activated (2026-08-13)
+
+Independent review accepts design `9df81032`. Implement only existing Bzlmod
+`source_preparation.rs`, hidden `lib.rs` exports, and four ledgers under
+180/420/600 and physical ceilings 11,080/380. Preserve exact Builtin-or-request
+ABI, policy/classifier/error order, renamed legacy wrapper and parity, compact
+RepoSpec shell clone, proof, and all no-third-file/key/store/Need/consumer/
+source/materialization/command/public/I/O/JVM stops. Stage 4 stays unchanged.
