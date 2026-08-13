@@ -1370,6 +1370,7 @@ struct HostSelectedExtensionMappings {
     root_usages: Arc<[RootExtensionUsage]>,
     usages: Arc<[HostSelectedExtensionUsage]>,
     overrides: Arc<[HostSelectedExtensionOverride]>,
+    base_mappings: Arc<[HostSelectedRepositoryMapping]>,
     mappings: Arc<[HostSelectedRepositoryMapping]>,
 }
 
@@ -1689,6 +1690,15 @@ fn selected_extension_mappings(
             must_exist: replacement.must_exist,
         });
     }
+    let base_mappings = routes
+        .entries
+        .iter()
+        .zip(no_overrides.iter())
+        .map(|(route, entries)| HostSelectedRepositoryMapping {
+            context_repo: route.mapping.context_repo.clone(),
+            entries: Arc::new(entries.clone()),
+        })
+        .collect::<Arc<_>>();
     let mappings = routes
         .entries
         .iter()
@@ -1710,6 +1720,7 @@ fn selected_extension_mappings(
         root_usages,
         usages: usages.into(),
         overrides: overrides.into(),
+        base_mappings,
         mappings,
     })
 }
@@ -1780,7 +1791,24 @@ impl Key for HostSelectedExtensionMappingsKey {
 pub struct HostSelectedExtensionDefinitionLoadRequest {
     bzl_file: CanonicalLabel,
     extension_name: CompactString,
+    unique_name: CanonicalRepoName,
+    base_mapping: HostSelectedRepositoryMapping,
     mapping: HostSelectedRepositoryMapping,
+    overrides: Arc<[HostSelectedExtensionDefinitionOverride]>,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct HostSelectedExtensionDefinitionOverride {
+    generated_name: CompactString,
+    replacement: CanonicalRepoName,
+    must_exist: bool,
+}
+
+impl HostSelectedExtensionDefinitionOverride {
+    pub fn parts(&self) -> (&str, &CanonicalRepoName, bool) {
+        (&self.generated_name, &self.replacement, self.must_exist)
+    }
 }
 
 impl HostSelectedExtensionDefinitionLoadRequest {
@@ -1797,6 +1825,22 @@ impl HostSelectedExtensionDefinitionLoadRequest {
             &self.extension_name,
             &self.mapping.context_repo,
             &self.mapping.entries,
+        )
+    }
+
+    pub fn namespace_parts(
+        &self,
+    ) -> (
+        &CanonicalRepoName,
+        &CanonicalRepoName,
+        &SmallMap<ApparentRepoName, CanonicalRepoName>,
+        &[HostSelectedExtensionDefinitionOverride],
+    ) {
+        (
+            &self.unique_name,
+            &self.base_mapping.context_repo,
+            &self.base_mapping.entries,
+            &self.overrides,
         )
     }
 }
@@ -1828,6 +1872,11 @@ enum HostSelectedExtensionDefinitionLoadRequestsErrorInner {
         owner: HostGraphModuleKey,
         id: HostSelectedExtensionId,
     },
+    Invalid {
+        id: HostSelectedExtensionId,
+        message: CompactString,
+    },
+    InvalidContext(CompactString),
 }
 
 #[doc(hidden)]
@@ -1851,13 +1900,32 @@ fn selected_extension_definition_load_requests(
     HostSelectedExtensionDefinitionLoadRequests,
     HostSelectedExtensionDefinitionLoadRequestsError,
 > {
-    let root_mapping = predecessor
+    let root_index = predecessor
         .routes
         .entries
         .iter()
         .position(|route| matches!(route.entry.key, HostGraphModuleKey::Root))
-        .and_then(|index| predecessor.mappings.get(index))
-        .expect("selected extension mappings retain the root mapping");
+        .ok_or_else(|| {
+            HostSelectedExtensionDefinitionLoadRequestsError(
+                HostSelectedExtensionDefinitionLoadRequestsErrorInner::InvalidContext(
+                    "selected extension root route is absent".into(),
+                ),
+            )
+        })?;
+    let root_base_mapping = predecessor.base_mappings.get(root_index).ok_or_else(|| {
+        HostSelectedExtensionDefinitionLoadRequestsError(
+            HostSelectedExtensionDefinitionLoadRequestsErrorInner::InvalidContext(
+                "selected extension root base mapping is absent".into(),
+            ),
+        )
+    })?;
+    let root_mapping = predecessor.mappings.get(root_index).ok_or_else(|| {
+        HostSelectedExtensionDefinitionLoadRequestsError(
+            HostSelectedExtensionDefinitionLoadRequestsErrorInner::InvalidContext(
+                "selected extension root final mapping is absent".into(),
+            ),
+        )
+    })?;
     let unsupported = predecessor.usages.iter().find(|usage| {
         !matches!(usage.owner, HostGraphModuleKey::Root)
             || usage.id.isolation.is_some()
@@ -1872,21 +1940,57 @@ fn selected_extension_definition_load_requests(
             },
         ));
     }
-    let mut seen = SmallSet::new();
-    let requests = predecessor
-        .usages
-        .iter()
-        .filter(|usage| seen.insert(usage.id.clone()))
-        .map(|usage| HostSelectedExtensionDefinitionLoadRequest {
+    let mut seen = SmallMap::new();
+    let mut namespace_owners = SmallMap::new();
+    let mut requests = Vec::new();
+    for usage in predecessor.usages.iter() {
+        if let Some(owner) = namespace_owners.get(&usage.unique_name) {
+            if owner != &usage.id {
+                return Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                    HostSelectedExtensionDefinitionLoadRequestsErrorInner::Invalid {
+                        id: usage.id.clone(),
+                        message: "selected extension namespace has duplicate ownership".into(),
+                    },
+                ));
+            }
+        } else {
+            namespace_owners.insert(usage.unique_name.clone(), usage.id.clone());
+        }
+        if let Some(unique_name) = seen.get(&usage.id) {
+            if unique_name != &usage.unique_name {
+                return Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                    HostSelectedExtensionDefinitionLoadRequestsErrorInner::Invalid {
+                        id: usage.id.clone(),
+                        message: "selected extension has mismatched namespace ownership".into(),
+                    },
+                ));
+            }
+            continue;
+        }
+        seen.insert(usage.id.clone(), usage.unique_name.clone());
+        let overrides = predecessor
+            .overrides
+            .iter()
+            .filter(|candidate| candidate.id == usage.id)
+            .map(|candidate| HostSelectedExtensionDefinitionOverride {
+                generated_name: candidate.generated_name.clone(),
+                replacement: candidate.replacement.clone(),
+                must_exist: candidate.must_exist,
+            })
+            .collect::<Arc<_>>();
+        requests.push(HostSelectedExtensionDefinitionLoadRequest {
             bzl_file: usage.id.bzl_file.clone(),
             extension_name: usage.id.extension_name.clone(),
+            unique_name: usage.unique_name.clone(),
+            base_mapping: root_base_mapping.clone(),
             mapping: root_mapping.clone(),
-        })
-        .collect::<Arc<_>>();
+            overrides,
+        });
+    }
     Ok(HostSelectedExtensionDefinitionLoadRequests {
         workspace,
         predecessor,
-        requests,
+        requests: requests.into(),
     })
 }
 
@@ -3652,6 +3756,130 @@ mod tests {
         assert_eq!(value.requests[0].mapping.context_repo.as_str(), "");
         assert!(value.requests[0].mapping.entries.contains_key("one"));
         assert!(value.requests[0].mapping.entries.contains_key("two"));
+        assert_eq!(value.requests[0].unique_name.as_str(), "+extension");
+        assert!(value.requests[0].overrides.is_empty());
+
+        let namespaced = selected_extension_mappings(
+            Arc::new(
+                selected_routes(
+                    &route_graph([route_root([], Some("root_self"))]),
+                    &HostSelectedRegistryRepoSpecs {
+                        entries: Arc::from([]),
+                    },
+                )
+                .unwrap(),
+            ),
+            Arc::from([
+                root_usage(
+                    "//:one.bzl",
+                    "shared",
+                    test_proxy("one", [("target", "replacement")]),
+                    false,
+                    [],
+                ),
+                root_usage(
+                    "//:two.bzl",
+                    "shared",
+                    test_proxy("two", [("overridden_alias", "generated")]),
+                    false,
+                    [("generated", "target"), ("other", "target")],
+                ),
+            ]),
+        )
+        .unwrap();
+        let namespaced = selected_extension_definition_load_requests(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            Arc::new(namespaced),
+        )
+        .unwrap();
+        assert_eq!(
+            namespaced
+                .requests
+                .iter()
+                .map(|request| request.unique_name.as_str())
+                .collect::<Vec<_>>(),
+            ["+shared", "+shared2"]
+        );
+        let (_, _, base, overrides) = namespaced.requests[1].namespace_parts();
+        assert_eq!(
+            base.get("overridden_alias").unwrap().as_str(),
+            "+shared2+generated"
+        );
+        assert_eq!(
+            namespaced.requests[1]
+                .parts()
+                .3
+                .get("overridden_alias")
+                .unwrap()
+                .as_str(),
+            "+shared+replacement"
+        );
+        assert_eq!(
+            overrides
+                .iter()
+                .map(HostSelectedExtensionDefinitionOverride::parts)
+                .collect::<Vec<_>>(),
+            [
+                (
+                    "generated",
+                    &CanonicalRepoName::new("+shared+replacement").unwrap(),
+                    true
+                ),
+                (
+                    "other",
+                    &CanonicalRepoName::new("+shared+replacement").unwrap(),
+                    true
+                ),
+            ]
+        );
+
+        let mut invalid = namespaced.predecessor.as_ref().clone();
+        let mut invalid_usages = invalid.usages.to_vec();
+        let mut mismatched = invalid_usages[0].clone();
+        mismatched.unique_name = CanonicalRepoName::new("+wrong").unwrap();
+        invalid_usages.push(mismatched);
+        invalid.usages = invalid_usages.into();
+        assert!(matches!(
+            selected_extension_definition_load_requests(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                Arc::new(invalid),
+            ),
+            Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                HostSelectedExtensionDefinitionLoadRequestsErrorInner::Invalid {
+                    ref message,
+                    ..
+                },
+            )) if message.contains("mismatched namespace ownership")
+        ));
+        let mut duplicate = namespaced.predecessor.as_ref().clone();
+        let mut duplicate_usages = duplicate.usages.to_vec();
+        duplicate_usages[1].unique_name = duplicate_usages[0].unique_name.clone();
+        duplicate.usages = duplicate_usages.into();
+        assert!(matches!(
+            selected_extension_definition_load_requests(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                Arc::new(duplicate),
+            ),
+            Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                HostSelectedExtensionDefinitionLoadRequestsErrorInner::Invalid {
+                    ref message,
+                    ..
+                },
+            )) if message.contains("duplicate ownership")
+        ));
+        let mut missing = namespaced.predecessor.as_ref().clone();
+        missing.base_mappings = Arc::from([]);
+        assert!(matches!(
+            selected_extension_definition_load_requests(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                Arc::new(missing),
+            ),
+            Err(HostSelectedExtensionDefinitionLoadRequestsError(
+                HostSelectedExtensionDefinitionLoadRequestsErrorInner::InvalidContext(
+                    ref message
+                ),
+            )) if message.contains("base mapping is absent")
+        ));
 
         let unsupported = selected_extension_mappings(
             routes,
@@ -3686,10 +3914,16 @@ mod tests {
         let request = HostSelectedExtensionDefinitionLoadRequest {
             bzl_file: CanonicalLabel::parse("@@root//:ext.bzl").unwrap(),
             extension_name: "ext".into(),
+            unique_name: CanonicalRepoName::new("root+ext").unwrap(),
+            base_mapping: HostSelectedRepositoryMapping {
+                context_repo: CanonicalRepoName::new("root").unwrap(),
+                entries: Arc::new(SmallMap::new()),
+            },
             mapping: HostSelectedRepositoryMapping {
                 context_repo: CanonicalRepoName::new("root").unwrap(),
                 entries: Arc::new(SmallMap::new()),
             },
+            overrides: Arc::from([]),
         };
         let tag = |name: &str, value: crate::NonrootAttributeValue| crate::NonrootExtensionTag {
             tag_class: name.into(),
@@ -4179,6 +4413,81 @@ repo(name = "replacement")
             &inputs,
             &restored_fields
         ));
+    }
+
+    #[tokio::test]
+    async fn real_definition_requests_retain_namespace_overrides_and_restore() {
+        let io = Arc::new(TrackingRegistryIo::new([]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.clone());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let source = |target: &str| {
+            format!(
+                r#"
+module(name = "bazel_tools", repo_name = "root_self")
+one = use_extension("//:one.bzl", "shared")
+use_repo(one, target = "replacement", other_target = "other")
+two = use_extension("//:two.bzl", "shared")
+use_repo(two, overridden_alias = "generated")
+override_repo(two, generated = "{target}")
+three = use_extension("//:three.bzl", "third")
+inject_repo(three, injected = "target")
+"#
+            )
+        };
+
+        let a = compute_real_definition_requests(&dice, &source("target"), 70, true).await;
+        let warm = compute_real_definition_requests(&dice, &source("target"), 70, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &warm
+        ));
+        let SourcePreparationOutcome::Complete(a_value) = &a else {
+            panic!("namespace requests must complete")
+        };
+        let a_value = a_value.as_ref().as_ref().unwrap();
+        assert_eq!(
+            a_value
+                .requests
+                .iter()
+                .map(|request| request.unique_name.as_str())
+                .collect::<Vec<_>>(),
+            ["+shared", "+shared2", "+third"]
+        );
+        let (_, _, base, overrides) = a_value.requests[1].namespace_parts();
+        assert_eq!(
+            base.get("overridden_alias").unwrap().as_str(),
+            "+shared2+generated"
+        );
+        assert_eq!(overrides.len(), 1);
+        assert_eq!(overrides[0].parts().0, "generated");
+        assert_eq!(overrides[0].parts().1.as_str(), "+shared+replacement");
+        assert!(overrides[0].parts().2);
+        let third = a_value.requests[2].namespace_parts().3;
+        assert_eq!(third.len(), 1);
+        assert_eq!(third[0].parts().0, "injected");
+        assert!(!third[0].parts().2);
+
+        let b = compute_real_definition_requests(&dice, &source("other_target"), 71, true).await;
+        let SourcePreparationOutcome::Complete(b_value) = &b else {
+            panic!("changed namespace requests must complete")
+        };
+        assert_eq!(
+            b_value.as_ref().as_ref().unwrap().requests[1]
+                .namespace_parts()
+                .3[0]
+                .parts()
+                .1
+                .as_str(),
+            "+shared+other"
+        );
+        assert!(!HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &b
+        ));
+        let restored = compute_real_definition_requests(&dice, &source("target"), 72, true).await;
+        assert!(HostSelectedExtensionDefinitionLoadRequestsKey::equality(
+            &a, &restored
+        ));
+        assert!(io.calls().is_empty());
     }
 
     #[tokio::test]

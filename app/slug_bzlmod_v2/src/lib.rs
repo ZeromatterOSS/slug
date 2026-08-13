@@ -263,6 +263,8 @@ pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsKey;
 #[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionOverride;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInput;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputError;
