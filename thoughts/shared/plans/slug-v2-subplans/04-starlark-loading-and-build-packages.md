@@ -2992,3 +2992,13 @@ generated, retaining original certificates without copies. Future Rust is only
 existing core `generated_repository_definition.rs` under 260/520/780. Stage 4
 production remains unchanged; no Bzlmod/loading/server Rust, second file,
 route/source/materializer/I/O, public API, or JVM work is authorized.
+
+### Core canonical definition composition implementation activated (2026-08-12)
+
+Independent review accepts design `e05a0dfc`. Run only
+`WP-4-5-6-host-canonical-repository-definition-composition-owner-implementation`
+in existing core `generated_repository_definition.rs` with colocated tests and
+four ledgers under 260/520/780 against `e05a0dfc`. Preserve selected-first,
+Missing-only generated fallback, original certificates, proof, and stops.
+Stage 4 production remains unchanged; no second Rust file, Bzlmod/loading/server
+edit, route/source/materializer/I/O, public API, or JVM work is authorized.

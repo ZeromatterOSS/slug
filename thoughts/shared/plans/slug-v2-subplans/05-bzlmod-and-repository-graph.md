@@ -3055,3 +3055,14 @@ without copies. Future Rust is only existing core
 `generated_repository_definition.rs` under 260/520/780. Stage 5 production
 remains unchanged; no Bzlmod/loading/server Rust, second file, builtin
 precedence, route/source/materializer/I/O, public API, or JVM work is authorized.
+
+### Core canonical definition composition implementation activated (2026-08-12)
+
+Independent review accepts design `e05a0dfc`. Run only
+`WP-4-5-6-host-canonical-repository-definition-composition-owner-implementation`
+in existing core `generated_repository_definition.rs` with colocated tests and
+four ledgers under 260/520/780 against `e05a0dfc`. Preserve selected-first
+short-circuiting, Missing-only generated fallback, retained original
+certificates, proof, compatibility, and stops. Stage 5 production remains
+unchanged; no second Rust file, Bzlmod/loading/server edit, builtin precedence,
+route/source/materializer/I/O, public API, or JVM work is authorized.
