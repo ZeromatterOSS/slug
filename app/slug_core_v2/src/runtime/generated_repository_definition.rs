@@ -19,6 +19,9 @@ use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionError;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionKey;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionView;
+use slug_bzlmod_v2::HostRootRepositoryMapping;
+use slug_bzlmod_v2::HostRootRepositoryMappingError;
+use slug_bzlmod_v2::HostRootRepositoryMappingKey;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
@@ -475,27 +478,55 @@ impl Key for HostCanonicalRepositoryDefinitionKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct HostCanonicalRepositoryApparentMapping {
-    predecessor: HostCanonicalRepositoryDefinition,
+    predecessor: ApparentMappingPredecessor,
     apparent_repo: ApparentRepoName,
 }
 
 impl HostCanonicalRepositoryApparentMapping {
     fn resolved_target(&self) -> Option<&CanonicalRepoName> {
-        self.predecessor.view()?.mapping_target(&self.apparent_repo)
+        match &self.predecessor {
+            ApparentMappingPredecessor::Root(predecessor) => predecessor
+                .view()?
+                .mapping()
+                .find_map(|(name, target)| (name == &self.apparent_repo).then_some(target)),
+            ApparentMappingPredecessor::Canonical(predecessor) => {
+                predecessor.view()?.mapping_target(&self.apparent_repo)
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum ApparentMappingPredecessor {
+    Root(HostRootRepositoryMapping),
+    Canonical(HostCanonicalRepositoryDefinition),
+}
+
+impl ApparentMappingPredecessor {
+    fn contexts(&self) -> Option<(&CanonicalRepoName, &CanonicalRepoName)> {
+        match self {
+            Self::Root(predecessor) => predecessor
+                .view()
+                .map(|view| (view.canonical_repo(), view.mapping_context())),
+            Self::Canonical(predecessor) => predecessor
+                .view()
+                .map(|view| (view.canonical_repo(), view.mapping_context())),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum HostCanonicalRepositoryApparentMappingErrorKind {
-    RootContext,
     RootApparent,
+    RootMapping(HostRootRepositoryMappingError),
+    RootMappingCompute(Arc<str>),
     Definition(HostCanonicalRepositoryDefinitionError),
     DefinitionCompute(Arc<str>),
     ContextMismatch {
-        predecessor: HostCanonicalRepositoryDefinition,
+        predecessor: ApparentMappingPredecessor,
     },
     Missing {
-        predecessor: HostCanonicalRepositoryDefinition,
+        predecessor: ApparentMappingPredecessor,
     },
 }
 
@@ -598,51 +629,83 @@ impl Key for HostCanonicalRepositoryApparentMappingKey {
                 kind,
             }))
         };
-        if self.context_repo.is_root() {
-            return terminal(HostCanonicalRepositoryApparentMappingErrorKind::RootContext);
-        }
-        if self.apparent_repo.is_root() {
+        if self.apparent_repo.is_root() && !self.context_repo.is_root() {
             return terminal(HostCanonicalRepositoryApparentMappingErrorKind::RootApparent);
         }
 
-        let predecessor = match ctx
-            .compute(&HostCanonicalRepositoryDefinitionKey::new(
-                self.workspace.clone(),
-                self.context_repo.clone(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => value.clone(),
-                Err(error) => {
-                    return terminal(HostCanonicalRepositoryApparentMappingErrorKind::Definition(
-                        error.clone(),
-                    ));
+        let predecessor = if self.context_repo.is_root() {
+            match ctx
+                .compute(&HostRootRepositoryMappingKey::new(self.workspace.clone()))
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
                 }
-            },
-            Err(error) => {
-                return terminal(
-                    HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute(
-                        error.to_string().into(),
-                    ),
-                );
+                Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                    Ok(value) => ApparentMappingPredecessor::Root(value.clone()),
+                    Err(error) => {
+                        return terminal(
+                            HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(
+                                error.clone(),
+                            ),
+                        );
+                    }
+                },
+                Err(error) => {
+                    return terminal(
+                        HostCanonicalRepositoryApparentMappingErrorKind::RootMappingCompute(
+                            error.to_string().into(),
+                        ),
+                    );
+                }
+            }
+        } else {
+            match ctx
+                .compute(&HostCanonicalRepositoryDefinitionKey::new(
+                    self.workspace.clone(),
+                    self.context_repo.clone(),
+                ))
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
+                    Ok(value) => ApparentMappingPredecessor::Canonical(value.clone()),
+                    Err(error) => {
+                        return terminal(
+                            HostCanonicalRepositoryApparentMappingErrorKind::Definition(
+                                error.clone(),
+                            ),
+                        );
+                    }
+                },
+                Err(error) => {
+                    return terminal(
+                        HostCanonicalRepositoryApparentMappingErrorKind::DefinitionCompute(
+                            error.to_string().into(),
+                        ),
+                    );
+                }
             }
         };
 
-        let Some(view) = predecessor.view() else {
+        let Some((canonical_repo, mapping_context)) = predecessor.contexts() else {
             return terminal(
                 HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch { predecessor },
             );
         };
-        match mapping_lookup_status(
-            &self.context_repo,
-            view.canonical_repo(),
-            view.mapping_context(),
-            || view.mapping_target(&self.apparent_repo).is_some(),
-        ) {
+        match mapping_lookup_status(&self.context_repo, canonical_repo, mapping_context, || {
+            match &predecessor {
+                ApparentMappingPredecessor::Root(value) => value.view().is_some_and(|view| {
+                    view.mapping().any(|(name, _)| name == &self.apparent_repo)
+                }),
+                ApparentMappingPredecessor::Canonical(value) => value
+                    .view()
+                    .and_then(|view| view.mapping_target(&self.apparent_repo))
+                    .is_some(),
+            }
+        }) {
             MappingLookupStatus::ContextMismatch => {
                 return terminal(
                     HostCanonicalRepositoryApparentMappingErrorKind::ContextMismatch {
@@ -742,6 +805,7 @@ ext=module_extension(implementation=impl)
         selected: Mutex<Vec<(ActivationKind, bool)>>,
         lookup: Mutex<Vec<(ActivationKind, bool)>>,
         apparent: Mutex<Vec<(ActivationKind, bool)>>,
+        root_mapping: Mutex<Vec<(ActivationKind, bool)>>,
         forbidden: Mutex<Vec<&'static str>>,
     }
 
@@ -791,6 +855,11 @@ ext=module_extension(implementation=impl)
                     .lock()
                     .unwrap()
                     .push((activation.kind(), activation.evaluation_data().is_some()));
+            } else if key.downcast_ref::<HostRootRepositoryMappingKey>().is_some() {
+                self.root_mapping
+                    .lock()
+                    .unwrap()
+                    .push((activation.kind(), activation.evaluation_data().is_some()));
             } else if key.downcast_ref::<RootRepositoryRouteKey>().is_some() {
                 self.forbidden.lock().unwrap().push("root-route");
             } else if key.downcast_ref::<RegistryFileKey>().is_some() {
@@ -802,6 +871,8 @@ ext=module_extension(implementation=impl)
                 || key.downcast_ref::<HostRepositorySourceFileKey>().is_some()
             {
                 self.forbidden.lock().unwrap().push("source");
+            } else if key.downcast_ref::<PathObservationEpochKey>().is_some() {
+                self.forbidden.lock().unwrap().push("filesystem");
             }
         }
     }
@@ -1531,6 +1602,22 @@ ext=module_extension(implementation=impl)
             [(ActivationKind::Evaluated, false)]
         );
         assert!(tracker.forbidden.lock().unwrap().is_empty());
+        tracker.canonical.lock().unwrap().clear();
+        tracker.root_mapping.lock().unwrap().clear();
+        let root_local = local_tx
+            .compute(&HostCanonicalRepositoryApparentMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::root(),
+                ApparentRepoName::new("local_alias").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert_eq!(target(&root_local).as_str(), "local+");
+        assert!(tracker.canonical.lock().unwrap().is_empty());
+        assert_eq!(
+            *tracker.root_mapping.lock().unwrap(),
+            [(ActivationKind::Evaluated, false)]
+        );
     }
 
     #[tokio::test]
@@ -1727,6 +1814,7 @@ ext=module_extension(implementation=impl)
             ]
         );
         assert!(tracker.lookup.lock().unwrap().is_empty());
+        assert!(tracker.root_mapping.lock().unwrap().is_empty());
         assert!(tracker.forbidden.lock().unwrap().is_empty());
         let missing = tx
             .compute(&key(generated[0].clone(), "missing"))
@@ -1760,6 +1848,14 @@ ext=module_extension(implementation=impl)
             ))
             .await
             .unwrap();
+        let root_self = tx
+            .compute(&HostCanonicalRepositoryApparentMappingKey::new(
+                workspace.clone(),
+                CanonicalRepoName::root(),
+                ApparentRepoName::root(),
+            ))
+            .await
+            .unwrap();
         assert_eq!(
             tracker.canonical.lock().unwrap().len(),
             predecessor_activations
@@ -1775,17 +1871,62 @@ ext=module_extension(implementation=impl)
                     })
                 )
         ));
-        assert!(matches!(
-            root_context,
-            SourcePreparationOutcome::Complete(value)
-                if matches!(
-                    value.as_ref(),
-                    Err(HostCanonicalRepositoryApparentMappingError {
-                        kind: HostCanonicalRepositoryApparentMappingErrorKind::RootContext,
-                        ..
-                    })
-                )
+        assert_eq!(target(&root_context), generated[0]);
+        assert_eq!(target(&root_self), CanonicalRepoName::root());
+        let ApparentMappingPredecessor::Root(root_predecessor) =
+            &mapping(&root_context).predecessor
+        else {
+            panic!("root lookup must retain root mapping predecessor")
+        };
+        let published_target = root_predecessor
+            .view()
+            .unwrap()
+            .mapping()
+            .find_map(|(name, target)| (name.as_str() == "first").then_some(target))
+            .unwrap();
+        assert!(std::ptr::eq(
+            published_target,
+            mapping(&root_context).resolved_target().unwrap(),
         ));
+        tx.compute(&HostRootRepositoryMappingKey::new(workspace.clone()))
+            .await
+            .unwrap();
+        tracker.root_mapping.lock().unwrap().clear();
+        tracker.canonical.lock().unwrap().clear();
+        tracker.apparent.lock().unwrap().clear();
+        tracker.forbidden.lock().unwrap().clear();
+        let root_builtin_key = HostCanonicalRepositoryApparentMappingKey::new(
+            workspace.clone(),
+            CanonicalRepoName::root(),
+            ApparentRepoName::new("bazel_tools").unwrap(),
+        );
+        let root_builtin = tx.compute(&root_builtin_key).await.unwrap();
+        assert_eq!(target(&root_builtin), CanonicalRepoName::root());
+        assert_eq!(
+            *tracker.root_mapping.lock().unwrap(),
+            [(ActivationKind::Reused, false)]
+        );
+        assert!(tracker.canonical.lock().unwrap().is_empty());
+        assert_eq!(
+            *tracker.apparent.lock().unwrap(),
+            [(ActivationKind::Evaluated, false)]
+        );
+        assert!(tracker.forbidden.lock().unwrap().is_empty());
+        let root_builtin_warm = tx.compute(&root_builtin_key).await.unwrap();
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_builtin,
+            &root_builtin_warm,
+        ));
+        assert_eq!(
+            *tracker.apparent.lock().unwrap(),
+            [
+                (ActivationKind::Evaluated, false),
+                (ActivationKind::Reused, false),
+            ]
+        );
+        assert_eq!(tracker.root_mapping.lock().unwrap().len(), 1);
+        assert!(tracker.canonical.lock().unwrap().is_empty());
+        assert!(tracker.forbidden.lock().unwrap().is_empty());
         async fn resolve(
             dice: &Arc<Dice>,
             module: &str,
@@ -1801,19 +1942,34 @@ ext=module_extension(implementation=impl)
             .await
             .unwrap()
         }
+        async fn resolve_root(
+            dice: &Arc<Dice>,
+            module: &str,
+            apparent: &str,
+        ) -> HostCanonicalRepositoryApparentMappingOutcome {
+            transaction(dice, module, EXTENSION_A, true, None)
+                .await
+                .compute(&HostCanonicalRepositoryApparentMappingKey::new(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                    CanonicalRepoName::root(),
+                    ApparentRepoName::new(apparent).unwrap(),
+                ))
+                .await
+                .unwrap()
+        }
         let override_module = format!("{MODULE}override_repo(e, first='bazel_tools')\n");
         let overridden = resolve(&dice, &override_module, "first").await;
         assert_eq!(target(&overridden), CanonicalRepoName::root());
         let SourcePreparationOutcome::Complete(overridden_value) = &overridden else {
             panic!("override mapping must complete")
         };
-        let HostCanonicalRepositoryDefinitionView::Generated(overridden_view) = overridden_value
-            .as_ref()
-            .as_ref()
-            .unwrap()
-            .predecessor
-            .view()
-            .unwrap()
+        let ApparentMappingPredecessor::Canonical(overridden_predecessor) =
+            &overridden_value.as_ref().as_ref().unwrap().predecessor
+        else {
+            panic!("overridden mapping must retain canonical predecessor")
+        };
+        let HostCanonicalRepositoryDefinitionView::Generated(overridden_view) =
+            overridden_predecessor.view().unwrap()
         else {
             panic!("overridden generated definition must stay generated")
         };
@@ -1826,6 +1982,148 @@ ext=module_extension(implementation=impl)
             &self_mapping,
             &resolve(&dice, MODULE, "first").await,
         ));
+        let root_a = resolve_root(&dice, MODULE, "first").await;
+        let root_b = resolve_root(&dice, &override_module, "first").await;
+        assert_eq!(target(&root_a), generated[0]);
+        assert_eq!(target(&root_b), CanonicalRepoName::root());
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a, &root_b,
+        ));
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &resolve_root(&dice, MODULE, "first").await,
+        ));
+        let order_module = "module(name='bazel_tools')\n\
+            e=use_extension('//:ext.bzl','ext')\n\
+            use_repo(e, second='second', first='first')\n";
+        let root_order = resolve_root(&dice, order_module, "first").await;
+        assert_eq!(target(&root_order), generated[0]);
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &root_order,
+        ));
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &resolve_root(&dice, MODULE, "first").await,
+        ));
+        let named_root_module = MODULE.replacen(
+            "module(name='bazel_tools')",
+            "module(name='bazel_tools', repo_name='root_self')",
+            1,
+        );
+        let named_root = resolve_root(&dice, &named_root_module, "first").await;
+        assert_eq!(target(&named_root), generated[0]);
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &named_root,
+        ));
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &resolve_root(&dice, MODULE, "first").await,
+        ));
+        let alternate_extension = EXTENSION_A.replace(
+            "ext=module_extension(implementation=impl)",
+            "ext=module_extension(implementation=impl)\nother=module_extension(implementation=impl)",
+        );
+        let alternate_module = "module(name='bazel_tools')\n\
+            e=use_extension('//:ext.bzl','other')\n\
+            use_repo(e, first='first', second='second')\n";
+        let alternate_root = transaction(&dice, alternate_module, &alternate_extension, true, None)
+            .await
+            .compute(&HostCanonicalRepositoryApparentMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::root(),
+                ApparentRepoName::new("first").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert_ne!(target(&alternate_root), generated[0]);
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &alternate_root,
+        ));
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &resolve_root(&dice, MODULE, "first").await,
+        ));
+        let mut invalid_tx = transaction(
+            &dice,
+            "this is not valid Starlark\n",
+            EXTENSION_A,
+            true,
+            None,
+        )
+        .await;
+        let direct_error = invalid_tx
+            .compute(&HostRootRepositoryMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(direct_error) = direct_error else {
+            panic!("invalid root mapping must complete")
+        };
+        let direct_error = direct_error.as_ref().as_ref().unwrap_err().clone();
+        let root_terminal = invalid_tx
+            .compute(&HostCanonicalRepositoryApparentMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::root(),
+                ApparentRepoName::new("first").unwrap(),
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            &root_terminal,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostCanonicalRepositoryApparentMappingError {
+                        context_repo,
+                        apparent_repo,
+                        kind: HostCanonicalRepositoryApparentMappingErrorKind::RootMapping(error),
+                        ..
+                    }) if context_repo.is_root()
+                        && apparent_repo.as_str() == "first"
+                        && error == &direct_error
+                )
+        ));
+        let root_injected = resolve_root(
+            &dice,
+            &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
+            "first",
+        )
+        .await;
+        assert_eq!(target(&root_injected), generated[0]);
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &root_injected,
+        ));
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &resolve_root(&dice, MODULE, "first").await,
+        ));
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &self_mapping,
+        ));
+        assert!(HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_a,
+            &resolve_root(&dice, MODULE, "first").await,
+        ));
+        let root_missing = resolve_root(&dice, MODULE, "missing").await;
+        assert!(matches!(
+            root_missing,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostCanonicalRepositoryApparentMappingError {
+                        kind: HostCanonicalRepositoryApparentMappingErrorKind::Missing {
+                            predecessor: ApparentMappingPredecessor::Root(_),
+                        },
+                        ..
+                    })
+                )
+        ));
         let injected = resolve(
             &dice,
             &format!("{MODULE}inject_repo(e, injected='bazel_tools')\n"),
@@ -1837,15 +2135,12 @@ ext=module_extension(implementation=impl)
             let SourcePreparationOutcome::Complete(value) = &injected else {
                 panic!("injected mapping must complete")
             };
-            value
-                .as_ref()
-                .as_ref()
-                .unwrap()
-                .predecessor
-                .view()
-                .unwrap()
-                .canonical_repo()
-                .clone()
+            let ApparentMappingPredecessor::Canonical(predecessor) =
+                &value.as_ref().as_ref().unwrap().predecessor
+            else {
+                panic!("injected mapping must retain canonical predecessor")
+            };
+            predecessor.view().unwrap().canonical_repo().clone()
         };
         let invalid_override_module = format!("{MODULE}override_repo(e, injected='bazel_tools')\n");
         let mut invalid_override_tx =
@@ -1967,6 +2262,45 @@ ext=module_extension(implementation=impl)
         assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
             &mapping_need,
             &mapping_need,
+        ));
+        let root_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let _root_tx = transaction(
+            &root_dice,
+            "module(name='bazel_tools')\n\
+             local_path_override(module_name='local', path='local')\n\
+             bazel_dep(name='local', version='1', repo_name='local_alias')\n",
+            EXTENSION_A,
+            true,
+            None,
+        )
+        .await;
+        let mut root_updater = root_dice.updater();
+        root_updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new([]).unwrap(),
+            )])
+            .unwrap();
+        let root_mapping_need = root_updater
+            .commit()
+            .await
+            .compute(&HostCanonicalRepositoryApparentMappingKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                CanonicalRepoName::root(),
+                ApparentRepoName::root(),
+            ))
+            .await
+            .unwrap();
+        assert!(matches!(
+            root_mapping_need,
+            SourcePreparationOutcome::Need(_)
+        ));
+        assert!(!HostCanonicalRepositoryApparentMappingKey::validity(
+            &root_mapping_need,
+        ));
+        assert!(!HostCanonicalRepositoryApparentMappingKey::equality(
+            &root_mapping_need,
+            &root_mapping_need,
         ));
 
         let mut missing_source = transaction(&dice, MODULE, EXTENSION_A, false, None).await;
