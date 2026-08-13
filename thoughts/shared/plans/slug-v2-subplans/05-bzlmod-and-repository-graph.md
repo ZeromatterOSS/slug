@@ -3417,3 +3417,18 @@ under 320/700/1,020 and ceilings 3,000/2,450/1,040/1,100. Preserve inherited
 real Registry evidence, real Generated/Nonregistry/Main/Builtin consumer rows,
 production-used pure vertical corruption proof, root-definition rejection,
 ABI, semantics, and all no-consumer/materialization breadth stops.
+
+### Repository source policy threaded; request projection designed (2026-08-13)
+
+Independent review accepts `65b1dd89` at 170/292/462 changed Rust lines with
+all focused proof and Bzlmod/loading/server validation green; core retains only
+the accepted unrelated deferred diagnostic assertion. Run only docs packet
+`WP-4-5-host-repository-source-capability-materialization-request-projection-design`
+in the four ledgers under 40/260/220/220/740. Freeze a pure hidden Bzlmod
+Builtin-or-existing-request disposition over the accepted capability. Explicit
+WorkspaceRelative, CommandAbsolute, and LocalUnsupported policy drives only
+the existing local/http/git classifier; one compact RepoSpec shell clone shares
+its attribute Arc. Future Rust is exactly `source_preparation.rs` and hidden
+`lib.rs` exports under 180/420/600. No new key/store/request layout, consumer
+migration, Need/DICE, source/materialization, command/public API, I/O, lockfile,
+wire, or JVM work is authorized.

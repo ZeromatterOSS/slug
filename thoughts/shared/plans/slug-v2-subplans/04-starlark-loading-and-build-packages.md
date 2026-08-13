@@ -3349,3 +3349,18 @@ Resume only the retained exact four-file implementation under 320/700/1,020
 and ceilings 3,000/2,450/1,040/1,100. Preserve the corrected Bzlmod-real,
 core-real, and production-used-pure proof split, root-definition fail-closed
 policy boundary, semantics, ABI, and all prior stops. Stage 4 stays unchanged.
+
+### Repository source policy threaded; request projection designed (2026-08-13)
+
+Independent review accepts `65b1dd89` at 170 production, 292 tests, and 462
+total changed Rust lines; Bzlmod/loading/server pass and core retains only its
+accepted unrelated deferred diagnostic assertion. Run only four-ledger docs
+packet
+`WP-4-5-host-repository-source-capability-materialization-request-projection-design`
+under 40/260/220/220/740 documentation caps. Freeze one computation-free
+Bzlmod projection from the accepted capability into Builtin identity or the
+existing owned materialization request. The one RepoSpec clone copies only its
+compact shell and shares the Arc attribute graph. Future Rust is exactly
+`source_preparation.rs` and hidden `lib.rs` exports under 180/420/600; Stage 4
+behavior stays unchanged. No DICE/Need, consumer migration, package/source,
+materialization, command, public wire, I/O, or JVM work is authorized.
