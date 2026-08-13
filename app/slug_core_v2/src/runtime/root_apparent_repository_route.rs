@@ -13,6 +13,8 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
+use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
+use slug_bzlmod_v2::HostRepositorySourceCapability;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
@@ -149,6 +151,46 @@ impl HostRootApparentRepositoryRoute {
     fn view(&self) -> Option<HostRootApparentRepositoryRouteView<'_>> {
         let view = predecessor_view(self.predecessor.as_ref())?;
         view_is_consistent(&self.apparent_repo, view).then_some(view)
+    }
+
+    fn source_capability(&self) -> Option<HostRootApparentRepositorySourceDisposition> {
+        source_capability_from_view(&self.workspace, self.view()?)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+enum HostRootApparentRepositorySourceDisposition {
+    Main,
+    Capability(HostRepositorySourceCapability),
+}
+
+fn source_capability_from_view(
+    workspace: &NormalizedAbsolutePath,
+    view: HostRootApparentRepositoryRouteView<'_>,
+) -> Option<HostRootApparentRepositorySourceDisposition> {
+    view_is_consistent(view.apparent_repo, view).then_some(())?;
+    match view.kind {
+        HostRootApparentRepositoryRouteKind::Main => {
+            Some(HostRootApparentRepositorySourceDisposition::Main)
+        }
+        HostRootApparentRepositoryRouteKind::Builtin => HostRepositorySourceCapability::builtin(
+            workspace.clone(),
+            view.apparent_repo.clone(),
+            view.canonical_repo.clone(),
+            BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+        )
+        .map(HostRootApparentRepositorySourceDisposition::Capability),
+        HostRootApparentRepositoryRouteKind::SelectedRegistry
+        | HostRootApparentRepositoryRouteKind::SelectedNonregistry
+        | HostRootApparentRepositoryRouteKind::Generated => {
+            HostRepositorySourceCapability::from_repo_spec(
+                workspace.clone(),
+                view.apparent_repo.clone(),
+                view.canonical_repo.clone(),
+                view.repo_spec?,
+            )
+            .map(HostRootApparentRepositorySourceDisposition::Capability)
+        }
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -292,6 +334,7 @@ mod tests {
     use dice::DynKey;
     use dice::RichActivation;
     use dice::UserComputationData;
+    use slug_bzlmod_v2::HostRepositorySourceCapabilitySource;
     use slug_bzlmod_v2::HostRepositorySourceFileKey;
     use slug_bzlmod_v2::RegistryFileKey;
     use slug_bzlmod_v2::RepositoryMaterializationEpochEntry;
@@ -555,6 +598,92 @@ mod tests {
             view.repo_spec().unwrap(),
             predecessor.view().unwrap().repo_spec().unwrap(),
         ));
+        let HostRootApparentRepositorySourceDisposition::Capability(capability) =
+            certificate.source_capability().unwrap()
+        else {
+            unreachable!()
+        };
+        assert_eq!(capability.workspace(), &workspace);
+        assert_eq!(capability.apparent_repo().as_str(), "first");
+        assert_eq!(capability.canonical_repo(), &canonical);
+        let HostRepositorySourceCapabilitySource::RepoSpec(spec) = capability.source() else {
+            unreachable!()
+        };
+        assert_eq!(spec.as_ref(), view.repo_spec().unwrap());
+        let cloned = capability.clone();
+        let HostRepositorySourceCapabilitySource::RepoSpec(cloned_spec) = cloned.source() else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(spec, cloned_spec));
+        let repeated = certificate.source_capability().unwrap();
+        assert_eq!(
+            repeated,
+            HostRootApparentRepositorySourceDisposition::Capability(capability)
+        );
+        let apparent_builtin = ApparentRepoName::new("bazel_tools").unwrap();
+        assert!(matches!(
+            source_capability_from_view(
+                &workspace,
+                HostRootApparentRepositoryRouteView {
+                    apparent_repo: &apparent_builtin,
+                    canonical_repo: view.canonical_repo(),
+                    kind: view.kind(),
+                    repo_spec: view.repo_spec(),
+                },
+            ),
+            Some(HostRootApparentRepositorySourceDisposition::Capability(_))
+        ));
+        let root = CanonicalRepoName::root();
+        let builtin = CanonicalRepoName::new("bazel_tools").unwrap();
+        for kind in [
+            HostRootApparentRepositoryRouteKind::Main,
+            HostRootApparentRepositoryRouteKind::Builtin,
+            HostRootApparentRepositoryRouteKind::SelectedRegistry,
+            HostRootApparentRepositoryRouteKind::SelectedNonregistry,
+            HostRootApparentRepositoryRouteKind::Generated,
+        ] {
+            for canonical_repo in [&root, &builtin, view.canonical_repo()] {
+                for repo_spec in [None, view.repo_spec()] {
+                    let apparent_repo = if kind == HostRootApparentRepositoryRouteKind::Builtin {
+                        &apparent_builtin
+                    } else {
+                        view.apparent_repo()
+                    };
+                    let expected = match kind {
+                        HostRootApparentRepositoryRouteKind::Main => {
+                            canonical_repo.is_root() && repo_spec.is_none()
+                        }
+                        HostRootApparentRepositoryRouteKind::Builtin => {
+                            canonical_repo.as_str() == "bazel_tools" && repo_spec.is_none()
+                        }
+                        HostRootApparentRepositoryRouteKind::SelectedRegistry
+                        | HostRootApparentRepositoryRouteKind::SelectedNonregistry
+                        | HostRootApparentRepositoryRouteKind::Generated => {
+                            canonical_repo == view.canonical_repo() && repo_spec.is_some()
+                        }
+                    };
+                    assert_eq!(
+                        source_capability_from_view(
+                            &workspace,
+                            HostRootApparentRepositoryRouteView {
+                                apparent_repo,
+                                canonical_repo,
+                                kind,
+                                repo_spec,
+                            },
+                        )
+                        .is_some(),
+                        expected,
+                    );
+                }
+            }
+        }
+        let corrupt_request = HostRootApparentRepositoryRoute {
+            workspace: workspace.clone(),
+            apparent_repo: ApparentRepoName::new("other").unwrap(),
+            predecessor: certificate.predecessor.clone(),
+        };
+        assert!(corrupt_request.source_capability().is_none());
         let invalid = invalid_predecessor(
             workspace.clone(),
             ApparentRepoName::new("first").unwrap(),
@@ -670,6 +799,16 @@ mod tests {
             view.repo_spec().unwrap(),
             predecessor.view().unwrap().repo_spec().unwrap(),
         ));
+        let HostRootApparentRepositorySourceDisposition::Capability(capability) =
+            certificate.source_capability().unwrap()
+        else {
+            unreachable!()
+        };
+        assert!(matches!(
+            capability.source(),
+            HostRepositorySourceCapabilitySource::RepoSpec(spec)
+                if spec.as_ref() == view.repo_spec().unwrap()
+        ));
     }
 
     #[tokio::test]
@@ -696,6 +835,10 @@ mod tests {
         assert_eq!(view.kind(), HostRootApparentRepositoryRouteKind::Main);
         assert!(view.canonical_repo().is_root());
         assert!(view.repo_spec().is_none());
+        assert_eq!(
+            certificate.source_capability(),
+            Some(HostRootApparentRepositorySourceDisposition::Main)
+        );
         assert_eq!(
             *tracker.predecessor.lock().unwrap(),
             [ActivationKind::Reused]
@@ -729,6 +872,16 @@ mod tests {
         assert_eq!(builtin.kind(), HostRootApparentRepositoryRouteKind::Builtin);
         assert_eq!(builtin.canonical_repo().as_str(), "bazel_tools");
         assert!(builtin.repo_spec().is_none());
+        let HostRootApparentRepositorySourceDisposition::Capability(capability) =
+            certificate.source_capability().unwrap()
+        else {
+            unreachable!()
+        };
+        assert!(matches!(
+            capability.source(),
+            HostRepositorySourceCapabilitySource::Builtin(identity)
+                if identity == &BuiltinBazelToolsSnapshot::CURRENT.route_identity()
+        ));
         assert_eq!(
             *tracker.predecessor.lock().unwrap(),
             [ActivationKind::Reused]
