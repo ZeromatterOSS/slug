@@ -1,13 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-generated-repository-validation-owner-design`
-Milestone: M7 post-evaluation extension repository validation owner design
+Packet: `WP-4-5-host-module-extension-generated-repository-validation-owner-implementation`
+Milestone: M7 post-evaluation extension repository validation implementation
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the smallest loading-owned import/existence validator after the
-accepted instantiation and validation-request owners; authorize no Rust.
+Result: implement the accepted loading-owned import/existence validator.
 
-## Active docs-only design contract
+## Active implementation contract
+
+Independent review accepts the design in `1f7165ed`. Run only
+`WP-4-5-host-module-extension-generated-repository-validation-owner-implementation`
+in existing
+`app/slug_loading_v2/src/module_extension_repository_instantiation.rs` for
+narrow crate-private accessors, new private
+`module_extension_repository_validation.rs`, and `lib.rs` solely for its
+private declaration, plus four ledgers. Caps are mandatory 320 production,
+650 tests, and 970 total formatted net Rust lines against `1f7165ed`.
+Preserve the exact owner/order/identity/proof/compatibility/stops below.
+
+## Accepted docs-only design contract
+
+This section is historical context only, grants no file, action, cap, or
+schedule authority, and is interpreted through the active implementation
+contract above.
 
 Independent review accepts `ff55dcbf`: one compact local-name order spine now
 owns root/nonroot import source order, and hidden requests retain aggregated
@@ -84,7 +99,7 @@ cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts the REPLAN design in `f14d3d7a`. Run only
 `WP-5-extension-import-order-identity-owner-implementation` in
@@ -98,7 +113,7 @@ proof, compatibility, and stop contract below.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 The first compiling request widening adds 108 production/test lines in
 `selected_repo_spec.rs` and two hidden `lib.rs` exports, but its required
@@ -153,7 +168,7 @@ consumer/API/JVM work, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts the design in `533a9453`. Run only
 `WP-5-host-selected-extension-validation-request-projection-implementation`
@@ -167,7 +182,7 @@ representation, compatibility, and stop contract below.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts repository-rule instantiation in `d50f02a2` at
 474 production, 799 tests, and 1,273 total within 480/900/1,380; full loading
@@ -232,7 +247,7 @@ I/O/materializer/lockfile/consumer/API/JVM work, or cap excess.
 
 This section and everything below it are historical context only, grant no
 file, action, cap, or schedule authority, and are interpreted only through the
-active docs-only design contract above.
+active implementation contract above.
 
 Independent review accepts the cap correction in `7cf2e45f`. Run only
 `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
@@ -249,7 +264,7 @@ remain.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted through the active
-docs-only design contract above.
+implementation contract above.
 
 The first compiling implementation is 474 production, 572 tests, and 1,046
 total formatted net Rust lines against `7616136f`. Production is within the
@@ -395,7 +410,7 @@ future Rust path, or cap excess.
 
 This section and everything below are historical accepted design context only,
 grant no independent file, action, cap, or schedule authority, and are
-interpreted solely through the active docs-only design contract above.
+interpreted solely through the active implementation contract above.
 
 The definition-owner audit below found no truthful standalone definition DICE
 leaf. Pinned Bazel 9.2 `repository_rule()` creates an immutable exported
@@ -567,7 +582,7 @@ total over 1,500.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active docs-only design contract above.
+active implementation contract above.
 
 The audit uses Bazel 9.2 tag commit `8220c619`:
 `RepositoryModuleApi.repository_rule`,
@@ -596,7 +611,7 @@ stopping before instantiation.
 
 This section and everything below are historical context only, grant no file,
 action, cap, or schedule authority, and are interpreted solely through the
-active docs-only design contract above.
+active implementation contract above.
 
 Independent review accepts the event correction in `f36ec593`. Implement only
 `WP-4-5-host-pure-module-extension-invocation-owner-implementation-r4` in the
@@ -625,7 +640,7 @@ architecture, ABI, errors, events, scope, caps, and all stops.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-docs-only design contract above.
+implementation contract above.
 
 Final implementation review accepts the invocation architecture but rejects
 the phrase that the invocation key itself replays its batch on warm reuse.
@@ -670,7 +685,7 @@ consumer/JVM breadth, or cap excess.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-docs-only design contract above.
+implementation contract above.
 
 The frozen 720/800/1,520 stop fired after the complete required proof was
 formatted: the exact four-path diff measures approximately 724 production, 846
@@ -747,7 +762,7 @@ remain unaccepted and unstaged.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent implementation review found the six shared runtime files sound but
 rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly

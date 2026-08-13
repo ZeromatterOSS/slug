@@ -2791,3 +2791,12 @@ instantiation accessor file, new private validation module, and private
 `lib.rs` declaration under mandatory 320/650/970. No Bzlmod edit/reverse edge,
 generated route/publication, execution/context, I/O/materializer/lockfile/
 consumer/API/JVM work resumes.
+
+### Loading generated-repository validation implementation activated (2026-08-12)
+
+Independent review accepts design 1f7165ed. Loading may implement only
+WP-4-5-host-module-extension-generated-repository-validation-owner-implementation
+in the accepted three loading paths plus four ledgers under 320/650/970.
+Stage 5 production remains unchanged; no Bzlmod edit/reverse edge, route,
+publication, execution/context, I/O/materializer/lockfile/consumer/API/JVM
+breadth.

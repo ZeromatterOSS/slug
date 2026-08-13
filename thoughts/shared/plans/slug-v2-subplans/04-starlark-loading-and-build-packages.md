@@ -2723,3 +2723,13 @@ successor in the instantiation file for narrow accessors, new private validation
 module, and `lib.rs` declaration under mandatory 320/650/970. No Rust resumes
 before acceptance/activation; no Bzlmod mutation, route/publication, repository
 execution/context, events/I/O/materializer/lockfile/consumer/API/JVM breadth.
+
+### Generated-repository validation implementation activated (2026-08-12)
+
+Independent review accepts design 1f7165ed. Run only
+WP-4-5-host-module-extension-generated-repository-validation-owner-implementation
+in the existing instantiation file for narrow accessors, new private validation
+module, and private lib.rs declaration plus four ledgers, under mandatory
+320/650/970. Preserve import-before-polarity order, predecessor-only success,
+typed exact terminals, zero events/I/O, and every route/materialization/public
+boundary.
