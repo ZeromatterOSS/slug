@@ -3104,3 +3104,13 @@ retained mappings; delete the callerless generated-only owner. Future Rust is
 only existing core `generated_repository_definition.rs` under 240/520/760.
 Stage 5 production remains unchanged; root/public routing, source preparation,
 materialization/I/O, and second-key/file breadth remain deferred.
+
+### Canonical apparent-mapping replacement implementation activated (2026-08-12)
+
+Independent review accepts design `706da25d`. Run only
+`WP-4-5-6-host-canonical-repository-apparent-mapping-composition-owner-implementation`
+in existing core `generated_repository_definition.rs` with colocated tests and
+four ledgers under 240/520/760 against `706da25d`. Replace the generated-only
+owner with one canonical-definition mapping consumer; preserve borrowed
+identity, proof, compatibility, complexity gate, and stops. Stage 5 production
+remains unchanged; no Bzlmod/loading/server or adjacent Rust is authorized.

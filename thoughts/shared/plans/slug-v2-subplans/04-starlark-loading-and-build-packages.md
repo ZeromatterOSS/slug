@@ -3039,3 +3039,12 @@ future Rust is only existing `generated_repository_definition.rs` under
 240/520/760 with no material size/responsibility growth. Keep root mapping
 fail-closed and route/source/materialization/public breadth deferred. Stage 4
 production remains unchanged; no second key/file or adjacent Rust is authorized.
+
+### Canonical apparent-mapping replacement implementation activated (2026-08-12)
+
+Independent review accepts design `706da25d`. Run only
+`WP-4-5-6-host-canonical-repository-apparent-mapping-composition-owner-implementation`
+in existing core `generated_repository_definition.rs` with colocated tests and
+four ledgers under 240/520/760 against `706da25d`. Delete the generated-only
+mapping owner; preserve the sole canonical predecessor, borrowed lookup, proof,
+compatibility, complexity gate, and stops. Stage 4 production remains unchanged.
