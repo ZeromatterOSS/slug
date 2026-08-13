@@ -3225,3 +3225,11 @@ identity/reuse/no-copy, and zero additional transport/filesystem/materialization
 after warming. Preserve exact three paths, 340/700/1,040, 2,400/900, semantics,
 and all reverse-edge/route/source/public stops; require acceptance and explicit
 r2 activation before Rust resumes.
+
+### Core root apparent-definition implementation r2 activated (2026-08-13)
+
+Independent review accepts proof correction `dfe5cad0` over design `512e40ed`.
+Resume only the retained private core composition module, opaque predecessor
+seam, and private module declaration under 340/700/1,040 and 2,400/900. Stage 5
+production stays unchanged; use the corrected proof split and preserve every
+reverse-edge/route/source/materialization/public/I/O/JVM stop.

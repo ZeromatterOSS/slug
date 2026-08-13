@@ -3159,3 +3159,11 @@ failures/short circuits, admitted successes, A/B/A, reuse/no-copy, and zero
 additional registry/filesystem/materialization work after warming. Preserve
 340/700/1,040, 2,400/900, scope, semantics, and all stops. Require acceptance
 and explicit r2 activation before Rust resumes.
+
+### Root apparent-definition implementation r2 activated (2026-08-13)
+
+Independent review accepts proof correction `dfe5cad0` over design `512e40ed`.
+Resume only the retained three-path core implementation under 340/700/1,040
+and 2,400/900. Use the corrected pure/inherited/real proof split; preserve the
+opaque sibling seam, no-map view, mapping-first/short-circuit semantics, and all
+route/source/materializer/command/public/I/O/JVM stops.
