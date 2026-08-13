@@ -2987,3 +2987,18 @@ builtin fail-closed terminal, proof, compatibility, and stops. Stage 5
 production remains otherwise unchanged; no `lib.rs`, second Rust file, new
 graph owner, loading/core/server edit, public route/source/materializer/I/O,
 execution, lockfile, consumer/API, or JVM work is authorized.
+
+### Selected-module definition publication design scheduled (2026-08-12)
+
+Independent review accepts private canonical lookup `bd3ab8ee`. Its selected
+catalog remains Bzlmod-owned; expose only a hidden borrowed certificate ABI
+before any higher core selected/generated composition.
+
+Run only four-ledger docs packet
+`WP-5-host-canonical-selected-module-definition-publication-design` under
+35/220/180/180/615 documentation caps. Freeze the existing key constructor,
+opaque structural errors, predecessor+ordinal certificate, ordered borrowed
+mapping and original selected RepoSpec view, future exact two-file 180/380/560
+scope, proof, and stops. Stage 5 production remains unchanged; no new key/store,
+loading/core/server Rust, route/source/materializer/I/O, lockfile, public stable
+API, consumer, or JVM work is authorized.

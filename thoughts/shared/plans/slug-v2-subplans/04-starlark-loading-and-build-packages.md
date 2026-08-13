@@ -2930,3 +2930,17 @@ predecessor+ordinal/no-copy access, typed builtin deferral, proof,
 compatibility, and stops. Stage 4 production remains unchanged; no second Rust
 file, public export, loading/core/server edit, route/source/materializer/I/O,
 execution, or JVM work is authorized.
+
+### Selected-module lookup accepted; hidden publication design scheduled (2026-08-12)
+
+Independent review accepts private Bzlmod lookup `bd3ab8ee`. Before core can
+compose selected and generated canonical domains, freeze a borrowed hidden ABI
+over that sole key/store rather than copying selected routes.
+
+Run only four-ledger docs packet
+`WP-5-host-canonical-selected-module-definition-publication-design` under
+35/220/180/180/615 documentation caps. Freeze opaque errors, one certificate
+plus borrowed kind/module/version/canonical/mapping/original-RepoSpec view, a
+two-file hidden successor under 180/380/560, proof, and stops. Stage 4
+production remains unchanged; no loading/core/server Rust, route,
+source/materializer/I/O, public stable API, or JVM work is authorized.
