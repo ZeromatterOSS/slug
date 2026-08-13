@@ -2958,3 +2958,20 @@ retained-map lookup, exact context identity, no-copy target access, proof, and
 all no-route/no-materialization stops. Stage 5 production remains unchanged;
 no Bzlmod/loading/server edit, second Rust file, reverse edge, source/I/O,
 consumer/public API, lockfile, materializer, or JVM work is authorized.
+
+### Canonical selected-module lookup design scheduled (2026-08-12)
+
+Independent review accepts generated-context mapping `f468fa30`. The next peer
+semantic catalog is already owned by private `HostSelectedModuleRoutesKey`;
+freeze canonical selection there before any core generated/selected domain
+composition or root route/source work.
+
+Run only four-ledger docs packet
+`WP-5-host-canonical-selected-module-definition-owner-design` under
+40/240/180/220/660 documentation caps. Freeze a private one-file lookup that
+computes only selected routes, scans to exhaustion for zero/duplicate canonical
+ownership, and retains catalog+ordinal with borrowed root/registry/nonregistry
+identity, typed builtin fail-closed handling, and warmed-predecessor
+zero-additional-source proof under mandatory future 220/500/720 caps. Stage 5 production remains
+unchanged; no loading/core/server Rust, public export, new graph, root route,
+source/materializer/I/O, lockfile, consumer/API, or JVM work is authorized.

@@ -2902,3 +2902,20 @@ definition-key dependency, nonroot/context validation, borrowed effective
 target, full proof, compatibility, and stops. Stage 4 production remains
 unchanged; no second Rust file, root mapping, route, execution,
 source/materializer I/O, public API, or JVM work is authorized.
+
+### Generated mapping accepted; selected-module lookup design scheduled (2026-08-12)
+
+Independent review accepts private core apparent mapping `f468fa30`. Before
+core can classify a canonical target, Bzlmod must provide the peer canonical
+lookup over its existing selected-route catalog; root apparent
+`RootRepositoryRouteKey` remains a later source-preparation owner.
+
+Run only four-ledger docs packet
+`WP-5-host-canonical-selected-module-definition-owner-design` under
+40/240/180/220/660 documentation caps. Freeze one private Bzlmod route-catalog
+key with complete-scan uniqueness, predecessor+ordinal/no-copy access, exact
+root/registry/nonregistry identity, typed builtin fail-closed handling, warmed
+predecessor zero-additional-source proof, future one-file 220/500/720 caps,
+proof, and stops. Stage 4 production remains unchanged; no core/loading Rust, route,
+repository execution/context, source/materializer I/O, public API, or JVM work
+is authorized.
