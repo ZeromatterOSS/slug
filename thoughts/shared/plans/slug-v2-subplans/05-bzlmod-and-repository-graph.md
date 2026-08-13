@@ -2703,3 +2703,13 @@ with the same three future loading paths and semantics, corrected mandatory
 independent acceptance plus explicit r2 activation. All no-Bzlmod-mutation,
 no-reconstruction, no-existence, no-I/O/materializer/lockfile/consumer/API/JVM
 stops remain.
+
+### Loading instantiation r2 activated (2026-08-12)
+
+Independent review accepts `7cf2e45f`. Resume only the same three loading
+paths and four ledgers as
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
+under 480/900/1,380 against `7616136f`. Stage 5 production remains unchanged;
+the complete join/namespace/lifecycle/A-B-A proof must land without Bzlmod
+mutation, reconstruction, existence/routes, execution, I/O, materializer,
+lockfile, consumer/API, or JVM breadth.

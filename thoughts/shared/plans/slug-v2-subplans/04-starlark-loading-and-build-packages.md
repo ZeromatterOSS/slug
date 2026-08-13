@@ -2647,3 +2647,13 @@ Run only the four-plan docs packet
 Retain the same three Rust paths and all semantics/stops, correct only the
 future caps to 480 production/900 tests/1,380 total, and authorize no Rust
 until independent acceptance and explicit r2 activation.
+
+### Repository-rule instantiation r2 activated (2026-08-12)
+
+Independent review accepts the cap correction in `7cf2e45f`. Resume only
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
+in the same three Rust paths plus four ledgers, under corrected mandatory
+480/900/1,380 caps against `7616136f`. Complete the exact join, substituted
+namespace precedence, predecessor Need/zero-event, completed/current prefix,
+and field-specific A/B/A proof without production growth or semantic breadth.
+All prior stops remain.

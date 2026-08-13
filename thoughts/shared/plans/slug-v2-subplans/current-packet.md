@@ -1,14 +1,30 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-module-extension-repository-rule-instantiation-owner-r2-cap-design`
-Milestone: M7 repository-rule instantiation proof-cap correction
+Packet: `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
+Milestone: M7 repository-rule instantiation projection implementation r2
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: correct only the test cap for the retained, unaccepted loading-owned
-instantiation diff; authorize no Rust until independent acceptance and explicit
-r2 implementation activation.
+Result: complete the retained loading-owned instantiation projection and its
+full frozen proof under the accepted corrected caps.
 
-## Active docs-only cap-correction contract
+## Active implementation contract
+
+Independent review accepts the cap correction in `7cf2e45f`. Run only
+`WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation-r2`
+in existing `module_extension_repository_rule.rs`, private
+`module_extension_repository_instantiation.rs`, and `lib.rs` solely for its
+private declaration, plus the four ledgers. Caps are 480 production, 900
+tests, and 1,380 total formatted net Rust lines against `7616136f`. Complete
+every frozen proof row below without production growth or semantic expansion.
+All prior fourth-file, Bzlmod mutation, extra key/loader, lifetime, execution,
+I/O, existence/routes, materializer, lockfile, consumer/API, JVM, and cap stops
+remain.
+
+## Accepted r2 cap correction
+
+This section is historical context only, grants no independent file, action,
+cap, or schedule authority, and is interpreted through the active
+implementation contract above.
 
 The first compiling implementation is 474 production, 572 tests, and 1,046
 total formatted net Rust lines against `7616136f`. Production is within the
@@ -31,8 +47,8 @@ file, another key/loader, reduced proof, behavior breadth, or cap excess.
 ## Accepted predecessor implementation contract
 
 This section is historical context only, grants no file, action, cap, or
-schedule authority, and is interpreted only through the active docs-only
-cap-correction contract above.
+schedule authority, and is interpreted only through the active implementation
+contract above.
 
 Independent review accepts `7616136f`. Run only
 `WP-4-5-host-module-extension-repository-rule-instantiation-owner-implementation`
