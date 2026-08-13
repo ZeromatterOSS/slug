@@ -3287,3 +3287,21 @@ Preserve computation-free identity, strict polarity, manual RepoSpec hashing,
 exact legacy route projection, shared allocation proof, and every no-key/store/
 consumer/source/materialization/command/public/I/O/JVM stop. Stage 5 production
 remains unchanged.
+
+### Owned source capability accepted; private core publication follows (2026-08-13)
+
+Independent review accepts hidden Bzlmod capability `3faa90dd` at 111/148/259. Run
+only four-ledger docs packet
+`WP-4-5-6-host-repository-source-capability-publication-design` under
+40/240/180/180/640 documentation caps. The accepted private core five-domain
+carrier is the first dependency-safe owner that can publish the capability:
+Main remains typed no-capability, Builtin uses the exact pinned identity, and
+SelectedRegistry/SelectedNonregistry/Generated retain the original RepoSpec in
+one shared allocation. Future Rust is only existing
+`root_apparent_repository_route.rs` under 180/360/540 against `3faa90dd` and a
+960-line ceiling. The computation-free projection returns an owned capability
+without adding retained carrier state or changing carrier equality.
+Stage 5 production stays unchanged. Defer materialization classification,
+generic request construction, loading consumer migration, package/source work,
+commands/public API, execution/I/O, lockfile, wire, and JVM; forbid new keys,
+stores, reverse edges, copied retained state, and second-file breadth.

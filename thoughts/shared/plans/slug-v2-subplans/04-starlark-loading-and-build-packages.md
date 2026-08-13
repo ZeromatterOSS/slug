@@ -3223,3 +3223,21 @@ Preserve the computation-free owned identity, strict builtin/spec polarity,
 manual structural hash, exact legacy projection, Arc-only clones, proof, and
 all no-key/core-loading/source/materialization/command/public/I/O/JVM stops.
 Stage 4 production remains unchanged.
+
+### Owned source capability accepted; core publication designed next (2026-08-13)
+
+Independent review accepts Bzlmod capability `3faa90dd` at 111 production, 148 tests,
+and 259 total formatted net Rust lines. Full Bzlmod/loading/server suites pass;
+core retains only its unchanged deferred external-visibility assertion. Run
+only four-ledger docs packet
+`WP-4-5-6-host-repository-source-capability-publication-design` under
+40/240/180/180/640 documentation caps. Freeze one computation-free publication
+inside the existing private core five-domain carrier: Main has no capability;
+Builtin and selected/generated definitions retain exact owned Bzlmod capability
+identity with one shared RepoSpec allocation. Future Rust is exactly existing
+`root_apparent_repository_route.rs` under 180/360/540 against `3faa90dd` and a
+960-line ceiling. The projection returns one owned capability disposition and
+does not store duplicate derived state or change carrier equality.
+Stage 4 production remains unchanged; no new key/store, Bzlmod/loading/server/
+command edit, source/package/materialization/I/O, public API, reverse edge, or
+JVM breadth is authorized.
