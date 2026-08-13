@@ -3181,3 +3181,14 @@ and private mod declaration under 320/650/970 with 960/800 old/new ceilings.
 Stage 4 production remains unchanged; no reverse edge, duplicate lookup/store,
 owned Bzlmod route, source/package/materialization/I/O, command/public API, or
 JVM work is authorized.
+
+### Root apparent repository carrier implementation activated (2026-08-13)
+
+Independent review accepts design `0c0c2402`. Implement only new private
+`root_apparent_repository_route.rs`, the frozen minimal `pub(super)` seam in
+`root_apparent_repository_definition.rs`, and the private `runtime/mod.rs`
+declaration under 320/650/970 with 960/800 definition/route ceilings. Preserve
+the sole-predecessor five-domain carrier, opaque Main/Builtin projection,
+fail-closed consistency, retained Arc/request identity, proof, and all no-route/
+source/materialization/command/public/I/O/JVM stops. Stage 4 production remains
+unchanged.

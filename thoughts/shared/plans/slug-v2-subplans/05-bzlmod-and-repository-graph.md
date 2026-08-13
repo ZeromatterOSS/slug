@@ -3246,3 +3246,12 @@ minimal composition seam, and private mod declaration under 320/650/970 and
 960/800 ceilings. Stage 5 production remains unchanged; forbid a Bzlmod-to-core
 or loading reverse edge, duplicate lookup/catalog, copied state, owned
 `RootRepositoryRoute`, source/materialization/I/O, command/public API, and JVM.
+
+### Core private repository carrier implementation activated (2026-08-13)
+
+Independent review accepts design `0c0c2402`. Run only the new private core
+route-carrier module, minimal opaque composition seam, and private module
+declaration under 320/650/970 and 960/800 ceilings. Stage 5 production remains
+unchanged. Preserve full predecessor/request identity, borrowed five-domain
+views, fail-closed consistency, proof, and every reverse-edge/owned-route/
+source/materialization/command/public/I/O/JVM stop.
