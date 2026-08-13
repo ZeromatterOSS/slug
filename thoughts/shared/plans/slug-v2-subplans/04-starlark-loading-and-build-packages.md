@@ -3538,3 +3538,17 @@ Independent review accepts design `7ef0c353`. Implement only Bzlmod
 one Builtin or request-result dependency, branch values/errors/proof, and every
 no-caller/core/loading/command/legacy-demand/second-result/new-I/O/public/
 reverse-edge/JVM stop. Stage 4 remains unchanged.
+
+### Repository source observation accepted; core dispatch audited next (2026-08-13)
+
+Independent review accepts `cbc44e43`: exact two-file hidden Bzlmod owner,
+one Builtin or request-result dependency, complete branch values/errors/Hash,
+focused 6/6 and full 365/365 proof, and no caller or legacy demand edge. Run
+only four-ledger docs packet
+`WP-4-5-6-host-root-repository-source-observation-consumer-audit` under
+40/320/240/240/840. Audit the first private core caller from the accepted
+source-path predecessor, including Main no-source ordering, exact observation
+Need/error retention, and the owned-versus-borrowed certificate clone boundary;
+choose one smallest atomic successor or prerequisite REPLAN. Authorize no Rust,
+new key/store/caller, loading/package/command/public behavior, legacy demand,
+new I/O/materialization, reverse edge, or JVM work. Stage 4 remains unchanged.
