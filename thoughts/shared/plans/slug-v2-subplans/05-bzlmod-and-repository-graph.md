@@ -2898,3 +2898,13 @@ new runtime module plus private `runtime/mod.rs` declaration under future
 mandatory 260/480/740 after acceptance/activation. Stage 5 production remains
 unchanged. No Bzlmod/loading/server edit, apparent route, `RootRepositoryRoute`,
 source/materializer/I/O, lockfile, consumer/API, or JVM work is authorized.
+
+### Core canonical generated-definition implementation activated (2026-08-12)
+
+Independent review accepts design `6678f54f`. Core may implement only the
+private two-file canonical lookup plus four ledgers under mandatory
+260/480/740. Stage 5 production remains unchanged. The key computes only the
+accepted hidden loading validation key and borrows its no-copy certificate;
+no Bzlmod/loading/server edit, reverse edge, apparent route,
+`RootRepositoryRoute`, repository execution/context, source/materializer/I/O,
+lockfile, consumer/API, or JVM work is authorized.

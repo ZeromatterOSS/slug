@@ -2841,3 +2841,15 @@ complete-scan uniqueness, borrowed no-copy result, proof, and stops. Stage 4
 production remains unchanged; apparent routing, repository execution/context,
 source/materialization/I/O, lockfile, command/wire API, and JVM remain
 forbidden.
+
+### Core generated-definition lookup implementation activated (2026-08-12)
+
+Independent review accepts design `6678f54f`. Implement only
+`WP-4-5-6-host-generated-repository-definition-lookup-owner-implementation`
+in new core runtime `generated_repository_definition.rs` plus `runtime/mod.rs`
+solely for its private declaration, and four ledgers, under mandatory
+260/480/740 against `6678f54f`. Preserve complete-scan canonical uniqueness,
+the retained certificate-plus-ordinal/no-copy result, proof, compatibility,
+and stops. Stage 4 production remains unchanged; no loading/Bzlmod/server,
+route, execution, source/materializer/I/O, lockfile, public API, or JVM work is
+authorized.
