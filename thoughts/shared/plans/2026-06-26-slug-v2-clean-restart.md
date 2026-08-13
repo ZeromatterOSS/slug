@@ -30,13 +30,13 @@ and must name the same packet.
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, and multi-platform choice are later breadth | preserve the admitted FileWrite boundary |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **active (repository relative-path owner implementation)** | relative-path owner design `4d96d094` accepted | implement the pure shared validator value | WP-4-5-host-repository-relative-path-owner-implementation |
+| M7: command/ruleset breadth | **active (root-apparent source-path input owner design)** | pure relative-path owner `b46c2c63` accepted | freeze the private path-first five-domain owner | WP-4-5-6-host-root-apparent-repository-source-path-input-owner-design |
 | M8: bootstrap | **developer graph accepted, parked** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | Stage 10.3/10.4 remain behind M2, M5, and M6 | wait for the semantic graph/execution chain |
 | M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-host-repository-relative-path-owner-implementation](./slug-v2-subplans/current-packet.md).
+[WP-4-5-6-host-root-apparent-repository-source-path-input-owner-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -1396,3 +1396,14 @@ Independent review accepts design `4d96d094`. Implement only Bzlmod
 100/240/340 and 11,540/380. Preserve the exact pure value/error/accessor ABI,
 sole existing checker, one post-validation Arc allocation, proof, and every
 no-caller/key/source/materialization/I/O/core/loading/command/public/JVM stop.
+
+### M7 relative path accepted; path-first core owner designed next (2026-08-13)
+
+Independent review accepts `b46c2c63`; all 359 Bzlmod tests pass. Run only
+four-ledger docs packet
+`WP-4-5-6-host-root-apparent-repository-source-path-input-owner-design` under
+40/300/240/240/820. Freeze a private core key that validates through the pure
+owner before any await, then computes only the accepted source-input key and
+retains exact path/predecessor identity. Future Rust is three core files under
+340/700/1,040 with 840/850 ceilings. No result/source/loading/command/I/O/JVM
+behavior is authorized.

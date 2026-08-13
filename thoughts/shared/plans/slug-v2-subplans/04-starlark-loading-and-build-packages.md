@@ -3486,3 +3486,13 @@ Independent review accepts design `4d96d094`. Implement only Bzlmod
 sole checker, post-validation Arc allocation, proof, and every no-caller/key/
 source/materialization/I/O/core/loading/command/public/JVM stop. Stage 4 remains
 unchanged.
+
+### Relative path accepted; path-first core source input designed next (2026-08-13)
+
+Independent review accepts `b46c2c63`; all Bzlmod tests pass. Run only docs
+packet `WP-4-5-6-host-root-apparent-repository-source-path-input-owner-design`
+under 40/300/240/240/820. Freeze one private core key that validates the pure
+relative path before any await, then computes only the accepted source-input
+key and retains exact path/predecessor identity. Future Rust is a new cohesive
+module, minimal source-input seam, and mod line under 340/700/1,040 with
+840/850 ceilings. Defer result/source/loading/command/public/I/O/JVM behavior.
