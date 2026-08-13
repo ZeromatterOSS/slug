@@ -14,6 +14,7 @@ use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use slug_bzlmod_v2::BuiltinBazelToolsSnapshot;
+use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
 use slug_bzlmod_v2::HostRepositorySourceCapability;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::SourcePreparationOutcome;
@@ -43,6 +44,7 @@ struct HostRootApparentRepositoryRouteView<'a> {
     canonical_repo: &'a CanonicalRepoName,
     kind: HostRootApparentRepositoryRouteKind,
     repo_spec: Option<&'a RepoSpec>,
+    local_path_policy: Option<HostRepositoryLocalPathPolicy>,
 }
 impl<'a> HostRootApparentRepositoryRouteView<'a> {
     fn apparent_repo(self) -> &'a ApparentRepoName {
@@ -57,11 +59,14 @@ impl<'a> HostRootApparentRepositoryRouteView<'a> {
     fn repo_spec(self) -> Option<&'a RepoSpec> {
         self.repo_spec
     }
+    fn local_path_policy(self) -> Option<HostRepositoryLocalPathPolicy> {
+        self.local_path_policy
+    }
 }
 fn predecessor_view(
     predecessor: &DefinitionResult,
 ) -> Option<HostRootApparentRepositoryRouteView<'_>> {
-    let (apparent_repo, canonical_repo, kind, repo_spec) = match predecessor {
+    let (apparent_repo, canonical_repo, kind, repo_spec, local_path_policy) = match predecessor {
         Ok(value) => {
             let view = value.view()?;
             let kind = match view.kind() {
@@ -80,6 +85,7 @@ fn predecessor_view(
                 view.canonical_repo(),
                 kind,
                 view.repo_spec(),
+                Some(view.local_path_policy()),
             )
         }
         Err(error) => {
@@ -92,7 +98,13 @@ fn predecessor_view(
                     HostRootApparentRepositoryRouteKind::Builtin
                 }
             };
-            (view.apparent_repo(), view.canonical_repo(), kind, None)
+            (
+                view.apparent_repo(),
+                view.canonical_repo(),
+                kind,
+                None,
+                None,
+            )
         }
     };
     Some(HostRootApparentRepositoryRouteView {
@@ -100,6 +112,7 @@ fn predecessor_view(
         canonical_repo,
         kind,
         repo_spec,
+        local_path_policy,
     })
 }
 fn view_is_consistent(
@@ -111,17 +124,33 @@ fn view_is_consistent(
     }
     match view.kind {
         HostRootApparentRepositoryRouteKind::Main => {
-            view.canonical_repo.is_root() && view.repo_spec.is_none()
+            view.canonical_repo.is_root()
+                && view.repo_spec.is_none()
+                && view.local_path_policy.is_none()
         }
         HostRootApparentRepositoryRouteKind::Builtin => {
-            view.canonical_repo.as_str() == "bazel_tools" && view.repo_spec.is_none()
+            view.canonical_repo.as_str() == "bazel_tools"
+                && view.repo_spec.is_none()
+                && view.local_path_policy.is_none()
         }
         HostRootApparentRepositoryRouteKind::SelectedRegistry
-        | HostRootApparentRepositoryRouteKind::SelectedNonregistry
         | HostRootApparentRepositoryRouteKind::Generated => {
             !view.canonical_repo.is_root()
                 && view.canonical_repo.as_str() != "bazel_tools"
                 && view.repo_spec.is_some()
+                && view.local_path_policy == Some(HostRepositoryLocalPathPolicy::LocalUnsupported)
+        }
+        HostRootApparentRepositoryRouteKind::SelectedNonregistry => {
+            !view.canonical_repo.is_root()
+                && view.canonical_repo.as_str() != "bazel_tools"
+                && view.repo_spec.is_some()
+                && matches!(
+                    view.local_path_policy,
+                    Some(
+                        HostRepositoryLocalPathPolicy::WorkspaceRelative
+                            | HostRepositoryLocalPathPolicy::CommandAbsolute
+                    )
+                )
         }
     }
 }
@@ -188,6 +217,7 @@ fn source_capability_from_view(
                 view.apparent_repo.clone(),
                 view.canonical_repo.clone(),
                 view.repo_spec?,
+                view.local_path_policy()?,
             )
             .map(HostRootApparentRepositorySourceDisposition::Capability)
         }
@@ -355,6 +385,7 @@ mod tests {
     use super::super::generated_repository_definition::tests::WORKSPACE;
     use super::super::generated_repository_definition::tests::names;
     use super::super::generated_repository_definition::tests::transaction;
+    use super::super::generated_repository_definition::tests::transaction_with_command_override;
     use super::super::generated_repository_definition::tests::validated;
     use super::super::root_apparent_repository_definition::tests::prepare_builtin;
     use super::*;
@@ -471,6 +502,7 @@ mod tests {
                     &root,
                     HostRootApparentRepositoryRouteKind::Main,
                     None,
+                    None,
                 ),
                 true,
             ),
@@ -479,6 +511,7 @@ mod tests {
                     &apparent,
                     &builtin,
                     HostRootApparentRepositoryRouteKind::Builtin,
+                    None,
                     None,
                 ),
                 true,
@@ -489,6 +522,7 @@ mod tests {
                     &root,
                     HostRootApparentRepositoryRouteKind::Main,
                     None,
+                    None,
                 ),
                 false,
             ),
@@ -497,6 +531,7 @@ mod tests {
                     &apparent,
                     &builtin,
                     HostRootApparentRepositoryRouteKind::Main,
+                    None,
                     None,
                 ),
                 false,
@@ -507,6 +542,7 @@ mod tests {
                     &root,
                     HostRootApparentRepositoryRouteKind::Builtin,
                     None,
+                    None,
                 ),
                 false,
             ),
@@ -515,6 +551,7 @@ mod tests {
                     &apparent,
                     &dep,
                     HostRootApparentRepositoryRouteKind::Generated,
+                    None,
                     None,
                 ),
                 false,
@@ -528,6 +565,7 @@ mod tests {
                         canonical_repo: view.1,
                         kind: view.2,
                         repo_spec: view.3,
+                        local_path_policy: view.4,
                     },
                 ),
                 expected,
@@ -606,12 +644,24 @@ mod tests {
         assert_eq!(capability.workspace(), &workspace);
         assert_eq!(capability.apparent_repo().as_str(), "first");
         assert_eq!(capability.canonical_repo(), &canonical);
-        let HostRepositorySourceCapabilitySource::RepoSpec(spec) = capability.source() else {
+        let HostRepositorySourceCapabilitySource::RepoSpec {
+            repo_spec: spec,
+            local_path_policy,
+        } = capability.source()
+        else {
             unreachable!()
         };
         assert_eq!(spec.as_ref(), view.repo_spec().unwrap());
+        assert_eq!(
+            *local_path_policy,
+            HostRepositoryLocalPathPolicy::LocalUnsupported
+        );
         let cloned = capability.clone();
-        let HostRepositorySourceCapabilitySource::RepoSpec(cloned_spec) = cloned.source() else {
+        let HostRepositorySourceCapabilitySource::RepoSpec {
+            repo_spec: cloned_spec,
+            ..
+        } = cloned.source()
+        else {
             unreachable!()
         };
         assert!(Arc::ptr_eq(spec, cloned_spec));
@@ -629,6 +679,7 @@ mod tests {
                     canonical_repo: view.canonical_repo(),
                     kind: view.kind(),
                     repo_spec: view.repo_spec(),
+                    local_path_policy: view.local_path_policy(),
                 },
             ),
             Some(HostRootApparentRepositorySourceDisposition::Capability(_))
@@ -644,37 +695,63 @@ mod tests {
         ] {
             for canonical_repo in [&root, &builtin, view.canonical_repo()] {
                 for repo_spec in [None, view.repo_spec()] {
-                    let apparent_repo = if kind == HostRootApparentRepositoryRouteKind::Builtin {
-                        &apparent_builtin
-                    } else {
-                        view.apparent_repo()
-                    };
-                    let expected = match kind {
-                        HostRootApparentRepositoryRouteKind::Main => {
-                            canonical_repo.is_root() && repo_spec.is_none()
-                        }
-                        HostRootApparentRepositoryRouteKind::Builtin => {
-                            canonical_repo.as_str() == "bazel_tools" && repo_spec.is_none()
-                        }
-                        HostRootApparentRepositoryRouteKind::SelectedRegistry
-                        | HostRootApparentRepositoryRouteKind::SelectedNonregistry
-                        | HostRootApparentRepositoryRouteKind::Generated => {
-                            canonical_repo == view.canonical_repo() && repo_spec.is_some()
-                        }
-                    };
-                    assert_eq!(
-                        source_capability_from_view(
-                            &workspace,
-                            HostRootApparentRepositoryRouteView {
-                                apparent_repo,
-                                canonical_repo,
-                                kind,
-                                repo_spec,
-                            },
-                        )
-                        .is_some(),
-                        expected,
-                    );
+                    for local_path_policy in [
+                        None,
+                        Some(HostRepositoryLocalPathPolicy::WorkspaceRelative),
+                        Some(HostRepositoryLocalPathPolicy::CommandAbsolute),
+                        Some(HostRepositoryLocalPathPolicy::LocalUnsupported),
+                    ] {
+                        let apparent_repo = if kind == HostRootApparentRepositoryRouteKind::Builtin
+                        {
+                            &apparent_builtin
+                        } else {
+                            view.apparent_repo()
+                        };
+                        let expected = match kind {
+                            HostRootApparentRepositoryRouteKind::Main => {
+                                canonical_repo.is_root()
+                                    && repo_spec.is_none()
+                                    && local_path_policy.is_none()
+                            }
+                            HostRootApparentRepositoryRouteKind::Builtin => {
+                                canonical_repo.as_str() == "bazel_tools"
+                                    && repo_spec.is_none()
+                                    && local_path_policy.is_none()
+                            }
+                            HostRootApparentRepositoryRouteKind::SelectedRegistry
+                            | HostRootApparentRepositoryRouteKind::Generated => {
+                                canonical_repo == view.canonical_repo()
+                                    && repo_spec.is_some()
+                                    && local_path_policy
+                                        == Some(HostRepositoryLocalPathPolicy::LocalUnsupported)
+                            }
+                            HostRootApparentRepositoryRouteKind::SelectedNonregistry => {
+                                canonical_repo == view.canonical_repo()
+                                    && repo_spec.is_some()
+                                    && matches!(
+                                        local_path_policy,
+                                        Some(
+                                            HostRepositoryLocalPathPolicy::WorkspaceRelative
+                                                | HostRepositoryLocalPathPolicy::CommandAbsolute
+                                        )
+                                    )
+                            }
+                        };
+                        assert_eq!(
+                            source_capability_from_view(
+                                &workspace,
+                                HostRootApparentRepositoryRouteView {
+                                    apparent_repo,
+                                    canonical_repo,
+                                    kind,
+                                    repo_spec,
+                                    local_path_policy,
+                                },
+                            )
+                            .is_some(),
+                            expected,
+                        );
+                    }
                 }
             }
         }
@@ -806,9 +883,67 @@ mod tests {
         };
         assert!(matches!(
             capability.source(),
-            HostRepositorySourceCapabilitySource::RepoSpec(spec)
-                if spec.as_ref() == view.repo_spec().unwrap()
+            HostRepositorySourceCapabilitySource::RepoSpec { repo_spec, local_path_policy }
+                if repo_spec.as_ref() == view.repo_spec().unwrap()
+                    && *local_path_policy == HostRepositoryLocalPathPolicy::WorkspaceRelative
         ));
+
+        let command_module = "module(name='bazel_tools')\n\
+            bazel_dep(name='local', version='1', repo_name='local_alias')\n";
+        let mut command_tx =
+            transaction_with_command_override(&dice, command_module, EXTENSION_A, "local").await;
+        let command_key = HostRootApparentRepositoryRouteKey::new(
+            workspace.clone(),
+            ApparentRepoName::new("local_alias").unwrap(),
+        )
+        .unwrap();
+        let mut command = command_tx.compute(&command_key).await.unwrap();
+        let mut command_requests = Vec::<Arc<RepositoryMaterializationRequest>>::new();
+        while let SourcePreparationOutcome::Need(need) = &command {
+            for request in need.repository_materializations().values() {
+                if !command_requests.iter().any(|seen| seen.id == request.id) {
+                    command_requests.push(request.clone());
+                }
+            }
+            let entries = command_requests.iter().cloned().map(|request| {
+                RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Local,
+                    ),
+                }
+            });
+            let mut updater = dice.updater();
+            updater
+                .changed_to(vec![(
+                    RepositoryMaterializationResultEpochKey {
+                        workspace: workspace.clone(),
+                    },
+                    RepositoryMaterializationResultEpoch::new(workspace.clone(), entries).unwrap(),
+                )])
+                .unwrap();
+            command_tx = updater.commit().await;
+            command = command_tx.compute(&command_key).await.unwrap();
+        }
+        let command = route(&command);
+        let command_view = command.view().unwrap();
+        assert_eq!(
+            command_view.kind(),
+            HostRootApparentRepositoryRouteKind::SelectedNonregistry
+        );
+        assert_eq!(
+            command_view.local_path_policy(),
+            Some(HostRepositoryLocalPathPolicy::CommandAbsolute)
+        );
+        let HostRootApparentRepositorySourceDisposition::Capability(command_capability) =
+            command.source_capability().unwrap()
+        else {
+            unreachable!()
+        };
+        assert_eq!(
+            command_capability.local_path_policy(),
+            Some(HostRepositoryLocalPathPolicy::CommandAbsolute)
+        );
     }
 
     #[tokio::test]
@@ -835,6 +970,7 @@ mod tests {
         assert_eq!(view.kind(), HostRootApparentRepositoryRouteKind::Main);
         assert!(view.canonical_repo().is_root());
         assert!(view.repo_spec().is_none());
+        assert_eq!(view.local_path_policy(), None);
         assert_eq!(
             certificate.source_capability(),
             Some(HostRootApparentRepositorySourceDisposition::Main)
@@ -872,6 +1008,7 @@ mod tests {
         assert_eq!(builtin.kind(), HostRootApparentRepositoryRouteKind::Builtin);
         assert_eq!(builtin.canonical_repo().as_str(), "bazel_tools");
         assert!(builtin.repo_spec().is_none());
+        assert_eq!(builtin.local_path_policy(), None);
         let HostRootApparentRepositorySourceDisposition::Capability(capability) =
             certificate.source_capability().unwrap()
         else {
@@ -882,6 +1019,7 @@ mod tests {
             HostRepositorySourceCapabilitySource::Builtin(identity)
                 if identity == &BuiltinBazelToolsSnapshot::CURRENT.route_identity()
         ));
+        assert_eq!(capability.local_path_policy(), None);
         assert_eq!(
             *tracker.predecessor.lock().unwrap(),
             [ActivationKind::Reused]

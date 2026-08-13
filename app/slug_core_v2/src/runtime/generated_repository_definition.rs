@@ -18,6 +18,7 @@ use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionError;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionErrorDisposition;
 use slug_bzlmod_v2::HostCanonicalSelectedModuleDefinitionKey;
+use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
 use slug_bzlmod_v2::HostRootRepositoryMapping;
 use slug_bzlmod_v2::HostRootRepositoryMappingError;
 use slug_bzlmod_v2::HostRootRepositoryMappingKey;
@@ -252,46 +253,51 @@ pub(super) struct HostCanonicalRepositoryDefinitionView<'a> {
     canonical_repo: &'a CanonicalRepoName,
     mapping_context: &'a CanonicalRepoName,
     repo_spec: Option<&'a RepoSpec>,
+    local_path_policy: Option<HostRepositoryLocalPathPolicy>,
 }
 
 impl HostCanonicalRepositoryDefinition {
     pub(super) fn view(&self) -> Option<HostCanonicalRepositoryDefinitionView<'_>> {
-        let (kind, canonical_repo, mapping_context, repo_spec) = match &self.source {
-            HostCanonicalRepositoryDefinitionSource::Selected(value) => {
-                let view = value.view();
-                let kind = match view.kind() {
-                    slug_bzlmod_v2::HostCanonicalSelectedModuleKind::Root => {
-                        HostCanonicalRepositoryDefinitionKind::Root
-                    }
-                    slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedRegistry => {
-                        HostCanonicalRepositoryDefinitionKind::SelectedRegistry
-                    }
-                    slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedNonregistry => {
-                        HostCanonicalRepositoryDefinitionKind::SelectedNonregistry
-                    }
-                };
-                (
-                    kind,
-                    view.canonical_repo(),
-                    view.mapping_context(),
-                    view.repo_spec(),
-                )
-            }
-            HostCanonicalRepositoryDefinitionSource::Generated(value) => {
-                let view = value.view()?;
-                (
-                    HostCanonicalRepositoryDefinitionKind::Generated,
-                    view.canonical_name,
-                    view.mapping.context_repo(),
-                    Some(view.repo_spec),
-                )
-            }
-        };
+        let (kind, canonical_repo, mapping_context, repo_spec, local_path_policy) =
+            match &self.source {
+                HostCanonicalRepositoryDefinitionSource::Selected(value) => {
+                    let view = value.view();
+                    let kind = match view.kind() {
+                        slug_bzlmod_v2::HostCanonicalSelectedModuleKind::Root => {
+                            HostCanonicalRepositoryDefinitionKind::Root
+                        }
+                        slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedRegistry => {
+                            HostCanonicalRepositoryDefinitionKind::SelectedRegistry
+                        }
+                        slug_bzlmod_v2::HostCanonicalSelectedModuleKind::SelectedNonregistry => {
+                            HostCanonicalRepositoryDefinitionKind::SelectedNonregistry
+                        }
+                    };
+                    (
+                        kind,
+                        view.canonical_repo(),
+                        view.mapping_context(),
+                        view.repo_spec(),
+                        view.local_path_policy(),
+                    )
+                }
+                HostCanonicalRepositoryDefinitionSource::Generated(value) => {
+                    let view = value.view()?;
+                    (
+                        HostCanonicalRepositoryDefinitionKind::Generated,
+                        view.canonical_name,
+                        view.mapping.context_repo(),
+                        Some(view.repo_spec),
+                        Some(HostRepositoryLocalPathPolicy::LocalUnsupported),
+                    )
+                }
+            };
         Some(HostCanonicalRepositoryDefinitionView {
             kind,
             canonical_repo,
             mapping_context,
             repo_spec,
+            local_path_policy,
         })
     }
 
@@ -323,6 +329,10 @@ impl<'a> HostCanonicalRepositoryDefinitionView<'a> {
 
     pub(super) fn repo_spec(self) -> Option<&'a RepoSpec> {
         self.repo_spec
+    }
+
+    pub(super) fn local_path_policy(self) -> Option<HostRepositoryLocalPathPolicy> {
+        self.local_path_policy
     }
 }
 
@@ -913,6 +923,49 @@ ext=module_extension(implementation=impl)
         extension_present: bool,
         tracker: Option<Arc<dyn ActivationTracker>>,
     ) -> dice::DiceTransaction {
+        transaction_with_policy(
+            dice,
+            module,
+            extension,
+            extension_present,
+            tracker,
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        )
+        .await
+    }
+
+    pub(in crate::runtime) async fn transaction_with_command_override(
+        dice: &Arc<Dice>,
+        module: &str,
+        extension: &str,
+        module_name: &str,
+    ) -> dice::DiceTransaction {
+        let override_value = format!("{module_name}={WORKSPACE}/local");
+        transaction_with_policy(
+            dice,
+            module,
+            extension,
+            true,
+            None,
+            BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap().as_path(),
+                [override_value.as_str()],
+            )
+            .unwrap(),
+        )
+        .await
+    }
+
+    async fn transaction_with_policy(
+        dice: &Arc<Dice>,
+        module: &str,
+        extension: &str,
+        extension_present: bool,
+        tracker: Option<Arc<dyn ActivationTracker>>,
+        command_policy: BzlmodCommandPolicyKey,
+    ) -> dice::DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
         let mut updater = dice.updater_with_data(UserComputationData {
             cycle_detector: Some(slug_loading_v2::bzl_load_cycle_detector()),
@@ -962,7 +1015,7 @@ ext=module_extension(implementation=impl)
         slug_bzlmod_v2::inject_root_module_request_inputs(
             &mut updater,
             workspace.as_path(),
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            command_policy,
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             LockfileMode::Update,
         )

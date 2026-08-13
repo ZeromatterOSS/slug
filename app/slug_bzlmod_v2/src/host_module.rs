@@ -487,7 +487,10 @@ pub enum RootRepositorySource {
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum HostRepositorySourceCapabilitySource {
     Builtin(BuiltinBazelToolsRouteIdentity),
-    RepoSpec(Arc<RepoSpec>),
+    RepoSpec {
+        repo_spec: Arc<RepoSpec>,
+        local_path_policy: crate::HostRepositoryLocalPathPolicy,
+    },
 }
 
 #[doc(hidden)]
@@ -506,6 +509,7 @@ impl HostRepositorySourceCapability {
         apparent_repo: ApparentRepoName,
         canonical_repo: CanonicalRepoName,
         repo_spec: &RepoSpec,
+        local_path_policy: crate::HostRepositoryLocalPathPolicy,
     ) -> Option<Self> {
         (!apparent_repo.is_root()
             && !canonical_repo.is_root()
@@ -514,7 +518,10 @@ impl HostRepositorySourceCapability {
                 workspace,
                 apparent_repo,
                 canonical_repo,
-                source: HostRepositorySourceCapabilitySource::RepoSpec(Arc::new(repo_spec.clone())),
+                source: HostRepositorySourceCapabilitySource::RepoSpec {
+                    repo_spec: Arc::new(repo_spec.clone()),
+                    local_path_policy,
+                },
             })
     }
 
@@ -545,6 +552,20 @@ impl HostRepositorySourceCapability {
     }
     pub fn source(&self) -> &HostRepositorySourceCapabilitySource {
         &self.source
+    }
+    pub fn repo_spec(&self) -> Option<&RepoSpec> {
+        match &self.source {
+            HostRepositorySourceCapabilitySource::Builtin(_) => None,
+            HostRepositorySourceCapabilitySource::RepoSpec { repo_spec, .. } => Some(repo_spec),
+        }
+    }
+    pub fn local_path_policy(&self) -> Option<crate::HostRepositoryLocalPathPolicy> {
+        match &self.source {
+            HostRepositorySourceCapabilitySource::Builtin(_) => None,
+            HostRepositorySourceCapabilitySource::RepoSpec {
+                local_path_policy, ..
+            } => Some(*local_path_policy),
+        }
     }
 }
 
@@ -626,7 +647,13 @@ impl Hash for HostRepositorySourceCapabilitySource {
         std::mem::discriminant(self).hash(state);
         match self {
             Self::Builtin(identity) => identity.hash(state),
-            Self::RepoSpec(spec) => hash_repo_spec(spec, state),
+            Self::RepoSpec {
+                repo_spec,
+                local_path_policy,
+            } => {
+                hash_repo_spec(repo_spec, state);
+                local_path_policy.hash(state);
+            }
         }
     }
 }
@@ -669,6 +696,7 @@ impl RootRepositoryRoute {
                     self.apparent_repo.clone(),
                     self.canonical_repo.clone(),
                     spec,
+                    crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
                 )
             }
             RootRepositorySource::BuiltinBazelTools(identity) => {
@@ -1002,15 +1030,21 @@ mod tests {
 
     fn external_source_capability_snapshot(
         route: &crate::RootRepositoryRoute,
-    ) -> (String, String, bool) {
+    ) -> (
+        String,
+        String,
+        bool,
+        Option<crate::HostRepositoryLocalPathPolicy>,
+    ) {
         let capability: crate::HostRepositorySourceCapability = route.source_capability();
         (
             capability.apparent_repo().as_str().to_owned(),
             capability.canonical_repo().as_str().to_owned(),
             matches!(
                 capability.source(),
-                crate::HostRepositorySourceCapabilitySource::RepoSpec(_)
+                crate::HostRepositorySourceCapabilitySource::RepoSpec { .. }
             ),
+            capability.local_path_policy(),
         )
     }
 
@@ -1461,13 +1495,24 @@ mod tests {
         assert_eq!(capability.workspace(), route.workspace());
         assert_eq!(capability.apparent_repo(), route.apparent_repo());
         assert_eq!(capability.canonical_repo(), route.canonical_repo());
-        let crate::HostRepositorySourceCapabilitySource::RepoSpec(spec) = capability.source()
+        let crate::HostRepositorySourceCapabilitySource::RepoSpec {
+            repo_spec: spec,
+            local_path_policy,
+        } = capability.source()
         else {
             panic!("direct-local route must project its RepoSpec");
         };
         assert_eq!(spec.as_ref(), route.repo_spec());
+        assert_eq!(capability.repo_spec(), Some(route.repo_spec()));
+        assert_eq!(
+            *local_path_policy,
+            crate::HostRepositoryLocalPathPolicy::WorkspaceRelative
+        );
         let cloned = capability.clone();
-        let crate::HostRepositorySourceCapabilitySource::RepoSpec(cloned_spec) = cloned.source()
+        let crate::HostRepositorySourceCapabilitySource::RepoSpec {
+            repo_spec: cloned_spec,
+            ..
+        } = cloned.source()
         else {
             unreachable!()
         };
@@ -1480,7 +1525,12 @@ mod tests {
         assert_eq!(capability_hash(&capability), capability_hash(&cloned));
         assert_eq!(
             external_source_capability_snapshot(route),
-            ("dep_alias".into(), "dep+".into(), true)
+            (
+                "dep_alias".into(),
+                "dep+".into(),
+                true,
+                Some(crate::HostRepositoryLocalPathPolicy::WorkspaceRelative)
+            )
         );
 
         let builtin =
@@ -1520,6 +1570,7 @@ mod tests {
                     apparent,
                     canonical,
                     route.repo_spec(),
+                    crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
                 )
                 .is_none()
             );
@@ -1529,11 +1580,12 @@ mod tests {
             ApparentRepoName::new("bazel_tools").unwrap(),
             route.canonical_repo().clone(),
             route.repo_spec(),
+            crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
         )
         .unwrap();
         assert!(matches!(
             apparent_builtin_spec.source(),
-            crate::HostRepositorySourceCapabilitySource::RepoSpec(_)
+            crate::HostRepositorySourceCapabilitySource::RepoSpec { .. }
         ));
         for (apparent, canonical) in [
             (
@@ -1570,6 +1622,7 @@ mod tests {
                 route.apparent_repo().clone(),
                 route.canonical_repo().clone(),
                 route.repo_spec(),
+                crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
             )
             .unwrap(),
             crate::HostRepositorySourceCapability::from_repo_spec(
@@ -1577,6 +1630,7 @@ mod tests {
                 ApparentRepoName::new("other").unwrap(),
                 route.canonical_repo().clone(),
                 route.repo_spec(),
+                crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
             )
             .unwrap(),
             crate::HostRepositorySourceCapability::from_repo_spec(
@@ -1584,6 +1638,7 @@ mod tests {
                 route.apparent_repo().clone(),
                 CanonicalRepoName::new("other+").unwrap(),
                 route.repo_spec(),
+                crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
             )
             .unwrap(),
             crate::HostRepositorySourceCapability::from_repo_spec(
@@ -1591,6 +1646,15 @@ mod tests {
                 route.apparent_repo().clone(),
                 route.canonical_repo().clone(),
                 changed_spec.repo_spec(),
+                crate::HostRepositoryLocalPathPolicy::WorkspaceRelative,
+            )
+            .unwrap(),
+            crate::HostRepositorySourceCapability::from_repo_spec(
+                workspace(),
+                route.apparent_repo().clone(),
+                route.canonical_repo().clone(),
+                route.repo_spec(),
+                crate::HostRepositoryLocalPathPolicy::CommandAbsolute,
             )
             .unwrap(),
             apparent_builtin_spec,

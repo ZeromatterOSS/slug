@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use dice::DiceComputations;
 use dice::Key;
 use dice_futures::cancellation::CancellationContext;
+use slug_bzlmod_v2::HostRepositoryLocalPathPolicy;
 use slug_bzlmod_v2::RepoSpec;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::ApparentRepoName;
@@ -45,6 +46,23 @@ pub(super) struct HostRootApparentRepositoryDefinitionView<'a> {
     canonical_repo: &'a CanonicalRepoName,
     kind: HostRootApparentRepositoryDefinitionKind,
     repo_spec: Option<&'a RepoSpec>,
+    local_path_policy: HostRepositoryLocalPathPolicy,
+}
+fn definition_policy_matches(
+    kind: HostRootApparentRepositoryDefinitionKind,
+    policy: HostRepositoryLocalPathPolicy,
+) -> bool {
+    match kind {
+        HostRootApparentRepositoryDefinitionKind::SelectedRegistry
+        | HostRootApparentRepositoryDefinitionKind::Generated => {
+            policy == HostRepositoryLocalPathPolicy::LocalUnsupported
+        }
+        HostRootApparentRepositoryDefinitionKind::SelectedNonregistry => matches!(
+            policy,
+            HostRepositoryLocalPathPolicy::WorkspaceRelative
+                | HostRepositoryLocalPathPolicy::CommandAbsolute
+        ),
+    }
 }
 impl HostRootApparentRepositoryDefinition {
     pub(super) fn view(&self) -> Option<HostRootApparentRepositoryDefinitionView<'_>> {
@@ -61,11 +79,14 @@ impl HostRootApparentRepositoryDefinition {
                 HostRootApparentRepositoryDefinitionKind::Generated
             }
         };
+        let local_path_policy = definition.local_path_policy()?;
+        definition_policy_matches(kind, local_path_policy).then_some(())?;
         Some(HostRootApparentRepositoryDefinitionView {
             apparent_repo: &self.apparent_repo,
             canonical_repo: definition.canonical_repo(),
             kind,
             repo_spec: definition.repo_spec(),
+            local_path_policy,
         })
     }
 }
@@ -81,6 +102,9 @@ impl<'a> HostRootApparentRepositoryDefinitionView<'a> {
     }
     pub(super) fn repo_spec(&self) -> Option<&'a RepoSpec> {
         self.repo_spec
+    }
+    pub(super) fn local_path_policy(self) -> HostRepositoryLocalPathPolicy {
+        self.local_path_policy
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -485,6 +509,27 @@ pub(super) mod tests {
             &CanonicalRepoName::new("other+").unwrap(),
             &target,
         ));
+        for kind in [
+            HostRootApparentRepositoryDefinitionKind::SelectedRegistry,
+            HostRootApparentRepositoryDefinitionKind::SelectedNonregistry,
+            HostRootApparentRepositoryDefinitionKind::Generated,
+        ] {
+            for policy in [
+                HostRepositoryLocalPathPolicy::WorkspaceRelative,
+                HostRepositoryLocalPathPolicy::CommandAbsolute,
+                HostRepositoryLocalPathPolicy::LocalUnsupported,
+            ] {
+                assert_eq!(
+                    definition_policy_matches(kind, policy),
+                    match kind {
+                        HostRootApparentRepositoryDefinitionKind::SelectedNonregistry => {
+                            policy != HostRepositoryLocalPathPolicy::LocalUnsupported
+                        }
+                        _ => policy == HostRepositoryLocalPathPolicy::LocalUnsupported,
+                    }
+                );
+            }
+        }
         assert!(!definition_context_matches(
             &target,
             &target,
