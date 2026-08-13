@@ -2918,3 +2918,15 @@ all no-route/no-materialization stops, but its complete proof measures
 authorize no Rust and change only future caps to 260/550/800. Stage 5
 production remains unchanged. Rust resumes only after acceptance and explicit
 r2 activation.
+
+### Core generated-definition lookup implementation r2 activated (2026-08-12)
+
+Independent review accepts cap correction `99a5b898`. Run only
+`WP-4-5-6-host-generated-repository-definition-lookup-owner-implementation-r2`
+in new core runtime `generated_repository_definition.rs` plus `runtime/mod.rs`
+solely for its private declaration and four ledgers, under mandatory
+260/550/800 against `6678f54f`. Preserve the sole loading-key dependency,
+complete scan, certificate-plus-ordinal/no-copy result, full proof, and every
+no-route/no-materialization stop. Stage 5 production remains unchanged; no
+Bzlmod/loading/server edit, reverse edge, public API, execution/I/O, lockfile,
+materializer, consumer, or JVM work is authorized.

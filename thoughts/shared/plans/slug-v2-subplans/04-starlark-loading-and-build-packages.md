@@ -2863,3 +2863,15 @@ exceeds only the old test/total caps. Run only the four-ledger docs packet
 Authorize no Rust. Preserve the exact two files, behavior, proof, compatibility,
 and stops; correct only future caps to 260/550/800. Stage 4 production remains
 unchanged until independent acceptance and explicit r2 activation.
+
+### Generated-definition lookup implementation r2 activated (2026-08-12)
+
+Independent review accepts cap correction `99a5b898`. Run only
+`WP-4-5-6-host-generated-repository-definition-lookup-owner-implementation-r2`
+in new core runtime `generated_repository_definition.rs` plus `runtime/mod.rs`
+solely for its private declaration and four ledgers, under mandatory
+260/550/800 against `6678f54f`. Preserve complete-scan uniqueness, the
+certificate-plus-ordinal no-copy result, every field/order/lifecycle proof,
+compatibility boundary, and stop. Stage 4 production remains unchanged; no
+third Rust file, loading/Bzlmod/server, route, execution, source/materializer
+I/O, public API, or JVM work is authorized.
