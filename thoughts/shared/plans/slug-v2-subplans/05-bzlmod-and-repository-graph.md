@@ -2874,3 +2874,12 @@ under mandatory 280/520/800 Rust caps after acceptance and activation. Stage 5
 production remains unchanged. No `RootRepositoryRoute`, Bzlmod/server,
 materializer, route, mapping reconstruction, I/O, lockfile, consumer/API, or
 JVM work is authorized.
+
+### Loading generated-mapping retention implementation activated (2026-08-12)
+
+Independent review accepts design `9e12fe58`. Loading may implement only the
+exact three-file mapping-retention/publication seam plus four ledgers under
+mandatory 280/520/800. Stage 5 production remains unchanged. No
+`RootRepositoryRoute` widening, selected-state reconstruction, Bzlmod/server
+edit, route/materializer, I/O, lockfile, consumer/API, or JVM work is
+authorized.

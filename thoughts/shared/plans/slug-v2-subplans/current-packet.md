@@ -1,12 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-generated-repository-mapping-retention-design`
+Packet: `WP-4-5-host-generated-repository-mapping-retention-implementation`
 Milestone: M7 generated-repository mapping publication prerequisite
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the missing loading-owned mapping-retention seam.
+Result: implement the accepted loading-owned mapping-retention seam.
 
-## Active docs-only design contract
+## Active implementation contract
+
+Independent review accepts design `9e12fe58`. Run only
+`WP-4-5-host-generated-repository-mapping-retention-implementation` in
+`module_extension_repository_instantiation.rs`,
+`module_extension_repository_validation.rs`, and `lib.rs` solely for the
+hidden mapping/row exports, plus the four ledgers. Mandatory caps are 280
+production, 520 tests, and 800 total formatted net Rust lines against
+`9e12fe58`. Preserve the one-allocation-per-request/no-copy ABI, row-specific
+context, canonical/internal/original-`RepoSpec` identity, proof, compatibility
+boundaries, and every stop below.
+
+## Accepted docs-only design contract
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+implementation contract above.
 
 The accepted route audit REPLANs at one smaller prerequisite. Pinned Bazel 9.2
 commit `8220c619` gives `SingleExtensionValue` both internal-name/original
@@ -73,7 +89,7 @@ file, execution/I/O, retained Starlark lifetime, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 The audit inspected pinned `SingleExtensionFunction`, `SingleExtensionValue`,
 `ModuleExtensionRepoMappingEntriesFunction`, and `RepoDefinitionFunction`, plus
@@ -86,7 +102,7 @@ internal-name association are currently transient. No generated-route owner,
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts `d2ed6ad3`. The existing validation key now exposes
 only a hidden success certificate and borrowed exact-size iterator over the
@@ -101,7 +117,7 @@ suites plus independent ABI/proof review.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts `b2a153aa`: loading now owns a complete
 heap-independent validation certificate over exact request-ordered generated
@@ -174,7 +190,7 @@ fourth Rust file, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts `b2a153aa` at approximately 295 production, 612
 tests, and 907 total formatted net Rust lines. It computes only the accepted
@@ -267,7 +283,7 @@ cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts the REPLAN design in `f14d3d7a`. Run only
 `WP-5-extension-import-order-identity-owner-implementation` in
@@ -281,7 +297,7 @@ proof, compatibility, and stop contract below.
 
 This section is historical context only, grants no independent file, action,
 cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 The first compiling request widening adds 108 production/test lines in
 `selected_repo_spec.rs` and two hidden `lib.rs` exports, but its required
@@ -336,7 +352,7 @@ consumer/API/JVM work, or cap excess.
 
 This section and everything below is historical context only, grants no file,
 action, cap, or schedule authority, and is interpreted only through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent review accepts the design in `533a9453`. Run only
 `WP-5-host-selected-extension-validation-request-projection-implementation`
@@ -808,7 +824,7 @@ architecture, ABI, errors, events, scope, caps, and all stops.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-docs-only design contract above.
+implementation contract above.
 
 Final implementation review accepts the invocation architecture but rejects
 the phrase that the invocation key itself replays its batch on warm reuse.
@@ -853,7 +869,7 @@ consumer/JVM breadth, or cap excess.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-docs-only design contract above.
+implementation contract above.
 
 The frozen 720/800/1,520 stop fired after the complete required proof was
 formatted: the exact four-path diff measures approximately 724 production, 846
@@ -930,7 +946,7 @@ remain unaccepted and unstaged.
 
 This section is historical correction context only, grants no file, action,
 cap, or schedule authority, and is interpreted solely through the active
-docs-only design contract above.
+implementation contract above.
 
 Independent implementation review found the six shared runtime files sound but
 rejected the frozen eight-file Git boundary. `module_extension.rs` is a wholly

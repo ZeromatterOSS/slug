@@ -2814,3 +2814,13 @@ extension request and a no-copy hidden row view in the existing instantiation,
 validation, and lib seams under future mandatory 280/520/800 Rust caps. Stage
 4 production remains unchanged; route, Bzlmod/server, execution/context,
 materialization/I/O, lockfile, command/API, and JVM work remain forbidden.
+
+### Generated-repository mapping retention implementation activated (2026-08-12)
+
+Independent review accepts design `9e12fe58`. Run only
+`WP-4-5-host-generated-repository-mapping-retention-implementation` in the
+existing instantiation and validation modules plus `lib.rs` solely for hidden
+exports and four ledgers, under mandatory 280/520/800 against `9e12fe58`.
+Preserve one shared mapping-entry allocation per request, row-specific context,
+the no-copy hidden iterator, original generated `RepoSpec`, all proof, and all
+no-route/Bzlmod/server/execution/I/O/materialization/public/JVM stops.
