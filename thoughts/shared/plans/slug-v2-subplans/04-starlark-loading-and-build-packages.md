@@ -3084,3 +3084,11 @@ ABI and typed projection before tests, exceeding 180. Run only docs packet
 `WP-5-host-root-repository-mapping-publication-r2-cap-design`; authorize no
 Rust. Preserve all semantics/proofs/stops and change only the future caps to
 240/420/660 against `d624dc5b`, pending acceptance and explicit r2 activation.
+
+### Root mapping publication r2 implementation activated (2026-08-13)
+
+Independent review accepts cap correction `054f70f7`. Resume only the two-file
+root-mapping publication implementation under 240/420/660 against `d624dc5b`.
+Complete the frozen proof without production or scope widening. Stage 4 remains
+unchanged; no third file, extra key/store, consumer, route/source/materializer,
+I/O, loading/core/server/Cargo, stable API, or JVM work is authorized.

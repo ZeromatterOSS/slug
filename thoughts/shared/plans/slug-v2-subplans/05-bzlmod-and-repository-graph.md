@@ -3152,3 +3152,13 @@ proof, so the 180 cap stops implementation. Run only four-ledger docs packet
 Rust and preserving the retained diff plus every semantic/proof/stop. Freeze
 only a future 240 production/420 tests/660 total successor against `d624dc5b`;
 require acceptance and explicit r2 activation before implementation resumes.
+
+### Root mapping publication r2 implementation activated (2026-08-13)
+
+Independent review accepts cap correction `054f70f7`. Run only
+`WP-5-host-root-repository-mapping-publication-implementation-r2` in existing
+`selected_repo_spec.rs` and hidden `lib.rs` exports under 240/420/660 against
+`d624dc5b`. Preserve the sole projection key, borrowed predecessor-plus-Root
+ordinal ABI, opaque terminals, exact proof, compatibility, and all stops. No
+additional key/store/file, consumer, route/source/materialization, I/O, or
+loading/core/server/Cargo/public/JVM breadth is authorized.
