@@ -13,7 +13,8 @@ Independent review accepts design `4d96d094`. Implement only existing
 `app/slug_bzlmod_v2/src/lib.rs`, and four completion ledgers. Mandatory caps are
 100 production/240 tests/340 total formatted Rust lines; physical ceilings are
 11,540/380. Preserve the exact hidden value, error, constructor and borrowed
-accessor ABI; sole existing checker call; one post-validation Arc allocation;+direct parity, path-shape, A/B/A, Eq/Hash, clone-sharing, external hidden-ABI
+accessor ABI; sole existing checker call; one post-validation Arc allocation;
+direct parity, path-shape, A/B/A, Eq/Hash, clone-sharing, external hidden-ABI
 and zero-activation proof; exact/Slug-native/deferred classification; and every
 stop in design `4d96d094`. No caller/key/store, core/loading/server/command,
 source-input/request, path result, materialization/source/package/I/O,
