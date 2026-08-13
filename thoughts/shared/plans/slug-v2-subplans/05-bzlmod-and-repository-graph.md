@@ -2723,6 +2723,18 @@ No new key/graph/map owner, loading dependency, validation/generated set,
 routes, I/O/materializer/lockfile/consumer/API/JVM breadth, third Rust file, or
 cap excess.
 
+### Selected validation-request projection implementation activated (2026-08-12)
+
+Independent review accepts `533a9453`. Implement only
+`WP-5-host-selected-extension-validation-request-projection-implementation`
+in `selected_repo_spec.rs` and `lib.rs` hidden accessors plus four ledgers,
+under mandatory 220 production/380 tests/600 total against `533a9453`.
+Aggregate exact-ID root usage/proxy/import rows before request dedup, retain
+local/exported names and proxy spans plus override spans, and preserve compact
+Arc/CompactString/LogicalSpan/SmallMap/Allocative ownership. No third file,
+new key/graph/map owner, loading edge, validation/routes, I/O/materializer/
+lockfile/consumer/API/JVM breadth, or cap excess.
+
 ### Loading instantiation r2 activated (2026-08-12)
 
 Independent review accepts `7cf2e45f`. Resume only the same three loading
@@ -2732,3 +2744,21 @@ under 480/900/1,380 against `7616136f`. Stage 5 production remains unchanged;
 the complete join/namespace/lifecycle/A-B-A proof must land without Bzlmod
 mutation, reconstruction, existence/routes, execution, I/O, materializer,
 lockfile, consumer/API, or JVM breadth.
+
+### Validation request REPLANs at shared import-order identity (2026-08-12)
+
+The first request widening compiles but its required real DICE import reorder
+row compares equal. Existing `NonrootRepoImports` owns only two
+order-insensitive `SmallMap`s, so selected code cannot reconstruct invalidated
+source order by iterating them later. The predecessor activation above is
+historical and grants no authority after this REPLAN.
+
+Run only the four-plan docs packet
+`WP-5-extension-import-order-identity-owner-design` under
+40/220/180/180/620. Freeze one `Arc<[CompactString]>` local-name order spine
+on the existing shared import algebra; retain the maps as sole lookup/bijection
+owners and duplicate no exported names. The corrected future implementation
+is exactly `interim_module.rs`, `selected_repo_spec.rs`, and hidden
+`lib.rs` accessors under mandatory 260/450/710. No new key/map/interner/
+cache/digest, loading edge, validation/routes, I/O/materializer/lockfile/
+consumer/API/JVM breadth, fourth Rust file, or cap excess.

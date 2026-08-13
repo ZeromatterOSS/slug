@@ -2672,3 +2672,27 @@ Run only the four-plan docs packet
 and override-location projection; no loading Rust, validation, generated
 publication/routes, repository execution/context, I/O, materialization,
 lockfile, consumer/API, or JVM work resumes before acceptance and activation.
+
+### Selected validation-request projection activated (2026-08-12)
+
+Independent review accepts `533a9453`. Run only
+`WP-5-host-selected-extension-validation-request-projection-implementation`
+in `selected_repo_spec.rs` and its existing hidden `lib.rs` accessors plus
+the four ledgers, under 220/380/600. Stage 4 production remains unchanged.
+Preserve exact import/override order and location identity; no validator,
+generated publication/routes, execution, I/O, materialization, lockfile,
+consumer/API, or JVM breadth.
+
+### Validation request REPLANs at import-order identity (2026-08-12)
+
+The retained request widening compiles, but its real DICE reorder proof fails:
+the shared `NonrootRepoImports` bidirectional `SmallMap` equality ignores
+insertion order, so an import-order-only edit is pruned before projection.
+Stage 4 production remains unchanged.
+
+Run only the four-plan docs packet
+`WP-5-extension-import-order-identity-owner-design` under
+40/220/180/180/620. Design the shared compact local-name order spine and a
+corrected three-file successor under 260/450/710. No loading Rust, validator,
+routes, execution/I/O/materialization/lockfile/consumer/API/JVM work resumes
+before independent acceptance and activation.
