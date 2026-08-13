@@ -3341,3 +3341,17 @@ sole producer chain before provenance disappears, including fail-closed
 registry/generated behavior. Stage 5 production stays unchanged; no path-shape
 inference, request/materialization/source/package implementation, new key/store,
 reverse edge, copied state, public/command API, I/O, lockfile, wire, or JVM.
+
+### Selected nonregistry local-path policy retention designed (2026-08-13)
+
+Independent review accepts policy-owner audit `980654c8`. Run only four-ledger
+docs packet `WP-5-host-selected-nonregistry-local-path-policy-retention-design`
+under 40/240/180/180/640 documentation caps. Retain the exact Copy policy from
+existing effective Root/Command provenance through the existing nonregistry
+closure, then expose it through the hidden selected-definition view; Registry
+publishes LocalUnsupported without rule inspection and Root publishes none.
+Future Rust is exactly `source_preparation.rs`, `selected_repo_spec.rs`, and
+`lib.rs` hidden export under 220/450/670. Stage 5 production stays unchanged;
+generated/core capability and request projection remain deferred, with no new
+edge/key/store, inference, source/materialization/I/O, command/public API,
+lockfile, wire, or JVM.

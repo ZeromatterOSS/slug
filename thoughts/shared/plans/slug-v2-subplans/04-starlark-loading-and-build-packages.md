@@ -3277,3 +3277,16 @@ capability, and core projection; freeze one compact fail-closed policy and one
 dependency-safe producer chain. Stage 4 production remains unchanged. Forbid
 path-shape inference, request/source/package/materialization work, new keys/
 stores, copied state, reverse edges, command/public API, I/O, and JVM breadth.
+
+### Local-path policy owner accepted; selected retention designed next (2026-08-13)
+
+Independent review accepts audit `980654c8`. Run only four-ledger docs packet
+`WP-5-host-selected-nonregistry-local-path-policy-retention-design` under
+40/240/180/180/640 documentation caps. Freeze a compact hidden Bzlmod
+WorkspaceRelative/CommandAbsolute/LocalUnsupported enum, retain it once from
+the existing effective-override producer through the nonregistry closure, and
+publish it through the hidden selected-definition view. Future Rust is exactly
+`source_preparation.rs`, `selected_repo_spec.rs`, and `lib.rs` hidden export
+under 220/450/670. Stage 4 production remains unchanged; no new edge/key/store,
+core/loading/capability/request/source/materialization edit, inference, public
+API, I/O, or JVM breadth is authorized.

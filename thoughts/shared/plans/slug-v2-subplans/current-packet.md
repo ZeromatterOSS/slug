@@ -1,62 +1,76 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-repository-local-path-policy-owner-design`
+Packet: `WP-5-host-selected-nonregistry-local-path-policy-retention-design`
 Milestone: M7 canonical repository routing prerequisites
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md`
-Result: freeze the provenance-owned local-path policy before request projection.
+Result: design Bzlmod retention and hidden publication of selected local policy.
 
 ## Active docs-only design contract
 
-Independent review accepts consumer audit `1cd140a6`, which selects a pure
-Bzlmod materialization-request projection before loading migration but proves
-one lower input is missing. Run only docs packet
-`WP-4-5-host-repository-local-path-policy-owner-design` in canonical, this
-manifest, Stage 4, and Stage 5 under mandatory 40/260/200/200/700 formatted net
-documentation lines. Authorize no Rust, Cargo, fixture, DICE key/store,
-request projection, source/package/materialization, command/server, public API,
+Independent review accepts policy-owner audit `980654c8`. Run only docs packet
+`WP-5-host-selected-nonregistry-local-path-policy-retention-design` in
+canonical, this manifest, Stage 4, and Stage 5 under mandatory
+40/240/180/180/640 formatted net documentation lines. Authorize no Rust,
+Cargo, fixture, new DICE key/store, capability/core/loading edit, request
+projection, source/package/materialization, command/server, public API,
 execution/I/O, lockfile, wire, or JVM work.
 
-Live `request_kind(workspace, repo_spec, allow_absolute_local_path)` derives its
-exact Local policy from `HostEffectiveModuleOverride::is_command()`: root/local
-overrides require normalized workspace-relative paths; command overrides
-require normalized absolute paths. That provenance is discarded before
-`HostNonregistryPreparedClosure`, the hidden selected-definition view, the
-private core carrier, and `HostRepositorySourceCapability`. Inferring policy
-from the RepoSpec path shape would let spelling replace semantic provenance.
-Package loading is later because it first needs the exact projected request and
-its legitimate Need boundary.
+Freeze hidden Bzlmod Copy/Eq/Hash/Allocative
+`HostRepositoryLocalPathPolicy::{WorkspaceRelative, CommandAbsolute,
+LocalUnsupported}`. `LocalUnsupported` means only that a future
+`local_repository` projection fails closed; it must not reject admitted
+policy-independent http/git RepoSpecs. The sole exact producer is the already
+computed `HostEffectiveModuleOverride`: Root yields WorkspaceRelative, Command
+yields CommandAbsolute. Retain the enum once beside the RepoSpec in existing
+`HostNonregistryPreparedClosure`; do not derive it from path, rule, logical
+root, or materialization result. No new compute or dependency edge is allowed.
 
-Audit exactly `HostEffectiveModuleOverride` in `module_eval.rs`, nonregistry
-materialization and `HostNonregistryModuleSourceIdentity` in
-`source_preparation.rs`, the hidden selected-definition RepoSpec view in
-`selected_repo_spec.rs`, generated RepoSpec ownership in loading validation,
-the Bzlmod capability in `host_module.rs`, and core's computation-free
-projection in `root_apparent_repository_route.rs`. Freeze one compact owned
-policy algebra and its sole exact producer chain. It must distinguish at least
-workspace-relative root/local override provenance, command-absolute override
-provenance, and a fail-closed nonlocal/unsupported-local case for registry and
-extension-generated RepoSpecs until pinned semantics prove otherwise. Builtin
-remains outside RepoSpec policy. Do not infer any variant from path spelling,
-rule name, materialized logical root, or post-materialization source kind.
+Expose the policy only through existing hidden
+`HostCanonicalSelectedModuleDefinitionView::local_path_policy(self)
+-> Option<HostRepositoryLocalPathPolicy>`. Root returns `None`; selected
+nonregistry returns the retained exact enum; selected registry returns
+`Some(LocalUnsupported)` from registry provenance, without inspecting its
+RepoSpec. Builtin remains a non-success before this ABI. Generated policy and
+core capability threading remain deferred and must later map generated to
+LocalUnsupported until pinned semantics admit more. Expose no effective
+override, closure, materialization, route provenance, path, or private variant.
 
-The design must decide the smallest implementation boundary: whether Bzlmod
-retains policy once in its existing nonregistry closure and hidden definition
-ABI before core copies only the compact enum into the owned capability, or
-whether a smaller capability constructor input can preserve the same exact
-provenance without a parallel catalog. Freeze every named hidden type/accessor,
-dependency direction, allocation/clone/equality/hash semantics, exact Rust
-allowlist and caps, and proof. Proof must discriminate identical RepoSpec/path
-content under root versus command provenance, relative/absolute spellings that
-must not self-classify, registry/generated fail-closed behavior, legacy root
-projection, policy/content/hash A/B/A, lifecycle/no events, and zero request/
-source/package/materialization/filesystem activation. Exact is only the pinned
-Bazel 9.2 local-path provenance distinction and admitted repository identity;
-private enum/ABI and Arc storage are Slug-native. Request-kind projection,
-custom/generated rule execution, package/source migration, materialization,
-commands/public API, I/O, lockfile, wire, and JVM remain deferred. REPLAN on
-path-shape inference, reverse edges, copied RepoSpec/catalog, a new DICE key or
-semantic store, public ABI, guessed generated-local semantics, or inability to
-retain provenance before it is discarded.
+Future Rust is exactly existing
+`app/slug_bzlmod_v2/src/source_preparation.rs`, existing
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, and existing
+`app/slug_bzlmod_v2/src/lib.rs` solely for the named hidden enum re-export,
+plus four ledgers, under mandatory 220 production/450 tests/670 total formatted
+net Rust lines against the accepted design commit. REPLAN on a fourth Rust
+path, new edge/key/store, or cap excess.
+
+Required proof: pure exact producer and Root/Registry/Nonregistry publication
+matrix; identical RepoSpec and path bytes under Root versus Command provenance
+compare unequal and restore A/B/A; real workspace-relative root override and
+command-absolute override; selected registry LocalUnsupported without rule
+inspection; policy participates in closure/selected-definition equality and
+hash where applicable; Need/error/order/evaluation lifecycle remain inherited;
+no path-shape self-classification; zero capability/core/loading/request/source/
+package/materialization/filesystem activation beyond accepted predecessor work;
+and full Bzlmod/loading/core/server dependents. Exact is the pinned Bazel 9.2
+root-relative versus command-absolute local-path provenance. The hidden enum,
+ABI, diagnostics, and retention shape are Slug-native. Generated policy,
+capability threading, materialization-request projection, package/source
+migration, commands/public API, execution/I/O, lockfile, wire, and JVM are
+deferred. STOP on path/rule inference, RepoSpec or catalog copy, capability/
+core/loading mutation, generated-local admission, request construction, source/
+materializer work, or public ABI.
+
+## Accepted local-path policy owner audit
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
+
+Independent review accepts `980654c8`: provenance must be retained from
+`HostEffectiveModuleOverride::is_command()` before path spelling can substitute
+for semantic root-versus-command identity. The smallest first implementation
+publishes only selected-module policy inside Bzlmod; core capability and request
+projection follow separately.
 
 ## Accepted consumer-order audit
 
