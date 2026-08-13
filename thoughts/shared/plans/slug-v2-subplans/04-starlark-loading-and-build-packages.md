@@ -2796,3 +2796,21 @@ freeze a bounded owner, exact compatibility slice, implementation allowlist,
 mandatory Rust caps, proof, and stops or `REPLAN`. Stage 4 production remains
 unchanged. Do not authorize route publication, repository execution/context,
 source preparation/materialization, lockfile, command/API, or JVM work.
+
+### Generated-route audit REPLANs at retained mapping identity (2026-08-12)
+
+Pinned Bazel 9.2 and live Slug ownership show that the exact per-extension
+mapping and canonical/internal association are prerequisites to route work.
+Instantiation builds the correct host/base then all-generated then
+override/inject keep-last mapping for Label coercion but discards it; the
+accepted hidden iterator exposes only canonical name and original `RepoSpec`.
+Do not widen `RootRepositoryRoute`, which still means an already
+source-preparable direct-local or built-in repository.
+
+Run next only the docs packet
+`WP-4-5-host-generated-repository-mapping-retention-design` under
+45/260/220/220/745 documentation caps. Freeze one shared retained mapping per
+extension request and a no-copy hidden row view in the existing instantiation,
+validation, and lib seams under future mandatory 280/520/800 Rust caps. Stage
+4 production remains unchanged; route, Bzlmod/server, execution/context,
+materialization/I/O, lockfile, command/API, and JVM work remain forbidden.

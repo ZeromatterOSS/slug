@@ -1,56 +1,86 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-host-generated-repository-route-boundary-design`
-Milestone: M7 generated-repository route ownership boundary
+Packet: `WP-4-5-host-generated-repository-mapping-retention-design`
+Milestone: M7 generated-repository mapping publication prerequisite
 Owners: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: audit and freeze the first dependency-safe generated-route owner.
+Result: freeze the missing loading-owned mapping-retention seam.
 
 ## Active docs-only design contract
 
-Independent review accepts `d2ed6ad3`: loading now publishes a hidden,
-heap-independent, no-copy view of validated generated canonical names and
-their original `RepoSpec` rows from the sole validation key. Bzlmod owns
-`RootRepositoryRouteKey`, repository package-source preparation, and
-materialization, but cannot depend back on loading. `slug_server_v2` already
-depends on both owner crates. Run only
-`WP-4-5-host-generated-repository-route-boundary-design` in the canonical
-plan, this manifest, Stage 4, and Stage 5 under 45/260/220/220/745 formatted
-net documentation lines. Authorize no Rust, fixture, Cargo, activation,
-route, mapping, materializer, lockfile, command/API, or JVM work.
+The accepted route audit REPLANs at one smaller prerequisite. Pinned Bazel 9.2
+commit `8220c619` gives `SingleExtensionValue` both internal-name/original
+`RepoSpec` rows and canonical-to-internal identity. Its
+`ModuleExtensionRepoMappingEntriesFunction` constructs shared mapping entries
+in host-module mapping, all generated entries, then ordered override/inject
+substitutions with keep-last order; each generated repository has those shared
+entries with its own canonical context. `RepoDefinitionFunction` later selects
+the original generated `RepoSpec`, not a replacement spec.
 
-Audit pinned Bazel 9.2 `SingleExtensionFunction` and `SingleExtensionValue`
-result construction after validation, including generated canonical route
-membership, extension/call encounter order, override and inject effects on
-the effective routed `RepoSpec`, and the complete per-generated-repository
-mapping/context. Audit live `RootRepositoryRoute`,
-`RepositoryPackageSourceKey`, and materialization consumers and the actual
-crate dependency graph. Decide whether the natural bounded successor is a
-loading-owned private generated-route value consumed later by a higher crate,
-or a neutral shared route algebra that does not reverse Bzlmod's dependency.
-Do not assume that the existing root-only route key or the validated hidden
-iterator is itself a final route certificate.
+Slug's accepted instantiation owner already builds this exact complete mapping
+before schema work for Label coercion, but discards it. The hidden validation
+ABI exposes only `(canonical, RepoSpec)`. The final mapping does not contain
+this namespace, and reconstructing it from retained base/generated/override
+ingredients would replay the exact algorithm outside its sole producer.
+`RootRepositoryRoute` is not the prerequisite: its module-name and
+DirectLocal/Builtin source
+assumptions feed source-preparation behavior, while an evaluated generated
+definition is not yet a prepared repository source.
 
-The completed design must name the sole producer/key/value for each retained
-route fact, exact request/Need/error/event ordering, equality and invalidation,
-compact lifetime ownership, collision and join behavior, and whether
-overridden generated rows publish their original or replacement `RepoSpec`.
-It must freeze exact implementation files, mandatory production/test/total
-caps, discriminating pure and real-DICE proof, direct-dependent validation,
-and terminal stops or `REPLAN` at the first missing semantic input.
+Run only `WP-4-5-host-generated-repository-mapping-retention-design` in the
+canonical plan, this manifest, Stage 4, and Stage 5 under 45/260/220/220/745
+formatted net documentation lines. Authorize no Rust, fixture, Cargo,
+activation, route, materializer, lockfile, command/API, or JVM work. Freeze a
+future implementation in exactly
+`module_extension_repository_instantiation.rs`,
+`module_extension_repository_validation.rs`, and `lib.rs` solely for hidden
+exports, with mandatory caps 280 production/520 tests/800 total formatted net
+Rust lines against the accepted design commit.
 
-Exact compatibility is limited to the admitted Bazel 9.2 generated route
-membership, mapping, effective `RepoSpec`, and encounter order proved by the
-audit. Private Rust representation, diagnostics, and DICE scheduling are
-Slug-native. Repository-rule implementation/context, source preparation and
-materialization, BUILD/package loading through generated repositories,
-lockfile replay/write, command consumers, stable public API, nonroot/MVO/
-isolation/innate breadth, and JVM remain deferred. `REPLAN` on guessed
-override publication, reconstructed selected mappings or canonical names,
-Bzlmod-to-loading dependency reversal, a second loader/evaluator or semantic
-row store, public `RootRepositoryRouteKey` widening, materialization/I/O,
-retained Starlark lifetime, more than four future Rust paths, or inability to
-freeze a bounded successor.
+The natural owner remains `HostInstantiatedModuleExtensionRepositoriesKey`:
+retain one compact immutable mapping-entry allocation per extension request at
+the point the exact namespace is already built, and share it across that
+request's rows. Extend the existing validation certificate's borrowed hidden
+iterator, without a new key or row catalog, to expose a row view containing
+internal generated name, canonical name, original `RepoSpec`, and a mapping
+view whose entries are shared per request while context is the row's canonical
+repository. Need/errors publish no iterator; success and terminals retain the
+same complete predecessor identity; no event or Starlark lifetime enters
+equality.
+
+Require empty/one/multiple extensions and calls; same-extension shared entries
+with distinct contexts; host/base entries, every generated name, and ordered
+substitution keep-last behavior; overridden/injected mapping entries while the
+original generated row remains; cross-generated Label visibility; collision
+and canonical/internal bijection failure; field/order/context A/B/A; Need,
+completed error, warm reuse, zero events/I/O/materialization; full loading and
+Bzlmod dependents; an external-style hidden consumer; and structural proof of
+one mapping allocation per request, no per-row clone, new key, copied catalog,
+retained evaluator value, or reverse edge.
+
+Exact compatibility is limited to the admitted Bazel 9.2 generated mapping
+entries/context, canonical/internal association, original `RepoSpec`, and
+request/call order. Hidden Rust row/mapping representation, diagnostics, and
+DICE scheduling are Slug-native. Generated route lookup, replacement route
+selection, `RootRepositoryRoute`, repository implementation/context, source
+preparation/materialization, BUILD/package loading, lockfile, command
+consumers, stable public API, nonroot/MVO/isolation/innate breadth, and JVM
+remain deferred. `REPLAN` on reconstructing mapping/name state, per-row map
+copies, a new key/catalog, Bzlmod/server/route/materializer edits, a fourth Rust
+file, execution/I/O, retained Starlark lifetime, or cap excess.
+
+## Completed route-boundary audit
+
+This section and everything below is historical context only, grants no file,
+action, cap, or schedule authority, and is interpreted only through the active
+docs-only design contract above.
+
+The audit inspected pinned `SingleExtensionFunction`, `SingleExtensionValue`,
+`ModuleExtensionRepoMappingEntriesFunction`, and `RepoDefinitionFunction`, plus
+live Slug route/source-preparation ownership and crate dependencies. Both
+independent reviews REPLAN before route work because the exact mapping and
+internal-name association are currently transient. No generated-route owner,
+`RootRepositoryRoute` widening, Bzlmod reverse edge, or Rust work was accepted.
 
 ## Accepted predecessor implementation contract
 

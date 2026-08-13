@@ -2857,3 +2857,20 @@ dependency-safe bounded successor or `REPLAN`. Stage 5 production remains
 unchanged. Do not widen `RootRepositoryRouteKey`, reconstruct selected state,
 add a Bzlmod-to-loading edge, or authorize materialization/I/O/lockfile/
 consumer/public/JVM work.
+
+### Route audit defers to loading mapping retention (2026-08-12)
+
+Pinned Bazel 9.2 keeps generated canonical-to-internal identity and constructs
+each generated repository's mapping from the host module mapping, every
+generated name, then ordered overrides/injections keep-last. Loading already
+computes that mapping transiently; its publication omits it. Bzlmod cannot
+recover it without duplicating loading semantics or a reverse dependency.
+
+Run next only the four-plan docs packet
+`WP-4-5-host-generated-repository-mapping-retention-design` under
+45/260/220/220/745 documentation caps. The bounded successor may touch only
+the existing loading instantiation/validation files and hidden lib exports
+under mandatory 280/520/800 Rust caps after acceptance and activation. Stage 5
+production remains unchanged. No `RootRepositoryRoute`, Bzlmod/server,
+materializer, route, mapping reconstruction, I/O, lockfile, consumer/API, or
+JVM work is authorized.
