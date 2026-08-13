@@ -3529,3 +3529,12 @@ branch-specific values, first Need/errors, identity, and no legacy demand
 metadata. Future Rust is only `source_preparation.rs` and hidden `lib.rs` under
 mandatory 420/800/1,220 and 12,250/430. No Rust/core/loading/command/public/
 new-I/O/reverse-edge/JVM work is authorized. Stage 4 remains unchanged.
+
+### Repository source-observation owner implementation activated (2026-08-13)
+
+Independent review accepts design `7ef0c353`. Implement only Bzlmod
+`source_preparation.rs`, hidden `lib.rs` exports, and completion ledgers under
+420/800/1,220 and 12,250/430. Preserve exact hidden ABI, structural Hash/Eq,
+one Builtin or request-result dependency, branch values/errors/proof, and every
+no-caller/core/loading/command/legacy-demand/second-result/new-I/O/public/
+reverse-edge/JVM stop. Stage 4 remains unchanged.
