@@ -3587,3 +3587,16 @@ visibility, legacy module-name demand scope, and choose one smallest
 dependency-safe successor or prerequisite REPLAN. Authorize no Rust,
 consumer/key/store, materialization/source/package/loading/command/public/
 wire/I/O/reverse-edge/JVM work. Stage 5 behavior remains unchanged.
+
+### Source-observation audit selects hidden Bzlmod owner design (2026-08-13)
+
+Independent review accepts audit `b6a90390`. Run only four-ledger docs packet
+`WP-4-5-host-repository-source-observation-owner-design` under
+40/360/260/260/920. Freeze one hidden Bzlmod key over the exact source-input
+certificate plus validated path. Builtin delegates once to the pinned catalog
+key; Request delegates once to the existing private materialization-result key
+then existing file observation. Preserve branch-specific value/error/Need and
+Arc identity without legacy demand metadata. Future Rust is only
+`source_preparation.rs` and hidden `lib.rs` under mandatory 420/800/1,220 and
+12,250/430. No Rust/core/loading/command/public/new-I/O/reverse-edge/JVM work is
+authorized. Stage 5 remains unchanged.
