@@ -59,6 +59,8 @@ use starlark_map::small_set::SmallSet;
 use crate::BuiltinBazelToolsRouteIdentity;
 use crate::BuiltinBazelToolsSnapshot;
 use crate::EvaluatedNonrootModule;
+use crate::HostRepositorySourceCapability;
+use crate::HostRepositorySourceCapabilitySource;
 use crate::ModuleKey;
 use crate::NonrootModuleKey;
 use crate::OverrideAttributeValue;
@@ -2827,7 +2829,7 @@ impl Key for RepositoryMaterializationRequestKey {
                 ));
             }
         };
-        let kind = match request_kind(&workspace, &repo_spec, effective.is_command()) {
+        let kind = match request_kind(&workspace, &repo_spec, local_path_policy(effective)) {
             Ok(kind) => kind,
             Err(error) => return Arc::new(Err(error)),
         };
@@ -2849,12 +2851,17 @@ impl Key for RepositoryMaterializationRequestKey {
 fn request_kind(
     workspace: &NormalizedAbsolutePath,
     repo_spec: &RepoSpec,
-    allow_absolute_local_path: bool,
+    local_path_policy: HostRepositoryLocalPathPolicy,
 ) -> Result<RepositoryMaterializationKind, RepositoryMaterializationError> {
     let local_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
         .expect("pinned local repository label is canonical");
     if repo_spec.rule_id.bzl_file == local_bzl && repo_spec.rule_id.rule_name == "local_repository"
     {
+        if local_path_policy == HostRepositoryLocalPathPolicy::LocalUnsupported {
+            return Err(RepositoryMaterializationError::Spec(
+                "local_repository is unsupported for this repository source".into(),
+            ));
+        }
         if repo_spec.attributes.len() != 1 {
             return Err(RepositoryMaterializationError::Spec(
                 "local_repository has unsupported attributes".into(),
@@ -2873,10 +2880,11 @@ fn request_kind(
                     Component::Prefix(_) | Component::RootDir | Component::Normal(_)
                 )
             })
-            || source.is_absolute() != allow_absolute_local_path
+            || source.is_absolute()
+                != (local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute)
         {
             return Err(RepositoryMaterializationError::Spec(
-                if allow_absolute_local_path {
+                if local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute {
                     "command local_repository path must be normalized and absolute"
                 } else {
                     "local_repository path must be normalized and workspace-relative"
@@ -2884,11 +2892,13 @@ fn request_kind(
                 .into(),
             ));
         }
-        let root = NormalizedAbsolutePath::new(if allow_absolute_local_path {
-            source.to_owned()
-        } else {
-            workspace.as_path().join(source)
-        })
+        let root = NormalizedAbsolutePath::new(
+            if local_path_policy == HostRepositoryLocalPathPolicy::CommandAbsolute {
+                source.to_owned()
+            } else {
+                workspace.as_path().join(source)
+            },
+        )
         .map_err(|error| RepositoryMaterializationError::Spec(error.to_string().into()))?;
         return Ok(RepositoryMaterializationKind::Local { logical_root: root });
     }
@@ -2907,22 +2917,48 @@ fn request_kind(
     ))
 }
 
-fn host_repository_materialization_request(
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub enum HostRepositoryMaterializationDisposition {
+    Builtin(BuiltinBazelToolsRouteIdentity),
+    Request(Arc<RepositoryMaterializationRequest>),
+}
+
+#[doc(hidden)]
+pub fn host_repository_materialization_request(
+    capability: &HostRepositorySourceCapability,
+) -> Result<HostRepositoryMaterializationDisposition, RepositoryMaterializationError> {
+    match capability.source() {
+        HostRepositorySourceCapabilitySource::Builtin(identity) => Ok(
+            HostRepositoryMaterializationDisposition::Builtin(identity.clone()),
+        ),
+        HostRepositorySourceCapabilitySource::RepoSpec {
+            repo_spec,
+            local_path_policy,
+        } => Ok(HostRepositoryMaterializationDisposition::Request(Arc::new(
+            RepositoryMaterializationRequest {
+                id: RepositoryMaterializationRequestId {
+                    workspace: capability.workspace().dupe(),
+                    canonical_repo: capability.canonical_repo().clone(),
+                },
+                repo_spec: repo_spec.as_ref().clone(),
+                kind: request_kind(capability.workspace(), repo_spec, *local_path_policy)?,
+            },
+        ))),
+    }
+}
+
+fn root_repository_materialization_request(
     route: &RootRepositoryRoute,
 ) -> Result<Arc<RepositoryMaterializationRequest>, RepositoryMaterializationError> {
-    if route.is_builtin_bazel_tools() {
-        return Err(RepositoryMaterializationError::Spec(
-            "built-in bazel_tools source requires its immutable source owner".into(),
-        ));
+    match host_repository_materialization_request(&route.source_capability())? {
+        HostRepositoryMaterializationDisposition::Builtin(_) => {
+            Err(RepositoryMaterializationError::Spec(
+                "built-in bazel_tools source requires its immutable source owner".into(),
+            ))
+        }
+        HostRepositoryMaterializationDisposition::Request(request) => Ok(request),
     }
-    Ok(Arc::new(RepositoryMaterializationRequest {
-        id: RepositoryMaterializationRequestId {
-            workspace: route.workspace().dupe(),
-            canonical_repo: route.canonical_repo().clone(),
-        },
-        repo_spec: route.repo_spec().clone(),
-        kind: request_kind(route.workspace(), route.repo_spec(), false)?,
-    }))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -3430,7 +3466,7 @@ impl Key for HostRepositoryPathKey {
             }
         };
         let repo_relative_path = Arc::new(relative.to_owned());
-        let request = match host_repository_materialization_request(&self.route) {
+        let request = match root_repository_materialization_request(&self.route) {
             Ok(request) => request,
             Err(error) => {
                 return SourcePreparationOutcome::Complete(Err(
@@ -3512,7 +3548,7 @@ impl Key for HostRepositorySourceFileKey {
         // `HostRepositoryPathKey` remains the sole validation/materialization
         // owner. Once it succeeds, retain the same exact request as a direct
         // provenance dependency of this selected byte-source anchor.
-        let request = host_repository_materialization_request(&self.route)
+        let request = root_repository_materialization_request(&self.route)
             .expect("a successful HostRepositoryPathKey has a valid materialization request");
         let materialization = ctx
             .compute(&RepositoryMaterializationResultKey { request })
@@ -4884,8 +4920,197 @@ mod tests {
         let route = RootRepositoryRoute::builtin_for_test(
             NormalizedAbsolutePath::new("/workspace").unwrap(),
         );
-        let error = host_repository_materialization_request(&route).unwrap_err();
-        assert!(matches!(error, RepositoryMaterializationError::Spec(_)));
+        let error = root_repository_materialization_request(&route).unwrap_err();
+        assert_eq!(
+            error,
+            RepositoryMaterializationError::Spec(
+                "built-in bazel_tools source requires its immutable source owner".into()
+            )
+        );
+        let capability = route.source_capability();
+        let crate::HostRepositoryMaterializationDisposition::Builtin(actual) =
+            crate::host_repository_materialization_request(&capability).unwrap()
+        else {
+            unreachable!()
+        };
+        let expected = BuiltinBazelToolsSnapshot::CURRENT.route_identity();
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn source_capability_projection_is_policy_exact_and_computation_free() {
+        use HostRepositoryLocalPathPolicy::CommandAbsolute;
+        use HostRepositoryLocalPathPolicy::LocalUnsupported;
+        use HostRepositoryLocalPathPolicy::WorkspaceRelative;
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let project = |spec: &RepoSpec, policy, apparent: &str| {
+            let capability = crate::HostRepositorySourceCapability::from_repo_spec(
+                workspace.dupe(),
+                ApparentRepoName::new(apparent).unwrap(),
+                CanonicalRepoName::new("dep+").unwrap(),
+                spec,
+                policy,
+            )
+            .unwrap();
+            crate::host_repository_materialization_request(&capability)
+        };
+        let request = |spec, policy, apparent| match project(spec, policy, apparent).unwrap() {
+            crate::HostRepositoryMaterializationDisposition::Request(request) => request,
+            crate::HostRepositoryMaterializationDisposition::Builtin(_) => unreachable!(),
+        };
+        let relative = local_route().repo_spec().clone();
+        let relative_request = request(&relative, WorkspaceRelative, "dep_alias");
+        assert_eq!(relative_request.id.workspace, workspace);
+        assert_eq!(relative_request.id.canonical_repo.as_str(), "dep+");
+        let projected = &relative_request.repo_spec;
+        assert_eq!(projected, &relative);
+        assert!(Arc::ptr_eq(&projected.attributes, &relative.attributes));
+        assert_eq!(
+            relative_request.kind,
+            RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap()
+            }
+        );
+        let spec_error = |message: &str| RepositoryMaterializationError::Spec(message.into());
+        assert_eq!(
+            project(&relative, CommandAbsolute, "dep_alias").unwrap_err(),
+            spec_error("command local_repository path must be normalized and absolute")
+        );
+        assert_eq!(
+            project(&relative, LocalUnsupported, "dep_alias").unwrap_err(),
+            spec_error("local_repository is unsupported for this repository source")
+        );
+        let mut git = immutable_route().repo_spec().clone();
+        git.rule_id.bzl_file =
+            CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:git.bzl").unwrap();
+        git.rule_id.rule_name = "git_repository".into();
+        let immutable = immutable_route();
+        for spec in [immutable.repo_spec(), &git] {
+            for policy in [WorkspaceRelative, CommandAbsolute, LocalUnsupported] {
+                assert_eq!(
+                    request(spec, policy, "bazel_tools").kind,
+                    RepositoryMaterializationKind::Immutable
+                );
+            }
+        }
+        let repeated = request(&relative, WorkspaceRelative, "dep_alias");
+        assert_eq!(relative_request, repeated);
+        assert_eq!(
+            relative_request,
+            request(&relative, WorkspaceRelative, "other_alias")
+        );
+        assert!(Arc::ptr_eq(&relative_request, &relative_request.dupe()));
+        assert_eq!(
+            root_repository_materialization_request(&local_route()).unwrap(),
+            relative_request
+        );
+    }
+
+    #[test]
+    fn source_capability_projection_local_matrix_and_identity_are_exact() {
+        use HostRepositoryLocalPathPolicy::CommandAbsolute;
+        use HostRepositoryLocalPathPolicy::LocalUnsupported;
+        use HostRepositoryLocalPathPolicy::WorkspaceRelative;
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let project_with = |workspace: &NormalizedAbsolutePath,
+                            canonical: &str,
+                            spec: &RepoSpec,
+                            policy: HostRepositoryLocalPathPolicy|
+         -> Result<
+            crate::HostRepositoryMaterializationDisposition,
+            RepositoryMaterializationError,
+        > {
+            let capability = crate::HostRepositorySourceCapability::from_repo_spec(
+                workspace.dupe(),
+                ApparentRepoName::new("dep_alias").unwrap(),
+                CanonicalRepoName::new(canonical).unwrap(),
+                spec,
+                policy,
+            )
+            .unwrap();
+            crate::host_repository_materialization_request(&capability)
+        };
+        let project = |spec: &RepoSpec, policy| project_with(&workspace, "dep+", spec, policy);
+        let spec = |path: &str| local_route_with_path(path).repo_spec().clone();
+        let error = |spec: &RepoSpec, policy| match project(spec, policy).unwrap_err() {
+            RepositoryMaterializationError::Spec(message) => message,
+            other => panic!("unexpected error: {other:?}"),
+        };
+        let relative = "local_repository path must be normalized and workspace-relative";
+        let absolute = "command local_repository path must be normalized and absolute";
+        for (path, policy, expected) in [
+            ("", WorkspaceRelative, relative),
+            (".", WorkspaceRelative, relative),
+            ("..", WorkspaceRelative, relative),
+            ("/absolute", WorkspaceRelative, relative),
+            ("", CommandAbsolute, absolute),
+            (".", CommandAbsolute, absolute),
+            ("..", CommandAbsolute, absolute),
+            ("relative", CommandAbsolute, absolute),
+        ] {
+            assert_eq!(error(&spec(path), policy).as_str(), expected);
+            assert_eq!(
+                error(&spec(path), LocalUnsupported).as_str(),
+                "local_repository is unsupported for this repository source"
+            );
+        }
+        for (path, root) in [("/", "/"), ("/command", "/command")] {
+            let crate::HostRepositoryMaterializationDisposition::Request(request) =
+                project(&spec(path), CommandAbsolute).unwrap()
+            else {
+                unreachable!()
+            };
+            assert_eq!(
+                request.kind,
+                RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new(root).unwrap()
+                }
+            );
+        }
+
+        let mut missing = spec("dep");
+        missing.attributes = Arc::default();
+        let mut malformed = spec("dep");
+        malformed.attributes = Arc::new(SmallMap::from_iter([(
+            CompactString::new("path"),
+            OverrideAttributeValue::Bool(true),
+        )]));
+        let mut extra = spec("dep");
+        Arc::make_mut(&mut extra.attributes).insert(
+            CompactString::new("extra"),
+            OverrideAttributeValue::String("value".into()),
+        );
+        for (candidate, expected) in [
+            (&missing, "local_repository has unsupported attributes"),
+            (&malformed, "local_repository requires a string path"),
+            (&extra, "local_repository has unsupported attributes"),
+        ] {
+            assert_eq!(error(candidate, WorkspaceRelative).as_str(), expected);
+            assert_eq!(
+                error(candidate, LocalUnsupported).as_str(),
+                "local_repository is unsupported for this repository source"
+            );
+        }
+
+        let mut unsupported = immutable_route().repo_spec().clone();
+        unsupported.rule_id.rule_name = "custom_repository".into();
+        assert_eq!(
+            error(&unsupported, WorkspaceRelative).as_str(),
+            "unsupported repository override rule"
+        );
+        let baseline = spec("dep");
+        let a = project(&baseline, WorkspaceRelative);
+        let other_workspace = NormalizedAbsolutePath::new("/other").unwrap();
+        for b in [
+            project_with(&other_workspace, "dep+", &baseline, WorkspaceRelative),
+            project_with(&workspace, "other+", &baseline, WorkspaceRelative),
+            project(&baseline, CommandAbsolute),
+            project(&spec("other"), WorkspaceRelative),
+            project(&extra, WorkspaceRelative),
+        ] {
+            assert_ne!(a, b);
+            assert_eq!(a, project(&baseline, WorkspaceRelative));
+        }
     }
 
     fn immutable_route() -> RootRepositoryRoute {

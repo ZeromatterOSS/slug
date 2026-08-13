@@ -313,6 +313,8 @@ pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsKey;
 #[doc(hidden)]
 pub use source_preparation::HostRepositoryLocalPathPolicy;
 #[doc(hidden)]
+pub use source_preparation::HostRepositoryMaterializationDisposition;
+#[doc(hidden)]
 pub use source_preparation::HostRepositorySourceFileKey;
 pub use source_preparation::HostRepositorySourceFileValue;
 pub use source_preparation::ModuleSourcePreparation;
@@ -343,5 +345,7 @@ pub use source_preparation::SourcePreparationNeeds;
 pub use source_preparation::SourcePreparationNeedsError;
 pub use source_preparation::SourcePreparationOutcome;
 pub use source_preparation::SourcePreparationResult;
+#[doc(hidden)]
+pub use source_preparation::host_repository_materialization_request;
 pub use source_preparation::install_repository_io;
 pub use source_preparation::source_identity;
