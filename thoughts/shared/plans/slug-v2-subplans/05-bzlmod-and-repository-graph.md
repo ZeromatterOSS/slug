@@ -3462,3 +3462,15 @@ Resume only retained Bzlmod `source_preparation.rs`, hidden `lib.rs` exports,
 and four ledgers under 180/420/600 and ceilings 11,240/380. Preserve the exact
 production ABI/order and corrected proof matrix with every prior no-consumer/
 materialization breadth stop. Stage 5 behavior remains unchanged.
+
+### Materialization request projected; first source consumer audited next (2026-08-13)
+
+Independent review accepts `06a5aa99` at 40/189/229 with the corrected proof,
+physical 11,192/351, and accepted dependent baseline. Run only docs packet
+`WP-4-5-host-repository-source-consumer-boundary-design` in four ledgers under
+40/280/220/220/760. Audit capability/request ownership across the first DICE
+await and choose exactly an atomic existing path-owner input migration or a
+smaller source-certificate prerequisite; loading remains last. Authorize no
+Rust, new key/store, duplicate request/catalog, inference, source/package/
+materialization/command/public/I/O/lockfile/wire/JVM breadth. Stage 5 remains
+unchanged.

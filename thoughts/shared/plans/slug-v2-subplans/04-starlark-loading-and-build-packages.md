@@ -3386,6 +3386,19 @@ Freeze future ceilings 11,240/380 while retaining 180/420/600 and every prior
 scope and no-consumer/materialization stop. Require acceptance and explicit r2
 activation before Rust resumes. Stage 4 behavior remains unchanged.
 
+### Materialization request projected; first source consumer audited next (2026-08-13)
+
+Independent review accepts `06a5aa99` at 40 production, 189 tests, and 229
+total formatted net Rust lines; Bzlmod/focused proof pass and direct dependents
+retain their accepted baseline. Run only four-ledger docs packet
+`WP-4-5-host-repository-source-consumer-boundary-design` under
+40/280/220/220/760. Audit existing Bzlmod path/source owners, loading package
+load, and the core call site read-only; choose exactly an atomic capability/
+request input for the existing path owner or a smaller source-certificate
+prerequisite. Authorize no Rust, loading/core/command change, key/store,
+materialization/source/package/I/O, copied state, or JVM breadth. Stage 4 stays
+unchanged.
+
 ### Repository materialization-request projection r2 activated (2026-08-13)
 
 Independent review accepts proof correction `6a8353d7` over design `9df81032`.
