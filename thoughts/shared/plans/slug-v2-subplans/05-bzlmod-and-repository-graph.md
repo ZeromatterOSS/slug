@@ -3189,3 +3189,17 @@ accepted hidden Root mapping; nonroot dispatch retains only canonical
 definition; success borrows its target. No Bzlmod or Stage 5 Rust changes, new
 key/file/store, route/RepoSpec/source/materialization/I/O/public/JVM breadth is
 authorized.
+
+### Core root apparent mapping accepted; definition composition designed next (2026-08-13)
+
+Core root apparent-mapping composition `59493b95` is independently accepted.
+Run only docs packet
+`WP-4-5-6-host-root-apparent-repository-definition-owner-design` under
+40/280/220/220/760 caps. The future cohesive private core module computes the
+accepted root mapping consumer first, short-circuits Root/builtin, then computes
+the exact canonical definition and retains both certificates without copied
+state. Future Rust is exactly new `root_apparent_repository_definition.rs`, a
+minimal `pub(super)` predecessor seam in `generated_repository_definition.rs`,
+and the private `runtime/mod.rs` declaration under 340/700/1,040 and 2,400/900
+old/new module ceilings. Stage 5 production remains unchanged; no reverse edge,
+route/source, materialization/I/O, public/command API, or JVM breadth is authorized.

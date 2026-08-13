@@ -3119,3 +3119,20 @@ nonroot predecessor dispatch, borrowed targets, typed order/errors, proof, and
 all stops. Stage 4 production remains unchanged; no new key/file, Bzlmod/
 loading/server/Cargo, route/RepoSpec/source/materializer/I/O/public/JVM breadth
 is authorized.
+
+### Root apparent mapping accepted; definition-owner design scheduled (2026-08-13)
+
+Independent review accepts core root apparent-mapping composition `59493b95`
+within 63/271/334 and the 2,600-line ceiling. Run only four-ledger docs packet
+`WP-4-5-6-host-root-apparent-repository-definition-owner-design` under
+40/280/220/220/760 documentation caps.
+
+Freeze one new private composition key in cohesive
+`root_apparent_repository_definition.rs`, a minimal `pub(super)` seam in
+`generated_repository_definition.rs`, and only its private `runtime/mod.rs`
+declaration. It computes root apparent mapping first, short-circuits
+Root/builtin as typed deferred terminals, then computes the identical canonical
+definition and retains both predecessors without copied target/map/RepoSpec.
+Future Rust is exactly those three paths under 340/700/1,040, with 2,400/900
+physical ceilings for the old/new modules. Stage 4 production remains unchanged;
+no route/source/materializer/command/public/I/O/JVM breadth is authorized.
