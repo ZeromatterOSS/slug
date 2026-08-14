@@ -155,7 +155,7 @@ manifests; workspace
 `runtime/{dice,request_revision,events}.rs`; loading
 `src/{lib,keys,file_discovery,package,bzl_module,load_label,cycle_detector}.rs`;
 Bzlmod
-`src/{lib,dice,source_preparation,root_bootstrap,host_module,host_include,host_package,host_file}.rs`;
+`src/{lib,dice,source_preparation,root_bootstrap,host_module,host_include,host_package,host_file,package_policy,repository_ignore}.rs`;
 `host_package_boundary/mod.rs`; and directly referenced focused tests. Missing
 named files may be mapped to their live equivalent without widening the owner
 families.
