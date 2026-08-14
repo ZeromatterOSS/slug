@@ -1,16 +1,16 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2-m1-request-revision-source-certificate-design`
+Packet: `WP-2A-m1-root-host-request-revision`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: freeze the smallest Rust-native request-revision/source-certificate
-vertical after the accepted focused Bazel prerequisite.
+Result: implement the accepted smallest Rust-native root-host
+request-revision/source-certificate vertical.
 
 The source-consumer cutover `53152727`, post-cutover audit `47090561`, and
-focused oracle implementation `2ffad088` are fixed predecessors. This is a
-read-only design packet. It edits only the canonical/current/Stage 1/Stage 2
-ledgers and cannot edit Rust, Cargo, BUILD files, fixtures, or generated
-evidence.
+focused oracle implementation `2ffad088` are fixed predecessors. The
+reviewed design is accepted in `94324880`. This packet implements only its
+private one-file Host vertical; it cannot activate public commands, loading,
+Bzlmod, repositories, or materialized paths.
 
 ## Accepted prerequisite
 
@@ -170,22 +170,20 @@ manual accepted semantic cache, spawned worker, repository root, or transfer in
 this vertical. Retry, failure, cancellation, and request drop release all
 command/scratch ownership; shutdown drops the service owner after DICE.
 
-## Future implementation allowlist and caps
+## Implementation allowlist and caps
 
-A later activation packet may edit exactly:
+Edit exactly:
 
 - new `app/slug_core_v2/src/runtime/request_revision.rs`;
 - `app/slug_core_v2/src/runtime/mod.rs`;
 - `app/slug_core_v2/src/runtime/dice.rs`;
-- `app/slug_core_v2/src/runtime/path_observation.rs` only if a named host-only
-  entry point/comment is required; and
 - canonical/current/Stage 2 ledgers for completion and successor selection.
 
 No Cargo or BUILD edit is expected because the crate already globs Rust sources
-and has the required dependencies. Proposed caps are four Rust paths, one new
+and has the required dependencies. Caps are three Rust paths, one new
 module, 560 net production lines, 700 in-module test lines, 260 ledger lines,
-and 1,520 total net lines. One correction may adjust caps or remove
-`path_observation.rs`, but may not add behavior/files.
+and 1,520 total net lines. One correction may adjust caps, but may not add
+behavior or files.
 
 Proof must include two genuinely overlapping requests with deterministic
 post-demand barriers; relevant-overlay separation and irrelevant-overlay
@@ -214,6 +212,6 @@ reads.
 
 ## Immediate successor
 
-Complete this docs-only design only after independent DICE/ownership and
-schedule/compatibility review. If accepted, activate exactly the bounded Rust
-vertical above; do not combine it with loading or public command migration.
+Accept this private vertical only after its complete proof and independent
+ownership/cleanup review. Then audit the smallest loading/public migration;
+do not combine that successor with this implementation.

@@ -745,9 +745,10 @@ git diff --check
 Package names are placeholders until the root reset chooses the final crate
 layout.
 
-### Active request-revision/source-certificate design (2026-08-13)
+### Accepted request-revision/source-certificate design (2026-08-13)
 
-The focused prerequisite is accepted in `2ffad088`. Its generation and two
+The focused prerequisite is accepted in `2ffad088`, and the reviewed design
+is accepted in `94324880`. Oracle generation and two
 independent fresh-root replays preserve the five-record V1/exit-9/V2/warm/V1
 sequence in one Bazel 9.2 server epoch. It supplies deterministic source-demand
 ordering and the serialized client boundary only; Slug final reobservation and
@@ -814,3 +815,27 @@ cancellation retains request ownership. Stop on a global command lease, manual
 semantic side store, accepted-snapshot reuse, command-side replay, watcher
 correctness, retained transaction/evaluator values, custom scheduler, lock
 across compute/Starlark, public command/server/Bzlmod edits, or cap excess.
+
+### Active first root-host request-revision implementation (2026-08-13)
+
+Packet `WP-2A-m1-root-host-request-revision` implements only the accepted
+private one-file Host vertical. Its exact Rust allowlist is
+`runtime/request_revision.rs`, `runtime/mod.rs`, and `runtime/dice.rs`;
+the existing `path_observation::observe_native` kernel is already
+`pub(super)`, so no fourth Rust path is authorized.
+
+The live competing production commits to close through the async revision owner
+are `WorkspaceRuntime::drive_command` attempt injection,
+`query_observations_with_policy_and_bzlmod_inputs_and_output_completion`,
+`WorkspaceRuntime::evaluate_observations_with_directory_probes_and_bzlmod_inputs`,
+`NativeDemandCommand::discard_in_place`, and
+`commit_selected_native_demand_snapshot`. Existing-state-only readers and
+`#[cfg(test)]` direct transactions are not production publication sites.
+The shared owner uses `tokio::sync::Mutex`; no held path computes, invokes
+Starlark, calls the repository materializer, or can reacquire the owner.
+
+Caps are three Rust paths, one new module, 560 production lines, 700 in-module
+test lines, 260 ledger lines, and 1,520 total net lines. The compatibility,
+proof, memory, STOP, and `REPLAN` contract is the compact current-packet
+manifest. This activation does not accept M1 or authorize loading/public
+migration.
