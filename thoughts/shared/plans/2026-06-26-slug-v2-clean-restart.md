@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; private root-host request-revision accepted, loading/public audit active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the accepted request-revision design in `94324880`, and the private one-file request-revision/source-certificate vertical in `207fe438`; full evidence is in the owner plans | the accepted private family is callerless, while production loading/public commands still depend on coarse whole-workspace snapshots; directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than this audit's scope | audit the smallest loading/public migration and select one bounded implementation successor |
+| M1: one semantic spine | **partial; private root-host request-revision accepted, native publication-bridge design active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the accepted request-revision design in `94324880`, and the private one-file request-revision/source-certificate vertical in `207fe438`; full evidence is in the owner plans | the smallest public root exported-source consumer needs a private full-epoch revision-publication bridge; production loading still depends on coarse whole-workspace snapshots, and directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | design the private core native-demand revision-publication bridge |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-2A-m1-loading-public-migration-audit](./slug-v2-subplans/current-packet.md).
+[WP-2A-m1-native-demand-revision-publication-bridge-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -1499,3 +1499,24 @@ candidates. Select one one-file Host migration or prerequisite `REPLAN`.
 Authorize no Rust,
 snapshot replacement, public activation, new key/store, repository/
 materialization, oracle generation, or JVM work.
+
+### M1 audit selects a native-demand revision-publication bridge design (2026-08-13)
+
+The live audit selects the explicit root exported-source branch as the uniquely
+smallest public source consumer. After root anchor, package load, target lookup,
+and exported-file kind selection, it issues exactly one contained Host
+FileBytes demand and already has accepted public terminal evidence. Root module,
+BUILD discovery, `.bzl` recursion, query, and external-repository candidates
+all require broader source or session ownership.
+
+The source certificate can stay private to core, but the callerless one-entry
+publisher cannot replace the native command's full selected path epoch. Event
+and demand selection also seals the provisional attempt before final
+validation. Run only docs packet
+`WP-2A-m1-native-demand-revision-publication-bridge-design` under
+40/260/240/540. Freeze full-epoch merge, branch-only revision consumption,
+selection-before-lock, atomic current-check/reobserve/selected commit,
+sealed-terminal retry suppression, initialization, cleanup, and a future
+three-core-file implementation packet. Authorize no Rust, public output/overlap,
+lease or repository/materializer change, loading-key migration, oracle
+generation, or JVM work.

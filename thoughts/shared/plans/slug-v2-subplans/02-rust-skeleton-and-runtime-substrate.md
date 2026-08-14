@@ -904,3 +904,58 @@ under 40/220/220/480. No Rust, Cargo/BUILD, oracle, generated evidence, public
 activation, snapshot replacement, new DICE key/store, second graph,
 directory/glob union, repository/materialization, watcher, historical-host,
 or JVM work is authorized.
+
+### Loading/public audit selects a private native-demand bridge design (2026-08-13)
+
+The audit compared the accepted direct root exported-source path with root
+module, selected BUILD, one `.bzl` load, native loading-query, legacy query
+adapters, and the direct-local external source branch. Root module owns
+`include()` and lockfile breadth over snapshot inputs; BUILD loading includes
+package/directory/build-file selection; `.bzl` is recursive; query owns the
+root anchor plus arbitrary environment Needs; legacy adapters inject whole
+text/raw/directory snapshots; and external source adds route/materialization
+ownership.
+
+The uniquely smallest candidate is an explicit root
+`TargetPattern::Single` selected as `PackageTargetKind::ExportedFile`.
+`BuildCommandRootKey` completes the root-module anchor and
+`RootPackageLoadKey`, then target lookup and kind selection, before its sole
+contained Host `PathObservationKey(FileBytes)`. Need flows through the native
+driver; Complete becomes `BuildTargetCompletion::ObservedExportedSource`.
+Attempt effects and demands are selected before the selected native snapshot is
+committed, and CLI/server output is projected only from `AcceptedCommand`.
+A root filegroup is only `LoadedOnly` and is not this source consumer.
+
+The certificate can be retained privately in
+`BuildRequestedTarget`/`BuildCommandEvaluation`; no cross-crate or public
+ABI is required. Direct reuse of `read_host_file` is nevertheless invalid:
+its mismatch path publishes a one-entry epoch, while the native attempt and
+selected snapshot own the full root-anchor/package/source epoch. Selection
+also moves the effect owner to terminal state, so version/source retry needs a
+new suppression/reset transition. Final reobservation and selected-snapshot
+commit must share one continuous async-owner linearization.
+
+### Active native-demand revision-publication bridge design (2026-08-13)
+
+Packet `WP-2A-m1-native-demand-revision-publication-bridge-design` freezes
+only a private core state machine. It must cover branch-only revision
+consumption after earlier errors, nonduplicating initialization, selection and
+updater preparation outside the lock, current comparison and exact reobserve
+inside, unchanged full selected-epoch plus successor-revision commit, changed
+full-epoch merge from a fresh updater, version/source retry, sealed-effect
+reset, abort/restoration ordering, cancellation, bounded nonprogress, and no
+terminal/event exposure before acceptance.
+
+The future proposal may consider only
+`runtime/request_revision.rs`, `runtime/dice.rs`, and
+`runtime/events.rs`; the current packet authorizes no Rust. Public commands
+remain serialized by the existing native lease, and that lease/repository
+session cannot become certificate storage or change behavior. Exact public
+serial source/output/Need-error behavior remains fixed; final reobservation,
+revision, retry, suppression, and future overlap remain Slug-native.
+
+The only writable files are canonical, current-packet, and this Stage 2 ledger
+under 40/260/240/540. Stop on code, public output/overlap, lease or repository/
+materializer change, snapshot/loading migration, accepted-snapshot certificate
+reuse, one-entry full-epoch overwrite, callback or compute under the owner,
+oracle generation, cross-crate API, JVM work, or cap excess.
