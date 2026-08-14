@@ -1161,3 +1161,45 @@ Authorize no Rust/Cargo/oracle write, third key/store/graph, legacy key/value
 or caller migration, loading/core/public caller, request finalization,
 repository/module/BUILD/`.bzl`/glob activation, generic public framework,
 reverse edge, direct/historical Host read, watcher, JVM, or cap excess.
+
+### Accepted observed-path frontier sibling-key design (2026-08-13)
+
+Design packet `8a87ce8a` freezes exactly two callerless sibling keys.
+Workspace `ResolvedPathObservationKey` has the legacy resolution key's exact
+identity, shares its state machine, captures each completed exact result Arc
+before transition, and returns one `ObservedResolvedPath` only for terminal
+success/error. Bzlmod-private `HostFileBytesObservationKey` consumes only
+that sibling, retains its epoch, and appends the exact final FileBytes result
+when the resolved kind requires it.
+
+`PathObservationEpoch` stays the sole retained compact map. A shared-pairs
+constructor/union sorts exact demands, checks operation agreement, preserves
+result Arcs, coalesces structurally equal duplicates, and rejects conflicting
+duplicates. A doc-hidden `ObservedPathFrontierError` is the outer completed
+failure for construction conflict/mismatch; legacy
+`PathResolutionError`/`HostFileError` remain nested semantic results and
+unchanged. Need is the only incomplete state.
+
+The workspace carrier/key are doc-hidden public solely for the existing
+workspace-to-Bzlmod dependency. The observed Host-file carrier/key remain
+crate-private. Every legacy key and caller remains untouched. Retained memory
+is one semantic result plus shared epoch for DICE-value lifetime; no
+transaction, evaluator, updater, event, repository result, materializer,
+worker, observer lease, or lock is retained.
+
+### Active callerless observed-path frontier implementation (2026-08-13)
+
+Run `WP-2A-m1-observed-path-frontier-key-implementation` in exactly workspace
+`path_observation.rs`, `path_resolution.rs`, `lib.rs`, and Bzlmod
+`host_file.rs`. Caps are 340 production, 480 in-module test, 820 total Rust,
+and 200 completion-ledger net lines. Prove exact epoch union/conflict, complete
+success/error prefixes, symlink/error/cycle/expansion and final FileBytes
+frontiers, Need/cancellation suppression, A-B-A equality, compact Arc
+ownership, and unchanged/unactivated legacy keys.
+
+Stop on any other file, Cargo/BUILD/dependency, third key/store/graph, legacy
+migration, loading/core/public caller, request finalization, repository/module/
+BUILD/`.bzl`/glob activation, generic public framework, panic/error
+laundering, reverse dependency, direct/historical Host read, watcher, oracle,
+JVM, or cap excess. Completion schedules docs-only hierarchical Host-loading
+frontier composition; it does not claim public final validation.
