@@ -28,7 +28,7 @@ use super::root_apparent_repository_source_input::HostRootApparentRepositorySour
 use super::root_apparent_repository_source_input::HostRootApparentRepositorySourceInputResult;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositorySourcePathInput {
+pub(super) struct HostRootApparentRepositorySourcePathInput {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     predecessor: Arc<HostRootApparentRepositorySourceInputResult>,
@@ -36,13 +36,13 @@ struct HostRootApparentRepositorySourcePathInput {
 }
 
 #[derive(Debug, Clone, Copy)]
-enum HostRootApparentRepositorySourcePathInputDispositionView<'a> {
+pub(super) enum HostRootApparentRepositorySourcePathInputDispositionView<'a> {
     Main,
     Input(&'a HostRepositorySourceInput),
 }
 
 #[derive(Debug, Clone, Copy)]
-struct HostRootApparentRepositorySourcePathInputView<'a> {
+pub(super) struct HostRootApparentRepositorySourcePathInputView<'a> {
     apparent_repo: &'a ApparentRepoName,
     canonical_repo: &'a CanonicalRepoName,
     relative_path: &'a HostRepositoryRelativePath,
@@ -50,7 +50,7 @@ struct HostRootApparentRepositorySourcePathInputView<'a> {
 }
 
 impl HostRootApparentRepositorySourcePathInput {
-    fn view(&self) -> Option<HostRootApparentRepositorySourcePathInputView<'_>> {
+    pub(super) fn view(&self) -> Option<HostRootApparentRepositorySourcePathInputView<'_>> {
         let source = self.predecessor.as_ref().as_ref().ok()?;
         let source_view = source.view()?;
         if source.workspace() != &self.workspace
@@ -76,19 +76,21 @@ impl HostRootApparentRepositorySourcePathInput {
 }
 
 impl<'a> HostRootApparentRepositorySourcePathInputView<'a> {
-    fn apparent_repo(self) -> &'a ApparentRepoName {
+    pub(super) fn apparent_repo(self) -> &'a ApparentRepoName {
         self.apparent_repo
     }
 
-    fn canonical_repo(self) -> &'a CanonicalRepoName {
+    pub(super) fn canonical_repo(self) -> &'a CanonicalRepoName {
         self.canonical_repo
     }
 
-    fn relative_path(self) -> &'a HostRepositoryRelativePath {
+    pub(super) fn relative_path(self) -> &'a HostRepositoryRelativePath {
         self.relative_path
     }
 
-    fn disposition(self) -> HostRootApparentRepositorySourcePathInputDispositionView<'a> {
+    pub(super) fn disposition(
+        self,
+    ) -> HostRootApparentRepositorySourcePathInputDispositionView<'a> {
         self.disposition
     }
 }
@@ -111,7 +113,7 @@ enum HostRootApparentRepositorySourcePathInputErrorKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
-struct HostRootApparentRepositorySourcePathInputError {
+pub(super) struct HostRootApparentRepositorySourcePathInputError {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     kind: HostRootApparentRepositorySourcePathInputErrorKind,
@@ -125,22 +127,22 @@ impl fmt::Display for HostRootApparentRepositorySourcePathInputError {
 
 impl std::error::Error for HostRootApparentRepositorySourcePathInputError {}
 
-type HostRootApparentRepositorySourcePathInputResult = Result<
+pub(super) type HostRootApparentRepositorySourcePathInputResult = Result<
     HostRootApparentRepositorySourcePathInput,
     HostRootApparentRepositorySourcePathInputError,
 >;
-type HostRootApparentRepositorySourcePathInputOutcome =
+pub(super) type HostRootApparentRepositorySourcePathInputOutcome =
     SourcePreparationOutcome<Arc<HostRootApparentRepositorySourcePathInputResult>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostRootApparentRepositorySourcePathInputKey {
+pub(super) struct HostRootApparentRepositorySourcePathInputKey {
     workspace: NormalizedAbsolutePath,
     apparent_repo: ApparentRepoName,
     requested_path: PathBuf,
 }
 
 impl HostRootApparentRepositorySourcePathInputKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         apparent_repo: ApparentRepoName,
         requested_path: PathBuf,
