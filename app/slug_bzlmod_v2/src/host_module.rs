@@ -97,6 +97,11 @@ pub(crate) enum HostRootModuleFileError {
         logical_path: NormalizedAbsolutePath,
         message: CompactString,
     },
+    IncludeCycle {
+        raw_label: CompactString,
+        location: LogicalSpan,
+        logical_path: NormalizedAbsolutePath,
+    },
     Evaluation {
         message: CompactString,
         include_occurrences: Arc<[NonrootIncludeRequest]>,
@@ -153,6 +158,29 @@ fn include_relative_path(
     target: &slug_identity_v2::TargetName,
 ) -> PathBuf {
     PathBuf::from(package.as_str()).join(target.as_str())
+}
+
+struct RootModuleIncludeAncestry {
+    logical_path: NormalizedAbsolutePath,
+    parent: Option<Arc<Self>>,
+}
+
+impl RootModuleIncludeAncestry {
+    fn contains(&self, logical_path: &NormalizedAbsolutePath) -> bool {
+        let mut current = Some(self);
+        while let Some(ancestry) = current {
+            if ancestry.logical_path == *logical_path {
+                return true;
+            }
+            current = ancestry.parent.as_deref();
+        }
+        false
+    }
+}
+
+struct PendingRootModuleInclude {
+    request: NonrootIncludeRequest,
+    ancestry: Arc<RootModuleIncludeAncestry>,
 }
 
 #[async_trait]
@@ -215,7 +243,19 @@ impl Key for HostRootModuleFileKey {
                     .expect("successful validation established UTF-8")
                     .to_owned(),
             );
-            let mut horizon = root_inspection.includes.to_vec();
+            let root_ancestry = Arc::new(RootModuleIncludeAncestry {
+                logical_path: root_path.dupe(),
+                parent: None,
+            });
+            let mut horizon = root_inspection
+                .includes
+                .iter()
+                .cloned()
+                .map(|request| PendingRootModuleInclude {
+                    request,
+                    ancestry: root_ancestry.dupe(),
+                })
+                .collect::<Vec<_>>();
             let mut files = vec![RootModuleSourceFile {
                 path: root_path.as_path().to_path_buf(),
                 source: root_source,
@@ -226,8 +266,12 @@ impl Key for HostRootModuleFileKey {
             let mut evaluation_occurrences = Vec::new();
 
             while !horizon.is_empty() {
+                let requests = horizon
+                    .iter()
+                    .map(|pending| pending.request.clone())
+                    .collect::<Vec<_>>();
                 let preflight =
-                    preflight_root_include_horizon(ctx, &self.workspace, &horizon).await;
+                    preflight_root_include_horizon(ctx, &self.workspace, &requests).await;
                 let preflight = match preflight {
                     PathOutcome::Need(need) => return path_need(need),
                     PathOutcome::Complete(value) => match value.as_ref() {
@@ -268,7 +312,7 @@ impl Key for HostRootModuleFileKey {
                         });
 
                 let mut next_horizon = Vec::new();
-                for include in preflight.includes() {
+                for (include, pending) in preflight.includes().iter().zip(&horizon) {
                     let request = include.include();
                     let logical_path = include.logical_path();
                     let bytes = match outcomes
@@ -312,12 +356,28 @@ impl Key for HostRootModuleFileKey {
                             });
                         }
                     };
+                    if pending.ancestry.contains(logical_path) {
+                        return terminal_error(HostRootModuleFileError::IncludeCycle {
+                            raw_label: CompactString::new(request.raw_label()),
+                            location: request.location().clone(),
+                            logical_path: logical_path.dupe(),
+                        });
+                    }
+                    let ancestry = Arc::new(RootModuleIncludeAncestry {
+                        logical_path: logical_path.dupe(),
+                        parent: Some(pending.ancestry.dupe()),
+                    });
                     let source = Arc::new(
                         std::str::from_utf8(bytes.as_ref())
                             .expect("successful validation established UTF-8")
                             .to_owned(),
                     );
-                    next_horizon.extend(inspection.includes.iter().cloned());
+                    next_horizon.extend(inspection.includes.iter().cloned().map(|request| {
+                        PendingRootModuleInclude {
+                            request,
+                            ancestry: ancestry.dupe(),
+                        }
+                    }));
                     let index = files.len();
                     include_indices.insert(CompactString::new(request.raw_label()), index);
                     module_file_paths.push(relative_path.clone());
@@ -2914,6 +2974,221 @@ print('ROOT_AFTER')
                 && !dependency.starts_with("root-module-environment-policy:")
                 && !dependency.starts_with("root-module-lockfile-mode:")
                 && !dependency.starts_with("root-module-graph:")
+        }));
+    }
+    #[tokio::test]
+    async fn active_ancestry_cycles_are_typed_at_alias_back_edges() {
+        struct Scenario {
+            root: &'static str,
+            packages: &'static [&'static str],
+            files: &'static [(&'static str, &'static str)],
+            expected_label: &'static str,
+            expected_location_file: &'static str,
+            expected_path: &'static str,
+        }
+
+        let scenarios = [
+            Scenario {
+                root: "include('//pkg:sub/x.MODULE.bazel')\n",
+                packages: &["pkg", "pkg/sub"],
+                files: &[(
+                    "/workspace/pkg/sub/x.MODULE.bazel",
+                    "include('//pkg/sub:x.MODULE.bazel')\n",
+                )],
+                expected_label: "//pkg/sub:x.MODULE.bazel",
+                expected_location_file: "/workspace/pkg/sub/x.MODULE.bazel",
+                expected_path: "/workspace/pkg/sub/x.MODULE.bazel",
+            },
+            Scenario {
+                root: "include('//a:a.MODULE.bazel')\n",
+                packages: &["a", "b"],
+                files: &[
+                    (
+                        "/workspace/a/a.MODULE.bazel",
+                        "include('//b:b.MODULE.bazel')\n",
+                    ),
+                    (
+                        "/workspace/b/b.MODULE.bazel",
+                        "include('//a:a.MODULE.bazel')\n",
+                    ),
+                ],
+                expected_label: "//a:a.MODULE.bazel",
+                expected_location_file: "/workspace/b/b.MODULE.bazel",
+                expected_path: "/workspace/a/a.MODULE.bazel",
+            },
+        ];
+
+        for (index, scenario) in scenarios.into_iter().enumerate() {
+            let variant = i64::try_from(index).unwrap() + 1;
+            let mut epoch = EpochBuilder::root(scenario.root, variant);
+            epoch.repository_policy(&["/workspace"], variant);
+            for package in scenario.packages {
+                epoch.package("/workspace", package, variant);
+            }
+            for (path, source) in scenario.files {
+                epoch.file(path, source, variant);
+            }
+            let tracker = Arc::new(EventTracker::default());
+            let outcome = observed(
+                &Dice::builder().build(DetectCycles::Enabled),
+                epoch.build(),
+                &["/workspace"],
+                true,
+                Some(tracker.dupe()),
+                None,
+                LockfileMode::Update,
+                None,
+            )
+            .await;
+            let SourcePreparationOutcome::Complete(value) = &outcome else {
+                panic!("a finite include cycle must complete");
+            };
+            let Err(HostRootModuleFileError::IncludeCycle {
+                raw_label,
+                location,
+                logical_path,
+            }) = value.as_ref()
+            else {
+                panic!("expected typed include cycle, got {value:?}");
+            };
+            assert_eq!(raw_label.as_str(), scenario.expected_label);
+            assert_eq!(location.file.0.as_str(), scenario.expected_location_file);
+            assert_eq!((location.start_line, location.start_column), (1, 1));
+            assert_eq!(
+                logical_path.as_path(),
+                std::path::Path::new(scenario.expected_path)
+            );
+            let entries = tracker.take();
+            let parent = entries
+                .iter()
+                .find(|entry| entry.key.starts_with("host-root-module-file:"))
+                .expect("the completed parent activation is recorded");
+            assert!(matches!(
+                parent.batch.as_ref(),
+                Some(batch) if batch.events().is_empty()
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn include_cycle_need_error_and_recovery_order_are_stable() {
+        let self_cycle = |source: &str, variant: i64| {
+            let mut epoch = EpochBuilder::root("include('//pkg:x.MODULE.bazel')\n", variant);
+            epoch.repository_policy(&["/workspace"], variant);
+            epoch.package("/workspace", "pkg", variant);
+            epoch.file("/workspace/pkg/x.MODULE.bazel", source, variant);
+            epoch.build()
+        };
+        let cycle_source = "include('//pkg:x.MODULE.bazel')\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let cycle_a = self_cycle(cycle_source, 10);
+        let first = observed(
+            &dice,
+            cycle_a.dupe(),
+            &["/workspace"],
+            false,
+            None,
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        let warm = observed(
+            &dice,
+            cycle_a,
+            &["/workspace"],
+            false,
+            None,
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        let acyclic = observed(
+            &dice,
+            self_cycle("print('OK')\n", 11),
+            &["/workspace"],
+            false,
+            None,
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        let restored = observed(
+            &dice,
+            self_cycle(cycle_source, 12),
+            &["/workspace"],
+            false,
+            None,
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        assert!(HostRootModuleFileKey::equality(&first, &warm));
+        assert!(!HostRootModuleFileKey::equality(&first, &acyclic));
+        assert!(HostRootModuleFileKey::equality(&first, &restored));
+
+        let mut earlier_error = EpochBuilder::root("include('//pkg:x.MODULE.bazel')\n", 20);
+        earlier_error.repository_policy(&["/workspace"], 20);
+        earlier_error.package("/workspace", "pkg", 20);
+        earlier_error.directory("/workspace/missing", 20);
+        earlier_error.missing("/workspace/missing/BUILD.bazel");
+        earlier_error.missing("/workspace/missing/BUILD");
+        earlier_error.file(
+            "/workspace/pkg/x.MODULE.bazel",
+            "include('//missing:y.MODULE.bazel')\ninclude('//pkg:x.MODULE.bazel')\n",
+            20,
+        );
+        let outcome = observed(
+            &Dice::builder().build(DetectCycles::Enabled),
+            earlier_error.build(),
+            &["/workspace"],
+            false,
+            None,
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        assert!(matches!(
+            outcome,
+            SourcePreparationOutcome::Complete(value)
+                if matches!(
+                    value.as_ref(),
+                    Err(HostRootModuleFileError::IncludePreflight {
+                        error: crate::host_include::HostRootIncludeError::Package {
+                            raw_label,
+                            ..
+                        }
+                    }) if raw_label == "//missing:y.MODULE.bazel"
+                )
+        ));
+
+        let mut later_need = EpochBuilder::root("include('//pkg:x.MODULE.bazel')\n", 21);
+        later_need.repository_policy(&["/workspace"], 21);
+        later_need.package("/workspace", "pkg", 21);
+        later_need.file(
+            "/workspace/pkg/x.MODULE.bazel",
+            "include('//pkg:x.MODULE.bazel')\ninclude('//need:y.MODULE.bazel')\n",
+            21,
+        );
+        let tracker = Arc::new(EventTracker::default());
+        let outcome = observed(
+            &Dice::builder().build(DetectCycles::Enabled),
+            later_need.build(),
+            &["/workspace"],
+            true,
+            Some(tracker.dupe()),
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        assert!(matches!(outcome, SourcePreparationOutcome::Need(_)));
+        assert!(tracker.take().iter().all(|entry| {
+            !entry.key.starts_with("host-root-module-file:") || entry.batch.is_none()
         }));
     }
 }
