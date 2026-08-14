@@ -1,159 +1,169 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-loading-frontier-composition-audit`
+Packet: `WP-2A-m1-host-repo-file-frontier-key-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: audit the smallest complete hierarchical Host-loading frontier above
-accepted observed-path and observed-Host-file sibling keys. Start with
-repository-ignore and root-module predecessors before package-marker
-selection. Select exactly one bounded design successor or record `REPLAN`.
+Result: freeze exactly one callerless Bzlmod-private observed `REPO.bazel`
+sibling key and its complete success/error frontier. Preserve the legacy key,
+callers, events, and public behavior. Activate no Rust until the design and
+independent ownership review are accepted.
 
-## Fixed predecessor and accepted evidence
+## Fixed predecessor and audit result
 
-Commit `308b409a` accepts the callerless lower frontier primitive. It adds:
+Commit `308b409a` accepts the callerless lower frontier chain:
 
-- doc-hidden workspace `ResolvedPathObservationKey`, sharing the legacy
-  resolution machine and retaining every exact completed Lstat/ReadLink Arc;
-- Bzlmod-private `HostFileBytesObservationKey`, consuming only that sibling
-  and appending the exact final FileBytes Arc when required;
-- one stable shared-pairs `PathObservationEpoch` constructor/union with typed
-  operation-mismatch and conflicting-duplicate failures; and
-- complete-only sibling equality/validity, Need/cancellation suppression,
-  exact Arc retention, A/B/A restoration, and an activation proof that neither
-  legacy key runs through the sibling chain.
+- doc-hidden workspace `ResolvedPathObservationKey` retains the exact
+  Lstat/ReadLink prefix for complete resolution success/error;
+- Bzlmod-private `HostFileBytesObservationKey` consumes only that sibling and
+  appends the exact final FileBytes result when required; and
+- `PathObservationEpoch` remains the sole retained compact observation map,
+  with stable exact-Arc union and typed mismatch/conflict errors.
 
-The implementation is callerless beyond the lower sibling edge. It does not
-complete a package, MODULE, BUILD, loading, core, or public-command frontier.
-It therefore is accepted evidence, not M1 completion or public migration.
+Commit `a6aaa844` activated the hierarchical composition audit. Inspection
+records a prerequisite `REPLAN`:
 
-Formatted cfg accounting is 352/380 production, 394/650 tests, and 746/1,030
-total net Rust lines. Physical files are 1,662/1,750, 4,346/4,400, 572/580,
-and 1,080/1,100. The single cap-only correction was consumed. Workspace 43,
-Bzlmod 367 plus integration groups, downstream core check, formatting, diff,
-scope, artifact, and independent ownership/memory gates passed. Strict Clippy
-remains blocked first in unchanged `allocative_derive`; archive-status
-failures remain the accepted missing-ref/allowlist baseline.
+- root `HostRepositoryIgnoreKey` first consumes legacy `HostRepoFileKey`,
+  then immutable ignore policy, then ordered `.bazelignore` Host-file probes;
+- `HostRepoFileKey` consumes root `REPO.bazel` through legacy
+  `HostFileBytesKey`, evaluates it, and returns only semantic value/error plus
+  per-transaction events, discarding the exact observation epoch;
+- reconstructing that predecessor in repository-ignore would duplicate work
+  above its natural owner;
+- root-module `include()` preflight already computes
+  `HostRootPackageLookupKey`, so root-module composition cannot precede
+  repository-ignore and package-marker composition; and
+- visible lockfile and selected package source are separate downstream
+  frontiers, not dependencies of `RootModuleLoadingAnchorKey`.
 
-## Audit objective
+The smallest prerequisite is one observed root REPO-file sibling.
+Repository-ignore, package markers, dynamically sealed MODULE includes,
+lockfile, selected BUILD/`.bzl`, loading, core, and public migration remain
+later packets.
 
-Map the complete mutable Host-source predecessor closure needed to build one
-hierarchical loading frontier without reconstructing observations above their
-natural owner. Inspect in this order:
+## Design objective
 
-1. `HostRepositoryIgnoreKey`: identify policy inputs, the exact
-   `.bazelignore`/repository-ignore Host-file dependency, completed success
-   and error carriers, and whether the accepted observed Host-file sibling can
-   be associated without changing legacy callers.
-2. Root-module loading anchor: identify root MODULE selection, bytes, nested
-   `include()` discovery, lockfile/source-selection inputs, completed
-   success/error/Need carriers, and the point at which the dynamically
-   discovered frontier is complete.
-3. Root package marker selection: only after the first two closures, map
-   package policy, configured roots, package-boundary probes, BUILD marker
-   precedence, and why any omitted predecessor would make a package terminal
-   partial.
+Freeze one crate-private `HostRepoFileObservationKey` in
+`app/slug_bzlmod_v2/src/repo_file.rs`. It has the same workspace identity and
+semantic ordering as `HostRepoFileKey`, but consumes exactly
+`HostFileBytesObservationKey(workspace/REPO.bazel)` and never the legacy
+Host-file key.
 
-The audit must distinguish immutable semantic inputs from exact Host
-observations. It must include negative/source-selection probes that can change
-the chosen or missing terminal. It must not treat repository-ignore or the
-root-module anchor as ambient state.
+Freeze private `ObservedHostRepoFile` containing one retained
+`Arc<Result<HostRepoFileValue, HostRepoFileError>>` plus the accepted
+`PathObservationEpoch`. Its accessor exposes only `&Result`; the sibling keeps
+its own produced result allocation and retains exact observation Arcs without
+copying them.
+The sibling value is
+`PathOutcome<Result<ObservedHostRepoFile, ObservedPathFrontierError>>`.
+`Need` is the only incomplete state. Dependency frontier error is a completed
+outer error with no partial carrier. Legacy policy/Host-file/parse/evaluation
+errors remain inner semantic errors with unchanged Display/source behavior.
 
-## Required output
+## Required ownership and ordering
 
-Freeze all of the following in the closing ledgers:
+Preserve this order exactly:
 
-- the exact one-way crate/key dependency graph for each inspected predecessor;
-- which key naturally owns each complete success/error frontier and which
-  completed errors cannot yet carry one;
-- deterministic union order, duplicate/conflict/provenance algebra, and the
-  exact use of the accepted shared `PathObservationEpoch`;
-- Need, cancellation, completed infrastructure error, semantic error, and
-  memory-lifetime boundaries;
-- whether one existing sibling key can be consumed directly or whether one
-  further callerless sibling/key design prerequisite is required;
-- one smallest independently bounded next design/implementation packet, with
-  exact files, owner visibility, caps, proof, compatibility, STOP/REPLAN, and
-  immediate successor; or
-- a precise `REPLAN` if no finite complete terminal is available before
-  dynamic evaluation, repository/materializer work, or a reverse dependency.
+1. compute `RootRepoFileSemanticsProjectionKey`;
+2. policy failure completes with the same semantic error plus an empty epoch
+   and activates neither Host-file key;
+3. compute the observed Host-file sibling for root `REPO.bazel`;
+4. forward `Need` or outer frontier error without evaluation;
+5. retain its exact epoch for missing, wrong-kind, resolution, FileBytes,
+   parse, evaluation, and successful terminals; and
+6. store the same completed per-transaction event batch as the legacy key when
+   capture is enabled, retaining no event batch in the carrier.
 
-Do not select successful BUILD evaluation in this audit unless its complete
-glob and recursive `.bzl` frontier is proven finite and sealed. Do not select
-a public command terminal while any mutable predecessor lacks the same-owner
-final-validation boundary.
+Factor only the smallest private semantic evaluation/event-finalization leaf
+needed to prove identical result and event behavior. Do not make one DICE key
+compute the other, activate a legacy dependency through the sibling, duplicate
+Starlark evaluation, or change the legacy value/equality.
 
-## Compatibility and ownership
+The epoch stays deterministic structural identity. Retain no new map,
+certificate framework, provenance table, cache, interner, evaluator,
+transaction, event batch, extra source bytes, worker, lock, or lease. Carrier
+lifetime is only its callerless DICE value and test references.
 
-Preserve every accepted serial MODULE/BUILD/`.bzl`/repository-ignore/package
-behavior, Need/error/event/output order, and all existing exact Host observation
-values. Existing accepted exact slices remain exact. Frontier aggregation,
-provenance, identity, batch validation, retry, suppression, and revision
-mechanics are Slug-native. Public overlap, exact Bazel identity bytes,
-directory/glob unions beyond a selected complete frontier, and
-repository/materialized certificates remain deferred.
+## Required design output
 
-A future frontier may retain only semantic terminal state plus the accepted
-compact exact observation epoch. It must not retain evaluators, transactions,
-updaters, accepted snapshots, event buffers, repository results,
-materializers, workers, observer leases, or locks. No lock or callback may
-cross DICE compute.
+Freeze all of the following:
+
+- exact private type signatures, constructor/accessor visibility, equality,
+  validity, Display, and error-conversion boundaries;
+- one shared compute/evaluation adapter, or a precise `REPLAN`, preserving
+  legacy and observed activation and event ownership;
+- policy failure, missing, wrong kind, resolution/read error, parse/evaluation
+  error, success, outer error, Need, and cancellation behavior;
+- exact Arc/epoch clone boundaries and compact lifetime;
+- one-file Rust allowlist if feasible, production/test/total and physical-line
+  caps, proof, compatibility, STOP/REPLAN, and completion records; and
+- a docs-only repository-ignore frontier design successor that unions the
+  observed REPO epoch with ordered observed `.bazelignore` and
+  platform-normalization observations.
+
+## Focused proof to require
+
+Require policy failure with empty epoch/zero Host activation; present, missing,
+wrong-kind, resolution/FileBytes/parse/evaluation errors and success with
+legacy semantic parity; exact epoch and final Arc identity; outer error with
+no carrier/events; Need invalidity and cancellation cleanup; A/B/A equality;
+capture-on/off event parity and exactly one completed batch; zero
+`HostRepoFileKey`/`HostFileBytesKey` activation through the sibling; compact
+allocation/clone accounting; and unchanged legacy tests/callers.
+
+## Compatibility
+
+Preserve accepted serial root `REPO.bazel` missing/present/error/evaluation
+behavior, diagnostics, events, and exact Host observation values. Existing
+exact slices remain exact. Frontier identity and future validation/retry are
+Slug-native. Routed/nonroot repository sources, materializer results,
+`.bazelignore`, package markers, MODULE/includes, lockfile, BUILD/`.bzl`,
+loading/core/public overlap, and exact Bazel identity bytes remain deferred.
 
 ## Authority, allowlists, and caps
 
-Write only:
-
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+Write only canonical, current-packet, and Stage 2 ledgers.
 
 Read only:
 
 - `docs/developers/dice.md`;
-- workspace/Bzlmod/loading/core Cargo manifests;
-- workspace `src/{lib,path_observation,path_resolution}.rs`;
-- Bzlmod `src/{lib,host_file,repository_ignore,root_bootstrap,host_module,host_include,host_lockfile,package_policy,host_package}.rs`;
-- Bzlmod `src/{repo_file,module_eval,source_preparation}.rs` only for the
-  delegated repository-ignore/root-module closure and exclusion boundaries;
-- Bzlmod `src/host_package_boundary/mod.rs`;
-- loading `src/{lib,bzl_module}.rs`;
-- core `src/runtime/{dice,request_revision}.rs`; and
+- `app/slug_bzlmod_v2/Cargo.toml`;
+- `.codex/skills/slug-buck2-utility-reuse/SKILL.md`;
+- the matching Stages-3/6 utility row in
+  `slug-v2-subplans/09-v1-extraction-ledger.md`;
+- `third-party/buck2/gazebo/dupe/src/lib.rs` and
+  `third-party/buck2/allocative/allocative/src/lib.rs` only for retained clone
+  and memory-accounting reuse;
+- Bzlmod `src/{host_file,repo_file,package_policy}.rs`;
+- workspace `src/path_observation.rs`; and
 - directly referenced focused tests inside those files.
 
-If a named file moved, use the live equivalent only after recording the
-substitution. Do not read V1/archive sources or unrelated Stage rows.
+If a named file moved, record the live substitution. Do not read V1/archive
+sources or unrelated Stage rows.
 
-Caps are 40 canonical, 320 current-packet, 280 Stage 2, and 640 total net
-ledger lines. No cap correction is reserved.
-
-## Proof and records
-
-Record source line anchors for every selected dependency and carrier. Prove
-that the selected frontier includes negative selection probes and all mutable
-predecessor Host sources, that Need/cancellation publishes no partial
-certificate, and that no existing public or legacy value/equality/output
-changes. Record source-inspection commands, status, artifact checks,
-`git diff --check`, exact ledger accounting, and two independent latest-text
-reviews.
+The future Rust write allowlist is exactly
+`app/slug_bzlmod_v2/src/repo_file.rs`. Its formatted caps are 200 production,
+370 in-module test, and 570 total net added lines; the physical ceiling is
+2,328 lines. Completion-ledger caps are 40 canonical, 260 current-packet, 220
+Stage 2, and 520 total net lines. No cap correction is reserved.
 
 ## STOP / REPLAN
 
-STOP on any Rust/Cargo/BUILD/oracle/generated-evidence write; loading/core/
-public activation; generic public certificate framework; third retained
-container; partial frontier; reconstruction of path demands above workspace;
-reverse core dependency; accepted-snapshot certificate authority; new graph,
-store, watcher, historical Host read, or JVM; repository/materializer
-activation; DICE/Starlark/evaluator/event callback under an owner lock;
-combining MODULE and BUILD implementation; or cap excess.
+STOP on Rust/Cargo/BUILD/oracle/generated-evidence writes; direct
+repository-ignore implementation; package/MODULE/lockfile/BUILD/`.bzl`/
+loading/core/public caller; routed/nonroot repository/materializer work;
+legacy key/value/equality/caller or public API/output/event change; generic
+certificate framework; second observed key; new retained container/graph/
+store/watcher/historical Host read/JVM; reconstructed demands;
+sibling-to-legacy DICE compute; duplicated evaluator; retained
+event/evaluator/transaction; or cap excess.
 
-REPLAN if repository-ignore policy inputs cannot be separated into immutable
-semantics versus exact observations, root-module dynamic includes cannot
-produce a complete success/error frontier before terminal sealing, exact
-epochs cannot cross the existing one-way visibility boundary, or no first
-hierarchical producer can be bounded independently.
+REPLAN if shared evaluation cannot preserve exact event storage/order, policy
+failure cannot retain an empty epoch without semantic change, the observed
+Host-file epoch cannot be retained by private Arc clones alone, or one
+callerless sibling cannot fit a bounded existing-file implementation.
 
 ## Immediate successor
 
-Accept only one bounded design/implementation successor or a named prerequisite
-REPLAN. The successor must remain callerless/private until a complete terminal
-frontier and compute-free same-owner batch final-validation path are both
-independently accepted.
+After independent design acceptance, activate only the callerless observed
+root REPO-file sibling implementation. Completion schedules a docs-only root
+repository-ignore frontier design and must not activate that consumer.

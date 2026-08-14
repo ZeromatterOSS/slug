@@ -1236,3 +1236,58 @@ frontier, loading/core/public activation, generic certificate framework,
 reverse dependency, new retained container/graph/store, repository/
 materializer activation, historical Host read, watcher, JVM, or combined
 MODULE/BUILD implementation.
+
+### Hierarchical audit records an observed root REPO-file prerequisite (2026-08-14)
+
+Source inspection under `a6aaa844` records `REPLAN` before repository-ignore,
+package-marker, or root-module implementation. Root
+`HostRepositoryIgnoreKey` first consumes legacy `HostRepoFileKey`, then
+immutable policy, then ordered `.bazelignore` probes. The legacy REPO key reads
+one root `REPO.bazel`, evaluates it, stores per-transaction events, and returns
+only semantic value/error; its exact Host-file epoch is erased. Reconstructing
+that epoch above the key would duplicate its natural owner.
+
+Package lookup subsequently consumes repository-ignore before ordered
+`BUILD.bazel`/`BUILD` resolution probes. Root MODULE cannot precede that
+work: every dynamically discovered `include()` horizon preflights its packages
+through the same lookup. The root-module frontier seals only when that horizon
+empties. Visible lockfile and selected package source are separate later
+frontiers, not dependencies of `RootModuleLoadingAnchorKey`. Routed/nonroot
+repository sources add repository/materializer ownership and remain deferred.
+
+The uniquely smallest prerequisite is one Bzlmod-private, callerless observed
+root REPO-file sibling. It can consume the accepted observed Host-file key,
+retain the exact epoch beside unchanged semantic success/error, and preserve
+events without activating repository-ignore or a public caller.
+
+### Active observed root REPO-file frontier-key design (2026-08-14)
+
+Run only docs packet `WP-2A-m1-host-repo-file-frontier-key-design` under
+40/260/220/520 ledger lines. Freeze exactly one crate-private
+`HostRepoFileObservationKey` and `ObservedHostRepoFile` carrier in
+`repo_file.rs`. The sibling uses the same workspace identity and policy-first
+ordering as the legacy key, consumes only `HostFileBytesObservationKey`, and
+returns unchanged semantic result/error plus the accepted exact epoch. Need is
+incomplete; dependency frontier errors are completed outer errors; policy
+failure retains the legacy semantic error with an empty epoch.
+
+Freeze shared semantic evaluation/event handling, exact Arc/epoch ownership,
+complete equality/validity, one-file implementation caps, focused parity/
+Need/cancellation/A-B-A/activation/event proof, and a docs-only
+repository-ignore frontier successor. Preserve legacy keys, callers, values,
+events, and public behavior.
+
+Authorize no Rust/Cargo/oracle write, direct repository-ignore consumer,
+package/MODULE/lockfile/BUILD/`.bzl`/loading/core/public activation,
+routed/nonroot repository/materializer work, second observed key, legacy
+migration, generic certificate framework, new retained container/graph/store,
+reconstructed path demands, sibling-to-legacy compute, duplicated evaluator,
+retained event/evaluator/transaction, historical Host read, watcher, JVM, or
+cap excess.
+
+The future Rust allowlist is exactly `app/slug_bzlmod_v2/src/repo_file.rs`.
+The observed carrier retains one private
+`Arc<Result<HostRepoFileValue, HostRepoFileError>>` plus the accepted epoch
+and exposes only a borrowed semantic result. Formatted implementation caps are
+200 production, 370 in-module test, and 570 total net lines; the physical file
+ceiling is 2,328 lines. No cap correction is reserved.
