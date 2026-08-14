@@ -1536,3 +1536,51 @@ all code/Cargo/oracle work, public or reverse seams, legacy-key changes, new
 retained storage, reconstructed/direct Host reads, or another consumer.
 Acceptance may activate exactly one bounded private root-module implementation
 or one smaller docs-only prerequisite; otherwise `REPLAN`.
+
+### Root-module frontier design REPLAN (2026-08-14)
+
+`WP-2A-m1-root-module-frontier-design` does not activate implementation.
+The accepted observed Host-file and package-marker siblings can represent every
+finite child frontier, but `HostRootModuleFileKey` has no direct/indirect
+include recurrence terminal. A valid include that includes itself continually
+repopulates `next_horizon`, so evaluation, event publication, and a complete
+DICE value are unreachable.
+
+The old `RootModuleEvaluationKey` raw-label seen guard is not reusable: the
+Host path deliberately preserves repeated acyclic include occurrences,
+revalidation, and repeated evaluation events, including alias spellings.
+Neither raw-label nor resolved-path suppression can be chosen without pinned
+Bazel 9.2 evidence and a precise ancestry/error-order contract. No current
+`HostRootModuleFileError` variant owns recurrence. Implementing an observed
+sibling now would either reproduce the unsealable loop or invent a terminal,
+so the packet records `REPLAN`.
+
+### Active root-module include-progress semantics design (2026-08-14)
+
+Run docs-only
+`WP-2A-m1-root-module-include-progress-semantics-design`. Inspect the bounded
+pinned Bazel 9.2 bzlmod source/tests and the existing module-file oracle to
+classify direct/indirect recurrence, alias identity, repeated sibling
+occurrences, error location/message/order, and cancellation.
+
+Freeze one finite source-backed contract: distinguish active-ancestry
+recurrence from accepted repeated acyclic occurrences; preserve root
+validation, package-preflight, grouped Host-file Need/error ordering, event
+ownership, and DICE invalidation; and name command-local progress ownership
+without a global visited set, side store, evaluator retention, or arbitrary
+depth cutoff. Need/cancellation/nonterminal recurrence suppresses only the
+parent frontier carrier and parent completed event batch; completed child DICE
+observations remain ordinary dependency-owned cache state. If source is
+nondiscriminating, select one focused Bazel oracle packet instead of guessing.
+
+Existing admitted acyclic behavior remains exact regression/non-widening.
+Recurrence is unclassified until evidence; a Slug-only finite safeguard must
+remain Slug-native or unsupported. Frontier aggregation and sealing remain
+Slug-native, while lockfile/registry/package-source/BUILD/.bzl/glob/loading/
+core/public and routed/materialized work stays deferred.
+
+Write only canonical/current/Stage 2 under 40/300/260/600. STOP on code,
+Cargo/oracle writes, frontier implementation, new DICE/storage/public seams,
+higher loading work, or another behavior family. Acceptance activates exactly
+one bounded include-progress implementation or one focused oracle packet, then
+returns to docs-only root-module frontier design.
