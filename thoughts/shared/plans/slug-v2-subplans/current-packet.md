@@ -1,16 +1,18 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-package-marker-frontier-design`
+Packet: `WP-2A-m1-host-package-marker-frontier-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: freeze the smallest callerless Bzlmod-private observed root
-package-marker/lookup sibling over immutable policy, the accepted observed
+Result: implement and prove exactly one callerless Bzlmod-private observed
+root package-marker/lookup sibling over immutable policy, the accepted observed
 repository-ignore frontier, and ordered `BUILD.bazel`/`BUILD` path-resolution
-frontiers. This packet is docs-only and cannot implement or activate a caller.
+frontiers. Preserve every legacy key, caller, diagnostic, terminal, and public
+behavior; completion schedules only docs-only root-module frontier design.
 
-## Accepted predecessor
+## Accepted design
 
-Commit `43adf74b` accepts the callerless
+Commit `2c174ca1` freezes the one-file package-marker frontier design on
+activation `13154327`. Commit `43adf74b` accepts the callerless
 `HostRepositoryIgnoreObservationKey` from design `8ac5c30f` and exact
 activation `c4ecd395`. It
 preserves legacy REPO -> policy -> ordered `.bazelignore` semantics and
@@ -137,9 +139,10 @@ fixtures; a generic frontier module or public seam is a REPLAN.
 
 Write only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+- `app/slug_bzlmod_v2/src/host_package.rs`; and
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
+  `slug-v2-subplans/current-packet.md`, and
+  `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md` at completion.
 
 Read only the active packet, this owner section,
 `docs/developers/dice.md`,
@@ -150,17 +153,15 @@ row of `slug-v2-subplans/09-v1-extraction-ledger.md`,
 workspace `src/{lib,path_observation,path_resolution}.rs`, the Bzlmod and
 workspace manifests, and directly referenced focused tests in those files.
 
-The frozen future Rust allowlist is exactly
-`app/slug_bzlmod_v2/src/host_package.rs` with colocated tests, but this design
-packet cannot activate it. Future caps are 250 production, 430 test, 680 total,
-and 4,035 physical lines, with a 180-line completion-ledger cap. Current design
-ledger caps are 40 canonical, 320 current-packet, 280 Stage 2, and 640 total net
-lines. No code, Cargo, oracle, generated evidence, or Stage 9 write is
-authorized.
+The exact Rust allowlist is `app/slug_bzlmod_v2/src/host_package.rs` with
+colocated tests. Formatted caps are 250 production, 430 test, and 680 total net
+lines; the physical ceiling is 4,035 from 3,355. Completion ledgers are capped
+at 180 net lines. No correction is reserved.
 
 ## STOP / REPLAN
 
-STOP on every code or oracle write; a second package consumer; root MODULE,
+STOP on every other Rust file; a second package consumer or observed key
+family; root MODULE,
 source bytes, BUILD evaluation, `.bzl`, glob, loading, core, request-revision,
 events, public command/API/output, external/routed/materialized repositories,
 legacy key/value/error changes, public export, Cargo/dependency change, reverse
@@ -177,7 +178,6 @@ implementation cannot be bounded.
 
 ## Immediate successor
 
-On design acceptance, activate exactly one implementation of the frozen
-private package-marker sibling in `host_package.rs`. Its completion may schedule
-only docs-only root-module frontier design. Do not combine package source,
-MODULE implementation, loading, core, or public activation.
+On implementation acceptance, activate only docs-only
+`WP-2A-m1-root-module-frontier-design`. Do not combine package source, MODULE
+implementation, loading, core, or public activation.

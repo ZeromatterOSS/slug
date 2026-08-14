@@ -1446,9 +1446,39 @@ completion ledgers are capped at 180. Independent cohesion/AI-cleanup review is
 mandatory before and after implementation because the file already exceeds
 2,000 lines. No generic frontier module or exported seam is allowed.
 
-The current packet remains docs-only until this design is accepted. Its write
+The design packet remained docs-only until acceptance. Its write
 scope is canonical/current/Stage 2 under 40/320/280/640. STOP on code,
 Cargo/oracle/public/export/dependency changes, another consumer or key family,
 new storage/graph, reconstructed/direct Host reads, or higher loading work.
 Acceptance schedules only the one-file private implementation; its completion
 may schedule only docs-only root-module frontier design.
+
+### Active host package-marker frontier implementation (2026-08-14)
+
+Run `WP-2A-m1-host-package-marker-frontier-implementation` from accepted
+design `2c174ca1`. Implement exactly one callerless crate-private
+`HostRootPackageLookupObservationKey` and
+`ObservedHostRootPackageLookup` in
+`app/slug_bzlmod_v2/src/host_package.rs`.
+
+Preserve structural policy and empty-epoch early exits, then consume only the
+accepted observed repository-ignore sibling and root-major,
+`BUILD.bazel`-before-`BUILD` observed resolution siblings. Union each
+complete child epoch before semantic interpretation. Need/cancellation/outer
+error publishes no carrier; inner semantic errors and selected/all-negative
+terminals retain their complete prefix. Preserve legacy keys, values, callers,
+diagnostics, events, and public behavior.
+
+Retain exactly one semantic-result Arc plus the existing Arc-backed epoch.
+Require focused empty/prefix/precedence/error/Need/outer/exact-Arc/
+legacy-nonactivation/equality/A-B-A/cancellation proof, full Bzlmod validation,
+one direct downstream compile, formatting, Clippy and archive dispositions,
+exact cap accounting, and mandatory independent cohesion/AI-cleanup review.
+
+The exact Rust allowlist is `host_package.rs`. Caps are 250 production, 430
+test, 680 total net, and 4,035 physical lines from 3,355; completion ledgers are
+capped at 180 with no correction. STOP on every other Rust file, another key or
+consumer, legacy/public/routed/materialized/MODULE/source/loading/core work, new
+retained storage or reconstructed/direct Host reads, and cap excess.
+Completion schedules only docs-only
+`WP-2A-m1-root-module-frontier-design`.
