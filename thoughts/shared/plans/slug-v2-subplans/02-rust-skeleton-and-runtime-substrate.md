@@ -1126,3 +1126,38 @@ core dependency, generic public framework, new graph/key/store, snapshot
 replacement, partial frontier, owner-held compute/Starlark/repository/event
 work, repository/materializer activation, watcher, historical Host read, JVM,
 combined consumers, or cap excess.
+
+### Loading-frontier design records an observed-path key prerequisite (2026-08-13)
+
+Source inspection under `c1d875ad`, `9d1c6b80`, and `3a627ebb` rejects
+a BUILD or `NoBuildFile` implementation as partial. Package lookup depends on
+policy, repository-ignore, package-root, and marker sources; package load also
+depends on the root MODULE anchor; successful evaluation may add `.bzl` and
+glob sources.
+
+The existing lower values lose the exact inputs needed to compose those
+frontiers. `ResolvedPathKey` exposes route/state or semantic error but not the
+exact Lstat/ReadLink arcs; `HostFileBytesKey` adds FileBytes and then discards
+the complete prefix. Reconstructing above workspace would be a second resolver.
+Changing the legacy values would activate unrelated consumers.
+
+The bounded answer is a callerless lower chain: one doc-hidden workspace
+observed-resolution sibling uses the existing state machine and returns
+complete result plus exact `PathObservationEpoch`; one Bzlmod-private
+observed-Host-file sibling consumes it and adds the final FileBytes observation.
+The current design packet independently forbids new keys, so it records
+`REPLAN` before selecting implementation.
+
+### Active observed-path frontier key design (2026-08-13)
+
+Run only docs packet `WP-2A-m1-observed-path-frontier-key-design` under
+40/260/220/520. Freeze exactly the two sibling key identities, complete
+success/error carriers, Need/cancellation suppression, shared-Arc epoch
+constructor/union and conflict algebra, sealed one-way visibility,
+structural equality, compact memory lifetime, four-file implementation
+allowlist/caps/tests, and hierarchical-design successor.
+
+Authorize no Rust/Cargo/oracle write, third key/store/graph, legacy key/value
+or caller migration, loading/core/public caller, request finalization,
+repository/module/BUILD/`.bzl`/glob activation, generic public framework,
+reverse edge, direct/historical Host read, watcher, JVM, or cap excess.

@@ -1,146 +1,128 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-frontier-certificate-design`
+Packet: `WP-2A-m1-observed-path-frontier-key-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: design the smallest app-internal multi-observation loading-frontier
-certificate and its one-way loading/Bzlmod-to-core ownership boundary. This
-packet is documentation-only and must select one future bounded consumer or
-record a prerequisite `REPLAN`.
+Result: design exactly one workspace observed-resolution sibling key and one
+Bzlmod-private observed-Host-file sibling key as the lower complete frontier
+primitive. This packet is documentation-only; it may select a four-file
+callerless implementation successor but may not implement it.
 
-## Fixed predecessors and audit result
+## Fixed predecessors and narrow REPLAN
 
-Commit `f0849151` accepts the sole-root exported-source bridge over the
-private request-revision family in `207fe438`. Commit `ea36fdcc` activates
-the independent next-consumer audit. That audit finds no remaining bounded
-one-observation consumer.
+Commit `f0849151` accepts the private sole-root one-file final-validation
+bridge. The next-consumer audit in `ea36fdcc` proves every remaining public
+loading terminal has a multi-observation or dynamically expanding frontier.
+The loading-frontier design activated in `c1d875ad`, with read-boundary
+corrections `9d1c6b80` and `3a627ebb`, finds that the existing lower keys
+discard the exact observation arcs needed for hierarchical composition.
 
-The least-broad apparent candidate, selected root BUILD loading, is already a
-source-selection frontier. `BuildCommandRootKey` reaches
-`RootPackageLoadKey`, which first anchors the root module and computes
-`RootPackageSourceKey::for_build`. `HostRootPackageLookupKey` probes
-`BUILD.bazel` then `BUILD` across configured package roots through
-`ResolvedPathKey`; only afterward does `HostFileBytesKey` read the selected
-file through `PathObservationKey`. The parsed BUILD may recursively compute
-`HostBzlModuleEvalKey` children. A selected-file certificate therefore cannot
-reject a concurrent precedence, package-root, boundary, or loaded-`.bzl`
-change.
+`ResolvedPathKey` returns semantic route/state or `PathResolutionError`,
+not the exact ordered Lstat/ReadLink demand/result pairs used by its resolution
+machine. `HostFileBytesKey` then returns semantic bytes/error and discards
+both that resolution frontier and the exact final FileBytes observation.
+Reconstructing demands in Bzlmod would duplicate the workspace resolver and is
+forbidden. Mutating the legacy value types would widen every lockfile,
+repository-ignore, package, module, repo-file, and glob caller before a
+consumer boundary is accepted.
 
-Root `MODULE.bazel` dynamically expands an `include()` horizon and retains
-evaluation effects. One `.bzl` recursively expands its load closure and cycle
-state. Direct-local external exported source adds route, repository result,
-materialization, package discovery, and source observations. The existing
-core-private one-file type cannot be produced across a crate boundary; moving
-it downward without a design would either expose a generic public framework or
-create the reverse dependency that the audit forbids.
+The active loading-frontier packet prohibited selecting any new key, so it
+records `REPLAN` rather than silently broadening. This prerequisite is
+authorized to design only the two sibling keys below. It does not claim a
+public/loading migration or M1 completion.
 
-Existing root MODULE, BUILD, `.bzl`, and direct-local behavior remains
-unchanged. The audit records `REPLAN`: representation, visibility, complete
-frontier aggregation, and batch final validation must be designed before a
-second consumer.
+## Exact design candidates
 
-## Design objective
+Freeze or reject exactly this chain:
 
-Freeze exactly one non-user-facing `LoadingFrontierCertificate` concept that
-can be produced in the existing loading/Bzlmod-to-core dependency direction
-and associated with one complete terminal. The design must choose its natural
-owner and visibility:
+```text
+PathObservationEpoch
+        |
+ResolvedPathObservationKey -> ObservedResolvedPath
+        |
+HostFileBytesObservationKey -> ObservedHostFileBytes
+```
 
-- prefer the lowest existing crate that can represent every required Host
-  observation without depending on core;
-- decide whether an internally public but sealed app type is acceptable;
-- otherwise select an existing lower shared owner without turning it into a
-  generic user API; and
-- `REPLAN` rather than introduce a loading/Bzlmod dependency on core or a
-  second graph/store.
+`ResolvedPathObservationKey` must have the same workspace namespace/path
+structural identity as `ResolvedPathKey`, use the same resolution machine,
+and capture each exact completed `Arc<PathObservationResult>` before the
+machine transition. It must not compute `ResolvedPathKey`, perform a second
+raw observation, or change the legacy key/value.
 
-Name the exact future type/module owners, dependency edges, construction sites,
-terminal carriers, and core consumption sites. Do not implement them here.
+`ObservedResolvedPath` must contain one complete
+`Result<ResolvedPath, PathResolutionError>` plus one exact immutable
+`PathObservationEpoch` for both success and terminal error. Need and
+cancellation return no carrier and drop accumulated scratch observations.
 
-## Complete frontier algebra
+Bzlmod-private `HostFileBytesObservationKey` must consume only the observed
+resolution key. Its `ObservedHostFileBytes` contains one complete
+`Result<HostFileBytes, HostFileError>` plus the exact resolution epoch and,
+only when resolution reaches a readable terminal path, the exact final
+FileBytes demand/result. Missing, wrong-kind, resolution error, inconsistent
+final read, operation error, present bytes, Need, and cancellation ordering
+must remain identical to `HostFileBytesKey`.
 
-The certificate must be a deterministic compact collection of exact Host
-observation demand/result pairs with explicit provenance. It includes both
-chosen source bytes and every negative or positive probe that controls source
-selection: package roots, BUILD precedence, package boundaries, include/load
-selection, and dynamically discovered children admitted by the chosen
-consumer.
+The two keys are callerless except for the observed Host-file key consuming the
+observed resolution key and focused tests computing the Host-file root.
+Existing legacy consumers do not migrate in this packet or its immediate
+implementation successor.
 
-The design must specify:
+## Epoch and duplicate algebra
 
-- complete-only construction for both success and completed errors;
-- Need and cancellation paths that publish no partial certificate;
-- deterministic ordering, structural equality/hash, duplicate coalescing, and
-  conflicting-result failure;
-- exact demand containment and workspace/root identity;
-- how recursive MODULE includes or `.bzl` loads union child frontiers without
-  retaining evaluators, transactions, repository results, or snapshots;
-- how negative selection probes remain reobservable rather than being reduced
-  to the chosen file;
-- Arc/clone boundaries, maximum retained lifetime, memory accounting, and
-  release on retry/error/cancellation; and
-- whether dynamic cardinality needs a per-command cap and its typed overflow.
+Reuse `PathObservationEpoch` and its retained
+`Arc<SortedMap<PathObservationDemand, Arc<PathObservationResult>>>`; invent
+no second retained map, interner, or cache. Design one shared-pairs
+construction/union API that:
 
-A certificate is evidence for one terminal, not accepted semantic state.
-`AcceptedNativeDemandSnapshot` remains only native
-inputs/repository/path selection and never becomes certificate authority.
+- sorts deterministically by exact demand identity;
+- validates operation/result agreement and Host namespace where required;
+- retains the exact result Arc without copying file bytes;
+- coalesces duplicate demands only when the exact results are structurally
+  equal, preferring an already shared Arc;
+- rejects same-demand conflicting results with a typed error;
+- accepts an empty epoch for a terminal reached before any Host demand; and
+- preserves structural epoch equality independently of Arc pointer identity.
 
-## Carrier and ordering design
+State whether path-resolution cardinality is already bounded by the resolution
+machine; otherwise name one checked typed cap. All builders are request/DICE
+compute scratch and disappear on Need, error before a complete carrier, or
+cancellation.
 
-For the first future consumer, map success, every completed source/evaluation
-error, Need, event, and cancellation ordering. Freeze the exact carrier path
-from the lower owner through loading to the core terminal without changing
-public results, error text, event batches, or output bytes.
+## Visibility, equality, and memory
 
-Certificate construction must finish before terminal sealing. Selection,
-activation closure, event/demand capture, full updater preparation, and
-repository validation remain outside the request-revision owner. The selected
-terminal token remains the sole provisional-effect authority.
+The observed resolution key/carrier may be doc-hidden public only because
+Bzlmod already depends on workspace. Fields and constructors stay sealed;
+expose borrowed result/epoch access only. The observed Host-file key/carrier
+remain Bzlmod-private, so no Bzlmod `lib.rs` export is needed.
 
-Choose exactly one first consumer. Root MODULE, selected BUILD, one `.bzl`,
-and direct-local external may be compared, but a future implementation packet
-may not combine them.
+Completed carrier equality is structural result plus exact epoch. Validity is
+complete-only; Need is invalid and never equal. Retention uses `Dupe`,
+`Allocative`, shared Arc results, and the existing deterministic
+`SortedMap`. No evaluator, transaction, updater, accepted snapshot, event,
+repository result, materializer, worker, or lock is retained.
 
-## Batch final-validation design
+The dependency direction remains
+`slug_workspace_v2 -> slug_bzlmod_v2 -> slug_loading_v2 -> slug_core_v2`.
+No Cargo edge changes.
 
-Extend the existing owner protocol conceptually, without code, for a complete
-frontier:
+## Compatibility and proof contract
 
-1. prepare and select the complete terminal outside the owner;
-2. acquire the existing async, nonreentrant publication owner;
-3. compare the prepared updater's existing state with the terminal transaction;
-4. exact Host-reobserve every certificate demand as a deterministic batch,
-   with no DICE compute, Starlark, repository/materializer work, event callback,
-   or lock reentry;
-5. when unchanged, add the checked successor revision to the prepared full
-   updater and commit once;
-6. when changed, replace every changed certificate entry inside the command's
-   full epoch, publish that epoch plus successor revision atomically from a
-   fresh updater, suppress/reset, and retry; and
-7. on version advance, observation error, overflow, nonprogress, cancellation,
-   or failure, expose no stale terminal or provisional event and restore or
-   fail closed.
+Legacy workspace resolution and Bzlmod Host-file keys, outputs, errors, Need
+order, DICE equality, and all public behavior remain unchanged. Exact retained
+observation values are the already admitted Host semantics. The sibling
+carrier, aggregation, provenance, and future batch validation are Slug-native;
+no new Bazel parity or public overlap is claimed.
 
-Specify changed-many ordering, observation-error algebra, exact counters,
-initial-revision interaction, retry cap, reset ownership, and proof that no
-compute or callback can reenter the owner. A partial revalidation or a
-one-entry overwrite of a full epoch is forbidden.
+A future implementation proof must cover shared-Arc epoch ordering, operation
+mismatch, semantic duplicate coalescing, conflicting duplicate failure, and
+empty/singleton/union; direct present/missing/wrong-kind/read-error;
+relative/absolute symlink and retarget; resolution missing/error/cycle/expansion
+terminal epochs; final FileBytes append exactly once; Need at resolution/final
+read with no partial carrier; success/error A-B-A equality; absence of legacy
+key activation; cancellation/drop; compact allocation/clone accounting; and
+unchanged legacy/public results.
 
-## Compatibility and evidence
-
-Preserve accepted serial MODULE, BUILD, `.bzl`, external, Need/error/event,
-output, and recovery behavior as regression/non-widening invariants. Reuse only
-separately accepted exact source-observation evidence; do not infer new parity
-from `f0849151`.
-
-Exact Host observation values remain exact only where already admitted.
-Frontier aggregation/identity, batch final validation, request revision,
-retry/reset, stale-effect suppression, and future overlap are Slug-native.
-Directory/glob unions beyond the selected frontier, repository/materialized
-certificates, public overlap, historical Host reads, and exact Bazel identity
-bytes remain unsupported/deferred.
-
-## Allowlist, caps, and proof contract
+## Allowlist and caps
 
 Edit exactly:
 
@@ -148,50 +130,36 @@ Edit exactly:
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
 - `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Caps are 40 canonical, 300 current-packet, 260 Stage 2, and 600 total net
-ledger lines. Read only `docs/developers/dice.md`; the four relevant Cargo
-manifests; workspace
-`src/{lib,path_observation,path_resolution}.rs`; core
-`runtime/{dice,request_revision,events}.rs`; loading
-`src/{lib,keys,file_discovery,package,bzl_module,load_label,cycle_detector}.rs`;
-Bzlmod
-`src/{lib,dice,source_preparation,root_bootstrap,host_module,host_include,host_package,host_file,package_policy,repository_ignore}.rs`;
-`host_package_boundary/mod.rs`; and directly referenced focused tests. Missing
-named files may be mapped to their live equivalent without widening the owner
-families.
+Caps are 40 canonical, 260 current-packet, 220 Stage 2, and 520 total net
+ledger lines. Read only `docs/developers/dice.md`; workspace
+`src/{lib,path_observation,path_resolution}.rs`; Bzlmod
+`src/{lib,host_file}.rs`; relevant Cargo manifests; the matching Stage 9
+retained-utility row; the repo `slug-buck2-utility-reuse` skill; retained
+`starlark_map/src/sorted_map.rs`, `gazebo/dupe/src/lib.rs`, and
+`allocative/allocative/src/lib.rs`; and directly referenced focused tests.
 
-For the retained compact representation only, read the matching
-Stages-3/6 utility row in
-`slug-v2-subplans/09-v1-extraction-ledger.md`, the repo
-`slug-buck2-utility-reuse` skill, and retained
-`starlark_map/src/{small_map,small_set,sorted_map}.rs`,
-`gazebo/dupe/src/lib.rs`, and `allocative/allocative/src/lib.rs`.
-This authorizes bounded comparison, not a Stage 9 write or new container.
+No Rust, Cargo/BUILD, oracle, generated evidence, or other ledger write is
+authorized. Independent review must confirm single-machine resolution,
+complete success/error epochs, no legacy activation, equality/duplicate
+algebra, one-way visibility, memory, compatibility, exact future allowlist and
+caps, and no hidden third key.
 
-No Rust, Cargo/BUILD, oracle fixture, generated evidence, or other ledger write
-is authorized. Use source inspection and existing accepted evidence only.
-Independent review must confirm dependency direction, complete selection
-frontier, error/effect ordering, owner nonreentry, memory/lifetime, bounded
-first consumer, compatibility, caps, and exact successor allowlist/proof.
+STOP on code, a third key/store/graph, legacy key/value or caller migration,
+loading/core/public caller, request revision/finalization, repository/module/
+BUILD/`.bzl`/glob activation, generic public framework, reverse dependency,
+direct or historical Host reads outside the existing observation owner,
+watcher, oracle, JVM, or cap excess.
 
-STOP on any code or oracle write, public user API/wire/output, reverse core
-dependency, generic public certificate framework, new graph/key/store,
-snapshot replacement, evaluation/compute/callback under the owner,
-repository/materializer activation, partial frontier, historical Host reads,
-watcher, JVM work, combining consumers, or cap excess.
-
-`REPLAN` if no one-way app-internal visibility boundary is possible, negative
-selection probes cannot be represented exactly, a complete frontier is
-unavailable before terminal sealing, batch final validation requires DICE,
-Starlark, or repository work under the owner, atomic multi-entry epoch plus
-revision cannot reuse the existing owner, or the first implementation consumer
-cannot be bounded independently.
+`REPLAN` if the resolution machine cannot expose every exact completed
+observation without duplicating I/O, complete errors cannot retain their
+prefix epoch, shared epochs require a new retained container, the doc-hidden
+workspace carrier widens user API, the observed Host-file key must activate a
+legacy caller, or the four-file implementation cannot remain bounded.
 
 ## Acceptance and immediate successor
 
-Accept only a design that names one coherent representation/owner, complete
-frontier and carrier algebra, compute-free batch finalization, one bounded first
-consumer, exact Rust/test/ledger allowlists and caps, focused proof, and all
-STOP/`REPLAN` boundaries. Then activate that implementation only after
-independent ownership and cleanup review; otherwise activate the smallest
-remaining design prerequisite.
+Accept only after independent DICE/ownership/memory review freezes the two-key
+identity, carrier, epoch algebra, exact four-Rust-file allowlist, caps, tests,
+and STOP/`REPLAN` boundaries. Then activate only the callerless lower
+vertical implementation. Its completion must schedule hierarchical package/
+module/ignore frontier design; it must not claim public final validation.

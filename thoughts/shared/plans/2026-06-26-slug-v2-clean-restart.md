@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; loading-frontier certificate design active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the private request-revision/source-certificate vertical in `207fe438`, and the accepted sole-root native publication bridge in `f0849151`; full evidence is in the owner plans | no remaining terminal has a bounded one-file source frontier; loading/Bzlmod ownership, complete multi-observation aggregation, and batch final validation must be designed before another consumer; directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | design one app-internal loading-frontier certificate and select one bounded consumer |
+| M1: one semantic spine | **partial; observed-path frontier key design active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the private request-revision/source-certificate vertical in `207fe438`, and the accepted sole-root native publication bridge in `f0849151`; full evidence is in the owner plans | existing resolution/Host-file values discard exact observation arcs, while every remaining public loading terminal has a broader frontier; a bounded observation-carrying lower key contract must precede hierarchical aggregation; directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | design exactly the workspace observed-resolution and Bzlmod observed-Host-file sibling keys |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-2A-m1-loading-frontier-certificate-design](./slug-v2-subplans/current-packet.md).
+[WP-2A-m1-observed-path-frontier-key-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -1586,3 +1586,25 @@ Run only docs packet `WP-2A-m1-loading-frontier-certificate-design` under
 consumer. Authorize no Rust, public API/output/overlap, reverse core edge, new
 graph/key/store, partial certificate, repository/materializer activation,
 oracle generation, watcher, historical Host reads, or JVM work.
+
+### M1 loading-frontier design selects an observed-path key prerequisite (2026-08-13)
+
+The design activated in `c1d875ad` confirms that no package/public terminal
+can yet retain a complete frontier. Root package lookup also consumes policy
+and repository-ignore sources; root package load first consumes the mutable
+MODULE anchor; successful BUILD evaluation may expand through `.bzl` and
+glob dependencies.
+
+The lowest missing contract is earlier. `ResolvedPathKey` discards the exact
+Lstat/ReadLink arcs used by its state machine, and `HostFileBytesKey` discards
+both that prefix and its final FileBytes result. Reconstructing them above
+workspace would duplicate the resolver; changing legacy values would widen all
+current callers. The active packet forbids selecting new keys, so it records
+`REPLAN`.
+
+Run only docs packet `WP-2A-m1-observed-path-frontier-key-design` under
+40/260/220/520. Design exactly one doc-hidden workspace observed-resolution
+sibling and one Bzlmod-private observed-Host-file sibling, sharing the existing
+resolution machine and `PathObservationEpoch`. Authorize no Rust, third key,
+legacy migration, loading/core/public caller, repository/module/BUILD/`.bzl`/
+glob activation, Cargo/oracle change, watcher, historical Host read, or JVM.
