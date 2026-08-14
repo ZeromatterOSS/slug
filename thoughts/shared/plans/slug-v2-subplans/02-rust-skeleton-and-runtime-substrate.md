@@ -1584,3 +1584,55 @@ Cargo/oracle writes, frontier implementation, new DICE/storage/public seams,
 higher loading work, or another behavior family. Acceptance activates exactly
 one bounded include-progress implementation or one focused oracle packet, then
 returns to docs-only root-module frontier design.
+
+### Frozen root-module include-progress semantics (2026-08-14)
+
+Pinned Bazel 9.2.0 `ModuleFileFunction` is decisive without a timeout oracle.
+Its nonregistry/root path drives a BFS `horizon` until empty; every compiled
+occurrence appends every child include and overwrites only a raw-label keyed
+compiled-file map. No visited, ancestry, recurrence, or nonprogress terminal
+exists. Matching Java and Python bzlmod tests cover finite acyclic include
+chains only. Direct or indirect recurrence therefore has no exact Bazel
+terminal, diagnostic, or location to copy: upstream nontermination remains
+unsupported, while Slug's finite safeguard is Slug-native.
+
+Freeze selected normalized logical Host path as active-ancestry identity.
+`HostRootModuleFileKey` owns command-local parent-linked immutable ancestry
+nodes rooted at the logical root `MODULE.bazel`. A raw-label alias is a cycle
+only when its selected logical path is already on that occurrence's ancestry;
+repeated siblings and aliases on distinct branches remain separate validated
+and evaluated occurrences.
+
+Preserve root policy/file/bootstrap/validation first, then each horizon's full
+label preflight, grouped Host-file observations, Need union, and source-order
+semantic selection. After a Present include successfully validates, detect an
+ancestry back edge before accumulating it for evaluation or extending its
+children. Add only private
+`HostRootModuleFileError::IncludeCycle { raw_label, location, logical_path }`.
+The complete semantic error retains no ancestry chain. With event capture it
+owns the same empty parent batch as other pre-evaluation complete errors;
+Need/cancellation owns no parent completed batch and drops all parent scratch.
+Completed child observations remain normal DICE cache state.
+
+The implementation changes only `host_module.rs`; no new key, store, graph,
+container, interner, direct read, retained frontier, or caller is admitted.
+Use existing `Arc`/`Dupe` pointer semantics for command scratch. Caps are 130
+production, 240 test, 370 total net, and 3,289 physical lines from 2,919;
+completion ledgers are capped at 180. Mandatory pre/post cohesion review owns
+the >2,000-line trigger. Proof covers direct/indirect/alias recurrence,
+repeated sibling behavior, Need/error/event order, warm/recovery/A-B-A,
+complete equality, cancellation release, and zero scope widening.
+
+### Active root-module include-progress implementation (2026-08-14)
+
+Run `WP-2A-m1-root-module-include-progress-implementation` from predecessor
+`8a555daa` and the pinned source decision above. Implement only the private
+active-ancestry guard and typed complete error in `host_module.rs`, preserving
+all admitted acyclic behavior and existing DICE/event ownership.
+
+Validate focused and full Bzlmod behavior, direct loading/core compilation,
+formatting, Clippy/archive dispositions, exact cap accounting, diff hygiene,
+and independent cohesion/ownership review. STOP on another file, another key or
+owner, retained frontier/public behavior, arbitrary depth cutoff, silent
+dedupe, panic/string-matched cycle handling, or cap excess. Completion returns
+only to docs-only `WP-2A-m1-root-module-frontier-design`.
