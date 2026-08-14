@@ -1751,3 +1751,61 @@ behavior change, second retained collection, reconstructed/direct Host read,
 retained evaluator/event/source/horizon/ancestry, higher loading/package-source
 work, or cap excess. Completion schedules only docs-only
 `WP-2A-m1-root-module-anchor-frontier-carrier-design`.
+
+### Accepted root-module frontier implementation (2026-08-14)
+
+Commit `2640d1c0` adds the callerless Bzlmod-private
+`HostRootModuleFileObservationKey` and one ephemeral observed include
+preflight helper. The legacy and observed paths share mode-aware root and
+preflight drivers while selecting disjoint child-key families. Completed
+success and semantic errors retain only the decisive source-order Host
+observation prefix; speculative later joined observations remain child-owned
+cache state. Need, cancellation, and outer frontier errors publish no parent
+carrier or event batch.
+
+The observed root key owns the one equivalent root event batch for semantic
+completion and retains only one semantic-result Arc plus the existing
+Arc-backed epoch. It does not retain evaluator, event batch, source bytes,
+package/file carrier, horizon, ancestry, transaction, or union scratch. Legacy
+root, anchor, and loading callers are unchanged.
+
+Exact cfg-aware accounting is 420 production and 559 in-module test lines, 979
+total net. `host_module.rs` is 266/425/691 and 3,885 physical lines;
+`host_include.rs` is 154/134/288 and 1,076 physical lines, within every
+per-file and aggregate cap. Focused observed proof passes 6/6, complete owner
+modules pass 20/20 and 8/8, and all 582 Bzlmod unit/integration tests pass.
+Direct loading/core checks, formatting, diff/artifact hygiene, and independent
+source, ownership, scheduling, and nine-category cleanup reviews pass. The
+cleanup review removed duplicate preflight orchestration before acceptance.
+Strict Clippy stops first in unchanged `allocative_derive`; the archive
+checker reproduces only the inherited missing-ref/non-V2-thoughts baseline.
+
+Existing admitted acyclic MODULE/include behavior, diagnostics, events, and
+Host observations remain exact. Frontier aggregation, decisive-prefix sealing,
+and certificate equality are Slug-native. The public anchor and all higher
+loading/core consumers remain deferred.
+
+### Active root-module anchor frontier carrier design (2026-08-14)
+
+Run docs-only `WP-2A-m1-root-module-anchor-frontier-carrier-design` from
+accepted predecessor `2640d1c0`. Map the private observed root producer,
+the public `RootModuleLoadingAnchor{,Error,Key}` projection and reexports,
+and loading's anchor-first `RootPackageLoadKey` consumption. Freeze the
+smallest app-internal one-way carrier that associates the accepted exact epoch
+with anchor success and completed error without changing public registrations,
+diagnostics, event ownership, or dependency order.
+
+The design must resolve representation/visibility, inner semantic versus outer
+frontier/Need algebra, equality and DICE lifetime, exact Arc reuse,
+`Dupe`/`Allocative`, cancellation release, no legacy-root
+activation, and an exact future file/cap/proof contract. The root observed key
+remains the sole event owner. Loading activation, package-source aggregation,
+BUILD/`.bzl`/glob, core final validation, and public overlap remain later
+packets.
+
+Write only canonical/current/Stage 2 under 40/280/260/580 net lines. STOP on
+code, Cargo, oracle, public user API/output, loading/core edits, another
+producer, reverse dependency, duplicate event authority, reconstructed Host
+reads, or new retained storage. Acceptance may activate only one bounded
+Bzlmod-side carrier implementation or one proven smaller docs prerequisite;
+otherwise `REPLAN`.
