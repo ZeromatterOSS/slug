@@ -56,59 +56,82 @@ Root MODULE anchoring, BUILD bytes/evaluation, recursive `.bzl`/glob work,
 package-source selection, loading, core finalization, and public commands are
 downstream of this lower lookup terminal and remain outside this packet.
 
-## Required design output
+## Frozen design
 
-Freeze one design or record `REPLAN`; do not write Rust.
+Add exactly one crate-private
+`HostRootPackageLookupObservationKey { workspace: NormalizedAbsolutePath,
+package: PackagePath }` in `host_package.rs`. Its Display is
+`bzlmod-observed-host-root-package-lookup:{workspace}//{package}`; its value is
+`PathOutcome<Result<ObservedHostRootPackageLookup,
+ObservedPathFrontierError>>`; equality is `complete_eq` and validity is
+`is_complete`.
 
-- Name the natural type/key/value owner, crate visibility, Display identity,
-  and exact relationship to legacy `HostRootPackageLookupKey`. Prefer one
-  callerless sibling in `host_package.rs`; legacy key/value/callers remain
-  unchanged and neither sibling computes the other.
-- Decide whether
-  `HostRootPackageLookupObservationKey { workspace, package }` returns
-  `PathOutcome<Result<ObservedHostRootPackageLookup,
-  ObservedPathFrontierError>>`, with one
-  `Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>` plus the
-  accepted `PathObservationEpoch`. If another shape is necessary, justify the
-  smaller ownership boundary.
-- Freeze exact complete-only equality and validity. Need and cancellation must
-  retain no partial carrier; completed outer aggregation errors retain no
-  partial carrier and never become legacy semantic errors.
-- Preserve policy-first and early-exit order. Policy error, invalid package,
-  configured deletion, and special `external` must have an exact empty Host
-  epoch because no Host predecessor ran.
-- Compute only the observed repository-ignore sibling after early exits. Its
-  complete semantic success/error must retain its exact epoch; an ignore match
-  completes `Deleted` without marker activation.
-- Probe only `ResolvedPathObservationKey` for each root-major,
-  `BUILD.bazel`-then-`BUILD` candidate. Union each completed epoch before
-  interpreting it. Missing and non-file terminal kinds remain negative probes;
-  regular/special selects; resolution semantic error retains the complete
-  prefix; all-negative completes `NoBuildFile`.
-- Freeze deterministic union, duplicate/conflict/operation-mismatch algebra,
-  source order, exact first-Arc retention, cardinality/overflow handling, and
-  proof that no demand is reconstructed above its workspace owner.
-- Preserve legacy result/error text, source ordering, equality, public output,
-  and all callers. The observed carrier is private, callerless, and cannot
-  become accepted-snapshot or public certificate authority.
-- Classify memory as DICE-terminal only: one semantic-result Arc plus one
-  existing Arc-backed epoch. Policy, matcher, resolution machine, transactions,
-  events, evaluators, workers, and scratch must not be retained.
-- Freeze one-file implementation/test caps, the physical-file ceiling from the
-  live 3,355-line `host_package.rs`, a mandatory >2,000-line cohesion
-  decision, focused proof, direct-dependent validation, and the unique next
-  docs-only hierarchical consumer.
+`ObservedHostRootPackageLookup` derives `Debug`, `Clone`, `PartialEq`,
+`Eq`, `Allocative`, and `Dupe`. It retains exactly one
+`Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>` plus one
+`PathObservationEpoch`, with crate-private borrowed `result()` and
+`observations()` accessors. Neither sibling computes the other. Do not export
+either new type or change the legacy key, value, error, equality, callers, or
+diagnostics.
 
-Focused proof must discriminate policy/invalid/deleted/external empty epochs;
-repository-ignore success/error/Need/outer and ignored deletion; root/name
-precedence; missing/wrong-kind/selected/resolution-error prefixes; exact Arc
-retention; duplicate/conflict/mismatch; no legacy sibling activation;
-complete equality/validity; A/B/A/warm; Need/cancellation; and unchanged legacy
-diagnostics/order. No new Bazel oracle is required because existing serial
-package selection and admitted Host observations remain exact regression
-invariants. Frontier aggregation/equality are Slug-native. Higher loading,
-overlap/final-validation, directory/glob unions, repository/materialization,
-and exact Bazel identity bytes remain unsupported/deferred.
+Preserve this exact compute and terminal algebra:
+
+1. Compute `RootPackageLookupInputsProjectionKey`. A policy error completes as
+   the existing inner `PolicyInput` error with an empty epoch.
+2. Preserve invalid-package, configured-deletion, and special `external`
+   early exits in their existing order. Each has an exact empty epoch and
+   activates neither observed ignore nor marker resolution.
+3. Compute only `HostRepositoryIgnoreObservationKey`. Forward Need and outer
+   frontier error without a parent carrier. Map its semantic error to the
+   existing inner `RepositoryIgnore` error while retaining the exact epoch.
+   An ignore match completes `Deleted` with that epoch and activates no marker.
+4. For each configured root in order, probe `BUILD.bazel` and then `BUILD`
+   only through `ResolvedPathObservationKey::new(Host, logical_path)`. Union a
+   completed child epoch before inspecting its semantic result.
+5. A resolution semantic error completes the existing inner
+   `Resolution { logical_path, error }` with the full prefix. Regular/special
+   selects the existing `HostPackage`. Missing and every other non-file
+   terminal continue as negative probes. Preserve the legacy terminal-symlink
+   invariant. Exhaustion completes `NoBuildFile` with every negative prefix.
+
+Use one private `union_observations(left, right)` helper backed exclusively by
+`PathObservationEpoch::from_shared`. Input order is accepted ignore epoch,
+then root-major/name-major marker epochs. Equal duplicates coalesce and retain
+the first exact result Arc; conflicting results and operation mismatch stay
+completed outer `ObservedPathFrontierError` values with no carrier. The
+accepted epoch utility owns sorting/allocation; do not add custom cardinality
+arithmetic or another retained Vec/map/cache/interner/graph/store.
+
+Need is the only invalid/self-unequal value. Need, cancellation, and child outer
+failure drop local prefix/epoch scratch and publish no parent carrier. The key
+stores no evaluation data and owns no events. DICE-terminal retained state is
+only the semantic-result Arc and the existing Arc-backed epoch; policy, ignore
+matcher, child resolved values, transaction, event data, and scratch release at
+compute return. Child observation Arcs pointer-share through `from_shared`;
+no deep-copy or historical-host-read claim is permitted.
+
+Focused proof must cover policy error, invalid name, configured deletion, and
+`external` empty epochs with zero observed-child activation; observed-ignore
+success/error/Need/outer and ignored deletion; root/name precedence;
+missing/wrong-kind negatives, regular/special selection, and resolution-error
+prefixes; exact Arc retention, duplicate first-Arc, conflict, and mismatch; zero
+legacy lookup/ignore/resolution activation; complete equality/validity;
+A/B/A/warm; Need/cancellation; and unchanged legacy diagnostics/order.
+
+No new Bazel oracle is required. Existing serial package-marker selection and
+admitted Host observations remain exact regression invariants. Aggregated
+frontier identity/equality is Slug-native. Root MODULE anchoring, package-source
+bytes, BUILD evaluation, `.bzl`, glob, loading/core/public activation,
+routed/materialized repositories, overlap/final-validation, and exact Bazel
+identity bytes remain unsupported/deferred.
+
+The future implementation is exactly `app/slug_bzlmod_v2/src/host_package.rs`
+with colocated tests. Formatted hard caps are 250 production, 430 test, and 680
+total net lines; the physical ceiling is 4,035 from the live 3,355-line
+baseline. Require independent cohesion/AI-cleanup review before and after
+implementation because the file already exceeds 2,000 lines. The change stays
+cohesive only while adjacent to the private root lookup owner and existing
+fixtures; a generic frontier module or public seam is a REPLAN.
 
 ## Authority and caps
 
@@ -127,10 +150,13 @@ row of `slug-v2-subplans/09-v1-extraction-ledger.md`,
 workspace `src/{lib,path_observation,path_resolution}.rs`, the Bzlmod and
 workspace manifests, and directly referenced focused tests in those files.
 
-The packet may name exactly one future `host_package.rs` implementation and
-its colocated tests, but cannot activate it. Ledger caps are 40 canonical, 320
-current-packet, 280 Stage 2, and 640 total net lines. No code, Cargo, oracle,
-generated evidence, or Stage 9 write is authorized.
+The frozen future Rust allowlist is exactly
+`app/slug_bzlmod_v2/src/host_package.rs` with colocated tests, but this design
+packet cannot activate it. Future caps are 250 production, 430 test, 680 total,
+and 4,035 physical lines, with a 180-line completion-ledger cap. Current design
+ledger caps are 40 canonical, 320 current-packet, 280 Stage 2, and 640 total net
+lines. No code, Cargo, oracle, generated evidence, or Stage 9 write is
+authorized.
 
 ## STOP / REPLAN
 
@@ -151,7 +177,7 @@ implementation cannot be bounded.
 
 ## Immediate successor
 
-On acceptance, activate exactly one implementation of the frozen private
-package-marker sibling, or one smaller docs-only prerequisite if a REPLAN
-condition is proved. Do not combine root MODULE, package source, loading, core,
-or public activation.
+On design acceptance, activate exactly one implementation of the frozen
+private package-marker sibling in `host_package.rs`. Its completion may schedule
+only docs-only root-module frontier design. Do not combine package source,
+MODULE implementation, loading, core, or public activation.

@@ -1405,32 +1405,50 @@ one cohesive repository-ignore owner; shared parsing removes duplication and a
 split would widen private seams. Retained state is one semantic Arc plus the
 existing Arc-backed epoch.
 
-### Active host package-marker frontier design (2026-08-14)
+### Frozen host package-marker frontier design (2026-08-14)
 
-Run docs-only `WP-2A-m1-host-package-marker-frontier-design` from accepted
-predecessor `43adf74b`. Freeze the smallest callerless Bzlmod-private observed
-sibling for the terminal owned by `HostRootPackageLookupKey`.
+The docs-only `WP-2A-m1-host-package-marker-frontier-design` accepts one
+callerless crate-private `HostRootPackageLookupObservationKey { workspace,
+package }` and `ObservedHostRootPackageLookup` in `host_package.rs`. The
+value is `PathOutcome<Result<ObservedHostRootPackageLookup,
+ObservedPathFrontierError>>`; complete equality/validity matches the accepted
+observed siblings. The carrier owns one
+`Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>` plus one
+accepted `PathObservationEpoch`.
 
-The live order is immutable policy, invalid/deleted/external early exits,
-observed repository-ignore, then root-major and
-`BUILD.bazel`-before-`BUILD` observed path-resolution probes. The design
-must preserve empty epochs for pre-Host terminals, exact predecessor epochs
-for ignore terminals, every negative marker prefix through selection or
-`NoBuildFile`, and complete error prefixes. Need/cancellation stays
-incomplete; aggregation mismatch/conflict stays a completed outer frontier
-error.
+The sibling computes immutable policy first and gives policy/invalid/deleted/
+`external` terminals empty epochs. It then computes only the accepted observed
+repository-ignore sibling, retaining its exact epoch for success/error/ignored
+deletion. Finally it probes only `ResolvedPathObservationKey` in root-major,
+`BUILD.bazel`-before-`BUILD` order, unioning every complete child epoch before
+semantic interpretation. Resolution errors and selected/all-negative terminals
+retain the full prefix. Need/cancellation/outer failure publishes no carrier.
 
-Decide the exact key/carrier/visibility/equality API, deterministic union,
-exact-Arc and structural-policy identity, memory lifetime, one-file future
-allowlist/caps, proof, cleanup decision for the live 3,355-line
-`host_package.rs`, and one unique hierarchical successor. Preserve every
-legacy result/error/caller and do not activate source bytes, MODULE, BUILD
-evaluation, `.bzl`, glob, loading, core, request revision, external/routed
-repositories, or public behavior.
+One private `PathObservationEpoch::from_shared` union retains first exact Arcs
+for equal duplicates and exposes conflict/mismatch as completed outer errors.
+No second collection, reconstructed demand, historical read, event authority,
+lock, transaction, evaluator, matcher, or resolved child is retained. Legacy
+lookup keys, values, errors, callers, diagnostics, and public output stay
+unchanged.
 
-Write only canonical/current/Stage 2. Ledger caps are 40/320/280/640. STOP on
-Rust/Cargo/oracle writes, another consumer, public/export/dependency changes,
-new retained storage or graph, reconstructed/direct Host reads, or scope
-growth. REPLAN to one smaller docs-only prerequisite if the accepted lower
-carriers cannot express a complete lookup terminal. Acceptance may schedule
-only the frozen one-file private implementation or that prerequisite.
+Exact serial marker behavior and admitted Host observations remain exact;
+frontier aggregation/equality is Slug-native; MODULE/source/loading/core/public,
+routed/materialized, overlap/final-validation, and Bazel identity bytes remain
+deferred. Focused proof covers early empty epochs, ignore/error/Need/outer,
+marker precedence/negative/selected/error prefixes, exact Arc/duplicate/
+conflict/mismatch, zero legacy activation, equality/validity, A/B/A/warm,
+cancellation, and legacy invariants.
+
+The future implementation allowlist is exactly
+`app/slug_bzlmod_v2/src/host_package.rs` with colocated tests. Caps are 250
+production, 430 test, 680 total net, and 4,035 physical lines from 3,355;
+completion ledgers are capped at 180. Independent cohesion/AI-cleanup review is
+mandatory before and after implementation because the file already exceeds
+2,000 lines. No generic frontier module or exported seam is allowed.
+
+The current packet remains docs-only until this design is accepted. Its write
+scope is canonical/current/Stage 2 under 40/320/280/640. STOP on code,
+Cargo/oracle/public/export/dependency changes, another consumer or key family,
+new storage/graph, reconstructed/direct Host reads, or higher loading work.
+Acceptance schedules only the one-file private implementation; its completion
+may schedule only docs-only root-module frontier design.
