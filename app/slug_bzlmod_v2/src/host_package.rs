@@ -30,11 +30,14 @@ use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
 use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 
 use crate::RootPackageLookupInputsProjectionKey;
@@ -46,6 +49,7 @@ use crate::host_file::HostFileError;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
+use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
 use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
 use crate::source_preparation::DirectLocalModuleSupport;
 use crate::source_preparation::DirectLocalModuleSupportError;
@@ -280,6 +284,213 @@ impl Key for HostRootPackageLookupKey {
         }
 
         PathOutcome::Complete(Arc::new(Ok(HostRootPackageLookup::NoBuildFile)))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostRootPackageLookup {
+    result: Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRootPackageLookup {
+    pub(crate) fn result(&self) -> &Result<HostRootPackageLookup, HostRootPackageLookupError> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostRootPackageLookupObservationKey {
+    workspace: NormalizedAbsolutePath,
+    package: PackagePath,
+}
+
+impl HostRootPackageLookupObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self { workspace, package }
+    }
+}
+
+impl fmt::Display for HostRootPackageLookupObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "bzlmod-observed-host-root-package-lookup:{}//{}",
+            self.workspace, self.package
+        )
+    }
+}
+
+fn complete_observed_lookup(
+    result: Result<HostRootPackageLookup, HostRootPackageLookupError>,
+    observations: PathObservationEpoch,
+) -> PathOutcome<Result<ObservedHostRootPackageLookup, ObservedPathFrontierError>> {
+    PathOutcome::Complete(Ok(ObservedHostRootPackageLookup {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn union_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+#[async_trait]
+impl Key for HostRootPackageLookupObservationKey {
+    type Value = PathOutcome<Result<ObservedHostRootPackageLookup, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let inputs = match dice_invariant(
+            ctx.compute(&RootPackageLookupInputsProjectionKey::new(
+                self.workspace.dupe(),
+            ))
+            .await,
+        ) {
+            Ok(inputs) => inputs,
+            Err(error) => {
+                return complete_observed_lookup(
+                    Err(HostRootPackageLookupError::PolicyInput(error)),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        };
+
+        if let Some(message) = invalid_package_name(&self.package) {
+            return complete_observed_lookup(
+                Ok(HostRootPackageLookup::InvalidPackageName { message }),
+                PathObservationEpoch::empty(),
+            );
+        }
+
+        let package_id = PackageIdentifier::new(CanonicalRepoName::root(), self.package.clone());
+        if inputs.deleted_packages().contains(&package_id) {
+            return complete_observed_lookup(
+                Ok(HostRootPackageLookup::Deleted),
+                PathObservationEpoch::empty(),
+            );
+        }
+        if self.package.as_str() == "external" {
+            return complete_observed_lookup(
+                Ok(HostRootPackageLookup::NoBuildFile),
+                PathObservationEpoch::empty(),
+            );
+        }
+
+        let repository_ignore = match dice_invariant(
+            ctx.compute(&HostRepositoryIgnoreObservationKey::new(
+                self.workspace.dupe(),
+            ))
+            .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(value)) => value,
+        };
+        let mut observations = repository_ignore.observations().dupe();
+        let repository_ignore = match repository_ignore.result() {
+            Ok(value) => value,
+            Err(error) => {
+                return complete_observed_lookup(
+                    Err(HostRootPackageLookupError::RepositoryIgnore(error.clone())),
+                    observations,
+                );
+            }
+        };
+        if repository_ignore.matching_entry(&self.package).is_some() {
+            return complete_observed_lookup(Ok(HostRootPackageLookup::Deleted), observations);
+        }
+
+        for root in inputs.package_roots() {
+            for build_file_name in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
+                let logical_path = NormalizedAbsolutePath::new(
+                    root.as_path()
+                        .join(self.package.as_str())
+                        .join(build_file_name.as_str()),
+                )
+                .expect("joining package and marker to a normalized root remains absolute");
+                let resolved = match dice_invariant(
+                    ctx.compute(&ResolvedPathObservationKey::new(
+                        PathObservationNamespace::Host,
+                        logical_path.dupe(),
+                    ))
+                    .await,
+                ) {
+                    PathOutcome::Need(need) => return PathOutcome::Need(need),
+                    PathOutcome::Complete(Err(error)) => {
+                        return PathOutcome::Complete(Err(error));
+                    }
+                    PathOutcome::Complete(Ok(value)) => value,
+                };
+                observations = match union_observations(&observations, resolved.observations()) {
+                    Ok(observations) => observations,
+                    Err(error) => return PathOutcome::Complete(Err(error)),
+                };
+                let resolved = match resolved.result() {
+                    Ok(resolved) => resolved,
+                    Err(error) => {
+                        return complete_observed_lookup(
+                            Err(HostRootPackageLookupError::Resolution {
+                                logical_path,
+                                error: error.clone(),
+                            }),
+                            observations,
+                        );
+                    }
+                };
+                match resolved.state() {
+                    ResolvedPathState::Present(lstat)
+                        if matches!(
+                            lstat.kind(),
+                            PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                        ) =>
+                    {
+                        return complete_observed_lookup(
+                            Ok(HostRootPackageLookup::Package(HostPackage {
+                                package_root: root.dupe(),
+                                build_file_name,
+                            })),
+                            observations,
+                        );
+                    }
+                    ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::Symlink => {
+                        unreachable!("ResolvedPathObservationKey returns the terminal symlink kind")
+                    }
+                    ResolvedPathState::Present(_) | ResolvedPathState::Missing => {}
+                }
+            }
+        }
+
+        complete_observed_lookup(Ok(HostRootPackageLookup::NoBuildFile), observations)
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1301,6 +1512,8 @@ mod tests {
     #[cfg(unix)]
     use slug_workspace_v2::NormalizedAbsolutePath;
     #[cfg(unix)]
+    use slug_workspace_v2::ObservedPathFrontierError;
+    #[cfg(unix)]
     use slug_workspace_v2::PathIoErrorKind;
     #[cfg(unix)]
     use slug_workspace_v2::PathLstat;
@@ -1325,6 +1538,10 @@ mod tests {
     #[cfg(unix)]
     use slug_workspace_v2::PathOutcome;
     #[cfg(unix)]
+    use slug_workspace_v2::ResolvedPathKey;
+    #[cfg(unix)]
+    use slug_workspace_v2::ResolvedPathObservationKey;
+    #[cfg(unix)]
     use starlark_map::small_map::SmallMap;
 
     #[cfg(unix)]
@@ -1339,6 +1556,10 @@ mod tests {
     use super::HostRootPackageLookup;
     #[cfg(unix)]
     use super::HostRootPackageLookupKey;
+    #[cfg(unix)]
+    use super::HostRootPackageLookupObservationKey;
+    #[cfg(unix)]
+    use super::ObservedHostRootPackageLookup;
     #[cfg(unix)]
     use super::RepositoryPackageSourceError;
     #[cfg(unix)]
@@ -1375,6 +1596,10 @@ mod tests {
     use crate::inject_root_package_policy_inputs;
     #[cfg(unix)]
     use crate::repo_file::HostRouteRepoFileKey;
+    #[cfg(unix)]
+    use crate::repository_ignore::HostRepositoryIgnoreKey;
+    #[cfg(unix)]
+    use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
     #[cfg(unix)]
     use crate::source_preparation::RepositoryMaterializationEpochEntry;
     #[cfg(unix)]
@@ -2575,6 +2800,124 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[derive(Default)]
+    struct ObservedLookupTracker {
+        legacy_lookup: AtomicUsize,
+        legacy_ignore: AtomicUsize,
+        legacy_resolution: AtomicUsize,
+        observed_ignore: AtomicUsize,
+        observed_resolution: AtomicUsize,
+        parent_event_data: Mutex<Vec<bool>>,
+    }
+
+    #[cfg(unix)]
+    impl ObservedLookupTracker {
+        fn assert_no_legacy_activation(&self) {
+            assert_eq!(self.legacy_lookup.load(Ordering::SeqCst), 0);
+            assert_eq!(self.legacy_ignore.load(Ordering::SeqCst), 0);
+            assert_eq!(self.legacy_resolution.load(Ordering::SeqCst), 0);
+        }
+
+        fn assert_no_parent_event_data(&self) {
+            let has_data = self
+                .parent_event_data
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|value| *value);
+            assert!(!has_data);
+        }
+    }
+
+    #[cfg(unix)]
+    impl ActivationTracker for ObservedLookupTracker {
+        fn key_activated(
+            &self,
+            _key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key
+                .downcast_ref::<HostRootPackageLookupObservationKey>()
+                .is_some()
+            {
+                self.parent_event_data
+                    .lock()
+                    .unwrap()
+                    .push(activation.evaluation_data().is_some());
+            } else if key.downcast_ref::<HostRootPackageLookupKey>().is_some() {
+                self.legacy_lookup.fetch_add(1, Ordering::SeqCst);
+            } else if key.downcast_ref::<HostRepositoryIgnoreKey>().is_some() {
+                self.legacy_ignore.fetch_add(1, Ordering::SeqCst);
+            } else if key.downcast_ref::<ResolvedPathKey>().is_some() {
+                self.legacy_resolution.fetch_add(1, Ordering::SeqCst);
+            } else if key
+                .downcast_ref::<HostRepositoryIgnoreObservationKey>()
+                .is_some()
+            {
+                self.observed_ignore.fetch_add(1, Ordering::SeqCst);
+            } else if key.downcast_ref::<ResolvedPathObservationKey>().is_some() {
+                self.observed_resolution.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    async fn observed_lookup(
+        dice: &Arc<Dice>,
+        tracker: Arc<ObservedLookupTracker>,
+        policy: Option<RootPackagePolicyInputs>,
+        observations: PathObservationEpoch,
+        package: &str,
+    ) -> <HostRootPackageLookupObservationKey as Key>::Value {
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        if let Some(policy) = policy {
+            inject_root_package_policy_inputs(&mut updater, policy).unwrap();
+        }
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&HostRootPackageLookupObservationKey::new(
+                path("/workspace"),
+                PackagePath::parse(package).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn observed_complete(
+        outcome: &<HostRootPackageLookupObservationKey as Key>::Value,
+    ) -> &ObservedHostRootPackageLookup {
+        let PathOutcome::Complete(Ok(value)) = outcome else {
+            panic!("observed package lookup did not complete: {outcome:?}");
+        };
+        value
+    }
+
+    #[cfg(unix)]
+    fn assert_shared_epoch(expected: &PathObservationEpoch, actual: &PathObservationEpoch) {
+        for (demand, result) in expected.observations() {
+            assert!(Arc::ptr_eq(result, actual.get(demand).unwrap()));
+        }
+    }
+
+    #[cfg(unix)]
     async fn source(
         policy: RootPackagePolicyInputs,
         entries: Vec<ScriptEntry>,
@@ -3351,5 +3694,302 @@ mod tests {
         assert!(matches!(outcome, PathOutcome::Need(_)));
         assert!(!HostRootPackageLookupKey::validity(&outcome));
         assert!(!HostRootPackageLookupKey::equality(&outcome, &outcome));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_lookup_early_terminals_have_empty_frontiers() {
+        let tracker = Arc::new(ObservedLookupTracker::default());
+        for (case, policy, package) in [
+            (0, None, "missing-policy"),
+            (1, Some(inputs(&["/root-a"], &[], None)), "bad:name"),
+            (
+                2,
+                Some(inputs(&["/root-a"], &["//deleted"], None)),
+                "deleted",
+            ),
+            (3, Some(inputs(&["/root-a"], &[], None)), "external"),
+        ] {
+            let outcome = observed_lookup(
+                &Dice::builder().build(DetectCycles::Enabled),
+                tracker.dupe(),
+                policy,
+                PathObservationEpoch::empty(),
+                package,
+            )
+            .await;
+            let observed = observed_complete(&outcome);
+            assert!(matches!(
+                (case, observed.result()),
+                (0, Err(super::HostRootPackageLookupError::PolicyInput(_)))
+                    | (1, Ok(HostRootPackageLookup::InvalidPackageName { .. }))
+                    | (2, Ok(HostRootPackageLookup::Deleted))
+                    | (3, Ok(HostRootPackageLookup::NoBuildFile))
+            ));
+            assert!(observed.observations().observations().is_empty());
+        }
+        assert_eq!(tracker.observed_ignore.load(Ordering::SeqCst), 0);
+        assert_eq!(tracker.observed_resolution.load(Ordering::SeqCst), 0);
+        tracker.assert_no_legacy_activation();
+        tracker.assert_no_parent_event_data();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_lookup_retains_ordered_negative_and_selected_arcs() {
+        let roots = ["/root-a", "/root-b"];
+        let mut entries = repository_prelude(&roots, 1);
+        entries.extend([
+            present("/root-a/pkg", PathNodeKind::Directory, 1),
+            present("/root-a/pkg/BUILD.bazel", PathNodeKind::Directory, 1),
+            missing("/root-a/pkg/BUILD"),
+            present("/root-b/pkg", PathNodeKind::Directory, 1),
+            present("/root-b/pkg/BUILD.bazel", PathNodeKind::RegularFile, 1),
+        ]);
+        let injected = epoch(&entries);
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedLookupTracker::default());
+        let outcome = observed_lookup(
+            &dice,
+            tracker.dupe(),
+            Some(inputs(&roots, &[], None)),
+            injected.dupe(),
+            "pkg",
+        )
+        .await;
+        assert!(HostRootPackageLookupObservationKey::validity(&outcome));
+        assert!(HostRootPackageLookupObservationKey::equality(
+            &outcome, &outcome
+        ));
+        let observed = observed_complete(&outcome);
+        let Ok(HostRootPackageLookup::Package(package)) = observed.result() else {
+            panic!("expected selected package, got {:?}", observed.result());
+        };
+        assert_eq!(package.package_root(), &path("/root-b"));
+        assert_eq!(package.build_file_name(), HostBuildFileName::BuildDotBazel);
+        assert_shared_epoch(&injected, observed.observations());
+        let result = observed.result.dupe();
+        assert!(Arc::ptr_eq(&result, &observed.result));
+        assert_eq!(tracker.observed_ignore.load(Ordering::SeqCst), 1);
+        assert_eq!(tracker.observed_resolution.load(Ordering::SeqCst), 6);
+        tracker.assert_no_legacy_activation();
+        tracker.assert_no_parent_event_data();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_lookup_need_ignore_and_resolution_errors_keep_polarity() {
+        let roots = ["/root-a"];
+        let need_tracker = Arc::new(ObservedLookupTracker::default());
+        let need = observed_lookup(
+            &Dice::builder().build(DetectCycles::Enabled),
+            need_tracker.dupe(),
+            Some(inputs(&roots, &[], None)),
+            PathObservationEpoch::empty(),
+            "pkg",
+        )
+        .await;
+        assert!(matches!(need, PathOutcome::Need(_)));
+        assert!(!HostRootPackageLookupObservationKey::validity(&need));
+        assert!(!HostRootPackageLookupObservationKey::equality(&need, &need));
+        need_tracker.assert_no_legacy_activation();
+        let ignore_entries = vec![
+            present("/", PathNodeKind::Directory, 2),
+            present("/workspace", PathNodeKind::Directory, 2),
+            lstat_error("/workspace/REPO.bazel"),
+        ];
+        let ignore_epoch = epoch(&ignore_entries);
+        let ignore_tracker = Arc::new(ObservedLookupTracker::default());
+        let ignore = observed_lookup(
+            &Dice::builder().build(DetectCycles::Enabled),
+            ignore_tracker.dupe(),
+            Some(inputs(&roots, &[], None)),
+            ignore_epoch.dupe(),
+            "pkg",
+        )
+        .await;
+        let ignore = observed_complete(&ignore);
+        assert!(matches!(
+            ignore.result(),
+            Err(super::HostRootPackageLookupError::RepositoryIgnore(_))
+        ));
+        assert_shared_epoch(&ignore_epoch, ignore.observations());
+        assert_eq!(ignore_tracker.observed_resolution.load(Ordering::SeqCst), 1);
+        ignore_tracker.assert_no_legacy_activation();
+        let mut resolution_entries = repository_prelude(&roots, 3);
+        resolution_entries.extend([
+            present("/root-a/pkg", PathNodeKind::Directory, 3),
+            lstat_error("/root-a/pkg/BUILD.bazel"),
+        ]);
+        let resolution_epoch = epoch(&resolution_entries);
+        let resolution_tracker = Arc::new(ObservedLookupTracker::default());
+        let resolution = observed_lookup(
+            &Dice::builder().build(DetectCycles::Enabled),
+            resolution_tracker.dupe(),
+            Some(inputs(&roots, &[], None)),
+            resolution_epoch.dupe(),
+            "pkg",
+        )
+        .await;
+        let resolution = observed_complete(&resolution);
+        assert!(matches!(
+            resolution.result(),
+            Err(super::HostRootPackageLookupError::Resolution { .. })
+        ));
+        assert_shared_epoch(&resolution_epoch, resolution.observations());
+        resolution_tracker.assert_no_legacy_activation();
+        resolution_tracker.assert_no_parent_event_data();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_lookup_ignore_and_all_negative_terminals_are_complete() {
+        let roots = ["/root-a"];
+        let ignored_entries = vec![
+            present("/", PathNodeKind::Directory, 1),
+            present("/workspace", PathNodeKind::Directory, 1),
+            present("/workspace/REPO.bazel", PathNodeKind::RegularFile, 1),
+            bytes(
+                "/workspace/REPO.bazel",
+                b"ignore_directories(['ignored/**'])\n",
+            ),
+            present("/root-a", PathNodeKind::Directory, 1),
+            missing("/root-a/.bazelignore"),
+        ];
+        let ignored_tracker = Arc::new(ObservedLookupTracker::default());
+        let ignored = observed_lookup(
+            &Dice::builder().build(DetectCycles::Enabled),
+            ignored_tracker.dupe(),
+            Some(inputs(&roots, &[], None)),
+            epoch(&ignored_entries),
+            "ignored/child",
+        )
+        .await;
+        assert!(matches!(
+            observed_complete(&ignored).result(),
+            Ok(HostRootPackageLookup::Deleted)
+        ));
+        assert_eq!(
+            ignored_tracker.observed_resolution.load(Ordering::SeqCst),
+            2
+        );
+        let mut missing_entries = repository_prelude(&roots, 2);
+        missing_entries.extend([
+            present("/root-a/pkg", PathNodeKind::Directory, 2),
+            missing("/root-a/pkg/BUILD.bazel"),
+            missing("/root-a/pkg/BUILD"),
+        ]);
+        let missing_epoch = epoch(&missing_entries);
+        let missing_tracker = Arc::new(ObservedLookupTracker::default());
+        let missing = observed_lookup(
+            &Dice::builder().build(DetectCycles::Enabled),
+            missing_tracker.dupe(),
+            Some(inputs(&roots, &[], None)),
+            missing_epoch.dupe(),
+            "pkg",
+        )
+        .await;
+        let missing = observed_complete(&missing);
+        assert!(matches!(
+            missing.result(),
+            Ok(HostRootPackageLookup::NoBuildFile)
+        ));
+        assert_shared_epoch(&missing_epoch, missing.observations());
+        ignored_tracker.assert_no_legacy_activation();
+        missing_tracker.assert_no_legacy_activation();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_lookup_warm_and_a_b_a_identity_is_structural() {
+        fn script(variant: i64) -> PathObservationEpoch {
+            let roots = ["/root-a"];
+            let mut entries = repository_prelude(&roots, variant);
+            entries.extend([
+                present("/root-a/pkg", PathNodeKind::Directory, variant),
+                present(
+                    "/root-a/pkg/BUILD.bazel",
+                    PathNodeKind::SpecialFile,
+                    variant,
+                ),
+            ]);
+            epoch(&entries)
+        }
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedLookupTracker::default());
+        let policy = inputs(&["/root-a"], &[], None);
+        let first = observed_lookup(
+            &dice,
+            tracker.dupe(),
+            Some(policy.clone()),
+            script(10),
+            "pkg",
+        )
+        .await;
+        let warm = observed_lookup(
+            &dice,
+            tracker.dupe(),
+            Some(policy.clone()),
+            script(10),
+            "pkg",
+        )
+        .await;
+        let changed = observed_lookup(
+            &dice,
+            tracker.dupe(),
+            Some(policy.clone()),
+            script(11),
+            "pkg",
+        )
+        .await;
+        let restored =
+            observed_lookup(&dice, tracker.dupe(), Some(policy), script(10), "pkg").await;
+
+        assert!(HostRootPackageLookupObservationKey::equality(&first, &warm));
+        assert!(!HostRootPackageLookupObservationKey::equality(
+            &first, &changed
+        ));
+        assert!(HostRootPackageLookupObservationKey::equality(
+            &first, &restored
+        ));
+        tracker.assert_no_legacy_activation();
+        tracker.assert_no_parent_event_data();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn observed_lookup_union_keeps_first_arc_and_rejects_bad_pairs() {
+        let marker = demand("/root-a/pkg/BUILD.bazel", PathObservationOperation::Lstat);
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let equal = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let left = PathObservationEpoch::from_shared([(marker.dupe(), first.dupe())]).unwrap();
+        let right = PathObservationEpoch::from_shared([(marker.dupe(), equal)]).unwrap();
+        let union = super::union_observations(&left, &right).unwrap();
+        assert!(Arc::ptr_eq(union.get(&marker).unwrap(), &first));
+
+        let changed = PathObservationEpoch::new([(
+            marker.dupe(),
+            PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                PathNodeKind::RegularFile,
+                1,
+            ))),
+        )])
+        .unwrap();
+        assert!(matches!(
+            super::union_observations(&left, &changed),
+            Err(ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::ConflictingDemand(_)
+            ))
+        ));
+
+        assert!(matches!(
+            PathObservationEpoch::from_shared([(
+                marker,
+                Arc::new(PathObservationResult::FileBytes(
+                    PathOperationResult::Missing
+                )),
+            )]),
+            Err(slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. })
+        ));
     }
 }
