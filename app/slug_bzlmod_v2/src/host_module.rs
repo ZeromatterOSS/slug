@@ -29,6 +29,8 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -50,9 +52,11 @@ use crate::SourcePreparationNeeds;
 use crate::SourcePreparationOutcome;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
+use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::host_include::HostRootIncludeError;
 use crate::host_include::preflight_root_include_horizon;
+use crate::host_include::preflight_root_include_horizon_observed;
 use crate::module_eval::RootModuleSourceFile;
 use crate::module_eval::evaluate_root_module_closure_with_events;
 use crate::module_eval::root_module_ignore_dev_dependency;
@@ -144,6 +148,34 @@ fn terminal_error(error: HostRootModuleFileError) -> HostRootModuleFileOutcome {
     SourcePreparationOutcome::Complete(Arc::new(Err(error)))
 }
 
+fn evaluate_root_module_terminal(
+    ignore_dev_dependency: bool,
+    files: Vec<RootModuleSourceFile>,
+    include_indices: SmallMap<CompactString, usize>,
+    module_file_paths: Arc<[PathBuf]>,
+    evaluation_occurrences: Vec<NonrootIncludeRequest>,
+    capture_events: bool,
+) -> (HostRootModuleFileCarrier, Option<EventBatch>) {
+    let (evaluation, captured) = evaluate_root_module_closure_with_events(
+        ignore_dev_dependency,
+        files,
+        include_indices,
+        module_file_paths,
+        capture_events,
+    );
+    let result = evaluation
+        .map(|evaluation| HostRootModuleFileValue {
+            module: evaluation.module,
+            overrides: evaluation.overrides,
+            module_file_paths: evaluation.module_file_paths,
+        })
+        .map_err(|message| HostRootModuleFileError::Evaluation {
+            message,
+            include_occurrences: evaluation_occurrences.into(),
+        });
+    (Arc::new(result), captured)
+}
+
 #[track_caller]
 fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host root-module DICE invariant failed: {error:?}"))
@@ -198,230 +230,464 @@ impl Key for HostRootModuleFileKey {
             .get::<CaptureEvaluationEvents>()
             .is_ok();
         let mut event_batch = None;
-        let outcome = async {
-            let ignore_dev_dependency =
-                match root_module_ignore_dev_dependency(ctx, self.workspace.as_path()).await {
-                    Ok(value) => value,
-                    Err(message) => {
-                        return terminal_error(HostRootModuleFileError::CommandPolicy { message });
-                    }
-                };
-
-            let root_path =
-                NormalizedAbsolutePath::new(self.workspace.as_path().join("MODULE.bazel"))
-                    .expect("joining the root MODULE basename remains normalized absolute");
-            let root_bytes =
-                match dice_invariant(ctx.compute(&HostFileBytesKey::new(root_path.dupe())).await) {
-                    PathOutcome::Need(need) => return path_need(need),
-                    PathOutcome::Complete(Err(error)) => {
-                        return terminal_error(HostRootModuleFileError::RootFile { error });
-                    }
-                    PathOutcome::Complete(Ok(HostFileBytes::Missing)) => {
-                        return SourcePreparationOutcome::Need(
-                            SourcePreparationNeeds::root_module_bootstrap(
-                                RootModuleBootstrapRequest {
-                                    workspace: self.workspace.dupe(),
-                                },
-                            ),
-                        );
-                    }
-                    PathOutcome::Complete(Ok(HostFileBytes::Present(bytes))) => bytes,
-                };
-            let root_id = root_logical_id(&root_path);
-            let root_inspection =
-                match validate_root_module_source(root_id.clone(), root_bytes.as_ref()) {
-                    Ok(inspection) => inspection,
-                    Err(message) => {
-                        return terminal_error(HostRootModuleFileError::RootValidation {
-                            logical_id: root_id,
-                            message,
-                        });
-                    }
-                };
-            let root_source = Arc::new(
-                std::str::from_utf8(root_bytes.as_ref())
-                    .expect("successful validation established UTF-8")
-                    .to_owned(),
-            );
-            let root_ancestry = Arc::new(RootModuleIncludeAncestry {
-                logical_path: root_path.dupe(),
-                parent: None,
-            });
-            let mut horizon = root_inspection
-                .includes
-                .iter()
-                .cloned()
-                .map(|request| PendingRootModuleInclude {
-                    request,
-                    ancestry: root_ancestry.dupe(),
-                })
-                .collect::<Vec<_>>();
-            let mut files = vec![RootModuleSourceFile {
-                path: root_path.as_path().to_path_buf(),
-                source: root_source,
-                _inspection: root_inspection,
-            }];
-            let mut include_indices = SmallMap::new();
-            let mut module_file_paths = vec![PathBuf::from("MODULE.bazel")];
-            let mut evaluation_occurrences = Vec::new();
-
-            while !horizon.is_empty() {
-                let requests = horizon
-                    .iter()
-                    .map(|pending| pending.request.clone())
-                    .collect::<Vec<_>>();
-                let preflight =
-                    preflight_root_include_horizon(ctx, &self.workspace, &requests).await;
-                let preflight = match preflight {
-                    PathOutcome::Need(need) => return path_need(need),
-                    PathOutcome::Complete(value) => match value.as_ref() {
-                        Ok(value) => value.clone(),
-                        Err(error) => {
-                            return terminal_error(HostRootModuleFileError::IncludePreflight {
-                                error: error.clone(),
-                            });
-                        }
-                    },
-                };
-
-                let mut unique_paths = SmallSet::with_capacity(preflight.includes().len());
-                for include in preflight.includes() {
-                    unique_paths.insert(include.logical_path().dupe());
-                }
-                let computed = ctx
-                    .compute_join(unique_paths, |ctx, logical_path| {
-                        Box::pin(async move {
-                            let outcome = dice_invariant(
-                                ctx.compute(&HostFileBytesKey::new(logical_path.dupe()))
-                                    .await,
-                            );
-                            (logical_path, outcome)
-                        })
-                    })
-                    .await;
-                let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
-                let all_need: Option<NeedPathObservations> =
-                    outcomes
-                        .values()
-                        .fold(None, |current, outcome| match outcome {
-                            PathOutcome::Need(incoming) => Some(match current {
-                                Some(current) => current.union(incoming),
-                                None => incoming.dupe(),
-                            }),
-                            PathOutcome::Complete(_) => current,
-                        });
-
-                let mut next_horizon = Vec::new();
-                for (include, pending) in preflight.includes().iter().zip(&horizon) {
-                    let request = include.include();
-                    let logical_path = include.logical_path();
-                    let bytes = match outcomes
-                        .get(logical_path)
-                        .expect("every selected logical include path was computed")
-                    {
-                        PathOutcome::Need(_) => {
-                            return path_need(
-                                all_need.expect("the current occurrence contributed a Need"),
-                            );
-                        }
-                        PathOutcome::Complete(Ok(HostFileBytes::Missing)) => {
-                            return terminal_error(HostRootModuleFileError::IncludeMissing {
-                                raw_label: CompactString::new(request.raw_label()),
-                                location: request.location().clone(),
-                                logical_path: logical_path.dupe(),
-                            });
-                        }
-                        PathOutcome::Complete(Err(error)) => {
-                            return terminal_error(HostRootModuleFileError::IncludeFile {
-                                raw_label: CompactString::new(request.raw_label()),
-                                location: request.location().clone(),
-                                logical_path: logical_path.dupe(),
-                                error: error.clone(),
-                            });
-                        }
-                        PathOutcome::Complete(Ok(HostFileBytes::Present(bytes))) => bytes.dupe(),
-                    };
-                    let relative_path =
-                        include_relative_path(request.package().package(), request.target());
-                    let logical_id =
-                        LogicalModuleFileId::new(logical_path.as_path().display().to_string());
-                    let inspection = match validate_root_module_source(logical_id, bytes.as_ref()) {
-                        Ok(inspection) => inspection,
-                        Err(message) => {
-                            return terminal_error(HostRootModuleFileError::IncludeValidation {
-                                raw_label: CompactString::new(request.raw_label()),
-                                location: request.location().clone(),
-                                logical_path: logical_path.dupe(),
-                                message,
-                            });
-                        }
-                    };
-                    if pending.ancestry.contains(logical_path) {
-                        return terminal_error(HostRootModuleFileError::IncludeCycle {
-                            raw_label: CompactString::new(request.raw_label()),
-                            location: request.location().clone(),
-                            logical_path: logical_path.dupe(),
-                        });
-                    }
-                    let ancestry = Arc::new(RootModuleIncludeAncestry {
-                        logical_path: logical_path.dupe(),
-                        parent: Some(pending.ancestry.dupe()),
-                    });
-                    let source = Arc::new(
-                        std::str::from_utf8(bytes.as_ref())
-                            .expect("successful validation established UTF-8")
-                            .to_owned(),
-                    );
-                    next_horizon.extend(inspection.includes.iter().cloned().map(|request| {
-                        PendingRootModuleInclude {
-                            request,
-                            ancestry: ancestry.dupe(),
-                        }
-                    }));
-                    let index = files.len();
-                    include_indices.insert(CompactString::new(request.raw_label()), index);
-                    module_file_paths.push(relative_path.clone());
-                    evaluation_occurrences.push(NonrootIncludeRequest {
-                        path: CompactString::new(request.raw_label()),
-                        location: request.location().clone(),
-                    });
-                    files.push(RootModuleSourceFile {
-                        path: logical_path.as_path().to_path_buf(),
-                        source,
-                        _inspection: inspection,
-                    });
-                }
-                horizon = next_horizon;
-            }
-
-            module_file_paths.sort();
-            module_file_paths.dedup();
-            let (evaluation, captured) = evaluate_root_module_closure_with_events(
-                ignore_dev_dependency,
-                files,
-                include_indices,
-                module_file_paths.into(),
-                capture_events,
-            );
-            event_batch = captured;
-            match evaluation {
-                Ok(evaluation) => {
-                    SourcePreparationOutcome::Complete(Arc::new(Ok(HostRootModuleFileValue {
-                        module: evaluation.module,
-                        overrides: evaluation.overrides,
-                        module_file_paths: evaluation.module_file_paths,
-                    })))
-                }
-                Err(message) => terminal_error(HostRootModuleFileError::Evaluation {
-                    message,
-                    include_occurrences: evaluation_occurrences.into(),
-                }),
-            }
-        }
+        let observed = drive_root_module(
+            ctx,
+            &self.workspace,
+            RootModuleFrontierMode::Legacy,
+            capture_events,
+            &mut event_batch,
+        )
         .await;
+        let outcome = match observed {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok(observed)) => {
+                SourcePreparationOutcome::Complete(observed.result)
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy Host root-module driver produced frontier error: {error}")
+            }
+        };
         if capture_events && outcome.is_complete() {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
                 .expect("Host root-module key stores exactly one event batch");
+        }
+        outcome
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostRootModuleFile {
+    result: HostRootModuleFileCarrier,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRootModuleFile {
+    pub(crate) fn result(&self) -> &Result<HostRootModuleFileValue, HostRootModuleFileError> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub(crate) struct HostRootModuleFileObservationKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostRootModuleFileObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostRootModuleFileObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "bzlmod-observed-host-root-module-file:{}",
+            self.workspace
+        )
+    }
+}
+
+type ObservedHostRootModuleFileOutcome =
+    SourcePreparationOutcome<Result<ObservedHostRootModuleFile, ObservedPathFrontierError>>;
+type RootModuleHostFileProjection = (Result<HostFileBytes, HostFileError>, PathObservationEpoch);
+type RootModulePreflightProjection = (
+    Arc<Result<crate::host_include::HostRootIncludeHorizon, HostRootIncludeError>>,
+    PathObservationEpoch,
+);
+
+#[derive(Clone, Copy)]
+enum RootModuleFrontierMode {
+    Legacy,
+    Observed,
+}
+
+fn observed_path_need(need: NeedPathObservations) -> ObservedHostRootModuleFileOutcome {
+    SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
+}
+
+fn observed_complete(
+    result: HostRootModuleFileCarrier,
+    observations: PathObservationEpoch,
+) -> ObservedHostRootModuleFileOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedHostRootModuleFile {
+        result,
+        observations,
+    }))
+}
+
+fn observed_error(
+    error: HostRootModuleFileError,
+    observations: PathObservationEpoch,
+) -> ObservedHostRootModuleFileOutcome {
+    observed_complete(Arc::new(Err(error)), observations)
+}
+
+fn observed_outer(error: ObservedPathFrontierError) -> ObservedHostRootModuleFileOutcome {
+    SourcePreparationOutcome::Complete(Err(error))
+}
+
+fn union_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+fn merge_observations(
+    mode: RootModuleFrontierMode,
+    left: PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    match mode {
+        RootModuleFrontierMode::Legacy => Ok(left),
+        RootModuleFrontierMode::Observed => union_observations(&left, right),
+    }
+}
+
+async fn compute_root_module_host_file(
+    ctx: &mut DiceComputations<'_>,
+    logical_path: NormalizedAbsolutePath,
+    mode: RootModuleFrontierMode,
+) -> PathOutcome<Result<RootModuleHostFileProjection, ObservedPathFrontierError>> {
+    match mode {
+        RootModuleFrontierMode::Legacy => {
+            match dice_invariant(ctx.compute(&HostFileBytesKey::new(logical_path)).await) {
+                PathOutcome::Need(need) => PathOutcome::Need(need),
+                PathOutcome::Complete(result) => {
+                    PathOutcome::Complete(Ok((result, PathObservationEpoch::empty())))
+                }
+            }
+        }
+        RootModuleFrontierMode::Observed => match dice_invariant(
+            ctx.compute(&HostFileBytesObservationKey::new(logical_path))
+                .await,
+        ) {
+            PathOutcome::Need(need) => PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(file)) => {
+                PathOutcome::Complete(Ok((file.result().clone(), file.observations().dupe())))
+            }
+        },
+    }
+}
+
+async fn compute_root_module_preflight(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    requests: &[NonrootIncludeRequest],
+    mode: RootModuleFrontierMode,
+) -> PathOutcome<Result<RootModulePreflightProjection, ObservedPathFrontierError>> {
+    match mode {
+        RootModuleFrontierMode::Legacy => {
+            match preflight_root_include_horizon(ctx, workspace, requests).await {
+                PathOutcome::Need(need) => PathOutcome::Need(need),
+                PathOutcome::Complete(value) => {
+                    PathOutcome::Complete(Ok((value, PathObservationEpoch::empty())))
+                }
+            }
+        }
+        RootModuleFrontierMode::Observed => {
+            preflight_root_include_horizon_observed(ctx, workspace, requests).await
+        }
+    }
+}
+
+async fn drive_root_module(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: RootModuleFrontierMode,
+    capture_events: bool,
+    event_batch: &mut Option<EventBatch>,
+) -> ObservedHostRootModuleFileOutcome {
+    let ignore_dev_dependency =
+        match root_module_ignore_dev_dependency(ctx, workspace.as_path()).await {
+            Ok(value) => value,
+            Err(message) => {
+                return observed_error(
+                    HostRootModuleFileError::CommandPolicy { message },
+                    PathObservationEpoch::empty(),
+                );
+            }
+        };
+    let root_path = NormalizedAbsolutePath::new(workspace.as_path().join("MODULE.bazel"))
+        .expect("joining the root MODULE basename remains normalized absolute");
+    let (root, mut observations) =
+        match compute_root_module_host_file(ctx, root_path.dupe(), mode).await {
+            PathOutcome::Need(need) => return observed_path_need(need),
+            PathOutcome::Complete(Err(error)) => return observed_outer(error),
+            PathOutcome::Complete(Ok(root)) => root,
+        };
+    let root_bytes = match root {
+        Err(error) => {
+            return observed_error(HostRootModuleFileError::RootFile { error }, observations);
+        }
+        Ok(HostFileBytes::Missing) => {
+            return SourcePreparationOutcome::Need(SourcePreparationNeeds::root_module_bootstrap(
+                RootModuleBootstrapRequest {
+                    workspace: workspace.dupe(),
+                },
+            ));
+        }
+        Ok(HostFileBytes::Present(bytes)) => bytes,
+    };
+    let root_id = root_logical_id(&root_path);
+    let root_inspection = match validate_root_module_source(root_id.clone(), root_bytes.as_ref()) {
+        Ok(inspection) => inspection,
+        Err(message) => {
+            return observed_error(
+                HostRootModuleFileError::RootValidation {
+                    logical_id: root_id,
+                    message,
+                },
+                observations,
+            );
+        }
+    };
+    let root_source = Arc::new(
+        std::str::from_utf8(root_bytes.as_ref())
+            .expect("successful validation established UTF-8")
+            .to_owned(),
+    );
+    let root_ancestry = Arc::new(RootModuleIncludeAncestry {
+        logical_path: root_path.dupe(),
+        parent: None,
+    });
+    let mut horizon = root_inspection
+        .includes
+        .iter()
+        .cloned()
+        .map(|request| PendingRootModuleInclude {
+            request,
+            ancestry: root_ancestry.dupe(),
+        })
+        .collect::<Vec<_>>();
+    let mut files = vec![RootModuleSourceFile {
+        path: root_path.as_path().to_path_buf(),
+        source: root_source,
+        _inspection: root_inspection,
+    }];
+    let mut include_indices = SmallMap::new();
+    let mut module_file_paths = vec![PathBuf::from("MODULE.bazel")];
+    let mut evaluation_occurrences = Vec::new();
+
+    while !horizon.is_empty() {
+        let requests = horizon
+            .iter()
+            .map(|pending| pending.request.clone())
+            .collect::<Vec<_>>();
+        let (preflight, preflight_observations) =
+            match compute_root_module_preflight(ctx, workspace, &requests, mode).await {
+                PathOutcome::Need(need) => return observed_path_need(need),
+                PathOutcome::Complete(Err(error)) => return observed_outer(error),
+                PathOutcome::Complete(Ok(value)) => value,
+            };
+        observations = match merge_observations(mode, observations, &preflight_observations) {
+            Ok(observations) => observations,
+            Err(error) => return observed_outer(error),
+        };
+        let preflight = match preflight.as_ref() {
+            Ok(preflight) => preflight,
+            Err(error) => {
+                return observed_error(
+                    HostRootModuleFileError::IncludePreflight {
+                        error: error.clone(),
+                    },
+                    observations,
+                );
+            }
+        };
+
+        let mut unique_paths = SmallSet::with_capacity(preflight.includes().len());
+        for include in preflight.includes() {
+            unique_paths.insert(include.logical_path().dupe());
+        }
+        let computed = ctx
+            .compute_join(unique_paths, |ctx, logical_path| {
+                Box::pin(async move {
+                    let outcome =
+                        compute_root_module_host_file(ctx, logical_path.dupe(), mode).await;
+                    (logical_path, outcome)
+                })
+            })
+            .await;
+        let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
+        let all_need: Option<NeedPathObservations> =
+            outcomes
+                .values()
+                .fold(None, |current, outcome| match outcome {
+                    PathOutcome::Need(incoming) => Some(match current {
+                        Some(current) => current.union(incoming),
+                        None => incoming.dupe(),
+                    }),
+                    PathOutcome::Complete(_) => current,
+                });
+
+        let mut next_horizon = Vec::new();
+        for (include, pending) in preflight.includes().iter().zip(&horizon) {
+            let request = include.include();
+            let logical_path = include.logical_path();
+            let (file, file_observations) = match outcomes
+                .get(logical_path)
+                .expect("every selected logical include path was computed")
+            {
+                PathOutcome::Need(_) => {
+                    return observed_path_need(
+                        all_need.expect("the current occurrence contributed a Need"),
+                    );
+                }
+                PathOutcome::Complete(Err(error)) => return observed_outer(error.dupe()),
+                PathOutcome::Complete(Ok(file)) => file,
+            };
+            observations = match merge_observations(mode, observations, file_observations) {
+                Ok(observations) => observations,
+                Err(error) => return observed_outer(error),
+            };
+            let bytes = match file {
+                Ok(HostFileBytes::Missing) => {
+                    return observed_error(
+                        HostRootModuleFileError::IncludeMissing {
+                            raw_label: CompactString::new(request.raw_label()),
+                            location: request.location().clone(),
+                            logical_path: logical_path.dupe(),
+                        },
+                        observations,
+                    );
+                }
+                Err(error) => {
+                    return observed_error(
+                        HostRootModuleFileError::IncludeFile {
+                            raw_label: CompactString::new(request.raw_label()),
+                            location: request.location().clone(),
+                            logical_path: logical_path.dupe(),
+                            error: error.clone(),
+                        },
+                        observations,
+                    );
+                }
+                Ok(HostFileBytes::Present(bytes)) => bytes.dupe(),
+            };
+            let relative_path =
+                include_relative_path(request.package().package(), request.target());
+            let logical_id = LogicalModuleFileId::new(logical_path.as_path().display().to_string());
+            let inspection = match validate_root_module_source(logical_id, bytes.as_ref()) {
+                Ok(inspection) => inspection,
+                Err(message) => {
+                    return observed_error(
+                        HostRootModuleFileError::IncludeValidation {
+                            raw_label: CompactString::new(request.raw_label()),
+                            location: request.location().clone(),
+                            logical_path: logical_path.dupe(),
+                            message,
+                        },
+                        observations,
+                    );
+                }
+            };
+            if pending.ancestry.contains(logical_path) {
+                return observed_error(
+                    HostRootModuleFileError::IncludeCycle {
+                        raw_label: CompactString::new(request.raw_label()),
+                        location: request.location().clone(),
+                        logical_path: logical_path.dupe(),
+                    },
+                    observations,
+                );
+            }
+            let ancestry = Arc::new(RootModuleIncludeAncestry {
+                logical_path: logical_path.dupe(),
+                parent: Some(pending.ancestry.dupe()),
+            });
+            let source = Arc::new(
+                std::str::from_utf8(bytes.as_ref())
+                    .expect("successful validation established UTF-8")
+                    .to_owned(),
+            );
+            next_horizon.extend(inspection.includes.iter().cloned().map(|request| {
+                PendingRootModuleInclude {
+                    request,
+                    ancestry: ancestry.dupe(),
+                }
+            }));
+            let index = files.len();
+            include_indices.insert(CompactString::new(request.raw_label()), index);
+            module_file_paths.push(relative_path);
+            evaluation_occurrences.push(NonrootIncludeRequest {
+                path: CompactString::new(request.raw_label()),
+                location: request.location().clone(),
+            });
+            files.push(RootModuleSourceFile {
+                path: logical_path.as_path().to_path_buf(),
+                source,
+                _inspection: inspection,
+            });
+        }
+        horizon = next_horizon;
+    }
+
+    module_file_paths.sort();
+    module_file_paths.dedup();
+    let (carrier, captured) = evaluate_root_module_terminal(
+        ignore_dev_dependency,
+        files,
+        include_indices,
+        module_file_paths.into(),
+        evaluation_occurrences,
+        capture_events,
+    );
+    *event_batch = captured;
+    observed_complete(carrier, observations)
+}
+
+#[async_trait]
+impl Key for HostRootModuleFileObservationKey {
+    type Value = ObservedHostRootModuleFileOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let outcome = drive_root_module(
+            ctx,
+            &self.workspace,
+            RootModuleFrontierMode::Observed,
+            capture_events,
+            &mut event_batch,
+        )
+        .await;
+        if capture_events && matches!(&outcome, SourcePreparationOutcome::Complete(Ok(_))) {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("observed Host root-module key stores exactly one event batch");
         }
         outcome
     }
@@ -1062,7 +1328,9 @@ mod tests {
 
     use super::HostRootModuleFileError;
     use super::HostRootModuleFileKey;
+    use super::HostRootModuleFileObservationKey;
     use super::HostRootModuleFileValue;
+    use super::ObservedHostRootModuleFile;
     use super::RootModuleLoadingAnchor;
     use super::RootModuleLoadingAnchorError;
     use super::RootModuleLoadingAnchorKey;
@@ -1078,6 +1346,9 @@ mod tests {
     use crate::SourcePreparationNeeds;
     use crate::SourcePreparationOutcome;
     use crate::host_file::HostFileBytesKey;
+    use crate::host_file::HostFileBytesObservationKey;
+    use crate::host_package::HostRootPackageLookupKey;
+    use crate::host_package::HostRootPackageLookupObservationKey;
     use crate::inject_root_module_request_inputs;
     use crate::inject_root_package_policy_inputs;
     use crate::module_eval::clear_validated_root_module_logical_ids;
@@ -1151,6 +1422,18 @@ mod tests {
             self.entries.insert(
                 Self::demand(path, PathObservationOperation::Lstat),
                 PathObservationResult::Lstat(PathOperationResult::Missing),
+            );
+        }
+
+        fn lstat_error(&mut self, path: &str) {
+            self.entries.insert(
+                Self::demand(path, PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Error(
+                    slug_workspace_v2::PathObservationError::Io {
+                        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                        raw_os_error: Some(13),
+                    },
+                )),
             );
         }
 
@@ -1257,9 +1540,17 @@ mod tests {
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             if key.downcast_ref::<HostRootModuleFileKey>().is_none()
+                && key
+                    .downcast_ref::<HostRootModuleFileObservationKey>()
+                    .is_none()
                 && key.downcast_ref::<RootModuleLoadingAnchorKey>().is_none()
                 && key.downcast_ref::<HostRepoFileKey>().is_none()
                 && key.downcast_ref::<HostFileBytesKey>().is_none()
+                && key.downcast_ref::<HostFileBytesObservationKey>().is_none()
+                && key.downcast_ref::<HostRootPackageLookupKey>().is_none()
+                && key
+                    .downcast_ref::<HostRootPackageLookupObservationKey>()
+                    .is_none()
             {
                 return;
             }
@@ -1373,6 +1664,60 @@ mod tests {
             .compute(&HostRootModuleFileKey::new(workspace()))
             .await
             .unwrap()
+    }
+
+    async fn observed_frontier(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        roots: &[&str],
+        capture_events: bool,
+        tracker: Option<Arc<EventTracker>>,
+        inject_request: bool,
+    ) -> <HostRootModuleFileObservationKey as Key>::Value {
+        let mut user_data = UserComputationData {
+            activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        if capture_events {
+            user_data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                snapshot(None),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(&mut updater, policy(roots)).unwrap();
+        if inject_request {
+            inject_root_module_request_inputs(
+                &mut updater,
+                workspace().as_path(),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+            )
+            .unwrap();
+        }
+        let mut transaction = updater.commit().await;
+        transaction
+            .compute(&HostRootModuleFileObservationKey::new(workspace()))
+            .await
+            .unwrap()
+    }
+
+    fn complete_frontier(
+        outcome: &<HostRootModuleFileObservationKey as Key>::Value,
+    ) -> &ObservedHostRootModuleFile {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("observed root module did not complete with a frontier: {outcome:?}");
+        };
+        observed
     }
 
     async fn observed_anchor(
@@ -3190,5 +3535,351 @@ print('ROOT_AFTER')
         assert!(tracker.take().iter().all(|entry| {
             !entry.key.starts_with("host-root-module-file:") || entry.batch.is_none()
         }));
+    }
+    #[tokio::test]
+    async fn observed_frontier_matches_legacy_events_and_retains_exact_input_arcs() {
+        let mut script = EpochBuilder::root(
+            "print('ROOT')
+include('//pkg:x.MODULE.bazel')
+",
+            1,
+        );
+        script.repository_policy(&["/workspace"], 1);
+        script.package("/workspace", "pkg", 1);
+        script.file(
+            "/workspace/pkg/x.MODULE.bazel",
+            "print('CHILD')
+",
+            1,
+        );
+        let injected = script.build();
+
+        let legacy_tracker = Arc::new(EventTracker::default());
+        let legacy = observed(
+            &Dice::builder().build(DetectCycles::Enabled),
+            injected.dupe(),
+            &["/workspace"],
+            true,
+            Some(legacy_tracker.dupe()),
+            None,
+            LockfileMode::Update,
+            None,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(legacy_result) = &legacy else {
+            panic!("complete legacy script returned Need");
+        };
+
+        let frontier_tracker = Arc::new(EventTracker::default());
+        let frontier = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            injected.dupe(),
+            &["/workspace"],
+            true,
+            Some(frontier_tracker.dupe()),
+            true,
+        )
+        .await;
+        assert!(HostRootModuleFileObservationKey::validity(&frontier));
+        assert!(HostRootModuleFileObservationKey::equality(
+            &frontier, &frontier
+        ));
+        let frontier_value = complete_frontier(&frontier);
+        assert_eq!(frontier_value.result(), legacy_result.as_ref());
+        for (demand, expected) in injected.observations() {
+            assert!(Arc::ptr_eq(
+                expected,
+                frontier_value
+                    .observations()
+                    .get(demand)
+                    .expect("every exact Host input is retained")
+            ));
+        }
+
+        let legacy_entries = legacy_tracker.take();
+        let legacy_batch = legacy_entries
+            .iter()
+            .find(|entry| entry.key.starts_with("host-root-module-file:"))
+            .and_then(|entry| entry.batch.as_ref())
+            .unwrap();
+        let frontier_entries = frontier_tracker.take();
+        let frontier_batch = frontier_entries
+            .iter()
+            .find(|entry| {
+                entry
+                    .key
+                    .starts_with("bzlmod-observed-host-root-module-file:")
+            })
+            .and_then(|entry| entry.batch.as_ref())
+            .unwrap();
+        assert_eq!(event_texts(frontier_batch), event_texts(legacy_batch));
+        assert_eq!(event_texts(frontier_batch), ["ROOT", "CHILD"]);
+        assert!(frontier_entries.iter().all(|entry| {
+            !entry.key.starts_with("host-root-module-file:")
+                && !entry.key.starts_with("bzlmod-host-file-bytes:")
+                && !entry.key.starts_with("host-root-package-lookup:")
+                && !entry.key.starts_with("host-repo-file:")
+        }));
+    }
+
+    #[tokio::test]
+    async fn observed_frontier_root_terminals_keep_exact_completion_polarity() {
+        let policy_tracker = Arc::new(EventTracker::default());
+        let policy = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            PathObservationEpoch::empty(),
+            &["/workspace"],
+            true,
+            Some(policy_tracker.dupe()),
+            false,
+        )
+        .await;
+        let policy = complete_frontier(&policy);
+        assert!(matches!(
+            policy.result(),
+            Err(HostRootModuleFileError::CommandPolicy { .. })
+        ));
+        assert!(policy.observations().observations().is_empty());
+        assert!(policy_tracker.take().iter().any(|entry| {
+            entry
+                .key
+                .starts_with("bzlmod-observed-host-root-module-file:")
+                && matches!(entry.batch.as_ref(), Some(batch) if batch.events().is_empty())
+        }));
+
+        let mut denied = EpochBuilder::default();
+        denied.directory("/", 1);
+        denied.directory("/workspace", 1);
+        denied.lstat_error("/workspace/MODULE.bazel");
+        let denied = denied.build();
+        let outcome = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            denied.dupe(),
+            &["/workspace"],
+            false,
+            None,
+            true,
+        )
+        .await;
+        let retained = complete_frontier(&outcome);
+        assert!(matches!(
+            retained.result(),
+            Err(HostRootModuleFileError::RootFile { .. })
+        ));
+        for (demand, expected) in denied.observations() {
+            assert!(Arc::ptr_eq(
+                expected,
+                retained.observations().get(demand).unwrap()
+            ));
+        }
+
+        let invalid = EpochBuilder::root(
+            "unknown_identifier
+",
+            2,
+        )
+        .build();
+        let outcome = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            invalid.dupe(),
+            &["/workspace"],
+            false,
+            None,
+            true,
+        )
+        .await;
+        let retained = complete_frontier(&outcome);
+        assert!(matches!(
+            retained.result(),
+            Err(HostRootModuleFileError::RootValidation { .. })
+        ));
+        assert_eq!(
+            retained.observations().observations().len(),
+            invalid.observations().len()
+        );
+
+        let mut missing = EpochBuilder::default();
+        missing.directory("/", 3);
+        missing.directory("/workspace", 3);
+        missing.missing("/workspace/MODULE.bazel");
+        let tracker = Arc::new(EventTracker::default());
+        let need = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            missing.build(),
+            &["/workspace"],
+            true,
+            Some(tracker.dupe()),
+            true,
+        )
+        .await;
+        assert!(matches!(
+            need,
+            SourcePreparationOutcome::Need(ref needs)
+                if needs.root_module_bootstrap_request().is_some()
+        ));
+        assert!(!HostRootModuleFileObservationKey::validity(&need));
+        assert!(!HostRootModuleFileObservationKey::equality(&need, &need));
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+    }
+
+    #[tokio::test]
+    async fn observed_frontier_excludes_speculative_later_files_and_groups_need() {
+        let root = "include('//a:a.MODULE.bazel')
+include('//b:b.MODULE.bazel')
+";
+        let base = |variant| {
+            let mut script = EpochBuilder::root(root, variant);
+            script.repository_policy(&["/workspace"], variant);
+            script.package("/workspace", "a", variant);
+            script.package("/workspace", "b", variant);
+            script
+        };
+
+        let mut terminal = base(1);
+        terminal.missing("/workspace/a/a.MODULE.bazel");
+        terminal.file(
+            "/workspace/b/b.MODULE.bazel",
+            "print('LATE')
+",
+            1,
+        );
+        let terminal = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            terminal.build(),
+            &["/workspace"],
+            true,
+            None,
+            true,
+        )
+        .await;
+        let terminal = complete_frontier(&terminal);
+        assert!(matches!(
+            terminal.result(),
+            Err(HostRootModuleFileError::IncludeMissing { raw_label, .. })
+                if raw_label == "//a:a.MODULE.bazel"
+        ));
+        assert!(terminal.observations().observations().keys().any(|demand| {
+            demand.path().as_path() == std::path::Path::new("/workspace/a/a.MODULE.bazel")
+        }));
+        assert!(terminal.observations().observations().keys().all(|demand| {
+            demand.path().as_path() != std::path::Path::new("/workspace/b/b.MODULE.bazel")
+        }));
+
+        let tracker = Arc::new(EventTracker::default());
+        let need = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            base(2).build(),
+            &["/workspace"],
+            true,
+            Some(tracker.dupe()),
+            true,
+        )
+        .await;
+        let SourcePreparationOutcome::Need(need) = need else {
+            panic!("unobserved include files must return Need");
+        };
+        let demands = need.path_observations().unwrap().demands();
+        assert!(demands.iter().any(|demand| {
+            demand.path().as_path() == std::path::Path::new("/workspace/a/a.MODULE.bazel")
+        }));
+        assert!(demands.iter().any(|demand| {
+            demand.path().as_path() == std::path::Path::new("/workspace/b/b.MODULE.bazel")
+        }));
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+    }
+
+    #[tokio::test]
+    async fn observed_frontier_cycles_and_a_b_a_restore_structural_identity() {
+        let cycle = |variant| {
+            let mut script = EpochBuilder::root(
+                "include('//pkg:x.MODULE.bazel')
+",
+                variant,
+            );
+            script.repository_policy(&["/workspace"], variant);
+            script.package("/workspace", "pkg", variant);
+            script.file(
+                "/workspace/pkg/x.MODULE.bazel",
+                "include('//pkg:x.MODULE.bazel')
+",
+                variant,
+            );
+            script.build()
+        };
+        let a = cycle(10);
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let first = observed_frontier(&dice, a.dupe(), &["/workspace"], false, None, true).await;
+        let warm = observed_frontier(&dice, a.dupe(), &["/workspace"], false, None, true).await;
+        let changed = observed_frontier(
+            &dice,
+            EpochBuilder::root(
+                "module(name='changed')
+",
+                11,
+            )
+            .build(),
+            &["/workspace"],
+            false,
+            None,
+            true,
+        )
+        .await;
+        let restored = observed_frontier(&dice, a, &["/workspace"], false, None, true).await;
+        assert!(matches!(
+            complete_frontier(&first).result(),
+            Err(HostRootModuleFileError::IncludeCycle { logical_path, .. })
+                if logical_path.as_path()
+                    == std::path::Path::new("/workspace/pkg/x.MODULE.bazel")
+        ));
+        assert!(HostRootModuleFileObservationKey::equality(&first, &warm));
+        assert!(!HostRootModuleFileObservationKey::equality(
+            &first, &changed
+        ));
+        assert!(HostRootModuleFileObservationKey::equality(
+            &first, &restored
+        ));
+
+        let mut indirect = EpochBuilder::root(
+            "include('//a:a.MODULE.bazel')
+",
+            20,
+        );
+        indirect.repository_policy(&["/workspace"], 20);
+        indirect.package("/workspace", "a", 20);
+        indirect.package("/workspace", "b", 20);
+        indirect.file(
+            "/workspace/a/a.MODULE.bazel",
+            "include('//b:b.MODULE.bazel')
+",
+            20,
+        );
+        indirect.file(
+            "/workspace/b/b.MODULE.bazel",
+            "include('//a:a.MODULE.bazel')
+",
+            20,
+        );
+        let indirect = observed_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            indirect.build(),
+            &["/workspace"],
+            false,
+            None,
+            true,
+        )
+        .await;
+        let indirect = complete_frontier(&indirect);
+        assert!(matches!(
+            indirect.result(),
+            Err(HostRootModuleFileError::IncludeCycle { logical_path, .. })
+                if logical_path.as_path()
+                    == std::path::Path::new("/workspace/a/a.MODULE.bazel")
+        ));
+        for path in ["/workspace/a/a.MODULE.bazel", "/workspace/b/b.MODULE.bazel"] {
+            assert!(indirect.observations().observations().keys().any(|demand| {
+                demand.path().as_path() == std::path::Path::new(path)
+                    && demand.operation() == PathObservationOperation::FileBytes
+            }));
+        }
     }
 }

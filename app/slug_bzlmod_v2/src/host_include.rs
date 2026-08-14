@@ -19,6 +19,8 @@ use dupe::Dupe;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -28,10 +30,49 @@ use crate::NonrootIncludeRequest;
 use crate::host_package::HostRootPackageLookup;
 use crate::host_package::HostRootPackageLookupError;
 use crate::host_package::HostRootPackageLookupKey;
+use crate::host_package::HostRootPackageLookupObservationKey;
+use crate::host_package::ObservedHostRootPackageLookup;
 use crate::module_eval::ParsedRootInclude;
 use crate::module_eval::parse_root_include;
 
-type PackageOutcome = PathOutcome<Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>>;
+type ObservedPreflight = PathOutcome<
+    Result<
+        (
+            Arc<Result<HostRootIncludeHorizon, HostRootIncludeError>>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+>;
+
+#[derive(Clone, Copy)]
+enum RootIncludeFrontierMode {
+    Legacy,
+    Observed,
+}
+
+enum PackageLookupValue {
+    Legacy(Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>),
+    Observed(ObservedHostRootPackageLookup),
+}
+
+impl PackageLookupValue {
+    fn result(&self) -> &Result<HostRootPackageLookup, HostRootPackageLookupError> {
+        match self {
+            Self::Legacy(value) => value,
+            Self::Observed(value) => value.result(),
+        }
+    }
+
+    fn observations(&self) -> Option<&PathObservationEpoch> {
+        match self {
+            Self::Legacy(_) => None,
+            Self::Observed(value) => Some(value.observations()),
+        }
+    }
+}
+
+type PackageOutcome = PathOutcome<Result<PackageLookupValue, ObservedPathFrontierError>>;
 
 fn first_seen_packages(parsed: &[ParsedRootInclude]) -> SmallSet<PackagePath> {
     let mut unique = SmallSet::with_capacity(parsed.len());
@@ -103,21 +144,104 @@ fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host include-horizon DICE invariant failed: {error:?}"))
 }
 
-pub(crate) async fn preflight_root_include_horizon(
+async fn compute_package_lookup(
     ctx: &mut DiceComputations<'_>,
+    mode: RootIncludeFrontierMode,
+    workspace: &NormalizedAbsolutePath,
+    package: &PackagePath,
+) -> PackageOutcome {
+    match mode {
+        RootIncludeFrontierMode::Legacy => {
+            match dice_invariant(
+                ctx.compute(&HostRootPackageLookupKey::new(
+                    workspace.dupe(),
+                    package.clone(),
+                ))
+                .await,
+            ) {
+                PathOutcome::Need(need) => PathOutcome::Need(need),
+                PathOutcome::Complete(value) => {
+                    PathOutcome::Complete(Ok(PackageLookupValue::Legacy(value)))
+                }
+            }
+        }
+        RootIncludeFrontierMode::Observed => {
+            match dice_invariant(
+                ctx.compute(&HostRootPackageLookupObservationKey::new(
+                    workspace.dupe(),
+                    package.clone(),
+                ))
+                .await,
+            ) {
+                PathOutcome::Need(need) => PathOutcome::Need(need),
+                PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
+                PathOutcome::Complete(Ok(value)) => {
+                    PathOutcome::Complete(Ok(PackageLookupValue::Observed(value)))
+                }
+            }
+        }
+    }
+}
+
+fn complete_preflight(
+    result: Result<HostRootIncludeHorizon, HostRootIncludeError>,
+    observations: PathObservationEpoch,
+) -> ObservedPreflight {
+    PathOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn complete_package_error(
+    include: ParsedRootInclude,
+    failure: HostRootIncludePackageFailure,
+    observations: PathObservationEpoch,
+) -> ObservedPreflight {
+    complete_preflight(
+        Err(HostRootIncludeError::Package {
+            raw_label: CompactString::new(include.raw_label()),
+            location: include.location().clone(),
+            failure,
+        }),
+        observations,
+    )
+}
+
+fn union_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+async fn drive_root_include_preflight(
+    ctx: &mut DiceComputations<'_>,
+    mode: RootIncludeFrontierMode,
     workspace: &NormalizedAbsolutePath,
     requests: &[NonrootIncludeRequest],
-) -> PathOutcome<Arc<Result<HostRootIncludeHorizon, HostRootIncludeError>>> {
+) -> ObservedPreflight {
     let mut parsed = Vec::with_capacity(requests.len());
     for request in requests {
         match parse_root_include(request) {
             Ok(include) => parsed.push(include),
             Err(message) => {
-                return PathOutcome::Complete(Arc::new(Err(HostRootIncludeError::BadLabel {
-                    raw_label: request.path.clone(),
-                    location: request.location.clone(),
-                    message,
-                })));
+                return complete_preflight(
+                    Err(HostRootIncludeError::BadLabel {
+                        raw_label: request.path.clone(),
+                        location: request.location.clone(),
+                        message,
+                    }),
+                    PathObservationEpoch::empty(),
+                );
             }
         }
     }
@@ -126,13 +250,7 @@ pub(crate) async fn preflight_root_include_horizon(
     let computed = ctx
         .compute_join(unique, |ctx, package| {
             Box::pin(async move {
-                let outcome = dice_invariant(
-                    ctx.compute(&HostRootPackageLookupKey::new(
-                        workspace.dupe(),
-                        package.clone(),
-                    ))
-                    .await,
-                );
+                let outcome = compute_package_lookup(ctx, mode, workspace, &package).await;
                 (package, outcome)
             })
         })
@@ -149,40 +267,60 @@ pub(crate) async fn preflight_root_include_horizon(
             PathOutcome::Complete(_) => need,
         });
 
+    let mut observations = PathObservationEpoch::empty();
     let mut resolved = Vec::with_capacity(parsed.len());
     for include in parsed {
         let package_path = include.package().package();
-        let outcome = outcomes
+        let value = match outcomes
             .get(package_path)
-            .expect("every parsed include package was computed");
-        let value = match outcome {
+            .expect("every parsed include package was computed")
+        {
             PathOutcome::Need(_) => {
                 return PathOutcome::Need(
                     all_need.expect("the current package contributed a nonempty Need"),
                 );
             }
-            PathOutcome::Complete(value) => value,
+            PathOutcome::Complete(Err(error)) => {
+                return PathOutcome::Complete(Err(error.dupe()));
+            }
+            PathOutcome::Complete(Ok(value)) => value,
         };
-        let package_root = match value.as_ref() {
+        if let Some(incoming) = value.observations() {
+            observations = match union_observations(&observations, incoming) {
+                Ok(observations) => observations,
+                Err(error) => return PathOutcome::Complete(Err(error)),
+            };
+        }
+        let package_root = match value.result() {
             Ok(HostRootPackageLookup::Package(package)) => package.package_root(),
             Ok(HostRootPackageLookup::NoBuildFile) => {
-                return package_error(include, HostRootIncludePackageFailure::NoBuildFile);
+                return complete_package_error(
+                    include,
+                    HostRootIncludePackageFailure::NoBuildFile,
+                    observations,
+                );
             }
             Ok(HostRootPackageLookup::Deleted) => {
-                return package_error(include, HostRootIncludePackageFailure::Deleted);
+                return complete_package_error(
+                    include,
+                    HostRootIncludePackageFailure::Deleted,
+                    observations,
+                );
             }
             Ok(HostRootPackageLookup::InvalidPackageName { message }) => {
-                return package_error(
+                return complete_package_error(
                     include,
                     HostRootIncludePackageFailure::InvalidPackageName {
                         message: message.dupe(),
                     },
+                    observations,
                 );
             }
             Err(error) => {
-                return package_error(
+                return complete_package_error(
                     include,
                     HostRootIncludePackageFailure::Operational(error.clone()),
+                    observations,
                 );
             }
         };
@@ -198,20 +336,36 @@ pub(crate) async fn preflight_root_include_horizon(
             logical_path,
         });
     }
-    PathOutcome::Complete(Arc::new(Ok(HostRootIncludeHorizon {
-        includes: resolved.into(),
-    })))
+    complete_preflight(
+        Ok(HostRootIncludeHorizon {
+            includes: resolved.into(),
+        }),
+        observations,
+    )
 }
 
-fn package_error(
-    include: ParsedRootInclude,
-    failure: HostRootIncludePackageFailure,
+pub(crate) async fn preflight_root_include_horizon(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    requests: &[NonrootIncludeRequest],
 ) -> PathOutcome<Arc<Result<HostRootIncludeHorizon, HostRootIncludeError>>> {
-    PathOutcome::Complete(Arc::new(Err(HostRootIncludeError::Package {
-        raw_label: CompactString::new(include.raw_label()),
-        location: include.location().clone(),
-        failure,
-    })))
+    match drive_root_include_preflight(ctx, RootIncludeFrontierMode::Legacy, workspace, requests)
+        .await
+    {
+        PathOutcome::Need(need) => PathOutcome::Need(need),
+        PathOutcome::Complete(Ok((result, _observations))) => PathOutcome::Complete(result),
+        PathOutcome::Complete(Err(error)) => {
+            panic!("legacy include preflight received frontier error: {error}")
+        }
+    }
+}
+
+pub(crate) async fn preflight_root_include_horizon_observed(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    requests: &[NonrootIncludeRequest],
+) -> ObservedPreflight {
+    drive_root_include_preflight(ctx, RootIncludeFrontierMode::Observed, workspace, requests).await
 }
 
 #[cfg(test)]
@@ -259,6 +413,8 @@ mod tests {
     #[cfg(unix)]
     use slug_workspace_v2::PathObservationEpoch;
     #[cfg(unix)]
+    use slug_workspace_v2::PathObservationEpochError;
+    #[cfg(unix)]
     use slug_workspace_v2::PathObservationEpochKey;
     #[cfg(unix)]
     use slug_workspace_v2::PathObservationNamespace;
@@ -280,6 +436,10 @@ mod tests {
     use super::first_seen_packages;
     #[cfg(unix)]
     use super::preflight_root_include_horizon;
+    #[cfg(unix)]
+    use super::preflight_root_include_horizon_observed;
+    #[cfg(unix)]
+    use super::union_observations;
     use crate::LogicalModuleFileId;
     use crate::LogicalSpan;
     use crate::NonrootIncludeRequest;
@@ -437,6 +597,31 @@ mod tests {
         }
         let mut transaction = updater.commit().await;
         preflight_root_include_horizon(&mut transaction, &path("/workspace"), requests).await
+    }
+
+    #[cfg(unix)]
+    async fn observed_preflight(
+        inputs: RootPackagePolicyInputs,
+        observations: PathObservationEpoch,
+        requests: &[NonrootIncludeRequest],
+    ) -> PathOutcome<
+        Result<
+            (
+                Arc<Result<HostRootIncludeHorizon, HostRootIncludeError>>,
+                PathObservationEpoch,
+            ),
+            slug_workspace_v2::ObservedPathFrontierError,
+        >,
+    > {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        inject_root_package_policy_inputs(&mut updater, inputs).unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        preflight_root_include_horizon_observed(&mut transaction, &path("/workspace"), requests)
+            .await
     }
 
     #[cfg(unix)]
@@ -784,5 +969,108 @@ mod tests {
             horizon.includes()[0].logical_path().as_path(),
             std::path::Path::new("/root/pkg/file.MODULE.bazel/file.MODULE.bazel")
         );
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_preflight_retains_exact_arcs_and_decisive_source_prefix() {
+        let roots = ["/root"];
+        let mut entries = prelude(&roots);
+        entries.extend([
+            present("/root/a", PathNodeKind::Directory, 2),
+            present("/root/a/BUILD.bazel", PathNodeKind::RegularFile, 2),
+            present("/root/b", PathNodeKind::Directory, 3),
+            present("/root/b/BUILD.bazel", PathNodeKind::RegularFile, 3),
+        ]);
+        let injected = epoch(&entries);
+        let requests = [
+            request("//a:first.MODULE.bazel", 1),
+            request("//a:second.MODULE.bazel", 2),
+            request("//b:third.MODULE.bazel", 3),
+        ];
+        let outcome = observed_preflight(policy(&roots, &[]), injected.dupe(), &requests).await;
+        let PathOutcome::Complete(Ok((horizon, retained))) = outcome else {
+            panic!("complete observed preflight did not retain a frontier");
+        };
+        assert_eq!(horizon.as_ref().as_ref().unwrap().includes().len(), 3);
+        assert_eq!(retained.observations().len(), injected.observations().len());
+        for (demand, result) in retained.observations() {
+            assert!(Arc::ptr_eq(
+                result,
+                injected.get(demand).expect("retained demand was injected")
+            ));
+        }
+
+        let terminal = observed_preflight(
+            policy(&roots, &["//deleted"]),
+            injected,
+            &[
+                request("//deleted:first.MODULE.bazel", 10),
+                request("//b:later.MODULE.bazel", 20),
+            ],
+        )
+        .await;
+        let PathOutcome::Complete(Ok((terminal, retained))) = terminal else {
+            panic!("source-first semantic terminal must complete");
+        };
+        assert!(matches!(
+            terminal.as_ref(),
+            Err(HostRootIncludeError::Package {
+                raw_label,
+                failure: HostRootIncludePackageFailure::Deleted,
+                ..
+            }) if raw_label == "//deleted:first.MODULE.bazel"
+        ));
+        assert!(retained.observations().is_empty());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_preflight_groups_need_and_union_errors_are_outer() {
+        let roots = ["/root"];
+        let requests = [
+            request("//a:first.MODULE.bazel", 1),
+            request("//b:second.MODULE.bazel", 2),
+        ];
+        let mut incomplete = prelude(&roots);
+        incomplete.extend([
+            present("/root/a", PathNodeKind::Directory, 2),
+            present("/root/b", PathNodeKind::Directory, 2),
+        ]);
+        let need = observed_preflight(policy(&roots, &[]), epoch(&incomplete), &requests).await;
+        let PathOutcome::Need(need) = need else {
+            panic!("incomplete observed packages must return grouped Need");
+        };
+        assert_eq!(need.demands().len(), 2);
+        assert!(need.demands().iter().any(|demand| {
+            demand.path().as_path() == std::path::Path::new("/root/a/BUILD.bazel")
+        }));
+        assert!(need.demands().iter().any(|demand| {
+            demand.path().as_path() == std::path::Path::new("/root/b/BUILD.bazel")
+        }));
+
+        let demand = demand("/conflict");
+        let left = PathObservationEpoch::new([(
+            demand.dupe(),
+            PathObservationResult::Lstat(PathOperationResult::Missing),
+        )])
+        .unwrap();
+        let right = PathObservationEpoch::new([(
+            demand,
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                1,
+                1,
+                1,
+                0o644,
+            ))),
+        )])
+        .unwrap();
+        assert!(matches!(
+            union_observations(&left, &right),
+            Err(slug_workspace_v2::ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::ConflictingDemand(_)
+            ))
+        ));
     }
 }
