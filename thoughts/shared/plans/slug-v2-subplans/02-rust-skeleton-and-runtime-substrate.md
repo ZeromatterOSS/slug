@@ -1379,31 +1379,58 @@ ceiling is 2,821 from the 2,091-line baseline. Require an independent
 cohesion/cleanup review above 2,400 formatted lines. Completion ledgers are
 capped at 180 net lines with no correction.
 
-### Active observed root repository-ignore implementation (2026-08-14)
+### Accepted observed root repository-ignore implementation (2026-08-14)
 
-Run `WP-2A-m1-host-repository-ignore-frontier-implementation` from accepted
-design `8ac5c30f`. Implement exactly one callerless crate-private
-`HostRepositoryIgnoreObservationKey` and `ObservedHostRepositoryIgnore` in
-`app/slug_bzlmod_v2/src/repository_ignore.rs`.
+Commit `43adf74b` accepts the callerless crate-private
+`HostRepositoryIgnoreObservationKey` and `ObservedHostRepositoryIgnore`.
+The sibling preserves observed REPO -> immutable policy -> ordered observed
+`.bazelignore` precedence, unions every complete child epoch before
+interpretation, and captures exact WindowsLongPath result Arcs in the shared
+parser. Need, outer error, and cancellation publish no parent carrier; inner
+semantic failures retain their complete prefix; repository-ignore owns no
+events. Legacy keys and callers remain independent and unchanged.
 
-Preserve observed REPO, immutable policy, ordered observed `.bazelignore`
-negative/selected probes, and Windows long-path observation order. Reuse one
-shared observed-capable parser and `PathObservationEpoch::from_shared`; Need
-and cancellation publish no carrier, semantic errors stay inner, and
-mismatch/conflict stays a completed outer frontier error. The observed REPO
-dependency remains the only event-batch owner. Retain only one semantic Arc and
-the existing epoch.
+Focused observed proof passes 4/4 and includes REPO/Host error prefixes,
+negative/selected exact Arcs, zero legacy activation, A/B/A/warm, typed
+conflict/mismatch, and cfg-windows duplicate-first-Arc coverage. All 568 Bzlmod
+unit/integration tests pass, `slug_core_v2` checks, and formatting/diff
+hygiene pass. WSL lacks a Windows target, so the cfg-windows proof was not
+executed. Strict Clippy stops first in unchanged `allocative_derive`; the
+archive checker reproduces the inherited archive-ref/non-V2-thoughts baseline.
 
-Require focused success/error/Need/outer, ordered precedence, exact-Arc,
-legacy-nonactivation, A/B/A/warm, create/edit/delete/recreate, policy-only,
-cancellation, and cfg(windows) normalization proof; full Bzlmod validation,
-direct downstream compile, formatting, Clippy disposition, diff/artifact/cap
-accounting, and independent ownership plus cohesion review.
+Raw growth is +708/-16. Exact cfg-aware net growth is 243 production plus 449
+in-module tests, 692 total, and 2,783 physical lines, within 280/450/730 and
+2,821. Independent ownership and AI-cleanup review accepts the large file as
+one cohesive repository-ignore owner; shared parsing removes duplication and a
+split would widen private seams. Retained state is one semantic Arc plus the
+existing Arc-backed epoch.
 
-The exact Rust allowlist is `repository_ignore.rs`. Caps are 280 production,
-450 in-module test, 730 total net, and 2,821 physical lines from the 2,091
-baseline; require cleanup review above 2,400 lines. Completion ledgers are
-capped at 180 net lines with no correction. STOP on every other code path,
-legacy/public/routed/materialized/higher activation, new storage or key family,
-and cap excess. Completion schedules only docs-only
-`WP-2A-m1-host-package-marker-frontier-design`.
+### Active host package-marker frontier design (2026-08-14)
+
+Run docs-only `WP-2A-m1-host-package-marker-frontier-design` from accepted
+predecessor `43adf74b`. Freeze the smallest callerless Bzlmod-private observed
+sibling for the terminal owned by `HostRootPackageLookupKey`.
+
+The live order is immutable policy, invalid/deleted/external early exits,
+observed repository-ignore, then root-major and
+`BUILD.bazel`-before-`BUILD` observed path-resolution probes. The design
+must preserve empty epochs for pre-Host terminals, exact predecessor epochs
+for ignore terminals, every negative marker prefix through selection or
+`NoBuildFile`, and complete error prefixes. Need/cancellation stays
+incomplete; aggregation mismatch/conflict stays a completed outer frontier
+error.
+
+Decide the exact key/carrier/visibility/equality API, deterministic union,
+exact-Arc and structural-policy identity, memory lifetime, one-file future
+allowlist/caps, proof, cleanup decision for the live 3,355-line
+`host_package.rs`, and one unique hierarchical successor. Preserve every
+legacy result/error/caller and do not activate source bytes, MODULE, BUILD
+evaluation, `.bzl`, glob, loading, core, request revision, external/routed
+repositories, or public behavior.
+
+Write only canonical/current/Stage 2. Ledger caps are 40/320/280/640. STOP on
+Rust/Cargo/oracle writes, another consumer, public/export/dependency changes,
+new retained storage or graph, reconstructed/direct Host reads, or scope
+growth. REPLAN to one smaller docs-only prerequisite if the accepted lower
+carriers cannot express a complete lookup terminal. Acceptance may schedule
+only the frozen one-file private implementation or that prerequisite.
