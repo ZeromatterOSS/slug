@@ -1636,3 +1636,58 @@ and independent cohesion/ownership review. STOP on another file, another key or
 owner, retained frontier/public behavior, arbitrary depth cutoff, silent
 dedupe, panic/string-matched cycle handling, or cap excess. Completion returns
 only to docs-only `WP-2A-m1-root-module-frontier-design`.
+
+### Accepted root-module include-progress implementation (2026-08-14)
+
+Commit `53833591` adds the private selected-logical-path active-ancestry guard
+and typed `HostRootModuleFileError::IncludeCycle` terminal. Each pending
+occurrence owns only a command-local parent-linked ancestry Arc; aliases on one
+active branch recur, while repeated siblings and aliases on distinct branches
+retain their admitted validation, evaluation, and event occurrences.
+
+Root processing, whole-horizon preflight, grouped Host-file Need union, and
+source-order file/validation errors remain ahead of cycle classification. A
+back edge completes only after its source validates and before child extension,
+file/evaluation accumulation, or Starlark evaluation. Complete cycle errors use
+the existing empty parent event batch; Need/cancellation publishes no parent
+completed batch and drops all ancestry/horizon scratch. No key, store, retained
+chain, frontier, caller, or public behavior is added.
+
+The sole Rust file changes by +279/-4: 60 production and 215 in-module test
+lines, 275 total net, and 3,194 physical lines, within 130/240/370 and 3,289.
+Focused Host-module proof passes 16/16; all 576 Bzlmod unit/integration tests
+and doctests pass; direct `slug_loading_v2` and `slug_core_v2` checks,
+formatting, and diff hygiene pass. Strict Clippy stops first in unchanged
+`allocative_derive`; the archive checker reproduces the inherited missing-ref
+and non-V2-thoughts baseline. Independent source, ownership, schedule, and
+nine-category cleanup reviews accept the implementation and the existing file
+cohesion.
+
+Admitted acyclic behavior remains exact. Selected-path ancestry and the finite
+cycle terminal are Slug-native because pinned Bazel 9.2 has no recurrence
+terminal. Root-frontier aggregation and every higher consumer remain deferred.
+
+### Resumed root-module frontier design (2026-08-14)
+
+Run docs-only `WP-2A-m1-root-module-frontier-design` from accepted predecessor
+`53833591`. With the legacy Host producer now finite, freeze exactly one
+callerless Bzlmod-private observed sibling that composes the accepted observed
+root/include Host-file and package-marker frontiers through every dynamic
+horizon occurrence and completed terminal.
+
+The design must preserve structural inputs, bootstrap Need, whole-horizon
+preflight, grouped Need and source-error order, repeated acyclic occurrence and
+event behavior, active-ancestry recurrence, and complete-only sealing. Freeze
+one semantic-result Arc plus the existing Arc-backed epoch, deterministic
+first-Arc union, inner semantic versus outer frontier errors, zero legacy-key
+activation, event/evaluator ownership, cancellation release, equality/A-B-A,
+exact future file/caps, and one bounded successor. No completed success or
+semantic error may retain a frontier until no undiscovered include can affect
+that terminal.
+
+Write only canonical/current/Stage 2 under 40/340/300/680. STOP on code,
+Cargo/oracle/public/export/loading/core changes, legacy-key behavior, another
+certificate family, new retained storage/graph, reconstructed/direct Host
+reads, or higher package-source/BUILD/.bzl/glob work. Acceptance may activate
+only one bounded private root-module implementation or one proven smaller
+docs-only prerequisite; otherwise `REPLAN`.

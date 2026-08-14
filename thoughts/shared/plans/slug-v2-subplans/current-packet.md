@@ -1,146 +1,120 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-module-include-progress-implementation`
+Packet: `WP-2A-m1-root-module-frontier-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: give the legacy Host root-MODULE producer a finite typed terminal for
-direct or indirect active-ancestry include recurrence without collapsing
-accepted repeated acyclic occurrences. This packet changes no frontier or
-public caller.
+Result: design one callerless Bzlmod-private observed root-MODULE sibling that
+retains the complete finite Host observation frontier without changing the
+legacy key, events, loading callers, or public behavior.
 
-## Accepted predecessor and pinned source decision
+## Accepted predecessor
 
-Commit `8a555daa` records the root-module frontier `REPLAN`: every finite child
-frontier is representable, but `HostRootModuleFileKey` can continually refill
-its include horizon and never publish a DICE value.
+Commit `53833591` gives `HostRootModuleFileKey` a finite private
+`IncludeCycle` terminal for selected-logical-path active-ancestry recurrence.
+It changes only `host_module.rs` by 60 production and 215 test lines (275
+total; 3,194 physical), within 130/240/370 and 3,289. Focused Host-module proof
+passes 16/16; the full Bzlmod crate passes 383 library tests and all integration
+groups (576 total) plus doctests; direct loading/core checks, formatting, and
+diff hygiene pass. Strict Clippy stops first in unchanged `allocative_derive`;
+the archive checker reproduces only the inherited missing-ref/non-V2-thoughts
+baseline. Independent source, ownership, schedule, and nine-category cleanup
+reviews accept the implementation.
 
-The exact Bazel 9.2.0 source at
-`src/main/java/com/google/devtools/build/lib/bazel/bzlmod/ModuleFileFunction.java`
-is discriminating. Its `State` retains a BFS `horizon` and a raw-label keyed
-compiled-file map. `execNonRegistryModuleFile` loops while the horizon is
-nonempty; `advanceHorizon` compiles every occurrence, overwrites the raw-label
-map entry, and appends every compiled child's include statements. It has no
-visited, ancestry, recurrence, or nonprogress terminal. Matching
-`ModuleFileFunctionTest.testRootModule_include_good` and
-`src/test/py/bazel/bzlmod/bazel_module_test.py::{testInclude,
-testNonRegistryOverrideModuleInclude}` prove only finite acyclic nesting; the
-matching Java/Python bzlmod tests contain no include-cycle case.
+Pinned Bazel 9.2 source has no recurrence terminal. Existing admitted acyclic
+MODULE/include behavior remains exact; selected-path ancestry and the finite
+cycle terminal are Slug-native. The accepted implementation remains private
+and carries no frontier or public caller.
 
-Therefore direct and indirect recurrence have no exact Bazel terminal, message,
-or source location to copy. A timeout-only oracle would merely reconfirm the
-source-proven lack of a result and would not select a finite contract, so this
-packet adds no fixture. Bazel nontermination remains unsupported; the finite
-Slug safeguard below is explicitly Slug-native. Existing acyclic include
-behavior remains an exact regression/non-widening invariant.
+## Design questions
 
-## Frozen implementation contract
+Freeze the smallest implementation contract for exactly one callerless
+Bzlmod-private observed sibling of `HostRootModuleFileKey`:
 
-1. `HostRootModuleFileKey` is the sole semantic and progress owner. Add one
-   private `HostRootModuleFileError::IncludeCycle { raw_label, location,
-   logical_path }`. The fields identify the back-edge occurrence only; do not
-   retain a chain, evaluator, event batch, transaction, child value, or second
-   source collection in the completed DICE result.
-2. Recurrence identity is the selected normalized logical Host path returned by
-   package preflight. Raw spellings that select the same path recur only when
-   that path is already on the current occurrence's ancestry. Repeated siblings
-   and repeated aliases on distinct ancestry branches remain distinct validated
-   and evaluated occurrences with their existing repeated events.
-3. Root policy, root bytes, bootstrap Need, and root validation stay first.
-   Each horizon still parses/preflights all labels, computes the same grouped
-   Host-file batch, unions the same Needs, and selects semantic failures in
-   source order. Only after the current occurrence has a complete Present file
-   and successful source validation, compare its logical path with its active
-   ancestry. A match returns `IncludeCycle` at that include call; otherwise add
-   the path to the ancestry inherited by its children and continue unchanged.
-4. Represent ancestry as command-local parent-linked immutable `Arc` nodes,
-   rooted at the logical root `MODULE.bazel` path. Use constant-time `Dupe`
-   pointer clones for sibling inheritance and a linear parent walk for a
-   membership check. Do not add a global visited set, DICE key/store, interner,
-   retained Arc slice, arbitrary depth limit, or direct filesystem read.
-5. A cycle is a normal complete semantic error. Complete pre-evaluation errors
-   retain the existing empty parent event-batch behavior when capture is
-   enabled. Need/cancellation publishes no parent terminal or parent completed
-   batch; parent ancestry and horizon scratch drop, while completed child DICE
+1. Preserve structural policy, root-file ordering, missing-root bootstrap
+   Need, source validation, full-horizon preflight, grouped child-file Need
+   union, source-order errors, active-ancestry recurrence, evaluation, and
+   event ownership. Do not make either sibling compute the legacy key.
+2. Consume only accepted observed producers: observed Host-file bytes for the
+   root and include files and observed package-marker lookup for every include
+   preflight occurrence. Determine the smallest shared driver/factoring that
+   prevents duplicated Starlark evaluation or Host observation while leaving
+   every legacy value/error/caller unchanged.
+3. Define one crate-private carrier containing exactly one shared semantic
+   `Result<HostRootModuleFileValue, HostRootModuleFileError>` and the accepted
+   Arc-backed `PathObservationEpoch`. Freeze visibility, `Dupe`/`Allocative`,
+   complete-only equality/validity, and borrowing accessors without a public or
+   loading-facing export.
+4. Union root bytes, every completed package-selection frontier, and every
+   completed include-file frontier in deterministic occurrence/source order.
+   Retain exact observation-result Arcs, including decisive negative probes.
+   Equal duplicates coalesce with first-Arc ownership; mismatch/conflict is a
+   completed outer `ObservedPathFrontierError`, never a panic or legacy error.
+5. Seal only when the dynamic horizon reaches its finite terminal. Completed
+   success and every completed semantic error, including `IncludeCycle`, must
+   retain the exact observation prefix that decided it. Need, cancellation, or
+   an outer child/union error publishes no parent carrier; completed child DICE
    observations remain dependency-owned cache state.
-6. Existing complete-only DICE equality/validity includes the new typed error
-   structurally. Warm recurrence reuse, cycle-to-acyclic recovery, and A/B/A
-   restoration must follow ordinary dependency invalidation without retained
-   progress state.
+6. Preserve the legacy root event batch as the sole event owner. Decide how a
+   sibling reuses the evaluator/finalizer without retaining or duplicating an
+   evaluator, reporter, batch, transaction, ancestry chain, horizon, package
+   matcher, or child carrier. The observed parent must add no competing event
+   batch.
+7. Freeze exact proof for root present/missing/error, finite nested/repeated
+   includes, direct/indirect cycle, package and file errors, Need/cancellation,
+   exact Arc union/conflict/mismatch, zero legacy activation, event parity,
+   structural equality, warm reuse, recovery, and A/B/A restoration.
+8. Name one exact future Rust allowlist, production/test/total/physical caps,
+   retained-memory accounting, and the unique successor toward package-source
+   or loading/core composition. If a complete carrier cannot be constructed in
+   one bounded owner without changing legacy behavior, select exactly one
+   smaller docs-only prerequisite or `REPLAN`.
 
-Existing admitted serial acyclic root MODULE/include parsing, validation,
-diagnostics, source-order errors, grouped Need behavior, evaluation, event
-order, repeated occurrences, and Host observation values remain exact.
-Selected-logical-path ancestry, the finite `IncludeCycle` terminal, and its
-diagnostic shape are Slug-native. Root-frontier aggregation/sealing remains for
-the immediate successor. Lockfile/registry, package source, BUILD/.bzl/glob,
-loading/core/public activation, routed/materialized repositories,
-overlap/final validation, and exact Bazel identity bytes remain
-unsupported/deferred.
-
-## Proof and validation
-
-Add focused colocated proof for:
-
-- a direct self-include and an indirect A -> B -> A recurrence, including an
-  alias-spelled back edge, with the exact typed back-edge fields;
-- the existing repeated sibling/alias case still validating and evaluating
-  every occurrence in the admitted event order;
-- grouped Need and earlier source-order semantic failures retaining precedence
-  over any later recurrence candidate;
-- a complete cycle error owning an empty parent event batch, while Need owns no
-  parent completed batch;
-- warm equality, cycle/acyclic recovery, and A/B/A restoration; and
-- source inspection that every await precedes only drop-safe command scratch
-  and that no legacy dependency or public output owner changes.
-
-Run the focused Host root-module tests, the full `slug_bzlmod_v2` suite, direct
-`slug_loading_v2` and `slug_core_v2` checks, `cargo fmt --all -- --check`,
-strict Clippy with inherited-baseline disposition, the V2 archive checker, and
-`git diff --check`. Do not run Cargo commands concurrently in one target
-directory.
-
-Because `host_module.rs` is already 2,919 physical lines, require independent
-pre- and post-implementation cohesion/AI-cleanup review. Keep the recurrence
-owner adjacent to the existing Host root-module key unless review proves a
-real separable responsibility; a split is not authorized implicitly.
+Existing admitted serial root MODULE/include parsing, validation, diagnostics,
+source-order errors, repeated occurrences, event order, and Host observation
+values remain exact. Frontier aggregation, identity, sealing, equality, and
+retry ownership are Slug-native. Lockfile/registry, package source,
+BUILD/.bzl/glob evaluation, loading/core/public activation,
+routed/materialized repositories, overlap/final validation, and exact Bazel
+identity bytes remain unsupported/deferred.
 
 ## Authority and caps
 
 Write only:
 
-- `app/slug_bzlmod_v2/src/host_module.rs`; and
-- at completion only,
-  `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
-  `slug-v2-subplans/current-packet.md`, and
-  `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `slug-v2-subplans/current-packet.md`; and
+- `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Read only the active packet and owner section, the plan-authoring guide,
+Read only this packet and owner section, the plan-authoring guide,
 `docs/developers/dice.md`, the Buck2 utility-reuse skill and matching Stage 9
-Arc/`Dupe`/`Allocative` row, local Bzlmod
-`src/{host_module,host_include,module_eval,interim_module,host_file,host_package,lib}.rs`,
-loading `src/bzl_module.rs`, their manifests and directly referenced focused
-tests, and the exact Bazel 9.2.0 source/tests named above.
+Arc/`Dupe`/`Allocative` row, Bzlmod
+`src/{host_module,host_include,host_file,host_package,interim_module,module_eval,lib}.rs`,
+workspace `src/{lib,path_observation,path_resolution}.rs`, loading
+`src/bzl_module.rs`, root `Cargo.toml`, app
+`slug_{workspace,bzlmod,loading}_v2/Cargo.toml`, and directly referenced focused
+tests.
 
-Rust growth is capped at 130 net production lines, 240 in-module test lines,
-370 total net lines, and 3,289 physical lines in `host_module.rs`, with no cap
-correction. Completion ledgers are capped at 180 net lines.
+Ledger growth is capped at 40 canonical, 340 current-packet, 300 Stage 2, and
+680 total net lines, with no correction.
 
 ## STOP / REPLAN
 
-STOP on every other Rust file; another key, cache, graph, store, interner,
-evaluator, retained frontier, public API/output, Cargo/dependency, oracle,
-fixture, loading/core caller, lockfile/registry/package-source/BUILD/.bzl/glob,
-routed/materialized repository, watcher, JVM, or unrelated cleanup change.
+STOP on Rust, Cargo, oracle, fixture, public API/output, loading/core caller,
+legacy key/value/error behavior, another certificate family, new graph/key/
+store/container/interner, reconstructed or direct Host reads, retained
+evaluator/event/transaction/ancestry/horizon, lockfile/registry/package-source/
+BUILD/.bzl/glob, routed/materialized repository, watcher, JVM, or unrelated
+cleanup work.
 
-REPLAN if selected logical-path identity is unavailable after the existing
-preflight, recurrence cannot be detected after validation without changing
-acyclic error/Need/event order, finite progress requires state outside the
-command-local Host producer, the typed error changes a legacy public surface
-beyond the declared Slug-native cycle case, another file is required, or any
-cap/ceiling is exceeded.
+REPLAN if the complete dynamic frontier is unavailable before the finite
+terminal, existing observed children cannot supply every decisive Host input,
+event/evaluation sharing requires a public or reverse seam, exact observation
+Arcs cannot be retained without a second container, a completed error would
+retain a partial frontier, or no single future implementation can stay within
+one bounded owner.
 
 ## Immediate successor
 
-On acceptance, resume docs-only `WP-2A-m1-root-module-frontier-design` using the
-finite legacy terminal. Do not combine observed-frontier implementation with
-this behavior correction.
+On design acceptance, activate exactly one bounded private observed
+root-module implementation or one proven smaller docs-only prerequisite. Do
+not combine package-source, loading/core publication, or another consumer.
