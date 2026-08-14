@@ -1371,3 +1371,42 @@ serialization neither requires nor permits Slug's global command lease.
 terminal, a general scheduler, arbitrary fixture executable, second group or
 schema, module-extension/repository execution, failure to terminate and reap
 both clients, cap excess, or any need for Rust/public-command changes.
+
+### Accepted M1 in-flight loading/source-lock implementation (2026-08-13)
+
+Commit `2ffad088` implements the bounded design above. The strict optional
+group parser rejects unknown keys, duplicate/nonadjacent command ownership,
+command-local mutations/diagnostics, absent epoch capture, non-exit-9
+contenders, manifest-root gate overlap, and a mutation that aliases the FIFO
+gate. The POSIX runner uses one mode-0600 FIFO, blocking writer-open readiness,
+two owned process groups, one absolute deadline, regular-file replacement, and
+guarded terminate/kill/reap/join/unlink cleanup. An already-exited primary is
+still passed through collection on failure.
+
+The fixture contains the seven authorized authored files and one generated
+oracle. Its five rows retain one server epoch and the exact sequence V1,
+exit-9 lock contender, V2, marker-free warm V2, restored V1. Pinned Bazel
+9.2.0 commit `8220c6198837d5c13d53fea211cf3282aa12408a` generated the
+oracle and two independent fresh-root no-update replays at
+`/tmp/slug-m1-oracle-replay-a` and `/tmp/slug-m1-oracle-replay-b` matched
+it. A third fresh-root replay after the final cleanup corrections also passed.
+These temporary paths identify local evidence only and are not repository
+inputs.
+
+Focused harness validation passed 19 tests. The full harness module passed 119
+tests; its only three failures are inherited stale expectations that predate
+this packet: the accepted extra `load-invalidation.restored_message_v1` row
+and two `simple-rule-action` tests that still construct one record after that
+fixture grew to three. They are outside this packet's semantic and file scope.
+
+Final net accounting is 325 production-harness lines, 323 harness-test lines,
+95 authored fixture lines, 169 generated-oracle lines, and 913 implementation
+lines total, all within the corrected caps. Local pinned-source anchors,
+`git diff --check`, process cleanup, schema/lifecycle review, and two
+independent evidence reviews passed.
+
+This evidence accepts only Bazel's serialized client boundary, exit 9,
+diagnostic/output relationships, and the stable pinned V1 observation. It does
+not accept V1 as Slug final-publication behavior. The active successor is the
+docs-only request-revision/source-certificate design; no further oracle subset
+is required before its first private root-host vertical.

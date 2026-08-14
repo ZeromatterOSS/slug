@@ -744,3 +744,73 @@ git diff --check
 
 Package names are placeholders until the root reset chooses the final crate
 layout.
+
+### Active request-revision/source-certificate design (2026-08-13)
+
+The focused prerequisite is accepted in `2ffad088`. Its generation and two
+independent fresh-root replays preserve the five-record V1/exit-9/V2/warm/V1
+sequence in one Bazel 9.2 server epoch. It supplies deterministic source-demand
+ordering and the serialized client boundary only; Slug final reobservation and
+overlap remain Rust-native.
+
+A fresh live audit found no existing request owner that can be extended
+unchanged. `NativeDemandSessionOwner` serializes with `Busy` and retains
+`AcceptedNativeDemandSnapshot`; `RepositoryMaterializer` separately
+serializes one active repository session. Legacy observation adapters still
+inject whole workspace text/raw/directory snapshots. The first request-revision
+vertical must create a new private owner rather than rename either lease or
+treat either accepted snapshot as the source certificate.
+
+The applicable DICE API supplies fixed transactions, exact equality tokens,
+`existing_state`, batched `changed_to`, and successor commits. It supplies
+neither a compare-and-swap commit nor a public changed-key compatibility diff.
+`DiceTransaction::into_updater` also creates a normal updater against the
+engine's newest state; it is not a conditional successor of the consumed
+transaction. Therefore every production updater/commit that can race the
+admitted private request family must pass through one runtime revision owner.
+The owner may lock only around current-version comparison, exact final host
+reobservation, typed injection, commit, and publication. DICE/root/Starlark
+compute remains outside it.
+
+The selected first vertical admits one private Host-namespace file-bytes
+request. Its root key includes runtime/workspace identity, a contained path,
+and one relevant semantic overlay projection. Presentation-only overlay data
+is request-local. A provisional root consumes the injected request revision
+and `PathObservationKey`; its exact demand and result form the one-entry
+source certificate. Directory/glob unions, repository/materialization
+namespaces, loading migration, and public command/server activation are later
+packets.
+
+On path Need or final mismatch, the coordinator reobserves only the exact typed
+demand, batches the complete one-entry `PathObservationEpoch` and a
+Slug-native successor revision, commits once, discards provisional effects,
+and retries. It accepts only if the provisional base still equals
+`existing_state` and final reobservation equals the certificate. A version
+advance, relevant mutation, observation/injection/publication failure,
+cancellation, or bounded nonprogress publishes no terminal. Transactions,
+barriers, effects, and certificates are attempt/command memory and never enter
+a DICE result or service cache.
+
+The future implementation is confined to a new
+`runtime/request_revision.rs`, `runtime/mod.rs`, `runtime/dice.rs`, and,
+only if a named Host-only entry point is required,
+`runtime/path_observation.rs`. Existing crate globs and dependencies require
+no Cargo/BUILD edit. Proposed caps are 560 production, 700 in-module test, 260
+ledger, and 1,520 total net lines with one bounded correction.
+
+Acceptance must prove two requests genuinely overlap on one `Arc<Dice>`;
+relevant overlays separate while irrelevant overlays share; V1 demanded before
+mutation is discarded; only V2 publishes; warm V2 and A/B/A reuse; exact
+reobservation/commit/retry/discard counters; one-waiter and last-waiter
+cancellation; injected observation/injection/publication/nonprogress failures;
+no publication or retained buffer on failure; and no revision-owner lock at
+compute barriers. This remains an M1 partial vertical, not loading or command
+migration.
+
+`REPLAN` if the production commit boundary cannot be closed for the admitted
+family, DICE overlap requires a second graph or historical read, the vertical
+needs repository-session concurrency, a stale terminal becomes visible, or
+cancellation retains request ownership. Stop on a global command lease, manual
+semantic side store, accepted-snapshot reuse, command-side replay, watcher
+correctness, retained transaction/evaluator values, custom scheduler, lock
+across compute/Starlark, public command/server/Bzlmod edits, or cap excess.
