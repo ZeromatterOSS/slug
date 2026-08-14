@@ -156,6 +156,11 @@ use super::events::CommandEffectError;
 use super::events::CommandEffectOwner;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
+use super::events::SelectedTerminalToken;
+use super::request_revision::NativeFinalization;
+use super::request_revision::RequestRevisionError;
+use super::request_revision::RequestRevisionKey;
+use super::request_revision::SourceCertificate;
 use super::starlark::evaluate_file;
 
 pub trait IncrementalEngine {
@@ -682,6 +687,8 @@ enum NativeDemandSessionError {
     ConflictingRepository(slug_identity_v2::CanonicalRepoName),
     RepositoryInternalNonProgress,
     PathInternalNonProgress,
+    RevisionInternalNonProgress,
+    Revision(RequestRevisionError),
     MissingSelectedPath(PathObservationDemand),
     PathEpoch(slug_workspace_v2::PathObservationEpochError),
     Effect(CommandEffectError),
@@ -705,6 +712,10 @@ impl fmt::Display for NativeDemandSessionError {
                 f.write_str("repository preparation made no progress")
             }
             Self::PathInternalNonProgress => f.write_str("path preparation made no progress"),
+            Self::RevisionInternalNonProgress => {
+                f.write_str("request revision made no bounded progress")
+            }
+            Self::Revision(error) => write!(f, "request revision failed: {error}"),
             Self::MissingSelectedPath(_) => {
                 f.write_str("a selected path observation was not materialized")
             }
@@ -771,6 +782,8 @@ struct NativeDemandPreparedAcceptance {
     events: super::events::SelectedEventBatches,
     snapshot: AcceptedNativeDemandSnapshot,
     validation: Vec<super::repository_io::RepositoryValidation>,
+    selected_updater: Option<DiceTransactionUpdater>,
+    terminal_token: SelectedTerminalToken,
 }
 
 #[allow(dead_code)]
@@ -874,10 +887,12 @@ struct DrivenCommand<T> {
     attempts: usize,
     terminal_root_count: usize,
 }
+const MAX_NATIVE_REVISION_RETRIES: usize = 8;
 
 #[allow(dead_code)]
 enum CommandAttemptResult<T> {
     Retry(slug_bzlmod_v2::SourcePreparationNeeds),
+    RevisionRetry(Option<Box<PathObservationEpoch>>),
     Terminal(T, NativeDemandPreparedAcceptance, usize),
 }
 
@@ -886,6 +901,17 @@ type SyntheticCommandResult = DrivenCommand<Result<SyntheticCommandValue, Synthe
 #[async_trait]
 trait NativeCommandRoot: Clone {
     type Terminal: Clone;
+
+    fn initializes_request_revision(&self) -> bool {
+        false
+    }
+
+    fn source_certificate<'a>(
+        &self,
+        _terminal: &'a Self::Terminal,
+    ) -> Option<&'a SourceCertificate> {
+        None
+    }
 
     fn allows_empty_terminal(&self) -> bool {
         false
@@ -1248,6 +1274,26 @@ impl NativeCommandRoot for RootQueryCommandKey {
 #[async_trait]
 impl NativeCommandRoot for BuildCommandRootKey {
     type Terminal = Arc<Result<BuildCommandEvaluation, BuildCommandError>>;
+
+    fn initializes_request_revision(&self) -> bool {
+        let [pattern] = self.targets.as_ref() else {
+            return false;
+        };
+        matches!(
+            TargetPattern::parse(pattern.as_ref()),
+            Ok(TargetPattern::Single(label)) if label.repo().is_root()
+        )
+    }
+
+    fn source_certificate<'a>(
+        &self,
+        terminal: &'a Self::Terminal,
+    ) -> Option<&'a SourceCertificate> {
+        match terminal.as_ref() {
+            Ok(evaluation) => evaluation.source_certificate(),
+            Err(error) => error.source_certificate(),
+        }
+    }
 
     fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
         matches!(
@@ -2390,6 +2436,7 @@ struct BuildRequestedTarget {
     package: LoadedPackage,
     analysis: Option<Arc<ConfiguredNodeResult>>,
     completion: BuildTargetCompletion,
+    source_certificate: Option<SourceCertificate>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Allocative)]
@@ -2412,7 +2459,10 @@ enum BuildCommandErrorKind {
     RepositoryPackage(RepositoryPackageLoadError),
     RepositorySource(RepositorySourceFileError),
     SourceMissing(CanonicalLabel),
-    RootSource(PathObservationResult),
+    RootSource {
+        observation: PathObservationResult,
+        source_certificate: Option<Box<SourceCertificate>>,
+    },
     ExternalTargetKind,
     TargetNotFound {
         pattern: Arc<str>,
@@ -2728,6 +2778,13 @@ impl BuildCommandEvaluation {
         })
     }
 
+    fn source_certificate(&self) -> Option<&SourceCertificate> {
+        let [target] = self.targets.as_ref() else {
+            return None;
+        };
+        target.source_certificate.as_ref()
+    }
+
     pub fn is_observed_exported_source(&self) -> bool {
         matches!(
             self.targets.as_ref(),
@@ -2969,6 +3026,15 @@ impl BuildCommandError {
         Self { kind }
     }
 
+    fn source_certificate(&self) -> Option<&SourceCertificate> {
+        match &self.kind {
+            BuildCommandErrorKind::RootSource {
+                source_certificate, ..
+            } => source_certificate.as_deref(),
+            _ => None,
+        }
+    }
+
     pub(super) fn infrastructure(error: impl fmt::Display) -> Self {
         Self {
             kind: BuildCommandErrorKind::Infrastructure(Arc::from(error.to_string())),
@@ -2996,8 +3062,8 @@ impl fmt::Display for BuildCommandError {
             BuildCommandErrorKind::SourceMissing(label) => {
                 write!(f, "{label}: missing input file '{label}'")
             }
-            BuildCommandErrorKind::RootSource(result) => {
-                write!(f, "source observation failed: {result:?}")
+            BuildCommandErrorKind::RootSource { observation, .. } => {
+                write!(f, "source observation failed: {observation:?}")
             }
             BuildCommandErrorKind::ExternalTargetKind => {
                 f.write_str("external build target is not an exported source file")
@@ -3250,6 +3316,7 @@ async fn compute_build_branch(
     _configuration: ConfigurationKey,
     base_configuration: ConfigurationKey,
     explicit_root_string_setting: Option<RootStringSettingValue>,
+    revision_eligible: bool,
 ) -> BuildBranchResult {
     let parsed = TargetPattern::parse(&pattern)
         .expect("BuildCommandRootKey stores validated canonical target patterns");
@@ -3287,8 +3354,8 @@ async fn compute_build_branch(
             }
         },
     };
-    let (analysis, completion) = match parsed {
-        TargetPattern::PackageAll { .. } => (None, BuildTargetCompletion::LoadedOnly),
+    let (analysis, completion, source_certificate) = match parsed {
+        TargetPattern::PackageAll { .. } => (None, BuildTargetCompletion::LoadedOnly, None),
         TargetPattern::Single(label) => {
             let Some(target) = package_value
                 .targets
@@ -3310,6 +3377,17 @@ async fn compute_build_branch(
                 target.kind,
                 slug_loading_v2::PackageTargetKind::ExportedFile
             ) {
+                if revision_eligible {
+                    match ctx
+                        .compute(&RequestRevisionKey::new(workspace.clone()))
+                        .await
+                    {
+                        Ok(_) => {}
+                        Err(error) => {
+                            return BuildBranchResult::Infrastructure(Arc::from(error.to_string()));
+                        }
+                    }
+                }
                 let path = workspace
                     .as_path()
                     .join(label.package().as_str())
@@ -3320,7 +3398,7 @@ async fn compute_build_branch(
                         .expect("root package target stays within the workspace"),
                     PathObservationOperation::FileBytes,
                 );
-                match ctx.compute(&PathObservationKey::new(demand)).await {
+                match ctx.compute(&PathObservationKey::new(demand.dupe())).await {
                     Err(error) => {
                         return BuildBranchResult::Infrastructure(Arc::from(error.to_string()));
                     }
@@ -3331,20 +3409,27 @@ async fn compute_build_branch(
                             ),
                         );
                     }
-                    Ok(PathOutcome::Complete(result)) => match result.as_ref() {
-                        PathObservationResult::FileBytes(PathOperationResult::Present(_)) => {
-                            (None, BuildTargetCompletion::ObservedExportedSource)
-                        }
-                        _ => {
-                            return BuildBranchResult::Outcome(
-                                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
-                                    BuildCommandError::new(BuildCommandErrorKind::RootSource(
-                                        (*result).clone(),
+                    Ok(PathOutcome::Complete(result)) => {
+                        let source_certificate = revision_eligible
+                            .then(|| SourceCertificate::new(demand, result.clone()));
+                        match result.as_ref() {
+                            PathObservationResult::FileBytes(PathOperationResult::Present(_)) => (
+                                None,
+                                BuildTargetCompletion::ObservedExportedSource,
+                                source_certificate,
+                            ),
+                            _ => {
+                                return BuildBranchResult::Outcome(
+                                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
+                                        BuildCommandError::new(BuildCommandErrorKind::RootSource {
+                                            observation: (*result).clone(),
+                                            source_certificate: source_certificate.map(Box::new),
+                                        }),
                                     )),
-                                )),
-                            );
+                                );
+                            }
                         }
-                    },
+                    }
                 }
             } else if let slug_loading_v2::PackageTargetKind::StarlarkRule(_) = &target.kind {
                 let canonical =
@@ -3384,9 +3469,11 @@ async fn compute_build_branch(
                     }
                     Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => {
                         match value.as_ref() {
-                            Ok(analysis) => {
-                                (Some(analysis.clone()), BuildTargetCompletion::Analyzed)
-                            }
+                            Ok(analysis) => (
+                                Some(analysis.clone()),
+                                BuildTargetCompletion::Analyzed,
+                                None,
+                            ),
                             Err(error) => {
                                 return BuildBranchResult::Outcome(
                                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(
@@ -3400,7 +3487,7 @@ async fn compute_build_branch(
                     }
                 }
             } else {
-                (None, BuildTargetCompletion::LoadedOnly)
+                (None, BuildTargetCompletion::LoadedOnly, None)
             }
         }
         TargetPattern::Recursive { .. } => unreachable!(),
@@ -3411,6 +3498,7 @@ async fn compute_build_branch(
             package: package_value,
             analysis,
             completion,
+            source_certificate,
         },
     )))
 }
@@ -3522,6 +3610,7 @@ async fn compute_external_exported_source_build_branch(
                     package,
                     analysis: None,
                     completion: BuildTargetCompletion::ObservedExportedSource,
+                    source_certificate: None,
                 }),
             )),
             Ok(HostRepositorySourceFileValue::Absent) => {
@@ -3566,6 +3655,7 @@ impl Key for BuildCommandRootKey {
         };
         let workspace = &self.workspace;
         let configuration = &self.configuration;
+        let revision_eligible = self.initializes_request_revision();
         let branches = ctx
             .compute_join(self.targets.iter().cloned(), |ctx, pattern| {
                 Box::pin(compute_build_branch(
@@ -3575,6 +3665,7 @@ impl Key for BuildCommandRootKey {
                     configuration.clone(),
                     self.base_configuration.clone(),
                     self.explicit_root_string_setting.clone(),
+                    revision_eligible,
                 ))
             })
             .await;
@@ -3949,6 +4040,7 @@ impl WorkspaceRuntime {
         let mut guard = NativeDemandAbortGuard::new(preflight.into_command());
         let allows_empty_terminal = root.allows_empty_terminal();
         let mut attempts = 0usize;
+        let mut revision_retries = 0usize;
         loop {
             attempts += 1;
             if let Err(error) = guard.begin_attempt() {
@@ -3959,7 +4051,14 @@ impl WorkspaceRuntime {
                 let data = guard.attempt_user_computation_data()?;
                 let mut updater = self.dice.updater_with_data(data);
                 guard.inject_attempt(&mut updater)?;
-                let mut transaction = self.request_revision.commit(updater).await;
+                let mut transaction = if attempt_root.initializes_request_revision() {
+                    self.request_revision
+                        .commit_native_attempt(updater)
+                        .await
+                        .map_err(NativeDemandSessionError::Revision)?
+                } else {
+                    self.request_revision.commit(updater).await
+                };
                 let root_outcome = attempt_root.compute(&mut transaction).await?;
                 match &root_outcome {
                     slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
@@ -3972,6 +4071,8 @@ impl WorkspaceRuntime {
                     }
                     slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal) => {
                         let terminal = terminal.clone();
+                        let source_certificate =
+                            attempt_root.source_certificate(&terminal).cloned();
                         let sealed = if attempt_root.allows_unavailable_terminal_roots(&terminal) {
                             guard.seal_terminal_allowing_unavailable_roots()?
                         } else if allows_empty_terminal {
@@ -3981,19 +4082,74 @@ impl WorkspaceRuntime {
                         };
                         let terminal_root_count = sealed.root_count();
                         let selected = sealed.select(&transaction).await?;
-                        let prepared = guard.prepare_accept(selected, &transaction).await;
+                        let mut prepared = match guard.prepare_accept(selected, &transaction).await
+                        {
+                            Ok(prepared) => prepared,
+                            Err(error) => {
+                                drop(root_outcome);
+                                drop(attempt_root);
+                                drop(transaction);
+                                #[cfg(test)]
+                                self.native_demand_sessions.record_trace(
+                                    NativeDemandTestTrace::TerminalTransactionDropped,
+                                );
+                                return Err(error);
+                            }
+                        };
+                        let revision_retry = if let Some(source_certificate) = source_certificate {
+                            let selected_updater = prepared
+                                .selected_updater
+                                .take()
+                                .expect("prepared native terminal owns its selected updater");
+                            let full_epoch = guard.command().path_observations.clone();
+                            match self
+                                .request_revision
+                                .finalize_native(
+                                    &transaction,
+                                    &source_certificate,
+                                    selected_updater,
+                                    &full_epoch,
+                                )
+                                .await
+                                .map_err(NativeDemandSessionError::Revision)?
+                            {
+                                NativeFinalization::Accepted { revision } => {
+                                    std::hint::black_box(revision);
+                                    #[cfg(test)]
+                                    self.native_demand_sessions.record_trace(
+                                        NativeDemandTestTrace::SelectedInjectionCommitted,
+                                    );
+                                    None
+                                }
+                                NativeFinalization::RetryVersionAdvanced => Some(None),
+                                NativeFinalization::RetrySourceChanged { merged_epoch } => {
+                                    Some(Some(Box::new(merged_epoch)))
+                                }
+                            }
+                        } else {
+                            commit_prepared_native_demand_snapshot(guard.command(), &mut prepared)
+                                .await?;
+                            None
+                        };
                         drop(root_outcome);
                         drop(attempt_root);
                         drop(transaction);
                         #[cfg(test)]
                         self.native_demand_sessions
                             .record_trace(NativeDemandTestTrace::TerminalTransactionDropped);
-                        let prepared = prepared?;
-                        Ok(CommandAttemptResult::Terminal(
-                            terminal,
-                            prepared,
-                            terminal_root_count,
-                        ))
+                        if let Some(epoch) = revision_retry {
+                            prepared
+                                .terminal_token
+                                .reset_to_idle()
+                                .map_err(NativeDemandSessionError::Effect)?;
+                            Ok(CommandAttemptResult::RevisionRetry(epoch))
+                        } else {
+                            Ok(CommandAttemptResult::Terminal(
+                                terminal,
+                                prepared,
+                                terminal_root_count,
+                            ))
+                        }
                     }
                 }
             });
@@ -4010,6 +4166,19 @@ impl WorkspaceRuntime {
                 CommandAttemptResult::Retry(needs) => {
                     if let Err(error) = guard.progress(&needs) {
                         return guard.abort(error);
+                    }
+                }
+                CommandAttemptResult::RevisionRetry(epoch) => {
+                    if let Some(epoch) = epoch {
+                        guard
+                            .command
+                            .as_mut()
+                            .expect("revision retry retains its native command")
+                            .path_observations = *epoch;
+                    }
+                    revision_retries += 1;
+                    if revision_retries >= MAX_NATIVE_REVISION_RETRIES {
+                        return guard.abort(NativeDemandSessionError::RevisionInternalNonProgress);
                     }
                 }
                 CommandAttemptResult::Terminal(terminal, prepared, terminal_root_count) => {
@@ -5294,7 +5463,8 @@ impl<'a> NativeDemandAbortGuard<'a> {
                         .map_err(NativeDemandSessionError::Effect)?,
                 );
                 let terminal_authority = updater.existing_state().await;
-                let prepared = self.prepare_accept(selected, &terminal_authority).await?;
+                let mut prepared = self.prepare_accept(selected, &terminal_authority).await?;
+                commit_prepared_native_demand_snapshot(command, &mut prepared).await?;
                 drop(terminal_authority);
                 Ok::<_, NativeDemandSessionError>(prepared)
             })
@@ -5313,14 +5483,16 @@ impl<'a> NativeDemandAbortGuard<'a> {
         if !Arc::ptr_eq(&self.command().effects, &selected.effects) {
             return Err(NativeDemandSessionError::ForeignEffects);
         }
-        let (events, demands) = selected.sidecars.into_parts();
+        let (events, demands, terminal_token) = selected.sidecars.into_parts();
         let (snapshot, validation) = self.command().selected_snapshot(demands)?;
-        commit_selected_native_demand_snapshot(self.command(), terminal_authority, &snapshot)
-            .await?;
+        let selected_updater =
+            prepare_selected_native_demand_snapshot(self.command(), terminal_authority, &snapshot)?;
         Ok(NativeDemandPreparedAcceptance {
             events,
             snapshot,
             validation,
+            selected_updater: Some(selected_updater),
+            terminal_token,
         })
     }
 
@@ -5333,7 +5505,14 @@ impl<'a> NativeDemandAbortGuard<'a> {
             events,
             snapshot,
             validation,
+            selected_updater,
+            terminal_token,
         } = prepared;
+        if selected_updater.is_some() {
+            return self.abort(NativeDemandSessionError::Injection(anyhow::anyhow!(
+                "prepared native snapshot reached acceptance before publication"
+            )));
+        }
         let materializer_accept = {
             let command = self.command();
             command.runtime.repository_materializer.accept(
@@ -5368,6 +5547,10 @@ impl<'a> NativeDemandAbortGuard<'a> {
             .runtime
             .native_demand_sessions
             .record_trace(NativeDemandTestTrace::AcceptedSnapshotReplaced);
+        if let Err(error) = terminal_token.disarm() {
+            self.phase = NativeDemandAbortPhase::FailClosed;
+            return Err(NativeDemandSessionError::Effect(error));
+        }
         let output = events.into_output_buffer();
         #[cfg(test)]
         self.command()
@@ -5491,11 +5674,11 @@ impl NativeDemandTerminalSelection {
     }
 }
 
-async fn commit_selected_native_demand_snapshot(
+fn prepare_selected_native_demand_snapshot(
     command: &NativeDemandCommand<'_>,
     terminal_authority: &dice::DiceTransaction,
     snapshot: &AcceptedNativeDemandSnapshot,
-) -> Result<(), NativeDemandSessionError> {
+) -> Result<DiceTransactionUpdater, NativeDemandSessionError> {
     #[cfg(test)]
     if command
         .runtime
@@ -5522,11 +5705,22 @@ async fn commit_selected_native_demand_snapshot(
         snapshot.path_observations.clone(),
     )
     .map_err(NativeDemandSessionError::Injection)?;
+    // Keep the provisional terminal alive until its prepared updater reaches
+    // revision finalization or the ordinary commit leaf.
+    std::hint::black_box(terminal_authority);
+    Ok(updater)
+}
+
+async fn commit_prepared_native_demand_snapshot(
+    command: &NativeDemandCommand<'_>,
+    prepared: &mut NativeDemandPreparedAcceptance,
+) -> Result<(), NativeDemandSessionError> {
+    let updater = prepared
+        .selected_updater
+        .take()
+        .expect("prepared native acceptance owns its uncommitted updater");
     let selected_snapshot_transaction = command.runtime.request_revision.commit(updater).await;
     drop(selected_snapshot_transaction);
-    // This explicit use after the selected commit makes the terminal
-    // transaction's authority lifetime part of the helper contract.
-    std::hint::black_box(terminal_authority);
     #[cfg(test)]
     command
         .runtime
@@ -9917,8 +10111,11 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
                 sidecars.sidecars().demands().unscoped_paths(),
                 &[path.clone()]
             );
-            let prepared = command
+            let mut prepared = command
                 .prepare_accept(sidecars, &transaction)
+                .await
+                .unwrap();
+            commit_prepared_native_demand_snapshot(command.command(), &mut prepared)
                 .await
                 .unwrap();
             drop(terminal_outcome);
@@ -11238,6 +11435,174 @@ ordinary_rule(
             .resolved_file_write_semantic_views()
             .unwrap();
         crate::runtime::FileWriteSemanticIdentity::from_resolved(&views[0]).unwrap()
+    }
+
+    #[test]
+    fn multi_target_exported_sources_do_not_enter_revision_bridge() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(workspace.path().join("MODULE.bazel"), "").unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "exports_files([\"one.txt\", \"two.txt\"])\n",
+        )
+        .unwrap();
+        fs::write(workspace.path().join("one.txt"), b"one").unwrap();
+        fs::write(workspace.path().join("two.txt"), b"two").unwrap();
+
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let workspace_path = NormalizedAbsolutePath::new(workspace.path().to_path_buf()).unwrap();
+        let root = BuildCommandRootKey::new(
+            workspace_path.clone(),
+            &[
+                TargetPattern::parse("//:one.txt").unwrap(),
+                TargetPattern::parse("//:two.txt").unwrap(),
+            ],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        assert!(!root.initializes_request_revision());
+
+        let driven = runtime
+            .drive_command(NativeDemandRequestInputBundle::normalized_initial(), root)
+            .unwrap();
+        let evaluation = driven
+            .accepted
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap();
+        assert_eq!(evaluation.targets.len(), 2);
+        assert!(evaluation.targets.iter().all(|target| {
+            target.completion == BuildTargetCompletion::ObservedExportedSource
+                && target.source_certificate.is_none()
+        }));
+
+        let revision = runtime.runtime.block_on(async {
+            let mut transaction = runtime.dice.updater().existing_state().await;
+            transaction
+                .compute(&RequestRevisionKey::new(workspace_path))
+                .await
+        });
+        assert!(revision.is_err());
+    }
+
+    #[test]
+    fn root_exported_source_revision_bridge_retries_changed_terminal_and_preserves_epoch() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(workspace.path().join("MODULE.bazel"), "").unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "print(\"BUILD_EVENT\")\nexports_files([\"source.txt\"])\n",
+        )
+        .unwrap();
+        let source = workspace.path().join("source.txt");
+        fs::write(&source, b"V1").unwrap();
+
+        let runtime = Arc::new(test_runtime(workspace.path()).unwrap());
+        let workspace_path = NormalizedAbsolutePath::new(workspace.path().to_path_buf()).unwrap();
+        let root = BuildCommandRootKey::new(
+            workspace_path,
+            &[TargetPattern::parse("//:source.txt").unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap();
+        assert!(root.initializes_request_revision());
+
+        let drive = || {
+            runtime
+                .drive_command(
+                    NativeDemandRequestInputBundle::normalized_initial(),
+                    root.clone(),
+                )
+                .unwrap()
+        };
+        let drive_after_gate = |mutate: &dyn Fn()| {
+            runtime.request_revision.arm_native_finalize_gate();
+            let thread_runtime = runtime.clone();
+            let thread_root = root.clone();
+            let handle = std::thread::spawn(move || {
+                thread_runtime
+                    .drive_command(
+                        NativeDemandRequestInputBundle::normalized_initial(),
+                        thread_root,
+                    )
+                    .unwrap()
+            });
+            runtime.request_revision.wait_native_finalize_gate();
+            mutate();
+            runtime.request_revision.release_native_finalize_gate();
+            handle.join().unwrap()
+        };
+        let accepted_epoch = || {
+            runtime
+                .native_demand_sessions
+                .state
+                .lock()
+                .unwrap()
+                .accepted
+                .path_observations
+                .clone()
+        };
+        let source_demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(source.clone()).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let assert_source = |epoch: &PathObservationEpoch, expected: Option<&[u8]>| {
+            let observation = epoch.get(&source_demand).expect("source stays selected");
+            match (observation.as_ref(), expected) {
+                (
+                    PathObservationResult::FileBytes(PathOperationResult::Present(actual)),
+                    Some(expected),
+                ) => assert_eq!(actual.as_ref(), expected),
+                (PathObservationResult::FileBytes(PathOperationResult::Missing), None) => {}
+                (actual, expected) => {
+                    panic!("unexpected source observation {actual:?} for {expected:?}")
+                }
+            }
+        };
+
+        let v1 = drive();
+        assert!(
+            v1.accepted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .is_observed_exported_source()
+        );
+        assert_eq!(accepted_output_text(&v1.accepted), ["BUILD_EVENT"]);
+        let v1_epoch = accepted_epoch();
+        assert_source(&v1_epoch, Some(b"V1"));
+        assert!(v1_epoch.observations().len() > 1);
+
+        let v2 = drive_after_gate(&|| fs::write(&source, b"V2").unwrap());
+        assert_eq!(v2.attempts, 2);
+        assert!(v2.accepted.terminal_for_test().as_ref().is_ok());
+        assert!(accepted_output_text(&v2.accepted).is_empty());
+        let v2_epoch = accepted_epoch();
+        assert_source(&v2_epoch, Some(b"V2"));
+        assert_eq!(v2_epoch.observations().len(), v1_epoch.observations().len());
+
+        let warm = drive();
+        assert_eq!(warm.attempts, 1);
+        assert!(warm.accepted.terminal_for_test().as_ref().is_ok());
+
+        let missing = drive_after_gate(&|| fs::remove_file(&source).unwrap());
+        assert_eq!(missing.attempts, 2);
+        let missing_error = missing
+            .accepted
+            .terminal_for_test()
+            .as_ref()
+            .as_ref()
+            .unwrap_err();
+        assert!(missing_error.source_certificate().is_some());
+        assert_source(&accepted_epoch(), None);
+
+        let restored = drive_after_gate(&|| fs::write(&source, b"V1").unwrap());
+        assert_eq!(restored.attempts, 2);
+        assert!(restored.accepted.terminal_for_test().as_ref().is_ok());
+        assert_source(&accepted_epoch(), Some(b"V1"));
     }
 
     #[test]

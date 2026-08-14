@@ -76,6 +76,43 @@ impl RequestTestGate {
 }
 
 #[cfg(test)]
+struct NativeFinalizeTestGate {
+    state: std::sync::Mutex<(bool, bool)>,
+    changed: std::sync::Condvar,
+}
+
+#[cfg(test)]
+impl NativeFinalizeTestGate {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
+            state: std::sync::Mutex::new((false, false)),
+            changed: std::sync::Condvar::new(),
+        })
+    }
+
+    fn enter(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.0 = true;
+        self.changed.notify_all();
+        while !state.1 {
+            state = self.changed.wait(state).unwrap();
+        }
+    }
+
+    fn wait_entered(&self) {
+        let mut state = self.state.lock().unwrap();
+        while !state.0 {
+            state = self.changed.wait(state).unwrap();
+        }
+    }
+
+    fn release(&self) {
+        let mut state = self.state.lock().unwrap();
+        state.1 = true;
+        self.changed.notify_all();
+    }
+}
+#[cfg(test)]
 #[derive(Default)]
 struct RequestTestFaults {
     observation: std::sync::atomic::AtomicBool,
@@ -90,6 +127,7 @@ struct RequestTestData {
     faults: RequestTestFaults,
     gates: std::sync::Mutex<std::collections::HashMap<Arc<str>, Arc<RequestTestGate>>>,
     compute_entries: tokio::sync::Semaphore,
+    native_finalize_gate: std::sync::Mutex<Option<Arc<NativeFinalizeTestGate>>>,
 }
 
 #[derive(Debug, Clone, Allocative)]
@@ -112,6 +150,26 @@ impl RequestOverlay {
 pub(super) struct SourceCertificate {
     demand: PathObservationDemand,
     observation: Arc<PathObservationResult>,
+}
+
+impl SourceCertificate {
+    pub(super) fn new(
+        demand: PathObservationDemand,
+        observation: Arc<PathObservationResult>,
+    ) -> Self {
+        Self {
+            demand,
+            observation,
+        }
+    }
+
+    pub(super) fn demand(&self) -> &PathObservationDemand {
+        &self.demand
+    }
+
+    pub(super) fn observation(&self) -> &Arc<PathObservationResult> {
+        &self.observation
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -189,6 +247,13 @@ impl fmt::Display for RequestRevisionError {
 
 impl std::error::Error for RequestRevisionError {}
 
+#[derive(Debug, Clone, Allocative)]
+pub(super) enum NativeFinalization {
+    Accepted { revision: u64 },
+    RetryVersionAdvanced,
+    RetrySourceChanged { merged_epoch: PathObservationEpoch },
+}
+
 #[derive(Debug, Allocative)]
 struct RevisionOwner {
     initialized: bool,
@@ -220,6 +285,7 @@ impl RequestRevisionRuntime {
                 faults: RequestTestFaults::default(),
                 gates: std::sync::Mutex::new(std::collections::HashMap::new()),
                 compute_entries: tokio::sync::Semaphore::new(0),
+                native_finalize_gate: std::sync::Mutex::new(None),
             }),
         })
     }
@@ -244,6 +310,137 @@ impl RequestRevisionRuntime {
         let transaction = updater.commit().await;
         drop(owner);
         transaction
+    }
+
+    #[cfg(test)]
+    pub(super) fn arm_native_finalize_gate(&self) {
+        *self.test_data.native_finalize_gate.lock().unwrap() = Some(NativeFinalizeTestGate::new());
+    }
+
+    #[cfg(test)]
+    pub(super) fn wait_native_finalize_gate(&self) {
+        let gate = self
+            .test_data
+            .native_finalize_gate
+            .lock()
+            .unwrap()
+            .as_ref()
+            .expect("native finalize gate is armed")
+            .clone();
+        gate.wait_entered();
+    }
+
+    #[cfg(test)]
+    pub(super) fn release_native_finalize_gate(&self) {
+        self.test_data
+            .native_finalize_gate
+            .lock()
+            .unwrap()
+            .take()
+            .expect("native finalize gate is armed")
+            .release();
+    }
+
+    /// Commit an already native-injected attempt, adding the initial revision
+    /// in that same transaction when this owner has not yet published one.
+    pub(super) async fn commit_native_attempt(
+        &self,
+        mut updater: dice::DiceTransactionUpdater,
+    ) -> Result<DiceTransaction, RequestRevisionError> {
+        let mut owner = self.owner.lock().await;
+        if !owner.initialized {
+            #[cfg(test)]
+            if self
+                .test_data
+                .faults
+                .injection
+                .swap(false, std::sync::atomic::Ordering::SeqCst)
+            {
+                return Err(RequestRevisionError::Injection(
+                    "forced test failure".to_owned(),
+                ));
+            }
+            let revision = Self::allocate_revision(&mut owner)?;
+            updater
+                .changed_to(vec![(
+                    RequestRevisionKey::new(self.workspace.dupe()),
+                    revision,
+                )])
+                .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
+            let transaction = updater.commit().await;
+            owner.published_revision = Some(revision);
+            owner.initialized = true;
+            #[cfg(test)]
+            self.test_data
+                .audit
+                .commits
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            drop(owner);
+            Ok(transaction)
+        } else {
+            let transaction = updater.commit().await;
+            drop(owner);
+            Ok(transaction)
+        }
+    }
+
+    /// Validate a provisional native terminal and atomically publish either its
+    /// already-injected selected epoch or the exact changed replacement.
+    pub(super) async fn finalize_native(
+        &self,
+        terminal: &DiceTransaction,
+        certificate: &SourceCertificate,
+        selected_updater: dice::DiceTransactionUpdater,
+        full_epoch: &PathObservationEpoch,
+    ) -> Result<NativeFinalization, RequestRevisionError> {
+        let mut owner = self.owner.lock().await;
+        let current = selected_updater.existing_state().await;
+        if !current.equivalent(terminal) {
+            drop(current);
+            drop(owner);
+            return Ok(NativeFinalization::RetryVersionAdvanced);
+        }
+        drop(current);
+        #[cfg(test)]
+        if self
+            .test_data
+            .faults
+            .nonprogress
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
+            drop(owner);
+            return Ok(NativeFinalization::RetryVersionAdvanced);
+        }
+
+        #[cfg(test)]
+        {
+            let gate = self.test_data.native_finalize_gate.lock().unwrap().clone();
+            if let Some(gate) = gate {
+                gate.enter();
+            }
+        }
+
+        let observed = self.observe_exact(certificate.demand())?;
+        if observed.as_ref() == certificate.observation().as_ref() {
+            let revision = self
+                .commit_native_revision_under_owner(&mut owner, selected_updater)
+                .await?;
+            drop(owner);
+            return Ok(NativeFinalization::Accepted {
+                revision: revision.0,
+            });
+        }
+
+        drop(selected_updater);
+        let merged_epoch = replace_epoch_observation(full_epoch, certificate.demand(), &observed)?;
+        let mut updater = self.updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, merged_epoch.clone())])
+            .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
+        self.commit_native_revision_under_owner(&mut owner, updater)
+            .await?;
+        drop(owner);
+        Ok(NativeFinalization::RetrySourceChanged { merged_epoch })
     }
 
     #[allow(dead_code)]
@@ -353,6 +550,51 @@ impl RequestRevisionRuntime {
             .next_revision
             .checked_add(1)
             .ok_or(RequestRevisionError::RevisionExhausted)?;
+        Ok(revision)
+    }
+
+    async fn commit_native_revision_under_owner(
+        &self,
+        owner: &mut RevisionOwner,
+        mut updater: dice::DiceTransactionUpdater,
+    ) -> Result<RequestRevision, RequestRevisionError> {
+        #[cfg(test)]
+        if self
+            .test_data
+            .faults
+            .injection
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(RequestRevisionError::Injection(
+                "forced test failure".to_owned(),
+            ));
+        }
+        let revision = Self::allocate_revision(owner)?;
+        updater
+            .changed_to(vec![(
+                RequestRevisionKey::new(self.workspace.dupe()),
+                revision,
+            )])
+            .map_err(|error| RequestRevisionError::Injection(error.to_string()))?;
+        #[cfg(test)]
+        if self
+            .test_data
+            .faults
+            .publication
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Err(RequestRevisionError::Publication(
+                "forced test failure".to_owned(),
+            ));
+        }
+        let transaction = updater.commit().await;
+        owner.published_revision = Some(revision);
+        #[cfg(test)]
+        self.test_data
+            .audit
+            .commits
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        drop(transaction);
         Ok(revision)
     }
 
@@ -515,6 +757,27 @@ impl RequestRevisionRuntime {
     }
 }
 
+fn replace_epoch_observation(
+    epoch: &PathObservationEpoch,
+    demand: &PathObservationDemand,
+    observation: &Arc<PathObservationResult>,
+) -> Result<PathObservationEpoch, RequestRevisionError> {
+    if epoch.get(demand).is_none() {
+        return Err(RequestRevisionError::Injection(
+            "native full epoch omitted certificate demand".to_owned(),
+        ));
+    }
+    let entries = epoch.observations().iter().map(|(known, result)| {
+        if known == demand {
+            (known.clone(), observation.as_ref().clone())
+        } else {
+            (known.clone(), result.as_ref().clone())
+        }
+    });
+    PathObservationEpoch::new(entries)
+        .map_err(|error| RequestRevisionError::Injection(error.to_string()))
+}
+
 fn contained_relative_path(path: &Path) -> Result<PathBuf, RequestRevisionError> {
     if path.as_os_str().is_empty()
         || path.is_absolute()
@@ -536,12 +799,18 @@ fn contained_relative_path(path: &Path) -> Result<PathBuf, RequestRevisionError>
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct RequestRevisionKey {
+pub(super) struct RequestRevisionKey {
     workspace: NormalizedAbsolutePath,
 }
 
+impl RequestRevisionKey {
+    pub(super) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
-struct RequestRevision(u64);
+pub(super) struct RequestRevision(u64);
 
 impl fmt::Display for RequestRevisionKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -629,10 +898,7 @@ impl Key for RootHostRequestKey {
                 }
                 RootHostOutcome::Complete(RootTerminal {
                     semantic: self.semantic.dupe(),
-                    certificate: SourceCertificate {
-                        demand,
-                        observation,
-                    },
+                    certificate: SourceCertificate::new(demand, observation),
                 })
             }
             Err(error) => RootHostOutcome::Failure(Arc::from(error.to_string())),
@@ -1087,5 +1353,145 @@ mod tests {
         assert_eq!(recovered.bytes(), Some(&b"other"[..]));
         assert_eq!(audit(&runtime).commits, baseline.commits + 1);
         assert_eq!(audit(&runtime).accepts, baseline.accepts + 1);
+    }
+    #[tokio::test]
+    async fn native_attempt_initialization_publishes_the_existing_epoch_once() {
+        let directory = tempfile::tempdir().unwrap();
+        let runtime = runtime(&directory);
+        let mut updater = runtime.updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = runtime.commit_native_attempt(updater).await.unwrap();
+
+        assert_eq!(
+            transaction
+                .compute(&RequestRevisionKey::new(runtime.workspace.dupe()))
+                .await
+                .unwrap(),
+            RequestRevision(1)
+        );
+        assert!(runtime.owner.lock().await.initialized);
+        assert_eq!(audit(&runtime).commits, 1);
+    }
+    #[tokio::test]
+    async fn native_finalization_commits_current_and_replaces_only_changed_source() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V1").unwrap();
+        let runtime = runtime(&directory);
+        let first = read(&runtime, "defs.bzl", "native", "native")
+            .await
+            .unwrap();
+
+        let mut terminal = runtime.updater().existing_state().await;
+        let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
+        let mut selected = runtime.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, epoch.clone())])
+            .unwrap();
+        assert!(matches!(
+            runtime
+                .finalize_native(&terminal, first.certificate(), selected, &epoch)
+                .await
+                .unwrap(),
+            NativeFinalization::Accepted { revision: 3 }
+        ));
+        drop(terminal);
+
+        let mut terminal = runtime.updater().existing_state().await;
+        let epoch = terminal.compute(&PathObservationEpochKey).await.unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V2").unwrap();
+        let mut selected = runtime.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, epoch.clone())])
+            .unwrap();
+        let result = runtime
+            .finalize_native(&terminal, first.certificate(), selected, &epoch)
+            .await
+            .unwrap();
+        let NativeFinalization::RetrySourceChanged { merged_epoch } = result else {
+            panic!("changed source did not retry");
+        };
+        assert_ne!(
+            merged_epoch.get(first.certificate().demand()).unwrap(),
+            first.certificate().observation()
+        );
+    }
+
+    #[tokio::test]
+    async fn native_finalization_retries_version_advance_then_accepts_successor() {
+        let directory = tempfile::tempdir().unwrap();
+        std::fs::write(directory.path().join("defs.bzl"), b"V1").unwrap();
+        let runtime = runtime(&directory);
+        let first = read(&runtime, "defs.bzl", "version", "version")
+            .await
+            .unwrap();
+
+        let mut stale_terminal = runtime.updater().existing_state().await;
+        let stale_epoch = stale_terminal
+            .compute(&PathObservationEpochKey)
+            .await
+            .unwrap();
+        let unrelated = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(directory.path().join("unrelated")).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let mut advanced_entries = stale_epoch
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.clone(), result.as_ref().clone()))
+            .collect::<Vec<_>>();
+        advanced_entries.push((
+            unrelated,
+            PathObservationResult::FileBytes(slug_workspace_v2::PathOperationResult::Missing),
+        ));
+        let advanced_epoch = PathObservationEpoch::new(advanced_entries).unwrap();
+        let mut advance = runtime.updater();
+        advance
+            .changed_to(vec![(PathObservationEpochKey, advanced_epoch)])
+            .unwrap();
+        drop(runtime.commit(advance).await);
+
+        let commits_before_retry = audit(&runtime).commits;
+        let mut selected = runtime.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, stale_epoch.clone())])
+            .unwrap();
+        assert!(matches!(
+            runtime
+                .finalize_native(&stale_terminal, first.certificate(), selected, &stale_epoch,)
+                .await
+                .unwrap(),
+            NativeFinalization::RetryVersionAdvanced
+        ));
+        assert_eq!(audit(&runtime).commits, commits_before_retry);
+        drop(stale_terminal);
+
+        let mut retry = runtime.updater();
+        retry
+            .changed_to(vec![(PathObservationEpochKey, stale_epoch.clone())])
+            .unwrap();
+        let successor_terminal = runtime.commit_native_attempt(retry).await.unwrap();
+        let mut selected = runtime.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, stale_epoch.clone())])
+            .unwrap();
+        assert!(matches!(
+            runtime
+                .finalize_native(
+                    &successor_terminal,
+                    first.certificate(),
+                    selected,
+                    &stale_epoch,
+                )
+                .await
+                .unwrap(),
+            NativeFinalization::Accepted { .. }
+        ));
+        assert_eq!(audit(&runtime).commits, commits_before_retry + 1);
     }
 }

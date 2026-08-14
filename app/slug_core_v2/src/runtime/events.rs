@@ -94,6 +94,14 @@ pub(super) struct SealedCommandAttempt {
     version: Option<VersionNumber>,
     roots: Arc<[DiceNodeId]>,
     allow_unavailable_roots: bool,
+    armed: bool,
+}
+
+#[derive(Debug)]
+pub(super) struct SelectedTerminalToken {
+    owner: Arc<CommandEffectOwner>,
+    id: CommandAttemptId,
+    armed: bool,
 }
 
 /// Ordered command-local batches selected from one exact terminal closure.
@@ -140,10 +148,11 @@ pub struct PublishedCommand<T> {
     stderr: String,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Debug)]
 pub(super) struct SelectedCommandSidecars {
     events: SelectedEventBatches,
     demands: SelectedWorkspaceDemands,
+    terminal: SelectedTerminalToken,
 }
 
 impl SelectedCommandSidecars {
@@ -155,8 +164,14 @@ impl SelectedCommandSidecars {
         &self.demands
     }
 
-    pub(super) fn into_parts(self) -> (SelectedEventBatches, SelectedWorkspaceDemands) {
-        (self.events, self.demands)
+    pub(super) fn into_parts(
+        self,
+    ) -> (
+        SelectedEventBatches,
+        SelectedWorkspaceDemands,
+        SelectedTerminalToken,
+    ) {
+        (self.events, self.demands, self.terminal)
     }
 
     #[cfg(test)]
@@ -166,6 +181,49 @@ impl SelectedCommandSidecars {
                 batches: Arc::from([]),
             },
             demands,
+            terminal: SelectedTerminalToken::detached_for_test(),
+        }
+    }
+}
+
+impl SelectedTerminalToken {
+    fn new(owner: Arc<CommandEffectOwner>, id: CommandAttemptId) -> Self {
+        Self {
+            owner,
+            id,
+            armed: true,
+        }
+    }
+
+    #[cfg(test)]
+    fn detached_for_test() -> Self {
+        Self {
+            owner: CommandEffectOwner::new(),
+            id: CommandAttemptId(0),
+            armed: false,
+        }
+    }
+
+    pub(super) fn reset_to_idle(mut self) -> Result<(), CommandEffectError> {
+        self.owner.reset_terminal(self.id)?;
+        self.armed = false;
+        Ok(())
+    }
+
+    pub(super) fn disarm(mut self) -> Result<(), CommandEffectError> {
+        if self.armed {
+            self.owner.validate_terminal(self.id)?;
+            self.armed = false;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for SelectedTerminalToken {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = self.owner.reset_terminal(self.id);
+            self.armed = false;
         }
     }
 }
@@ -584,7 +642,33 @@ impl CommandEffectOwner {
             version,
             roots: nodes,
             allow_unavailable_roots,
+            armed: true,
         })
+    }
+
+    fn validate_terminal(&self, id: CommandAttemptId) -> Result<(), CommandEffectError> {
+        let state = self
+            .state
+            .lock()
+            .expect("command effect owner mutex poisoned");
+        if matches!(state.phase, CommandEffectPhase::Terminal(active) if active == id) {
+            Ok(())
+        } else {
+            Err(CommandEffectError::StaleAttempt)
+        }
+    }
+
+    fn reset_terminal(&self, id: CommandAttemptId) -> Result<(), CommandEffectError> {
+        let mut state = self
+            .state
+            .lock()
+            .expect("command effect owner mutex poisoned");
+        if matches!(state.phase, CommandEffectPhase::Terminal(active) if active == id) {
+            state.phase = CommandEffectPhase::Idle;
+            Ok(())
+        } else {
+            Err(CommandEffectError::StaleAttempt)
+        }
     }
 
     fn finish_suppressed(&self, id: CommandAttemptId) -> Result<(), CommandEffectError> {
@@ -727,19 +811,31 @@ impl SealedCommandAttempt {
         let selected_demands = demands
             .select(&closure)
             .map_err(CommandEffectError::Demand)?;
+        let terminal = SelectedTerminalToken::new(self.owner.clone(), self.id);
+        self.armed = false;
         Ok(SelectedCommandSidecars {
             events,
+            terminal,
             demands: selected_demands,
         })
     }
 }
 
+impl Drop for SealedCommandAttempt {
+    fn drop(&mut self) {
+        if self.armed {
+            let _ = self.owner.reset_terminal(self.id);
+            self.armed = false;
+        }
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::fmt;
     use std::hash::Hash;
     use std::hash::Hasher;
     use std::sync::Arc;
+    use std::sync::Weak;
     use std::sync::atomic::AtomicU64;
     use std::sync::atomic::Ordering;
 
@@ -760,12 +856,85 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::AcceptedCommand;
+    use super::CommandAttemptId;
     use super::CommandEffectError;
     use super::CommandEffectOwner;
+    use super::CommandEffectPhase;
     use super::CommandOutputBuffer;
+    use super::SealedCommandAttempt;
     use super::SelectedEventBatches;
+    use super::SelectedTerminalToken;
     use super::TerminalOutput;
     use crate::runtime::demands::WorkspaceDemandOwner;
+
+    fn terminal_owner(id: u64) -> (Arc<CommandEffectOwner>, CommandAttemptId) {
+        let owner = CommandEffectOwner::new();
+        let id = CommandAttemptId(id);
+        owner.state.lock().unwrap().phase = CommandEffectPhase::Terminal(id);
+        (owner, id)
+    }
+
+    #[test]
+    fn selected_terminal_reset_suppresses_and_permits_fresh_attempt() {
+        let (owner, id) = terminal_owner(7);
+        SelectedTerminalToken::new(owner.clone(), id)
+            .reset_to_idle()
+            .unwrap();
+        let fresh = owner.begin_attempt().unwrap();
+        assert_ne!(fresh.id, id);
+        fresh.seal_retry().unwrap();
+    }
+
+    #[test]
+    fn selected_terminal_drop_performs_cancellation_cleanup() {
+        let (owner, id) = terminal_owner(11);
+        drop(SelectedTerminalToken::new(owner.clone(), id));
+        let fresh = owner.begin_attempt().unwrap();
+        assert_ne!(fresh.id, id);
+        fresh.seal_retry().unwrap();
+    }
+    #[test]
+    fn sealed_terminal_drop_cleans_up_cancelled_selection() {
+        let (owner, id) = terminal_owner(12);
+        drop(SealedCommandAttempt {
+            owner: owner.clone(),
+            demands: Weak::new(),
+            id,
+            version: None,
+            roots: Arc::from([]),
+            allow_unavailable_roots: true,
+            armed: true,
+        });
+        let fresh = owner.begin_attempt().unwrap();
+        assert_ne!(fresh.id, id);
+        fresh.seal_retry().unwrap();
+    }
+
+    #[test]
+    fn selected_terminal_accept_disarms_without_reopening_command() {
+        let (owner, id) = terminal_owner(13);
+        SelectedTerminalToken::new(owner.clone(), id)
+            .disarm()
+            .unwrap();
+        assert_eq!(
+            owner.begin_attempt().unwrap_err(),
+            CommandEffectError::CommandFinished
+        );
+    }
+
+    #[test]
+    fn selected_terminal_reset_rejects_nonmatching_attempt() {
+        let (owner, id) = terminal_owner(17);
+        let error = SelectedTerminalToken::new(owner.clone(), CommandAttemptId(18))
+            .reset_to_idle()
+            .unwrap_err();
+        assert_eq!(error, CommandEffectError::StaleAttempt);
+        assert_eq!(
+            owner.begin_attempt().unwrap_err(),
+            CommandEffectError::CommandFinished
+        );
+        owner.reset_terminal(id).unwrap();
+    }
 
     #[test]
     fn opaque_projection_borrows_once_and_retains_exact_terminal_identity() {
@@ -1145,10 +1314,8 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
         let sealed = terminal.seal_terminal()?;
         let selected = select_events(sealed, &terminal_transaction).await?;
         assert_eq!(selected_text(&selected), ["leaf", "parent"]);
-        assert_eq!(
-            owner.begin_attempt().unwrap_err(),
-            CommandEffectError::CommandFinished
-        );
+        let reopened = owner.begin_attempt()?;
+        reopened.seal_retry()?;
 
         let fresh_owner = CommandEffectOwner::new();
         let fresh = fresh_owner.begin_attempt()?;
