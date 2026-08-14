@@ -1,183 +1,151 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-package-marker-frontier-implementation`
+Packet: `WP-2A-m1-root-module-frontier-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: implement and prove exactly one callerless Bzlmod-private observed
-root package-marker/lookup sibling over immutable policy, the accepted observed
-repository-ignore frontier, and ordered `BUILD.bazel`/`BUILD` path-resolution
-frontiers. Preserve every legacy key, caller, diagnostic, terminal, and public
-behavior; completion schedules only docs-only root-module frontier design.
+Result: design and freeze exactly one callerless Bzlmod-private observed
+root-MODULE/include frontier sibling. It must retain every exact Host
+observation that selects and evaluates the dynamically sealed root module
+closure while preserving legacy keys, events, diagnostics, and public
+behavior. This packet is documentation-only.
 
-## Accepted design
+## Accepted predecessor
 
-Commit `2c174ca1` freezes the one-file package-marker frontier design on
-activation `13154327`. Commit `43adf74b` accepts the callerless
-`HostRepositoryIgnoreObservationKey` from design `8ac5c30f` and exact
-activation `c4ecd395`. It
-preserves legacy REPO -> policy -> ordered `.bazelignore` semantics and
-retains the complete accepted Host epoch with no parent event authority.
+Commit `0875728b` accepts the callerless
+`HostRootPackageLookupObservationKey` and
+`ObservedHostRootPackageLookup` from design `2c174ca1`. The sibling preserves
+policy and early exits, consumes only the accepted observed repository-ignore
+frontier, and probes `BUILD.bazel` before `BUILD` in configured root order.
+Every complete child epoch is unioned before semantic interpretation; Need,
+outer error, and cancellation publish no parent carrier.
 
-The sole Rust file changed by +708/-16 raw lines: 243 production and 449
-in-module test lines, 692 net total, with 2,783 physical lines. These are within
-280/450/730 and 2,821. Focused observed proof passes 4/4; all 568 Bzlmod
-unit/integration tests pass; `slug_core_v2` checks; formatting and diff hygiene
-pass. Strict Clippy stops first in unchanged `allocative_derive`; its
-no-dependency run reports only pre-existing crate warnings after the new local
-warning was removed. The archive checker reproduces the inherited missing
-archive-ref/non-V2-thoughts baseline. WSL has no Windows Rust target, so the
-cfg-windows duplicate/operation-mismatch proof is source-checked but not
-executed. Independent ownership and AI-cleanup review accepts the 2,783-line
-repository-ignore file as one cohesive owner.
+The one-file change is +640/-0 raw and net: 211 production plus 429 in-module
+test lines, with 3,995 physical lines. Focused observed proof passes 6/6; all
+574 Bzlmod unit/integration tests pass; `slug_core_v2` checks; formatting and
+diff hygiene pass. Strict Clippy stops in inherited workspace/crate warnings,
+and the archive checker reproduces the inherited archive-ref/non-V2-thoughts
+baseline. Independent ownership and AI-cleanup review accepts the large file
+as one cohesive package lookup/source owner. Retained state is exactly one
+semantic-result Arc plus the accepted Arc-backed epoch.
 
-This predecessor is still a private producer. It does not certify package
-lookup, MODULE loading, source bytes, BUILD evaluation, or any public command.
+This accepted lower producer remains private and callerless. It does not yet
+certify root MODULE evaluation, package-source bytes, BUILD evaluation,
+loading, core finalization, or any public command.
 
 ## Live source boundary
 
-`HostRootPackageLookupKey { workspace, package }` in `host_package.rs`
-currently owns one exact ordered terminal:
+`RootModuleLoadingAnchorKey` is the outward loading anchor over the
+crate-private `HostRootModuleFileKey`. The Host key currently reads the root
+`MODULE.bazel` through legacy `HostFileBytesKey`. A missing root module is a
+bootstrap `Need` rather than a completed value.
 
-1. compute `RootPackageLookupInputsProjectionKey`;
-2. return structural policy errors, invalid package names, configured deleted
-   packages, or the special `external` no-build-file terminal before Host work;
-3. compute legacy `HostRepositoryIgnoreKey`, preserving Need/error and mapping
-   a match to `Deleted`;
-4. for each configured package root in order, probe `BUILD.bazel` and then
-   `BUILD` through legacy `ResolvedPathKey`;
-5. select the first regular/special marker, preserve resolution error
-   precedence, or return `NoBuildFile` after every negative probe.
+After a root file is present, the key discovers include labels and repeatedly
+extends a first-seen include horizon. `preflight_root_include_horizon` resolves
+each discovered include package through legacy `HostRootPackageLookupKey`;
+Need suppresses completion, while invalid/deleted/no-build-file/operational
+outcomes preserve their existing completed error order. Each selected include
+is then read through the legacy Host-file path. The horizon is complete only
+when evaluation discovers no new include work; completed success and semantic
+evaluation errors are published only after that seal.
 
-The accepted `HostRepositoryIgnoreObservationKey` supplies the complete
-predecessor epoch. The accepted `ResolvedPathObservationKey` supplies each
-exact symlink/lstat/negative resolution prefix. Policy, package identity,
-deleted packages, root order, and build-file-name order are immutable semantic
-inputs, not reconstructed Host observations.
+The accepted `HostFileBytesObservationKey` and
+`HostRootPackageLookupObservationKey` now provide exact lower frontiers without
+reconstructing demands. The design must determine whether one private observed
+root-module sibling can consume them while sharing the existing parser,
+preflight, evaluation, event, and diagnostic ownership.
 
-Root MODULE anchoring, BUILD bytes/evaluation, recursive `.bzl`/glob work,
-package-source selection, loading, core finalization, and public commands are
-downstream of this lower lookup terminal and remain outside this packet.
+`HostVisibleLockfileKey` is orthogonal to this loading anchor and belongs to
+later registry/lockfile resolution. `RootPackageSourceKey` and BUILD/.bzl
+loading occur downstream of the anchor. Neither is part of this design.
 
-## Frozen design
+## Required design output
 
-Add exactly one crate-private
-`HostRootPackageLookupObservationKey { workspace: NormalizedAbsolutePath,
-package: PackagePath }` in `host_package.rs`. Its Display is
-`bzlmod-observed-host-root-package-lookup:{workspace}//{package}`; its value is
-`PathOutcome<Result<ObservedHostRootPackageLookup,
-ObservedPathFrontierError>>`; equality is `complete_eq` and validity is
-`is_complete`.
+Freeze one bounded architecture or record `REPLAN`. The accepted design must
+answer all of the following:
 
-`ObservedHostRootPackageLookup` derives `Debug`, `Clone`, `PartialEq`,
-`Eq`, `Allocative`, and `Dupe`. It retains exactly one
-`Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>` plus one
-`PathObservationEpoch`, with crate-private borrowed `result()` and
-`observations()` accessors. Neither sibling computes the other. Do not export
-either new type or change the legacy key, value, error, equality, callers, or
-diagnostics.
+1. Name the exact crate-private key, carrier, visibility boundary, and
+   semantic-result/error Arc. Preserve `HostRootModuleFileKey` and every legacy
+   caller; neither sibling may compute the other.
+2. Specify the exact dependency order: structural root-module inputs, observed
+   root `MODULE.bazel` bytes, each first-seen include label, observed package
+   lookup, and observed include bytes. Include every decisive positive,
+   negative, symlink, and error prefix supplied by the accepted children.
+3. Define dynamic horizon sealing and deterministic union order. Complete
+   success or semantic error may carry a frontier only after no undiscovered
+   include can affect that terminal. Need and cancellation must retain no
+   partial carrier.
+4. Preserve the existing missing-root bootstrap Need, include label/package
+   error precedence, cycle/nonprogress behavior, evaluator result, diagnostics,
+   and event order. Events may remain owned by the existing evaluation path but
+   cannot become certificate authority or be retained in the frontier.
+5. Separate completed inner semantic errors from
+   `ObservedPathFrontierError`. Child outer errors and union
+   mismatch/conflict must remain complete outer errors with no carrier; no
+   panic, string matching, or laundering into legacy errors is allowed.
+6. Reuse `PathObservationEpoch::from_shared` and exact child result Arcs.
+   Classify transient include horizon/evaluator state separately from the
+   DICE-retained semantic Arc and epoch. Retain no evaluator, transaction,
+   event batch, matcher, resolved child, second collection, cache, interner,
+   graph, or historical Host state.
+7. Define complete-only equality/validity, A/B/A and warm behavior, Arc clone
+   boundaries, cancellation release, and zero legacy-key activation proof.
+8. Name the smallest future Rust allowlist, production/test/total caps,
+   physical ceilings, platform gates, direct dependent validation, and the
+   mandatory cohesion decision for every touched file above 2,000 lines.
+   Select exactly one implementation packet or one smaller prerequisite.
 
-Preserve this exact compute and terminal algebra:
-
-1. Compute `RootPackageLookupInputsProjectionKey`. A policy error completes as
-   the existing inner `PolicyInput` error with an empty epoch.
-2. Preserve invalid-package, configured-deletion, and special `external`
-   early exits in their existing order. Each has an exact empty epoch and
-   activates neither observed ignore nor marker resolution.
-3. Compute only `HostRepositoryIgnoreObservationKey`. Forward Need and outer
-   frontier error without a parent carrier. Map its semantic error to the
-   existing inner `RepositoryIgnore` error while retaining the exact epoch.
-   An ignore match completes `Deleted` with that epoch and activates no marker.
-4. For each configured root in order, probe `BUILD.bazel` and then `BUILD`
-   only through `ResolvedPathObservationKey::new(Host, logical_path)`. Union a
-   completed child epoch before inspecting its semantic result.
-5. A resolution semantic error completes the existing inner
-   `Resolution { logical_path, error }` with the full prefix. Regular/special
-   selects the existing `HostPackage`. Missing and every other non-file
-   terminal continue as negative probes. Preserve the legacy terminal-symlink
-   invariant. Exhaustion completes `NoBuildFile` with every negative prefix.
-
-Use one private `union_observations(left, right)` helper backed exclusively by
-`PathObservationEpoch::from_shared`. Input order is accepted ignore epoch,
-then root-major/name-major marker epochs. Equal duplicates coalesce and retain
-the first exact result Arc; conflicting results and operation mismatch stay
-completed outer `ObservedPathFrontierError` values with no carrier. The
-accepted epoch utility owns sorting/allocation; do not add custom cardinality
-arithmetic or another retained Vec/map/cache/interner/graph/store.
-
-Need is the only invalid/self-unequal value. Need, cancellation, and child outer
-failure drop local prefix/epoch scratch and publish no parent carrier. The key
-stores no evaluation data and owns no events. DICE-terminal retained state is
-only the semantic-result Arc and the existing Arc-backed epoch; policy, ignore
-matcher, child resolved values, transaction, event data, and scratch release at
-compute return. Child observation Arcs pointer-share through `from_shared`;
-no deep-copy or historical-host-read claim is permitted.
-
-Focused proof must cover policy error, invalid name, configured deletion, and
-`external` empty epochs with zero observed-child activation; observed-ignore
-success/error/Need/outer and ignored deletion; root/name precedence;
-missing/wrong-kind negatives, regular/special selection, and resolution-error
-prefixes; exact Arc retention, duplicate first-Arc, conflict, and mismatch; zero
-legacy lookup/ignore/resolution activation; complete equality/validity;
-A/B/A/warm; Need/cancellation; and unchanged legacy diagnostics/order.
-
-No new Bazel oracle is required. Existing serial package-marker selection and
-admitted Host observations remain exact regression invariants. Aggregated
-frontier identity/equality is Slug-native. Root MODULE anchoring, package-source
-bytes, BUILD evaluation, `.bzl`, glob, loading/core/public activation,
-routed/materialized repositories, overlap/final-validation, and exact Bazel
-identity bytes remain unsupported/deferred.
-
-The future implementation is exactly `app/slug_bzlmod_v2/src/host_package.rs`
-with colocated tests. Formatted hard caps are 250 production, 430 test, and 680
-total net lines; the physical ceiling is 4,035 from the live 3,355-line
-baseline. Require independent cohesion/AI-cleanup review before and after
-implementation because the file already exceeds 2,000 lines. The change stays
-cohesive only while adjacent to the private root lookup owner and existing
-fixtures; a generic frontier module or public seam is a REPLAN.
+No new Bazel oracle is required for a private representation-only design.
+Existing serial root MODULE/include behavior, diagnostics, event order, and
+admitted Host observations remain exact regression/non-widening invariants.
+Frontier aggregation, dynamic sealing identity, equality, and retry ownership
+are Slug-native. Lockfile/registry resolution, package source, BUILD/.bzl/glob
+evaluation, loading/core/public activation, overlap/final validation,
+routed/materialized repositories, and exact Bazel identity bytes remain
+unsupported/deferred.
 
 ## Authority and caps
 
 Write only:
 
-- `app/slug_bzlmod_v2/src/host_package.rs`; and
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
-  `slug-v2-subplans/current-packet.md`, and
-  `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md` at completion.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `slug-v2-subplans/current-packet.md`; and
+- `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Read only the active packet, this owner section,
+Read only the active packet and owner section,
+`thoughts/shared/plans/slug-v2-plan-authoring-guide.md`,
 `docs/developers/dice.md`,
-`.codex/skills/slug-buck2-utility-reuse/SKILL.md`, the matching Stages-3/6
-row of `slug-v2-subplans/09-v1-extraction-ledger.md`,
+`.codex/skills/slug-buck2-utility-reuse/SKILL.md`, the matching Stages-3/6 row
+of `slug-v2-subplans/09-v1-extraction-ledger.md`,
 `gazebo/dupe/src/lib.rs`, `allocative/allocative/src/lib.rs`, Bzlmod
-`src/{lib,host_package,package_policy,repository_ignore,host_file}.rs`,
-workspace `src/{lib,path_observation,path_resolution}.rs`, the Bzlmod and
-workspace manifests, and directly referenced focused tests in those files.
+`src/{lib,host_module,host_include,host_file,host_package,root_bootstrap,module_eval,package_policy,repository_ignore}.rs`,
+loading `src/{lib,bzl_module}.rs`, workspace
+`src/{lib,path_observation,path_resolution}.rs`, the four relevant Cargo
+manifests, and directly referenced focused tests in those files.
 
-The exact Rust allowlist is `app/slug_bzlmod_v2/src/host_package.rs` with
-colocated tests. Formatted caps are 250 production, 430 test, and 680 total net
-lines; the physical ceiling is 4,035 from 3,355. Completion ledgers are capped
-at 180 net lines. No correction is reserved.
+This docs-only packet is capped at 40 net canonical lines, 340 current-packet
+lines, 300 Stage 2 lines, and 680 total net ledger lines. It authorizes no Rust,
+Cargo, oracle, fixture, generated-file, or archive write.
 
 ## STOP / REPLAN
 
-STOP on every other Rust file; a second package consumer or observed key
-family; root MODULE,
-source bytes, BUILD evaluation, `.bzl`, glob, loading, core, request-revision,
-events, public command/API/output, external/routed/materialized repositories,
-legacy key/value/error changes, public export, Cargo/dependency change, reverse
-edge, generic certificate framework, new container/cache/interner/graph/store,
-reconstructed or direct/historical Host reads, watcher, JVM, or cap excess.
+STOP on code, Cargo, oracle, fixture, public export/API/output, loading/core
+activation, lockfile/registry/package-source/BUILD/.bzl/glob implementation,
+routed/materialized repositories, legacy key/value/error changes, reverse
+dependency, generic certificate framework, new retained container/cache/
+interner/graph/store, reconstructed/direct/historical Host reads, watcher, JVM,
+or combining another consumer.
 
-REPLAN to one smaller docs-only prerequisite if the accepted observed
-repository-ignore or resolved-path carrier cannot be consumed without changing
-legacy keys; policy/root/name precedence cannot be represented structurally;
-some lookup terminal has an additional mutable predecessor; exact negative
-probes are unavailable before completion; union requires another retained
-container; visibility escapes Bzlmod; or one cohesive `host_package.rs`
-implementation cannot be bounded.
+REPLAN to one smaller docs-only prerequisite if the dynamic include horizon
+cannot be sealed before every completed semantic terminal; a completed error
+cannot retain its entire mutable predecessor frontier; include discovery
+requires a reconstructed Host demand or legacy-key rewrite; event/evaluator
+ownership would have to enter the certificate; exact child epochs cannot be
+unioned without new retained storage; visibility escapes Bzlmod; or one
+independently bounded implementation cannot be named.
 
 ## Immediate successor
 
-On implementation acceptance, activate only docs-only
-`WP-2A-m1-root-module-frontier-design`. Do not combine package source, MODULE
-implementation, loading, core, or public activation.
+On design acceptance, activate exactly one bounded Bzlmod-private root-module
+frontier implementation, or the single smaller prerequisite proved necessary.
+Do not combine lockfile, registry, package source, BUILD/.bzl/glob, loading,
+core, request-revision, or public activation.

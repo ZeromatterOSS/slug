@@ -1482,3 +1482,57 @@ consumer, legacy/public/routed/materialized/MODULE/source/loading/core work, new
 retained storage or reconstructed/direct Host reads, and cap excess.
 Completion schedules only docs-only
 `WP-2A-m1-root-module-frontier-design`.
+
+### Accepted host package-marker frontier implementation (2026-08-14)
+
+Commit `0875728b` accepts the callerless crate-private
+`HostRootPackageLookupObservationKey` and
+`ObservedHostRootPackageLookup` from design `2c174ca1`. Policy, invalid,
+deleted, and `external` terminals retain exact empty epochs; only the accepted
+observed repository-ignore and resolved-path siblings supply Host state.
+Every complete child epoch is unioned before semantic interpretation, so
+ignore/resolution errors, ignored deletion, selected regular/special markers,
+and all-negative `NoBuildFile` terminals retain their complete exact prefix.
+Need, outer error, and cancellation publish no parent carrier.
+
+The implementation changes only `host_package.rs` by +640/-0: 211 production
+and 429 in-module test lines, with 3,995 physical lines, within
+250/430/680 and 4,035. Focused observed proof passes 6/6; all 574 Bzlmod
+unit/integration tests pass; `slug_core_v2` checks; formatting and diff hygiene
+pass. Strict Clippy stops in inherited workspace/crate warnings and the archive
+checker reproduces the inherited archive-ref/non-V2-thoughts baseline.
+Independent ownership and AI-cleanup review accepts the file as cohesive.
+Retained state is one semantic-result Arc plus the accepted Arc-backed epoch;
+legacy keys, events, diagnostics, callers, and public behavior remain
+unchanged. The lower producer intentionally remains private and callerless.
+
+### Active root-module frontier design (2026-08-14)
+
+Run docs-only `WP-2A-m1-root-module-frontier-design`. Determine whether one
+callerless Bzlmod-private observed root-module sibling can carry the complete
+mutable Host frontier of `HostRootModuleFileKey` without changing legacy keys.
+
+The design must preserve structural inputs and the missing-root bootstrap Need,
+then compose exact observed root `MODULE.bazel` bytes with every dynamically
+discovered include package lookup and include-file observation. It must freeze
+deterministic first-seen horizon order, complete-only sealing, semantic versus
+outer frontier errors, event/evaluator ownership, exact Arc union, equality,
+memory lifetime, Need/cancellation release, zero legacy activation, and the
+smallest future implementation allowlist/caps. Completed success or semantic
+error may retain a frontier only after no undiscovered include can affect the
+terminal.
+
+Existing serial root MODULE/include behavior, diagnostics, event order, and
+admitted Host observations remain exact regression invariants. Aggregation,
+dynamic sealing identity, equality, and retry ownership are Slug-native.
+Lockfile/registry, package source, BUILD/.bzl/glob, loading/core/public
+activation, routed/materialized repositories, overlap/final validation, and
+exact Bazel identity bytes remain deferred.
+
+Write only canonical/current/Stage 2 under 40/340/300/680. Inspect only the
+bounded Bzlmod/loading/workspace owner sources, DICE guidance, retained-utility
+reuse references, manifests, and focused tests named by the manifest. STOP on
+all code/Cargo/oracle work, public or reverse seams, legacy-key changes, new
+retained storage, reconstructed/direct Host reads, or another consumer.
+Acceptance may activate exactly one bounded private root-module implementation
+or one smaller docs-only prerequisite; otherwise `REPLAN`.
