@@ -1,21 +1,167 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-6-host-root-repository-source-observation-consumer-audit`
+Packet: `WP-4-5-6-host-root-repository-source-observation-consumer-design`
 Milestone: M7 repository source consumer prerequisites
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: choose the first private core consumer of the accepted observation
-owner without combining loading or command migration.
+Result: freeze the first private core consumer of the accepted repository
+source-observation owner without activating loading, packages, or commands.
 
-Scheduling boundary: this audit remains unchanged by the cross-stage reorder.
-Its selected successor may design and implement only the first private core
-source-observation consumer, including a smaller prerequisite `REPLAN` if
-required. Acceptance of that implementation is the canonical source-consumer
-cutover. At that point scheduling pivots to the focused M1 request-revision
-oracle and DICE audit; it does not continue into package, loading, command, or
-public source migration.
+Scheduling boundary: acceptance and implementation of this one private core
+consumer is the fixed source-consumer cutover. After that implementation is
+accepted, scheduling pivots to the focused M1 mutation/concurrent-request
+oracle and Buck2 DICE audit; it does not continue into another M7 consumer.
 
-## Active docs-only audit contract
+Evidence is reused from accepted implementation `cbc44e43`: its pinned Bazel
+9.2 Builtin catalog and Request materialization/source-observation evidence and
+focused regressions remain the exact oracle. This private wrapper adds no new
+user-observable behavior, so no upstream test or fixture is migrated or
+skipped in this packet.
+
+## Active docs-only design contract
+
+Design one callerless private core DICE key
+`HostRootApparentRepositorySourceObservationKey { workspace, apparent_repo,
+requested_path }`. Its constructor accepts exact
+`NormalizedAbsolutePath`, `ApparentRepoName`, and `PathBuf`, and rejects a
+root apparent name. It computes only the accepted
+`HostRootApparentRepositorySourcePathInputKey` first. A predecessor Need is
+forwarded unchanged; a completed path/source-input terminal is retained and
+completes before any observation; and a predecessor compute failure becomes a
+typed private compute terminal. Do not reconstruct a route, capability, source
+input, relative path, request, module name, or repository scope.
+
+For a valid completed predecessor, inspect its borrowed disposition once.
+`Main` completes a no-source certificate retaining the exact completed
+predecessor Arc and performs zero Bzlmod observation computation. `Input`
+clones the borrowed `HostRepositorySourceInput` and
+`HostRepositoryRelativePath` exactly once into
+`HostRepositorySourceObservationKey::new`, computes that key exactly once,
+forwards its first Need unchanged, and retains the exact completed observation
+result Arc. A Bzlmod typed observation error remains typed inside that Arc; a
+DICE compute failure becomes a private compute terminal without parsing
+Display. No second observation, materialization result, path, source-file,
+package, or loading lookup is allowed.
+
+The compact clone boundary is accepted. A Request input clone pointer-shares
+its `Arc<RepositoryMaterializationRequest>`; its capability clone
+pointer-shares `Arc<RepoSpec>`; and the relative-path clone pointer-shares its
+`Arc<PathBuf>`. This is Slug-native shallow ownership at a DICE key boundary,
+not a no-copy claim. Do not add a borrowed Bzlmod constructor, copy RepoSpec or
+catalog state, retain a second identity object, or introduce an interner/cache.
+The core carrier separately retains the exact completed predecessor Arc and,
+for Input only, the exact completed observation Arc.
+
+Freeze certificate
+`HostRootApparentRepositorySourceObservation { predecessor:
+Arc<HostRootApparentRepositorySourcePathInputResult>, observation:
+Option<Arc<HostRepositorySourceObservationResult>> }`. Freeze borrowed
+`HostRootApparentRepositorySourceObservationView<'a>` with exact
+`apparent_repo`, `canonical_repo`, `relative_path`, and disposition, plus
+`HostRootApparentRepositorySourceObservationDispositionView<'a>::Main |
+Input { input: &'a HostRepositorySourceInput, observation: &'a
+HostRepositorySourceObservation }`. Its read-only accessors expose only those
+borrowed facts. `view()` fails closed unless the predecessor is valid, Main is
+paired with no observation, Input is paired with one successful observation,
+and Builtin/Request source-input polarity matches the observation branch.
+
+Freeze result
+`HostRootApparentRepositorySourceObservationResult = Result<certificate,
+error>` and outcome
+`HostRootApparentRepositorySourceObservationOutcome =
+SourcePreparationOutcome<Arc<...Result>>`. Freeze private error fields
+`workspace: NormalizedAbsolutePath`, `apparent_repo: ApparentRepoName`, and
+kind exactly `SourcePath { predecessor } | InvalidSourcePath { predecessor } |
+SourcePathCompute { message } | Observation { predecessor, observation } |
+InvalidObservation { predecessor, observation } | ObservationCompute {
+predecessor, message }`. `SourcePath` and `InvalidSourcePath` retain the
+exact completed predecessor before observation. `SourcePathCompute` is the
+only terminal without a completed predecessor and retains the exact DICE
+message; it occurs before any observation activation. `Observation` retains
+the exact typed Bzlmod terminal Arc. `InvalidObservation` is only fail-closed
+association defense and retains both exact Arcs. `ObservationCompute` retains
+the exact completed predecessor and exact DICE message. Derive structural
+Debug/Clone/PartialEq/Eq/Allocative; Display/Error must not parse another
+Display value.
+
+The key derives structural Debug/Clone/PartialEq/Eq/Hash/Allocative. Complete
+outcomes compare structurally; Need is invalid and self-unequal. Workspace,
+apparent and canonical repository, source capability/policy/spec/request,
+relative path, predecessor, branch, observed value, and typed terminal all
+participate through the retained predecessor and observation Arcs. A/B/A
+restoration must work for each changing factor. The key stores no evaluation
+event data and adds no lock or mutable side state. DICE owns computation,
+deduplication, equality cutoff, invalidation, and release with the retained
+graph generation; command scratch, async-transfer memory, eviction policy, and
+shutdown hooks are inapplicable.
+
+The only prerequisite seam widens the existing source-path key, constructor,
+opaque result/outcome aliases, certificate/view/disposition, and their
+read-only accessors to `pub(super)`. Fields and error taxonomy remain opaque.
+Core already depends on Bzlmod; Bzlmod has no core dependency and remains
+unchanged, so the hidden exported observation ABI is consumed without a
+reverse edge. The source-path module remains cohesive as a private producer;
+the new observation consumer is a separate module rather than extending the
+843-line predecessor beyond its responsibility.
+
+## Compatibility, proof, scope, and stops
+
+Exact compatibility is limited to accepted path/source-input association,
+Main no-source dispatch, and the existing Builtin catalog or Request
+materialization/source observation including first Need and typed terminals.
+The private core key/carrier/error/view names, shallow clone boundary, lifetime,
+and nonobservable scheduling are Slug-native. Loading/package/command/public
+migration, legacy demand replacement, generated custom repository execution,
+new transport/materialization behavior or I/O, request-level M1 source
+certificates, wire changes, and JVM behavior are unsupported/deferred.
+
+Future Rust is exactly new
+`app/slug_core_v2/src/runtime/root_apparent_repository_source_observation.rs`,
+the minimal `pub(super)` seam in existing
+`app/slug_core_v2/src/runtime/root_apparent_repository_source_path_input.rs`,
+and one private `mod root_apparent_repository_source_observation;` in existing
+`app/slug_core_v2/src/runtime/mod.rs`.
+
+Mandatory caps are 340 production, 700 tests, and 1,040 total formatted added
+lines. Physical ceilings are 870 lines for the live 843-line predecessor, 900
+for the new module, and 247 for the live 246-line `mod.rs`; REPLAN on excess.
+The proof must cover path/source terminal before observation; Main with zero
+observation activation; Builtin and Request with exactly one observation;
+predecessor and observation Need forwarding; forced SourcePathCompute with no
+predecessor and zero observation activation; forced ObservationCompute with the
+exact completed predecessor; Builtin value/error/integrity and Request
+Local/Immutable present/absent/wrong-kind/file terminals through the
+accepted owner; exact retained predecessor/observation Arc provenance; shallow
+Request/RepoSpec/path Arc sharing; workspace/apparent/canonical/source/policy/
+spec/path/value/error A/B/A; branch inequality; corruption fail-closed; Need
+invalidity; structural complete equality; cold/warm reuse; zero events; and
+the absence of a second route/materialization/path/source/package/loading edge.
+Run focused new-key tests, the full `slug_core_v2` suite, the direct dependent
+`slug_commands_v2` compile/test named by the implementation packet, Rust
+formatting, archive status, scope/forbidden-edge checks, cleanup, and
+`git diff --check`.
+
+STOP on a fourth Rust file, Bzlmod/Cargo/BUILD edit, public export or caller,
+legacy key/demand mutation, loading/package/command/server behavior, copied
+RepoSpec/request/catalog/path allocation, borrowed Bzlmod constructor, new
+key/store/lock beyond the one named core key, second observation or result
+lookup, path rewriting or source reclassification, new materialization/I/O,
+reverse dependency, evaluator/JVM work, cap/ceiling excess, or inability to
+retain complete structural identity with no events. Require independent design
+acceptance before Rust activation.
+
+## Immediate predecessor audit
+
+Independent ownership audit of live commit `cbc44e43` selected this bounded
+consumer with no prerequisite REPLAN. The source-path owner already provides
+borrowed Main/Input and validated path views while retaining its exact source
+predecessor. Live representation proves the three clones above are Arc-shallow.
+The accepted Bzlmod key already owns one Builtin or Request-result dependency,
+first Need, typed errors, complete structural equality, and no events. Live
+manifests prove `slug_core_v2 -> slug_bzlmod_v2` with no reverse edge. No Rust,
+fixture, key, caller, behavior, or legacy demand changed in the audit.
+
+## Historical audit contract
 
 Implementation `cbc44e43` accepts the hidden Bzlmod observation owner. Audit
 only the exact call/dependency path from the accepted private core

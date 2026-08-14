@@ -3624,3 +3624,20 @@ choose one smallest atomic successor or prerequisite REPLAN. Authorize no Rust,
 new key/store/caller, loading/package/command/public behavior, legacy demand,
 new I/O/materialization, reverse edge, wire, or JVM work. Stage 5 remains
 unchanged.
+
+### Core source-observation dispatch audit selects compact consumer (2026-08-13)
+
+The read-only audit found no prerequisite REPLAN. `HostRepositorySourceInput`
+and `HostRepositoryRelativePath` clone only Arc-owned request, RepoSpec, and
+path allocations, while the core carrier retains the exact completed
+source-path predecessor and observation result Arcs. Run docs-only packet
+`WP-4-5-6-host-root-repository-source-observation-consumer-design` in four
+ledgers under 40/320/240/240/840. Freeze one private callerless core key: path
+predecessor first; Main without observation; Input with exactly one existing
+hidden observation key; exact Need/error/identity and zero events. Future Rust
+is only the new private core observation module, minimal source-path
+`pub(super)` seam, and one private core `runtime/mod.rs` line under
+340/700/1,040 and physical 870/900/247 ceilings. No Bzlmod Rust changes,
+borrowed constructor, reverse edge, deep RepoSpec/catalog copy, legacy demand,
+package/loading/command/public/new-I/O/JVM work, or Rust before independent
+design acceptance. Stage 5 behavior is unchanged.

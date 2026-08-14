@@ -3552,3 +3552,20 @@ Need/error retention, and the owned-versus-borrowed certificate clone boundary;
 choose one smallest atomic successor or prerequisite REPLAN. Authorize no Rust,
 new key/store/caller, loading/package/command/public behavior, legacy demand,
 new I/O/materialization, reverse edge, or JVM work. Stage 4 remains unchanged.
+
+### Core source-observation dispatch audit selects compact consumer (2026-08-13)
+
+The read-only audit found no prerequisite REPLAN. The accepted source input
+and relative path clone shallow Arc-owned request, RepoSpec, and path
+allocations, so the first consumer can be one callerless private core key. Run
+docs-only packet
+`WP-4-5-6-host-root-repository-source-observation-consumer-design` in the four
+ledgers under 40/320/240/240/840. Freeze path-predecessor-first ordering, Main
+with no observation, Input with one hidden Bzlmod observation, exact retained
+predecessor/observation Arcs, typed Need/errors, complete structural identity,
+and zero events. Future Rust is only a new private core observation module,
+minimal source-path `pub(super)` seam, and one private `runtime/mod.rs` line
+under 340/700/1,040 and physical 870/900/247 ceilings. No Rust is authorized
+before independent design acceptance; package/loading/command/public/legacy-
+demand/new-I/O/reverse-edge/JVM work remains deferred. Stage 4 behavior is
+unchanged.
