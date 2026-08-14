@@ -149,8 +149,10 @@ Edit exactly:
 - `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
 Caps are 40 canonical, 300 current-packet, 260 Stage 2, and 600 total net
-ledger lines. Read only `docs/developers/dice.md`; the three relevant Cargo
-manifests; core `runtime/{dice,request_revision,events}.rs`; loading
+ledger lines. Read only `docs/developers/dice.md`; the four relevant Cargo
+manifests; workspace
+`src/{lib,path_observation,path_resolution}.rs`; core
+`runtime/{dice,request_revision,events}.rs`; loading
 `src/{lib,keys,file_discovery,package,bzl_module,load_label,cycle_detector}.rs`;
 Bzlmod
 `src/{lib,dice,source_preparation,root_bootstrap,host_module,host_include,host_package,host_file}.rs`;
