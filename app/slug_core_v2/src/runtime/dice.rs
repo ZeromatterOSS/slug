@@ -432,6 +432,7 @@ pub struct WorkspaceRuntime {
     repository_materializer: Arc<super::repository_io::RepositoryMaterializer>,
     #[allow(dead_code)] // Dormant until the shared retry-driver packet.
     native_demand_sessions: NativeDemandSessionOwner,
+    request_revision: Arc<super::request_revision::RequestRevisionRuntime>,
     #[cfg(test)]
     activation_audit: Option<Arc<ExternalQueryActivationAudit>>,
 }
@@ -3794,6 +3795,11 @@ impl WorkspaceRuntime {
         let dice = dice_builder.build(DetectCycles::Enabled);
         let native_demand_sessions = NativeDemandSessionOwner::new(normalized_workspace.clone());
         let demand_owner = WorkspaceDemandOwner::new(&dice, normalized_workspace);
+        let request_revision = super::request_revision::RequestRevisionRuntime::new(
+            dice.dupe(),
+            NormalizedAbsolutePath::new(workspace.clone())
+                .expect("canonical workspace remains normalized"),
+        );
         Ok(Self {
             workspace,
             process_host,
@@ -3807,6 +3813,7 @@ impl WorkspaceRuntime {
             next_repository_materialization_generation: AtomicU64::new(1),
             repository_materializer,
             native_demand_sessions,
+            request_revision,
             #[cfg(test)]
             activation_audit: None,
         })
@@ -3952,7 +3959,7 @@ impl WorkspaceRuntime {
                 let data = guard.attempt_user_computation_data()?;
                 let mut updater = self.dice.updater_with_data(data);
                 guard.inject_attempt(&mut updater)?;
-                let mut transaction = updater.commit().await;
+                let mut transaction = self.request_revision.commit(updater).await;
                 let root_outcome = attempt_root.compute(&mut transaction).await?;
                 match &root_outcome {
                     slug_bzlmod_v2::SourcePreparationOutcome::Need(needs) => {
@@ -4430,7 +4437,7 @@ impl WorkspaceRuntime {
             .map_err(|error| {
                 QueryError::evaluation(format!("injecting bzlmod request inputs: {error}"))
             })?;
-            let mut transaction = updater.commit().await;
+            let mut transaction = self.request_revision.commit(updater).await;
             evaluate_loading_query_with_policy_and_output_completion(
                 &mut transaction,
                 self.workspace.clone(),
@@ -4623,7 +4630,7 @@ impl WorkspaceRuntime {
                 registry_urls,
             )
             .context("injecting bzlmod request inputs")?;
-            let mut transaction = updater.commit().await;
+            let mut transaction = self.request_revision.commit(updater).await;
             let root_module_graph = transaction
                 .compute(&RootModuleGraphKey {
                     workspace: self.workspace.clone(),
@@ -5013,7 +5020,7 @@ impl NativeDemandCommand<'_> {
                 prior.path_observations,
             )
             .map_err(NativeDemandSessionError::Restoration)?;
-            let transaction = updater.commit().await;
+            let transaction = self.runtime.request_revision.commit(updater).await;
             drop(transaction);
             Ok::<_, NativeDemandSessionError>(())
         })?;
@@ -5515,7 +5522,7 @@ async fn commit_selected_native_demand_snapshot(
         snapshot.path_observations.clone(),
     )
     .map_err(NativeDemandSessionError::Injection)?;
-    let selected_snapshot_transaction = updater.commit().await;
+    let selected_snapshot_transaction = command.runtime.request_revision.commit(updater).await;
     drop(selected_snapshot_transaction);
     // This explicit use after the selected commit makes the terminal
     // transaction's authority lifetime part of the helper contract.

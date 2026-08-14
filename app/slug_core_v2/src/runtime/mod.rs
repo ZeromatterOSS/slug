@@ -20,6 +20,7 @@ mod process_host;
 pub mod reapi;
 mod registry_io;
 mod repository_io;
+mod request_revision;
 mod root_apparent_repository_definition;
 mod root_apparent_repository_route;
 mod root_apparent_repository_source_input;
