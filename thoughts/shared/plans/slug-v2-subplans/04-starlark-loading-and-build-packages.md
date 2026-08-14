@@ -3569,3 +3569,14 @@ under 340/700/1,040 and physical 870/900/247 ceilings. No Rust is authorized
 before independent design acceptance; package/loading/command/public/legacy-
 demand/new-I/O/reverse-edge/JVM work remains deferred. Stage 4 behavior is
 unchanged.
+
+### Core source-observation consumer implementation activated (2026-08-13)
+
+Independent review accepts design `b6d0ecae`. Implement exactly the new private
+core observation module, minimal source-path `pub(super)` seam, and one private
+`runtime/mod.rs` declaration under 340/700/1,040 and physical 870/900/247.
+Preserve Main zero-observation, Input one-observation, split predecessor versus
+observation compute terminals, exact retained Arcs, shallow clone boundary,
+structural equality/Need/events proof, and every no-Bzlmod/caller/loading/
+package/command/legacy-demand/new-I/O/reverse-edge/JVM stop. Stage 4 behavior
+remains unchanged until independent implementation acceptance.

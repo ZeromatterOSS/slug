@@ -3641,3 +3641,15 @@ is only the new private core observation module, minimal source-path
 borrowed constructor, reverse edge, deep RepoSpec/catalog copy, legacy demand,
 package/loading/command/public/new-I/O/JVM work, or Rust before independent
 design acceptance. Stage 5 behavior is unchanged.
+
+### Core source-observation consumer implementation activated (2026-08-13)
+
+Independent review accepts design `b6d0ecae`. Implement exactly the new private
+core observation module, minimal source-path `pub(super)` seam, and one private
+core `runtime/mod.rs` declaration under 340/700/1,040 and physical
+870/900/247. Preserve Main zero-observation, Input one existing hidden Bzlmod
+observation, split predecessor versus observation compute terminals, exact
+retained Arcs, shallow clone boundary, structural equality/Need/events proof,
+and every no-Bzlmod-change/caller/loading/package/command/legacy-demand/new-I/O/
+reverse-edge/JVM stop. Stage 5 behavior remains unchanged until independent
+implementation acceptance.

@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-4-5-6-host-root-repository-source-observation-consumer-design`
+Packet: `WP-4-5-6-host-root-repository-source-observation-consumer-implementation`
 Milestone: M7 repository source consumer prerequisites
 Owner: `slug-v2-subplans/04-starlark-loading-and-build-packages.md` and
 `slug-v2-subplans/05-bzlmod-and-repository-graph.md`
-Result: freeze the first private core consumer of the accepted repository
-source-observation owner without activating loading, packages, or commands.
+Result: implement the accepted first private core repository source-observation
+consumer without activating loading, packages, or commands.
 
 Scheduling boundary: acceptance and implementation of this one private core
 consumer is the fixed source-consumer cutover. After that implementation is
@@ -18,7 +18,34 @@ focused regressions remain the exact oracle. This private wrapper adds no new
 user-observable behavior, so no upstream test or fixture is migrated or
 skipped in this packet.
 
-## Active docs-only design contract
+## Active implementation contract
+
+Independent review accepts design `b6d0ecae`. Implement exactly new
+`app/slug_core_v2/src/runtime/root_apparent_repository_source_observation.rs`,
+the minimal accepted `pub(super)` seam in existing
+`root_apparent_repository_source_path_input.rs`, and one private declaration
+in existing `runtime/mod.rs`. Mandatory caps remain 340 production, 700 tests,
+and 1,040 total formatted added Rust lines; physical ceilings remain 870 for
+the predecessor, 900 for the new module, and 247 for `mod.rs`.
+
+Preserve the complete private certificate/view/result/key ABI, shallow
+Request/RepoSpec/path clone boundary, exact retained predecessor and observation
+Arcs, Main-before-observation and Input-one-observation ordering, split
+`SourcePathCompute`/ `ObservationCompute` ownership, complete structural
+equality, Need invalidity, zero event data, compatibility classes, proof
+matrix, and every stop below. No fourth Rust file, Bzlmod/Cargo/BUILD edit,
+public export/caller, loading/package/command/server or legacy-demand change,
+second observation/result lookup, new materialization/I/O, reverse edge, or JVM
+work is authorized.
+
+Run serially:
+`cargo test -p slug_core_v2 root_apparent_repository_source_observation`,
+`cargo test -p slug_core_v2`, and
+`cargo test -p slug_commands_v2 --no-run`; then Rust formatting,
+`scripts/v2_archive_status.sh`, scope/size/forbidden-edge checks, cleanup, and
+`git diff --check`. Require independent implementation acceptance.
+
+## Accepted docs-only design contract
 
 Design one callerless private core DICE key
 `HostRootApparentRepositorySourceObservationKey { workspace, apparent_repo,
