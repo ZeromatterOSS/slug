@@ -1,0 +1,6 @@
+load(":defs.bzl", "ROOT_SRCS")
+
+filegroup(
+    name = "root",
+    srcs = ROOT_SRCS,
+)

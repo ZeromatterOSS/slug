@@ -47,6 +47,15 @@ class FixtureCommand:
 
 
 @dataclass(frozen=True)
+class ConcurrentCommandGroup:
+    primary: str
+    contender: str
+    gate_path: str
+    gate_content: str
+    mutations: tuple[Mutation, ...]
+
+
+@dataclass(frozen=True)
 class ReapiConfig:
     remote_executor: bool = False
     default_exec_properties: tuple[str, ...] = ()
@@ -85,6 +94,7 @@ class Fixture:
     required_host_os: str | None = None
     http_registry: bool = False
     http_registry_port: int | None = None
+    concurrent_command_group: ConcurrentCommandGroup | None = None
 
     @property
     def expected_oracle(self) -> Path:
@@ -286,6 +296,77 @@ def _parse_provenance(value: Any) -> FixtureProvenance:
     )
 
 
+def _parse_concurrent_command_group(
+    value: Any, commands: list[FixtureCommand]
+) -> ConcurrentCommandGroup | None:
+    if value is None:
+        return None
+    if not isinstance(value, dict):
+        raise ValueError("concurrent_command_group must be a table")
+    expected_keys = {"primary", "contender", "gate_path", "gate_content", "mutations"}
+    if set(value) != expected_keys:
+        raise ValueError(
+            "concurrent_command_group permits only "
+            + ", ".join(sorted(expected_keys))
+        )
+    primary = value["primary"]
+    contender = value["contender"]
+    gate_path = value["gate_path"]
+    gate_content = value["gate_content"]
+    if not isinstance(primary, str) or not primary:
+        raise ValueError("concurrent_command_group.primary must be a non-empty string")
+    if not isinstance(contender, str) or not contender:
+        raise ValueError("concurrent_command_group.contender must be a non-empty string")
+    if primary == contender:
+        raise ValueError("concurrent_command_group primary and contender must differ")
+    if not isinstance(gate_path, str) or not gate_path:
+        raise ValueError("concurrent_command_group.gate_path must be a non-empty string")
+    _validate_relative_path(gate_path, "concurrent_command_group.gate_path")
+    if not isinstance(gate_content, str) or not gate_content:
+        raise ValueError("concurrent_command_group.gate_content must be a non-empty string")
+    mutation_data = value["mutations"]
+    if (
+        not isinstance(mutation_data, list)
+        or len(mutation_data) != 1
+        or not isinstance(mutation_data[0], dict)
+        or set(mutation_data[0]) != {"path", "find", "replace"}
+    ):
+        raise ValueError(
+            "concurrent_command_group requires exactly one ordinary text replacement"
+        )
+    mutations = _parse_mutations(mutation_data)
+    mutation = mutations[0]
+    if mutation.op is not None or not mutation.find or mutation.replace is None:
+        raise ValueError(
+            "concurrent_command_group requires exactly one ordinary text replacement"
+        )
+    if mutation.path == gate_path:
+        raise ValueError("concurrent command mutation path must differ from the FIFO gate")
+    names = [command.name for command in commands]
+    if len(set(names)) != len(names):
+        raise ValueError("concurrent_command_group requires unique command names")
+    if primary not in names or contender not in names:
+        raise ValueError("concurrent_command_group commands must name unique commands")
+    if names[:2] != [primary, contender]:
+        raise ValueError(
+            "concurrent_command_group primary and contender must be adjacent commands zero and one"
+        )
+    for command in commands[:2]:
+        if command.mutations or command.capture_startup_diagnostics:
+            raise ValueError("concurrent command rows cannot declare mutations or diagnostics")
+        if not command.capture_server_epoch:
+            raise ValueError("concurrent command rows must capture the server epoch")
+    if commands[1].expected_exit != 9:
+        raise ValueError("concurrent command contender must expect exit 9")
+    return ConcurrentCommandGroup(
+        primary=primary,
+        contender=contender,
+        gate_path=gate_path,
+        gate_content=gate_content,
+        mutations=mutations,
+    )
+
+
 def load_fixture(path: Path) -> Fixture:
     fixture_file = path / "fixture.toml"
     if not fixture_file.is_file():
@@ -376,6 +457,24 @@ def load_fixture(path: Path) -> Fixture:
         raise ValueError("fixture.observe_server_epochs requires fixture.daemon = true")
     if not observe_server_epochs and any(command.capture_server_epoch for command in commands):
         raise ValueError("commands.capture_server_epoch requires fixture.observe_server_epochs = true")
+    concurrent_command_group = _parse_concurrent_command_group(
+        raw.get("concurrent_command_group"), commands
+    )
+    if concurrent_command_group is not None:
+        if not (daemon and observe_server_epochs and required_host_os == "posix"):
+            raise ValueError(
+                "concurrent_command_group requires daemon, server epochs, and a POSIX host"
+            )
+        all_manifest_roots = [
+            *manifest_roots,
+            *(root for command in commands for root in command.manifest_roots),
+        ]
+        if any(
+            Path(root) == Path(".")
+            or Path(concurrent_command_group.gate_path).is_relative_to(Path(root))
+            for root in all_manifest_roots
+        ):
+            raise ValueError("concurrent command gate must not be at or under a manifest root")
 
     return Fixture(
         name=name,
@@ -400,6 +499,7 @@ def load_fixture(path: Path) -> Fixture:
         required_host_os=required_host_os,
         http_registry=http_registry,
         http_registry_port=http_registry_port,
+        concurrent_command_group=concurrent_command_group,
     )
 
 

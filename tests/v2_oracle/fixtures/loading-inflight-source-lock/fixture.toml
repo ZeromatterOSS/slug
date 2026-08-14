@@ -1,0 +1,81 @@
+[fixture]
+name = "loading-inflight-source-lock"
+description = "Bazel 9.2 package-loading source mutation ordered against same-output-base nonblocking lock contention."
+comparison = "semantic"
+daemon = true
+observe_server_epochs = true
+required_host_os = "posix"
+oracle_notes = "The FIFO proves defs.bzl V1 was demanded before mutation while loading remained in flight. The first V1 result is pinned Bazel-only evidence, not a Slug parity rule. Bazel clients serialize one output base; later overlapping Slug request/final-validation proof is Slug-native."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/test/shell/integration/client_test.sh:465-495 test_noblock_for_lock_reuse_server",
+  "src/test/shell/integration/client_test.sh:286-393 test_multiple_commands_same_output_base",
+  "src/main/cpp/blaze.cc:96-128,286-323",
+  "src/main/cpp/startup_options.cc:73,122",
+  "src/test/java/com/google/devtools/build/lib/skyframe/PackageFunctionTest.java:896-938 testTransitiveStarlarkDepsStoredInPackage",
+  "src/test/java/com/google/devtools/build/lib/skyframe/LocalDiffAwarenessIntegrationTest.java:104-113,270-291 changedFile_detectsChange",
+]
+translation_notes = "Adapts the client FIFO package-loading gate with a loaded defs.bzl edge. Excludes module extensions, repositories, execution-time source edits, and any claim that Bazel final-reobserves during one command."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture loading-inflight-source-lock --tool bazel --bazel /home/wgray/.local/bin/bazel --timeout 120 --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture loading-inflight-source-lock --tool bazel --bazel /home/wgray/.local/bin/bazel --timeout 120"
+
+[concurrent_command_group]
+primary = "inflight_v1_loading"
+contender = "same_output_base_noblock"
+gate_path = "b/BUILD.bazel"
+gate_content = "filegroup(name = \"b\", srcs = [\"gate.txt\"], visibility = [\"//visibility:public\"])\n"
+mutations = [{ path = "a/defs.bzl", find = "V1_SENTINEL", replace = "V2_SENTINEL" }]
+
+[[commands]]
+name = "inflight_v1_loading"
+argv = ["query", "deps(//a:root)"]
+compare = "message_shape"
+expected_exit = 0
+capture_server_epoch = true
+stdout_patterns = ["(?s)\\A(?=.*(?:\\A|\\n)//a:root(?:\\n|\\Z))(?=.*(?:\\A|\\n)//a:before\\.txt(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:b(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:gate\\.txt(?:\\n|\\Z))(?!.*//a:after\\.txt).+\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!M1_INFLIGHT_SOURCE_).)*M1_INFLIGHT_SOURCE_V1(?:(?!M1_INFLIGHT_SOURCE_).)*\\Z"]
+
+[[commands]]
+name = "same_output_base_noblock"
+argv = ["info"]
+startup_argv = ["--noblock_for_lock"]
+compare = "message_shape"
+expected_exit = 9
+capture_server_epoch = true
+stdout_patterns = ["\\A\\Z"]
+stderr_patterns = ["(?s)\\A.*Another command \\(pid=\\d+\\) is running\\. Exiting immediately\\..*\\Z"]
+
+[[commands]]
+name = "post_mutation_v2"
+argv = ["query", "deps(//a:root)"]
+compare = "message_shape"
+expected_exit = 0
+capture_server_epoch = true
+stdout_patterns = ["(?s)\\A(?=.*(?:\\A|\\n)//a:root(?:\\n|\\Z))(?=.*(?:\\A|\\n)//a:after\\.txt(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:b(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:gate\\.txt(?:\\n|\\Z))(?!.*//a:before\\.txt).+\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!M1_INFLIGHT_SOURCE_).)*M1_INFLIGHT_SOURCE_V2(?:(?!M1_INFLIGHT_SOURCE_).)*\\Z"]
+
+[[commands]]
+name = "warm_v2_no_replay"
+argv = ["query", "deps(//a:root)"]
+compare = "message_shape"
+expected_exit = 0
+capture_server_epoch = true
+stdout_patterns = ["(?s)\\A(?=.*(?:\\A|\\n)//a:root(?:\\n|\\Z))(?=.*(?:\\A|\\n)//a:after\\.txt(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:b(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:gate\\.txt(?:\\n|\\Z))(?!.*//a:before\\.txt).+\\Z"]
+stderr_patterns = ["(?s)\\A(?!.*M1_INFLIGHT_SOURCE_).*\\Z"]
+
+[[commands]]
+name = "restored_v1"
+argv = ["query", "deps(//a:root)"]
+compare = "message_shape"
+expected_exit = 0
+capture_server_epoch = true
+stdout_patterns = ["(?s)\\A(?=.*(?:\\A|\\n)//a:root(?:\\n|\\Z))(?=.*(?:\\A|\\n)//a:before\\.txt(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:b(?:\\n|\\Z))(?=.*(?:\\A|\\n)//b:gate\\.txt(?:\\n|\\Z))(?!.*//a:after\\.txt).+\\Z"]
+stderr_patterns = ["(?s)\\A(?:(?!M1_INFLIGHT_SOURCE_).)*M1_INFLIGHT_SOURCE_V1(?:(?!M1_INFLIGHT_SOURCE_).)*\\Z"]
+
+  [[commands.mutations]]
+  path = "a/defs.bzl"
+  find = "V2_SENTINEL"
+  replace = "V1_SENTINEL"

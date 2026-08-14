@@ -8,6 +8,7 @@ import socket
 import stat
 import subprocess
 import sys
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -50,6 +51,8 @@ from tools.v2_oracle_lib.runner import (
     _shutdown_bazel_daemon,
     _wait_for_bazel_shutdown,
     _slug_reapi_argv,
+    _run_loading_inflight_group,
+    _stop_group,
     run_fixture,
 )
 
@@ -2325,3 +2328,323 @@ def test_reapi_evidence_comparison_rejects_empty_uploads_on_ac_miss() -> None:
     }
     failures = compare_result(fixture, actual, expected=expected)
     assert any("uploaded_digests must be nonempty" in f for f in failures)
+
+
+
+def test_group_cleanup_kills_and_reaps_after_termination_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    signals: list[int] = []
+
+    class Process:
+        pid = 17
+        calls = 0
+
+        def poll(self) -> None:
+            return None
+
+        def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+            self.calls += 1
+            assert timeout == 5
+            if self.calls == 1:
+                raise subprocess.TimeoutExpired(["fake"], timeout)
+            return ("", "")
+
+    def killpg(pid: int, signal: int) -> None:
+        assert pid == 17
+        signals.append(signal)
+        if signal == 0:
+            raise ProcessLookupError
+
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.os.killpg", killpg)
+    process = Process()
+    _stop_group(process)  # type: ignore[arg-type]
+    assert signals == [15, 9, 0]
+    assert process.calls == 2
+_GROUP_FIXTURE = FIXTURES / "loading-inflight-source-lock"
+
+
+def _group_fixture_copy(tmp_path: Path) -> Path:
+    root = tmp_path / "fixture"
+    root.mkdir()
+    (root / "fixture.toml").write_text(
+        (_GROUP_FIXTURE / "fixture.toml").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    return root
+
+
+def test_concurrent_group_fixture_parses_exact_contract() -> None:
+    group = load_fixture(_GROUP_FIXTURE).concurrent_command_group
+    assert group is not None
+    assert (group.primary, group.contender, group.gate_path) == (
+        "inflight_v1_loading",
+        "same_output_base_noblock",
+        "b/BUILD.bazel",
+    )
+    assert group.mutations == (
+        Mutation(path="a/defs.bzl", find="V1_SENTINEL", replace="V2_SENTINEL"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("old", "new", "message"),
+    [
+        (
+            "[concurrent_command_group]\n",
+            "[concurrent_command_group]\nextra = true\n",
+            "permits only",
+        ),
+        (
+            'contender = "same_output_base_noblock"',
+            'contender = "post_mutation_v2"',
+            "adjacent commands zero and one",
+        ),
+        (
+            'name = "post_mutation_v2"',
+            'name = "inflight_v1_loading"',
+            "unique command names",
+        ),
+        (
+            "capture_server_epoch = true",
+            'mutations = [{ path = "a/defs.bzl", find = "x", replace = "y" }]\n'
+            "capture_server_epoch = true",
+            "cannot declare mutations",
+        ),
+        (
+            "capture_server_epoch = true",
+            "capture_startup_diagnostics = true\ncapture_server_epoch = true",
+            "cannot declare mutations or diagnostics",
+        ),
+        (
+            "capture_server_epoch = true",
+            "capture_server_epoch = false",
+            "must capture the server epoch",
+        ),
+        ("expected_exit = 9", "expected_exit = 8", "must expect exit 9"),
+        (
+            'comparison = "semantic"',
+            'comparison = "semantic"\nmanifest_roots = ["."]',
+            "must not be at or under a manifest root",
+        ),
+        (
+            'path = "a/defs.bzl"',
+            'path = "b/BUILD.bazel"',
+            "must differ from the FIFO gate",
+        ),
+    ],
+)
+def test_concurrent_group_parser_rejects_contract_widening(
+    tmp_path: Path, old: str, new: str, message: str
+) -> None:
+    root = _group_fixture_copy(tmp_path)
+    fixture_toml = root / "fixture.toml"
+    text = fixture_toml.read_text(encoding="utf-8")
+    assert old in text
+    fixture_toml.write_text(text.replace(old, new, 1), encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        load_fixture(root)
+
+
+class _GroupProcess:
+    def __init__(self, index: int, cwd: Path, behavior: str) -> None:
+        self.pid = 4100 + index
+        self.returncode: int | None = None
+        self._index = index
+        self._behavior = behavior
+        self._reader: threading.Thread | None = None
+        self.gate_content: str | None = None
+        self.reaped = False
+        if index == 0 and behavior != "gate_timeout":
+            self._reader = threading.Thread(
+                target=self._read_gate,
+                args=(cwd / "b" / "BUILD.bazel",),
+                name="test-fifo-primary",
+            )
+            self._reader.start()
+
+    def _read_gate(self, gate: Path) -> None:
+        with gate.open("r", encoding="utf-8") as source:
+            if self._behavior == "early_exit":
+                self.returncode = 1
+            self.gate_content = source.read()
+        if self.returncode is None:
+            self.returncode = 0
+
+    def poll(self) -> int | None:
+        if self._behavior == "early_exit":
+            return 1
+        return self.returncode
+
+    def communicate(self, timeout: float | None = None) -> tuple[str, str]:
+        if self._index == 1:
+            if self._behavior == "contender_timeout":
+                raise subprocess.TimeoutExpired(["fake-contender"], timeout)
+            self.returncode = 0 if self._behavior == "contender_wrong_exit" else 9
+            return ("", "Another command (pid=4100) is running. Exiting immediately.")
+        assert self._reader is not None
+        self._reader.join(timeout)
+        if self._reader.is_alive():
+            raise subprocess.TimeoutExpired(["fake-primary"], timeout)
+        return (
+            "//a:before.txt\n//a:root\n//b:b\n//b:gate.txt\n",
+            "M1_INFLIGHT_SOURCE_V1\n",
+        )
+
+    def stop(self) -> None:
+        self.returncode = -15
+        if self._reader is not None:
+            self._reader.join(1)
+        self.reaped = True
+
+
+def _run_group_case(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    behavior: str = "success",
+    timeout: float = 2,
+    processes: list[_GroupProcess] | None = None,
+) -> tuple[list[dict[str, object]], dict[str, object], Path, list[_GroupProcess]]:
+    fixture = load_fixture(_GROUP_FIXTURE)
+    workspace = tmp_path / "workspace"
+    shutil.copytree(fixture.workspace, workspace)
+    output_base = tmp_path / "output-base"
+    output_base.mkdir()
+    processes = [] if processes is None else processes
+
+    def popen(argv: list[str], **kwargs: object) -> _GroupProcess:
+        assert kwargs["start_new_session"] is True
+        process = _GroupProcess(len(processes), Path(str(kwargs["cwd"])), behavior)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr("tools.v2_oracle_lib.runner.subprocess.Popen", popen)
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._read_bazel_server_identity",
+        lambda _: BazelServerIdentity(99, "start", ("127.0.0.1", 1234)),
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._stop_group", lambda process: process.stop()
+    )
+    records, evidence = _run_loading_inflight_group(
+        fixture,
+        ToolConfig(name="bazel", executable=Path("/fake/bazel")),
+        RunOptions(run_root=tmp_path / "runs", timeout_seconds=timeout),
+        workspace,
+        output_base,
+        {},
+        ServerEpochs(),
+    )
+    return records, evidence, workspace, processes
+
+
+def test_concurrent_group_handshake_orders_records_and_replaces_gate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    records, evidence, workspace, processes = _run_group_case(
+        tmp_path, monkeypatch
+    )
+    assert [record["name"] for record in records] == [
+        "inflight_v1_loading",
+        "same_output_base_noblock",
+    ]
+    assert [record["exit_code"] for record in records] == [0, 9]
+    assert [record["server_epoch"] for record in records] == [1, 1]
+    assert records[1]["mutations"][0]["path"] == "a/defs.bzl"
+    gate = workspace / "b" / "BUILD.bazel"
+    assert gate.is_file() and not stat.S_ISFIFO(gate.stat().st_mode)
+    group = load_fixture(_GROUP_FIXTURE).concurrent_command_group
+    assert group is not None
+    assert gate.read_text(encoding="utf-8") == group.gate_content
+    assert processes[0].gate_content == group.gate_content
+    assert evidence["gate_mode"] == "0600"
+    assert "V2_SENTINEL" in (workspace / "a" / "defs.bzl").read_text(
+        encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize(
+    ("behavior", "message"),
+    [
+        ("early_exit", "primary exited before FIFO release"),
+        ("gate_timeout", "FIFO gate readiness"),
+        ("contender_timeout", "collecting lock contender"),
+        ("contender_wrong_exit", "lock contender must exit 9"),
+    ],
+)
+def test_concurrent_group_failure_cleans_fifo_and_processes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    behavior: str,
+    message: str,
+) -> None:
+    processes: list[_GroupProcess] = []
+    with pytest.raises((RuntimeError, TimeoutError), match=message):
+        _run_group_case(
+            tmp_path,
+            monkeypatch,
+            behavior,
+            timeout=0.05 if behavior == "gate_timeout" else 2,
+            processes=processes,
+        )
+    assert not (tmp_path / "workspace" / "b" / "BUILD.bazel").exists()
+    if behavior == "early_exit":
+        assert processes[0].reaped
+
+
+def test_concurrent_group_writer_and_replacement_failures_cleanup(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_open = Path.open
+
+    def fail_writer(path: Path, *args: object, **kwargs: object):
+        if path.name == "BUILD.bazel" and args and args[0] == "w":
+            raise OSError("writer failed")
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", fail_writer)
+    with pytest.raises(RuntimeError, match="writer failed before readiness"):
+        _run_group_case(tmp_path, monkeypatch, behavior="gate_timeout")
+    assert not (tmp_path / "workspace" / "b" / "BUILD.bazel").exists()
+
+    monkeypatch.undo()
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner.os.replace",
+        lambda *_: (_ for _ in ()).throw(OSError("replace failed")),
+    )
+    replace_root = tmp_path / "replace"
+    replace_root.mkdir()
+    with pytest.raises(OSError, match="replace failed"):
+        _run_group_case(replace_root, monkeypatch)
+    assert not (replace_root / "workspace" / "b" / "BUILD.bazel").exists()
+
+
+def test_concurrent_group_preserves_primary_error_with_cleanup_cause(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = load_fixture(_GROUP_FIXTURE)
+    workspace = tmp_path / "workspace"
+    shutil.copytree(fixture.workspace, workspace)
+    output_base = tmp_path / "output-base"
+    output_base.mkdir()
+    process = _GroupProcess(0, workspace, "gate_timeout")
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner.subprocess.Popen", lambda *_, **__: process
+    )
+    monkeypatch.setattr(
+        "tools.v2_oracle_lib.runner._stop_group",
+        lambda _: (_ for _ in ()).throw(RuntimeError("cleanup failed")),
+    )
+    with pytest.raises(TimeoutError) as error:
+        _run_loading_inflight_group(
+            fixture,
+            ToolConfig(name="bazel", executable=Path("/fake/bazel")),
+            RunOptions(run_root=tmp_path / "runs", timeout_seconds=0.05),
+            workspace,
+            output_base,
+            {},
+            ServerEpochs(),
+        )
+    assert isinstance(error.value.__cause__, RuntimeError)
+    assert "cleanup failed" in str(error.value.__cause__)
+    assert not (workspace / "b" / "BUILD.bazel").exists()

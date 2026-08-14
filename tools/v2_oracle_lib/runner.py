@@ -7,10 +7,12 @@ import os
 import re
 import select
 import shutil
+import signal
 import socket
 import stat
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -784,6 +786,218 @@ def _extract_reapi_evidence(stderr: str) -> dict[str, Any] | None:
     return None
 
 
+def _remaining(deadline: float, phase: str) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise TimeoutError(f"timed out while {phase}")
+    return remaining
+
+
+def _stop_group(process: subprocess.Popen[str]) -> None:
+    if process.poll() is None:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        try:
+            process.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate(timeout=5)
+    else:
+        process.communicate()
+    try:
+        os.killpg(process.pid, 0)
+    except ProcessLookupError:
+        return
+    raise RuntimeError("process group survived cleanup")
+
+
+def _run_loading_inflight_group(
+    fixture: Fixture,
+    tool: ToolConfig,
+    options: RunOptions,
+    workspace: Path,
+    output_base: Path,
+    replacements: dict[str, str],
+    epochs: ServerEpochs,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    group = fixture.concurrent_command_group
+    assert group is not None
+    if tool.name != "bazel" or fixture.http_registry or fixture.reapi.remote_executor:
+        raise RuntimeError("concurrent command groups are Bazel-only without services")
+    primary, contender = fixture.commands[:2]
+    gate = _workspace_mutation_entry_path(workspace, group.gate_path)
+    if os.path.lexists(gate):
+        raise FileExistsError(f"concurrent command gate already exists: {group.gate_path}")
+    parent = gate.parent
+    if not parent.is_dir() or parent.is_symlink():
+        raise FileNotFoundError("concurrent command gate parent must be an existing real directory")
+    os.mkfifo(gate, 0o600)
+    if not stat.S_ISFIFO(gate.lstat().st_mode) or stat.S_IMODE(gate.stat().st_mode) != 0o600:
+        gate.unlink()
+        raise RuntimeError("concurrent command gate is not a mode-0600 FIFO")
+
+    deadline = time.monotonic() + options.timeout_seconds
+    ready, release, cancel, signalled = (threading.Event() for _ in range(4))
+    writer_errors: list[BaseException] = []
+    primary_process: subprocess.Popen[str] | None = None
+    contender_process: subprocess.Popen[str] | None = None
+    reader: int | None = None
+    thread_started = False
+
+    def writer() -> None:
+        try:
+            with gate.open("w", encoding="utf-8", newline="") as output:
+                ready.set()
+                signalled.set()
+                release.wait()
+                if not cancel.is_set():
+                    output.write(group.gate_content)
+                    output.flush()
+        except BaseException as error:
+            writer_errors.append(error)
+            signalled.set()
+
+    thread = threading.Thread(target=writer, name="v2-oracle-fifo-writer")
+    failure: BaseException | None = None
+    try:
+        thread.start()
+        thread_started = True
+        def start(command: FixtureCommand) -> tuple[subprocess.Popen[str], list[str], float]:
+            env = os.environ.copy()
+            env.update(dict(fixture.env))
+            env.update(dict(command.env))
+            argv = _argv(tool, fixture, command, output_base)
+            return (
+                subprocess.Popen(
+                    argv, cwd=workspace, env=env, text=True,
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    start_new_session=True,
+                ),
+                argv,
+                time.monotonic(),
+            )
+
+        primary_process, primary_argv, primary_started = start(primary)
+        if not signalled.wait(_remaining(deadline, "waiting for FIFO gate readiness")):
+            raise TimeoutError("timed out while waiting for FIFO gate readiness")
+        if writer_errors:
+            raise RuntimeError("FIFO writer failed before readiness") from writer_errors[0]
+        if not ready.is_set():
+            raise RuntimeError("FIFO writer did not acknowledge readiness")
+        if primary_process.poll() is not None:
+            raise RuntimeError("primary exited before FIFO release")
+
+        mutation_row = FixtureCommand(
+            name=group.contender, argv=(), compare=fixture.compare, mutations=group.mutations
+        )
+        mutations = _apply_mutations(workspace, mutation_row)
+        contender_process, contender_argv, contender_started = start(contender)
+        try:
+            contender_out, contender_err = contender_process.communicate(
+                timeout=_remaining(deadline, "collecting lock contender")
+            )
+        except subprocess.TimeoutExpired as error:
+            raise TimeoutError("timed out while collecting lock contender") from error
+        if contender_process.returncode != 9:
+            raise RuntimeError(f"lock contender must exit 9, got {contender_process.returncode}")
+        contender_duration = int((time.monotonic() - contender_started) * 1000)
+
+        release.set()
+        try:
+            primary_out, primary_err = primary_process.communicate(
+                timeout=_remaining(deadline, "collecting FIFO primary")
+            )
+        except subprocess.TimeoutExpired as error:
+            raise TimeoutError("timed out while collecting FIFO primary") from error
+        primary_duration = int((time.monotonic() - primary_started) * 1000)
+        thread.join(_remaining(deadline, "joining FIFO writer"))
+        if thread.is_alive() or writer_errors:
+            raise RuntimeError("FIFO writer failed during release")
+        gate.unlink()
+        replacement = gate.parent / f".{gate.name}.release-{os.getpid()}"
+        try:
+            replacement.write_text(group.gate_content, encoding="utf-8", newline="")
+            os.replace(replacement, gate)
+        finally:
+            if replacement.exists():
+                replacement.unlink()
+        if not gate.is_file() or gate.is_symlink():
+            raise RuntimeError("FIFO gate regular-file replacement failed")
+    except BaseException as error:
+        failure = error
+        raise
+    finally:
+        cancel.set()
+        release.set()
+        errors: list[BaseException] = []
+        try:
+            if gate.exists() and stat.S_ISFIFO(gate.lstat().st_mode):
+                reader = os.open(gate, os.O_RDONLY | os.O_NONBLOCK)
+        except BaseException as error:
+            errors.append(error)
+        for process in (contender_process, primary_process):
+            if process is not None and (failure is not None or process.poll() is None):
+                try:
+                    _stop_group(process)
+                except BaseException as error:
+                    errors.append(error)
+        if thread_started:
+            try:
+                thread.join(5)
+            except BaseException as error:
+                errors.append(error)
+            if thread.is_alive():
+                errors.append(RuntimeError("FIFO writer survived cleanup"))
+        if reader is not None:
+            try:
+                os.close(reader)
+            except BaseException as error:
+                errors.append(error)
+        try:
+            if gate.exists() and stat.S_ISFIFO(gate.lstat().st_mode):
+                gate.unlink()
+        except BaseException as error:
+            errors.append(error)
+        if errors:
+            if failure is not None:
+                raise failure from errors[0]
+            raise errors[0]
+
+    def record(
+        command: FixtureCommand, argv: list[str], code: int, stdout: str, stderr: str,
+        duration_ms: int, applied: list[dict[str, str | None]],
+    ) -> dict[str, Any]:
+        env = os.environ.copy()
+        env.update(dict(fixture.env))
+        env.update(dict(command.env))
+        return {
+            "name": command.name, "argv": command.argv, "executed_argv": argv,
+            "fixture_startup_argv": fixture.startup_argv, "startup_argv": command.startup_argv,
+            "env_allowlist": {key: env.get(key) for key in command.env_allowlist},
+            "fixture_env_overrides": dict(fixture.env), "env_overrides": dict(command.env),
+            "cwd": str(workspace), "exit_code": code, "stdout": stdout, "stderr": stderr,
+            "normalized_stdout": normalize_text(stdout, replacements),
+            "normalized_stderr": normalize_text(stderr, replacements),
+            "duration_ms": duration_ms, "mutations": applied,
+            "manifest": _collect_manifest(
+                workspace, command.manifest_roots or fixture.manifest_roots, None
+            ),
+            "server_epoch": epochs.observe(_read_bazel_server_identity(output_base)),
+        }
+
+    return (
+        [
+            record(primary, primary_argv, primary_process.returncode, primary_out, primary_err, primary_duration, []),
+            record(contender, contender_argv, contender_process.returncode, contender_out, contender_err, contender_duration, mutations),
+        ],
+        {"primary": group.primary, "contender": group.contender, "gate_path": group.gate_path, "gate_mode": "0600"},
+    )
+
 def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict[str, Any]:
     if fixture.required_host_os == "posix" and os.name != "posix":
         raise RuntimeError(
@@ -836,7 +1050,17 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
             )
             replacements.update(path_replacements(http_registry=registry_endpoint))
         records: list[dict[str, Any]] = []
-        for command_index, command in enumerate(fixture.commands, start=1):
+        coordination: list[dict[str, Any]] = []
+        commands = fixture.commands
+        command_start = 1
+        if fixture.concurrent_command_group is not None:
+            records, evidence = _run_loading_inflight_group(
+                fixture, tool, options, workspace, output_base, replacements, epochs
+            )
+            coordination.append(evidence)
+            commands = fixture.commands[2:]
+            command_start = 3
+        for command_index, command in enumerate(commands, start=command_start):
             mutations = _apply_mutations(workspace, command)
             argv = _argv(tool, fixture, command, output_base)
             if registry_endpoint is not None:
@@ -980,6 +1204,7 @@ def run_fixture(fixture: Fixture, tool: ToolConfig, options: RunOptions) -> dict
         "workspace": str(workspace),
         "output_base": str(output_base),
         "commands": records,
+        **({"concurrent_command_groups": coordination} if coordination else {}),
     }
     (run_dir / f"{tool.name}.json").write_text(json.dumps(result, indent=2, sort_keys=True), encoding="utf-8")
     return result
