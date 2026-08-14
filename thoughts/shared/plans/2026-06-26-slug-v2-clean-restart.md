@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; private root-host request-revision implementation active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, and the accepted request-revision design in `94324880`; full evidence is in the owner plans | production still depends on coarse whole-workspace snapshots and lacks request-private source certificates, final reobservation, atomic revision acceptance, and overlapping-request proof; external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than M1 blockers | implement the accepted one-file Host request-revision/source-certificate vertical |
+| M1: one semantic spine | **partial; private root-host request-revision accepted, loading/public audit active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the accepted request-revision design in `94324880`, and the private one-file request-revision/source-certificate vertical in `207fe438`; full evidence is in the owner plans | the accepted private family is callerless, while production loading/public commands still depend on coarse whole-workspace snapshots; directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than this audit's scope | audit the smallest loading/public migration and select one bounded implementation successor |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-2A-m1-root-host-request-revision](./slug-v2-subplans/current-packet.md).
+[WP-2A-m1-loading-public-migration-audit](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -1473,3 +1473,29 @@ Independent review accepts design `7ef0c353`. Implement only Bzlmod
 Hash/Eq identity, one Builtin or request-result dependency, branch-specific
 values/errors, proof, and all no-caller/core/loading/command/legacy-demand/
 second-result/new-I/O/public/reverse-edge/JVM stops.
+
+### M1 private root-host request revision accepted; loading/public audit next (2026-08-13)
+
+Independent ownership and cleanup review accepts `207fe438`. One retained
+`Arc<Dice>` now has a private one-file Host request family with immutable
+semantic/presentation overlay separation, exact source certificates, final
+reobservation, atomic revision/observation commits, stale-terminal suppression,
+bounded retry, and shared-work cancellation. The same async nonreentrant owner
+closes all five live production commit sites without spanning DICE compute,
+Starlark, repository work, or event formatting.
+
+Focused proof passes 7/7, the full crate passes 210 unit and 12 integration
+tests with two independently reproduced out-of-packet baseline failures
+skipped, and accounting closes at 456/560 production, 648/700 test, and
+1,104/1,520 total lines. Strict Clippy and targeted Bazel-Rust validation are
+blocked in unchanged `allocative_derive` and the absent `rules_rust`
+toolchain; local Clippy has no new-module warning.
+
+Run only docs packet `WP-2A-m1-loading-public-migration-audit` under
+40/220/220/480. Map the exact public/daemon-to-loading call chains, including
+the accepted direct root exported-source/filegroup source terminal, and
+compare that path with root module, BUILD, `.bzl`, and loading-query
+candidates. Select one one-file Host migration or prerequisite `REPLAN`.
+Authorize no Rust,
+snapshot replacement, public activation, new key/store, repository/
+materialization, oracle generation, or JVM work.

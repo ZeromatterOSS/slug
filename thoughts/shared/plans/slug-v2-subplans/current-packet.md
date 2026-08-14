@@ -1,217 +1,127 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-host-request-revision`
+Packet: `WP-2A-m1-loading-public-migration-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: implement the accepted smallest Rust-native root-host
-request-revision/source-certificate vertical.
+Result: audit the smallest loading/public consumer of the accepted private
+root-host request-revision family and select one bounded implementation
+successor. This packet is documentation-only.
 
-The source-consumer cutover `53152727`, post-cutover audit `47090561`, and
-focused oracle implementation `2ffad088` are fixed predecessors. The
-reviewed design is accepted in `94324880`. This packet implements only its
-private one-file Host vertical; it cannot activate public commands, loading,
-Bzlmod, repositories, or materialized paths.
+## Fixed predecessor
 
-## Accepted prerequisite
+Commit `207fe438` accepts the callerless one-file Host vertical designed in
+`94324880` after the pinned Bazel 9.2 ordering evidence in `2ffad088`.
+`WorkspaceRuntime` owns one `RequestRevisionRuntime` over its retained
+`Arc<Dice>`; all five live production updater/commit sites share its async,
+nonreentrant publication owner. The private root key consumes a Slug-native
+revision plus the existing typed `PathObservationKey`, retains an exact
+one-demand source certificate, final-reobserves under the publication owner,
+and discards a stale provisional terminal before bounded retry. It retains no
+transaction, evaluator, accepted semantic snapshot, worker, or manual cache.
 
-`loading-inflight-source-lock` records five Bazel 9.2 rows in one server
-epoch: unmixed V1 primary, exit-9 same-output-base contender, V2 after mutation,
-marker-free warm V2, and restored V1. Generation, two independent fresh-root
-replays, and one post-correction replay match the checked-in normalized oracle.
-The implementation passed 19 focused harness tests; the full module passed 119
-tests with only its three pre-existing stale fixture-cardinality assertions.
-Production harness, harness tests, authored fixture, and generated oracle closed
-at 325/430, 323/380, 95/150, and 169/500 net lines. The FIFO proves causal
-ordering only; Bazel's V1 terminal and serialized clients do not define Slug
-request concurrency or final validation.
+The accepted proof covers contained and missing paths, relevant/irrelevant
+overlay identity, serial V1/V2/warm/A-B-A/restoration, two genuinely
+overlapping post-demand requests with V1 discarded and V2-only acceptance,
+exact observation/commit/retry counters, one-waiter and last-waiter
+cancellation, forced observation/injection/publication/nonprogress failures,
+lock-state assertions, idle cleanup, and no leaked gate or publishable failure.
+Focused `cargo test -p slug_core_v2 request_revision -- --nocapture` passes
+7/7; `cargo check -p slug_core_v2` passes. The full suite passes 210 unit and
+12 integration tests when two independently reproducible inherited failures
+are skipped:
 
-## Live ownership and DICE findings
+- `direct_external_query_uses_host_route_native_materialization_and_apparent_output`
+  expects an older external-repository visibility diagnostic; and
+- `loaded_custom_rule_reaches_analysis_and_declares_an_action` reaches the
+  pre-existing legacy configured-analysis `Needs` boundary.
 
-`WorkspaceRuntime` owns the sole retained `Arc<Dice>`. Its production
-updater/commit sites are the native attempt injection, legacy observation
-adapters, restoration, and selected-snapshot publication in
-`app/slug_core_v2/src/runtime/dice.rs`; a separate test-only acceptance seam
-is not a competing production commit. The design must enumerate the live
-production sites again immediately before implementation and route every site
-that can race the admitted family through one revision owner.
+Fixing either would enter repository or public/loading work forbidden by the
+implementation packet. Strict `clippy -D warnings` stops first in unchanged
+`allocative_derive`; local `--all-targets --no-deps` finishes with no
+`request_revision` warning. The targeted Bazel Rust test cannot analyze
+because the checkout has no matching `rules_rust` toolchain. Diff hygiene and
+two independent ownership/cleanup reviews pass.
 
-Neither existing session owner is the future architecture:
+Formatted accounting partitions every `#[cfg(test)]` range: 456/560 net
+production lines, 648/700 in-module test lines, and 1,104/1,520 total net
+lines. No cap correction was consumed.
 
-- `NativeDemandSessionOwner::acquire` returns `Busy` whenever one command is
-  open and retains `AcceptedNativeDemandSnapshot`, so it cannot prove
-  overlapping requests and cannot become the request certificate store.
-- `RepositoryMaterializer::begin` also permits one active session. Repository
-  production, materialized namespaces, and external-repository requests are
-  excluded from the first vertical rather than moving that lease outward.
-- legacy `WorkspaceSnapshot`, `WorkspaceRawSnapshot`, and
-  `WorkspaceDirectorySnapshot` adapters remain scaffolding outside the
-  admitted family. They are not accepted source certificates.
+## Audit question
 
-The vendored DICE surface supports the bounded design:
+Which single live loading/public path can first consume
+`RequestRevisionRuntime::read_host_file` without widening the accepted
+one-file Host family, duplicating DICE ownership, or changing unrelated
+repository/materialization behavior?
 
-- a `DiceTransaction` is fixed at creation, exposes exact-version
-  `equivalent`/`equality_token`, and must never be stored by a computation or
-  result;
-- `existing_state` reads the current version, while `changed_to` batches
-  typed injected values and `commit` publishes a successor against the newest
-  state;
-- DICE exposes no conditional-version or compare-and-swap commit and no public
-  changed-key compatibility diff;
-- A/B/A reuse and shared-work cancellation are supported, but do not provide a
-  host-history owner; and
-- projection keys cannot reobserve host state or commit a successor.
+The audit must inspect the live checkout and map exact symbols from public or
+daemon request entry through `WorkspaceRuntime`, loading/Bzlmod/query
+adapters, and the terminal producer. It must compare the already accepted
+direct root exported-source/filegroup source-read path, including its exact
+`BuildCommandRootKey`/source-terminal chain and Need/error/publication
+ordering, against at least the root `MODULE.bazel` read, selected package
+BUILD-file read, one `.bzl` load, and the loading-query adapter, then select
+the smallest dependency-safe candidate
+or record a prerequisite `REPLAN`.
 
-Therefore a DICE key cannot own final validation. A private
-`WorkspaceRuntime` request-revision owner must linearize reobservation and
-publication outside DICE.
+For every candidate, record:
 
-## Selected first vertical
+- the current snapshot/input keys, host-read owner, and complete Need/error
+  ordering;
+- whether the request is exactly one contained Host file-bytes demand or would
+  require a directory/glob union, repository namespace, or materialization;
+- the immutable semantic overlay fields that belong in root identity and the
+  presentation/event fields that must remain outside DICE;
+- the exact command/server caller, provisional terminal/effect boundary, and
+  cancellation lifetime;
+- whether the private `pub(super)` seam is sufficient and which production
+  updater/commit sites can race it;
+- the accepted oracle or pinned-source evidence that discriminates the
+  candidate, and any demonstrated evidence gap; and
+- a future exact file allowlist, production/test/ledger caps, focused proof,
+  compatibility classification, STOPs, and `REPLAN` triggers.
 
-The implementation packet may add one private root-host file request family.
-It is production Rust, but has no public command/server activation yet.
+## Compatibility and authority
 
-A request owns:
+The predecessor remains exact only for serial Host file
+present/bytes/absence/error behavior and oracle-backed invalidation, warm reuse,
+and restoration. Overlay identity, overlapping-request isolation, revision
+numbers, final reobservation, no-mixed-epoch publication, and provisional
+suppression are Slug-native. Directory/glob certificates,
+repository/materialized sources, public overlapping commands, and historical
+filesystem reads remain unsupported/deferred until separately admitted.
 
-- the originating runtime identity and exact base DICE equality token;
-- an immutable request overlay split into a semantic projection retained in
-  root-key identity and presentation-only data retained outside DICE;
-- one root-host `PathObservationDemand` using the existing typed
-  `PathObservationKey`/`PathObservationEpochKey` producer chain;
-- one provisional terminal/effect buffer; and
-- one heap-independent source certificate containing the exact demand and
-  observed `PathObservationResult`.
+This audit cannot convert a Slug-native property into Bazel parity, treat the
+Bazel client lock as concurrent-request evidence, or count a callerless private
+proof as M1 completion. The current manifest remains the scheduling authority;
+the compact predecessor above plus Git retains the implementation evidence.
 
-The root key structurally includes workspace, contained relative path, and the
-relevant semantic projection. It computes the request-revision injected key and
-the typed path observation. Presentation text, diagnostics, and test barriers
-remain request-local and cannot alter root identity. The first vertical admits
-exactly one Host-namespace file-bytes demand. Directory/glob unions,
-materialization instances, repositories, root-module/loading migration, and
-public output are successors.
-
-The coordinator is service-owned and retains no accepted semantic snapshot. It
-may retain only a monotonic Slug-native revision allocator and one asynchronous
-publication mutex. All observations live in DICE values or ephemeral request
-certificates.
-
-## Attempt and publication algorithm
-
-For every request:
-
-1. under the short revision owner, obtain the current fixed transaction and
-   base equality token; release the owner before computation;
-2. compute the root provisionally with no runtime lock held;
-3. on a typed path Need, observe that exact Host demand through the existing
-   native path-observation kernel, enter the revision owner, confirm the base
-   is still current, inject the complete path epoch plus successor revision in
-   one `changed_to` batch, commit, release, discard the attempt, and retry;
-4. on a provisional terminal, retain its exact one-demand certificate and
-   buffered effects, then enter the revision owner;
-5. read `existing_state`; if it is not equivalent to the provisional base,
-   release, discard, and retry from the latest state;
-6. reobserve the exact certified demand while holding only the publication
-   owner. If unchanged, linearize acceptance and make the buffered terminal
-   eligible for its private caller;
-7. if changed, batch the new typed observation and successor revision, commit
-   once, release, discard the stale terminal/effects, and retry; and
-8. on cancellation, failure, or bounded nonprogress, publish nothing and drop
-   the request's certificate, transaction, buffers, barriers, and interests.
-
-The publication owner may span `existing_state`, exact host reobservation,
-`changed_to`, and `commit`. It must never span `compute`, Starlark
-evaluation, repository/materializer work, terminal selection, or event
-formatting. The implementation must route all production commits capable of
-racing this private family through the same owner; otherwise `REPLAN` because
-DICE has no conditional commit.
-
-Because the owner is held across `existing_state` and `commit().await`, it
-must be an async `tokio::sync::Mutex`, never `std` or `parking_lot`.
-Every held-path operation must be a leaf that cannot reacquire the owner;
-the typed `changed_to` commit must perform no compute or callback re-entry.
-
-Attempt outcomes are explicit:
-
-- `Accepted { revision, terminal }`;
-- `RetryVersionAdvanced { observed_current }`;
-- `RetrySourceChanged { successor, changed_observation }`;
-- `ComputeFailed`, `ObservationFailed`, `InjectionFailed`, or
-  `PublicationFailed`;
-- `Cancelled`; and
-- `RetryNonProgress` or bounded exhaustion.
-
-No failure or retry carries a publishable terminal. A transaction is attempt
-scratch and never enters these retained values.
-
-## Compatibility and memory
-
-Exact within the admitted family: serial file present/bytes/absence/error
-semantics plus the oracle-backed changed-source invalidation, compatible warm
-reuse, and restoration relationships.
-
-Slug-native: relevant/irrelevant overlay identity, overlapping-request
-isolation, revision numbers, equality tokens exposed only to tests,
-certificate representation, final reobservation, no-mixed-epoch publication,
-provisional-output suppression, retry counters, and deterministic barriers.
-Unavailable historical filesystem reads, materialized/repository sources,
-directory/glob certificates, and public overlapping command behavior remain
-unsupported/deferred.
-
-Memory classes:
-
-- service: revision owner, publication mutex, and monotonic allocator;
-- DICE-retained semantic: injected revision/path epoch, root values, dependency
-  edges, and equality-cutoff values;
-- command: immutable overlay, attempt, certificate, cancellation interest, and
-  provisional terminal/effects;
-- scratch: reobservation buffers and deterministic test barriers.
-
-There is no retained evaluator value, transaction, whole-workspace snapshot,
-manual accepted semantic cache, spawned worker, repository root, or transfer in
-this vertical. Retry, failure, cancellation, and request drop release all
-command/scratch ownership; shutdown drops the service owner after DICE.
-
-## Implementation allowlist and caps
+## Allowlist and caps
 
 Edit exactly:
 
-- new `app/slug_core_v2/src/runtime/request_revision.rs`;
-- `app/slug_core_v2/src/runtime/mod.rs`;
-- `app/slug_core_v2/src/runtime/dice.rs`;
-- canonical/current/Stage 2 ledgers for completion and successor selection.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-No Cargo or BUILD edit is expected because the crate already globs Rust sources
-and has the required dependencies. Caps are three Rust paths, one new
-module, 560 net production lines, 700 in-module test lines, 260 ledger lines,
-and 1,520 total net lines. One correction may adjust caps, but may not add
-behavior or files.
+Caps are 40 canonical, 220 current-packet, 220 Stage 2, and 480 total net
+ledger lines. No Rust, Cargo/BUILD, oracle fixture, generated evidence, or
+other ledger file is authorized. Read-only source inspection and focused
+existing-test discovery are permitted; do not generate or update an oracle.
 
-Proof must include two genuinely overlapping requests with deterministic
-post-demand barriers; relevant-overlay separation and irrelevant-overlay
-shared reuse; V1 mutation after demand; stale V1 terminal discard; V2-only
-acceptance; warm V2 and A/B/A; exact reobservation/commit/retry counters;
-one-waiter and last-waiter cancellation; forced observation, injection,
-publication, and nonprogress failures; no leaked task/interest/buffer; no
-publish before validation; lock-state assertions at every compute barrier;
-full `slug_core_v2` tests; `cargo clippy -p slug_core_v2 --all-targets -- -D
-warnings`; targeted Bazel Rust tests if available; `git diff --check`;
-archive status; line accounting; and independent ownership/cleanup review.
+STOP on any code write, public API activation, command/server behavior change,
+new DICE key/store, second graph, snapshot replacement, directory/glob union,
+repository/materialization session, source observation, watcher claim,
+historical host read, JVM work, evidence generation, or cap excess.
 
-STOP on public command/server/Bzlmod changes, repository/materialization
-sessions, a second DICE graph, a global command lease, reuse of
-`AcceptedNativeDemandSnapshot`, a manual semantic side store, mutable global
-options, command-side replay, source reads outside the typed observation owner,
-watcher correctness, retained transactions/evaluator values, custom DICE
-scheduler, spawned background worker, lock across compute/Starlark, unbounded
-retry, out-of-allowlist files, or cap excess.
+`REPLAN` if no one-file Host candidate preserves current Need/error/output
+ordering within a bounded migration, if the first consumer inherently requires
+multi-file or repository-session concurrency, or if accepted evidence cannot
+discriminate the selected boundary.
 
-`REPLAN` if the implementation cannot close every competing production
-commit site for this family, cannot demonstrate true overlap on one DICE,
-requires repository-session concurrency, cannot suppress a stale terminal,
-cannot cancel without retained request ownership, or needs historical host
-reads.
+## Acceptance and immediate successor
 
-## Immediate successor
-
-Accept this private vertical only after its complete proof and independent
-ownership/cleanup review. Then audit the smallest loading/public migration;
-do not combine that successor with this implementation.
+Accept only after independent review confirms the live symbol/call-chain
+inventory, one uniquely smallest candidate, exact/Slug-native/deferred
+classification, bounded file/cap/proof contract, and no hidden competing
+publication path. Then activate only that candidate's implementation packet;
+do not combine audit and Rust implementation.

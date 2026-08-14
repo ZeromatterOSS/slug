@@ -839,3 +839,68 @@ test lines, 260 ledger lines, and 1,520 total net lines. The compatibility,
 proof, memory, STOP, and `REPLAN` contract is the compact current-packet
 manifest. This activation does not accept M1 or authorize loading/public
 migration.
+
+### Accepted first root-host request-revision implementation (2026-08-13)
+
+Commit `207fe438` implements the callerless private one-file Host vertical.
+`WorkspaceRuntime` owns one `RequestRevisionRuntime` over its existing
+`Arc<Dice>`. The root key structurally consumes a contained relative path,
+semantic overlay projection, injected request revision, and the typed
+`PathObservationKey`; presentation remains outside DICE. A complete root
+retains the exact one-demand/result certificate. The coordinator accepts only
+after current-version comparison and exact final host reobservation, commits a
+changed observation plus successor revision atomically, and drops a stale
+terminal before retry.
+
+All five audited production updater/commit sites use the same
+`tokio::sync::Mutex` owner. Its held paths are nonreentrant leaves over
+`existing_state`, exact host reobservation, typed `changed_to`, and
+`commit`; compute, Starlark, repository/materializer work, terminal
+selection, and formatting remain outside. The runtime retains no transaction,
+evaluator, accepted snapshot, worker, or semantic side cache.
+
+The in-module proof covers contained/missing paths, relevant/irrelevant
+overlays, serial V1/V2/warm/A-B-A/restoration, genuine two-request
+post-demand overlap with stale V1 discarded and V2-only acceptance, exact
+observation/commit/retry counters, one-waiter and last-waiter cancellation,
+forced observation/injection/publication/nonprogress failure, no publish
+before validation, lock state, idle cleanup, and gate ownership. Focused tests
+pass 7/7 and `cargo check -p slug_core_v2` passes.
+
+The full crate passes 210 unit and 12 integration tests when two independently
+reproducible inherited failures are skipped: an older external-repository
+visibility diagnostic expectation and the legacy configured-analysis
+`Needs` boundary. Those fixes are repository/public-loading work outside the
+packet. Strict `clippy -D warnings` stops first in unchanged
+`allocative_derive`; `--all-targets --no-deps` finishes without a
+`request_revision` warning. The targeted Bazel Rust test cannot analyze
+without a matching `rules_rust` toolchain. Diff hygiene and two independent
+reviews pass.
+
+Formatted cfg accounting is 456/560 net production, 648/700 in-module test,
+and 1,104/1,520 total lines. No correction was consumed. Exact remains limited
+to serial Host file present/bytes/absence/error behavior and oracle-backed
+invalidation, warm reuse, and restoration. Overlay identity, overlap
+isolation, revision numbers, final reobservation, no-mixed-epoch publication,
+and provisional suppression remain Slug-native. Directory/glob,
+repository/materialized, and public overlapping behavior remain deferred.
+This acceptance is M1 evidence, not M1 completion.
+
+### Active loading/public migration audit (2026-08-13)
+
+Packet `WP-2A-m1-loading-public-migration-audit` is documentation-only.
+Trace exact symbols from public/daemon requests through `WorkspaceRuntime`
+and loading/Bzlmod/query adapters; compare the accepted direct root
+exported-source/filegroup `BuildCommandRootKey` source-terminal path with root
+`MODULE.bazel`, BUILD, one `.bzl` load, and loading-query candidates.
+Select exactly one contained one-file Host consumer with preserved
+Need/error/output ordering, immutable
+overlay ownership, cancellation/publication lifetime, evidence, future
+allowlist/caps/proof, and compatibility boundaries, or record a prerequisite
+`REPLAN`.
+
+The only writable files are canonical, current-packet, and this Stage 2 ledger
+under 40/220/220/480. No Rust, Cargo/BUILD, oracle, generated evidence, public
+activation, snapshot replacement, new DICE key/store, second graph,
+directory/glob union, repository/materialization, watcher, historical-host,
+or JVM work is authorized.
