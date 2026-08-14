@@ -28,6 +28,8 @@ use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_events_v2::StarlarkSourceLocation;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
@@ -61,7 +63,9 @@ use crate::RootRepoFileUtf8Mode;
 use crate::RootRepositoryRoute;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
+use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
+use crate::host_file::ObservedHostFileBytes;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
@@ -798,6 +802,69 @@ fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host REPO-file DICE invariant failed: {error:?}"))
 }
 
+enum HostRepoFileTerminal<'a> {
+    Complete(Result<HostRepoFileValue, HostRepoFileError>),
+    Evaluate {
+        logical_path: &'a NormalizedAbsolutePath,
+        bytes: &'a [u8],
+        utf8_mode: RootRepoFileUtf8Mode,
+    },
+}
+
+fn finalize_host_repo_file(
+    ctx: &mut DiceComputations<'_>,
+    capture_events: bool,
+    terminal: HostRepoFileTerminal<'_>,
+) -> Arc<Result<HostRepoFileValue, HostRepoFileError>> {
+    let (value, batch) = match terminal {
+        HostRepoFileTerminal::Complete(value) => (value, EventBatch::empty()),
+        HostRepoFileTerminal::Evaluate {
+            logical_path,
+            bytes,
+            utf8_mode,
+        } => {
+            let recording = capture_events.then(RecordingRepoEventReporter::default);
+            let direct = DirectRepoEventReporter;
+            let reporter: &dyn RepoEventReporter = match recording.as_ref() {
+                Some(recording) => recording,
+                None => &direct,
+            };
+            let value = evaluate_repo_file(logical_path, bytes, utf8_mode, reporter);
+            let batch =
+                recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch);
+            (value, batch)
+        }
+    };
+    if capture_events {
+        ctx.store_evaluation_data(batch)
+            .expect("Host REPO key stores exactly one event batch");
+    }
+    Arc::new(value)
+}
+
+fn observed_host_repo_terminal<'a>(
+    logical_path: &'a NormalizedAbsolutePath,
+    utf8_mode: RootRepoFileUtf8Mode,
+    observed: &'a Result<ObservedHostFileBytes, ObservedPathFrontierError>,
+) -> Result<(PathObservationEpoch, HostRepoFileTerminal<'a>), ObservedPathFrontierError> {
+    let observed = observed.as_ref().map_err(|error| error.dupe())?;
+    let observations = observed.observations().dupe();
+    let terminal = match observed.result() {
+        Err(error) => {
+            HostRepoFileTerminal::Complete(Err(HostRepoFileError::HostFile(error.clone())))
+        }
+        Ok(HostFileBytes::Missing) => {
+            HostRepoFileTerminal::Complete(Ok(HostRepoFileValue::empty()))
+        }
+        Ok(HostFileBytes::Present(bytes)) => HostRepoFileTerminal::Evaluate {
+            logical_path,
+            bytes,
+            utf8_mode,
+        },
+    };
+    Ok((observations, terminal))
+}
+
 #[async_trait]
 impl Key for HostRepoFileKey {
     type Value = PathOutcome<Arc<Result<HostRepoFileValue, HostRepoFileError>>>;
@@ -820,13 +887,11 @@ impl Key for HostRepoFileKey {
         ) {
             Ok(semantics) => semantics,
             Err(error) => {
-                if capture_events {
-                    ctx.store_evaluation_data(EventBatch::empty())
-                        .expect("Host REPO key stores exactly one event batch");
-                }
-                return PathOutcome::Complete(Arc::new(Err(HostRepoFileError::PolicyProjection(
-                    error,
-                ))));
+                return PathOutcome::Complete(finalize_host_repo_file(
+                    ctx,
+                    capture_events,
+                    HostRepoFileTerminal::Complete(Err(HostRepoFileError::PolicyProjection(error))),
+                ));
             }
         };
         let logical_path = NormalizedAbsolutePath::new(self.workspace.as_path().join("REPO.bazel"))
@@ -837,34 +902,127 @@ impl Key for HostRepoFileKey {
         ) {
             PathOutcome::Need(need) => return PathOutcome::Need(need),
             PathOutcome::Complete(Err(error)) => {
-                if capture_events {
-                    ctx.store_evaluation_data(EventBatch::empty())
-                        .expect("Host REPO key stores exactly one event batch");
-                }
-                return PathOutcome::Complete(Arc::new(Err(HostRepoFileError::HostFile(error))));
+                return PathOutcome::Complete(finalize_host_repo_file(
+                    ctx,
+                    capture_events,
+                    HostRepoFileTerminal::Complete(Err(HostRepoFileError::HostFile(error))),
+                ));
             }
             PathOutcome::Complete(Ok(HostFileBytes::Missing)) => {
-                if capture_events {
-                    ctx.store_evaluation_data(EventBatch::empty())
-                        .expect("Host REPO key stores exactly one event batch");
-                }
-                return PathOutcome::Complete(Arc::new(Ok(HostRepoFileValue::empty())));
+                return PathOutcome::Complete(finalize_host_repo_file(
+                    ctx,
+                    capture_events,
+                    HostRepoFileTerminal::Complete(Ok(HostRepoFileValue::empty())),
+                ));
             }
             PathOutcome::Complete(Ok(HostFileBytes::Present(bytes))) => bytes,
         };
+        PathOutcome::Complete(finalize_host_repo_file(
+            ctx,
+            capture_events,
+            HostRepoFileTerminal::Evaluate {
+                logical_path: &logical_path,
+                bytes: &bytes,
+                utf8_mode: semantics.utf8_mode,
+            },
+        ))
+    }
 
-        let recording = capture_events.then(RecordingRepoEventReporter::default);
-        let direct = DirectRepoEventReporter;
-        let reporter: &dyn RepoEventReporter = match recording.as_ref() {
-            Some(recording) => recording,
-            None => &direct,
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostRepoFile {
+    result: Arc<Result<HostRepoFileValue, HostRepoFileError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRepoFile {
+    pub(crate) fn result(&self) -> &Result<HostRepoFileValue, HostRepoFileError> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub(crate) struct HostRepoFileObservationKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl HostRepoFileObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for HostRepoFileObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "bzlmod-observed-host-repo-file:{}", self.workspace)
+    }
+}
+
+#[async_trait]
+impl Key for HostRepoFileObservationKey {
+    type Value = PathOutcome<Result<ObservedHostRepoFile, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let semantics = match dice_invariant(
+            ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
+                self.workspace.dupe(),
+            ))
+            .await,
+        ) {
+            Ok(semantics) => semantics,
+            Err(error) => {
+                return PathOutcome::Complete(Ok(ObservedHostRepoFile {
+                    result: finalize_host_repo_file(
+                        ctx,
+                        capture_events,
+                        HostRepoFileTerminal::Complete(Err(HostRepoFileError::PolicyProjection(
+                            error,
+                        ))),
+                    ),
+                    observations: PathObservationEpoch::empty(),
+                }));
+            }
         };
-        let value = evaluate_repo_file(&logical_path, &bytes, semantics.utf8_mode, reporter);
-        if let Some(recording) = recording {
-            ctx.store_evaluation_data(recording.into_batch())
-                .expect("Host REPO key stores exactly one event batch");
-        }
-        PathOutcome::Complete(Arc::new(value))
+        let logical_path = NormalizedAbsolutePath::new(self.workspace.as_path().join("REPO.bazel"))
+            .expect("joining a normalized absolute workspace remains absolute");
+        let observed = dice_invariant(
+            ctx.compute(&HostFileBytesObservationKey::new(logical_path.dupe()))
+                .await,
+        );
+        let observed = match observed {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(observed) => observed,
+        };
+        let (observations, terminal) =
+            match observed_host_repo_terminal(&logical_path, semantics.utf8_mode, &observed) {
+                Ok(value) => value,
+                Err(error) => return PathOutcome::Complete(Err(error)),
+            };
+        PathOutcome::Complete(Ok(ObservedHostRepoFile {
+            result: finalize_host_repo_file(ctx, capture_events, terminal),
+            observations,
+        }))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1110,6 +1268,10 @@ mod tests {
     use std::sync::Arc;
     #[cfg(unix)]
     use std::sync::Mutex;
+    #[cfg(unix)]
+    use std::sync::atomic::AtomicUsize;
+    #[cfg(unix)]
+    use std::sync::atomic::Ordering;
 
     use compact_str::CompactString;
     #[cfg(unix)]
@@ -1125,6 +1287,8 @@ mod tests {
     #[cfg(unix)]
     use dice::DynKey;
     #[cfg(unix)]
+    use dice::Key;
+    #[cfg(unix)]
     use dice::RichActivation;
     #[cfg(unix)]
     use dice::UserComputationData;
@@ -1138,6 +1302,10 @@ mod tests {
     use slug_events_v2::EventBatch;
     use slug_workspace_v2::NormalizedAbsolutePath;
     #[cfg(unix)]
+    use slug_workspace_v2::ObservedPathFrontierError;
+    #[cfg(unix)]
+    use slug_workspace_v2::PathIoErrorKind;
+    #[cfg(unix)]
     use slug_workspace_v2::PathLstat;
     #[cfg(unix)]
     use slug_workspace_v2::PathNodeKind;
@@ -1146,7 +1314,11 @@ mod tests {
     #[cfg(unix)]
     use slug_workspace_v2::PathObservationEpoch;
     #[cfg(unix)]
+    use slug_workspace_v2::PathObservationEpochError;
+    #[cfg(unix)]
     use slug_workspace_v2::PathObservationEpochKey;
+    #[cfg(unix)]
+    use slug_workspace_v2::PathObservationError;
     #[cfg(unix)]
     use slug_workspace_v2::PathObservationNamespace;
     #[cfg(unix)]
@@ -1159,11 +1331,17 @@ mod tests {
     use slug_workspace_v2::PathOutcome;
 
     use super::HostRepoFileError;
+    #[cfg(unix)]
+    use super::HostRepoFileObservationKey;
     use super::INVALID_UTF8;
     use super::INVALID_UTF8_ERROR_SUFFIX;
+    #[cfg(unix)]
+    use super::ObservedHostRepoFile;
     use super::RecordingRepoEventReporter;
     use super::RootRepoFileUtf8Mode;
     use super::evaluate_repo_file;
+    #[cfg(unix)]
+    use super::observed_host_repo_terminal;
     use super::repo_globals;
     #[cfg(unix)]
     use crate::RootPackagePolicyInputs;
@@ -1607,6 +1785,170 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[derive(Default)]
+    struct ObservedRepoEventTracker {
+        activations: Mutex<Vec<RepoActivation>>,
+        legacy_repo: AtomicUsize,
+        legacy_host_file: AtomicUsize,
+        observed_host_file: AtomicUsize,
+    }
+
+    #[cfg(unix)]
+    impl ObservedRepoEventTracker {
+        fn take(&self) -> Vec<RepoActivation> {
+            std::mem::take(&mut *self.activations.lock().unwrap())
+        }
+
+        fn assert_legacy_keys_inactive(&self) {
+            assert_eq!(self.legacy_repo.load(Ordering::SeqCst), 0);
+            assert_eq!(self.legacy_host_file.load(Ordering::SeqCst), 0);
+        }
+    }
+
+    #[cfg(unix)]
+    fn assert_no_batches(activations: Vec<RepoActivation>) {
+        assert!(
+            activations
+                .iter()
+                .all(|activation| activation.batch.is_none())
+        );
+    }
+
+    #[cfg(unix)]
+    fn assert_print(activations: Vec<RepoActivation>, expected: &str) {
+        assert!(matches!(
+            activations.as_slice(),
+            [RepoActivation {
+                kind: ActivationKind::Evaluated,
+                batch: Some(batch),
+            }] if matches!(
+                batch.events(),
+                [EvaluationEvent::StarlarkPrint { text, .. }] if text == expected
+            )
+        ));
+    }
+
+    #[cfg(unix)]
+    impl ActivationTracker for ObservedRepoEventTracker {
+        fn key_activated(
+            &self,
+            _key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key.downcast_ref::<HostRepoFileObservationKey>().is_some() {
+                self.activations.lock().unwrap().push(RepoActivation {
+                    kind: activation.kind(),
+                    batch: activation
+                        .evaluation_data()
+                        .and_then(|data| data.downcast_ref::<EventBatch>())
+                        .map(Dupe::dupe),
+                });
+            } else if key.downcast_ref::<super::HostRepoFileKey>().is_some() {
+                self.legacy_repo.fetch_add(1, Ordering::SeqCst);
+            } else if key
+                .downcast_ref::<crate::host_file::HostFileBytesKey>()
+                .is_some()
+            {
+                self.legacy_host_file.fetch_add(1, Ordering::SeqCst);
+            } else if key
+                .downcast_ref::<crate::host_file::HostFileBytesObservationKey>()
+                .is_some()
+            {
+                self.observed_host_file.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    #[cfg(unix)]
+    async fn observed_repo_frontier(
+        dice: &Arc<Dice>,
+        tracker: Arc<ObservedRepoEventTracker>,
+        epoch: PathObservationEpoch,
+        capture_events: bool,
+        inject_policy: bool,
+    ) -> PathOutcome<Result<ObservedHostRepoFile, ObservedPathFrontierError>> {
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        if capture_events {
+            user_data.data.set(CaptureEvaluationEvents);
+        }
+        let mut updater = dice.updater_with_data(user_data);
+        if inject_policy {
+            inject_root_package_policy_inputs(
+                &mut updater,
+                RootPackagePolicyInputs::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    Arc::from([NormalizedAbsolutePath::new("/workspace").unwrap()]),
+                    std::iter::empty::<&str>(),
+                    None,
+                    Some("warning"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        }
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        transaction
+            .compute(&HostRepoFileObservationKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn repo_epoch_with(
+        workspace: PathOperationResult<PathLstat>,
+        repo: PathOperationResult<PathLstat>,
+        bytes: Option<PathOperationResult<Arc<[u8]>>>,
+    ) -> PathObservationEpoch {
+        let lstat = |kind| PathLstat::new(kind, 11, 11, 11, 11, 0o755);
+        let demand = |path: &str, operation| {
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let mut entries = vec![
+            (
+                demand("/", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                    PathNodeKind::Directory,
+                ))),
+            ),
+            (
+                demand("/workspace", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(workspace),
+            ),
+            (
+                demand("/workspace/REPO.bazel", PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(repo),
+            ),
+        ];
+        if let Some(bytes) = bytes {
+            entries.push((
+                demand("/workspace/REPO.bazel", PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(bytes),
+            ));
+        }
+        PathObservationEpoch::new(entries).unwrap()
+    }
+
+    #[cfg(unix)]
     fn repo_epoch(source: Option<&'static [u8]>, variant: i64) -> PathObservationEpoch {
         let lstat = |kind| PathLstat::new(kind, variant, variant, variant, variant, 0o755);
         let demand = |path: &str, operation| {
@@ -1711,19 +2053,11 @@ mod tests {
         ));
 
         observed_repo(&dice, tracker.dupe(), repo_epoch(Some(source_a), 1)).await;
-        assert!(
-            tracker
-                .take()
-                .iter()
-                .all(|activation| activation.batch.is_none())
-        );
+        assert_no_batches(tracker.take());
 
         let source_b = b"print('B')\nignore_directories(['b'])\n";
         observed_repo(&dice, tracker.dupe(), repo_epoch(Some(source_b), 2)).await;
-        assert!(tracker.take().iter().any(|activation| matches!(
-            activation.batch.as_ref().map(EventBatch::events),
-            Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "B"
-        )));
+        assert_print(tracker.take(), "B");
 
         let failure = b"print('PREFIX')\nfail('boom')\n";
         let failed = observed_repo(&dice, tracker.dupe(), repo_epoch(Some(failure), 3)).await;
@@ -1750,9 +2084,198 @@ mod tests {
         )));
 
         observed_repo(&dice, tracker.dupe(), repo_epoch(Some(source_a), 5)).await;
-        assert!(tracker.take().iter().any(|activation| matches!(
-            activation.batch.as_ref().map(EventBatch::events),
-            Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "A"
-        )));
+        assert_print(tracker.take(), "A");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_repo_file_retains_exact_frontier_events_and_private_dependencies() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedRepoEventTracker::default());
+        let epoch = repo_epoch(Some(b"print('A')\nignore_directories(['a'])\n"), 20);
+        let complete =
+            observed_repo_frontier(&dice, tracker.dupe(), epoch.dupe(), true, true).await;
+        assert!(HostRepoFileObservationKey::validity(&complete));
+        let PathOutcome::Complete(Ok(observed)) = &complete else {
+            panic!("observed REPO file must complete with a frontier carrier");
+        };
+        let value = observed.result().as_ref().unwrap();
+        assert_eq!(value.ignored_directories(), ["a"]);
+        for (demand, expected) in epoch.observations() {
+            let retained = observed
+                .observations()
+                .get(demand)
+                .expect("every consumed Host observation is retained");
+            assert!(Arc::ptr_eq(expected, retained));
+        }
+        assert!(Arc::ptr_eq(&observed.result, &observed.result.dupe()));
+        tracker.assert_legacy_keys_inactive();
+        assert_eq!(tracker.observed_host_file.load(Ordering::SeqCst), 1);
+        assert_print(tracker.take(), "A");
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_repo_file_policy_need_and_outer_errors_publish_no_partial_state() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedRepoEventTracker::default());
+        let policy = observed_repo_frontier(
+            &dice,
+            tracker.dupe(),
+            PathObservationEpoch::empty(),
+            true,
+            false,
+        )
+        .await;
+        let PathOutcome::Complete(Ok(policy)) = &policy else {
+            panic!("missing policy is a completed semantic error");
+        };
+        assert!(matches!(
+            policy.result(),
+            Err(HostRepoFileError::PolicyProjection(_))
+        ));
+        assert!(policy.observations().observations().is_empty());
+        tracker.assert_legacy_keys_inactive();
+        assert_eq!(tracker.observed_host_file.load(Ordering::SeqCst), 0);
+        assert!(matches!(
+            tracker.take().as_slice(),
+            [RepoActivation {
+                batch: Some(batch),
+                ..
+            }] if batch.events().is_empty()
+        ));
+
+        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let need_tracker = Arc::new(ObservedRepoEventTracker::default());
+        let need = observed_repo_frontier(
+            &need_dice,
+            need_tracker.dupe(),
+            PathObservationEpoch::empty(),
+            true,
+            true,
+        )
+        .await;
+        assert!(matches!(need, PathOutcome::Need(_)));
+        assert_no_batches(need_tracker.take());
+        need_tracker.assert_legacy_keys_inactive();
+
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path(),
+            PathObservationOperation::FileBytes,
+        );
+        let lower: Result<crate::host_file::ObservedHostFileBytes, _> =
+            Err(ObservedPathFrontierError::from(
+                PathObservationEpochError::ConflictingDemand(demand.dupe()),
+            ));
+        let Err(error) =
+            observed_host_repo_terminal(&path(), RootRepoFileUtf8Mode::Warning, &lower)
+        else {
+            panic!("outer frontier error must bypass semantic terminal construction");
+        };
+        assert!(matches!(error, ObservedPathFrontierError::Epoch(_)));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_repo_file_preserves_all_legacy_semantic_terminals_without_capture() {
+        let lstat = |kind| PathLstat::new(kind, 12, 12, 12, 12, 0o755);
+        let io = || PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let cases = vec![
+            ("missing", repo_epoch(None, 30)),
+            (
+                "wrong-kind",
+                repo_epoch_with(
+                    PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+                    PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+                    None,
+                ),
+            ),
+            (
+                "resolution-error",
+                repo_epoch_with(
+                    PathOperationResult::Error(io()),
+                    PathOperationResult::Missing,
+                    None,
+                ),
+            ),
+            (
+                "file-bytes-error",
+                repo_epoch_with(
+                    PathOperationResult::Present(lstat(PathNodeKind::Directory)),
+                    PathOperationResult::Present(lstat(PathNodeKind::RegularFile)),
+                    Some(PathOperationResult::Error(io())),
+                ),
+            ),
+            ("parse", repo_epoch(Some(b"("), 31)),
+            (
+                "restricted",
+                repo_epoch(Some(b"load('//:x.bzl', 'x')\n"), 32),
+            ),
+            ("evaluation", repo_epoch(Some(b"fail('boom')\n"), 33)),
+            (
+                "success",
+                repo_epoch(Some(b"ignore_directories(['ok'])\n"), 34),
+            ),
+        ];
+        for (name, epoch) in cases {
+            let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let legacy = observed_repo(
+                &legacy_dice,
+                Arc::new(RepoEventTracker::default()),
+                epoch.dupe(),
+            )
+            .await;
+            let observed_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let tracker = Arc::new(ObservedRepoEventTracker::default());
+            let observed =
+                observed_repo_frontier(&observed_dice, tracker.dupe(), epoch.dupe(), false, true)
+                    .await;
+            let PathOutcome::Complete(legacy) = legacy else {
+                panic!("legacy {name} unexpectedly needed observations");
+            };
+            let PathOutcome::Complete(Ok(observed)) = observed else {
+                panic!("observed {name} unexpectedly lacked a complete carrier");
+            };
+            assert_eq!(legacy.as_ref(), observed.result(), "{name}");
+            if name == "resolution-error" {
+                assert_eq!(observed.observations().observations().len(), 2);
+            }
+            for (demand, retained) in observed.observations().observations() {
+                assert!(Arc::ptr_eq(
+                    epoch
+                        .get(demand)
+                        .expect("retained demand came from input epoch"),
+                    retained,
+                ));
+            }
+            tracker.assert_legacy_keys_inactive();
+            assert_no_batches(tracker.take());
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_repo_file_warm_and_a_b_a_event_lifecycle_is_exact() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedRepoEventTracker::default());
+        let a = repo_epoch(Some(b"print('A')\nignore_directories(['a'])\n"), 40);
+        let b = repo_epoch(Some(b"print('B')\nignore_directories(['b'])\n"), 41);
+        let first = observed_repo_frontier(&dice, tracker.dupe(), a.dupe(), true, true).await;
+        assert_print(tracker.take(), "A");
+
+        let warm = observed_repo_frontier(&dice, tracker.dupe(), a.dupe(), true, true).await;
+        assert!(HostRepoFileObservationKey::equality(&warm, &first));
+        assert_no_batches(tracker.take());
+
+        observed_repo_frontier(&dice, tracker.dupe(), b, true, true).await;
+        assert_print(tracker.take(), "B");
+
+        let restored = observed_repo_frontier(&dice, tracker.dupe(), a, true, true).await;
+        assert!(HostRepoFileObservationKey::equality(&restored, &first));
+        assert_print(tracker.take(), "A");
     }
 }
