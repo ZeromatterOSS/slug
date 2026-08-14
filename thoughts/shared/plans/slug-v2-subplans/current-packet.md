@@ -1,18 +1,18 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-repository-ignore-frontier-design`
+Packet: `WP-2A-m1-host-repository-ignore-frontier-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: accept exactly one docs-only design for a callerless Bzlmod-private
-observed root repository-ignore sibling. It composes the accepted REPO
-frontier with every mutable ignore-selection predecessor without changing or
-activating a legacy/public consumer.
+Result: implement and prove exactly one callerless Bzlmod-private observed
+root repository-ignore sibling. Preserve every legacy key, caller, diagnostic,
+event, matcher result, and public behavior. Completion schedules only the
+package-marker frontier design.
 
-## Accepted predecessor
+## Accepted design
 
-Commit `f2c7305f` accepts the callerless
-`HostRepoFileObservationKey` vertical designed in `7d7f0d25` on top of the
-observed path/Host-file frontier in `308b409a`.
+Commit `8ac5c30f` accepts the one-file repository-ignore frontier design on
+exact predecessor `f2c7305f`. The lower observed path/Host-file frontier remains
+accepted in `308b409a`.
 
 The implementation is confined to `repo_file.rs`. It preserves the legacy
 policy-first semantic and event behavior, computes only
@@ -31,7 +31,7 @@ legacy/root/routed REPO owners, evaluator/reporters, event finalizer, and
 activation tests are one responsibility, and a split would widen private seams
 without isolating another owner.
 
-## Learned facts and design boundary
+## Implementation boundary
 
 The earlier hierarchical audit `a6aaa844` established the root-only chain:
 
@@ -47,10 +47,10 @@ The REPO predecessor is now representable through
 semantics, not a Host observation pair. The existing
 `PathObservationEpoch` remains the only retained compact collection.
 
-This packet designs a lower private producer only. It does not certify package
-lookup, root MODULE includes, BUILD selection, loading, or a public command.
-The eventual request-revision finalizer remains deferred until a complete
-higher terminal frontier exists.
+This packet implements a lower private producer only. It does not certify
+package lookup, root MODULE includes, BUILD selection, loading, or a public
+command. The eventual request-revision finalizer remains deferred until a
+complete higher terminal frontier exists.
 
 ## Frozen design
 
@@ -127,9 +127,10 @@ and exact Bazel identity bytes remain unsupported/deferred.
 
 Write only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `slug-v2-subplans/current-packet.md`; and
-- `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+- `app/slug_bzlmod_v2/src/repository_ignore.rs`; and
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
+  `slug-v2-subplans/current-packet.md`, and
+  `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md` at completion.
 
 Read only the active packet, this owner section, `docs/developers/dice.md`,
 `.codex/skills/slug-buck2-utility-reuse/SKILL.md`, the matching Stages-3/6
@@ -139,38 +140,33 @@ row of `slug-v2-subplans/09-v1-extraction-ledger.md`,
 `src/path_observation.rs`, the Bzlmod/workspace manifests, and directly
 referenced focused tests in those files.
 
-Ledger caps are 40 canonical, 300 current, 260 Stage 2, and 600 net total lines.
-No correction is reserved. This packet performs no Rust, Cargo, BUILD, oracle,
-or generated-evidence write.
-
-The accepted future Rust allowlist is exactly
-`app/slug_bzlmod_v2/src/repository_ignore.rs`. Formatted implementation caps
-are 280 production, 450 in-module test, and 730 total net added lines; the
-physical ceiling is 2,821 lines from the 2,091-line baseline. Require an
-independent cohesion/cleanup review once the formatted file exceeds 2,400
-lines. Completion-ledger growth is capped at 180 net lines, with no correction.
+Formatted Rust caps are 280 production, 450 in-module test, and 730 total net
+added lines. The physical `repository_ignore.rs` ceiling is 2,821 lines from
+the 2,091-line baseline. Require an independent cohesion/cleanup review once
+the formatted file exceeds 2,400 lines. Completion ledgers are capped at 180
+net lines. No correction is reserved.
 
 ## STOP / REPLAN
 
-STOP on code; implementation; a second observed key family; any package,
-MODULE, lockfile, selected-source, BUILD, `.bzl`, glob, loading, core, or
-public caller; routed/nonroot repository or materializer work; legacy key/value/
-error/event/output changes; public export/API; Cargo/dependency change; generic
-certificate framework; new retained container/cache/interner/graph/store;
-reconstructed path demands; direct/historical Host reads; compute/evaluation
-under a manual lock; watcher; JVM; or combining the implementation successor.
+STOP on every other Rust file; a second observed key family; any package,
+MODULE, lockfile, selected-source, BUILD, `.bzl`, glob, loading, core, or public
+caller; routed/nonroot repository or materializer work; legacy key/value/error/
+event/output changes; public export/API; Cargo/dependency/BUILD/oracle/generated
+evidence; generic certificate framework; new retained container/cache/interner/
+graph/store; reconstructed demands; direct/historical Host reads; a manual lock
+across compute/evaluation; watcher; JVM; or cap/physical-ceiling excess.
 
-REPLAN if the root-only legacy key has another mutable predecessor not covered
-by the accepted observed siblings, platform normalization cannot expose its
-exact observation pair without a new workspace key, policy changes cannot
-remain structural DICE dependencies, completed errors cannot retain the full
-prefix without changing legacy diagnostics/order, visibility requires a public
-export or reverse edge, deterministic union needs another retained container,
-or a one-file implementation cannot be bounded.
+REPLAN if shared parsing changes legacy diagnostics/order, a Windows
+normalization result cannot retain its exact Arc without another workspace key,
+an inner semantic error loses its complete prefix, Need/outer error publishes a
+partial carrier, deterministic union needs another retained container,
+visibility escapes the crate, tests require another Rust file, or the cohesion
+review finds a real split prerequisite.
 
 ## Immediate successor
 
-On acceptance, activate exactly one implementation packet in
-`app/slug_bzlmod_v2/src/repository_ignore.rs` plus completion ledgers, using
-the frozen caps and proof. If the design proves that boundary incomplete,
-schedule exactly one docs-only prerequisite instead.
+On acceptance, activate only docs-only
+`WP-2A-m1-host-package-marker-frontier-design`. It may design one private
+observed root package-marker/lookup sibling over immutable policy, the accepted
+repository-ignore epoch, and ordered `BUILD.bazel`/`BUILD` resolution probes.
+It must not implement that consumer or activate MODULE/loading/core/public work.

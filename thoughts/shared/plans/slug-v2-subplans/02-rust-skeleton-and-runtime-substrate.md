@@ -1378,3 +1378,32 @@ production, 450 in-module test, and 730 total net added lines; the physical
 ceiling is 2,821 from the 2,091-line baseline. Require an independent
 cohesion/cleanup review above 2,400 formatted lines. Completion ledgers are
 capped at 180 net lines with no correction.
+
+### Active observed root repository-ignore implementation (2026-08-14)
+
+Run `WP-2A-m1-host-repository-ignore-frontier-implementation` from accepted
+design `8ac5c30f`. Implement exactly one callerless crate-private
+`HostRepositoryIgnoreObservationKey` and `ObservedHostRepositoryIgnore` in
+`app/slug_bzlmod_v2/src/repository_ignore.rs`.
+
+Preserve observed REPO, immutable policy, ordered observed `.bazelignore`
+negative/selected probes, and Windows long-path observation order. Reuse one
+shared observed-capable parser and `PathObservationEpoch::from_shared`; Need
+and cancellation publish no carrier, semantic errors stay inner, and
+mismatch/conflict stays a completed outer frontier error. The observed REPO
+dependency remains the only event-batch owner. Retain only one semantic Arc and
+the existing epoch.
+
+Require focused success/error/Need/outer, ordered precedence, exact-Arc,
+legacy-nonactivation, A/B/A/warm, create/edit/delete/recreate, policy-only,
+cancellation, and cfg(windows) normalization proof; full Bzlmod validation,
+direct downstream compile, formatting, Clippy disposition, diff/artifact/cap
+accounting, and independent ownership plus cohesion review.
+
+The exact Rust allowlist is `repository_ignore.rs`. Caps are 280 production,
+450 in-module test, 730 total net, and 2,821 physical lines from the 2,091
+baseline; require cleanup review above 2,400 lines. Completion ledgers are
+capped at 180 net lines with no correction. STOP on every other code path,
+legacy/public/routed/materialized/higher activation, new storage or key family,
+and cap excess. Completion schedules only docs-only
+`WP-2A-m1-host-package-marker-frontier-design`.
