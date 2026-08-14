@@ -117,7 +117,7 @@ Write only:
 Read only the active packet and owner section, the plan-authoring guide,
 `docs/developers/dice.md`, the Buck2 utility-reuse skill and matching Stage 9
 Arc/`Dupe`/`Allocative` row, local Bzlmod
-`src/{host_module,host_include,module_eval,host_file,host_package,lib}.rs`,
+`src/{host_module,host_include,module_eval,interim_module,host_file,host_package,lib}.rs`,
 loading `src/bzl_module.rs`, their manifests and directly referenced focused
 tests, and the exact Bazel 9.2.0 source/tests named above.
 
