@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; private root-host request-revision accepted, native publication-bridge design active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the accepted request-revision design in `94324880`, and the private one-file request-revision/source-certificate vertical in `207fe438`; full evidence is in the owner plans | the smallest public root exported-source consumer needs a private full-epoch revision-publication bridge; production loading still depends on coarse whole-workspace snapshots, and directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | design the private core native-demand revision-publication bridge |
+| M1: one semantic spine | **partial; private native revision-publication bridge implementation active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the accepted request-revision design in `94324880`, and the private one-file request-revision/source-certificate vertical in `207fe438`; full evidence is in the owner plans | the accepted callerless family is not yet connected to the smallest public root exported-source terminal; production loading still depends on coarse snapshots, and directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | implement the bounded three-file native revision-publication bridge |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-2A-m1-native-demand-revision-publication-bridge-design](./slug-v2-subplans/current-packet.md).
+[WP-2A-m1-native-demand-revision-publication-bridge](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -1520,3 +1520,22 @@ sealed-terminal retry suppression, initialization, cleanup, and a future
 three-core-file implementation packet. Authorize no Rust, public output/overlap,
 lease or repository/materializer change, loading-key migration, oracle
 generation, or JVM work.
+
+### M1 native-demand revision-publication bridge implementation activated (2026-08-13)
+
+Independent design review accepts a same-crate three-file bridge. The explicit
+single root exported-source branch retains the exact certificate for both
+success and source error after existing anchor/package/lookup/kind ordering.
+The first native attempt atomically injects the initial revision with its full
+native epoch. Selection and updater preparation remain outside the owner;
+under it, unchanged source commits the full selected updater plus successor
+revision, while changed source commits a one-entry replacement inside the full
+command epoch and retries through a reversible sealed-terminal token.
+
+Implement only `runtime/request_revision.rs`, `runtime/dice.rs`, and
+`runtime/events.rs` plus completion ledgers under 600 production, 750 test,
+and 1,350 total added Rust lines, with a separate 260-ledger-line cap. Preserve
+all public bytes and the existing lease/repository lifecycle. No CLI/server,
+loading/snapshot,
+root-module/BUILD/`.bzl`, external repository, public overlap, new key/store,
+oracle, or JVM work is authorized.

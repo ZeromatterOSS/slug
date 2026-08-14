@@ -959,3 +959,85 @@ under 40/260/240/540. Stop on code, public output/overlap, lease or repository/
 materializer change, snapshot/loading migration, accepted-snapshot certificate
 reuse, one-entry full-epoch overwrite, callback or compute under the owner,
 oracle generation, cross-crate API, JVM work, or cap excess.
+
+### Accepted native-demand revision-publication bridge design (2026-08-13)
+
+The bridge remains private to core. `SourceCertificate` adds sibling-only
+construction/borrowing. An exactly one-target root
+`PackageTargetKind::ExportedFile` retains it in
+`BuildRequestedTarget`; a completed root-source error retains the same
+certificate beside its existing observation. Success and error selectors
+therefore final-validate present, absence, wrong-kind, read-error, and content
+mutation without changing public result types or formatting. All other target
+kinds and external sources retain no certificate.
+
+After existing anchor/package/lookup/kind ordering, the branch computes the
+private request revision before its existing Host FileBytes path key. A private
+`NativeCommandRoot` hook sends every syntactically sole-root
+`BuildCommandRootKey` through `commit_native_attempt`; multi-target,
+package-all, query, cquery, synthetic, non-root, and external driving retain
+`commit`. Sole-root rules and filegroups acquire no revision dependency or
+certificate. The native-attempt leaf receives an updater that already contains
+the full native input/repository/path snapshot. On its first use it adds only
+the initial revision and commits once; it never duplicates or empties the path
+epoch. Subsequent admitted attempts use the same owner leaf. The callerless
+initializer and the other four routed production commits remain bounded as
+before.
+
+Event selection returns an armed private terminal token. Its sole retry
+transition consumes matching `Terminal(id)` into `Idle`, drops provisional
+events/demands, and permits a fresh attempt ID. Acceptance disarms it; armed
+drop supplies cancellation cleanup. The token remains command-owned through
+snapshot construction, final validation, materializer acceptance, and native
+session replacement, so no provisional batch reaches output.
+
+Native preparation selects activation/events/demands, constructs the selected
+snapshot and repository validations, and injects an uncommitted full selected
+updater without the revision owner. `finalize_native` then owns current-state
+comparison and exact reobservation. Unchanged adds a successor revision to that
+prepared updater and commits once. Version advance drops it and retries with no
+commit. Changed drops it, replaces the certificate demand inside the full
+command epoch, commits that merged epoch plus successor revision from a fresh
+updater, returns the merged epoch to command state, and retries. The mismatch
+commit relies on the current attempt version for unchanged non-path inputs; it
+does not accept the stale selected snapshot.
+
+Bridge-only terminal retries are capped at eight. Every error/cancellation
+before irreversible acceptance drops the updater/certificate/selected state
+and resets/suppresses effects; the existing abort guard restores the prior
+snapshot or fails closed. No lock spans DICE root/activation compute, Starlark,
+selection/formatting, user-data/native injection, repository/materializer work,
+restoration, or a callback. `AcceptedNativeDemandSnapshot` never becomes
+certificate storage.
+
+No newly widened Bazel parity is claimed. The root-source public surface remains
+a byte-for-byte regression/non-widening invariant. `42f4a64b` supplies only
+the shared completion/lifecycle boundary and its accepted external-source
+slice, not new root-specific parity. Certificate identity, request revision,
+final reobservation, retry/reset, and future overlap are Slug-native. Public
+commands remain lease-serialized.
+
+### Active native-demand revision-publication bridge implementation (2026-08-13)
+
+Packet `WP-2A-m1-native-demand-revision-publication-bridge` edits exactly
+`runtime/request_revision.rs`, `runtime/dice.rs`, and `runtime/events.rs`,
+plus canonical/current/Stage 2 ledgers only at completion. Caps are 600 net
+production, 750 in-module test, and 1,350 total added Rust lines. The separate
+ledger cap is 260 net lines, with one cap-only correction.
+
+Proof covers atomic first initialization, branch/error ordering, exact success
+and source-error certificates, unchanged acceptance, V1-to-V2/absence/error
+and absence-to-present suppression, full-epoch preservation, version retry,
+selected event reset/fresh ID, exact counters, warm/restoration, forced
+initialization/observation/injection/publication/reset/materializer/session/
+restoration failure, cancellation, nonprogress, lock barriers, leak checks,
+full crate validation, Clippy, targeted Bazel Rust if available, formatting,
+diff/artifact/archive/cap checks, and independent ownership/event cleanup
+review.
+
+Stop on every other file, CLI/server/public output/API/overlap, lease removal,
+repository/materializer change, other root/target kinds, loading/snapshot
+migration, new DICE key/store/graph, accepted-snapshot certificate storage,
+one-entry full-epoch overwrite, unbounded retry, owner-held callback/compute/
+Starlark/event/repository work, oracle growth, watcher, historical host state,
+or JVM work.
