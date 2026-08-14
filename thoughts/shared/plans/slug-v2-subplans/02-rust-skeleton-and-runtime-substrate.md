@@ -1691,3 +1691,63 @@ certificate family, new retained storage/graph, reconstructed/direct Host
 reads, or higher package-source/BUILD/.bzl/glob work. Acceptance may activate
 only one bounded private root-module implementation or one proven smaller
 docs-only prerequisite; otherwise `REPLAN`.
+
+### Frozen root-module frontier design (2026-08-14)
+
+The complete callerless frontier is implementable with exactly one new
+Bzlmod-private DICE key in `host_module.rs` and one non-retained observed
+preflight helper in `host_include.rs`. The retained carrier owns the existing
+semantic result Arc plus one accepted Arc-backed `PathObservationEpoch`; no
+second key, certificate family, public export, or workspace/Cargo change is
+required.
+
+The observed root key preserves command policy, root/bootstrap order,
+whole-horizon parsing, first-seen joined package lookup, grouped Need union,
+source-order semantic selection, grouped include-file computation, validation,
+active-path recurrence, evaluation, and event finalization. It consumes only
+the accepted observed Host-file and package-lookup keys. Neither root key
+computes the other.
+
+Epochs are unioned only while interpreting occurrences in legacy source order.
+Thus a complete semantic terminal retains its decisive completed prefix, while
+speculative later joined work may remain child-owned cache state but does not
+enter the certificate. Need/cancellation/outer error publishes no carrier.
+Success and evaluation error seal only after the finite horizon empties.
+`PathObservationEpoch::from_shared` owns deterministic ordering, earliest-Arc
+duplicate retention, and typed mismatch/conflict errors.
+
+On the observed path the new key owns exactly one equivalent root event batch;
+pre-evaluation semantic errors own an empty batch and Need/outer error owns no
+batch. No evaluator, event batch, source text, package/file carrier, horizon,
+ancestry, transaction, or union scratch survives the computation. The final
+DICE value retains only the semantic Arc and epoch.
+
+Exact admitted acyclic behavior and Host values remain exact. Frontier
+aggregation, sealing, and certificate equality are Slug-native; the existing
+cycle terminal remains Slug-native. Public anchor/loading/package-source and
+higher surfaces remain deferred.
+
+The future Rust allowlist is exactly `host_module.rs` and `host_include.rs`.
+Caps are respectively 280/430/710 and 190/170/360 production/test/total net,
+470/600/1,070 aggregate, with physical ceilings 3,904 and 1,148. Mandatory
+cohesion review applies to the already-large root owner. No correction is
+authorized. Completion schedules only docs-only root-module anchor frontier
+carrier design.
+
+### Active root-module frontier implementation (2026-08-14)
+
+Run `WP-2A-m1-root-module-frontier-implementation` from predecessor
+`b0d46420` and the frozen design above. Add exactly one callerless private
+observed root-module key/carrier and one ephemeral observed-preflight helper.
+Preserve every legacy/public caller and exact acyclic behavior.
+
+Require focused root/preflight/frontier/error/Need/cycle/event/legacy-
+nonactivation/equality/A-B-A proof, full Bzlmod validation, direct loading/core
+checks, formatting, strict Clippy/archive dispositions, exact cap accounting,
+artifact/diff hygiene, and independent ownership/cohesion review.
+
+STOP on another file or key, a public/exported carrier, legacy activation or
+behavior change, second retained collection, reconstructed/direct Host read,
+retained evaluator/event/source/horizon/ancestry, higher loading/package-source
+work, or cap excess. Completion schedules only docs-only
+`WP-2A-m1-root-module-anchor-frontier-carrier-design`.
