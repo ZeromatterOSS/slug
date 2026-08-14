@@ -1291,3 +1291,53 @@ The observed carrier retains one private
 and exposes only a borrowed semantic result. Formatted implementation caps are
 200 production, 370 in-module test, and 570 total net lines; the physical file
 ceiling is 2,328 lines. No cap correction is reserved.
+
+### Accepted observed root REPO-file frontier-key design (2026-08-14)
+
+Independent source and ownership review accepts the design activated in
+`7d7f0d25`. One crate-private `HostRepoFileObservationKey` shares the
+legacy workspace identity and policy-first ordering but computes only
+`HostFileBytesObservationKey`. Its callerless DICE value is
+`PathOutcome<Result<ObservedHostRepoFile, ObservedPathFrontierError>>`.
+The carrier retains one private semantic-result Arc plus the accepted exact
+epoch and exposes only borrowed result/epoch accessors.
+
+Policy projection failure retains the unchanged inner semantic error with an
+empty epoch and zero Host activation. Need/cancellation publishes no carrier
+or events. A lower frontier error remains a completed outer error. Completed
+Host-file resolution/read errors, missing, evaluation errors, and success all
+retain the exact dependency epoch. A synchronous stack-only adapter owns the
+existing reporter/evaluator path and exactly one completed event-batch store;
+neither DICE key computes the other, and no lock, evaluator, batch,
+transaction, or extra source copy enters retained state.
+
+The authorized retained utility sources moved to live
+`gazebo/dupe/src/lib.rs` and `allocative/allocative/src/lib.rs`; the stale
+`third-party/buck2/` prefixes are replaced without widening the comparison.
+`Dupe` covers only cheap Arc/epoch bumps and `Allocative` preserves DICE
+memory accounting. No new container, export, manifest edge, or public behavior
+is introduced.
+
+### Active observed root REPO-file frontier-key implementation (2026-08-14)
+
+Run `WP-2A-m1-host-repo-file-frontier-key-implementation` in exactly
+`app/slug_bzlmod_v2/src/repo_file.rs`, plus canonical/current/Stage 2 only at
+completion. Caps are 200 production, 370 in-module test, 570 total formatted
+net lines, and 2,328 physical lines, with no correction.
+
+Prove policy failure/empty epoch, present/missing/wrong-kind/resolution/
+FileBytes/parse/evaluation terminals, exact observation/result Arc ownership,
+outer-error passthrough, Need/cancellation, A/B/A, capture-on/off event parity,
+exactly one completed event batch, zero legacy-key activation, compact
+allocation/clone behavior, unchanged legacy callers, focused/full Bzlmod and
+direct-dependent validation, formatting, archive/diff/artifact/cap gates, and
+independent cleanup/ownership review.
+
+Stop on every other Rust file, Cargo/BUILD/oracle/generated evidence,
+repository-ignore or routed/materialized activation, package/MODULE/lockfile/
+BUILD/`.bzl`/loading/core/public callers, legacy key/value/equality behavior,
+public export/API/output/event changes, second observed key, new retained
+container/graph/store, reconstructed or historical Host reads, watcher, JVM,
+duplicated evaluator, retained event/evaluator/transaction, or cap excess.
+Completion schedules only a docs design for root repository-ignore frontier
+composition.
