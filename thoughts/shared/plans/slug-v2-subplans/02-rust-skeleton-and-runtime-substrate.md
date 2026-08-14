@@ -1041,3 +1041,50 @@ migration, new DICE key/store/graph, accepted-snapshot certificate storage,
 one-entry full-epoch overwrite, unbounded retry, owner-held callback/compute/
 Starlark/event/repository work, oracle growth, watcher, historical host state,
 or JVM work.
+
+### Accepted native root-source revision-publication bridge (2026-08-13)
+
+Commit `f0849151` closes
+`WP-2A-m1-native-demand-revision-publication-bridge` in exactly
+`runtime/request_revision.rs`, `runtime/dice.rs`, and
+`runtime/events.rs`. A syntactically sole-root build initializes revision
+with its already-full native attempt updater. Only a later root
+`ExportedFile` success or completed source error consumes revision and
+retains the exact FileBytes certificate; multi-target roots, rules,
+filegroups, query, external, and loading paths retain no certificate.
+
+Selection transfers one armed terminal token through prepared-snapshot
+construction and finalization. Unchanged source adds the successor revision to
+the prepared full updater and commits once. Version advance commits nothing.
+Changed source replaces exactly the certificate demand in the command's full
+epoch, commits it with the successor revision from a fresh updater, resets the
+terminal, and retries with a fresh attempt ID. Acceptance disarms only after
+native session replacement; error, cancellation, and drop suppress provisional
+events and restore or fail closed.
+
+Focused proof passes eleven revision tests, the sole-root bridge integration,
+the fresh-runtime multi-target isolation regression, and five terminal-token
+lifecycle tests. The bounded full crate passes 220 library and 12 integration
+tests with the two inherited out-of-packet failures skipped. Strict Clippy
+stops first in unchanged `allocative_derive`. Targeted Bazel Rust reaches
+analysis and stops on six unchanged `slug_bzlmod_v2` `include_bytes!`
+files omitted from Bazel `srcs`. Formatting, diff/artifact checks, and
+independent DICE/event/cleanup review pass.
+
+Conservative top-level-`cfg(test)` accounting charges 194 production plus
+171 test net lines in `dice.rs`, 95 plus 72 in `events.rs`, and 266 plus
+140 in `request_revision.rs`: 555/600 production, 383/750 test, and
+938/1,350 total. Public bytes remain a regression/non-widening invariant;
+certificate/revision/final-validation/reset behavior remains Slug-native.
+
+### Active next source-certificate consumer audit (2026-08-13)
+
+Run only docs packet
+`WP-2A-m1-next-source-certificate-consumer-audit` under
+40/220/220/480 ledger lines. Compare root MODULE, selected BUILD, one loaded
+`.bzl`, and direct-local external source frontiers only enough to select one
+complete bounded private certificate consumer or a precise prerequisite
+`REPLAN`. Authorize no Rust, partial certificate, public API/output/overlap
+or lease change, new key/store/graph, snapshot replacement, repository/
+materialization activation, oracle generation, watcher, historical Host read,
+or JVM work.
