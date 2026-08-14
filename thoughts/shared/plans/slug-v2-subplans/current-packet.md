@@ -147,12 +147,12 @@ Edit exactly these Rust files:
 At completion edit only canonical, current-packet, and Stage 2 ledgers. No
 Cargo/BUILD file or dependency change is authorized.
 
-Caps are 340 net production lines, 480 in-module test lines, and 820 total
-added Rust lines. Physical file ceilings after formatting are 1,680 lines for
-`path_observation.rs`, 4,200 for `path_resolution.rs`, 572 for workspace
-`lib.rs`, and 925 for `host_file.rs`. Completion-ledger growth is capped at
-200 net lines. One correction may adjust caps only; it may not add files,
-callers, or behavior.
+Corrected caps are 380 net production lines, 650 in-module test lines, and
+1,030 total added Rust lines. Physical file ceilings after formatting are
+1,750 lines for `path_observation.rs`, 4,400 for `path_resolution.rs`, 580
+for workspace `lib.rs`, and 1,100 for `host_file.rs`. Completion-ledger
+growth is capped at 200 net lines. The single cap-only correction is consumed
+by the required discriminating proof; it adds no files, callers, or behavior.
 
 Focused proof must cover:
 

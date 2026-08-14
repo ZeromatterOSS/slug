@@ -1191,8 +1191,9 @@ worker, observer lease, or lock is retained.
 
 Run `WP-2A-m1-observed-path-frontier-key-implementation` in exactly workspace
 `path_observation.rs`, `path_resolution.rs`, `lib.rs`, and Bzlmod
-`host_file.rs`. Caps are 340 production, 480 in-module test, 820 total Rust,
-and 200 completion-ledger net lines. Prove exact epoch union/conflict, complete
+`host_file.rs`. Corrected caps are 380 production, 650 in-module test, 1,030
+total Rust, and 200 completion-ledger net lines; the single cap-only correction
+is consumed by discriminating proof. Prove exact epoch union/conflict, complete
 success/error prefixes, symlink/error/cycle/expansion and final FileBytes
 frontiers, Need/cancellation suppression, A-B-A equality, compact Arc
 ownership, and unchanged/unactivated legacy keys.

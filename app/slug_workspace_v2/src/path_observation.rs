@@ -668,9 +668,10 @@ impl PathObservationResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub enum PathObservationEpochError {
     DuplicateDemand(PathObservationDemand),
+    ConflictingDemand(PathObservationDemand),
     OperationMismatch {
         demand: PathObservationDemand,
         result_operation: PathObservationOperation,
@@ -683,6 +684,12 @@ impl fmt::Display for PathObservationEpochError {
             Self::DuplicateDemand(demand) => write!(
                 f,
                 "duplicate path observation demand for {:?} ({:?})",
+                demand.path(),
+                demand.operation()
+            ),
+            Self::ConflictingDemand(demand) => write!(
+                f,
+                "conflicting path observations for {:?} ({:?})",
                 demand.path(),
                 demand.operation()
             ),
@@ -740,6 +747,35 @@ impl PathObservationEpoch {
                     .map(|(demand, result)| (demand, Arc::new(result)))
                     .collect(),
             ),
+        })
+    }
+
+    #[doc(hidden)]
+    pub fn from_shared(
+        observations: impl IntoIterator<Item = (PathObservationDemand, Arc<PathObservationResult>)>,
+    ) -> Result<Self, PathObservationEpochError> {
+        let mut observations = observations.into_iter().collect::<Vec<_>>();
+        observations.sort_by(|(left, _), (right, _)| left.cmp(right));
+        let mut unique: Vec<(PathObservationDemand, Arc<PathObservationResult>)> =
+            Vec::with_capacity(observations.len());
+        for (demand, result) in observations {
+            if demand.operation() != result.operation() {
+                return Err(PathObservationEpochError::OperationMismatch {
+                    demand,
+                    result_operation: result.operation(),
+                });
+            }
+            match unique.last() {
+                Some((previous, previous_result)) if *previous == demand => {
+                    if previous_result.as_ref() != result.as_ref() {
+                        return Err(PathObservationEpochError::ConflictingDemand(demand));
+                    }
+                }
+                _ => unique.push((demand, result)),
+            }
+        }
+        Ok(Self {
+            observations: Arc::new(unique.into_iter().collect()),
         })
     }
 
@@ -1299,6 +1335,38 @@ mod tests {
                 PathObservationResult::WindowsLongPath(Arc::from(
                     "C:/Program Files".encode_utf16().collect::<Vec<_>>(),
                 )),
+            )]),
+            Err(PathObservationEpochError::OperationMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn shared_epoch_coalesces_equal_arcs_and_rejects_conflicts() {
+        let demand = demand(
+            PathObservationNamespace::Host,
+            "/workspace/file",
+            PathObservationOperation::FileBytes,
+        );
+        let shared = Arc::new(file_bytes(b"same"));
+        let epoch = PathObservationEpoch::from_shared([
+            (demand.dupe(), shared.dupe()),
+            (demand.dupe(), Arc::new(file_bytes(b"same"))),
+        ])
+        .unwrap();
+        assert_eq!(epoch.observations().len(), 1);
+        assert!(Arc::ptr_eq(epoch.get(&demand).unwrap(), &shared));
+
+        assert!(matches!(
+            PathObservationEpoch::from_shared([
+                (demand.dupe(), shared),
+                (demand.dupe(), Arc::new(file_bytes(b"changed"))),
+            ]),
+            Err(PathObservationEpochError::ConflictingDemand(_))
+        ));
+        assert!(matches!(
+            PathObservationEpoch::from_shared([(
+                demand,
+                Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
             )]),
             Err(PathObservationEpochError::OperationMismatch { .. })
         ));

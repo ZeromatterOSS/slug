@@ -1625,8 +1625,9 @@ frontier error for conflicting results or operation mismatch. That error is
 never a panic or a legacy semantic error.
 
 Implement only workspace `path_observation.rs`, `path_resolution.rs`,
-`lib.rs`, and Bzlmod `host_file.rs` under 340 production, 480 test, and 820
-total added Rust lines plus 200 completion-ledger lines. Preserve every legacy
+`lib.rs`, and Bzlmod `host_file.rs` under the corrected 380 production,
+650 test, and 1,030 total added Rust lines plus 200 completion-ledger lines.
+The single cap-only correction is consumed by discriminating proof. Preserve every legacy
 key/value/caller and all public behavior. No Cargo/BUILD, third key,
 loading/core/public activation, repository/module/BUILD/`.bzl`/glob work,
 request finalization, direct/historical Host read, oracle, watcher, or JVM is

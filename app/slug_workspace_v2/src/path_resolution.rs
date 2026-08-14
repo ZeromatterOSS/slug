@@ -27,6 +27,8 @@ use crate::PathDirectoryEntries;
 use crate::PathLstat;
 use crate::PathNodeKind;
 use crate::PathObservationDemand;
+use crate::PathObservationEpoch;
+use crate::PathObservationEpochError;
 use crate::PathObservationError;
 use crate::PathObservationKey;
 use crate::PathObservationNamespace;
@@ -35,6 +37,45 @@ use crate::PathObservationResult;
 use crate::PathOperationResult;
 use crate::PathOutcome;
 use crate::PathResult;
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub enum ObservedPathFrontierError {
+    Epoch(PathObservationEpochError),
+}
+
+impl fmt::Display for ObservedPathFrontierError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Epoch(error) => error.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for ObservedPathFrontierError {}
+
+impl From<PathObservationEpochError> for ObservedPathFrontierError {
+    fn from(error: PathObservationEpochError) -> Self {
+        Self::Epoch(error)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedResolvedPath {
+    result: Result<ResolvedPath, PathResolutionError>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedResolvedPath {
+    pub fn result(&self) -> &Result<ResolvedPath, PathResolutionError> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
 
 /// One physical symlink followed while resolving a logical path.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -203,6 +244,34 @@ impl fmt::Display for ResolvedPathKey {
         write!(
             f,
             "resolved-path:{:?}:{:?}",
+            self.namespace,
+            self.logical_path.as_path()
+        )
+    }
+}
+
+/// The callerless observed sibling of ResolvedPathKey.
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct ResolvedPathObservationKey {
+    namespace: PathObservationNamespace,
+    logical_path: NormalizedAbsolutePath,
+}
+
+impl ResolvedPathObservationKey {
+    pub fn new(namespace: PathObservationNamespace, logical_path: NormalizedAbsolutePath) -> Self {
+        Self {
+            namespace,
+            logical_path,
+        }
+    }
+}
+
+impl fmt::Display for ResolvedPathObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "observed-resolved-path:{:?}:{:?}",
             self.namespace,
             self.logical_path.as_path()
         )
@@ -671,6 +740,65 @@ fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("path-resolution DICE invariant failed: {error:?}"))
 }
 
+async fn drive_resolution(
+    ctx: &mut DiceComputations<'_>,
+    namespace: PathObservationNamespace,
+    logical_path: NormalizedAbsolutePath,
+    mut captured: Option<&mut Vec<(PathObservationDemand, Arc<PathObservationResult>)>>,
+) -> Result<PathResult<ResolvedPath, PathResolutionError>, PathObservationEpochError> {
+    let mut machine = ResolutionMachine::new(namespace, logical_path.dupe());
+    let mut next = None;
+    loop {
+        let step = next.take().unwrap_or_else(|| machine.transition());
+        match step {
+            MachineStep::PushParent(parent) => machine.push_parent(parent),
+            MachineStep::Observe(demand) => {
+                let observed =
+                    dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await);
+                match observed {
+                    PathOutcome::Need(need) => return Ok(PathOutcome::Need(need)),
+                    PathOutcome::Complete(result) => {
+                        if demand.operation() != result.operation() {
+                            return Err(PathObservationEpochError::OperationMismatch {
+                                demand,
+                                result_operation: result.operation(),
+                            });
+                        }
+                        if let Some(captured) = captured.as_mut() {
+                            captured.push((demand.dupe(), result.dupe()));
+                        }
+                        next = machine.observe(demand, result);
+                    }
+                }
+            }
+            MachineStep::Complete(result) => {
+                if let Some(step) = machine.finish_frame(result) {
+                    if machine.frames.is_empty() {
+                        let MachineStep::Complete(result) = step else {
+                            unreachable!("root-frame completion is terminal")
+                        };
+                        return Ok(PathOutcome::Complete(result.map_err(|cause| {
+                            cause.with_outer_context(namespace, logical_path.dupe())
+                        })));
+                    }
+                    next = Some(step);
+                }
+            }
+        }
+    }
+}
+
+fn assemble_observed_resolution(
+    result: Result<ResolvedPath, PathResolutionError>,
+    captured: Vec<(PathObservationDemand, Arc<PathObservationResult>)>,
+) -> Result<ObservedResolvedPath, ObservedPathFrontierError> {
+    let observations = PathObservationEpoch::from_shared(captured)?;
+    Ok(ObservedResolvedPath {
+        result,
+        observations,
+    })
+}
+
 #[async_trait]
 impl Key for ResolvedPathKey {
     type Value = PathResult<ResolvedPath, PathResolutionError>;
@@ -680,35 +808,9 @@ impl Key for ResolvedPathKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let mut machine = ResolutionMachine::new(self.namespace, self.logical_path.dupe());
-        let mut next = None;
-        loop {
-            let step = next.take().unwrap_or_else(|| machine.transition());
-            match step {
-                MachineStep::PushParent(parent) => machine.push_parent(parent),
-                MachineStep::Observe(demand) => {
-                    let observed =
-                        dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await);
-                    match observed {
-                        PathOutcome::Need(need) => return PathOutcome::Need(need),
-                        PathOutcome::Complete(result) => next = machine.observe(demand, result),
-                    }
-                }
-                MachineStep::Complete(result) => {
-                    if let Some(step) = machine.finish_frame(result) {
-                        if machine.frames.is_empty() {
-                            let MachineStep::Complete(result) = step else {
-                                unreachable!("root-frame completion is terminal")
-                            };
-                            return PathOutcome::Complete(result.map_err(|cause| {
-                                cause.with_outer_context(self.namespace, self.logical_path.dupe())
-                            }));
-                        }
-                        next = Some(step);
-                    }
-                }
-            }
-        }
+        drive_resolution(ctx, self.namespace, self.logical_path.dupe(), None)
+            .await
+            .expect("PathObservationKey result operation matches its demand")
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -727,6 +829,40 @@ pub enum PathFileBytes {
     Missing,
 }
 
+#[async_trait]
+impl Key for ResolvedPathObservationKey {
+    type Value = PathOutcome<Result<ObservedResolvedPath, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let mut captured = Vec::new();
+        match drive_resolution(
+            ctx,
+            self.namespace,
+            self.logical_path.dupe(),
+            Some(&mut captured),
+        )
+        .await
+        {
+            Err(error) => PathOutcome::Complete(Err(error.into())),
+            Ok(PathOutcome::Need(need)) => PathOutcome::Need(need),
+            Ok(PathOutcome::Complete(result)) => {
+                PathOutcome::Complete(assemble_observed_resolution(result, captured))
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 /// A byte-projection failure containing only semantic identity.
 #[derive(Debug, Clone, Allocative, Dupe)]
 pub enum PathFileBytesError {
@@ -1308,6 +1444,8 @@ mod tests {
     use dice_futures::cancellation::CancellationContext;
     use dupe::Dupe;
 
+    use super::ObservedPathFrontierError;
+    use super::ObservedResolvedPath;
     use super::PathDirectoryListing;
     use super::PathDirectoryListingError;
     use super::PathDirectoryListingKey;
@@ -1318,7 +1456,9 @@ mod tests {
     use super::PathResolutionError;
     use super::ResolvedPath;
     use super::ResolvedPathKey;
+    use super::ResolvedPathObservationKey;
     use super::ResolvedPathState;
+    use super::assemble_observed_resolution;
     use crate::NeedPathObservations;
     use crate::NormalizedAbsolutePath;
     use crate::PathDirectoryEntries;
@@ -1330,6 +1470,7 @@ mod tests {
     use crate::PathNodeKind;
     use crate::PathObservationDemand;
     use crate::PathObservationEpoch;
+    use crate::PathObservationEpochError;
     use crate::PathObservationEpochKey;
     use crate::PathObservationError;
     use crate::PathObservationInstanceId;
@@ -4013,5 +4154,193 @@ mod tests {
             super::filesystem_root(Path::new(r"\\?\C:\workspace\file")),
             PathBuf::from(r"\\?\C:\")
         );
+    }
+
+    async fn observed_script(logical_path: &str, script: &[ScriptEntry]) -> ObservedResolvedPath {
+        let injected = PathObservationEpoch::new(
+            script
+                .iter()
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        let key =
+            ResolvedPathObservationKey::new(PathObservationNamespace::Host, path(logical_path));
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, injected.dupe())])
+            .unwrap();
+        let complete = updater.commit().await.compute(&key).await.unwrap();
+        assert!(ResolvedPathObservationKey::validity(&complete));
+        assert!(ResolvedPathObservationKey::equality(&complete, &complete));
+        let PathOutcome::Complete(Ok(observed)) = complete else {
+            panic!("full observed-resolution script must complete with a carrier");
+        };
+        assert_eq!(observed.observations().observations().len(), script.len());
+        for (demand, expected) in injected.observations() {
+            let retained = observed
+                .observations()
+                .observations()
+                .get(demand)
+                .expect("every injected observation is retained");
+            assert!(Arc::ptr_eq(expected, retained));
+        }
+        observed
+    }
+
+    #[tokio::test]
+    async fn observed_resolution_retains_complete_error_frontiers() {
+        let ns = PathObservationNamespace::Host;
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let inconsistent = observed_script(
+            "/bad",
+            &[
+                host_root(),
+                present(ns, "/bad", PathNodeKind::Symlink),
+                read_link_result(ns, "/bad", PathOperationResult::Missing),
+            ],
+        )
+        .await;
+        assert!(matches!(
+            inconsistent.result(),
+            Err(PathResolutionError::InconsistentState { .. })
+        ));
+        let observation =
+            observed_script("/file/child", &[host_root(), lstat_error(ns, "/file", io)]).await;
+        assert!(matches!(
+            observation.result(),
+            Err(PathResolutionError::Observation { error, .. }) if *error == io
+        ));
+        let cycle = observed_script(
+            "/self",
+            &[
+                host_root(),
+                present(ns, "/self", PathNodeKind::Symlink),
+                read_link(ns, "/self", "self"),
+            ],
+        )
+        .await;
+        assert!(matches!(
+            cycle.result(),
+            Err(PathResolutionError::Cycle { .. })
+        ));
+        let expansion = observed_script(
+            "/prefix",
+            &[
+                host_root(),
+                present(ns, "/prefix", PathNodeKind::Symlink),
+                read_link(ns, "/prefix", "a"),
+                present(ns, "/a", PathNodeKind::Symlink),
+                read_link(ns, "/a", "a/child"),
+            ],
+        )
+        .await;
+        assert!(matches!(
+            expansion.result(),
+            Err(PathResolutionError::InfiniteExpansion { .. })
+        ));
+    }
+
+    #[test]
+    fn observed_resolution_assembly_returns_typed_outer_errors() {
+        let ns = PathObservationNamespace::Host;
+        let key_demand = demand(ns, "/bad", PathObservationOperation::Lstat);
+        let semantic = || -> Result<ResolvedPath, PathResolutionError> {
+            Err(PathResolutionError::Observation {
+                namespace: ns,
+                requested_path: path("/bad"),
+                demand: key_demand.dupe(),
+                error: PathObservationError::NotALink,
+            })
+        };
+        let mismatch = PathOutcome::Complete(assemble_observed_resolution(
+            semantic(),
+            vec![(
+                key_demand.dupe(),
+                Arc::new(PathObservationResult::ReadLink(
+                    PathOperationResult::Missing,
+                )),
+            )],
+        ));
+        assert!(matches!(
+            mismatch,
+            PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::OperationMismatch { .. }
+            )))
+        ));
+        assert!(ResolvedPathObservationKey::validity(&mismatch));
+        assert!(ResolvedPathObservationKey::equality(&mismatch, &mismatch));
+
+        let (_, regular) = present(ns, "/bad", PathNodeKind::RegularFile);
+        let (_, special) = present(ns, "/bad", PathNodeKind::SpecialFile);
+        let conflict = PathOutcome::Complete(assemble_observed_resolution(
+            semantic(),
+            vec![
+                (key_demand.dupe(), Arc::new(regular)),
+                (key_demand, Arc::new(special)),
+            ],
+        ));
+        assert!(matches!(
+            conflict,
+            PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::ConflictingDemand(_)
+            )))
+        ));
+        assert!(ResolvedPathObservationKey::validity(&conflict));
+        assert!(ResolvedPathObservationKey::equality(&conflict, &conflict));
+    }
+
+    #[tokio::test]
+    async fn observed_resolution_retains_exact_symlink_frontier_after_need() {
+        let script = linked_file_script(
+            PathObservationNamespace::Host,
+            "/target",
+            lstat(PathNodeKind::RegularFile),
+            PathOperationResult::Present(Arc::from(&b"bytes"[..])),
+        );
+        let resolution = &script[..4];
+        let key = ResolvedPathObservationKey::new(PathObservationNamespace::Host, path("/entry"));
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let need = transaction.compute(&key).await.unwrap();
+        assert!(matches!(need, PathOutcome::Need(_)));
+        assert!(!ResolvedPathObservationKey::validity(&need));
+
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                PathObservationEpoch::new(
+                    resolution
+                        .iter()
+                        .map(|(demand, result)| (demand.dupe(), result.dupe())),
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        let complete = updater.commit().await.compute(&key).await.unwrap();
+        let PathOutcome::Complete(Ok(observed)) = &complete else {
+            panic!("full observed-resolution script must complete successfully");
+        };
+        assert!(matches!(
+            observed.result(),
+            Ok(resolved) if resolved.real_path() == &path("/target")
+        ));
+        assert_eq!(
+            observed.observations().observations().len(),
+            resolution.len()
+        );
+        assert!(ResolvedPathObservationKey::validity(&complete));
+        assert!(ResolvedPathObservationKey::equality(&complete, &complete));
     }
 }

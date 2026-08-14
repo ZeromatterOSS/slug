@@ -20,9 +20,12 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
+use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochError;
 use slug_workspace_v2::PathObservationError;
 use slug_workspace_v2::PathObservationKey;
 use slug_workspace_v2::PathObservationNamespace;
@@ -33,6 +36,7 @@ use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
 use slug_workspace_v2::PathResult;
 use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
@@ -216,6 +220,176 @@ impl Key for HostFileBytesKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostFileBytes {
+    result: Result<HostFileBytes, HostFileError>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostFileBytes {
+    pub(crate) fn result(&self) -> &Result<HostFileBytes, HostFileError> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub(crate) struct HostFileBytesObservationKey {
+    logical_path: NormalizedAbsolutePath,
+}
+
+impl HostFileBytesObservationKey {
+    pub(crate) fn new(logical_path: NormalizedAbsolutePath) -> Self {
+        Self { logical_path }
+    }
+}
+
+impl fmt::Display for HostFileBytesObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "bzlmod-observed-host-file-bytes:{:?}",
+            self.logical_path.as_path()
+        )
+    }
+}
+
+fn append_host_file_observation(
+    observations: &PathObservationEpoch,
+    demand: PathObservationDemand,
+    observed: Arc<PathObservationResult>,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        observations
+            .observations()
+            .iter()
+            .map(|(known, result)| (known.dupe(), result.dupe()))
+            .chain(std::iter::once((demand, observed))),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+#[async_trait]
+impl Key for HostFileBytesObservationKey {
+    type Value = PathOutcome<Result<ObservedHostFileBytes, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let resolved = dice_invariant(
+            ctx.compute(&ResolvedPathObservationKey::new(
+                PathObservationNamespace::Host,
+                self.logical_path.dupe(),
+            ))
+            .await,
+        );
+        let resolved = match resolved {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(resolved)) => resolved,
+        };
+        let observations = resolved.observations().dupe();
+        let resolved_path = match resolved.result() {
+            Err(error) => {
+                return PathOutcome::Complete(Ok(ObservedHostFileBytes {
+                    result: Err(HostFileError::from_resolution(
+                        self.logical_path.dupe(),
+                        error.dupe(),
+                    )),
+                    observations,
+                }));
+            }
+            Ok(resolved) => resolved,
+        };
+        let lstat = match resolved_path.state() {
+            ResolvedPathState::Missing => {
+                return PathOutcome::Complete(Ok(ObservedHostFileBytes {
+                    result: Ok(HostFileBytes::Missing),
+                    observations,
+                }));
+            }
+            ResolvedPathState::Present(lstat)
+                if matches!(
+                    lstat.kind(),
+                    PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                ) =>
+            {
+                lstat
+            }
+            ResolvedPathState::Present(lstat) => {
+                return PathOutcome::Complete(Ok(ObservedHostFileBytes {
+                    result: Err(HostFileError::WrongKind {
+                        logical_path: self.logical_path.dupe(),
+                        actual: lstat.kind(),
+                    }),
+                    observations,
+                }));
+            }
+        };
+
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            resolved_path.real_path().dupe(),
+            PathObservationOperation::FileBytes,
+        );
+        let observed = dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await);
+        let observed = match observed {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(result) => result,
+        };
+        let observations =
+            match append_host_file_observation(&observations, demand.dupe(), observed.dupe()) {
+                Ok(observations) => observations,
+                Err(error) => return PathOutcome::Complete(Err(error)),
+            };
+        let result = match observed.as_ref() {
+            PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
+                Ok(HostFileBytes::Present(bytes.dupe()))
+            }
+            PathObservationResult::FileBytes(PathOperationResult::Missing) => {
+                Err(HostFileError::InconsistentState {
+                    logical_path: self.logical_path.dupe(),
+                    operation: demand.operation(),
+                    before: Some(lstat),
+                    after: None,
+                })
+            }
+            PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
+                Err(HostFileError::Observation {
+                    logical_path: self.logical_path.dupe(),
+                    operation: demand.operation(),
+                    error: *error,
+                })
+            }
+            other => {
+                return PathOutcome::Complete(Err(ObservedPathFrontierError::from(
+                    PathObservationEpochError::OperationMismatch {
+                        demand,
+                        result_operation: other.operation(),
+                    },
+                )));
+            }
+        };
+        PathOutcome::Complete(Ok(ObservedHostFileBytes {
+            result,
+            observations,
+        }))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fmt;
@@ -223,26 +397,33 @@ mod tests {
     use std::hash::Hasher;
     use std::path::PathBuf;
     use std::sync::Arc;
+    use std::sync::Mutex;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
 
     use allocative::Allocative;
     use async_trait::async_trait;
+    use dice::ActivationData;
+    use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
     use dice::DiceComputations;
     use dice::DiceProjectionComputations;
     use dice::DiceTransaction;
+    use dice::DynKey;
     use dice::Key;
     use dice::ProjectionKey;
+    use dice::UserComputationData;
     use dice_futures::cancellation::CancellationContext;
     use dupe::Dupe;
     use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::ObservedPathFrontierError;
     use slug_workspace_v2::PathIoErrorKind;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
     use slug_workspace_v2::PathObservationError;
     use slug_workspace_v2::PathObservationNamespace;
@@ -251,14 +432,53 @@ mod tests {
     use slug_workspace_v2::PathOperationResult;
     use slug_workspace_v2::PathOutcome;
     use slug_workspace_v2::PathResult;
+    use slug_workspace_v2::ResolvedPathKey;
+    use slug_workspace_v2::ResolvedPathObservationKey;
 
     use super::HostFileBytes;
     use super::HostFileBytesKey;
+    use super::HostFileBytesObservationKey;
     use super::HostFileError;
+    use super::ObservedHostFileBytes;
+    use super::append_host_file_observation;
     use super::dice_invariant;
-
     type ScriptEntry = (PathObservationDemand, PathObservationResult);
 
+    #[derive(Default)]
+    struct KeyTracker(Mutex<Vec<&'static str>>);
+
+    impl KeyTracker {
+        fn take(&self) -> Vec<&'static str> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    impl ActivationTracker for KeyTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            _dependencies: &mut dyn Iterator<Item = &DynKey>,
+            activation: ActivationData,
+        ) {
+            if !matches!(activation, ActivationData::Evaluated(_)) {
+                return;
+            }
+            let kind = if key.downcast_ref::<ResolvedPathKey>().is_some() {
+                Some("legacy-resolution")
+            } else if key.downcast_ref::<HostFileBytesKey>().is_some() {
+                Some("legacy-host-file")
+            } else if key.downcast_ref::<ResolvedPathObservationKey>().is_some() {
+                Some("observed-resolution")
+            } else if key.downcast_ref::<HostFileBytesObservationKey>().is_some() {
+                Some("observed-host-file")
+            } else {
+                None
+            };
+            if let Some(kind) = kind {
+                self.0.lock().unwrap().push(kind);
+            }
+        }
+    }
     fn path(value: &str) -> NormalizedAbsolutePath {
         NormalizedAbsolutePath::new(value).unwrap()
     }
@@ -344,11 +564,114 @@ mod tests {
         .unwrap()
     }
 
+    fn observed_host_outcome(
+        result: Result<PathObservationEpoch, ObservedPathFrontierError>,
+    ) -> <HostFileBytesObservationKey as Key>::Value {
+        PathOutcome::Complete(result.map(|observations| ObservedHostFileBytes {
+            result: Ok(HostFileBytes::Missing),
+            observations,
+        }))
+    }
+
+    #[test]
+    fn observed_host_union_returns_typed_outer_errors() {
+        let final_demand = demand("/file", PathObservationOperation::FileBytes);
+        let missing = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Missing,
+        ));
+        let known = PathObservationEpoch::from_shared([(final_demand.dupe(), missing)]).unwrap();
+        let conflict = observed_host_outcome(append_host_file_observation(
+            &known,
+            final_demand.dupe(),
+            Arc::new(PathObservationResult::FileBytes(
+                PathOperationResult::Present(Arc::from(&b"bytes"[..])),
+            )),
+        ));
+        assert!(matches!(
+            &conflict,
+            PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::ConflictingDemand(_)
+            )))
+        ));
+        assert!(HostFileBytesObservationKey::validity(&conflict));
+        assert!(HostFileBytesObservationKey::equality(&conflict, &conflict));
+
+        let mismatch = observed_host_outcome(append_host_file_observation(
+            &PathObservationEpoch::empty(),
+            final_demand,
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                lstat_variant(PathNodeKind::RegularFile, 1),
+            ))),
+        ));
+        assert!(matches!(
+            &mismatch,
+            PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::OperationMismatch { .. }
+            )))
+        ));
+        assert!(HostFileBytesObservationKey::validity(&mismatch));
+        assert!(HostFileBytesObservationKey::equality(&mismatch, &mismatch));
+    }
+
+    #[tokio::test]
+    async fn observed_host_file_retains_exact_arcs_without_legacy_activation() {
+        let bytes: Arc<[u8]> = Arc::from(&b"frontier"[..]);
+        let script = linked_script(
+            "/target",
+            PathNodeKind::RegularFile,
+            9,
+            PathOperationResult::Present(bytes.dupe()),
+        );
+        let injected = epoch(&script);
+        let tracker = Arc::new(KeyTracker::default());
+        let user_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, injected.dupe())])
+            .unwrap();
+        let key = HostFileBytesObservationKey::new(path("/entry"));
+        let complete = updater.commit().await.compute(&key).await.unwrap();
+        assert!(HostFileBytesObservationKey::validity(&complete));
+        assert!(HostFileBytesObservationKey::equality(&complete, &complete));
+        let PathOutcome::Complete(Ok(observed)) = &complete else {
+            panic!("complete observed Host-file script must retain a carrier");
+        };
+        assert_eq!(observed.result(), &Ok(HostFileBytes::Present(bytes.dupe())));
+        assert_eq!(observed.observations().observations().len(), script.len());
+        assert_eq!(
+            observed
+                .observations()
+                .observations()
+                .keys()
+                .filter(|demand| demand.operation() == PathObservationOperation::FileBytes)
+                .count(),
+            1
+        );
+        for (demand, expected) in injected.observations() {
+            let retained = observed
+                .observations()
+                .observations()
+                .get(demand)
+                .expect("every injected Host observation is retained");
+            assert!(Arc::ptr_eq(expected, retained));
+        }
+        let activations = tracker.take();
+        assert!(activations.contains(&"observed-resolution"));
+        assert!(activations.contains(&"observed-host-file"));
+        assert!(!activations.contains(&"legacy-resolution"));
+        assert!(!activations.contains(&"legacy-host-file"));
+    }
+
     async fn cumulative(
         logical_path: &str,
         script: &[ScriptEntry],
     ) -> Result<HostFileBytes, HostFileError> {
         let key = HostFileBytesKey::new(path(logical_path));
+        let observed_key = HostFileBytesObservationKey::new(path(logical_path));
         let dice = Dice::builder().build(DetectCycles::Enabled);
         let mut transaction = dice.updater().commit().await;
         for prefix_len in 0..=script.len() {
@@ -361,6 +684,7 @@ mod tests {
                 .unwrap();
             transaction = updater.commit().await;
             let outcome = transaction.compute(&key).await.unwrap();
+            let observed = transaction.compute(&observed_key).await.unwrap();
             if prefix_len < script.len() {
                 let PathOutcome::Need(need) = &outcome else {
                     panic!("Host byte projection completed before script prefix {prefix_len}");
@@ -368,6 +692,8 @@ mod tests {
                 assert_eq!(need.demands(), &[script[prefix_len].0.dupe()]);
                 assert!(!HostFileBytesKey::validity(&outcome));
                 assert!(!HostFileBytesKey::equality(&outcome, &outcome));
+                assert!(matches!(observed, PathOutcome::Need(_)));
+                assert!(!HostFileBytesObservationKey::validity(&observed));
             } else {
                 let PathOutcome::Complete(result) = outcome else {
                     panic!("complete Host byte script still needs observations");
@@ -379,6 +705,16 @@ mod tests {
                     &PathOutcome::Complete(result.dupe()),
                     &PathOutcome::Complete(result.dupe())
                 ));
+                let PathOutcome::Complete(Ok(observed_value)) = &observed else {
+                    panic!("complete observed Host byte script still needs observations");
+                };
+                assert_eq!(observed_value.result(), &result);
+                assert_eq!(
+                    observed_value.observations().observations().len(),
+                    script.len()
+                );
+                assert!(HostFileBytesObservationKey::validity(&observed));
+                assert!(HostFileBytesObservationKey::equality(&observed, &observed));
                 return result;
             }
         }
@@ -620,6 +956,7 @@ mod tests {
         let bytes_a: Arc<[u8]> = Arc::from(&b"A\xff"[..]);
         let bytes_b: Arc<[u8]> = Arc::from(&b"B\0"[..]);
         let key = HostFileBytesKey::new(path("/entry"));
+        let observed = HostFileBytesObservationKey::new(path("/entry"));
         let counter = Arc::new(AtomicUsize::new(0));
         let counter_key = HostFileCounterKey {
             file: key.dupe(),
@@ -636,6 +973,7 @@ mod tests {
         );
         transaction = update(transaction, &state_a).await;
         let initial = complete(&mut transaction, &key).await;
+        let a = transaction.compute(&observed).await.unwrap();
         assert_eq!(initial, Ok(HostFileBytes::Present(bytes_a.dupe())));
         assert!(matches!(
             transaction.compute(&counter_key).await.unwrap(),
@@ -670,6 +1008,8 @@ mod tests {
             transaction.compute(&counter_key).await.unwrap(),
             PathOutcome::Complete(2)
         ));
+        let b = transaction.compute(&observed).await.unwrap();
+        assert!(!HostFileBytesObservationKey::equality(&b, &a));
 
         let missing_state = vec![present("/", PathNodeKind::Directory, 0), missing("/entry")];
         transaction = update(transaction, &missing_state).await;
@@ -733,6 +1073,8 @@ mod tests {
             transaction.compute(&counter_key).await.unwrap(),
             PathOutcome::Complete(5)
         ));
+        let restored = transaction.compute(&observed).await.unwrap();
+        assert!(HostFileBytesObservationKey::equality(&restored, &a));
         assert_eq!(counter.load(Ordering::SeqCst), 5);
     }
 }

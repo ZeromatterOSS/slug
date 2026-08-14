@@ -50,6 +50,10 @@ pub use path_observation::PathOperationResult;
 pub use path_observation::PathOutcome;
 pub use path_observation::PathResult;
 pub use path_observation::WindowsOptionPathLongNameOutcome;
+#[doc(hidden)]
+pub use path_resolution::ObservedPathFrontierError;
+#[doc(hidden)]
+pub use path_resolution::ObservedResolvedPath;
 pub use path_resolution::PathDirectoryListing;
 pub use path_resolution::PathDirectoryListingError;
 pub use path_resolution::PathDirectoryListingKey;
@@ -60,6 +64,8 @@ pub use path_resolution::PathResolutionChain;
 pub use path_resolution::PathResolutionError;
 pub use path_resolution::ResolvedPath;
 pub use path_resolution::ResolvedPathKey;
+#[doc(hidden)]
+pub use path_resolution::ResolvedPathObservationKey;
 pub use path_resolution::ResolvedPathState;
 pub use path_resolution::ResolvedSymlink;
 
