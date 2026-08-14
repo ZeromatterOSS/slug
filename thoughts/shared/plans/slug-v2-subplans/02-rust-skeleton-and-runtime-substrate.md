@@ -339,9 +339,10 @@ literal exits/order/group evidence, and inverse restoration are discriminating.
 
 The implementation allowlist is the three existing harness/parser/test files,
 one seven-authored-file fixture plus generated oracle, and canonical/current/
-Stage 1/Stage 2 ledgers. Its caps are 260 production-harness, 280 harness-test,
-150 authored-fixture, 500 generated-oracle, 260 ledger, and 1,450 total net
-lines, with one correction. It authorizes no Rust, DICE, Cargo/BUILD, public
+Stage 1/Stage 2 ledgers. Its corrected caps are 430 production-harness, 380
+harness-test, 150 authored-fixture, 500 generated-oracle, 260 ledger, and
+1,850 total net lines. The single allowed correction is consumed by this
+cap-only increase. It authorizes no Rust, DICE, Cargo/BUILD, public
 Slug command/server, network, JVM, or request-owner change.
 
 After accepted replay, design the request-revision vertical against local Rust

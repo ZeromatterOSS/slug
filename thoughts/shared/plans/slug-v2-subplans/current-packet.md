@@ -133,9 +133,11 @@ Edit exactly:
   selection.
 
 Caps: three harness files, one fixture, seven authored fixture files plus one
-generated oracle, five records, 260 net production-harness lines, 280 net
+generated oracle, five records, 430 net production-harness lines, 380 net
 harness-test lines, 150 authored fixture lines, 500 generated-oracle lines,
-260 net ledger lines, and 1,450 total net lines. One correction is allowed.
+260 net ledger lines, and 1,850 total net lines. The single allowed correction
+is consumed by this cap-only increase after the strict parser plus complete
+owned-process cleanup proved the original 260/280 budgets underfit.
 
 Proof must include parser invariants; FIFO containment/mode and causal
 handshake; success record order; early-exit, timeout, writer, contender, and
