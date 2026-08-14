@@ -1342,30 +1342,39 @@ private seams without isolating another responsibility. Retained state is only
 the semantic-result Arc and existing compact epoch; source bytes, evaluator,
 reporter, events, transaction, and scratch do not escape computation.
 
-### Active root repository-ignore frontier design (2026-08-14)
+### Accepted root repository-ignore frontier design (2026-08-14)
 
-Run docs-only packet
-`WP-2A-m1-host-repository-ignore-frontier-design` under
-40/300/260/600 ledger lines with no correction. Design one callerless
-Bzlmod-private observed root repository-ignore sibling. It must compose the
-accepted observed REPO carrier, immutable policy projection, every ordered
-observed `.bazelignore` selected/negative probe, and each exact
-platform-normalization observation while preserving legacy order, diagnostics,
-events, and public behavior.
+Independent source and ownership review accepts one callerless crate-private
+`HostRepositoryIgnoreObservationKey` in `repository_ignore.rs`. Its sole
+identity is the normalized workspace, its value is
+`PathOutcome<Result<ObservedHostRepositoryIgnore,
+ObservedPathFrontierError>>`, and complete equality/validity match the accepted
+observed siblings. The carrier retains exactly one matcher/error Arc and the
+existing `PathObservationEpoch` and exposes borrowed accessors only.
 
-Freeze the private key/carrier and visibility, inner semantic versus outer
-frontier error algebra, complete success/error and Need/cancellation behavior,
-deterministic exact-Arc epoch union, DICE equality/validity, memory lifetime,
-dependency/event activation, A/B/A and precedence proof, exact future one-file
-allowlist/caps/physical ceiling, validation, and one implementation successor.
-Prefer only `repository_ignore.rs`; REPLAN on another mutable predecessor,
-unobservable platform input, public/reverse visibility, a second retained
-container/key family, or an unbounded one-file implementation.
+The sibling computes observed REPO first, immutable policy second, then
+observed `.bazelignore` files in configured root order. Missing and directory
+terminals remain exact negative probes; other Host errors, parse errors, the
+first selected file, and the all-negative success retain the complete prefix.
+One shared observed-capable parser additionally captures each exact Windows
+long-path result Arc before interpretation. Need/cancellation drops all scratch.
 
-Authorize no code/Cargo/oracle write, implementation, package/MODULE/lockfile/
-selected-source/BUILD/`.bzl`/glob/loading/core/public consumer,
-routed/nonroot/materializer work, legacy migration, new container/graph/store,
-reconstructed/historical Host read, watcher, JVM, or combined successor.
-Compatibility remains exact for existing serial repository-ignore behavior and
-admitted Host observations, Slug-native for the new aggregate identity, and
-deferred beyond this private root-only producer.
+One private `PathObservationEpoch::from_shared` union preserves REPO/root/line
+input order, exact first-Arc retention, deterministic duplicate coalescing, and
+typed outer mismatch/conflict failures. Legacy repository-ignore semantic
+errors, diagnostics, source order, matcher behavior, and events do not change.
+The observed REPO dependency remains the sole event-batch owner.
+
+No public export, reverse edge, extra key family, retained container, copied
+observation, evaluator, reporter, policy object, transaction, worker, or lock
+is required. Exact serial repository-ignore behavior and admitted Host
+observations remain exact; aggregate frontier identity is Slug-native;
+routed/materialized and higher package/MODULE/source/loading/core/public
+surfaces remain deferred.
+
+The implementation allowlist is exactly
+`app/slug_bzlmod_v2/src/repository_ignore.rs`. Formatted caps are 280
+production, 450 in-module test, and 730 total net added lines; the physical
+ceiling is 2,821 from the 2,091-line baseline. Require an independent
+cohesion/cleanup review above 2,400 formatted lines. Completion ledgers are
+capped at 180 net lines with no correction.
