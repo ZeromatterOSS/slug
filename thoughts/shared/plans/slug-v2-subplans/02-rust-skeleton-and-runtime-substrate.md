@@ -1088,3 +1088,41 @@ complete bounded private certificate consumer or a precise prerequisite
 or lease change, new key/store/graph, snapshot replacement, repository/
 materialization activation, oracle generation, watcher, historical Host read,
 or JVM work.
+
+### Next-consumer audit records a loading-frontier prerequisite (2026-08-13)
+
+Independent source and ownership review accepts the audit activated in
+`ea36fdcc`: there is no remaining bounded one-observation consumer. The
+selected root BUILD terminal depends on root-module anchoring,
+`HostRootPackageLookupKey` package-root and `BUILD.bazel`/BUILD probes,
+`HostFileBytesKey`, and any recursively loaded `HostBzlModuleEvalKey`
+children. Root MODULE expands `include()`; one `.bzl` expands its load
+closure and cycle state; direct-local external source adds route, repository,
+materialization, package-discovery, and source observations.
+
+Certifying only chosen bytes omits selection negatives and recursively
+discovered sources. The core-private one-file type also cannot be produced by
+loading/Bzlmod without either crossing visibility deliberately or reversing
+the dependency. The audit records `REPLAN` before any implementation.
+
+### Active loading-frontier certificate design (2026-08-13)
+
+Run only docs packet `WP-2A-m1-loading-frontier-certificate-design` under
+40/300/260/600. Freeze one app-internal deterministic compact collection of
+exact Host demand/result pairs, including selection negatives and dynamically
+discovered children. Choose its lowest viable one-way owner and sealed
+visibility, complete-only success/error construction, Need/cancellation
+suppression, equality/order/duplicate/conflict algebra, provenance, memory
+lifetime, terminal carrier, and one first bounded consumer.
+
+Design compute-free batch reobservation under the existing async publication
+owner, atomic changed-entry merge into the command's full epoch plus successor
+revision, selected-terminal suppression/reset, and failure/nonprogress
+cleanup. Preserve accepted public serial bytes and ordering. Aggregation,
+revision, validation, retry, and suppression remain Slug-native.
+
+Authorize no Rust/Cargo/oracle writes, public API/wire/output/overlap, reverse
+core dependency, generic public framework, new graph/key/store, snapshot
+replacement, partial frontier, owner-held compute/Starlark/repository/event
+work, repository/materializer activation, watcher, historical Host read, JVM,
+combined consumers, or cap excess.

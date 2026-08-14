@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; native root-source revision-publication bridge accepted; next-consumer audit active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the private request-revision/source-certificate vertical in `207fe438`, and the accepted sole-root native publication bridge in `f0849151`; full evidence is in the owner plans | root module, BUILD, and `.bzl` loading still lack bounded source certificates; production loading depends on coarse snapshots, and directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | audit the next smallest single source-certificate consumer |
+| M1: one semantic spine | **partial; loading-frontier certificate design active** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, the first private core repository source-observation consumer in `53152727`, the pinned in-flight loading/source-lock oracle in `2ffad088`, the private request-revision/source-certificate vertical in `207fe438`, and the accepted sole-root native publication bridge in `f0849151`; full evidence is in the owner plans | no remaining terminal has a bounded one-file source frontier; loading/Bzlmod ownership, complete multi-observation aggregation, and batch final validation must be designed before another consumer; directory/glob unions, repositories/materialization, external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` | design one app-internal loading-frontier certificate and select one bounded consumer |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-2A-m1-next-source-certificate-consumer-audit](./slug-v2-subplans/current-packet.md).
+[WP-2A-m1-loading-frontier-certificate-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -1564,3 +1564,25 @@ test, and 938/1,350 total net Rust lines.
 Run only docs packet `WP-2A-m1-next-source-certificate-consumer-audit`.
 Select one complete bounded Host source frontier or record its prerequisite.
 Authorize no Rust, public overlap, repository/materialization, oracle, or JVM.
+
+### M1 next-consumer audit requires a loading-frontier certificate design (2026-08-13)
+
+The audit activated in `ea36fdcc` finds no second bounded one-observation
+consumer after `f0849151`. Selected BUILD loading first resolves package
+roots and `BUILD.bazel`/BUILD precedence, then reads bytes, and may recursively
+load `.bzl` children. Root MODULE expands an include horizon; one `.bzl`
+expands its load closure; direct-local external source also depends on route,
+repository result, materialization, package discovery, and source observations.
+A selected-file certificate would therefore be partial and stale by design.
+
+The current core-private certificate cannot be produced across loading/Bzlmod
+crate boundaries, while moving it without an ownership design risks a reverse
+dependency or generic public framework. Record `REPLAN`: define one
+app-internal complete frontier representation, its one-way visibility and
+carrier, and compute-free batch final validation before another consumer.
+
+Run only docs packet `WP-2A-m1-loading-frontier-certificate-design` under
+40/300/260/600. Select one representation owner and one future bounded
+consumer. Authorize no Rust, public API/output/overlap, reverse core edge, new
+graph/key/store, partial certificate, repository/materializer activation,
+oracle generation, watcher, historical Host reads, or JVM work.
