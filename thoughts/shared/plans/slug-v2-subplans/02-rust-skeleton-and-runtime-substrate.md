@@ -301,13 +301,57 @@ typed observations, and either accept or retry. It must not span
 `compute`, Starlark evaluation, or another DICE computation, and it cannot
 become a manual semantic store.
 
-The active oracle design edits only canonical, current, Stage 1, and this owner
-under 40/320/280/280/840 documentation caps. It must select one pinned Bazel
-9.2 fixture, deterministic public/test-anchored gate, exact future file and
-record caps, cleanup ownership, compatibility classes, and one oracle
-implementation or precise `REPLAN`. It authorizes no tool, fixture, Bazel
-run, Rust, Cargo/BUILD, network, public command, JVM, Zabel, snapshot
-replacement, or request owner implementation.
+#### Accepted focused oracle design - `WP-1-2-m1-mutation-concurrent-request-oracle-design` (2026-08-13)
+
+The design selected the single Bazel-only
+`loading-inflight-source-lock` fixture. Bazel 9.2
+`client_test.sh.test_noblock_for_lock_reuse_server` supplies its public FIFO
+package-loading and same-output-base nonblocking-client theme. The exclusive
+output-base lock in `blaze.cc`, transitive Starlark package-dependency test,
+and serial local-diff tests bound the other claims.
+
+The fixture's V1 `a/defs.bzl` supplies both a versioned source label and the
+`//b:b` edge. A writer opening FIFO `b/BUILD.bazel` can therefore
+acknowledge only after V1 was demanded. While the primary query remains
+blocked, the harness changes that source to V2 and records a same-output-base
+`--noblock_for_lock info` contender before releasing the gate. Subsequent
+serial rows prove V2, compatible warm V2 nonreplay, and V1 restoration.
+
+This is a causal ordering observation, not evidence that Bazel final-reobserves
+an already demanded source. Pinned generation and two fresh-root replays must
+all return one unmixed V1 primary result; any V2/mixed/variable terminal is
+`REPLAN`. Same-output-base Bazel clients serialize, and the contender's
+exit-9 diagnostic is exact Bazel client behavior. Neither result is a Slug
+request-concurrency parity requirement.
+
+The implementation may add one optional `concurrent_command_group` table
+referencing adjacent ordinary primary/contender commands. It reuses exactly
+one text `Mutation`, one contained absent FIFO path, and one fixed release
+body. The runner owns both clients, writer, descriptors, process groups, one
+absolute deadline, regular-file replacement, and terminate/kill/wait/join
+cleanup. It admits no scheduler, arbitrary executable, polling, second group,
+or module-extension/repository execution.
+
+Exactly five generated records are allowed: in-flight V1, lock contender,
+post-mutation V2, warm V2 without marker replay, and restored V1. All capture
+one retained Bazel server epoch. Query/marker and normalized diagnostic shapes,
+literal exits/order/group evidence, and inverse restoration are discriminating.
+
+The implementation allowlist is the three existing harness/parser/test files,
+one seven-authored-file fixture plus generated oracle, and canonical/current/
+Stage 1/Stage 2 ledgers. Its caps are 260 production-harness, 280 harness-test,
+150 authored-fixture, 500 generated-oracle, 260 ledger, and 1,450 total net
+lines, with one correction. It authorizes no Rust, DICE, Cargo/BUILD, public
+Slug command/server, network, JVM, or request-owner change.
+
+After accepted replay, design the request-revision vertical against local Rust
+barriers/counters. That later proof must run two genuinely overlapping Slug
+requests, mutate an already demanded source, discard/retry any provisional
+stale terminal, publish only V2-compatible results, prove warm reuse and A/B/A,
+release cancellation ownership, and hold no lock across DICE/Starlark work.
+Those revision/certificate identities and no-mixed-epoch rules remain
+Slug-native. The Bazel FIFO and client lock create no Slug production surface.
+
 
 #### Historical reviewed packet - `WP-2-m1-workspace-runtime` (2026-07-22)
 

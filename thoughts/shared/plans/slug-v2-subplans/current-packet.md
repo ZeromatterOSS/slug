@@ -1,161 +1,165 @@
 # Current Slug V2 Packet
 
-Packet: `WP-1-2-m1-mutation-concurrent-request-oracle-design`
+Packet: `WP-1-m1-loading-inflight-source-lock-oracle`
 Milestone: M1 one semantic spine
 Owners: `slug-v2-subplans/01-compliance-oracle-harness.md` and
 `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: freeze the smallest Bazel 9.2 mutation/concurrent-client oracle and
-local Slug concurrency-proof boundary required before request-revision Rust.
+Result: generate and independently replay one pinned Bazel 9.2 package-loading
+source-mutation/output-base-lock oracle before request-revision Rust.
 
-The fixed source-consumer cutover is accepted in `53152727`. Scheduling has
-therefore left M7 and follows the canonical M1 -> just-in-time oracle -> M7A ->
-M8 -> M7B order. This packet is docs-only design. It may select one bounded
-oracle implementation or return a precise prerequisite `REPLAN`; it cannot
-implement the oracle or the request-revision vertical.
+The source-consumer cutover `53152727` and post-cutover audit `47090561`
+are fixed. The accepted design selects one Bazel-only fixture and one narrow
+coordination table. This packet implements that evidence only; it cannot edit
+Rust or infer Slug concurrency from Bazel's serialized clients.
 
-## Active design contract
+## Exact fixture contract
 
-Audit the canonical Bazel 9.2 source and tests from the pinned `9.2.0` commit
-for two distinct observations:
+Add `tests/v2_oracle/fixtures/loading-inflight-source-lock/` with exactly
+seven authored files plus generated `expected/oracle.json`:
 
-1. one command whose demanded loading or repository source changes while work
-   is in flight, including the exact terminal/retry/failure and warm-restoration
-   behavior that is publicly observable; and
-2. two clients contending for one Bazel output base, including the exact
-   `--block_for_lock`/nonblocking boundary and whether Bazel serializes rather
-   than concurrently evaluates commands.
+- `fixture.toml`;
+- `workspace/MODULE.bazel`;
+- `workspace/a/BUILD.bazel` and `workspace/a/defs.bzl`;
+- `workspace/a/before.txt` and `workspace/a/after.txt`; and
+- `workspace/b/gate.txt`.
 
-Do not infer true overlapping server-request semantics from two Bazel client
-processes. If Bazel serializes them, record that exact surface and classify
-Slug's internal overlapping-request execution as Slug-native architecture over
-the same exact accepted outputs.
+There is no tracked `b/BUILD.bazel`. V1 `defs.bzl` prints one V1 marker and
+exports the complete `srcs` list `["before.txt", "//b:b"]`; V2 changes
+only that marker and first label to `after.txt`. `a/BUILD.bazel` loads the
+list and declares `//a:root`. The runtime gate body declares public
+`//b:b` over `gate.txt`.
 
-Audit the current oracle harness before choosing a representation. The live
-model applies every command's mutations before a blocking `subprocess.run` and
-then runs commands serially. Freeze at most one fixture-scoped coordination
-shape that can start one command, wait for a deterministic public or
-fixture-owned gate, mutate one contained source, optionally launch the
-contention client, collect both processes, and prove cleanup. Prefer an
-existing Bazel integration-test theme and public workspace behavior. Do not add
-a general process scheduler, arbitrary shell program, sleep-based race, or a
-second fixture language.
+The fixture is `required_host_os = "posix"`, `daemon = true`, and
+`observe_server_epochs = true`. Its first two ordinary commands are the
+adjacent group-owned rows:
 
-The design must name:
+1. `inflight_v1_loading`: `query deps(//a:root)`;
+2. `same_output_base_noblock`: startup option
+   `--noblock_for_lock`, command `info`, expected exit 9.
 
-- the exact upstream Bazel source/test anchors and any deliberately skipped
-  cases;
-- one fixture name, complete workspace/source roles, literal command ordering,
-  mutation and restoration sequence, expected exits/channels/manifests, and
-  comparison modes;
-- whether the existing mutation schema is reused or one narrow concurrent
-  command-group schema is required;
-- the exact future tool, harness-test, fixture, and owner-plan allowlist;
-- process, signal/gate, output-base, timeout, failure, cancellation, and cleanup
-  ownership for Bazel and Slug runs;
-- which records are Bazel-generated exact evidence and which later Rust
-  barriers/counters are Slug-native proof only; and
-- authored-line, file-count, record-count, and correction caps plus terminal
-  `REPLAN` conditions.
+The remaining serial rows are `post_mutation_v2`,
+`warm_v2_no_replay`, and `restored_v1`; the last uses ordinary inverse
+text mutations. All five capture the same server epoch. Anchored
+message-shape expressions require an unmixed V1 primary result, the public
+PID-shaped lock diagnostic, unmixed V2 post-mutation and warm outputs with no
+warm marker replay, and unmixed restored V1. Command order and literal exits
+remain fixture/schema assertions; generated coordination evidence is retained
+for provenance.
 
-The focused evidence is a prerequisite, not the request architecture. A later
-Rust design must still provide two genuinely overlapping Slug requests at one
-accepted base revision, different relevant and irrelevant immutable overlays,
-an in-flight demanded-source mutation that discards and retries the provisional
-terminal, A/B/A restoration, compatible warm reuse, cancellation release, and
-zero lock across DICE or Starlark computation. Bazel output-base serialization
-does not authorize Slug's current global command lease.
+Permit exactly this optional table shape:
 
-## Compatibility and DICE boundary
+```toml
+[concurrent_command_group]
+primary = "inflight_v1_loading"
+contender = "same_output_base_noblock"
+gate_path = "b/BUILD.bazel"
+gate_content = "filegroup(name = \"b\", srcs = [\"gate.txt\"], visibility = [\"//visibility:public\"])\n"
+mutations = [{ path = "a/defs.bzl", find = "V1_SENTINEL", replace = "V2_SENTINEL" }]
+```
 
-Exact compatibility is limited to the named Bazel 9.2 public command,
-mutation, invalidation, diagnostic, exit, and output relationships selected by
-the design. Slug-native scope is the request/revision/source-certificate
-representation, true overlapping-request scheduling, DICE transaction
-composition, local barriers/counters, revision tokens, memory ownership, and
-diagnostic wording where Bazel exposes no stable byte contract. Historical host
-snapshots, watcher correctness, unselected source families, public command
-migration, transport/materialization breadth, and Zabel implementation are
-unsupported/deferred.
+`primary` and `contender` must name distinct commands at indexes zero and
+one. Parse `mutations` through the existing `Mutation` model, but require
+exactly one ordinary text replacement. Reject extra table keys, duplicate
+command names, nonadjacency, command-local mutations on either owned row,
+non-Bazel execution, non-POSIX fixtures, absent/symlink parents, an existing
+gate, escaping paths, a gate at/under any manifest root, an empty release body,
+or a second group/schema. This is not a reusable asynchronous scheduler.
 
-The accepted DICE audit constrains later design:
+## Deterministic runner lifecycle
 
-- one updater may record typed `changed_to` batches and one commit publishes a
-  version; equal injected values need not create a new version;
-- a transaction is fixed at creation and must not be retained by a computation
-  or result;
-- identical key/version work is deduplicated, distinct computations can run in
-  parallel, and dropping one of multiple waiters does not cancel their shared
-  work;
-- DICE has version-tagged active/in-flight machinery, but this audit found no
-  public contract/test or historical-host-read owner sufficient for M1 final
-  validation/publication to rely on concurrent independently mutated versions
-  without separate proof;
-- a DICE key cannot reobserve the host and commit a successor transaction from
-  inside its computation.
+For the selected group only, `runner.py` must:
 
-Therefore the future final-validation owner must be a request/runtime
-coordinator outside key computation. It may use only a narrowly scoped
-publication critical section after provisional DICE work; it may not retain a
-global command lease, hold a lock across `compute`/Starlark work, replay
-semantic inputs in a manual side store, or create a second graph. User-visible
-terminal/events/output remain provisional until exact reobservation accepts the
-base revision or injects changed observations and retries.
+1. validate the contained absent gate and create it as a mode-0600 FIFO;
+2. create the writer thread and start primary A with `Popen`, pipes, and its
+   own process group;
+3. treat successful blocking writer `open(O_WRONLY)` as the only readiness
+   acknowledgement; reaching `b/BUILD.bazel` is causally after V1
+   `defs.bzl` supplied the `//b:b` edge;
+4. apply the one V1-to-V2 mutation, then start and collect contender B against
+   the same output base within the remaining deadline;
+5. require B exit 9, signal the writer to write the fixed BUILD body, collect
+   A, close descriptors, unlink the FIFO, and atomically create the identical
+   regular `b/BUILD.bazel` for later rows; and
+6. build normal records for A then B in declaration order before returning to
+   the existing serial loop.
 
-## Scope, caps, proof, and stops
+One monotonic absolute deadline bounds gate readiness, B, release, and A
+collection. The writer propagates open/write/close failures. The `finally`
+path must signal release/cancellation, use a nonblocking cleanup reader to
+unblock a writer still in `open`, close every owned descriptor, terminate
+then kill and wait for uncollected process groups, join the writer, remove the
+FIFO, and preserve the primary failure with cleanup chained. Fail early A
+exit, gate timeout, B timeout/success/wrong exit, mutation or release failure,
+missing collection, surviving process/descendant, writer failure, or
+regular-file replacement failure. No sleep or polling establishes readiness.
 
-This docs-only design may edit exactly:
+## Source authority and compatibility
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
-- `thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md`; and
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+Use only pinned local Bazel tag `9.2.0` at
+`8220c6198837d5c13d53fea211cf3282aa12408a`:
 
-Net documentation growth is capped at 40 canonical, 320 current, 280 Stage 1,
-280 Stage 2, and 840 total added lines. Require exact live-harness and pinned
-source/test maps, explicit command-versus-server concurrency classification,
-one smallest future allowlist and fixture schema, proof/caps/stops, compact
-predecessor retention, `git diff --check`, and independent design acceptance.
+- `src/test/shell/integration/client_test.sh:465-495`,
+  `test_noblock_for_lock_reuse_server`;
+- `client_test.sh:286-393`, same-output-base serialization;
+- `src/main/cpp/blaze.cc:96-128,286-323` and
+  `src/main/cpp/startup_options.cc:73,122`;
+- `src/test/java/com/google/devtools/build/lib/skyframe/PackageFunctionTest.java:896-938`;
+  and
+- `src/test/java/com/google/devtools/build/lib/skyframe/LocalDiffAwarenessIntegrationTest.java:104-113,270-291`.
 
-STOP on any tool, fixture, generated oracle, Bazel execution, network access,
-Rust, Cargo/BUILD, public command or server change, generic asynchronous
-harness, arbitrary fixture-owned executable, sleep/poll-only race, second
-fixture schema, JVM/Java artifact in Slug, Zabel code, unbounded source family,
-more than one selected future fixture, fifth documentation file, cap excess, or
-lack of a deterministic public/test-anchored mutation gate. `REPLAN` if the
-only Bazel evidence requires private test hooks unavailable to the oracle
-harness, if client lock behavior cannot discriminate the intended claim, or if
-the selected source mutation belongs to execution rather than the M1 semantic
-spine.
+The FIFO proves ordering only. Upstream supplies no final-reobservation
+guarantee for an already demanded loading source. Accept the first V1 result
+only as stable pinned-version Bazel evidence after generation and two
+fresh-root replays; it is not a Slug parity rule. Same-output-base serialization,
+exit 9, the named diagnostic, and serial V1/V2/warm/V1 relationships are exact
+within this fixture. Slug overlapping requests, source certificates, revision
+identity, final validation/retry, barriers/counters, and no-mixed-epoch
+publication remain Slug-native and create no Bazel record. Bazel client
+serialization does not authorize the production global command lease.
+
+Deliberately exclude module-extension `ctx.read`, repository materialization,
+lockfile behavior, `EditDuringBuildTest` execution-only undefined results,
+watcher correctness, historical host reads, and any public Slug behavior.
+
+## Allowlist, caps, proof, and stops
+
+Edit exactly:
+
+- `tools/v2_oracle_lib/fixture.py`;
+- `tools/v2_oracle_lib/runner.py`;
+- `tests/v2_oracle/test_v2_oracle.py`;
+- the eight selected fixture paths above; and
+- canonical/current/Stage 1/Stage 2 ledgers only for completion and successor
+  selection.
+
+Caps: three harness files, one fixture, seven authored fixture files plus one
+generated oracle, five records, 260 net production-harness lines, 280 net
+harness-test lines, 150 authored fixture lines, 500 generated-oracle lines,
+260 net ledger lines, and 1,450 total net lines. One correction is allowed.
+
+Proof must include parser invariants; FIFO containment/mode and causal
+handshake; success record order; early-exit, timeout, writer, contender, and
+cleanup failure injection; exact process reap/join assertions; the focused
+fixture generation; two independent fresh-root replays with identical expected
+JSON; the full harness test module; local pinned-source-anchor verification;
+daemon cleanup; `git diff --check`; archive status; cap accounting; and an
+independent evidence/cleanup review. Never inspect or copy Bazel RC contents.
+
+STOP on Rust, Cargo/BUILD, Slug command/server or DICE changes, network access,
+JVM/Java artifacts, a second fixture/group/schema, arbitrary fixture
+executable, polling/sleep race, module-extension/repository execution,
+generated custom repository, generalized scheduler, unbounded process tree,
+cap excess, or an out-of-allowlist file. `REPLAN` if Bazel rejects the FIFO,
+A does not stably produce unmixed V1 across generation and both replays, the
+contender does not deterministically exit 9, serial V2/warm/V1 is unstable, or
+both process groups cannot be terminated and reaped deterministically.
 
 ## Immediate predecessor record
 
-Implementation `53152727` accepts the first callerless private core root
-repository source-observation consumer and is the fixed cutover. Focused
-consumer tests pass 6/6; the direct dependent compile and formatting pass; an
-independent reviewer accepted the split path-compute/observation-compute
-terminal ownership and retained-Arc proof. The full core suite still has the
-unrelated clean-reproducing deferred-message baseline, and the archive checker
-still has the inherited missing-ref/active-guide baseline; neither widened the
-three-file implementation.
-
-The completed `WP-2-m1-mutation-concurrent-request-dice-audit` found that
-`load-invalidation` is the serial retained-server mutation/warm-reuse
-baseline, not concurrency evidence. The fixture model stores mutations on one
-command, and the runner applies them before each blocking command. Live Slug
-also has two incomplete authorities: legacy requests inject complete text/raw/
-directory workspace snapshots with no final reobservation, while production
-native-demand commands use a single `Busy` lease and a manual accepted
-snapshot containing request inputs, synthetic generations, repository results,
-path observations, and selected demands. The latter retries materialization
-Needs and commits a selected snapshot but does not finally reobserve every
-mutable unscoped source before exposing output.
-
-Command/environment policy, lockfile mode, registry URLs, root package policy,
-repository/materialization generations and results, and path epochs enter DICE
-through typed injected keys. Root string settings and query/cquery options are
-partly root-key owned; process-host configuration, repository/materializer
-session state, accepted-demand state, observation I/O, presentation, and
-revision counters remain runtime-owned. This inventory rules out treating the
-existing global lease or selected-snapshot side store as the M1 request-level
-certificate. The focused oracle design above is the smallest prerequisite
-before freezing its replacement.
+The accepted docs-only design audited the live harness and pinned Bazel 9.2
+source without executing Bazel. It rejected the broader module-extension gate,
+classified the client boundary as serialization rather than overlapping
+server requests, and froze the fixture/schema/lifecycle above. The compact
+post-cutover audit in `47090561` remains the authority for current input
+ownership, DICE transactions, the external request-coordinator requirement,
+and the later Slug-native two-request/final-reobservation proof.

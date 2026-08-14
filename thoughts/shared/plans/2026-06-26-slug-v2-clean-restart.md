@@ -24,7 +24,7 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; focused oracle design active after the accepted source-consumer cutover** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, and the first private core repository source-observation consumer in `53152727`; full evidence is in the Stage 5 owner plan | production still depends on coarse whole-workspace snapshots and lacks request-private source certificates, final reobservation, atomic revision acceptance, and overlapping-request proof; external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than M1 blockers | design and generate the focused mutation/concurrent-client oracle selected by the DICE audit, then design the smallest request-revision/source-certificate vertical |
+| M1: one semantic spine | **partial; focused oracle implementation active after the accepted source-consumer cutover** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, and the first private core repository source-observation consumer in `53152727`; full evidence is in the Stage 5 owner plan | production still depends on coarse whole-workspace snapshots and lacks request-private source certificates, final reobservation, atomic revision acceptance, and overlapping-request proof; external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than M1 blockers | generate and replay the accepted focused loading-source/output-base-lock oracle, then design the smallest request-revision/source-certificate vertical |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-1-2-m1-mutation-concurrent-request-oracle-design](./slug-v2-subplans/current-packet.md).
+[WP-1-m1-loading-inflight-source-lock-oracle](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -640,16 +640,16 @@ contract for new and materially revised packets.
 
 The first private core source-observation consumer is accepted in `53152727`,
 so the fixed **source-consumer cutover** has occurred without package, loading,
-command, or public migration. The post-cutover DICE audit selected the focused
-mutation/concurrent-client oracle design as the smallest prerequisite before
-request-revision Rust. Neither the roadmap nor that design widens M1 into the
+command, or public migration. The post-cutover DICE audit and focused design
+selected one loading-source/output-base-lock oracle as the smallest
+prerequisite before request-revision Rust. Neither decision widens M1 into the
 unrelated Wave A catalog.
 
 After the source-consumer cutover, schedule the remaining work as bounded
 packets in this order:
 
-1. run only the M1 mutation/concurrent-request oracle prerequisite and the
-   applicable Buck2 DICE transaction/publication audit;
+1. generate and replay only the accepted M1 loading-source/output-base-lock
+   oracle prerequisite; the applicable DICE audit is already accepted;
 2. implement the smallest M1 request-revision/source-certificate vertical with
    final reobservation and atomic compatible publication;
 3. add each Bazel-derived Starlark/provider/action/aquery/toolchain oracle

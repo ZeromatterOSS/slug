@@ -66,9 +66,10 @@ canonical Bazel 9.2 source/test anchor, and preserve the `fixture.toml`
 provenance and comparison-mode contract above. Record why any apparently
 relevant upstream test is skipped.
 
-Wave A is the first adoption packet after the active M7 packet reaches a
-terminal result. Keep it oracle-only and split it into bounded packets when one
-workspace or behavior family would obscure error precedence.
+Wave A is a just-in-time catalog, not one prerequisite block. Admit each
+bounded oracle-only subset immediately before its semantic owner; keep the
+unrelated catalog behind the active M1 request-revision vertical and split any
+workspace or behavior family that would obscure error precedence.
 
 | Theme | Required discrimination | Likely owner |
 |-------|-------------------------|--------------|
@@ -1235,3 +1236,136 @@ negative assertion is safely removable. Tracked-archive inventory, per-commit
 and per-fixture attribution, and added-blob inspection therefore set both the
 pruning allowlist and affected replay set to `none`. The next checkpoint starts
 from accepted tree `8d84d336` and counts later accepted oracle packets only.
+
+### Accepted M1 in-flight loading/source-lock design (2026-08-13)
+
+The accepted design selects one Bazel-only fixture,
+`loading-inflight-source-lock`. It adapts the public package-loading FIFO and
+same-output-base client-lock theme at pinned Bazel 9.2.0 commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`; it does not claim that Bazel
+executes two same-output-base commands concurrently or that its first
+in-flight result defines Slug's final-validation policy.
+
+Pinned authorities are:
+
+- `src/test/shell/integration/client_test.sh:465-495`,
+  `test_noblock_for_lock_reuse_server`: a command consumes one package and
+  then blocks reading a demanded FIFO `BUILD`; a same-output-base
+  `--noblock_for_lock` client exits 9;
+- `client_test.sh:286-393`, `test_multiple_commands_same_output_base`:
+  same-output-base clients execute sequentially;
+- `src/main/cpp/blaze.cc:96-128,286-323` and
+  `src/main/cpp/startup_options.cc:73,122`: the output-base lock is exclusive,
+  blocking is the default, and the negated startup option exits immediately;
+- `src/test/java/com/google/devtools/build/lib/skyframe/PackageFunctionTest.java:896-938`,
+  `testTransitiveStarlarkDepsStoredInPackage`: a transitive `.bzl` source is
+  a package dependency and changes the next explicitly invalidated result; and
+- `src/test/java/com/google/devtools/build/lib/skyframe/LocalDiffAwarenessIntegrationTest.java:104-113,270-291`:
+  serial host-change observation is eventual and its test retries.
+
+The design deliberately skips
+`ModuleExtensionResolutionTest.labels_readInModuleExtension`: it proves
+`ctx.read` output but no FIFO or in-flight mutation and would widen the packet
+into module-extension/repository materialization. It also skips
+`EditDuringBuildTest`, whose edited action input has an explicitly undefined
+first result and belongs to execution rather than the M1 semantic spine.
+
+#### Fixture and five-record timeline
+
+The workspace contains `MODULE.bazel`; `a/BUILD.bazel`;
+`a/defs.bzl`; two source sentinels `a/before.txt` and
+`a/after.txt`; and `b/gate.txt` only to retain the gate-package directory.
+The loaded `defs.bzl` exports the complete `srcs` list for
+`//a:root`: V1 names `before.txt` and `//b:b`, while V2 names
+`after.txt` and the same gate target. It also prints a version marker.
+There is initially no `b/BUILD.bazel`.
+
+The runner creates contained mode-0600 FIFO `b/BUILD.bazel`, starts the
+ordinary primary `query deps(//a:root)` command, and owns a writer thread
+whose successful blocking `open(O_WRONLY)` proves Bazel reached that package.
+Because the `//b:b` edge comes from the already evaluated V1 `defs.bzl`,
+this is a causal ordering gate: V1 was demanded and the request is still in
+loading. The runner then changes the one `.bzl` sentinel from V1 to V2,
+runs the adjacent ordinary `info` contender with
+`--noblock_for_lock` against the same output base, writes the fixed
+`b/BUILD.bazel` filegroup through the FIFO, collects both clients, replaces
+the consumed FIFO with the identical regular file, and continues serially.
+
+The result contains exactly five command records in declaration order:
+
+1. `inflight_v1_loading`: exit 0, one V1 load marker, V1 dependency output,
+   no V2 marker or dependency;
+2. `same_output_base_noblock`: exit 9 and the normalized public
+   lock-contention diagnostic;
+3. `post_mutation_v2`: exit 0, one V2 marker and V2 dependency output;
+4. `warm_v2_no_replay`: exit 0, the same V2 dependencies and no version
+   marker; and
+5. `restored_v1`: the existing inverse text mutation restores V1, exit 0,
+   one V1 marker and V1 dependencies.
+
+All rows capture one Bazel server epoch. Query outputs and marker
+presence/absence use anchored message-shape expressions; exit codes, command
+order, group evidence, mutations, and epochs remain literal generated fields.
+The lock diagnostic is message-shape normalized for its PID/path material.
+The first in-flight V1 terminal is accepted only if generation plus two
+fresh-root replays are identical. It is pinned-version observation, not an
+upstream guarantee and not a Slug parity requirement; any V2 result,
+mixed marker/dependency result, or replay variation returns `REPLAN`.
+
+#### One narrow harness schema and ownership
+
+Permit at most one optional fixture table:
+
+```toml
+[concurrent_command_group]
+primary = "inflight_v1_loading"
+contender = "same_output_base_noblock"
+gate_path = "b/BUILD.bazel"
+gate_content = "filegroup(name = \"b\", srcs = [\"gate.txt\"], visibility = [\"//visibility:public\"])\n"
+mutations = [{ path = "a/defs.bzl", find = "V1_SENTINEL", replace = "V2_SENTINEL" }]
+```
+
+The two names reference distinct adjacent ordinary `[[commands]]`; their
+declared positions are also their output-record positions. The table reuses
+`Mutation` parsing and admits exactly one text mutation, one contained absent
+FIFO path, and one fixed UTF-8 release body. It is POSIX-only, Bazel-only,
+cannot occur under a manifest root, and cannot coexist with command-local
+mutations on its two owned rows. It is not a general scheduler.
+
+`runner.py` owns both `Popen` objects, the FIFO descriptor, writer thread,
+one absolute group deadline, stdout/stderr pipes, process groups, gate
+replacement, and all cleanup. Early primary exit, gate-open timeout, contender
+timeout/success, bad exit, mutation/release failure, incomplete collection, or
+a live descendant fails the fixture. One `finally` path signals the writer,
+opens a nonblocking cleanup reader when needed, closes descriptors, terminates
+then kills and waits for uncollected process groups, joins the writer, unlinks
+the FIFO, and chains cleanup failure behind the primary error. No sleep or
+polling decides readiness.
+
+The future implementation allowlist is exactly:
+
+- `tools/v2_oracle_lib/fixture.py`,
+  `tools/v2_oracle_lib/runner.py`, and
+  `tests/v2_oracle/test_v2_oracle.py`;
+- one new `tests/v2_oracle/fixtures/loading-inflight-source-lock/` directory
+  containing `fixture.toml`, the six workspace files named above, and
+  generated `expected/oracle.json`; and
+- canonical/current/Stage 1/Stage 2 owner ledgers.
+
+Caps are three harness files, one fixture, seven authored fixture files plus
+one generated oracle, five records, 260 net production-harness lines, 280 net
+harness-test lines, 150 authored fixture lines, 500 generated-oracle lines,
+260 net ledger lines, and 1,450 total net lines. One correction is allowed.
+
+Exact compatibility is the pinned Bazel serial package-change relationship,
+same-output-base serialization, exit 9, and selected diagnostic/output
+relationships. The first in-flight result is Bazel-only recorded evidence.
+Slug's overlapping requests, immutable overlays, barriers, final reobservation,
+retry, certificate/revision identity, and no-mixed-epoch publication are
+Slug-native; the later Rust proof emits no Bazel records. Bazel client
+serialization neither requires nor permits Slug's global command lease.
+
+`REPLAN` on a noncausal gate, FIFO rejection, polling/sleeps, unstable first
+terminal, a general scheduler, arbitrary fixture executable, second group or
+schema, module-extension/repository execution, failure to terminate and reap
+both clients, cap excess, or any need for Rust/public-command changes.
