@@ -1204,3 +1204,35 @@ BUILD/`.bzl`/glob activation, generic public framework, panic/error
 laundering, reverse dependency, direct/historical Host read, watcher, oracle,
 JVM, or cap excess. Completion schedules docs-only hierarchical Host-loading
 frontier composition; it does not claim public final validation.
+
+### Accepted callerless observed-path frontier implementation (2026-08-14)
+
+Commit `308b409a` preserves both legacy keys and adds exactly the accepted
+callerless observed siblings. The workspace sibling shares one resolution
+driver, retains exact completed Lstat/ReadLink Arcs, and publishes no carrier
+on Need/cancellation. The Bzlmod sibling consumes only it and appends the final
+FileBytes Arc exactly once. Stable shared-epoch union returns typed outer
+conflict/mismatch errors without partial or legacy-error laundering.
+
+Focused observed proof is 3 workspace plus 2 Bzlmod tests. Full workspace
+43, Bzlmod 367 plus all integration groups, and downstream core check pass.
+Strict Clippy stops first in unchanged `allocative_derive`; archive status
+retains its named missing-ref/allowlist baseline. Exact accounting is
+352/380 production, 394/650 tests, and 746/1,030 total; physical files are
+1,662/1,750, 4,346/4,400, 572/580, and 1,080/1,100. The single cap correction
+is consumed. Independent ownership, memory, scope, artifact, formatting, and
+diff reviews accept.
+
+### Active hierarchical Host-loading frontier composition audit (2026-08-14)
+
+Run only docs packet
+`WP-2A-m1-host-loading-frontier-composition-audit` under
+40/320/280/640 ledger lines. Inspect repository-ignore, root-module anchor,
+and only then package-marker selection to identify complete mutable Host
+predecessor closures and one bounded private successor or `REPLAN`.
+
+Write only canonical/current/Stage 2. Authorize no Rust/Cargo/oracle, partial
+frontier, loading/core/public activation, generic certificate framework,
+reverse dependency, new retained container/graph/store, repository/
+materializer activation, historical Host read, watcher, JVM, or combined
+MODULE/BUILD implementation.
