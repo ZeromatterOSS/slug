@@ -1318,26 +1318,54 @@ The authorized retained utility sources moved to live
 memory accounting. No new container, export, manifest edge, or public behavior
 is introduced.
 
-### Active observed root REPO-file frontier-key implementation (2026-08-14)
+### Accepted observed root REPO-file frontier-key implementation (2026-08-14)
 
-Run `WP-2A-m1-host-repo-file-frontier-key-implementation` in exactly
-`app/slug_bzlmod_v2/src/repo_file.rs`, plus canonical/current/Stage 2 only at
-completion. Caps are 200 production, 370 in-module test, 570 total formatted
-net lines, and 2,328 physical lines, with no correction.
+Commit `f2c7305f` accepts the callerless Bzlmod-private
+`HostRepoFileObservationKey`. It preserves legacy policy-first semantic and
+event behavior, computes only the accepted observed Host-file sibling, keeps
+Need incomplete, forwards outer frontier errors before evaluation/event
+storage, and retains one semantic-result Arc plus the exact child epoch.
+Neither REPO sibling computes the other.
 
-Prove policy failure/empty epoch, present/missing/wrong-kind/resolution/
-FileBytes/parse/evaluation terminals, exact observation/result Arc ownership,
-outer-error passthrough, Need/cancellation, A/B/A, capture-on/off event parity,
-exactly one completed event batch, zero legacy-key activation, compact
-allocation/clone behavior, unchanged legacy callers, focused/full Bzlmod and
-direct-dependent validation, formatting, archive/diff/artifact/cap gates, and
-independent cleanup/ownership review.
+Focused proof is 4/4 plus the strengthened resolution-prefix rerun 1/1. All 564
+Bzlmod unit/integration tests and the direct `slug_core_v2` compile check pass;
+formatting and diff hygiene pass. Strict Clippy stops first in unchanged
+`allocative_derive`; the archive checker reproduces its inherited missing
+archive-ref/non-V2-thoughts baseline. Formatted net growth is 158 production,
+365 in-module test, and 523 total lines; the file is 2,281 physical lines,
+within 200/370/570 and 2,328.
 
-Stop on every other Rust file, Cargo/BUILD/oracle/generated evidence,
-repository-ignore or routed/materialized activation, package/MODULE/lockfile/
-BUILD/`.bzl`/loading/core/public callers, legacy key/value/equality behavior,
-public export/API/output/event changes, second observed key, new retained
-container/graph/store, reconstructed or historical Host reads, watcher, JVM,
-duplicated evaluator, retained event/evaluator/transaction, or cap excess.
-Completion schedules only a docs design for root repository-ignore frontier
-composition.
+Independent ownership and AI-cleanup review accepts the file as cohesive:
+root/nonroot/routed REPO parsing/evaluation, reporters, event finalization,
+private keys, and activation proof remain one owner. A split would widen
+private seams without isolating another responsibility. Retained state is only
+the semantic-result Arc and existing compact epoch; source bytes, evaluator,
+reporter, events, transaction, and scratch do not escape computation.
+
+### Active root repository-ignore frontier design (2026-08-14)
+
+Run docs-only packet
+`WP-2A-m1-host-repository-ignore-frontier-design` under
+40/300/260/600 ledger lines with no correction. Design one callerless
+Bzlmod-private observed root repository-ignore sibling. It must compose the
+accepted observed REPO carrier, immutable policy projection, every ordered
+observed `.bazelignore` selected/negative probe, and each exact
+platform-normalization observation while preserving legacy order, diagnostics,
+events, and public behavior.
+
+Freeze the private key/carrier and visibility, inner semantic versus outer
+frontier error algebra, complete success/error and Need/cancellation behavior,
+deterministic exact-Arc epoch union, DICE equality/validity, memory lifetime,
+dependency/event activation, A/B/A and precedence proof, exact future one-file
+allowlist/caps/physical ceiling, validation, and one implementation successor.
+Prefer only `repository_ignore.rs`; REPLAN on another mutable predecessor,
+unobservable platform input, public/reverse visibility, a second retained
+container/key family, or an unbounded one-file implementation.
+
+Authorize no code/Cargo/oracle write, implementation, package/MODULE/lockfile/
+selected-source/BUILD/`.bzl`/glob/loading/core/public consumer,
+routed/nonroot/materializer work, legacy migration, new container/graph/store,
+reconstructed/historical Host read, watcher, JVM, or combined successor.
+Compatibility remains exact for existing serial repository-ignore behavior and
+admitted Host observations, Slug-native for the new aggregate identity, and
+deferred beyond this private root-only producer.
