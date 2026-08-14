@@ -14,15 +14,15 @@ layout.
 
 This roadmap is a cross-stage adoption checklist, not Stage 11 and not a new
 scheduling authority. The canonical Live Status and compact current-packet
-manifest remain authoritative. Do not widen the active M7 audit. The fixed
-handoff is acceptance of the first private core repository source-observation
-consumer, including any smallest prerequisite selected by the audit. This
-**source-consumer cutover** does not include package, loading, command, or
-public migration and does not move merely because a new packet becomes active.
+manifest remain authoritative. The first private core repository
+source-observation consumer is accepted in `53152727`; this fixed
+**source-consumer cutover** includes no package, loading, command, or public
+migration. The accepted post-cutover DICE audit activates only the focused M1
+mutation/concurrent-client oracle design.
 
 ## Ordered adoption gates
 
-After the source-consumer cutover:
+After the now-accepted source-consumer cutover:
 
 1. run the focused M1 mutation/concurrent-request oracle and Buck2 DICE
    transaction/publication audit;
@@ -45,9 +45,9 @@ after the functional bootstrap path.
 |------------|-------|---------------|--------------|--------|
 | Plan/prompt readiness guide | canonical/orchestration | Slug-native process | none | adopted in planning |
 | Just-in-time Starlark/provider/action/aquery/toolchain oracle subsets | Stage 1 with Stages 4/6/8 | exact observable behavior | Bazel 9.2 provenance and a selected semantic owner | planned as bounded prerequisites, never one M1-blocking wave |
-| Immutable request overlays, source certificates, and provisional publication | Stage 2/M1 | exact isolation/invalidation; Slug-native representation | source-consumer cutover, focused mutation/concurrency oracle, and Buck2 DICE audit | scheduled first after the cutover |
+| Immutable request overlays, source certificates, and provisional publication | Stage 2/M1 | exact isolation/invalidation; Slug-native representation | accepted source-consumer cutover, focused mutation/concurrency oracle, and accepted Buck2 DICE audit | focused oracle design active before the Rust vertical |
 | Six-class memory-lifetime review | all stages | Slug-native architecture | packet touches retained/cache/async state | adopted in planning |
-| Natural evaluated `.bzl` producer and repository owner/materializer split | Stages 4/5 | exact semantics; Slug-native Rust boundaries | accepted graph owners and first private source-observation consumer | in progress through the fixed cutover |
+| Natural evaluated `.bzl` producer and repository owner/materializer split | Stages 4/5 | exact semantics; Slug-native Rust boundaries | accepted graph owners and first private source-observation consumer | first private consumer/cutover accepted; public migration deferred |
 | Immutable action-owner context | Stage 6 | exact platform/exec-group semantics; Slug-native storage | M1 request-revision vertical and relevant oracle subset | planned before broader action registration |
 | REAPI concurrency/interoperability oracle wave | Stage 7 | exact REAPI behavior | M7A action kinds/input trees | planned before bootstrap execution |
 | Sparse AC/CAS repository-output cache | Stages 5/7 | exact only after Bazel-compatible initial identity; otherwise Slug-native | generated-repository owner and recorded inputs | deferred |
@@ -71,8 +71,8 @@ after the functional bootstrap path.
       and measured rejected-experiment discipline.
 - [x] Record all agreed architecture, fixture, product, and non-adoption items
       in their owning stage plans.
-- [x] Keep the active M7 audit unchanged and name its first-consumer acceptance
-      as the fixed cutover.
+- [x] Accept the first private consumer as the fixed cutover and pivot only to
+      the focused M1 oracle/DICE gate before request-revision Rust.
 
 ## Fixture adoption checklist
 

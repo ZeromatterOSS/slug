@@ -24,19 +24,19 @@ and must name the same packet.
 | Milestone | Status | Accepted evidence | Blocking gap | Current or next packet |
 |-----------|--------|-------------------|--------------|------------------------|
 | M0: archive and baseline health | **accepted** | both archive refs peel to `e218054d…`; clean-root checker green in `9897e940` | none | preserve the refs and checker gate |
-| M1: one semantic spine | **partial; next architecture gate after the M7 source-consumer cutover** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, and direct-local exported-source build completion in `42f4a64b`; full evidence is in the Stage 5 owner plan | production still depends on coarse whole-workspace snapshots and lacks request-private source certificates, final reobservation, atomic revision acceptance, and overlapping-request proof; external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than M1 blockers | after the first private core repository source-observation consumer is accepted, run the focused mutation/concurrency oracle plus Buck2 DICE audit, then implement the smallest request-revision/source-certificate vertical |
+| M1: one semantic spine | **partial; focused oracle design active after the accepted source-consumer cutover** | Host loading observations, typed command/event ownership, direct local-override external query loading, the query-only unsupported-cycle boundary in `ea2019f8`, direct-local exported-source build completion in `42f4a64b`, and the first private core repository source-observation consumer in `53152727`; full evidence is in the Stage 5 owner plan | production still depends on coarse whole-workspace snapshots and lacks request-private source certificates, final reobservation, atomic revision acceptance, and overlapping-request proof; external test-base/tools closure, JVM-dependent registry directory transport, and native-Windows byte-glob ordering remain unsupported or `REPLAN` rather than M1 blockers | design and generate the focused mutation/concurrent-client oracle selected by the DICE audit, then design the smallest request-revision/source-certificate vertical |
 | M2: analysis graph | **accepted (Slug-native identity)** | recursive configured analysis, bounded root cquery in `135b0567`, transitions, toolchain context, recursive action closure, and the reviewed complete Rust-native default structural vertical | exact Bazel configuration/output/ActionKey bytes remain deferred to M9 | preserve the accepted structural and digest-domain boundaries |
 | M3: `query` | **accepted** | all 16 default functions; default/explicit `label`, graph, `label_kind`, and `package` output; the 18-lane/165-pair Bazel 9.2 `attr()` oracle in `4ea8f6c7`; complete retained descriptors in `83fe6037`; and runtime activation in `ed38f82a` | Sky Query-only functions and non-text formats remain later breadth, not M3 gates | preserve the accepted loading-query graph |
 | M4: `cquery` | **accepted** | the same provider/action/edge-bearing configured analysis result, full structural/null Target/Exec identity, transitions, toolchain/delegation topology, forward/reverse graph semantics, admitted formatters, Need/error ordering, and one-shot/daemon recovery | none; remaining expression and topology shapes are later breadth | preserve the accepted configured-query graph |
 | M5: `aquery` | **accepted (bounded FileWrite; Slug-native identity/order)** | recursive action ownership, complete structural configuration identity, closure-resolved toolchain-backed FileWrite semantics, exact literal owner order/framing, bounded aspect-free `deps()` owner membership, stable-daemon A/B/A restoration, and sole-candidate selected-implementation action platforms | broader action kinds, expressions, formats, ordinary zero-toolchain owners, and multi-platform choice are later breadth | preserve the admitted FileWrite boundary |
 | M6: execution and caching | **accepted (bounded FileWrite)** | the resolved semantic view is the sole FileWrite executor input; canonical inline Directory/Command/Action SHA-256 identity, selected-platform properties, raw-path rejection, one-shot and stable-daemon A/B/A, and zero direct-local actions are accepted | broader actions, input trees, backends, cache/materializer policy, and transport breadth remain later Stage 7 work | preserve the accepted FileWrite handoff |
-| M7: command/ruleset breadth | **active (root source-observation consumer implementation)** | design `b6d0ecae` independently accepted the compact private core carrier and split compute-terminal ownership | implement and accept the first private core caller and owned-certificate boundary | WP-4-5-6-host-root-repository-source-observation-consumer-implementation |
+| M7: command/ruleset breadth | **partial; source-consumer cutover accepted and later breadth parked behind M1** | `53152727` accepts the first private core caller, split compute-terminal ownership, retained predecessor/observation identity, and no public migration | bootstrap-critical repository, rules_rust, action/input-tree, aquery, and REAPI closure remains M7A after the M1 request-revision vertical | resume only after M1 and its just-in-time evidence, then follow M7A -> M8 -> M7B |
 | M8: bootstrap | **developer graph accepted; parked behind M7A only** | exact 33-package CLI boundary plus accepted Gates A-B; the 43-test BuildBuddy developer gate is `PROVED_CACHE_ONLY` and `PROVED_RBE` with clean lifecycle; CI explicitly not admitted | the bootstrap closure still needs its repository sources, rules_rust/provider/toolchain semantics, action kinds/input trees, normalized aquery, and REAPI execution/materialization; accepted bounded M2/M5/M6 are no longer the named blocker | begin Stage 10.3/10.4 as soon as the bootstrap-critical M7A closure is accepted; do not wait for run/test/BEP or unrelated public-ruleset breadth |
 | M9: exact Bazel identity bytes | deferred | four-domain C0/C1/P0/P1/content/path evidence in `f00e99db` | in-depth Rust-only analysis and reproduction of Bazel configuration checksum, output-directory identity, and ActionKey algorithms | begin only after the functional semantic graph/bootstrap path |
 
 ### Current packet
 
-[WP-4-5-6-host-root-repository-source-observation-consumer-implementation](./slug-v2-subplans/current-packet.md).
+[WP-1-2-m1-mutation-concurrent-request-oracle-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 
@@ -638,14 +638,12 @@ execution, progress, explain, watch, complexity, and performance follow-ups.
 The [plan-authoring guide](./slug-v2-plan-authoring-guide.md) is the readiness
 contract for new and materially revised packets.
 
-Neither document widens the active M7 packet. Finish the current
-source-observation consumer audit and, if it selects a bounded successor,
-complete only the design and implementation needed to accept the first private
-core consumer. If the audit returns `REPLAN`, complete only the smallest
-prerequisite needed to reach that same consumer. Acceptance of that consumer is
-the fixed **source-consumer cutover**; merely finishing whichever packet happens
-to be active is not the cutover, and package/loading/command migration is not
-part of it.
+The first private core source-observation consumer is accepted in `53152727`,
+so the fixed **source-consumer cutover** has occurred without package, loading,
+command, or public migration. The post-cutover DICE audit selected the focused
+mutation/concurrent-client oracle design as the smallest prerequisite before
+request-revision Rust. Neither the roadmap nor that design widens M1 into the
+unrelated Wave A catalog.
 
 After the source-consumer cutover, schedule the remaining work as bounded
 packets in this order:

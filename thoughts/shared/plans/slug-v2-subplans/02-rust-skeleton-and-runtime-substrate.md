@@ -237,7 +237,83 @@ DICE scheduler. The existing coarse snapshots remain accepted scaffolding only
 until a separately scheduled packet replaces them; this section authorizes no
 runtime edit by itself.
 
-#### Reviewed next packet — `WP-2-m1-workspace-runtime` (2026-07-22)
+#### Accepted post-cutover audit - `WP-2-m1-mutation-concurrent-request-dice-audit` (2026-08-13)
+
+The source-consumer cutover is accepted in `53152727`. The bounded read-only
+audit selected
+`WP-1-2-m1-mutation-concurrent-request-oracle-design` before any
+request-revision Rust because the existing Bazel evidence is serial and no
+fixture yet discriminates an in-flight source mutation.
+
+The accepted `load-invalidation` fixture remains the exact Bazel 9.2
+retained-server baseline for serial mutation, warm nonreplay, invalidation, and
+A/B/A restoration. It is not concurrent-request evidence: the fixture model
+attaches mutations to one command, and the runner applies them before a
+blocking `subprocess.run` inside a serial command loop. The selected design
+must separately pin Bazel's public in-flight mutation result and its
+same-output-base client lock/serialization boundary. True overlapping Slug
+request computation and its barrier/cancellation proof are Slug-native and may
+not be inferred from contending Bazel clients.
+
+The live input inventory has two incomplete paths:
+
+- legacy `evaluate_observations` and loading-query adapters inject whole
+  `WorkspaceSnapshot`, `WorkspaceRawSnapshot`, and
+  `WorkspaceDirectorySnapshot` values collected before the request, plus
+  Bzlmod request inputs; they have no final reobservation;
+- production build/query/cquery use `NativeDemandSessionOwner`, whose single
+  `Busy` lease serializes commands and whose manual accepted snapshot retains
+  request inputs, synthetic workspace/registry/repository generations,
+  repository results, path observations, and selected demands;
+- that driver retries repository/path Needs and commits a selected snapshot,
+  but it does not finally reobserve every mutable unscoped host path before
+  moving events and the terminal into user-visible output;
+- command and environment policy, lockfile mode, registry URLs, root package
+  policy, repository/materialization generations and results, and path epochs
+  enter DICE as typed injected keys; root string settings and semantic
+  query/cquery options participate through root identity;
+- process-host configuration, repository/materializer session state,
+  observation I/O, accepted-demand state, revision counters, command
+  presentation, and event buffers remain runtime-owned. Mapping, lockfile, and
+  repository graph values derived from admitted injected inputs already remain
+  DICE-owned and must not be copied into a request replay store.
+
+The applicable vendored DICE contract is narrower than the old synthetic
+driver assumes. One updater can record typed `changed_to` batches and one
+commit publishes the resulting version; equal values can preserve the existing
+version. Each transaction is fixed at creation and must never be retained by a
+computation or result. Same-key/same-version work is deduplicated, distinct
+computations can run in parallel, and a shared computation survives one waiter
+dropping while another remains. DICE cancellation tests also prove cleanup and
+reuse after the last waiter drops. DICE has version-tagged active/in-flight
+machinery, but this audit found no public contract/test or historical-host-read
+owner sufficient for M1 final validation/publication to rely on concurrent
+independently mutated versions without separate proof.
+
+A single DICE key therefore cannot own final reobservation and successor
+publication: key computation has no authority to observe mutable host state and
+commit a new transaction. The future cohesive owner must pair a private
+immutable request overlay and DICE-produced source certificate with a runtime
+request coordinator. Provisional work runs without a command-global lease.
+Only a narrow final-validation/publication critical section after DICE work may
+compare the accepted base, reobserve the exact certificate, commit changed
+typed observations, and either accept or retry. It must not span
+`compute`, Starlark evaluation, or another DICE computation, and it cannot
+become a manual semantic store.
+
+The active oracle design edits only canonical, current, Stage 1, and this owner
+under 40/320/280/280/840 documentation caps. It must select one pinned Bazel
+9.2 fixture, deterministic public/test-anchored gate, exact future file and
+record caps, cleanup ownership, compatibility classes, and one oracle
+implementation or precise `REPLAN`. It authorizes no tool, fixture, Bazel
+run, Rust, Cargo/BUILD, network, public command, JVM, Zabel, snapshot
+replacement, or request owner implementation.
+
+#### Historical reviewed packet - `WP-2-m1-workspace-runtime` (2026-07-22)
+
+This earlier whole-snapshot packet is retained as history only and is
+superseded by the request-revision/source-certificate contract and accepted
+post-cutover audit above.
 
 A Terra-medium source audit followed by Sol-low ownership review revised the
 first M1 packet. Root evaluation and loading must be unified immediately; merely
