@@ -803,6 +803,99 @@ impl Key for RootModuleLoadingAnchorKey {
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedRootModuleLoadingAnchor {
+    result: Result<RootModuleLoadingAnchor, RootModuleLoadingAnchorError>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRootModuleLoadingAnchor {
+    #[doc(hidden)]
+    pub fn result(&self) -> &Result<RootModuleLoadingAnchor, RootModuleLoadingAnchorError> {
+        &self.result
+    }
+
+    #[doc(hidden)]
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct RootModuleLoadingAnchorObservationKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl RootModuleLoadingAnchorObservationKey {
+    #[doc(hidden)]
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for RootModuleLoadingAnchorObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-root-module-loading-anchor:{}", self.workspace)
+    }
+}
+
+type ObservedRootModuleLoadingAnchorOutcome =
+    SourcePreparationOutcome<Result<ObservedRootModuleLoadingAnchor, ObservedPathFrontierError>>;
+
+fn project_observed_root_module_loading_anchor(
+    outcome: ObservedHostRootModuleFileOutcome,
+) -> ObservedRootModuleLoadingAnchorOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            SourcePreparationOutcome::Complete(Err(error))
+        }
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            let ObservedHostRootModuleFile {
+                result: carrier,
+                observations,
+            } = observed;
+            let result = if carrier.is_ok() {
+                Ok(RootModuleLoadingAnchor { carrier })
+            } else {
+                Err(RootModuleLoadingAnchorError { carrier })
+            };
+            SourcePreparationOutcome::Complete(Ok(ObservedRootModuleLoadingAnchor {
+                result,
+                observations,
+            }))
+        }
+    }
+}
+
+#[async_trait]
+impl Key for RootModuleLoadingAnchorObservationKey {
+    type Value = ObservedRootModuleLoadingAnchorOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        project_observed_root_module_loading_anchor(dice_invariant(
+            ctx.compute(&HostRootModuleFileObservationKey::new(
+                self.workspace.dupe(),
+            ))
+            .await,
+        ))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub enum RootRepositorySource {
     DirectLocal(RepoSpec),
@@ -1311,10 +1404,12 @@ mod tests {
     use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::NormalizedAbsolutePath;
+    use slug_workspace_v2::ObservedPathFrontierError;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
@@ -1334,9 +1429,11 @@ mod tests {
     use super::RootModuleLoadingAnchor;
     use super::RootModuleLoadingAnchorError;
     use super::RootModuleLoadingAnchorKey;
+    use super::RootModuleLoadingAnchorObservationKey;
     use super::RootRepositoryRoute;
     use super::RootRepositoryRouteKey;
     use super::RootRepositorySource;
+    use super::project_observed_root_module_loading_anchor;
     use crate::BzlmodCommandPolicyKey;
     use crate::BzlmodEnvironmentPolicyKey;
     use crate::EvaluatedRootModule;
@@ -1526,7 +1623,11 @@ mod tests {
             deps: &mut dyn Iterator<Item = &DynKey>,
             _activation: ActivationData,
         ) {
-            if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
+            if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some()
+                || key
+                    .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
+                    .is_some()
+            {
                 self.anchor_dependencies
                     .lock()
                     .unwrap()
@@ -1544,6 +1645,9 @@ mod tests {
                     .downcast_ref::<HostRootModuleFileObservationKey>()
                     .is_none()
                 && key.downcast_ref::<RootModuleLoadingAnchorKey>().is_none()
+                && key
+                    .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
+                    .is_none()
                 && key.downcast_ref::<HostRepoFileKey>().is_none()
                 && key.downcast_ref::<HostFileBytesKey>().is_none()
                 && key.downcast_ref::<HostFileBytesObservationKey>().is_none()
@@ -1755,6 +1859,45 @@ mod tests {
         let mut transaction = updater.commit().await;
         transaction
             .compute(&RootModuleLoadingAnchorKey::new(workspace()))
+            .await
+            .unwrap()
+    }
+
+    async fn observed_frontier_anchor(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        tracker: &Arc<EventTracker>,
+    ) -> <RootModuleLoadingAnchorObservationKey as Key>::Value {
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                snapshot(None),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(&mut updater, policy(&["/workspace"])).unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace().as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&RootModuleLoadingAnchorObservationKey::new(workspace()))
             .await
             .unwrap()
     }
@@ -3881,5 +4024,175 @@ include('//b:b.MODULE.bazel')
                     && demand.operation() == PathObservationOperation::FileBytes
             }));
         }
+    }
+    #[test]
+    fn observed_anchor_projection_preserves_arcs_and_outer_error_polarity() {
+        let demand = EpochBuilder::demand("/", PathObservationOperation::Lstat);
+        let shared = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), shared.dupe())]).unwrap();
+        let success: Arc<Result<HostRootModuleFileValue, HostRootModuleFileError>> =
+            Arc::new(Ok(empty_value()));
+        let projected = project_observed_root_module_loading_anchor(
+            SourcePreparationOutcome::Complete(Ok(ObservedHostRootModuleFile {
+                result: success.dupe(),
+                observations: epoch,
+            })),
+        );
+        let SourcePreparationOutcome::Complete(Ok(projected)) = projected else {
+            panic!("semantic success must produce an observed anchor");
+        };
+        let anchor = projected.result().as_ref().unwrap();
+        assert!(Arc::ptr_eq(&anchor.carrier, &success));
+        assert!(Arc::ptr_eq(
+            projected.observations().get(&demand).unwrap(),
+            &shared
+        ));
+
+        let failure: Arc<Result<HostRootModuleFileValue, HostRootModuleFileError>> =
+            Arc::new(Err(HostRootModuleFileError::CommandPolicy {
+                message: "policy".into(),
+            }));
+        let projected = project_observed_root_module_loading_anchor(
+            SourcePreparationOutcome::Complete(Ok(ObservedHostRootModuleFile {
+                result: failure.dupe(),
+                observations: PathObservationEpoch::empty(),
+            })),
+        );
+        let SourcePreparationOutcome::Complete(Ok(projected)) = projected else {
+            panic!("semantic failure must produce an observed anchor error");
+        };
+        assert!(Arc::ptr_eq(
+            &projected.result().as_ref().unwrap_err().carrier,
+            &failure
+        ));
+
+        let outer =
+            ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(demand));
+        let projected = project_observed_root_module_loading_anchor(
+            SourcePreparationOutcome::Complete(Err(outer.dupe())),
+        );
+        let SourcePreparationOutcome::Complete(Err(projected)) = projected else {
+            panic!("outer frontier error must remain outer");
+        };
+        assert_eq!(projected, outer);
+        let projected = SourcePreparationOutcome::Complete(Err(projected));
+        assert!(RootModuleLoadingAnchorObservationKey::validity(&projected));
+        assert_eq!(
+            RootModuleLoadingAnchorObservationKey::new(workspace()).to_string(),
+            "observed-root-module-loading-anchor:\"/workspace\""
+        );
+    }
+
+    #[tokio::test]
+    async fn observed_anchor_retains_frontier_events_and_a_b_a_without_legacy_activation() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(EventTracker::default());
+        let source = |reversed: bool| {
+            if reversed {
+                "print('OBSERVED_ANCHOR')\nregister_execution_platforms('//:second', '//:first')\n"
+            } else {
+                "print('OBSERVED_ANCHOR')\nregister_execution_platforms('//:first', '//:second')\n"
+            }
+        };
+        let a = EpochBuilder::root(source(false), 31).build();
+        let first = observed_frontier_anchor(&dice, a.dupe(), &tracker).await;
+        assert!(RootModuleLoadingAnchorObservationKey::validity(&first));
+        let SourcePreparationOutcome::Complete(Ok(frontier)) = &first else {
+            panic!("observed anchor must complete");
+        };
+        assert_eq!(
+            frontier
+                .result()
+                .as_ref()
+                .unwrap()
+                .registrations()
+                .execution_platforms()
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>(),
+            ["//:first", "//:second"]
+        );
+        for (demand, expected) in a.observations() {
+            assert!(Arc::ptr_eq(
+                frontier.observations().get(demand).unwrap(),
+                expected
+            ));
+        }
+        let entries = tracker.take();
+        assert!(entries.iter().any(|entry| {
+            entry
+                .key
+                .starts_with("observed-root-module-loading-anchor:")
+                && entry.batch.is_none()
+        }));
+        assert!(entries.iter().any(|entry| {
+            entry
+                .key
+                .starts_with("bzlmod-observed-host-root-module-file:")
+                && matches!(
+                    entry.batch.as_ref().map(event_texts),
+                    Some(texts) if texts == ["OBSERVED_ANCHOR"]
+                )
+        }));
+        assert!(entries.iter().all(|entry| {
+            !entry.key.starts_with("host-root-module-file:")
+                && !entry.key.starts_with("root-module-loading-anchor:")
+        }));
+        assert_eq!(
+            tracker.take_anchor_dependencies(),
+            vec![vec![String::from(
+                "bzlmod-observed-host-root-module-file:\"/workspace\""
+            )]]
+        );
+
+        let warm = observed_frontier_anchor(&dice, a.dupe(), &tracker).await;
+        assert!(RootModuleLoadingAnchorObservationKey::equality(
+            &first, &warm
+        ));
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+        tracker.take_anchor_dependencies();
+
+        let changed = observed_frontier_anchor(
+            &dice,
+            EpochBuilder::root(source(true), 32).build(),
+            &tracker,
+        )
+        .await;
+        assert!(!RootModuleLoadingAnchorObservationKey::equality(
+            &first, &changed
+        ));
+        tracker.take();
+        tracker.take_anchor_dependencies();
+
+        let restored = observed_frontier_anchor(&dice, a, &tracker).await;
+        assert!(RootModuleLoadingAnchorObservationKey::equality(
+            &first, &restored
+        ));
+    }
+
+    #[tokio::test]
+    async fn observed_anchor_need_is_invalid_and_retains_no_parent_event() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(EventTracker::default());
+        let path_need =
+            observed_frontier_anchor(&dice, PathObservationEpoch::empty(), &tracker).await;
+        assert!(matches!(path_need, SourcePreparationOutcome::Need(_)));
+        assert!(!RootModuleLoadingAnchorObservationKey::validity(&path_need));
+        assert!(!RootModuleLoadingAnchorObservationKey::equality(
+            &path_need, &path_need
+        ));
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+        tracker.take_anchor_dependencies();
+
+        let mut missing = EpochBuilder::default();
+        missing.directory("/", 1);
+        missing.directory("/workspace", 1);
+        missing.missing("/workspace/MODULE.bazel");
+        let bootstrap = observed_frontier_anchor(&dice, missing.build(), &tracker).await;
+        let SourcePreparationOutcome::Need(bootstrap) = bootstrap else {
+            panic!("missing root module must request bootstrap");
+        };
+        assert!(bootstrap.root_module_bootstrap_request().is_some());
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
     }
 }

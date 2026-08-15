@@ -73,9 +73,13 @@ pub use dice::digest_repo_mappings;
 pub use host_module::HostRepositorySourceCapability;
 #[doc(hidden)]
 pub use host_module::HostRepositorySourceCapabilitySource;
+#[doc(hidden)]
+pub use host_module::ObservedRootModuleLoadingAnchor;
 pub use host_module::RootModuleLoadingAnchor;
 pub use host_module::RootModuleLoadingAnchorError;
 pub use host_module::RootModuleLoadingAnchorKey;
+#[doc(hidden)]
+pub use host_module::RootModuleLoadingAnchorObservationKey;
 pub use host_module::RootRepositoryRoute;
 pub use host_module::RootRepositoryRouteError;
 pub use host_module::RootRepositoryRouteKey;
