@@ -29,6 +29,7 @@ use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetName;
+use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathNodeKind;
@@ -45,6 +46,7 @@ use crate::RootPackagePolicyProjectionError;
 use crate::RootRepositoryRoute;
 use crate::host_file::HostFileBytes;
 use crate::host_file::HostFileBytesKey;
+use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
@@ -1302,10 +1304,239 @@ fn append_bzl_target(
     Ok(package_dir)
 }
 
-fn source_complete_error(
+type RootPackageSourceCarrier = Arc<Result<RootPackageSource, RootPackageSourceError>>;
+type RootPackageSourceProjection = (RootPackageSourceCarrier, PathObservationEpoch);
+type RootPackageSourceDriverOutcome =
+    SourcePreparationOutcome<Result<RootPackageSourceProjection, ObservedPathFrontierError>>;
+
+#[derive(Clone, Copy)]
+enum RootPackageSourceMode {
+    Legacy,
+    Observed,
+}
+
+fn source_complete(
+    result: Result<RootPackageSource, RootPackageSourceError>,
+    observations: PathObservationEpoch,
+) -> RootPackageSourceDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn source_error(
     inner: RootPackageSourceErrorInner,
-) -> SourcePreparationOutcome<Arc<Result<RootPackageSource, RootPackageSourceError>>> {
-    SourcePreparationOutcome::Complete(Arc::new(Err(RootPackageSourceError::new(inner))))
+    observations: PathObservationEpoch,
+) -> RootPackageSourceDriverOutcome {
+    source_complete(Err(RootPackageSourceError::new(inner)), observations)
+}
+
+fn source_need(need: NeedPathObservations) -> RootPackageSourceDriverOutcome {
+    SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
+}
+
+fn merge_source_epoch(
+    mode: RootPackageSourceMode,
+    observations: PathObservationEpoch,
+    next: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    match mode {
+        RootPackageSourceMode::Legacy => {
+            debug_assert!(next.observations().is_empty());
+            Ok(observations)
+        }
+        RootPackageSourceMode::Observed => union_observations(&observations, next),
+    }
+}
+
+async fn source_lookup(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    package: PackagePath,
+    mode: RootPackageSourceMode,
+) -> PathOutcome<
+    Result<
+        (
+            Arc<Result<HostRootPackageLookup, HostRootPackageLookupError>>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+> {
+    match mode {
+        RootPackageSourceMode::Legacy => dice_invariant(
+            ctx.compute(&HostRootPackageLookupKey::new(workspace, package))
+                .await,
+        )
+        .map(|result| Ok((result, PathObservationEpoch::empty()))),
+        RootPackageSourceMode::Observed => match dice_invariant(
+            ctx.compute(&HostRootPackageLookupObservationKey::new(
+                workspace, package,
+            ))
+            .await,
+        ) {
+            PathOutcome::Need(need) => PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(value)) => {
+                PathOutcome::Complete(Ok((value.result.clone(), value.observations().dupe())))
+            }
+        },
+    }
+}
+
+async fn source_file(
+    ctx: &mut DiceComputations<'_>,
+    logical_path: NormalizedAbsolutePath,
+    mode: RootPackageSourceMode,
+) -> PathOutcome<
+    Result<(Result<HostFileBytes, HostFileError>, PathObservationEpoch), ObservedPathFrontierError>,
+> {
+    match mode {
+        RootPackageSourceMode::Legacy => {
+            dice_invariant(ctx.compute(&HostFileBytesKey::new(logical_path)).await)
+                .map(|result| Ok((result, PathObservationEpoch::empty())))
+        }
+        RootPackageSourceMode::Observed => match dice_invariant(
+            ctx.compute(&HostFileBytesObservationKey::new(logical_path))
+                .await,
+        ) {
+            PathOutcome::Need(need) => PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(value)) => {
+                PathOutcome::Complete(Ok((value.result().clone(), value.observations().dupe())))
+            }
+        },
+    }
+}
+
+async fn compute_root_package_source(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    request: &RootPackageSourceRequest,
+    mode: RootPackageSourceMode,
+) -> RootPackageSourceDriverOutcome {
+    let declared_package = request.package();
+    let candidates = match request {
+        RootPackageSourceRequest::Build(package) => vec![package.clone()],
+        RootPackageSourceRequest::Bzl { package, target } => {
+            containing_package_candidates(package, target)
+        }
+    };
+    let mut observations = PathObservationEpoch::empty();
+    let mut selected = None;
+    for candidate in candidates {
+        let (lookup, next) =
+            match source_lookup(ctx, workspace.dupe(), candidate.clone(), mode).await {
+                PathOutcome::Need(need) => return source_need(need),
+                PathOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                PathOutcome::Complete(Ok(value)) => value,
+            };
+        observations = match merge_source_epoch(mode, observations, &next) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        match lookup.as_ref() {
+            Err(error) => {
+                return source_error(
+                    RootPackageSourceErrorInner::PackageLookup {
+                        package: candidate,
+                        error: error.clone(),
+                    },
+                    observations,
+                );
+            }
+            Ok(HostRootPackageLookup::Package(package)) => {
+                if &candidate != declared_package {
+                    return source_error(
+                        RootPackageSourceErrorInner::LabelCrossesPackageBoundary {
+                            package: declared_package.clone(),
+                            containing_package: candidate,
+                        },
+                        observations,
+                    );
+                }
+                selected = Some(package.dupe());
+                break;
+            }
+            Ok(HostRootPackageLookup::NoBuildFile) if &candidate == declared_package => {
+                return source_error(
+                    RootPackageSourceErrorInner::NoBuildFile { package: candidate },
+                    observations,
+                );
+            }
+            Ok(HostRootPackageLookup::Deleted) if &candidate == declared_package => {
+                return source_error(
+                    RootPackageSourceErrorInner::DeletedPackage { package: candidate },
+                    observations,
+                );
+            }
+            Ok(HostRootPackageLookup::InvalidPackageName { message })
+                if &candidate == declared_package =>
+            {
+                return source_error(
+                    RootPackageSourceErrorInner::InvalidPackageName {
+                        package: candidate,
+                        message: message.clone(),
+                    },
+                    observations,
+                );
+            }
+            Ok(HostRootPackageLookup::NoBuildFile)
+            | Ok(HostRootPackageLookup::Deleted)
+            | Ok(HostRootPackageLookup::InvalidPackageName { .. }) => {}
+        }
+    }
+    let selected = selected.expect("declared package candidate returns or selects a package");
+    let package_dir = selected
+        .package_root()
+        .as_path()
+        .join(declared_package.as_str());
+    let (logical_path, relative_path): (PathBuf, Arc<[u8]>) = match request {
+        RootPackageSourceRequest::Build(_) => {
+            let name = selected.build_file_name().as_str();
+            (package_dir.join(name), Arc::from(name.as_bytes()))
+        }
+        RootPackageSourceRequest::Bzl { target, .. } => (
+            match append_bzl_target(package_dir, target) {
+                Ok(path) => path,
+                Err(error) => return source_complete(Err(error), observations),
+            },
+            target.raw.clone(),
+        ),
+    };
+    let logical_path = NormalizedAbsolutePath::new(logical_path)
+        .expect("selected package roots and validated target remain normalized absolute");
+    let (source, next) = match source_file(ctx, logical_path.dupe(), mode).await {
+        PathOutcome::Need(need) => return source_need(need),
+        PathOutcome::Complete(Err(error)) => return SourcePreparationOutcome::Complete(Err(error)),
+        PathOutcome::Complete(Ok(value)) => value,
+    };
+    observations = match merge_source_epoch(mode, observations, &next) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    match source {
+        Err(error) => source_error(
+            RootPackageSourceErrorInner::Source {
+                logical_path,
+                error,
+            },
+            observations,
+        ),
+        Ok(HostFileBytes::Missing) => source_error(
+            RootPackageSourceErrorInner::Missing { logical_path },
+            observations,
+        ),
+        Ok(HostFileBytes::Present(bytes)) => source_complete(
+            Ok(RootPackageSource {
+                package_root: selected.package_root().dupe(),
+                logical_path,
+                relative_path,
+                bytes,
+            }),
+            observations,
+        ),
+    }
 }
 
 #[async_trait]
@@ -1317,118 +1548,117 @@ impl Key for RootPackageSourceKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let declared_package = self.request.package();
-        let candidates = match &self.request {
-            RootPackageSourceRequest::Build(package) => vec![package.clone()],
-            RootPackageSourceRequest::Bzl { package, target } => {
-                containing_package_candidates(package, target)
+        match compute_root_package_source(
+            ctx,
+            &self.workspace,
+            &self.request,
+            RootPackageSourceMode::Legacy,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => {
+                SourcePreparationOutcome::Complete(result)
             }
-        };
-        let mut selected = None;
-        for candidate in candidates {
-            let lookup = dice_invariant(
-                ctx.compute(&HostRootPackageLookupKey::new(
-                    self.workspace.dupe(),
-                    candidate.clone(),
-                ))
-                .await,
-            );
-            let lookup = match lookup {
-                PathOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
-                }
-                PathOutcome::Complete(value) => value,
-            };
-            match lookup.as_ref() {
-                Err(error) => {
-                    return source_complete_error(RootPackageSourceErrorInner::PackageLookup {
-                        package: candidate,
-                        error: error.clone(),
-                    });
-                }
-                Ok(HostRootPackageLookup::Package(package)) => {
-                    if &candidate != declared_package {
-                        return source_complete_error(
-                            RootPackageSourceErrorInner::LabelCrossesPackageBoundary {
-                                package: declared_package.clone(),
-                                containing_package: candidate,
-                            },
-                        );
-                    }
-                    selected = Some(package.dupe());
-                    break;
-                }
-                Ok(HostRootPackageLookup::NoBuildFile) if &candidate == declared_package => {
-                    return source_complete_error(RootPackageSourceErrorInner::NoBuildFile {
-                        package: candidate,
-                    });
-                }
-                Ok(HostRootPackageLookup::Deleted) if &candidate == declared_package => {
-                    return source_complete_error(RootPackageSourceErrorInner::DeletedPackage {
-                        package: candidate,
-                    });
-                }
-                Ok(HostRootPackageLookup::InvalidPackageName { message })
-                    if &candidate == declared_package =>
-                {
-                    return source_complete_error(
-                        RootPackageSourceErrorInner::InvalidPackageName {
-                            package: candidate,
-                            message: message.clone(),
-                        },
-                    );
-                }
-                Ok(HostRootPackageLookup::NoBuildFile)
-                | Ok(HostRootPackageLookup::Deleted)
-                | Ok(HostRootPackageLookup::InvalidPackageName { .. }) => {}
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy root package source produced frontier error: {error}")
             }
         }
-        let selected = selected.expect("declared package candidate returns or selects a package");
-        let package_dir = selected
-            .package_root()
-            .as_path()
-            .join(declared_package.as_str());
-        let (logical_path, relative_path): (PathBuf, Arc<[u8]>) = match &self.request {
-            RootPackageSourceRequest::Build(_) => {
-                let name = selected.build_file_name().as_str();
-                (package_dir.join(name), Arc::from(name.as_bytes()))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedRootPackageSource {
+    result: RootPackageSourceCarrier,
+    observations: PathObservationEpoch,
+}
+
+#[doc(hidden)]
+impl ObservedRootPackageSource {
+    pub fn result(&self) -> &Result<RootPackageSource, RootPackageSourceError> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RootPackageSourceObservationKey {
+    workspace: NormalizedAbsolutePath,
+    request: RootPackageSourceRequest,
+}
+
+#[doc(hidden)]
+impl RootPackageSourceObservationKey {
+    pub fn for_build(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self {
+            workspace,
+            request: RootPackageSourceRequest::Build(package),
+        }
+    }
+
+    pub fn for_bzl(
+        workspace: NormalizedAbsolutePath,
+        package: PackagePath,
+        target: RootPackageBzlTarget,
+    ) -> Self {
+        Self {
+            workspace,
+            request: RootPackageSourceRequest::Bzl { package, target },
+        }
+    }
+}
+
+impl fmt::Display for RootPackageSourceObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-")?;
+        RootPackageSourceKey {
+            workspace: self.workspace.dupe(),
+            request: self.request.clone(),
+        }
+        .fmt(f)
+    }
+}
+
+#[async_trait]
+impl Key for RootPackageSourceObservationKey {
+    type Value =
+        SourcePreparationOutcome<Result<ObservedRootPackageSource, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match compute_root_package_source(
+            ctx,
+            &self.workspace,
+            &self.request,
+            RootPackageSourceMode::Observed,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedRootPackageSource {
+                    result,
+                    observations,
+                }))
             }
-            RootPackageSourceRequest::Bzl { target, .. } => (
-                match append_bzl_target(package_dir, target) {
-                    Ok(path) => path,
-                    Err(error) => {
-                        return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
-                    }
-                },
-                target.raw.clone(),
-            ),
-        };
-        let logical_path = NormalizedAbsolutePath::new(logical_path)
-            .expect("selected package roots and validated target remain normalized absolute");
-        let source = dice_invariant(
-            ctx.compute(&HostFileBytesKey::new(logical_path.dupe()))
-                .await,
-        );
-        match source {
-            PathOutcome::Need(need) => {
-                SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
-            }
-            PathOutcome::Complete(Err(error)) => {
-                source_complete_error(RootPackageSourceErrorInner::Source {
-                    logical_path,
-                    error,
-                })
-            }
-            PathOutcome::Complete(Ok(HostFileBytes::Missing)) => {
-                source_complete_error(RootPackageSourceErrorInner::Missing { logical_path })
-            }
-            PathOutcome::Complete(Ok(HostFileBytes::Present(bytes))) => {
-                SourcePreparationOutcome::Complete(Arc::new(Ok(RootPackageSource {
-                    package_root: selected.package_root().dupe(),
-                    logical_path,
-                    relative_path,
-                    bytes,
-                })))
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
         }
     }
@@ -1561,6 +1791,8 @@ mod tests {
     #[cfg(unix)]
     use super::ObservedHostRootPackageLookup;
     #[cfg(unix)]
+    use super::ObservedRootPackageSource;
+    #[cfg(unix)]
     use super::RepositoryPackageSourceError;
     #[cfg(unix)]
     use super::RepositoryPackageSourceErrorInner;
@@ -1574,6 +1806,8 @@ mod tests {
     use super::RootPackageSourceError;
     #[cfg(unix)]
     use super::RootPackageSourceKey;
+    #[cfg(unix)]
+    use super::RootPackageSourceObservationKey;
     #[cfg(unix)]
     use crate::BzlmodCommandPolicyKey;
     #[cfg(unix)]
@@ -2802,9 +3036,14 @@ mod tests {
     #[cfg(unix)]
     #[derive(Default)]
     struct ObservedLookupTracker {
+        legacy_source: AtomicUsize,
         legacy_lookup: AtomicUsize,
+        legacy_file: AtomicUsize,
         legacy_ignore: AtomicUsize,
         legacy_resolution: AtomicUsize,
+        observed_source: AtomicUsize,
+        observed_lookup: AtomicUsize,
+        observed_file: AtomicUsize,
         observed_ignore: AtomicUsize,
         observed_resolution: AtomicUsize,
         parent_event_data: Mutex<Vec<bool>>,
@@ -2813,7 +3052,9 @@ mod tests {
     #[cfg(unix)]
     impl ObservedLookupTracker {
         fn assert_no_legacy_activation(&self) {
+            assert_eq!(self.legacy_source.load(Ordering::SeqCst), 0);
             assert_eq!(self.legacy_lookup.load(Ordering::SeqCst), 0);
+            assert_eq!(self.legacy_file.load(Ordering::SeqCst), 0);
             assert_eq!(self.legacy_ignore.load(Ordering::SeqCst), 0);
             assert_eq!(self.legacy_resolution.load(Ordering::SeqCst), 0);
         }
@@ -2845,15 +3086,37 @@ mod tests {
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             if key
+                .downcast_ref::<RootPackageSourceObservationKey>()
+                .is_some()
+            {
+                self.observed_source.fetch_add(1, Ordering::SeqCst);
+                self.parent_event_data
+                    .lock()
+                    .unwrap()
+                    .push(activation.evaluation_data().is_some());
+            } else if key.downcast_ref::<RootPackageSourceKey>().is_some() {
+                self.legacy_source.fetch_add(1, Ordering::SeqCst);
+            } else if key
                 .downcast_ref::<HostRootPackageLookupObservationKey>()
                 .is_some()
             {
+                self.observed_lookup.fetch_add(1, Ordering::SeqCst);
                 self.parent_event_data
                     .lock()
                     .unwrap()
                     .push(activation.evaluation_data().is_some());
             } else if key.downcast_ref::<HostRootPackageLookupKey>().is_some() {
                 self.legacy_lookup.fetch_add(1, Ordering::SeqCst);
+            } else if key
+                .downcast_ref::<crate::host_file::HostFileBytesObservationKey>()
+                .is_some()
+            {
+                self.observed_file.fetch_add(1, Ordering::SeqCst);
+            } else if key
+                .downcast_ref::<crate::host_file::HostFileBytesKey>()
+                .is_some()
+            {
+                self.legacy_file.fetch_add(1, Ordering::SeqCst);
             } else if key.downcast_ref::<HostRepositoryIgnoreKey>().is_some() {
                 self.legacy_ignore.fetch_add(1, Ordering::SeqCst);
             } else if key.downcast_ref::<ResolvedPathKey>().is_some() {
@@ -2933,6 +3196,51 @@ mod tests {
             )])
             .unwrap();
         updater.commit().await.compute(&key).await.unwrap()
+    }
+
+    #[cfg(unix)]
+    async fn observed_source(
+        dice: &Arc<Dice>,
+        tracker: Arc<ObservedLookupTracker>,
+        policy: RootPackagePolicyInputs,
+        observations: PathObservationEpoch,
+        key: RootPackageSourceObservationKey,
+    ) -> <RootPackageSourceObservationKey as Key>::Value {
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        inject_root_package_policy_inputs(&mut updater, policy).unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        updater.commit().await.compute(&key).await.unwrap()
+    }
+
+    #[cfg(unix)]
+    fn observed_source_complete(
+        outcome: &<RootPackageSourceObservationKey as Key>::Value,
+    ) -> &ObservedRootPackageSource {
+        let SourcePreparationOutcome::Complete(Ok(value)) = outcome else {
+            panic!("observed root package source did not complete: {outcome:?}");
+        };
+        value
+    }
+
+    #[cfg(unix)]
+    fn assert_retained_observation_arc(
+        input: &PathObservationEpoch,
+        retained: &PathObservationEpoch,
+        path: &str,
+        operation: PathObservationOperation,
+    ) {
+        let demand = demand(path, operation);
+        assert!(Arc::ptr_eq(
+            input.get(&demand).expect("input observation"),
+            retained.get(&demand).expect("retained observation"),
+        ));
     }
 
     #[cfg(unix)]
@@ -3279,6 +3587,270 @@ mod tests {
         let need = updater.commit().await.compute(&key).await.unwrap();
         assert!(!RootPackageSourceKey::validity(&need));
         assert!(!RootPackageSourceKey::equality(&need, &need));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_source_retains_decisive_build_and_bzl_frontiers() {
+        let build_roots = ["/root-a", "/root-b"];
+        let mut build_entries = repository_prelude(&build_roots, 51);
+        build_entries.extend([
+            present("/root-a/pkg", PathNodeKind::Directory, 51),
+            missing("/root-a/pkg/BUILD.bazel"),
+            present("/root-a/pkg/BUILD", PathNodeKind::SpecialFile, 51),
+            bytes("/root-a/pkg/BUILD", b"observed-build"),
+            present("/root-b/pkg", PathNodeKind::Directory, 51),
+            present("/root-b/pkg/BUILD.bazel", PathNodeKind::RegularFile, 51),
+        ]);
+        let build_epoch = epoch(&build_entries);
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedLookupTracker::default());
+        let build = observed_source(
+            &dice,
+            tracker.dupe(),
+            inputs(&build_roots, &[], None),
+            build_epoch.dupe(),
+            RootPackageSourceObservationKey::for_build(
+                path("/workspace"),
+                PackagePath::parse("pkg").unwrap(),
+            ),
+        )
+        .await;
+        assert!(RootPackageSourceObservationKey::validity(&build));
+        assert!(RootPackageSourceObservationKey::equality(&build, &build));
+        let build = observed_source_complete(&build);
+        let build_source = build.result().as_ref().unwrap();
+        assert_eq!(build_source.logical_path(), &path("/root-a/pkg/BUILD"));
+        assert_eq!(build_source.bytes().as_ref(), b"observed-build");
+        assert_retained_observation_arc(
+            &build_epoch,
+            build.observations(),
+            "/root-a/pkg/BUILD.bazel",
+            PathObservationOperation::Lstat,
+        );
+        assert_retained_observation_arc(
+            &build_epoch,
+            build.observations(),
+            "/root-a/pkg/BUILD",
+            PathObservationOperation::FileBytes,
+        );
+        assert!(
+            build
+                .observations()
+                .get(&demand(
+                    "/root-b/pkg/BUILD.bazel",
+                    PathObservationOperation::Lstat,
+                ))
+                .is_none(),
+            "later package-root probes must not enter the decisive prefix",
+        );
+        let build_result = build.result.dupe();
+        assert!(Arc::ptr_eq(&build_result, &build.result));
+
+        let bzl_roots = ["/root"];
+        let mut bzl_entries = repository_prelude(&bzl_roots, 52);
+        bzl_entries.extend([
+            present("/root/pkg", PathNodeKind::Directory, 52),
+            present("/root/pkg/defs", PathNodeKind::Directory, 52),
+            missing("/root/pkg/defs/BUILD.bazel"),
+            missing("/root/pkg/defs/BUILD"),
+            present("/root/pkg/BUILD.bazel", PathNodeKind::RegularFile, 52),
+            present("/root/pkg/defs/lib.bzl", PathNodeKind::SpecialFile, 52),
+            bytes("/root/pkg/defs/lib.bzl", b"observed-bzl"),
+        ]);
+        let bzl_epoch = epoch(&bzl_entries);
+        let bzl = observed_source(
+            &dice,
+            tracker.dupe(),
+            inputs(&bzl_roots, &[], None),
+            bzl_epoch.dupe(),
+            RootPackageSourceObservationKey::for_bzl(
+                path("/workspace"),
+                PackagePath::parse("pkg").unwrap(),
+                RootPackageBzlTarget::parse("defs/lib.bzl").unwrap(),
+            ),
+        )
+        .await;
+        let bzl = observed_source_complete(&bzl);
+        let bzl_source = bzl.result().as_ref().unwrap();
+        assert_eq!(bzl_source.logical_path(), &path("/root/pkg/defs/lib.bzl"));
+        assert_eq!(bzl_source.bytes().as_ref(), b"observed-bzl");
+        assert_retained_observation_arc(
+            &bzl_epoch,
+            bzl.observations(),
+            "/root/pkg/defs/BUILD",
+            PathObservationOperation::Lstat,
+        );
+        assert_retained_observation_arc(
+            &bzl_epoch,
+            bzl.observations(),
+            "/root/pkg/defs/lib.bzl",
+            PathObservationOperation::FileBytes,
+        );
+        let bzl_result = bzl.result.dupe();
+        assert!(Arc::ptr_eq(&bzl_result, &bzl.result));
+        tracker.assert_no_legacy_activation();
+        tracker.assert_no_parent_event_data();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_source_retains_missing_and_host_error_prefixes() {
+        let roots = ["/root"];
+
+        let mut missing_entries = repository_prelude(&roots, 53);
+        missing_entries.extend([
+            present("/root/pkg", PathNodeKind::Directory, 53),
+            present("/root/pkg/BUILD.bazel", PathNodeKind::RegularFile, 53),
+            missing("/root/pkg/missing.bzl"),
+        ]);
+        let missing_epoch = epoch(&missing_entries);
+        let missing_tracker = Arc::new(ObservedLookupTracker::default());
+        let missing = observed_source(
+            &Dice::builder().build(DetectCycles::Enabled),
+            missing_tracker.dupe(),
+            inputs(&roots, &[], None),
+            missing_epoch.dupe(),
+            RootPackageSourceObservationKey::for_bzl(
+                path("/workspace"),
+                PackagePath::parse("pkg").unwrap(),
+                RootPackageBzlTarget::parse("missing.bzl").unwrap(),
+            ),
+        )
+        .await;
+        let missing = observed_source_complete(&missing);
+        assert!(missing.result().as_ref().unwrap_err().is_missing());
+        assert_retained_observation_arc(
+            &missing_epoch,
+            missing.observations(),
+            "/root/pkg/missing.bzl",
+            PathObservationOperation::Lstat,
+        );
+        missing_tracker.assert_no_legacy_activation();
+        missing_tracker.assert_no_parent_event_data();
+
+        let mut error_entries = repository_prelude(&roots, 54);
+        error_entries.extend([
+            present("/root/pkg", PathNodeKind::Directory, 54),
+            present("/root/pkg/BUILD.bazel", PathNodeKind::RegularFile, 54),
+            lstat_error("/root/pkg/error.bzl"),
+        ]);
+        let error_epoch = epoch(&error_entries);
+        let error_tracker = Arc::new(ObservedLookupTracker::default());
+        let error = observed_source(
+            &Dice::builder().build(DetectCycles::Enabled),
+            error_tracker.dupe(),
+            inputs(&roots, &[], None),
+            error_epoch.dupe(),
+            RootPackageSourceObservationKey::for_bzl(
+                path("/workspace"),
+                PackagePath::parse("pkg").unwrap(),
+                RootPackageBzlTarget::parse("error.bzl").unwrap(),
+            ),
+        )
+        .await;
+        let error = observed_source_complete(&error);
+        assert!(
+            error
+                .result()
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .starts_with("reading root package source"),
+        );
+        assert_retained_observation_arc(
+            &error_epoch,
+            error.observations(),
+            "/root/pkg/error.bzl",
+            PathObservationOperation::Lstat,
+        );
+        error_tracker.assert_no_legacy_activation();
+        error_tracker.assert_no_parent_event_data();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_source_preserves_need_semantic_and_a_b_a_equality() {
+        let roots = ["/root"];
+        let key = RootPackageSourceObservationKey::for_build(
+            path("/workspace"),
+            PackagePath::parse("pkg").unwrap(),
+        );
+        let need_tracker = Arc::new(ObservedLookupTracker::default());
+        let need = observed_source(
+            &Dice::builder().build(DetectCycles::Enabled),
+            need_tracker.dupe(),
+            inputs(&roots, &[], None),
+            PathObservationEpoch::empty(),
+            key.clone(),
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!RootPackageSourceObservationKey::validity(&need));
+        assert!(!RootPackageSourceObservationKey::equality(&need, &need));
+        need_tracker.assert_no_legacy_activation();
+
+        let deleted = observed_source(
+            &Dice::builder().build(DetectCycles::Enabled),
+            Arc::new(ObservedLookupTracker::default()),
+            inputs(&roots, &["//pkg"], None),
+            PathObservationEpoch::empty(),
+            key.clone(),
+        )
+        .await;
+        let deleted = observed_source_complete(&deleted);
+        assert_eq!(
+            deleted.result().as_ref().unwrap_err().to_string(),
+            "package //pkg is deleted or ignored"
+        );
+        assert!(deleted.observations().observations().is_empty());
+
+        fn script(variant: i64) -> PathObservationEpoch {
+            let roots = ["/root"];
+            let mut entries = repository_prelude(&roots, variant);
+            entries.extend([
+                present("/root/pkg", PathNodeKind::Directory, variant),
+                present("/root/pkg/BUILD.bazel", PathNodeKind::RegularFile, variant),
+                bytes(
+                    "/root/pkg/BUILD.bazel",
+                    if variant == 61 { b"first" } else { b"second" },
+                ),
+            ]);
+            epoch(&entries)
+        }
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedLookupTracker::default());
+        let policy = inputs(&roots, &[], None);
+        let first = observed_source(
+            &dice,
+            tracker.dupe(),
+            policy.clone(),
+            script(61),
+            key.clone(),
+        )
+        .await;
+        let warm = observed_source(
+            &dice,
+            tracker.dupe(),
+            policy.clone(),
+            script(61),
+            key.clone(),
+        )
+        .await;
+        let changed = observed_source(
+            &dice,
+            tracker.dupe(),
+            policy.clone(),
+            script(62),
+            key.clone(),
+        )
+        .await;
+        let restored = observed_source(&dice, tracker.dupe(), policy, script(61), key).await;
+        assert!(RootPackageSourceObservationKey::equality(&first, &warm));
+        assert!(!RootPackageSourceObservationKey::equality(&first, &changed));
+        assert!(RootPackageSourceObservationKey::equality(&first, &restored));
+        tracker.assert_no_legacy_activation();
+        tracker.assert_no_parent_event_data();
     }
 
     #[cfg(unix)]

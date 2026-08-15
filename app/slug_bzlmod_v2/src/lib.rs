@@ -84,6 +84,8 @@ pub use host_module::RootRepositoryRoute;
 pub use host_module::RootRepositoryRouteError;
 pub use host_module::RootRepositoryRouteKey;
 pub use host_module::RootRepositorySource;
+#[doc(hidden)]
+pub use host_package::ObservedRootPackageSource;
 pub use host_package::RepositoryPackageSource;
 pub use host_package::RepositoryPackageSourceError;
 pub use host_package::RepositoryPackageSourceKey;
@@ -92,6 +94,8 @@ pub use host_package::RootPackageBzlTargetError;
 pub use host_package::RootPackageSource;
 pub use host_package::RootPackageSourceError;
 pub use host_package::RootPackageSourceKey;
+#[doc(hidden)]
+pub use host_package::RootPackageSourceObservationKey;
 pub use host_package_boundary::HostRootPackageBoundary;
 pub use host_package_boundary::HostRootPackageBoundaryError;
 pub use host_package_boundary::HostRootPackageBoundaryKey;
