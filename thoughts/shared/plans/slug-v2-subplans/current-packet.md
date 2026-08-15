@@ -1,154 +1,123 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-package-source-frontier-implementation`
+Packet: `WP-2A-m1-host-bzl-module-frontier-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: add one callerless doc-hidden Bzlmod root-package source frontier
-carrier/key over the accepted package-lookup and Host-file frontiers, without
-activating loading or changing the legacy source API/behavior.
+Result: design the first complete recursive Host `.bzl` module frontier over
+the accepted root-package source carrier, without implementing code or
+activating package loading, glob evaluation, core publication, or public
+overlap.
 
-## Accepted predecessor and frozen design
+## Accepted predecessor
 
-The loading-consumer audit recorded in `c457a6d3` proves that direct
-`RootPackageLoadKey` activation would publish a partial certificate: package
-source, recursive `.bzl`, and glob inputs remain outside the accepted anchor
-frontier. The finite source producer is the uniquely required first
-prerequisite.
+Commit `2225cf99` adds the callerless doc-hidden/public
+`ObservedRootPackageSource` and `RootPackageSourceObservationKey`. One
+mode-aware driver preserves legacy BUILD and deepest-to-declared `.bzl` source
+selection while the observed sibling retains the exact decisive package-lookup
+and Host-file observation prefix. It owns no events and remains unconsumed by
+loading.
 
-The frozen design adds a separate observed `RootPackageSource` sibling in
-Bzlmod. One mode-aware private driver replaces the legacy source orchestration
-and serves both legacy and observed wrappers. Small mode-selecting helpers
-compute exactly one legacy or observed package-lookup/file child; neither DICE
-key computes the other. The legacy wrapper extracts the same one semantic
-Result Arc and discards a guaranteed-empty transient epoch. The observed
-wrapper moves that exact Arc and the composed epoch into its carrier.
+The implementation is accepted at 234 production plus 342 in-module test
+lines, 576 total net Rust lines. `host_package.rs` reaches 4,567 physical lines
+and `lib.rs` reaches its 387-line ceiling. Focused observed-source and legacy
+projection suites pass 3/3 each; all 588 Bzlmod tests pass; direct loading/core
+checks and formatting pass. Strict Clippy stops first in unchanged
+`allocative_derive`, and archive checks reproduce only inherited baselines.
+The Windows platform-path branch was source-checked but not executed because
+the installed toolchain exposes only `x86_64-unknown-linux-gnu`.
 
-## Frozen implementation contract
+Existing source selection, bytes, diagnostics, Need/error order and admitted
+Host observations remain exact. The callerless frontier association/equality
+is Slug-native. Recursive `.bzl`, glob, package-loading, core finalization and
+public overlap remain unsupported/deferred.
 
-1. In `host_package.rs` add `#[doc(hidden)] pub
-   ObservedRootPackageSource` with private
-   `result: Arc<Result<RootPackageSource, RootPackageSourceError>>` and
-   `observations: PathObservationEpoch`. Derive
-   `Debug, Clone, PartialEq, Eq, Allocative, Dupe` and expose only doc-hidden
-   borrowed `result()` and `observations()` accessors.
-2. Add `#[doc(hidden)] pub RootPackageSourceObservationKey` with the same
-   workspace/private-request structural identity as `RootPackageSourceKey`,
-   doc-hidden public `for_build`/`for_bzl` constructors, normal key derives,
-   and the legacy display identity prefixed by `observed-`.
-3. Its Value is
-   `SourcePreparationOutcome<Result<ObservedRootPackageSource,
-   ObservedPathFrontierError>>`; equality is `complete_eq` and validity is
-   `is_complete`. Need remains invalid/self-unequal. Completed semantic and
-   outer errors remain structural valid values.
-4. Replace the legacy key's orchestration with one private
-   `compute_root_package_source` driver parameterized by
-   `RootPackageSourceMode::{Legacy, Observed}`. It returns an ephemeral
-   projection containing exactly one terminal semantic Result Arc plus an epoch
-   that is guaranteed empty in legacy mode. Do not duplicate the full driver,
-   create a generic certificate framework, or compute one source key from the
-   other.
-5. Preserve candidate order exactly. BUILD inspects only the declared package.
-   `.bzl` walks the existing deepest-to-declared candidates. In observed mode,
-   union every completed observed lookup epoch before interpreting its semantic
-   result. Nondeclared NoBuild/Deleted/Invalid continues; lookup error,
-   intervening Package, or a declared terminal stops with exactly the decisive
-   prefix. Exclude later speculative child state.
-6. Preserve path/source order. After selection, a platform-path error completes
-   semantically with the lookup prefix. Compute exactly one mode-selected
-   Host-file child and, in observed mode, union its completed epoch before
-   interpreting Host error, Missing, or Present. Reuse the exact Present bytes
-   Arc in `RootPackageSource`.
-7. Lookup/file Need returns the identical `SourcePreparationNeeds` and no
-   parent carrier. Child or union mismatch/conflict returns a completed outer
-   `ObservedPathFrontierError` with no semantic carrier. Cancellation drops
-   only local candidates, paths, epoch and Arc scratch. The legacy outer-error
-   branch is an explicit unreachable invariant, never a public error conversion.
-8. The retained observed value owns only the single semantic Result Arc and the
-   existing Arc-backed epoch. Retain no lookup/file carrier, policy, candidate
-   vector, path scratch, evaluator, source text/AST, event batch, transaction,
-   or second collection. Preserve `Dupe` cheap-clone signaling and
-   `Allocative` accounting.
-9. Store no evaluation data. The observed path activates exactly its observed
-   lookup and file dependencies, never legacy lookup/file/source keys. Leave
-   `RootPackageSourceKey`'s public Value, errors, constructors, Display,
-   equality, validity, callers, and admitted behavior unchanged.
-10. In `lib.rs` reexport only the carrier/key under `#[doc(hidden)]` for the
-    later natural Bzlmod-to-loading dependency. This is app-internal Rust
-    visibility, not a user API/wire/output/stability promise.
+## Design questions
 
-Existing serial source selection, bytes, diagnostics, Need/error order and exact
-Host observations remain exact. The callerless certificate
-association/aggregation/equality is Slug-native. Recursive `.bzl`, glob and
-loading aggregation, core final validation, public overlap, repository/
-materializer work, and exact Bazel identity bytes remain unsupported/deferred.
+1. Map the complete live `HostBzlModuleEvalKey` dependency, parse/load-label,
+   recursive child, cycle-detection, evaluation, freeze and event order. Name
+   every success, completed-error, Need and cancellation boundary before
+   selecting a carrier.
+2. Decide whether one loading-private observed sibling can consume
+   `RootPackageSourceObservationKey` and recursively consume only its own
+   observed family without computing or changing the legacy module key. If
+   not, select exactly one smaller docs prerequisite.
+3. Resolve the current `HostBzlLoadCycleGuard` ownership: it is typed around
+   the legacy module key. Freeze a bounded shared/private cycle identity and
+   diagnostic path that preserves legacy cycle/error order without a second
+   graph, global seen set, public ABI, or key-to-key compute.
+4. Freeze source-order decisive-prefix composition. Merge the current module
+   source epoch before semantic interpretation, then merge recursive child
+   epochs only as their terminals become decisive. Exclude later joined child
+   cache state from an earlier terminal.
+5. Keep semantic errors inside the legacy-equivalent semantic carrier and
+   observation aggregation/conflict failures as completed outer
+   `ObservedPathFrontierError`s. Need, cancellation and nonterminal attempts
+   publish no parent carrier or parent completed event batch; completed child
+   DICE state remains dependency-owned cache state.
+6. Preserve exactly one equivalent event batch per selected module-key
+   activation. Freeze whether a shared semantic evaluation/finalization leaf
+   can serve legacy and observed wrappers without duplicating evaluation or
+   making either key compute the other.
+7. Bound retained memory to one semantic Result Arc plus the accepted
+   Arc-backed epoch. Retain no evaluator, AST, source collection, transaction,
+   cycle guard, event batch, child carrier, historical read, or second compact
+   collection.
+8. Freeze complete equality/validity, exact-Arc clone boundaries, A/B/A and
+   warm behavior, cancellation release, outer-error polarity, focused proof,
+   exact Rust file allowlist, per-file production/test/total caps, physical
+   ceilings and mandatory cleanup review.
+9. Identify the next missing producer after this frontier. Host glob and final
+   `RootPackageLoadKey` aggregation remain separate packets and must not be
+   combined here.
 
-## Proof and validation
+## Compatibility boundary
 
-Add colocated proof for:
-
-- legacy success/error/Need parity and unchanged key identity;
-- BUILD one-lookup/one-file order;
-- `.bzl` deepest-to-declared negative candidates and package-boundary stop;
-- lookup semantic classes and platform-path error retaining the exact prefix;
-- Host error, Missing and Present retaining the full prefix;
-- exact semantic, bytes and every epoch result Arc by pointer;
-- forced lookup/file union mismatch/conflict as completed outer error with no
-  carrier;
-- lookup/file Need with no carrier/event and complete-only equality/validity;
-- observed activation once with zero legacy lookup/file/source activation;
-- no evaluation data on semantic, outer or Need paths;
-- warm reuse, mutation and A/B/A restoration; and
-- cancellation source proof plus cfg(windows) platform-path coverage or a
-  recorded target-availability stop.
-
-Run focused new source-frontier and unchanged source-projection tests, full
-`slug_bzlmod_v2`, direct `slug_loading_v2` and `slug_core_v2` checks,
-`cargo fmt --all -- --check`, strict Clippy with inherited-baseline
-disposition, `scripts/v2_archive_status.sh`, artifact scan and
-`git diff --check`. No Bazel oracle is required because no admitted behavior
-changes. Do not run Cargo commands concurrently in one target directory.
-
-Because `host_package.rs` already exceeds 2,000 lines, require independent
-pre/post cohesion and nine-category cleanup review. Keep the sibling beside
-the private request/error/lookup/source fixtures; splitting requires a concrete
-independent responsibility and `REPLAN`.
+Preserve admitted serial `.bzl` source, label/load, cycle/error, evaluation,
+event and recovery behavior exactly. Reuse existing pinned/source evidence;
+do not claim new Bazel parity. Frontier aggregation, certificate identity and
+final-validation preparation are Slug-native. Glob/directory unions, package
+loading consumption, core request revision, public overlap, repository/
+materializer work and exact Bazel identity bytes remain deferred.
 
 ## Authority and caps
 
-Write only:
+This packet is docs-only. Write exactly:
 
-- `app/slug_bzlmod_v2/src/host_package.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`; and
-- at completion only, canonical/current/Stage 2.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Caps from the live 3,995/383-line baselines are:
+Read only the three ledgers; `docs/developers/dice.md`; the Bzlmod, loading and
+workspace Cargo manifests; Bzlmod `src/{lib,host_package}.rs`; loading
+`src/{lib,keys,bzl_module,cycle_detector,load_label}.rs`; workspace
+`src/{lib,path_observation}.rs`; directly referenced focused tests; the
+`slug-buck2-utility-reuse` skill and matching Stages-3/6 Stage 9 row; and only
+`gazebo/dupe/src/lib.rs` plus `allocative/allocative/src/lib.rs` for retained
+clone/memory rules.
 
-- `host_package.rs`: 240 production, 420 in-module tests, 660 total net and
-  4,655 physical lines;
-- `lib.rs`: 4 production, zero tests, 4 total net and 387 physical lines; and
-- aggregate: 244 production, 420 tests and 664 total net Rust lines.
-
-Completion ledgers are capped at 180 net lines. No correction is authorized.
+Ledger caps are 40 canonical, 340 current, 300 Stage 2 and 680 total net lines.
+No correction is authorized.
 
 ## STOP / REPLAN
 
-STOP on every other file; changing the legacy source API/value/error/caller or
-accepted lookup/Host-file/anchor owners; loading/core edits; a second key,
-carrier, collection or event owner; key-to-key compute; duplicated full source
-driver; partial prefixes; outer-error laundering; direct/reconstructed or
-historical Host reads; retained child/policy/candidate/path/evaluator/event/
-source-text/AST/transaction state; recursive `.bzl` evaluation, glob/directory,
-repository/materializer, watcher, JVM, oracle, public behavior, or any cap/
-ceiling excess.
+STOP on Rust, Cargo, oracle or generated-file writes; a public user API/wire/
+output change; loading/package-load/core activation; glob/directory,
+repository/materializer, watcher or JVM work; a reverse dependency; a generic
+certificate framework; a new retained container, graph or store; duplicated
+evaluation/event authority; direct/reconstructed/historical Host reads;
+partial recursive frontiers; outer-error laundering; combined consumers; or
+cap excess.
 
-REPLAN if the mode driver cannot replace rather than duplicate the legacy
-orchestration; exact semantic/observation Arcs cannot be reused; a complete
-semantic error cannot retain its decisive prefix; outer error/Need cannot stay
-distinct; legacy behavior or a third Rust file must change; the large file has
-a concrete split boundary; or any correction is needed.
+REPLAN if recursive completion cannot remain finite under the existing cycle
+semantics; the typed legacy cycle guard cannot serve both families without a
+behavior/API change; completed errors cannot retain their exact decisive
+prefix; Need/outer/semantic/event ownership cannot remain distinct; exact
+observations require reconstruction; or no independently bounded first
+producer exists.
 
 ## Immediate successor
 
-On acceptance schedule only docs-only `WP-2A-m1-host-bzl-module-frontier-design`.
-Do not combine recursive evaluation, glob aggregation, loading activation,
-core publication, or another consumer.
+Acceptance may schedule exactly one bounded Host `.bzl` frontier
+implementation or one uniquely required docs-only prerequisite. It must not
+combine Host glob, final package-load aggregation, loading consumption, core
+publication, or public overlap.

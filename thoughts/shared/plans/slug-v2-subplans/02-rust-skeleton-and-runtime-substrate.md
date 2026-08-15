@@ -1979,3 +1979,52 @@ container/event owner, duplicate driver, reconstructed Host read, partial
 prefix, recursive evaluation/glob/loading/core/public work, or cap excess.
 Completion schedules only docs-only
 `WP-2A-m1-host-bzl-module-frontier-design`.
+
+### Accepted root-package source frontier (2026-08-14)
+
+Commit `2225cf99` adds the callerless doc-hidden/public
+`ObservedRootPackageSource` and `RootPackageSourceObservationKey`. A single
+mode-aware source driver preserves legacy BUILD and deepest-to-declared `.bzl`
+selection while the observed sibling retains the exact decisive package-lookup
+and Host-file epoch. Need and outer error publish no carrier, completed
+semantic errors retain their prefix, and neither source key owns events.
+
+Exact accounting is 230 production plus 342 test lines in `host_package.rs`,
+572 total net and 4,567 physical; `lib.rs` adds four production reexport lines
+and reaches 387 physical. Aggregate is 234/342/576 within 244/420/664. Focused
+observed-source and legacy source-projection tests pass 3/3 each, all 588
+Bzlmod tests pass, direct loading/core checks and formatting pass, and
+independent ownership/cohesion cleanup accepts the large-file placement.
+Strict Clippy stops first in unchanged `allocative_derive`; archive checks
+reproduce only inherited baselines. The Windows platform-path branch was
+source-checked but unexecuted: the target is unavailable because the installed
+toolchain exposes only `x86_64-unknown-linux-gnu`.
+
+Existing source behavior and admitted Host observations remain exact. The
+callerless frontier association/equality is Slug-native. Recursive `.bzl`,
+glob, package loading, core finalization and public overlap remain deferred.
+
+### Active Host `.bzl` module frontier design (2026-08-14)
+
+Run docs-only `WP-2A-m1-host-bzl-module-frontier-design` from accepted
+predecessor `2225cf99`. Map the complete `HostBzlModuleEvalKey` source/load,
+recursive-child, cycle, evaluation, freeze and event frontier. Decide whether
+one private observed sibling can consume the accepted source frontier and
+recursively compose exact source-order child epochs without computing or
+changing the legacy key.
+
+The design must resolve the legacy-key-typed cycle guard, decisive-prefix
+exclusion, Need/outer/semantic polarity, single selected-key event authority,
+complete equality/validity, exact Arcs, compact lifetime, cancellation release,
+proof, exact files/caps and a single next producer. Preserve admitted serial
+`.bzl` behavior exactly; aggregation is Slug-native. Glob, final package-load
+aggregation, core/public activation and repository/materializer work remain
+deferred.
+
+Write only canonical/current/Stage 2 under 40/340/300/680 net lines. STOP on
+code, Cargo/oracle writes, public or loading/core activation, a reverse edge,
+generic certificate framework, new graph/store/container, duplicate
+evaluation/events, reconstructed Host reads, partial recursive frontier,
+combined consumer or cap excess. Acceptance may schedule only one bounded Host
+`.bzl` implementation or one uniquely required docs prerequisite; otherwise
+`REPLAN`.
