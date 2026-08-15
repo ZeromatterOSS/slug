@@ -1,128 +1,154 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-package-source-frontier-design`
+Packet: `WP-2A-m1-root-package-source-frontier-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: freeze one callerless doc-hidden Bzlmod root-package source
-frontier carrier/key as the uniquely required prerequisite for loading-side
-anchor consumption, without activating loading or changing the legacy source
-key.
+Result: add one callerless doc-hidden Bzlmod root-package source frontier
+carrier/key over the accepted package-lookup and Host-file frontiers, without
+activating loading or changing the legacy source API/behavior.
 
-## Accepted predecessor and REPLAN
+## Accepted predecessor and frozen design
 
-Commit `c6e61d60` accepts the callerless
-`RootModuleLoadingAnchorObservationKey`: the Bzlmod-to-loading boundary now can
-carry the complete root-MODULE frontier, preserve outer frontier errors, and
-reuse the exact semantic/observation Arcs without activating loading.
+The loading-consumer audit recorded in `c457a6d3` proves that direct
+`RootPackageLoadKey` activation would publish a partial certificate: package
+source, recursive `.bzl`, and glob inputs remain outside the accepted anchor
+frontier. The finite source producer is the uniquely required first
+prerequisite.
 
-The loading-consumer audit against `a1e58d60` rejects direct activation.
-`RootPackageLoadKey` is anchor-first, but then consumes legacy
-`RootPackageSourceKey`, parses BUILD bytes, recursively evaluates every
-discovered `.bzl`, and executes Host glob attempts before publishing a
-`LoadedPackage`. Those mutable predecessors do not share the accepted frontier
-boundary. Replacing only the anchor edge would discard its epoch or attach a
-partial certificate, and its outer `ObservedPathFrontierError` cannot be
-laundered into the public semantic `RootModule` error.
+The frozen design adds a separate observed `RootPackageSource` sibling in
+Bzlmod. One mode-aware private driver replaces the legacy source orchestration
+and serves both legacy and observed wrappers. Small mode-selecting helpers
+compute exactly one legacy or observed package-lookup/file child; neither DICE
+key computes the other. The legacy wrapper extracts the same one semantic
+Result Arc and discards a guaranteed-empty transient epoch. The observed
+wrapper moves that exact Arc and the composed epoch into its carrier.
 
-The uniquely smallest prerequisite is the finite root-package source producer.
-Accepted private `HostRootPackageLookupObservationKey` and
-`HostFileBytesObservationKey` already own its exact package-selection
-negatives and selected source bytes. No recursive evaluation, glob, event,
-loading, core, or public activation belongs in this packet.
+## Frozen implementation contract
 
-## Design questions
-
-1. Freeze one `#[doc(hidden)] pub ObservedRootPackageSource` in Bzlmod with one
-   semantic `Arc<Result<RootPackageSource, RootPackageSourceError>>` and one
-   accepted `PathObservationEpoch`, plus borrowed result/observation accessors.
-   Freeze one `#[doc(hidden)] pub RootPackageSourceObservationKey` with the
-   legacy workspace/request identity and explicit `for_build`/`for_bzl`
-   constructors for later loading use.
-2. Its Value must preserve
+1. In `host_package.rs` add `#[doc(hidden)] pub
+   ObservedRootPackageSource` with private
+   `result: Arc<Result<RootPackageSource, RootPackageSourceError>>` and
+   `observations: PathObservationEpoch`. Derive
+   `Debug, Clone, PartialEq, Eq, Allocative, Dupe` and expose only doc-hidden
+   borrowed `result()` and `observations()` accessors.
+2. Add `#[doc(hidden)] pub RootPackageSourceObservationKey` with the same
+   workspace/private-request structural identity as `RootPackageSourceKey`,
+   doc-hidden public `for_build`/`for_bzl` constructors, normal key derives,
+   and the legacy display identity prefixed by `observed-`.
+3. Its Value is
    `SourcePreparationOutcome<Result<ObservedRootPackageSource,
-   ObservedPathFrontierError>>`, complete-only equality, and complete-only
-   validity. Need/cancellation publishes no carrier; child or union frontier
-   failure remains a completed outer error; every completed semantic
-   success/error retains its decisive observation prefix.
-3. Preserve the legacy candidate order exactly. BUILD inspects only its
-   declared package. `.bzl` inspection walks containing-package candidates
-   from deepest to declared. Union each completed observed package-lookup epoch
-   before interpreting its semantic result, and stop at the first legacy
-   terminal. Later candidates may remain ordinary child cache state but cannot
-   enter the parent certificate.
-4. After package selection, preserve target/path construction and error order.
-   A platform path error retains the completed lookup prefix. Compute only the
-   observed Host-file sibling, union its epoch before interpreting
-   present/missing/error, and retain the full prefix on semantic completion.
-5. Decide the smallest shared driver/factoring that keeps the legacy and
-   observed source paths behaviorally aligned without making either DICE key
-   compute the other. Do not accept a duplicated full source driver, a generic
-   public certificate framework, or a change to the legacy key/value/error.
-6. Preserve exact Arc identity and cheap-clone/memory accounting. The completed
-   carrier may retain only the semantic Result Arc and existing Arc-backed
-   epoch; source bytes remain the same shared bytes already owned by the
-   semantic result/observation. Retain no child carrier, policy value,
-   evaluator, event batch, transaction, candidate vector, path scratch, or
-   second collection.
-7. The source key owns no events. Prove zero legacy package-lookup/Host-file/
-   source activation from the observed path and no evaluation data on either
-   Need, outer error, or semantic completion.
-8. Freeze the exact implementation files, production/test/total caps, physical
-   ceilings, focused proof, direct dependents, large-file cohesion decision,
-   residual platform risk, and the single docs-only recursive `.bzl` frontier
-   successor.
+   ObservedPathFrontierError>>`; equality is `complete_eq` and validity is
+   `is_complete`. Need remains invalid/self-unequal. Completed semantic and
+   outer errors remain structural valid values.
+4. Replace the legacy key's orchestration with one private
+   `compute_root_package_source` driver parameterized by
+   `RootPackageSourceMode::{Legacy, Observed}`. It returns an ephemeral
+   projection containing exactly one terminal semantic Result Arc plus an epoch
+   that is guaranteed empty in legacy mode. Do not duplicate the full driver,
+   create a generic certificate framework, or compute one source key from the
+   other.
+5. Preserve candidate order exactly. BUILD inspects only the declared package.
+   `.bzl` walks the existing deepest-to-declared candidates. In observed mode,
+   union every completed observed lookup epoch before interpreting its semantic
+   result. Nondeclared NoBuild/Deleted/Invalid continues; lookup error,
+   intervening Package, or a declared terminal stops with exactly the decisive
+   prefix. Exclude later speculative child state.
+6. Preserve path/source order. After selection, a platform-path error completes
+   semantically with the lookup prefix. Compute exactly one mode-selected
+   Host-file child and, in observed mode, union its completed epoch before
+   interpreting Host error, Missing, or Present. Reuse the exact Present bytes
+   Arc in `RootPackageSource`.
+7. Lookup/file Need returns the identical `SourcePreparationNeeds` and no
+   parent carrier. Child or union mismatch/conflict returns a completed outer
+   `ObservedPathFrontierError` with no semantic carrier. Cancellation drops
+   only local candidates, paths, epoch and Arc scratch. The legacy outer-error
+   branch is an explicit unreachable invariant, never a public error conversion.
+8. The retained observed value owns only the single semantic Result Arc and the
+   existing Arc-backed epoch. Retain no lookup/file carrier, policy, candidate
+   vector, path scratch, evaluator, source text/AST, event batch, transaction,
+   or second collection. Preserve `Dupe` cheap-clone signaling and
+   `Allocative` accounting.
+9. Store no evaluation data. The observed path activates exactly its observed
+   lookup and file dependencies, never legacy lookup/file/source keys. Leave
+   `RootPackageSourceKey`'s public Value, errors, constructors, Display,
+   equality, validity, callers, and admitted behavior unchanged.
+10. In `lib.rs` reexport only the carrier/key under `#[doc(hidden)]` for the
+    later natural Bzlmod-to-loading dependency. This is app-internal Rust
+    visibility, not a user API/wire/output/stability promise.
 
-Existing serial package-source selection, diagnostics, Need/error order, bytes,
-and exact Host observation values remain exact. The callerless certificate
-association, aggregation, and equality are Slug-native. Loading consumption,
-recursive `.bzl`, glob/directory unions, core final validation, public overlap,
-routed/materialized repositories, and exact Bazel identity bytes remain
-unsupported/deferred.
+Existing serial source selection, bytes, diagnostics, Need/error order and exact
+Host observations remain exact. The callerless certificate
+association/aggregation/equality is Slug-native. Recursive `.bzl`, glob and
+loading aggregation, core final validation, public overlap, repository/
+materializer work, and exact Bazel identity bytes remain unsupported/deferred.
 
-## Evidence, authority, and caps
+## Proof and validation
 
-Reuse `308b409a`, `0875728b`, `c6e61d60`, and the existing root-package source
-tests. No Bazel oracle is required because this design changes no admitted
-behavior. Use live source/DICE ownership as authority.
+Add colocated proof for:
+
+- legacy success/error/Need parity and unchanged key identity;
+- BUILD one-lookup/one-file order;
+- `.bzl` deepest-to-declared negative candidates and package-boundary stop;
+- lookup semantic classes and platform-path error retaining the exact prefix;
+- Host error, Missing and Present retaining the full prefix;
+- exact semantic, bytes and every epoch result Arc by pointer;
+- forced lookup/file union mismatch/conflict as completed outer error with no
+  carrier;
+- lookup/file Need with no carrier/event and complete-only equality/validity;
+- observed activation once with zero legacy lookup/file/source activation;
+- no evaluation data on semantic, outer or Need paths;
+- warm reuse, mutation and A/B/A restoration; and
+- cancellation source proof plus cfg(windows) platform-path coverage or a
+  recorded target-availability stop.
+
+Run focused new source-frontier and unchanged source-projection tests, full
+`slug_bzlmod_v2`, direct `slug_loading_v2` and `slug_core_v2` checks,
+`cargo fmt --all -- --check`, strict Clippy with inherited-baseline
+disposition, `scripts/v2_archive_status.sh`, artifact scan and
+`git diff --check`. No Bazel oracle is required because no admitted behavior
+changes. Do not run Cargo commands concurrently in one target directory.
+
+Because `host_package.rs` already exceeds 2,000 lines, require independent
+pre/post cohesion and nine-category cleanup review. Keep the sibling beside
+the private request/error/lookup/source fixtures; splitting requires a concrete
+independent responsibility and `REPLAN`.
+
+## Authority and caps
 
 Write only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest; and
-- `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+- `app/slug_bzlmod_v2/src/host_package.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`; and
+- at completion only, canonical/current/Stage 2.
 
-Read only this packet and owner section, the plan-authoring guide,
-`docs/developers/dice.md`, the Buck2 utility-reuse skill, the matching
-Stages-3/6 row of `slug-v2-subplans/09-v1-extraction-ledger.md`,
-`gazebo/dupe/src/lib.rs`, `allocative/allocative/src/lib.rs`, Bzlmod
-`src/{host_package,host_file,lib}.rs`, workspace
-`src/{lib,path_observation,path_resolution}.rs`, root `Cargo.toml`, app
-`slug_{workspace,bzlmod}_v2/Cargo.toml`, and directly referenced focused tests.
+Caps from the live 3,995/383-line baselines are:
 
-Ledger caps are 40 canonical, 300 current, 260 Stage 2, and 600 total net
-lines. No Rust, Cargo, test, oracle, or fixture write is authorized.
+- `host_package.rs`: 240 production, 420 in-module tests, 660 total net and
+  4,655 physical lines;
+- `lib.rs`: 4 production, zero tests, 4 total net and 387 physical lines; and
+- aggregate: 244 production, 420 tests and 664 total net Rust lines.
+
+Completion ledgers are capped at 180 net lines. No correction is authorized.
 
 ## STOP / REPLAN
 
-STOP on every code/oracle write; loading/core changes; changing the accepted
-anchor, lookup, Host-file, or legacy source key/value/error/caller; public
-user-facing API/wire/output/diagnostic behavior; a second key or carrier;
-partial decisive prefixes; outer-error laundering; direct/reconstructed or
-historical Host reads; reverse dependency; new graph/store/container/interner;
-retained evaluator/event/source-text/AST/transaction/candidate/path scratch;
-recursive `.bzl`, glob/directory, repository/materializer, watcher, JVM, or
-combined consumer work.
+STOP on every other file; changing the legacy source API/value/error/caller or
+accepted lookup/Host-file/anchor owners; loading/core edits; a second key,
+carrier, collection or event owner; key-to-key compute; duplicated full source
+driver; partial prefixes; outer-error laundering; direct/reconstructed or
+historical Host reads; retained child/policy/candidate/path/evaluator/event/
+source-text/AST/transaction state; recursive `.bzl` evaluation, glob/directory,
+repository/materializer, watcher, JVM, oracle, public behavior, or any cap/
+ceiling excess.
 
-REPLAN if exact lookup/file epochs cannot be consumed without recomputation;
-the semantic result cannot reuse one Arc; a complete semantic error cannot
-retain its decisive prefix; legacy and observed paths cannot share semantic
-orchestration without a second key or behavior change; doc-hidden visibility
-would become user-facing; more than `host_package.rs` plus `lib.rs` is required;
-or the first implementation cannot be bounded independently.
+REPLAN if the mode driver cannot replace rather than duplicate the legacy
+orchestration; exact semantic/observation Arcs cannot be reused; a complete
+semantic error cannot retain its decisive prefix; outer error/Need cannot stay
+distinct; legacy behavior or a third Rust file must change; the large file has
+a concrete split boundary; or any correction is needed.
 
 ## Immediate successor
 
-On acceptance, activate only one Bzlmod-side callerless root-package source
-frontier implementation. Completion returns to docs-only recursive `.bzl`
-frontier design; do not combine loading activation, glob aggregation, core
-publication, or another consumer.
+On acceptance schedule only docs-only `WP-2A-m1-host-bzl-module-frontier-design`.
+Do not combine recursive evaluation, glob aggregation, loading activation,
+core publication, or another consumer.

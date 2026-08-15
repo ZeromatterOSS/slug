@@ -1939,3 +1939,43 @@ code, loading/core/public changes, another key/carrier/container, reconstructed
 Host reads, partial prefixes, recursive evaluation/glob/repository work, or
 behavior widening. Acceptance may activate only one two-file Bzlmod
 implementation; otherwise `REPLAN`.
+
+### Frozen root-package source frontier design (2026-08-14)
+
+Docs review accepts one doc-hidden/public
+`ObservedRootPackageSource` and `RootPackageSourceObservationKey` in Bzlmod.
+The carrier owns one semantic `Arc<Result<RootPackageSource, ...>>` plus the
+accepted Arc-backed epoch. One private mode-aware driver replaces the legacy
+source orchestration; small helpers select legacy or observed lookup/file
+children without key-to-key compute, duplicate full flows, or a new retained
+representation.
+
+BUILD preserves one declared-package lookup. `.bzl` preserves
+deepest-to-declared candidates. Observed epochs union immediately before each
+semantic interpretation, so success and every completed semantic error retain
+only the decisive prefix; later child cache state is excluded. Need,
+cancellation and outer frontier failure publish no carrier. Both source keys
+own no events. Legacy Value, errors, identity, callers and behavior remain
+unchanged.
+
+Exact behavior and Host observations remain exact. Carrier association and
+equality are Slug-native; recursive `.bzl`, glob, loading and public/core
+publication remain deferred. The exact implementation allowlist is
+`host_package.rs` plus doc-hidden `lib.rs` reexports, capped at
+240/420/660/4,655 and 4/0/4/387, aggregate 244/420/664, with no correction and
+mandatory large-file cohesion review.
+
+### Active root-package source frontier implementation (2026-08-14)
+
+Run `WP-2A-m1-root-package-source-frontier-implementation` from design
+predecessor `c457a6d3` and the frozen contract above. Require discriminating
+legacy parity, candidate/prefix/error/Need/outer/exact-Arc/activation/event/
+equality/A-B-A proof, full Bzlmod, direct loading/core checks, formatting,
+strict Clippy/archive dispositions, exact cap accounting, artifact/diff
+hygiene and independent cleanup/ownership acceptance.
+
+STOP on any other file, legacy behavior/API/caller change, another key/carrier/
+container/event owner, duplicate driver, reconstructed Host read, partial
+prefix, recursive evaluation/glob/loading/core/public work, or cap excess.
+Completion schedules only docs-only
+`WP-2A-m1-host-bzl-module-frontier-design`.
