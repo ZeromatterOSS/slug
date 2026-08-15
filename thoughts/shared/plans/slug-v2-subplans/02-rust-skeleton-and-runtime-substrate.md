@@ -1901,3 +1901,41 @@ dependencies, reconstructed Host reads, retained evaluator/source/AST/glob
 state, or combined consumers. Acceptance may activate only one bounded
 loading-side implementation or one uniquely required docs prerequisite;
 otherwise `REPLAN`.
+
+### REPLAN: loading consumption requires a source frontier (2026-08-14)
+
+The loading-consumer audit against `a1e58d60` rejects direct
+`RootPackageLoadKey` activation. Although that key consumes the root-module
+anchor first, its terminal also depends on legacy root-package source
+selection/bytes, recursively discovered `.bzl` modules, and Host glob
+traversal. None shares the accepted certificate boundary. Replacing only the
+anchor edge would discard its epoch or publish a partial certificate, and the
+outer frontier error cannot enter the public semantic `RootModule` error.
+
+Live source proves the first missing finite owner is
+`RootPackageSourceKey`: it walks containing-package candidates through legacy
+package lookup, then reads the selected BUILD or `.bzl` bytes through the
+legacy Host-file key. The accepted observed lookup and Host-file siblings can
+compose this exact decisive prefix without evaluation, globbing, events, a
+reverse edge, or reconstructed observations. Recursive `.bzl`, glob, and final
+loading aggregation remain separate later packets.
+
+Existing serial loading/source behavior and Host observations remain exact.
+Source-frontier association/equality is Slug-native; loading/public/core
+publication remains deferred. This is an authority `REPLAN`, not evidence of a
+loading consumer.
+
+### Active root-package source frontier design (2026-08-14)
+
+Run docs-only `WP-2A-m1-root-package-source-frontier-design` from accepted
+carrier `c6e61d60` and the source audit above. Freeze one doc-hidden Bzlmod
+observed source carrier/key over only the accepted package-lookup and Host-file
+frontiers. Preserve BUILD and deepest-to-declared `.bzl` candidate order,
+decisive prefix exclusion, Need/outer/semantic polarity, legacy behavior,
+zero event ownership, exact Arcs, and one semantic Result Arc plus epoch.
+
+Write only canonical/current/Stage 2 under 40/300/260/600 net lines. STOP on
+code, loading/core/public changes, another key/carrier/container, reconstructed
+Host reads, partial prefixes, recursive evaluation/glob/repository work, or
+behavior widening. Acceptance may activate only one two-file Bzlmod
+implementation; otherwise `REPLAN`.
