@@ -1809,3 +1809,49 @@ producer, reverse dependency, duplicate event authority, reconstructed Host
 reads, or new retained storage. Acceptance may activate only one bounded
 Bzlmod-side carrier implementation or one proven smaller docs prerequisite;
 otherwise `REPLAN`.
+
+### Frozen root-module anchor frontier carrier design (2026-08-14)
+
+Changing the live public `RootModuleLoadingAnchorKey` is rejected: loading
+already computes it, its Value has no outer frontier-error channel, and
+switching its producer would prematurely activate the observed graph or
+launder an infrastructure error into the public semantic error surface.
+
+The selected boundary is a separate sealed doc-hidden/public
+`ObservedRootModuleLoadingAnchor` and
+`RootModuleLoadingAnchorObservationKey` in Bzlmod, reexported doc-hidden for
+later loading use. The Value preserves
+`SourcePreparationOutcome<Result<carrier, ObservedPathFrontierError>>`.
+It computes only the private observed root producer, forwards Need and outer
+errors unchanged, and maps semantic success/error through the exact existing
+root-result Arc into the unchanged public anchor wrappers.
+
+The carrier stores an inline anchor `Result` plus the accepted Arc-backed
+epoch. It adds no outer semantic Arc, collection, event owner, evaluator,
+source, transaction, horizon, ancestry, loading result, or reverse dependency.
+The observed root remains the sole event owner. Existing public anchor and
+loading behavior remain untouched.
+
+Exact admitted anchor behavior and Host observations remain exact. The
+callerless carrier ABI/equality is Slug-native; loading consumption and all
+higher source/public behavior remain deferred. The future allowlist is exactly
+`host_module.rs` and `lib.rs`, capped respectively at 100/220/320/4,205
+and 4/0/4/383, aggregate 104/220/324. No correction is authorized.
+
+### Active root-module anchor frontier carrier implementation (2026-08-14)
+
+Run `WP-2A-m1-root-module-anchor-frontier-carrier-implementation` from
+predecessor `2640d1c0` and the frozen design above. Add only the doc-hidden
+carrier/key and reexports. Preserve the existing public anchor key, value,
+errors, dependency, events, and every loading/core caller.
+
+Require focused semantic/outer/Need/event/activation/exact-Arc/equality/A-B-A
+proof, unchanged public-anchor regression, full Bzlmod validation, direct
+loading/core checks, formatting, strict Clippy/archive dispositions, exact cap
+accounting, artifact/diff hygiene, and independent ownership/cohesion review.
+
+STOP on another file/key/carrier, existing-anchor or loading changes, second
+event owner, extra semantic Arc or retained collection, reconstructed Host
+read, public user behavior, higher loading/source work, or cap excess.
+Completion schedules only docs-only
+`WP-2A-m1-root-module-anchor-frontier-loading-consumer-design`.
