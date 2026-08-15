@@ -1,148 +1,115 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-module-anchor-frontier-carrier-implementation`
+Packet: `WP-2A-m1-root-module-anchor-frontier-loading-consumer-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: add one callerless doc-hidden app-internal observed anchor carrier/key
-that projects the accepted private root-module frontier across the existing
-Bzlmod-to-loading dependency direction without changing the live public anchor
-or activating loading.
+Result: decide the smallest loading-side consumer of the accepted doc-hidden
+root-module anchor frontier without attaching a partial certificate to a
+broader package/load terminal or activating public/core publication.
 
-## Accepted predecessor and frozen decision
+## Accepted predecessor
 
-Commit `2640d1c0` accepts the callerless Bzlmod-private
-`HostRootModuleFileObservationKey`: complete root MODULE success and semantic
-errors retain their decisive exact Host prefix; Need, cancellation, and outer
-frontier errors retain no parent carrier or event batch.
+Commit `c6e61d60` adds the callerless doc-hidden/public
+`ObservedRootModuleLoadingAnchor` and
+`RootModuleLoadingAnchorObservationKey`. The key computes only the private
+observed root producer, forwards Need and outer errors, retains the exact
+semantic-result and observation Arcs, owns no events, and leaves the live
+public anchor and every loading/core caller unchanged.
 
-Docs-only design review rejects changing `RootModuleLoadingAnchorKey`. That
-live key is already consumed by loading, computes the legacy root producer, and
-has no outer `ObservedPathFrontierError` channel. Switching it would
-prematurely activate the observed graph and would require panic, error
-laundering, or a public Value/error change.
+The accepted implementation changes exactly `host_module.rs` and `lib.rs`:
+97 production and 220 test lines, 317 total net, within all caps. Focused
+observed-anchor proof passes 3/3, the unchanged public-anchor regressions pass
+2/2, all 585 Bzlmod tests pass, and loading/core checks, formatting, diff and
+artifact hygiene, plus independent ownership/cleanup review pass. Strict
+Clippy and archive checks stop only on their recorded inherited baselines.
 
-The accepted design is a separate sealed `#[doc(hidden)] pub` sibling in
-Bzlmod, reexported only for later app-internal loading use. This completes the
-one-way carrier ABI now; loading already depends on Bzlmod, so no reverse edge
-or current loading edit is required.
+## Design questions
 
-## Frozen implementation contract
+1. Map the exact loading chain from `RootPackageLoadKey`'s anchor-first
+   dependency through root package source selection, source bytes, parse, load
+   labels, recursive `.bzl` evaluation, glob/package listing, semantic errors,
+   Need union, events, and final `LoadedPackage` publication.
+2. Decide whether any bounded loading terminal can consume
+   `RootModuleLoadingAnchorObservationKey` and retain its certificate without
+   claiming completeness for mutable predecessors it does not own. Merely
+   replacing the legacy anchor dependency and then dropping the epoch is not
+   an accepted consumer.
+3. Preserve anchor-first Need/error order. Keep
+   `ObservedPathFrontierError` outer; do not launder it into
+   `RootPackageLoadErrorInner::RootModule` or another public semantic error.
+   Freeze the exact success/error/Need/cancellation carrier algebra before any
+   implementation.
+4. Prove the selected terminal's complete mutable predecessor frontier.
+   Root-module observations, package-source selection negatives/bytes,
+   recursive `.bzl` loads, and glob/directory inputs must either be included
+   before sealing or shown to be outside that terminal. A partial certificate,
+   ambient mutable dependency, or command-side reconstruction is forbidden.
+5. Preserve event ownership: the observed root producer remains the sole root
+   MODULE event owner, while the selected loading key may retain only its
+   existing loading/evaluation batch. No path may store two equivalent root or
+   package batches.
+6. Preserve the one-way Bzlmod-to-loading dependency. Choose the natural loading
+   producer/key/value, visibility, structural equality, request policy,
+   invalidation, exact Arc reuse, and DICE lifetime. Retain no evaluator,
+   transaction, event batch, source text, AST, horizon, glob walker, or
+   materializer state as certificate authority.
+7. Decide whether the uniquely smallest successor is one bounded loading-side
+   implementation or one docs-only prerequisite such as package-source or
+   recursive loading-frontier design. Do not combine independent consumers.
+   Freeze its exact files, production/test/total caps, physical ceilings,
+   proof, cleanup trigger, and successor.
 
-1. In `host_module.rs`, add `#[doc(hidden)] pub
-   ObservedRootModuleLoadingAnchor` with private fields:
-   `result: Result<RootModuleLoadingAnchor, RootModuleLoadingAnchorError>`
-   and `observations: PathObservationEpoch`. Derive
-   `Debug, Clone, PartialEq, Eq, Allocative, Dupe`; expose only doc-hidden
-   borrowed `result()` and `observations()` accessors.
-2. Add `#[doc(hidden)] pub RootModuleLoadingAnchorObservationKey`, keyed only
-   by normalized workspace, with the normal structural key derives, public
-   app-internal constructor, and display identity
-   `observed-root-module-loading-anchor:{workspace}`.
-3. Its Value is
-   `SourcePreparationOutcome<Result<ObservedRootModuleLoadingAnchor,
-   ObservedPathFrontierError>>`; equality is `complete_eq` and validity is
-   `is_complete`. Need remains invalid/self-unequal; completed semantic and
-   outer errors remain valid structural values.
-4. Compute only `HostRootModuleFileObservationKey` once. Forward bootstrap or
-   path Need unchanged. Forward a completed outer frontier error unchanged and
-   construct no carrier. On completed semantic success/error, reuse the exact
-   existing `HostRootModuleFileCarrier` Arc to construct the unchanged public
-   anchor or anchor-error wrapper and carry the exact Arc-backed epoch.
-5. Keep the anchor `result` inline. Do not add
-   `Arc<Result<RootModuleLoadingAnchor, ...>>`: each public wrapper already
-   owns the one existing semantic-result Arc. The final retained value owns
-   only that Arc plus the accepted Arc-backed epoch.
-6. Store no evaluation data. The observed root child remains the sole root
-   event owner. Never compute `HostRootModuleFileKey` or
-   `RootModuleLoadingAnchorKey`, re-evaluate MODULE files, reconstruct Host
-   demands, or retain evaluator, event batch, source bytes, horizon, ancestry,
-   transaction, loading result, or union scratch.
-7. In `lib.rs`, reexport only the new carrier and key under
-   `#[doc(hidden)]`. This is an app-internal Rust visibility boundary, not a
-   user CLI, wire, output, diagnostic, or stability promise.
-8. Leave existing `RootModuleLoadingAnchor{,Error,Key}`, registrations,
-   Display/source, key identity, dependency, equality, events, tests, and all
-   loading/core callers unchanged.
+Existing admitted serial anchor, package loading, error/Need/event order,
+outputs, and exact Host observation values remain exact. Loading-side
+certificate association, aggregation, and equality are Slug-native. Public
+command overlap/final validation, package-source/BUILD/`.bzl`/glob frontiers
+not proven complete here, routed/materialized repositories, and exact Bazel
+identity bytes remain unsupported/deferred.
 
-Existing admitted acyclic MODULE/include behavior, public anchor behavior,
-diagnostics, events, and exact Host observations remain exact. The callerless
-carrier representation, certificate association, and equality are
-Slug-native. Loading consumption, package source, BUILD/`.bzl`/glob closure,
-core final validation, overlapping publication, routed/materialized
-repositories, and exact Bazel identity bytes remain unsupported/deferred.
+## Evidence, authority, and caps
 
-## Proof and validation
-
-Add colocated `host_module.rs` proof for:
-
-- semantic success and semantic error parity with the legacy anchor mapping;
-- exact semantic-result Arc and every epoch observation Arc retained by pointer;
-- bootstrap and path Need forwarding with no carrier;
-- forced outer frontier-error forwarding with no semantic carrier or event;
-- observed root activation exactly once and zero legacy root/anchor activation;
-- the observed child as the only root event owner;
-- complete-only equality/validity, warm reuse, mutation, and A/B/A restoration;
-- cancellation/source proof that only drop-safe locals cross the await; and
-- unchanged public anchor identity, registrations, error, dependency, and event
-  regressions.
-
-Run the focused observed-anchor and existing public-anchor tests, full
-`slug_bzlmod_v2`, direct `slug_loading_v2` and `slug_core_v2` checks,
-`cargo fmt --all -- --check`, strict Clippy with inherited-baseline
-disposition, the V2 archive checker, artifact scan, and `git diff --check`.
-No Bazel oracle is needed because no admitted behavior is activated or changed.
-Do not run Cargo commands concurrently in one target directory.
-
-Because `host_module.rs` exceeds 2,000 lines, require independent pre/post
-cohesion and ownership review. The projection belongs beside both root
-producer and anchor families; a split requires a concrete independent
-responsibility and `REPLAN`.
-
-## Authority and caps
+Reuse `c6e61d60` and existing loading tests; no new Bazel oracle is needed
+for this docs-only ownership decision. Use live source and DICE ownership as
+authority, and record why any broader terminal is rejected as partial.
 
 Write only:
 
-- `app/slug_bzlmod_v2/src/host_module.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`; and
-- at completion only, canonical/current/Stage 2.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest; and
+- `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
 Read only this packet and owner section, the plan-authoring guide,
 `docs/developers/dice.md`, the Buck2 utility-reuse skill and matching Stage 9
-Arc/`Dupe`/`Allocative` row, Bzlmod `src/{host_module,lib}.rs`,
-loading `src/bzl_module.rs`, workspace `src/{lib,path_observation}.rs`,
-root `Cargo.toml`, app `slug_{workspace,bzlmod,loading}_v2/Cargo.toml`,
-and directly referenced focused tests.
+Arc/`Dupe`/`Allocative` row, Bzlmod
+`src/{host_module,host_package,lib}.rs`, loading
+`src/{bzl_module,glob,keys,load_label,cycle_detector,lib}.rs`, loading
+`src/host_glob/{mod,adapter,traversal}.rs`, workspace
+`src/{lib,path_observation}.rs`, root `Cargo.toml`, app
+`slug_{workspace,bzlmod,loading}_v2/Cargo.toml`, and directly referenced
+focused tests.
 
-Caps from the live baselines are:
-
-- `host_module.rs`: 100 production, 220 in-module tests, 320 total net, and
-  4,205 physical lines from 3,885;
-- `lib.rs`: 4 production, zero tests, 4 total net, and 383 physical lines
-  from 379; and
-- aggregate: 104 production, 220 tests, and 324 total net Rust lines.
-
-Completion ledgers are capped at 180 net lines. No correction is authorized.
+Ledger caps are 40 canonical, 320 current, 280 Stage 2, and 640 total net
+lines. No Rust, Cargo, test, oracle, or fixture write is authorized.
 
 ## STOP / REPLAN
 
-STOP on every other Rust file; changing the existing public/legacy anchor key,
-value, error, dependency, event, or caller; loading/core edits; user-facing
-API/wire/output/diagnostic behavior; another key or carrier; another event
-owner; outer-error laundering; direct/reconstructed or historical Host reads;
-new graph/store/container/interner; retained evaluator/event/source/
-transaction/horizon/ancestry/loading state; package source,
-BUILD/`.bzl`/glob, routed/materialized repository, watcher, JVM, oracle, or
-any cap/ceiling excess.
+STOP on every code/oracle write; changing the accepted anchor carrier or public
+anchor; core/public caller edits; user API/wire/output/diagnostic behavior;
+partial certificate publication; treating mutable package/source/load/glob
+inputs as ambient; outer-error laundering; reverse dependency; direct/
+reconstructed or historical Host reads; new graph/store/container/interner;
+retained evaluator/event/source/AST/transaction/horizon/glob/materializer
+state; routed/materialized repository, watcher, JVM, or combined consumers.
 
-REPLAN if the doc-hidden types cannot cross Bzlmod-to-loading without widening
-user behavior; exact semantic/epoch Arcs cannot be reused; outer error or Need
-cannot remain distinct; event parity requires storing a second batch; the
-existing public anchor must change; a third Rust file is required; or any
-correction is needed.
+REPLAN if no bounded loading terminal has a complete frontier; consuming the
+anchor would require a public error change or duplicate event owner; recursive
+load/glob discovery cannot seal before completion; package-source or another
+lower producer must first gain an observed carrier; a complete carrier needs a
+new shared representation; or the first implementation cannot be bounded
+independently.
 
 ## Immediate successor
 
-On acceptance, schedule only docs-only
-`WP-2A-m1-root-module-anchor-frontier-loading-consumer-design`. Do not combine
-loading activation, package-source aggregation, BUILD/`.bzl`/glob, core
-publication, or another frontier.
+On acceptance, activate only one bounded loading-side consumer implementation
+or one uniquely required docs-only prerequisite. Do not combine package-source,
+recursive `.bzl`/glob, core publication, public overlap, or another consumer.

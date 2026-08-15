@@ -1855,3 +1855,49 @@ event owner, extra semantic Arc or retained collection, reconstructed Host
 read, public user behavior, higher loading/source work, or cap excess.
 Completion schedules only docs-only
 `WP-2A-m1-root-module-anchor-frontier-loading-consumer-design`.
+
+### Accepted root-module anchor frontier carrier (2026-08-14)
+
+Commit `c6e61d60` adds the doc-hidden/public
+`ObservedRootModuleLoadingAnchor` and
+`RootModuleLoadingAnchorObservationKey`. The callerless Bzlmod key computes
+only the private observed root producer, forwards Need and outer frontier
+errors unchanged, and projects completed semantic success/error through the
+exact existing root-result Arc plus accepted Arc-backed epoch. It stores no
+event data and leaves the legacy/public anchor and every loading/core caller
+unchanged.
+
+Exact accounting is 93 production plus 220 test lines in
+`host_module.rs`, 313 total net and 4,198 physical; `lib.rs` adds exactly
+four production reexport lines and reaches 383 physical. Aggregate is
+97/220/317 within 104/220/324. Focused observed-anchor proof passes 3/3,
+unchanged public-anchor proof passes 2/2, all 585 Bzlmod tests pass, and direct
+loading/core checks, formatting, diff/artifact hygiene, and independent
+ownership/cohesion review pass. Strict Clippy and archive checks reproduce only
+their inherited baselines.
+
+Existing public anchor behavior and Host observations remain exact. The
+callerless app-internal carrier ABI/equality is Slug-native. Loading consumption
+and every higher frontier/publication surface remain deferred.
+
+### Active root-module anchor loading-consumer design (2026-08-14)
+
+Run docs-only `WP-2A-m1-root-module-anchor-frontier-loading-consumer-design`
+from accepted predecessor `c6e61d60`. Map loading's anchor-first package
+chain and choose the first terminal that can retain the anchor epoch without
+claiming completeness for unmodeled package-source, recursive `.bzl`, or glob
+dependencies. Replacing the legacy anchor edge and dropping the epoch is not an
+accepted consumer.
+
+Freeze outer frontier versus semantic error/Need algebra, decisive predecessor
+closure, event ownership, exact Arc reuse, DICE equality/lifetime, cancellation
+release, exact future files/caps/proof, and one bounded successor. Preserve
+current serial loading behavior exactly; aggregation is Slug-native and public
+overlap/final validation remains deferred.
+
+Write only canonical/current/Stage 2 under 40/320/280/640 net lines. STOP on
+code, partial certificates, public/core changes, error laundering, reverse
+dependencies, reconstructed Host reads, retained evaluator/source/AST/glob
+state, or combined consumers. Acceptance may activate only one bounded
+loading-side implementation or one uniquely required docs prerequisite;
+otherwise `REPLAN`.
