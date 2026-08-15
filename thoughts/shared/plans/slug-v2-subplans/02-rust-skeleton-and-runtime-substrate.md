@@ -2028,3 +2028,58 @@ evaluation/events, reconstructed Host reads, partial recursive frontier,
 combined consumer or cap excess. Acceptance may schedule only one bounded Host
 `.bzl` implementation or one uniquely required docs prerequisite; otherwise
 `REPLAN`.
+
+### Frozen Host `.bzl` module frontier design (2026-08-14)
+
+Source and ownership audit accepts one loading-private
+`ObservedHostBzlModule` and `HostBzlModuleObservationKey` in
+`bzl_module.rs`, plus a bounded family-tag generalization of the one existing
+Host cycle guard in `cycle_detector.rs`. One mode-aware evaluator replaces the
+legacy orchestration and selects only legacy or observed source/child keys;
+neither module key computes the other.
+
+Observed mode consumes the accepted root-package source frontier first, then
+unions each recursive child epoch immediately before interpreting that child's
+semantic result. Source, input, parse, load-label, child, evaluation and freeze
+errors remain inside the unchanged semantic family with their decisive prefix.
+Need and outer frontier errors publish no parent carrier/event. Semantic
+completion stores one equivalent local event batch per selected key activation.
+
+Cycle handling is explicit. Detector nodes retain distinct Legacy and Observed
+family tags over one shared diagnostic identity. When the detector wakes every
+strongly connected member, an observed member rotates only `cycle.keys` to
+itself, directly computes the accepted source key for the other members, and
+unions those exact epochs before returning `Cycle`. Non-cycle `cycle.path`
+sources remain owned by their actual parents. The unchanged invalid poison
+dependency forces cycle recomputation. No epoch enters the detector and no
+second graph/channel/lock/task/container is added.
+
+The final carrier retains one semantic Result Arc plus the existing Arc-backed
+epoch. Detector identities are request-local; evaluator, AST, source text,
+loads, children, events and union scratch are compute-local. Exact admitted
+Host `.bzl` behavior remains exact; frontier aggregation/family identity is
+Slug-native. External modules, Host glob, final package loading, core/public
+activation and repository/materializer work remain deferred.
+
+The exact implementation allowlist is `bzl_module.rs` and
+`cycle_detector.rs`. Caps are respectively 330/400/730/5,822 and
+115/0/115/667, aggregate 445 production, 400 tests and 845 total net lines. No
+correction is authorized; the large module requires independent cohesion and
+cleanup review.
+
+### Active Host `.bzl` module frontier implementation (2026-08-14)
+
+Run `WP-2A-m1-host-bzl-module-frontier-implementation` from accepted source
+frontier `2225cf99` and the frozen design above. Require discriminating
+source/child/error/Need/outer/exact-Arc/event/equality/A-B-A proof, direct and
+indirect cycle-member frontier proof, family-separation proof, unchanged legacy
+cycle/event regressions, full loading validation, direct core check, formatting,
+strict Clippy/archive dispositions, exact cap accounting, artifact/diff hygiene
+and independent ownership/cleanup acceptance.
+
+STOP on any other Rust file, public/consumer behavior, another key/carrier/
+detector/graph/channel/lock/task/container/event owner, mixed detector families,
+module key-to-key compute, `cycle.path` retention in a member, detector-held
+epochs, reconstructed Host reads, partial cycle prefixes, duplicate evaluator,
+glob/package-load/core/repository/materializer work or cap excess. Completion
+schedules only docs-only `WP-2A-m1-host-glob-frontier-design`.
