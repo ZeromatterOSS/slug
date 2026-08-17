@@ -1296,6 +1296,23 @@ impl PartialEq for PathDirectoryListingError {
 
 impl Eq for PathDirectoryListingError {}
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedPathDirectoryListing {
+    result: Result<PathDirectoryListing, PathDirectoryListingError>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedPathDirectoryListing {
+    pub fn result(&self) -> &Result<PathDirectoryListing, PathDirectoryListingError> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
 /// Resolves and lists one exact logical directory.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub struct PathDirectoryListingKey {
@@ -1331,6 +1348,141 @@ impl fmt::Display for PathDirectoryListingKey {
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub struct PathDirectoryListingObservationKey(PathDirectoryListingKey);
+
+impl PathDirectoryListingObservationKey {
+    pub fn new(namespace: PathObservationNamespace, logical_path: NormalizedAbsolutePath) -> Self {
+        Self(PathDirectoryListingKey::new(namespace, logical_path))
+    }
+}
+
+impl fmt::Display for PathDirectoryListingObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type ObservedDirectoryListingOutcome =
+    PathOutcome<Result<ObservedPathDirectoryListing, ObservedPathFrontierError>>;
+
+fn complete_directory_listing(
+    result: Result<PathDirectoryListing, PathDirectoryListingError>,
+    observations: PathObservationEpoch,
+) -> ObservedDirectoryListingOutcome {
+    PathOutcome::Complete(Ok(ObservedPathDirectoryListing {
+        result,
+        observations,
+    }))
+}
+
+async fn compute_directory_listing(
+    ctx: &mut DiceComputations<'_>,
+    namespace: PathObservationNamespace,
+    logical_path: &NormalizedAbsolutePath,
+    observed_mode: bool,
+) -> ObservedDirectoryListingOutcome {
+    let (resolved, mut observations) = if observed_mode {
+        match dice_invariant(
+            ctx.compute(&ResolvedPathObservationKey::new(
+                namespace,
+                logical_path.dupe(),
+            ))
+            .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(observed)) => (observed.result, observed.observations),
+        }
+    } else {
+        match dice_invariant(
+            ctx.compute(&ResolvedPathKey::new(namespace, logical_path.dupe()))
+                .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(result) => (result, PathObservationEpoch::empty()),
+        }
+    };
+    let resolved = match resolved {
+        Err(error) => {
+            return complete_directory_listing(
+                Err(PathDirectoryListingError::from_resolution(
+                    logical_path.dupe(),
+                    error,
+                )),
+                observations,
+            );
+        }
+        Ok(resolved) => resolved,
+    };
+    let lstat = match resolved.state() {
+        ResolvedPathState::Missing => {
+            return complete_directory_listing(Ok(PathDirectoryListing::Missing), observations);
+        }
+        ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::Directory => lstat,
+        ResolvedPathState::Present(lstat) => {
+            return complete_directory_listing(
+                Err(PathDirectoryListingError::WrongKind {
+                    logical_path: logical_path.dupe(),
+                    expected: PathNodeKind::Directory,
+                    actual: lstat.kind(),
+                }),
+                observations,
+            );
+        }
+    };
+    let demand = PathObservationDemand::new(
+        namespace,
+        resolved.real_path().dupe(),
+        PathObservationOperation::DirectoryEntries,
+    );
+    let result = match dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await) {
+        PathOutcome::Need(need) => return PathOutcome::Need(need),
+        PathOutcome::Complete(result) => result,
+    };
+    if observed_mode {
+        observations = match PathObservationEpoch::from_shared(
+            observations
+                .observations()
+                .iter()
+                .map(|(known, result)| (known.dupe(), result.dupe()))
+                .chain(std::iter::once((demand.dupe(), result.dupe()))),
+        ) {
+            Ok(observations) => observations,
+            Err(error) => return PathOutcome::Complete(Err(error.into())),
+        };
+    }
+    let result = match result.as_ref() {
+        PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries)) => {
+            Ok(PathDirectoryListing::Present(entries.dupe()))
+        }
+        PathObservationResult::DirectoryEntries(PathOperationResult::Missing) => {
+            Err(PathDirectoryListingError::InconsistentState {
+                logical_path: logical_path.dupe(),
+                operation: demand.operation(),
+                before: Some(lstat),
+                after: None,
+            })
+        }
+        PathObservationResult::DirectoryEntries(PathOperationResult::Error(error)) => {
+            Err(PathDirectoryListingError::Observation {
+                logical_path: logical_path.dupe(),
+                operation: demand.operation(),
+                error: *error,
+            })
+        }
+        PathObservationResult::Lstat(_)
+        | PathObservationResult::ReadLink(_)
+        | PathObservationResult::FileBytes(_)
+        | PathObservationResult::WindowsLongPath(_)
+        | PathObservationResult::WindowsOptionPathLongName(_) => {
+            unreachable!("DirectoryEntries demand must return a DirectoryEntries observation")
+        }
+    };
+    complete_directory_listing(result, observations)
+}
+
 #[async_trait]
 impl Key for PathDirectoryListingKey {
     type Value = PathResult<PathDirectoryListing, PathDirectoryListingError>;
@@ -1340,75 +1492,34 @@ impl Key for PathDirectoryListingKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let resolved = dice_invariant(
-            ctx.compute(&ResolvedPathKey::new(
-                self.namespace,
-                self.logical_path.dupe(),
-            ))
-            .await,
-        );
-        let resolved = match resolved {
-            PathOutcome::Need(need) => return PathOutcome::Need(need),
-            PathOutcome::Complete(Err(error)) => {
-                return PathOutcome::Complete(Err(PathDirectoryListingError::from_resolution(
-                    self.logical_path.dupe(),
-                    error,
-                )));
-            }
-            PathOutcome::Complete(Ok(resolved)) => resolved,
-        };
-        let lstat = match resolved.state() {
-            ResolvedPathState::Missing => {
-                return PathOutcome::Complete(Ok(PathDirectoryListing::Missing));
-            }
-            ResolvedPathState::Present(lstat) if lstat.kind() == PathNodeKind::Directory => lstat,
-            ResolvedPathState::Present(lstat) => {
-                return PathOutcome::Complete(Err(PathDirectoryListingError::WrongKind {
-                    logical_path: self.logical_path.dupe(),
-                    expected: PathNodeKind::Directory,
-                    actual: lstat.kind(),
-                }));
-            }
-        };
-
-        let demand = PathObservationDemand::new(
-            self.namespace,
-            resolved.real_path().dupe(),
-            PathObservationOperation::DirectoryEntries,
-        );
-        let observed = dice_invariant(ctx.compute(&PathObservationKey::new(demand.dupe())).await);
-        match observed {
+        match compute_directory_listing(ctx, self.namespace, &self.logical_path, false).await {
             PathOutcome::Need(need) => PathOutcome::Need(need),
-            PathOutcome::Complete(result) => match result.as_ref() {
-                PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries)) => {
-                    PathOutcome::Complete(Ok(PathDirectoryListing::Present(entries.dupe())))
-                }
-                PathObservationResult::DirectoryEntries(PathOperationResult::Missing) => {
-                    PathOutcome::Complete(Err(PathDirectoryListingError::InconsistentState {
-                        logical_path: self.logical_path.dupe(),
-                        operation: demand.operation(),
-                        before: Some(lstat),
-                        after: None,
-                    }))
-                }
-                PathObservationResult::DirectoryEntries(PathOperationResult::Error(error)) => {
-                    PathOutcome::Complete(Err(PathDirectoryListingError::Observation {
-                        logical_path: self.logical_path.dupe(),
-                        operation: demand.operation(),
-                        error: *error,
-                    }))
-                }
-                PathObservationResult::Lstat(_)
-                | PathObservationResult::ReadLink(_)
-                | PathObservationResult::FileBytes(_)
-                | PathObservationResult::WindowsLongPath(_)
-                | PathObservationResult::WindowsOptionPathLongName(_) => {
-                    unreachable!(
-                        "DirectoryEntries demand must return a DirectoryEntries observation"
-                    )
-                }
-            },
+            PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(observed.result),
+            PathOutcome::Complete(Err(error)) => {
+                panic!("legacy directory-listing frontier invariant failed: {error}")
+            }
         }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for PathDirectoryListingObservationKey {
+    type Value = ObservedDirectoryListingOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        compute_directory_listing(ctx, self.0.namespace, &self.0.logical_path, true).await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1433,14 +1544,18 @@ mod tests {
 
     use allocative::Allocative;
     use async_trait::async_trait;
+    use dice::ActivationData;
+    use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
     use dice::DiceComputations;
     use dice::DiceProjectionComputations;
     use dice::DiceTransaction;
+    use dice::DynKey;
     use dice::InjectedKey;
     use dice::Key;
     use dice::ProjectionKey;
+    use dice::UserComputationData;
     use dice_futures::cancellation::CancellationContext;
     use dupe::Dupe;
 
@@ -1449,6 +1564,7 @@ mod tests {
     use super::PathDirectoryListing;
     use super::PathDirectoryListingError;
     use super::PathDirectoryListingKey;
+    use super::PathDirectoryListingObservationKey;
     use super::PathFileBytes;
     use super::PathFileBytesError;
     use super::PathFileBytesKey;
@@ -4342,5 +4458,179 @@ mod tests {
         );
         assert!(ResolvedPathObservationKey::validity(&complete));
         assert!(ResolvedPathObservationKey::equality(&complete, &complete));
+    }
+
+    #[derive(Default)]
+    struct ObservedListingTracker {
+        legacy: AtomicUsize,
+        observed_resolution: AtomicUsize,
+        observation_demands: AtomicUsize,
+    }
+
+    impl ActivationTracker for ObservedListingTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            _dependencies: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+            if key.downcast_ref::<PathDirectoryListingKey>().is_some()
+                || key.downcast_ref::<ResolvedPathKey>().is_some()
+            {
+                self.legacy.fetch_add(1, Ordering::SeqCst);
+            } else if key.downcast_ref::<ResolvedPathObservationKey>().is_some() {
+                self.observed_resolution.fetch_add(1, Ordering::SeqCst);
+            } else if key.downcast_ref::<crate::PathObservationKey>().is_some() {
+                self.observation_demands.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
+
+    async fn observed_listing(
+        dice: &Arc<Dice>,
+        tracker: &Arc<ObservedListingTracker>,
+        observations: PathObservationEpoch,
+    ) -> <PathDirectoryListingObservationKey as Key>::Value {
+        let mut updater = dice.updater_with_data(UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        });
+        updater
+            .changed_to(vec![(PathObservationEpochKey, observations)])
+            .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&PathDirectoryListingObservationKey::new(
+                PathObservationNamespace::Host,
+                path("/directory"),
+            ))
+            .await
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn observed_directory_listing_retains_exact_arcs_without_legacy_activation() {
+        let ns = PathObservationNamespace::Host;
+        let epoch_a = PathObservationEpoch::new([
+            host_root(),
+            present(ns, "/directory", PathNodeKind::Directory),
+            directory_entries(ns, "/directory", &[("a", PathDirectoryEntryKind::File)]),
+        ])
+        .unwrap();
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedListingTracker::default());
+        let first = observed_listing(&dice, &tracker, epoch_a.dupe()).await;
+        let PathOutcome::Complete(Ok(observed)) = &first else {
+            panic!("observed listing must complete");
+        };
+        let result = observed.result();
+        assert!(matches!(result, Ok(PathDirectoryListing::Present(_))));
+        for (demand, expected) in epoch_a.observations() {
+            assert!(Arc::ptr_eq(
+                expected,
+                observed.observations().observations().get(demand).unwrap()
+            ));
+        }
+        assert_eq!(tracker.observation_demands.load(Ordering::SeqCst), 3);
+        assert!(PathDirectoryListingObservationKey::validity(&first));
+        let eq = PathDirectoryListingObservationKey::equality;
+        let warm = observed_listing(&dice, &tracker, epoch_a.dupe()).await;
+        assert!(eq(&warm, &first));
+        let changed = observed_listing(
+            &dice,
+            &tracker,
+            PathObservationEpoch::new([
+                host_root(),
+                present(ns, "/directory", PathNodeKind::Directory),
+                directory_entries(ns, "/directory", &[("b", PathDirectoryEntryKind::File)]),
+            ])
+            .unwrap(),
+        )
+        .await;
+        assert!(!eq(&changed, &first));
+        let restored = observed_listing(&dice, &tracker, epoch_a).await;
+        assert!(eq(&restored, &first));
+        let need = observed_listing(&dice, &tracker, PathObservationEpoch::empty()).await;
+        assert!(matches!(need, PathOutcome::Need(_)));
+        assert!(!PathDirectoryListingObservationKey::validity(&need));
+        assert!(!eq(&need, &need));
+        assert_eq!(tracker.legacy.load(Ordering::SeqCst), 0);
+        assert!(tracker.observed_resolution.load(Ordering::SeqCst) > 0);
+    }
+
+    #[tokio::test]
+    async fn observed_directory_listing_preserves_errors_and_outer_polarity() {
+        let ns = PathObservationNamespace::Host;
+        let file = present(ns, "/directory", PathNodeKind::RegularFile);
+        let io = PathObservationError::Io {
+            kind: PathIoErrorKind::PermissionDenied,
+            raw_os_error: Some(13),
+        };
+        let cases = [
+            vec![missing(ns, "/")],
+            vec![host_root(), file],
+            vec![host_root(), lstat_error(ns, "/directory", io)],
+            vec![
+                host_root(),
+                present(ns, "/directory", PathNodeKind::Directory),
+                directory_entries_result(ns, "/directory", PathOperationResult::Missing),
+            ],
+            vec![
+                host_root(),
+                present(ns, "/directory", PathNodeKind::Directory),
+                directory_entries_result(ns, "/directory", PathOperationResult::Error(io)),
+            ],
+        ];
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedListingTracker::default());
+        for script in cases {
+            let expected = resolve_directory_script(ns, "/directory", &script).await;
+            let value =
+                observed_listing(&dice, &tracker, PathObservationEpoch::new(script).unwrap()).await;
+            let PathOutcome::Complete(Ok(observed)) = value else {
+                panic!("completed legacy terminal must retain an observed carrier");
+            };
+            assert_eq!(observed.result(), &expected);
+        }
+
+        let directory_demand = demand(ns, "/directory", PathObservationOperation::DirectoryEntries);
+        let missing_entries =
+            directory_entries_result(ns, "/directory", PathOperationResult::Missing).1;
+        let mismatch: <PathDirectoryListingObservationKey as Key>::Value = PathOutcome::Complete(
+            PathObservationEpoch::from_shared([(
+                directory_demand.dupe(),
+                Arc::new(missing(ns, "/directory").1),
+            )])
+            .map(|_| unreachable!())
+            .map_err(ObservedPathFrontierError::from),
+        );
+        assert!(matches!(
+            mismatch,
+            PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::OperationMismatch { .. }
+            )))
+        ));
+        let conflict = PathOutcome::Complete(
+            PathObservationEpoch::from_shared([
+                (directory_demand.dupe(), Arc::new(missing_entries)),
+                (
+                    directory_demand,
+                    Arc::new(directory_entries(ns, "/directory", &[]).1),
+                ),
+            ])
+            .map(|_| unreachable!())
+            .map_err(ObservedPathFrontierError::from),
+        );
+        assert!(matches!(
+            conflict,
+            PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+                PathObservationEpochError::ConflictingDemand(_)
+            )))
+        ));
+        assert!(PathDirectoryListingObservationKey::validity(&conflict));
+        assert!(PathDirectoryListingObservationKey::equality(
+            &conflict, &conflict
+        ));
     }
 }

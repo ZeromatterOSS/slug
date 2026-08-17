@@ -51,12 +51,16 @@ pub use path_observation::PathOutcome;
 pub use path_observation::PathResult;
 pub use path_observation::WindowsOptionPathLongNameOutcome;
 #[doc(hidden)]
+pub use path_resolution::ObservedPathDirectoryListing;
+#[doc(hidden)]
 pub use path_resolution::ObservedPathFrontierError;
 #[doc(hidden)]
 pub use path_resolution::ObservedResolvedPath;
 pub use path_resolution::PathDirectoryListing;
 pub use path_resolution::PathDirectoryListingError;
 pub use path_resolution::PathDirectoryListingKey;
+#[doc(hidden)]
+pub use path_resolution::PathDirectoryListingObservationKey;
 pub use path_resolution::PathFileBytes;
 pub use path_resolution::PathFileBytesError;
 pub use path_resolution::PathFileBytesKey;

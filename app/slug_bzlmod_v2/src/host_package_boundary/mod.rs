@@ -24,13 +24,17 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 
 use crate::host_package::HostRootPackageLookup;
 use crate::host_package::HostRootPackageLookupError;
 use crate::host_package::HostRootPackageLookupKey;
+use crate::host_package::HostRootPackageLookupObservationKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
+use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub enum HostRootPackageBoundaryKind {
@@ -195,21 +199,150 @@ impl fmt::Display for HostRootPackageBoundaryKey {
     }
 }
 
-type HostRootPackageBoundaryCarrier =
-    Arc<Result<HostRootPackageBoundary, HostRootPackageBoundaryError>>;
-type HostRootPackageBoundaryOutcome = PathOutcome<HostRootPackageBoundaryCarrier>;
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedHostRootPackageBoundary {
+    result: Arc<Result<HostRootPackageBoundary, HostRootPackageBoundaryError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRootPackageBoundary {
+    pub fn result(&self) -> &Result<HostRootPackageBoundary, HostRootPackageBoundaryError> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct HostRootPackageBoundaryObservationKey(HostRootPackageBoundaryKey);
+
+impl HostRootPackageBoundaryObservationKey {
+    pub fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self(HostRootPackageBoundaryKey::new(workspace, package))
+    }
+}
+
+impl fmt::Display for HostRootPackageBoundaryObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type ObservedHostRootPackageBoundaryOutcome =
+    PathOutcome<Result<ObservedHostRootPackageBoundary, ObservedPathFrontierError>>;
 
 #[track_caller]
 fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host package-boundary DICE invariant failed: {error:?}"))
 }
 
-fn complete_success(boundary: HostRootPackageBoundary) -> HostRootPackageBoundaryOutcome {
-    PathOutcome::Complete(Arc::new(Ok(boundary)))
-}
+async fn compute_boundary(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRootPackageBoundaryKey,
+    observed_mode: bool,
+) -> ObservedHostRootPackageBoundaryOutcome {
+    let complete = |result, observations| {
+        PathOutcome::Complete(Ok(ObservedHostRootPackageBoundary {
+            result: Arc::new(result),
+            observations,
+        }))
+    };
+    let (repository_ignore, mut observations) = if observed_mode {
+        match dice_invariant(
+            ctx.compute(&HostRepositoryIgnoreObservationKey::new(
+                key.workspace.dupe(),
+            ))
+            .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(observed)) => {
+                (observed.result().clone(), observed.observations().dupe())
+            }
+        }
+    } else {
+        match dice_invariant(
+            ctx.compute(&HostRepositoryIgnoreKey::new(key.workspace.dupe()))
+                .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(value) => (value.as_ref().clone(), PathObservationEpoch::empty()),
+        }
+    };
+    let repository_ignore = match repository_ignore {
+        Ok(value) => value,
+        Err(error) => {
+            return complete(
+                Err(HostRootPackageBoundaryError::repository_ignore(error)),
+                observations,
+            );
+        }
+    };
+    if repository_ignore.matching_entry(&key.package).is_some() {
+        let ignored = HostRootPackageBoundary::ignored_directory();
+        return complete(Ok(ignored), observations);
+    }
 
-fn complete_error(error: HostRootPackageBoundaryError) -> HostRootPackageBoundaryOutcome {
-    PathOutcome::Complete(Arc::new(Err(error)))
+    let lookup = if observed_mode {
+        match dice_invariant(
+            ctx.compute(&HostRootPackageLookupObservationKey::new(
+                key.workspace.dupe(),
+                key.package.clone(),
+            ))
+            .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
+            PathOutcome::Complete(Ok(observed)) => {
+                observations = match PathObservationEpoch::from_shared(
+                    observations
+                        .observations()
+                        .iter()
+                        .map(|(demand, result)| (demand.dupe(), result.dupe()))
+                        .chain(
+                            observed
+                                .observations()
+                                .observations()
+                                .iter()
+                                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+                        ),
+                ) {
+                    Ok(observations) => observations,
+                    Err(error) => return PathOutcome::Complete(Err(error.into())),
+                };
+                observed.result().clone()
+            }
+        }
+    } else {
+        match dice_invariant(
+            ctx.compute(&HostRootPackageLookupKey::new(
+                key.workspace.dupe(),
+                key.package.clone(),
+            ))
+            .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(value) => value.as_ref().clone(),
+        }
+    };
+    complete(
+        match lookup {
+            Err(error) => Err(HostRootPackageBoundaryError::package_lookup(error)),
+            Ok(HostRootPackageLookup::Package(package)) => Ok(HostRootPackageBoundary::package(
+                package.package_root().dupe(),
+            )),
+            Ok(HostRootPackageLookup::Deleted) => Ok(HostRootPackageBoundary::deleted_package()),
+            Ok(HostRootPackageLookup::NoBuildFile)
+            | Ok(HostRootPackageLookup::InvalidPackageName { .. }) => {
+                Ok(HostRootPackageBoundary::no_package())
+            }
+        },
+        observations,
+    )
 }
 
 #[async_trait]
@@ -221,48 +354,34 @@ impl Key for HostRootPackageBoundaryKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let repository_ignore = match dice_invariant(
-            ctx.compute(&HostRepositoryIgnoreKey::new(self.workspace.dupe()))
-                .await,
-        ) {
-            PathOutcome::Need(need) => return PathOutcome::Need(need),
-            PathOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.dupe(),
-                Err(error) => {
-                    return complete_error(HostRootPackageBoundaryError::repository_ignore(
-                        error.clone(),
-                    ));
-                }
-            },
-        };
-        if repository_ignore.matching_entry(&self.package).is_some() {
-            return complete_success(HostRootPackageBoundary::ignored_directory());
-        }
-
-        match dice_invariant(
-            ctx.compute(&HostRootPackageLookupKey::new(
-                self.workspace.dupe(),
-                self.package.clone(),
-            ))
-            .await,
-        ) {
+        match compute_boundary(ctx, self, false).await {
             PathOutcome::Need(need) => PathOutcome::Need(need),
-            PathOutcome::Complete(value) => match value.as_ref() {
-                Err(error) => {
-                    complete_error(HostRootPackageBoundaryError::package_lookup(error.clone()))
-                }
-                Ok(HostRootPackageLookup::Package(package)) => complete_success(
-                    HostRootPackageBoundary::package(package.package_root().dupe()),
-                ),
-                Ok(HostRootPackageLookup::Deleted) => {
-                    complete_success(HostRootPackageBoundary::deleted_package())
-                }
-                Ok(HostRootPackageLookup::NoBuildFile)
-                | Ok(HostRootPackageLookup::InvalidPackageName { .. }) => {
-                    complete_success(HostRootPackageBoundary::no_package())
-                }
-            },
+            PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(observed.result),
+            PathOutcome::Complete(Err(error)) => {
+                panic!("legacy package-boundary frontier invariant failed: {error}")
+            }
         }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostRootPackageBoundaryObservationKey {
+    type Value = ObservedHostRootPackageBoundaryOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        compute_boundary(ctx, &self.0, true).await
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

@@ -1,93 +1,59 @@
-#[cfg(unix)]
+#![cfg(unix)]
+
 use std::fmt;
-#[cfg(unix)]
 use std::hash::Hash;
-#[cfg(unix)]
 use std::hash::Hasher;
-#[cfg(unix)]
 use std::path::PathBuf;
-#[cfg(unix)]
 use std::sync::Arc;
-#[cfg(unix)]
 use std::sync::Mutex;
-#[cfg(unix)]
 use std::sync::atomic::AtomicUsize;
-#[cfg(unix)]
 use std::sync::atomic::Ordering;
 
-#[cfg(unix)]
 use allocative::Allocative;
-#[cfg(unix)]
 use async_trait::async_trait;
-#[cfg(unix)]
 use dice::ActivationData;
-#[cfg(unix)]
 use dice::ActivationTracker;
-#[cfg(unix)]
 use dice::DetectCycles;
-#[cfg(unix)]
 use dice::Dice;
-#[cfg(unix)]
 use dice::DiceComputations;
-#[cfg(unix)]
 use dice::DiceTransaction;
-#[cfg(unix)]
 use dice::DynKey;
-#[cfg(unix)]
 use dice::Key;
-#[cfg(unix)]
+use dice::RichActivation;
 use dice::UserComputationData;
-#[cfg(unix)]
 use dice_futures::cancellation::CancellationContext;
-#[cfg(unix)]
 use dupe::Dupe;
-#[cfg(unix)]
+use slug_events_v2::CaptureEvaluationEvents;
 use slug_identity_v2::PackagePath;
-#[cfg(unix)]
 use slug_workspace_v2::NormalizedAbsolutePath;
-#[cfg(unix)]
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathIoErrorKind;
-#[cfg(unix)]
 use slug_workspace_v2::PathLstat;
-#[cfg(unix)]
 use slug_workspace_v2::PathNodeKind;
-#[cfg(unix)]
 use slug_workspace_v2::PathObservationDemand;
-#[cfg(unix)]
 use slug_workspace_v2::PathObservationEpoch;
-#[cfg(unix)]
+use slug_workspace_v2::PathObservationEpochError;
 use slug_workspace_v2::PathObservationEpochKey;
-#[cfg(unix)]
 use slug_workspace_v2::PathObservationError;
-#[cfg(unix)]
 use slug_workspace_v2::PathObservationNamespace;
-#[cfg(unix)]
 use slug_workspace_v2::PathObservationOperation;
-#[cfg(unix)]
 use slug_workspace_v2::PathObservationResult;
-#[cfg(unix)]
 use slug_workspace_v2::PathOperationResult;
-#[cfg(unix)]
 use slug_workspace_v2::PathOutcome;
 
-#[cfg(unix)]
 use super::HostRootPackageBoundaryErrorInner;
-#[cfg(unix)]
 use super::HostRootPackageBoundaryKey;
-#[cfg(unix)]
 use super::HostRootPackageBoundaryKind;
-#[cfg(unix)]
+use super::HostRootPackageBoundaryObservationKey;
+use super::ObservedHostRootPackageBoundary;
 use crate::RootPackagePolicyInputs;
-#[cfg(unix)]
 use crate::host_package::HostRootPackageLookupKey;
-#[cfg(unix)]
+use crate::host_package::HostRootPackageLookupObservationKey;
 use crate::inject_root_package_policy_inputs;
-#[cfg(unix)]
 use crate::repository_ignore::HostRepositoryIgnoreKey;
-#[cfg(unix)]
+use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
 type ScriptEntry = (PathObservationDemand, PathObservationResult);
 
-#[cfg(unix)]
 #[derive(Default)]
 struct BoundaryTracker {
     boundary_dependencies: Mutex<Vec<Vec<String>>>,
@@ -95,7 +61,54 @@ struct BoundaryTracker {
     activated: Mutex<Vec<String>>,
 }
 
-#[cfg(unix)]
+#[derive(Default)]
+struct ObservedBoundaryTracker {
+    legacy: AtomicUsize,
+    observed_ignore: AtomicUsize,
+    observed_lookup: AtomicUsize,
+    parent_event_data: Mutex<Vec<bool>>,
+}
+
+impl ActivationTracker for ObservedBoundaryTracker {
+    fn key_activated(
+        &self,
+        _key: &DynKey,
+        _dependencies: &mut dyn Iterator<Item = &DynKey>,
+        _activation: ActivationData,
+    ) {
+    }
+
+    fn tracks_rich_activations(&self) -> bool {
+        true
+    }
+    fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+        if key
+            .downcast_ref::<HostRootPackageBoundaryObservationKey>()
+            .is_some()
+        {
+            self.parent_event_data
+                .lock()
+                .unwrap()
+                .push(activation.evaluation_data().is_some());
+        } else if key
+            .downcast_ref::<HostRepositoryIgnoreObservationKey>()
+            .is_some()
+        {
+            self.observed_ignore.fetch_add(1, Ordering::SeqCst);
+        } else if key
+            .downcast_ref::<HostRootPackageLookupObservationKey>()
+            .is_some()
+        {
+            self.observed_lookup.fetch_add(1, Ordering::SeqCst);
+        } else if key.downcast_ref::<HostRootPackageBoundaryKey>().is_some()
+            || key.downcast_ref::<HostRepositoryIgnoreKey>().is_some()
+            || key.downcast_ref::<HostRootPackageLookupKey>().is_some()
+        {
+            self.legacy.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+}
+
 impl ActivationTracker for BoundaryTracker {
     fn key_activated(
         &self,
@@ -116,22 +129,18 @@ impl ActivationTracker for BoundaryTracker {
     }
 }
 
-#[cfg(unix)]
 fn path(value: &str) -> NormalizedAbsolutePath {
     NormalizedAbsolutePath::new(value).unwrap()
 }
 
-#[cfg(unix)]
 fn lstat(kind: PathNodeKind, variant: i64) -> PathLstat {
     PathLstat::new(kind, variant, variant, variant, variant, 0o755)
 }
 
-#[cfg(unix)]
 fn demand(value: &str, operation: PathObservationOperation) -> PathObservationDemand {
     PathObservationDemand::new(PathObservationNamespace::Host, path(value), operation)
 }
 
-#[cfg(unix)]
 fn observed_lstat(value: &str, result: PathOperationResult<PathLstat>) -> ScriptEntry {
     (
         demand(value, PathObservationOperation::Lstat),
@@ -139,17 +148,14 @@ fn observed_lstat(value: &str, result: PathOperationResult<PathLstat>) -> Script
     )
 }
 
-#[cfg(unix)]
 fn present(value: &str, kind: PathNodeKind, variant: i64) -> ScriptEntry {
     observed_lstat(value, PathOperationResult::Present(lstat(kind, variant)))
 }
 
-#[cfg(unix)]
 fn missing(value: &str) -> ScriptEntry {
     observed_lstat(value, PathOperationResult::Missing)
 }
 
-#[cfg(unix)]
 fn lstat_error(value: &str) -> ScriptEntry {
     observed_lstat(
         value,
@@ -160,7 +166,6 @@ fn lstat_error(value: &str) -> ScriptEntry {
     )
 }
 
-#[cfg(unix)]
 fn bytes(value: &str, contents: &'static [u8]) -> ScriptEntry {
     (
         demand(value, PathObservationOperation::FileBytes),
@@ -168,7 +173,6 @@ fn bytes(value: &str, contents: &'static [u8]) -> ScriptEntry {
     )
 }
 
-#[cfg(unix)]
 fn read_link(value: &str, target: &str) -> ScriptEntry {
     (
         demand(value, PathObservationOperation::ReadLink),
@@ -178,7 +182,6 @@ fn read_link(value: &str, target: &str) -> ScriptEntry {
     )
 }
 
-#[cfg(unix)]
 fn inputs(roots: &[&str], deleted: &[&str]) -> RootPackagePolicyInputs {
     RootPackagePolicyInputs::new(
         path("/workspace"),
@@ -190,7 +193,6 @@ fn inputs(roots: &[&str], deleted: &[&str]) -> RootPackagePolicyInputs {
     .unwrap()
 }
 
-#[cfg(unix)]
 fn repository_prelude(roots: &[&str], variant: i64) -> Vec<ScriptEntry> {
     let mut entries = vec![
         present("/", PathNodeKind::Directory, variant),
@@ -204,7 +206,6 @@ fn repository_prelude(roots: &[&str], variant: i64) -> Vec<ScriptEntry> {
     entries
 }
 
-#[cfg(unix)]
 fn epoch(entries: &[ScriptEntry]) -> PathObservationEpoch {
     PathObservationEpoch::new(
         entries
@@ -214,7 +215,6 @@ fn epoch(entries: &[ScriptEntry]) -> PathObservationEpoch {
     .unwrap()
 }
 
-#[cfg(unix)]
 async fn boundary(
     policy: Option<RootPackagePolicyInputs>,
     entries: Vec<ScriptEntry>,
@@ -241,7 +241,6 @@ async fn boundary(
         .unwrap()
 }
 
-#[cfg(unix)]
 async fn tracked_boundary(
     policy: RootPackagePolicyInputs,
     entries: Vec<ScriptEntry>,
@@ -271,7 +270,54 @@ async fn tracked_boundary(
     (outcome, tracker)
 }
 
-#[cfg(unix)]
+async fn observed_boundary(
+    dice: &Arc<Dice>,
+    tracker: Arc<ObservedBoundaryTracker>,
+    policy: Option<RootPackagePolicyInputs>,
+    observations: PathObservationEpoch,
+    package: &str,
+) -> <HostRootPackageBoundaryObservationKey as Key>::Value {
+    let mut data = UserComputationData {
+        activation_tracker: Some(tracker),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(data);
+    if let Some(policy) = policy {
+        inject_root_package_policy_inputs(&mut updater, policy).unwrap();
+    }
+    updater
+        .changed_to(vec![(PathObservationEpochKey, observations)])
+        .unwrap();
+    updater
+        .commit()
+        .await
+        .compute(&HostRootPackageBoundaryObservationKey::new(
+            path("/workspace"),
+            PackagePath::parse(package).unwrap(),
+        ))
+        .await
+        .unwrap()
+}
+
+fn observed_complete(
+    value: &<HostRootPackageBoundaryObservationKey as Key>::Value,
+) -> &ObservedHostRootPackageBoundary {
+    let PathOutcome::Complete(Ok(value)) = value else {
+        panic!("expected a complete observed boundary: {value:?}");
+    };
+    value
+}
+
+fn assert_shared_epoch(expected: &PathObservationEpoch, actual: &PathObservationEpoch) {
+    for (demand, result) in actual.observations() {
+        assert!(Arc::ptr_eq(
+            result,
+            expected.observations().get(demand).unwrap()
+        ));
+    }
+}
+
 fn complete(
     value: &PathOutcome<
         Arc<Result<super::HostRootPackageBoundary, super::HostRootPackageBoundaryError>>,
@@ -286,7 +332,6 @@ fn complete(
         .expect("expected a successful boundary")
 }
 
-#[cfg(unix)]
 #[derive(Debug, Clone, Allocative)]
 struct BoundaryCounterKey {
     boundary: HostRootPackageBoundaryKey,
@@ -294,17 +339,14 @@ struct BoundaryCounterKey {
     counter: Arc<AtomicUsize>,
 }
 
-#[cfg(unix)]
 impl PartialEq for BoundaryCounterKey {
     fn eq(&self, other: &Self) -> bool {
         self.boundary == other.boundary && Arc::ptr_eq(&self.counter, &other.counter)
     }
 }
 
-#[cfg(unix)]
 impl Eq for BoundaryCounterKey {}
 
-#[cfg(unix)]
 impl Hash for BoundaryCounterKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.boundary.hash(state);
@@ -312,14 +354,12 @@ impl Hash for BoundaryCounterKey {
     }
 }
 
-#[cfg(unix)]
 impl fmt::Display for BoundaryCounterKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "host-package-boundary-counter:{}", self.boundary)
     }
 }
 
-#[cfg(unix)]
 #[async_trait]
 impl Key for BoundaryCounterKey {
     type Value = PathOutcome<usize>;
@@ -342,7 +382,6 @@ impl Key for BoundaryCounterKey {
     }
 }
 
-#[cfg(unix)]
 async fn update_epoch(transaction: DiceTransaction, entries: &[ScriptEntry]) -> DiceTransaction {
     let mut updater = transaction.into_updater();
     updater
@@ -351,7 +390,6 @@ async fn update_epoch(transaction: DiceTransaction, entries: &[ScriptEntry]) -> 
     updater.commit().await
 }
 
-#[cfg(unix)]
 async fn update_policy(
     transaction: DiceTransaction,
     policy: RootPackagePolicyInputs,
@@ -361,7 +399,6 @@ async fn update_policy(
     updater.commit().await
 }
 
-#[cfg(unix)]
 #[test]
 fn key_identity_and_display_are_only_workspace_and_package() {
     let pkg = PackagePath::parse("pkg/child").unwrap();
@@ -379,7 +416,6 @@ fn key_identity_and_display_are_only_workspace_and_package() {
     );
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn projects_all_four_kinds_and_retains_only_selected_root() {
     let roots = ["/root-a", "/root-b"];
@@ -453,7 +489,6 @@ async fn projects_all_four_kinds_and_retains_only_selected_root() {
     );
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn selection_uses_root_major_marker_minor_and_file_semantics() {
     let roots = ["/root-a", "/root-b"];
@@ -503,7 +538,6 @@ async fn selection_uses_root_major_marker_minor_and_file_semantics() {
     }
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn ignore_precedes_deleted_invalid_and_marker_without_lookup_demands() {
     let roots = ["/root-a"];
@@ -549,7 +583,6 @@ async fn ignore_precedes_deleted_invalid_and_marker_without_lookup_demands() {
     }
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn invalid_latin_one_scalars_are_distinct_no_package_without_marker_demands() {
     let roots = ["/root-a"];
@@ -576,7 +609,6 @@ async fn invalid_latin_one_scalars_are_distinct_no_package_without_marker_demand
     );
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn typed_errors_need_and_error_surface_remain_opaque() {
     let roots = ["/root-a"];
@@ -677,7 +709,6 @@ async fn typed_errors_need_and_error_surface_remain_opaque() {
     assert!(!HostRootPackageBoundaryKey::equality(&need, &need));
 }
 
-#[cfg(unix)]
 #[tokio::test]
 async fn retained_dice_prunes_marker_changes_and_replays_boundary_transitions() {
     fn script(marker: Option<i64>, ignore: bool, root_b: bool, variant: i64) -> Vec<ScriptEntry> {
@@ -847,4 +878,196 @@ async fn retained_dice_prunes_marker_changes_and_replays_boundary_transitions() 
         transaction.compute(&counter).await.unwrap(),
         PathOutcome::Complete(10)
     ));
+}
+
+#[tokio::test]
+async fn observed_boundary_preserves_all_terminals_and_exact_child_arcs() {
+    let roots = ["/root-a"];
+    let mut ignored = repository_prelude(&roots, 1);
+    ignored.retain(|(demand, _)| !demand.path().as_path().ends_with(".bazelignore"));
+    ignored.extend([
+        present("/root-a/.bazelignore", PathNodeKind::RegularFile, 1),
+        bytes("/root-a/.bazelignore", b"ignored\n"),
+    ]);
+    let mut package = repository_prelude(&roots, 2);
+    package.extend([
+        present("/root-a/pkg", PathNodeKind::Directory, 2),
+        present("/root-a/pkg/BUILD.bazel", PathNodeKind::RegularFile, 2),
+    ]);
+    let mut no_build = repository_prelude(&roots, 3);
+    no_build.extend([
+        present("/root-a/pkg", PathNodeKind::Directory, 3),
+        missing("/root-a/pkg/BUILD.bazel"),
+        missing("/root-a/pkg/BUILD"),
+    ]);
+    let mut lookup_error = repository_prelude(&roots, 4);
+    lookup_error.extend([
+        present("/root-a/pkg", PathNodeKind::Directory, 4),
+        lstat_error("/root-a/pkg/BUILD.bazel"),
+    ]);
+    let ignore_error = vec![
+        present("/", PathNodeKind::Directory, 5),
+        present("/workspace", PathNodeKind::Directory, 5),
+        lstat_error("/workspace/REPO.bazel"),
+    ];
+    let cases = [
+        (inputs(&roots, &[]), ignored, "ignored/child", false),
+        (inputs(&roots, &[]), package, "pkg", true),
+        (
+            inputs(&roots, &["//pkg"]),
+            repository_prelude(&roots, 6),
+            "pkg",
+            true,
+        ),
+        (inputs(&roots, &[]), no_build, "pkg", true),
+        (
+            inputs(&roots, &[]),
+            repository_prelude(&roots, 7),
+            "bad:name",
+            true,
+        ),
+        (inputs(&roots, &[]), lookup_error, "pkg", true),
+        (inputs(&roots, &[]), ignore_error, "ignore-error", false),
+    ];
+    for (policy, entries, package, activates_lookup) in cases {
+        let injected = epoch(&entries);
+        let tracker = Arc::new(ObservedBoundaryTracker::default());
+        let value = observed_boundary(
+            &Dice::builder().build(DetectCycles::Enabled),
+            tracker.dupe(),
+            Some(policy.clone()),
+            injected.dupe(),
+            package,
+        )
+        .await;
+        let observed = observed_complete(&value);
+        let PathOutcome::Complete(expected) = boundary(Some(policy), entries, package).await else {
+            unreachable!();
+        };
+        assert_eq!(observed.result(), expected.as_ref());
+        assert_shared_epoch(&injected, observed.observations());
+        let result = observed.result.dupe();
+        assert!(Arc::ptr_eq(&result, &observed.result));
+        assert!(HostRootPackageBoundaryObservationKey::validity(&value));
+        assert_eq!(tracker.legacy.load(Ordering::SeqCst), 0);
+        assert!(tracker.observed_ignore.load(Ordering::SeqCst) > 0);
+        assert_eq!(
+            tracker.observed_lookup.load(Ordering::SeqCst) > 0,
+            activates_lookup
+        );
+        assert!(!tracker.parent_event_data.lock().unwrap().contains(&true));
+    }
+}
+
+#[tokio::test]
+async fn observed_boundary_replays_and_preserves_outer_polarity() {
+    fn script(variant: i64) -> PathObservationEpoch {
+        let roots = ["/root-a"];
+        let mut entries = repository_prelude(&roots, variant);
+        entries.extend([
+            present("/root-a/pkg", PathNodeKind::Directory, variant),
+            present(
+                "/root-a/pkg/BUILD.bazel",
+                PathNodeKind::RegularFile,
+                variant,
+            ),
+        ]);
+        epoch(&entries)
+    }
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(ObservedBoundaryTracker::default());
+    let policy = inputs(&["/root-a"], &[]);
+    let first = observed_boundary(
+        &dice,
+        tracker.dupe(),
+        Some(policy.clone()),
+        script(10),
+        "pkg",
+    )
+    .await;
+    let warm = observed_boundary(
+        &dice,
+        tracker.dupe(),
+        Some(policy.clone()),
+        script(10),
+        "pkg",
+    )
+    .await;
+    let changed = observed_boundary(
+        &dice,
+        tracker.dupe(),
+        Some(policy.clone()),
+        script(11),
+        "pkg",
+    )
+    .await;
+    let restored = observed_boundary(
+        &dice,
+        tracker.dupe(),
+        Some(policy.clone()),
+        script(10),
+        "pkg",
+    )
+    .await;
+    let eq = HostRootPackageBoundaryObservationKey::equality;
+    assert!(eq(&first, &warm));
+    assert!(!eq(&first, &changed));
+    assert!(eq(&first, &restored));
+    let need = observed_boundary(
+        &dice,
+        tracker,
+        Some(policy),
+        PathObservationEpoch::empty(),
+        "pkg",
+    )
+    .await;
+    assert!(matches!(need, PathOutcome::Need(_)));
+    assert!(!HostRootPackageBoundaryObservationKey::validity(&need));
+    assert!(!eq(&need, &need));
+    let key = HostRootPackageBoundaryObservationKey::new(
+        path("/workspace"),
+        PackagePath::parse("pkg").unwrap(),
+    );
+    assert_eq!(
+        key.to_string(),
+        r#"observed-host-root-package-boundary:"/workspace"//pkg"#
+    );
+    let lstat_demand = demand("/root-a/pkg", PathObservationOperation::Lstat);
+    let outer = |pairs| -> <HostRootPackageBoundaryObservationKey as Key>::Value {
+        PathOutcome::Complete(
+            PathObservationEpoch::from_shared(pairs)
+                .map(|_| unreachable!())
+                .map_err(ObservedPathFrontierError::from),
+        )
+    };
+    let mismatch = outer(vec![(
+        demand("/root-a/pkg", PathObservationOperation::FileBytes),
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+    )]);
+    assert!(matches!(
+        mismatch,
+        PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+            PathObservationEpochError::OperationMismatch { .. }
+        )))
+    ));
+    let conflict = outer(vec![
+        (
+            lstat_demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        ),
+        (
+            lstat_demand,
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                lstat(PathNodeKind::Directory, 1),
+            ))),
+        ),
+    ]);
+    assert!(matches!(
+        conflict,
+        PathOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+            PathObservationEpochError::ConflictingDemand(_)
+        )))
+    ));
+    assert!(HostRootPackageBoundaryObservationKey::validity(&conflict));
+    assert!(eq(&conflict, &conflict));
 }

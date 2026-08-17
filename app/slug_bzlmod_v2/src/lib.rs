@@ -100,6 +100,10 @@ pub use host_package_boundary::HostRootPackageBoundary;
 pub use host_package_boundary::HostRootPackageBoundaryError;
 pub use host_package_boundary::HostRootPackageBoundaryKey;
 pub use host_package_boundary::HostRootPackageBoundaryKind;
+#[doc(hidden)]
+pub use host_package_boundary::HostRootPackageBoundaryObservationKey;
+#[doc(hidden)]
+pub use host_package_boundary::ObservedHostRootPackageBoundary;
 pub use interim_module::EvaluatedNonrootModule;
 pub use interim_module::LogicalModuleFileId;
 pub use interim_module::LogicalSpan;
