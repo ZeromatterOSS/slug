@@ -52,6 +52,7 @@ use slug_bzlmod_v2::RootPackageBzlTargetError;
 use slug_bzlmod_v2::RootPackageSource;
 use slug_bzlmod_v2::RootPackageSourceError;
 use slug_bzlmod_v2::RootPackageSourceKey;
+use slug_bzlmod_v2::RootPackageSourceObservationKey;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_events_v2::CaptureEvaluationEvents;
@@ -63,6 +64,8 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackageIdentifier;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use starlark::PrintHandler;
 use starlark::PrintLocation;
 use starlark::environment::FrozenModule;
@@ -1207,15 +1210,83 @@ pub(crate) struct HostBzlModuleEvalKey {
     label: HostRootBzlLabel,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostBzlCycleIdentity {
+    workspace: NormalizedAbsolutePath,
+    label: HostRootBzlLabel,
+}
+
+impl HostBzlCycleIdentity {
+    fn source_key(&self) -> RootPackageSourceObservationKey {
+        RootPackageSourceObservationKey::for_bzl(
+            self.workspace.dupe(),
+            self.label.package.clone(),
+            self.label.target.dupe(),
+        )
+    }
+}
+
 impl HostBzlModuleEvalKey {
     pub(crate) fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
         Self { workspace, label }
+    }
+
+    pub(crate) fn cycle_identity(&self) -> HostBzlCycleIdentity {
+        HostBzlCycleIdentity {
+            workspace: self.workspace.dupe(),
+            label: self.label.clone(),
+        }
     }
 }
 
 impl fmt::Display for HostBzlModuleEvalKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "host-bzl-module:{}:{}", self.workspace, self.label)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostBzlModule {
+    result: Arc<Result<FrozenBzlModule, HostBzlModuleError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostBzlModule {
+    pub(crate) fn result(&self) -> &Result<FrozenBzlModule, HostBzlModuleError> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostBzlModuleObservationKey {
+    workspace: NormalizedAbsolutePath,
+    label: HostRootBzlLabel,
+}
+
+impl HostBzlModuleObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, label: HostRootBzlLabel) -> Self {
+        Self { workspace, label }
+    }
+
+    pub(crate) fn cycle_identity(&self) -> HostBzlCycleIdentity {
+        HostBzlCycleIdentity {
+            workspace: self.workspace.dupe(),
+            label: self.label.clone(),
+        }
+    }
+}
+
+impl fmt::Display for HostBzlModuleObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "observed-host-bzl-module:{}:{}",
+            self.workspace, self.label
+        )
     }
 }
 
@@ -1669,15 +1740,355 @@ fn host_dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host loading DICE invariant failed: {error:?}"))
 }
 
+type HostBzlModuleCarrier = Arc<Result<FrozenBzlModule, HostBzlModuleError>>;
+type HostBzlModuleProjection = (HostBzlModuleCarrier, PathObservationEpoch);
+type HostBzlModuleDriverOutcome =
+    SourcePreparationOutcome<Result<HostBzlModuleProjection, ObservedPathFrontierError>>;
+
+#[derive(Clone, Copy)]
+enum HostBzlModuleMode {
+    Legacy,
+    Observed,
+}
+
+#[cfg(test)]
+struct ForceHostBzlFreezeFailure;
+
 fn host_bzl_complete(
     result: Result<FrozenBzlModule, HostBzlModuleError>,
-) -> SourcePreparationOutcome<Arc<Result<FrozenBzlModule, HostBzlModuleError>>> {
-    SourcePreparationOutcome::Complete(Arc::new(result))
+    observations: PathObservationEpoch,
+) -> HostBzlModuleDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn union_host_bzl_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+async fn complete_observed_host_bzl_cycle(
+    ctx: &mut DiceComputations<'_>,
+    current: &HostBzlCycleIdentity,
+    cycle: &HostBzlLoadCycle,
+    mut observations: PathObservationEpoch,
+) -> HostBzlModuleDriverOutcome {
+    let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+    if !cycle.keys.is_empty() {
+        let current_index = cycle
+            .keys
+            .iter()
+            .position(|identity| identity == current)
+            .expect("detected Host bzl cycle contains the current observed module");
+        for offset in 1..cycle.keys.len() {
+            let identity = &cycle.keys[(current_index + offset) % cycle.keys.len()];
+            let source = match host_dice_invariant(ctx.compute(&identity.source_key()).await) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(source)) => source,
+            };
+            observations = match union_host_bzl_observations(&observations, source.observations()) {
+                Ok(observations) => observations,
+                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+            };
+            if let Err(error) = source.result() {
+                return host_bzl_complete(
+                    Err(HostBzlModuleError::Source(error.clone())),
+                    observations,
+                );
+            }
+        }
+    }
+    host_bzl_complete(Err(HostBzlModuleError::Cycle(cycle.clone())), observations)
+}
+
+async fn compute_host_bzl_module(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    label: &HostRootBzlLabel,
+    mode: HostBzlModuleMode,
+    capture_events: bool,
+    event_batch: &mut Option<EventBatch>,
+) -> HostBzlModuleDriverOutcome {
+    let source = match mode {
+        HostBzlModuleMode::Legacy => match host_dice_invariant(
+            ctx.compute(&RootPackageSourceKey::for_bzl(
+                workspace.dupe(),
+                label.package.clone(),
+                label.target.dupe(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(result) => SourcePreparationOutcome::Complete(Ok((
+                result.as_ref().clone(),
+                PathObservationEpoch::empty(),
+            ))),
+        },
+        HostBzlModuleMode::Observed => match host_dice_invariant(
+            ctx.compute(&RootPackageSourceObservationKey::for_bzl(
+                workspace.dupe(),
+                label.package.clone(),
+                label.target.dupe(),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok(source)) => SourcePreparationOutcome::Complete(
+                Ok((source.result().clone(), source.observations().dupe())),
+            ),
+        },
+    };
+    let (source, observations) = match source {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    let source = match source {
+        Ok(source) => source,
+        Err(error) => {
+            return host_bzl_complete(Err(HostBzlModuleError::Source(error)), observations);
+        }
+    };
+    let source_text = match host_source_text(&source) {
+        Ok(source) => source,
+        Err(error) => {
+            return host_bzl_complete(Err(HostBzlModuleError::Input(error)), observations);
+        }
+    };
+    let source_name = match host_source_name(&source) {
+        Ok(name) => name,
+        Err(error) => {
+            return host_bzl_complete(Err(HostBzlModuleError::Input(error)), observations);
+        }
+    };
+    let ast = match AstModule::parse_with_string_encoding(
+        &source_name,
+        source_text.as_ref().clone(),
+        &Dialect::Standard,
+        StringEncoding::BazelInternal,
+    ) {
+        Ok(ast) => ast,
+        Err(error) => {
+            return host_bzl_complete(
+                Err(HostBzlModuleError::Parse {
+                    label: label.clone(),
+                    message: Arc::from(error.to_string()),
+                }),
+                observations,
+            );
+        }
+    };
+    let loads = ast
+        .loads()
+        .into_iter()
+        .map(|load| load.module_id.to_owned())
+        .collect::<Vec<_>>();
+    let mut loaded_modules = Vec::with_capacity(loads.len());
+    let mut observations = observations;
+    for load in &loads {
+        let child_label = match resolve_host_load_label(&label.package, load) {
+            Ok(label) => label,
+            Err(error) => {
+                return host_bzl_complete(
+                    Err(HostBzlModuleError::LoadLabel {
+                        source: label.clone(),
+                        error,
+                    }),
+                    observations,
+                );
+            }
+        };
+        let guard = host_dice_invariant(ctx.cycle_guard::<HostBzlLoadCycleGuard>())
+            .expect("Host bzl loading requires the request cycle detector");
+        let child = match mode {
+            HostBzlModuleMode::Legacy => {
+                let child = HostBzlModuleEvalKey::new(workspace.dupe(), child_label.clone());
+                match guard.guard_this(ctx.compute(&child)).await {
+                    Ok(result) => host_dice_invariant(result)
+                        .map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty()))),
+                    Err(cycle) => {
+                        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
+                        return host_bzl_complete(
+                            Err(HostBzlModuleError::Cycle(cycle)),
+                            observations,
+                        );
+                    }
+                }
+            }
+            HostBzlModuleMode::Observed => {
+                let child = HostBzlModuleObservationKey::new(workspace.dupe(), child_label.clone());
+                match guard.guard_this(ctx.compute(&child)).await {
+                    Ok(result) => match host_dice_invariant(result) {
+                        SourcePreparationOutcome::Need(need) => {
+                            SourcePreparationOutcome::Need(need)
+                        }
+                        SourcePreparationOutcome::Complete(Err(error)) => {
+                            SourcePreparationOutcome::Complete(Err(error))
+                        }
+                        SourcePreparationOutcome::Complete(Ok(value)) => {
+                            SourcePreparationOutcome::Complete(Ok((
+                                value.result().clone(),
+                                value.observations().dupe(),
+                            )))
+                        }
+                    },
+                    Err(cycle) => {
+                        return complete_observed_host_bzl_cycle(
+                            ctx,
+                            &HostBzlCycleIdentity {
+                                workspace: workspace.dupe(),
+                                label: label.clone(),
+                            },
+                            &cycle,
+                            observations,
+                        )
+                        .await;
+                    }
+                }
+            }
+        };
+        let (child, incoming) = match child {
+            SourcePreparationOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+        };
+        observations = match mode {
+            HostBzlModuleMode::Legacy => {
+                debug_assert!(incoming.observations().is_empty());
+                observations
+            }
+            HostBzlModuleMode::Observed => {
+                match union_host_bzl_observations(&observations, &incoming) {
+                    Ok(observations) => observations,
+                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                }
+            }
+        };
+        let module = match child {
+            Ok(module) => module,
+            Err(error) => {
+                return host_bzl_complete(
+                    Err(HostBzlModuleError::Child {
+                        load: Arc::from(load.as_str()),
+                        label: child_label,
+                        error: Arc::new(error),
+                    }),
+                    observations,
+                );
+            }
+        };
+        loaded_modules.push((load.clone(), module));
+    }
+
+    let module = Module::new();
+    let manifest = BzlLoadManifest::new(
+        BzlModuleIdentity {
+            label: label.canonical_label(),
+            workspace_path: source.logical_path().as_path().to_path_buf(),
+        },
+        digest(source_text.as_str()),
+        loaded_modules.iter().map(|(_, module)| module),
+    );
+    let loader = LocalBzlLoader {
+        modules: loaded_modules
+            .iter()
+            .map(|(load, module)| (load.as_str(), module.module.dupe()))
+            .collect(),
+    };
+    let evaluation_context = BzlEvaluationContext::new(label.to_string());
+    let print_capture = capture_events.then(LoadingPrintCapture::default);
+    let globals = loading_globals();
+    {
+        let mut evaluator = Evaluator::new(&module);
+        evaluator.extra = Some(&evaluation_context);
+        evaluator.set_loader(&loader);
+        if let Some(print_capture) = print_capture.as_ref() {
+            evaluator.set_print_handler(print_capture);
+        }
+        let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
+        drop(evaluator);
+        *event_batch = print_capture.map(LoadingPrintCapture::into_batch);
+        if let Err(error) = evaluation {
+            return host_bzl_complete(
+                Err(HostBzlModuleError::Evaluation(LoadingError::new(
+                    error.to_string(),
+                ))),
+                observations,
+            );
+        }
+    }
+    #[cfg(test)]
+    if ctx
+        .per_transaction_data()
+        .data
+        .get::<ForceHostBzlFreezeFailure>()
+        .is_ok()
+    {
+        return host_bzl_complete(
+            Err(HostBzlModuleError::Freeze {
+                label: label.clone(),
+                message: Arc::from("forced test freeze failure"),
+            }),
+            observations,
+        );
+    }
+    let module = match module.freeze() {
+        Ok(module) => module,
+        Err(error) => {
+            return host_bzl_complete(
+                Err(HostBzlModuleError::Freeze {
+                    label: label.clone(),
+                    message: Arc::from(format!("{error:?}")),
+                }),
+                observations,
+            );
+        }
+    };
+    host_bzl_complete(
+        Ok(FrozenBzlModule {
+            module,
+            path: source.logical_path().as_path().to_path_buf(),
+            loads,
+            retained_bzl_modules: retained_module_closure(&loaded_modules),
+            manifest,
+        }),
+        observations,
+    )
+}
+
+fn stores_host_bzl_event_batch(value: &HostBzlModuleDriverOutcome) -> bool {
+    matches!(value, SourcePreparationOutcome::Complete(Ok(_)))
 }
 
 #[async_trait]
 impl Key for HostBzlModuleEvalKey {
-    type Value = SourcePreparationOutcome<Arc<Result<FrozenBzlModule, HostBzlModuleError>>>;
+    type Value = SourcePreparationOutcome<HostBzlModuleCarrier>;
 
     async fn compute(
         &self,
@@ -1690,148 +2101,80 @@ impl Key for HostBzlModuleEvalKey {
             .get::<CaptureEvaluationEvents>()
             .is_ok();
         let mut event_batch = None;
-        let value = async {
-            let source = match host_dice_invariant(
-                ctx.compute(&RootPackageSourceKey::for_bzl(
-                    self.workspace.dupe(),
-                    self.label.package.clone(),
-                    self.label.target.dupe(),
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(source) => match source.as_ref() {
-                    Ok(source) => source.dupe(),
-                    Err(error) => {
-                        return host_bzl_complete(Err(HostBzlModuleError::Source(error.clone())));
-                    }
-                },
-            };
-            let source_text = match host_source_text(&source) {
-                Ok(source) => source,
-                Err(error) => return host_bzl_complete(Err(HostBzlModuleError::Input(error))),
-            };
-            let source_name = match host_source_name(&source) {
-                Ok(name) => name,
-                Err(error) => return host_bzl_complete(Err(HostBzlModuleError::Input(error))),
-            };
-            let ast = match AstModule::parse_with_string_encoding(
-                &source_name,
-                source_text.as_ref().clone(),
-                &Dialect::Standard,
-                StringEncoding::BazelInternal,
-            ) {
-                Ok(ast) => ast,
-                Err(error) => {
-                    return host_bzl_complete(Err(HostBzlModuleError::Parse {
-                        label: self.label.clone(),
-                        message: Arc::from(error.to_string()),
-                    }));
-                }
-            };
-            let loads = ast
-                .loads()
-                .into_iter()
-                .map(|load| load.module_id.to_owned())
-                .collect::<Vec<_>>();
-            let mut loaded_modules = Vec::with_capacity(loads.len());
-            for load in &loads {
-                let label = match resolve_host_load_label(&self.label.package, load) {
-                    Ok(label) => label,
-                    Err(error) => {
-                        return host_bzl_complete(Err(HostBzlModuleError::LoadLabel {
-                            source: self.label.clone(),
-                            error,
-                        }));
-                    }
-                };
-                let child = HostBzlModuleEvalKey::new(self.workspace.dupe(), label.clone());
-                let guard = host_dice_invariant(ctx.cycle_guard::<HostBzlLoadCycleGuard>())
-                    .expect("Host bzl loading requires the request cycle detector");
-                let child_value = match guard.guard_this(ctx.compute(&child)).await {
-                    Ok(result) => host_dice_invariant(result),
-                    Err(cycle) => {
-                        let _unused = ctx.compute(&BzlLoadCyclePoisonKey).await;
-                        return host_bzl_complete(Err(HostBzlModuleError::Cycle(cycle)));
-                    }
-                };
-                let module = match child_value {
-                    SourcePreparationOutcome::Need(need) => {
-                        return SourcePreparationOutcome::Need(need);
-                    }
-                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                        Ok(module) => module.clone(),
-                        Err(error) => {
-                            return host_bzl_complete(Err(HostBzlModuleError::Child {
-                                load: Arc::from(load.as_str()),
-                                label,
-                                error: Arc::new(error.clone()),
-                            }));
-                        }
-                    },
-                };
-                loaded_modules.push((load.clone(), module));
-            }
-
-            let module = Module::new();
-            let manifest = BzlLoadManifest::new(
-                BzlModuleIdentity {
-                    label: self.label.canonical_label(),
-                    workspace_path: source.logical_path().as_path().to_path_buf(),
-                },
-                digest(source_text.as_str()),
-                loaded_modules.iter().map(|(_, module)| module),
-            );
-            let loader = LocalBzlLoader {
-                modules: loaded_modules
-                    .iter()
-                    .map(|(load, module)| (load.as_str(), module.module.dupe()))
-                    .collect(),
-            };
-            let evaluation_context = BzlEvaluationContext::new(self.label.to_string());
-            let print_capture = capture_events.then(LoadingPrintCapture::default);
-            let globals = loading_globals();
-            {
-                let mut evaluator = Evaluator::new(&module);
-                evaluator.extra = Some(&evaluation_context);
-                evaluator.set_loader(&loader);
-                if let Some(print_capture) = print_capture.as_ref() {
-                    evaluator.set_print_handler(print_capture);
-                }
-                let evaluation = evaluator.eval_module(ast, &globals).map(|_| ());
-                drop(evaluator);
-                event_batch = print_capture.map(LoadingPrintCapture::into_batch);
-                if let Err(error) = evaluation {
-                    return host_bzl_complete(Err(HostBzlModuleError::Evaluation(
-                        LoadingError::new(error.to_string()),
-                    )));
-                }
-            }
-            let module = match module.freeze() {
-                Ok(module) => module,
-                Err(error) => {
-                    return host_bzl_complete(Err(HostBzlModuleError::Freeze {
-                        label: self.label.clone(),
-                        message: Arc::from(format!("{error:?}")),
-                    }));
-                }
-            };
-            host_bzl_complete(Ok(FrozenBzlModule {
-                module,
-                path: source.logical_path().as_path().to_path_buf(),
-                loads,
-                retained_bzl_modules: retained_module_closure(&loaded_modules),
-                manifest,
-            }))
-        }
+        let value = compute_host_bzl_module(
+            ctx,
+            &self.workspace,
+            &self.label,
+            HostBzlModuleMode::Legacy,
+            capture_events,
+            &mut event_batch,
+        )
         .await;
-        if capture_events && value.is_complete() {
+        if capture_events && stores_host_bzl_event_batch(&value) {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
                 .expect("HostBzlModuleEvalKey stores one local Complete event batch");
         }
-        value
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy Host bzl module produced frontier error: {error}")
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostBzlModuleObservationKey {
+    type Value = SourcePreparationOutcome<Result<ObservedHostBzlModule, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = compute_host_bzl_module(
+            ctx,
+            &self.workspace,
+            &self.label,
+            HostBzlModuleMode::Observed,
+            capture_events,
+            &mut event_batch,
+        )
+        .await;
+        if capture_events && stores_host_bzl_event_batch(&value) {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("HostBzlModuleObservationKey stores one local Complete event batch");
+        }
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostBzlModule {
+                    result,
+                    observations,
+                }))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3853,6 +4196,8 @@ mod host_package_load_tests;
 #[cfg(test)]
 mod module_extension_definition_loading_tests {
     use std::sync::Mutex;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
     use dice::ActivationData;
     use dice::ActivationKind;
@@ -3898,14 +4243,34 @@ mod module_extension_definition_loading_tests {
         label: CanonicalLabel,
         kind: ActivationKind,
         batch: Option<EventBatch>,
+        observed: bool,
     }
 
     #[derive(Default)]
-    struct BzlEventTracker(Mutex<Vec<BzlActivation>>);
+    struct BzlEventTracker {
+        events: Mutex<Vec<BzlActivation>>,
+        legacy_modules: AtomicUsize,
+        observed_modules: AtomicUsize,
+        legacy_sources: AtomicUsize,
+        observed_sources: AtomicUsize,
+    }
 
     impl BzlEventTracker {
         fn take(&self) -> Vec<BzlActivation> {
-            std::mem::take(&mut *self.0.lock().unwrap())
+            std::mem::take(&mut *self.events.lock().unwrap())
+        }
+
+        fn take_empty_observed_batches(&self, only: Option<&CanonicalLabel>) -> bool {
+            let activations = self.take();
+            only.is_none_or(|name| {
+                matches!(
+                    activations.as_slice(),
+                    [activation] if activation.observed && &activation.label == name
+                )
+            }) && activations.into_iter().all(|activation| {
+                !activation.observed
+                    || matches!(activation.batch, Some(batch) if batch.events().is_empty())
+            })
         }
     }
 
@@ -3923,29 +4288,70 @@ mod module_extension_definition_loading_tests {
         }
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            let batch = || {
+                activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe)
+            };
             if let Some(key) = key.downcast_ref::<HostBzlModuleEvalKey>() {
-                self.0.lock().unwrap().push(BzlActivation {
+                self.legacy_modules.fetch_add(1, Ordering::SeqCst);
+                self.events.lock().unwrap().push(BzlActivation {
                     label: key.label.canonical_label(),
                     kind: activation.kind(),
-                    batch: activation
-                        .evaluation_data()
-                        .and_then(|data| data.downcast_ref::<EventBatch>())
-                        .map(Dupe::dupe),
+                    batch: batch(),
+                    observed: false,
                 });
+            } else if let Some(key) = key.downcast_ref::<HostBzlModuleObservationKey>() {
+                self.observed_modules.fetch_add(1, Ordering::SeqCst);
+                self.events.lock().unwrap().push(BzlActivation {
+                    label: key.label.canonical_label(),
+                    kind: activation.kind(),
+                    batch: batch(),
+                    observed: true,
+                });
+            } else if key.downcast_ref::<RootPackageSourceKey>().is_some() {
+                self.legacy_sources.fetch_add(1, Ordering::SeqCst);
+            } else if key
+                .downcast_ref::<RootPackageSourceObservationKey>()
+                .is_some()
+            {
+                self.observed_sources.fetch_add(1, Ordering::SeqCst);
             } else if key
                 .downcast_ref::<HostPureModuleExtensionInvocationsKey>()
                 .is_some()
             {
-                self.0.lock().unwrap().push(BzlActivation {
+                self.events.lock().unwrap().push(BzlActivation {
                     label: CanonicalLabel::parse("@@//:module_extension_invocation").unwrap(),
                     kind: activation.kind(),
-                    batch: activation
-                        .evaluation_data()
-                        .and_then(|data| data.downcast_ref::<EventBatch>())
-                        .map(Dupe::dupe),
+                    batch: batch(),
+                    observed: false,
                 });
             }
         }
+    }
+
+    fn host_bzl_user_data(
+        detector: Arc<dyn dice::UserCycleDetector>,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> UserComputationData {
+        let mut data = UserComputationData {
+            cycle_detector: Some(detector),
+            activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        data
+    }
+
+    async fn host_bzl_transaction(
+        dice: &Arc<Dice>,
+        detector: Arc<dyn dice::UserCycleDetector>,
+        tracker: Arc<BzlEventTracker>,
+    ) -> DiceTransaction {
+        dice.updater_with_data(host_bzl_user_data(detector, Some(tracker)))
+            .commit()
+            .await
     }
 
     async fn compute(
@@ -4025,14 +4431,32 @@ mod module_extension_definition_loading_tests {
         child_present: bool,
         tracker: Option<Arc<BzlEventTracker>>,
     ) -> DiceTransaction {
+        case_transaction_with_other(
+            dice,
+            module_source,
+            extension_source,
+            child_source,
+            "def implementation(ctx):\n    pass\nother=module_extension(implementation=implementation)\n",
+            child_present,
+            tracker,
+        )
+        .await
+    }
+
+    async fn case_transaction_with_other(
+        dice: &Arc<Dice>,
+        module_source: &str,
+        extension_source: &str,
+        child_source: &str,
+        other_source: &str,
+        child_present: bool,
+        tracker: Option<Arc<BzlEventTracker>>,
+    ) -> DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let mut user_data = UserComputationData {
-            cycle_detector: Some(crate::cycle_detector::bzl_load_cycle_detector()),
-            activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
-            ..Default::default()
-        };
-        user_data.data.set(CaptureEvaluationEvents);
-        let mut updater = dice.updater_with_data(user_data);
+        let mut updater = dice.updater_with_data(host_bzl_user_data(
+            crate::cycle_detector::bzl_load_cycle_detector(),
+            tracker,
+        ));
         updater
             .changed_to(vec![(
                 slug_workspace_v2::WorkspaceSnapshotKey {
@@ -4058,9 +4482,7 @@ mod module_extension_definition_loading_tests {
                         ),
                         (
                             workspace.as_path().join("other.bzl"),
-                            WorkspaceFileValue::Present(Arc::new(
-                                "def implementation(ctx):\n    pass\nother=module_extension(implementation=implementation)\n".to_owned(),
-                            )),
+                            WorkspaceFileValue::Present(Arc::new(other_source.to_owned())),
                         ),
                         (
                             workspace.as_path().join("BUILD.bazel"),
@@ -4119,110 +4541,109 @@ mod module_extension_definition_loading_tests {
             )])
             .unwrap();
         let path_epoch = PathObservationEpoch::new(
-                    ["/", WORKSPACE]
+            ["/", WORKSPACE]
+                .into_iter()
+                .enumerate()
+                .map(|(index, path)| {
+                    (
+                        PathObservationDemand::new(
+                            PathObservationNamespace::Host,
+                            NormalizedAbsolutePath::new(path).unwrap(),
+                            PathObservationOperation::Lstat,
+                        ),
+                        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                            PathNodeKind::Directory,
+                            index as i64 + 1,
+                            1,
+                            1,
+                            1,
+                            0o755,
+                        ))),
+                    )
+                })
+                .chain(
+                    ["REPO.bazel", ".bazelignore", "BUILD"]
                         .into_iter()
-                        .enumerate()
-                        .map(|(index, path)| {
+                        .map(|name| {
                             (
                                 PathObservationDemand::new(
                                     PathObservationNamespace::Host,
-                                    NormalizedAbsolutePath::new(path).unwrap(),
+                                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}"))
+                                        .unwrap(),
                                     PathObservationOperation::Lstat,
                                 ),
-                                PathObservationResult::Lstat(PathOperationResult::Present(
-                                    PathLstat::new(
-                                        PathNodeKind::Directory,
-                                        index as i64 + 1,
-                                        1,
-                                        1,
-                                        1,
-                                        0o755,
-                                    ),
-                                )),
+                                PathObservationResult::Lstat(PathOperationResult::Missing),
                             )
-                        })
-                        .chain(
-                            ["REPO.bazel", ".bazelignore", "BUILD"]
-                                .into_iter()
-                                .map(|name| {
-                                    (
-                                        PathObservationDemand::new(
-                                            PathObservationNamespace::Host,
-                                            NormalizedAbsolutePath::new(format!(
-                                                "{WORKSPACE}/{name}"
-                                            ))
-                                            .unwrap(),
-                                            PathObservationOperation::Lstat,
-                                        ),
-                                        PathObservationResult::Lstat(PathOperationResult::Missing),
-                                    )
-                                }),
-                        )
-                        .chain(std::iter::once((
+                        }),
+                )
+                .chain(std::iter::once((
+                    PathObservationDemand::new(
+                        PathObservationNamespace::Host,
+                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/BUILD.bazel")).unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                        PathNodeKind::RegularFile,
+                        20,
+                        1,
+                        1,
+                        1,
+                        0o644,
+                    ))),
+                )))
+                .chain(
+                    ["ext.bzl", "child.bzl", "other.bzl"]
+                        .into_iter()
+                        .enumerate()
+                        .map(|(index, name)| {
+                            (
+                                PathObservationDemand::new(
+                                    PathObservationNamespace::Host,
+                                    NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}"))
+                                        .unwrap(),
+                                    PathObservationOperation::Lstat,
+                                ),
+                                PathObservationResult::Lstat(
+                                    if name == "child.bzl" && !child_present {
+                                        PathOperationResult::Missing
+                                    } else {
+                                        PathOperationResult::Present(PathLstat::new(
+                                            PathNodeKind::RegularFile,
+                                            index as i64 + 30,
+                                            1,
+                                            1,
+                                            1,
+                                            0o644,
+                                        ))
+                                    },
+                                ),
+                            )
+                        }),
+                )
+                .chain(
+                    [
+                        ("ext.bzl", extension_source.as_bytes()),
+                        ("child.bzl", child_source.as_bytes()),
+                        ("other.bzl", other_source.as_bytes()),
+                    ]
+                    .into_iter()
+                    .map(|(name, bytes)| {
+                        (
                             PathObservationDemand::new(
                                 PathObservationNamespace::Host,
-                                NormalizedAbsolutePath::new(format!("{WORKSPACE}/BUILD.bazel"))
-                                    .unwrap(),
-                                PathObservationOperation::Lstat,
+                                NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}")).unwrap(),
+                                PathObservationOperation::FileBytes,
                             ),
-                            PathObservationResult::Lstat(PathOperationResult::Present(
-                                PathLstat::new(PathNodeKind::RegularFile, 20, 1, 1, 1, 0o644),
-                            )),
-                        )))
-                        .chain(["ext.bzl", "child.bzl", "other.bzl"].into_iter().enumerate().map(
-                            |(index, name)| {
-                                (
-                                    PathObservationDemand::new(
-                                        PathObservationNamespace::Host,
-                                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}"))
-                                            .unwrap(),
-                                        PathObservationOperation::Lstat,
-                                    ),
-                                    PathObservationResult::Lstat(
-                                        if name == "child.bzl" && !child_present {
-                                            PathOperationResult::Missing
-                                        } else {
-                                            PathOperationResult::Present(PathLstat::new(
-                                                PathNodeKind::RegularFile,
-                                                index as i64 + 30,
-                                                1,
-                                                1,
-                                                1,
-                                                0o644,
-                                            ))
-                                        },
-                                    ),
-                                )
-                            },
-                        ))
-                        .chain(
-                            [
-                                ("ext.bzl", extension_source.as_bytes()),
-                                ("child.bzl", child_source.as_bytes()),
-                                (
-                                    "other.bzl",
-                                    b"def implementation(ctx):\n    pass\nother=module_extension(implementation=implementation)\n" as &[u8],
-                                ),
-                            ]
-                            .into_iter()
-                            .map(|(name, bytes)| {
-                                (
-                                    PathObservationDemand::new(
-                                        PathObservationNamespace::Host,
-                                        NormalizedAbsolutePath::new(format!("{WORKSPACE}/{name}"))
-                                            .unwrap(),
-                                        PathObservationOperation::FileBytes,
-                                    ),
-                                    PathObservationResult::FileBytes(
-                                        if name == "child.bzl" && !child_present {
-                                            PathOperationResult::Missing
-                                        } else {
-                                            PathOperationResult::Present(Arc::from(bytes))
-                                        },
-                                    ),
-                                )
-                            }),
-                        ),
+                            PathObservationResult::FileBytes(
+                                if name == "child.bzl" && !child_present {
+                                    PathOperationResult::Missing
+                                } else {
+                                    PathOperationResult::Present(Arc::from(bytes))
+                                },
+                            ),
+                        )
+                    }),
+                ),
         )
         .unwrap();
         updater
@@ -5070,6 +5491,408 @@ mod module_extension_definition_loading_tests {
                 }))
         ));
         assert!(export_drift.prints.is_empty());
+    }
+    fn observed_test_label(name: &str) -> HostRootBzlLabel {
+        HostRootBzlLabel::new(
+            PackagePath::parse("").unwrap(),
+            RootPackageBzlTarget::parse(name).unwrap(),
+        )
+    }
+
+    async fn compute_observed_module(
+        transaction: &mut DiceTransaction,
+        name: &str,
+    ) -> <HostBzlModuleObservationKey as Key>::Value {
+        transaction
+            .compute(&HostBzlModuleObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                observed_test_label(name),
+            ))
+            .await
+            .unwrap()
+    }
+
+    fn observed_module(
+        outcome: &<HostBzlModuleObservationKey as Key>::Value,
+    ) -> &ObservedHostBzlModule {
+        let SourcePreparationOutcome::Complete(Ok(value)) = outcome else {
+            panic!("observed Host bzl module did not complete with a carrier: {outcome:?}");
+        };
+        value
+    }
+
+    fn assert_observed_frontier(
+        value: &ObservedHostBzlModule,
+        epoch: &PathObservationEpoch,
+        required_files: &[&str],
+        excluded_files: &[&str],
+    ) {
+        for (demand, result) in value.observations().observations() {
+            let expected = epoch
+                .get(demand)
+                .unwrap_or_else(|| panic!("missing {demand:?}"));
+            assert!(Arc::ptr_eq(result, expected), "changed Arc for {demand:?}");
+        }
+        let has_file = |name: &str| {
+            value.observations().observations().keys().any(|demand| {
+                demand.operation() == PathObservationOperation::FileBytes
+                    && demand.path().as_path().ends_with(name)
+            })
+        };
+        assert!(required_files.iter().all(|name| has_file(name)));
+        assert!(excluded_files.iter().all(|name| !has_file(name)));
+    }
+
+    async fn transaction_with_epoch(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        tracker: Arc<BzlEventTracker>,
+        force_freeze: bool,
+    ) -> DiceTransaction {
+        let mut data = host_bzl_user_data(
+            crate::cycle_detector::bzl_load_cycle_detector(),
+            Some(tracker),
+        );
+        if force_freeze {
+            data.data.set(ForceHostBzlFreezeFailure);
+        }
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[tokio::test]
+    async fn observed_bzl_module_retains_recursive_arcs_events_and_a_b_a_identity() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let parent = "print('parent')\nload('//:child.bzl','child')\nvalue=child\n";
+        let child_a = "print('child-a')\nchild=1\n";
+        let child_b = "print('child-b')\nchild=2\n";
+        let mut first_transaction =
+            case_transaction(&dice, "", parent, child_a, true, Some(tracker.clone())).await;
+        let epoch = first_transaction
+            .compute(&PathObservationEpochKey)
+            .await
+            .unwrap();
+        let first = compute_observed_module(&mut first_transaction, "ext.bzl").await;
+        assert!(HostBzlModuleObservationKey::validity(&first));
+        assert!(HostBzlModuleObservationKey::equality(&first, &first));
+        let value = observed_module(&first);
+        assert!(value.result().is_ok());
+        assert_observed_frontier(value, &epoch, &["ext.bzl", "child.bzl"], &[]);
+        assert_eq!(tracker.legacy_modules.load(Ordering::SeqCst), 0);
+        assert_eq!(tracker.legacy_sources.load(Ordering::SeqCst), 0);
+        assert_eq!(tracker.observed_modules.load(Ordering::SeqCst), 2);
+        assert_eq!(tracker.observed_sources.load(Ordering::SeqCst), 2);
+        let activations = tracker.take();
+        assert!(activations.iter().all(|activation| {
+            activation.observed
+                && activation
+                    .batch
+                    .as_ref()
+                    .is_some_and(|batch| !batch.events().is_empty())
+        }));
+        let mut warm_transaction =
+            case_transaction(&dice, "", parent, child_a, true, Some(tracker.clone())).await;
+        let warm = compute_observed_module(&mut warm_transaction, "ext.bzl").await;
+        assert!(HostBzlModuleObservationKey::equality(&first, &warm));
+        assert!(tracker.take().iter().all(|activation| {
+            !activation.observed
+                || activation.kind == ActivationKind::Reused && activation.batch.is_none()
+        }));
+        let mut changed_transaction =
+            case_transaction(&dice, "", parent, child_b, true, None).await;
+        let changed = compute_observed_module(&mut changed_transaction, "ext.bzl").await;
+        assert!(!HostBzlModuleObservationKey::equality(&first, &changed));
+        let mut restored_transaction =
+            case_transaction(&dice, "", parent, child_a, true, None).await;
+        let restored = compute_observed_module(&mut restored_transaction, "ext.bzl").await;
+        assert!(HostBzlModuleObservationKey::equality(&first, &restored));
+    }
+
+    #[tokio::test]
+    async fn observed_bzl_module_preserves_decisive_terminals_need_and_outer_polarity() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let mut seed = case_transaction(&dice, "", "x=1\n", "", true, None).await;
+        let epoch = seed.compute(&PathObservationEpochKey).await.unwrap();
+
+        let mut need_transaction =
+            transaction_with_epoch(&dice, PathObservationEpoch::empty(), tracker.clone(), false)
+                .await;
+        let need = compute_observed_module(&mut need_transaction, "ext.bzl").await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostBzlModuleObservationKey::validity(&need));
+        assert!(!HostBzlModuleObservationKey::equality(&need, &need));
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .all(|activation| activation.batch.is_none())
+        );
+
+        let sources = [
+            ("parse", "def broken(\n", "", true),
+            (
+                "load-label",
+                "load('@outside//:child.bzl','child')\n",
+                "",
+                true,
+            ),
+            (
+                "child",
+                "load('//:child.bzl','child')\nx=child\n",
+                "",
+                false,
+            ),
+            ("evaluation", "print('before')\nfail('boom')\n", "", true),
+        ];
+        for (name, source, child, child_present) in sources {
+            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let tracker = Arc::new(BzlEventTracker::default());
+            let mut transaction = case_transaction(
+                &case_dice,
+                "",
+                source,
+                child,
+                child_present,
+                Some(tracker.clone()),
+            )
+            .await;
+            let injected = transaction.compute(&PathObservationEpochKey).await.unwrap();
+            let outcome = compute_observed_module(&mut transaction, "ext.bzl").await;
+            let value = observed_module(&outcome);
+            assert_observed_frontier(
+                value,
+                &injected,
+                &["ext.bzl"],
+                if name == "child" { &[] } else { &["child.bzl"] },
+            );
+            if name == "child" {
+                assert!(
+                    value
+                        .observations()
+                        .observations()
+                        .keys()
+                        .any(|demand| demand.path().as_path().ends_with("child.bzl"))
+                );
+            }
+            assert!(matches!(
+                (name, value.result()),
+                ("parse", Err(HostBzlModuleError::Parse { .. }))
+                    | ("load-label", Err(HostBzlModuleError::LoadLabel { .. }))
+                    | ("child", Err(HostBzlModuleError::Child { .. }))
+                    | ("evaluation", Err(HostBzlModuleError::Evaluation(_)))
+            ));
+            assert_eq!(tracker.legacy_modules.load(Ordering::SeqCst), 0);
+            assert_eq!(tracker.legacy_sources.load(Ordering::SeqCst), 0);
+            assert!(
+                tracker
+                    .take()
+                    .iter()
+                    .all(|activation| !activation.observed || activation.batch.is_some())
+            );
+        }
+
+        let bytes = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(format!("{WORKSPACE}/ext.bzl")).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let bad = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::<[u8]>::from([0xff])),
+        ));
+        let invalid_epoch = PathObservationEpoch::from_shared(epoch.observations().iter().map(
+            |(demand, result)| {
+                (
+                    demand.dupe(),
+                    if demand == &bytes {
+                        bad.dupe()
+                    } else {
+                        result.dupe()
+                    },
+                )
+            },
+        ))
+        .unwrap();
+        let terminal_label = observed_test_label("ext.bzl").canonical_label();
+        let terminal_tracker = Arc::new(BzlEventTracker::default());
+        let mut input_tx =
+            transaction_with_epoch(&dice, invalid_epoch.dupe(), terminal_tracker.clone(), false)
+                .await;
+        let input = compute_observed_module(&mut input_tx, "ext.bzl").await;
+        let input = observed_module(&input);
+        assert!(matches!(input.result(), Err(HostBzlModuleError::Input(_))));
+        assert!(Arc::ptr_eq(input.observations().get(&bytes).unwrap(), &bad));
+        assert!(terminal_tracker.take_empty_observed_batches(Some(&terminal_label)));
+        let mut freeze_tx =
+            transaction_with_epoch(&dice, epoch.dupe(), terminal_tracker.clone(), true).await;
+        let freeze = compute_observed_module(&mut freeze_tx, "ext.bzl").await;
+        let freeze = observed_module(&freeze);
+        assert!(matches!(
+            freeze.result(),
+            Err(HostBzlModuleError::Freeze { .. })
+        ));
+        assert_observed_frontier(freeze, &epoch, &["ext.bzl"], &["child.bzl"]);
+        assert!(terminal_tracker.take_empty_observed_batches(Some(&terminal_label)));
+        let source_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut source_tx = case_transaction(&source_dice, "", "", "", false, None).await;
+        let source_epoch = source_tx.compute(&PathObservationEpochKey).await.unwrap();
+        let source = compute_observed_module(&mut source_tx, "child.bzl").await;
+        let source = observed_module(&source);
+        assert!(matches!(
+            source.result(),
+            Err(HostBzlModuleError::Source(_))
+        ));
+        assert_observed_frontier(source, &source_epoch, &[], &["ext.bzl"]);
+
+        let error = PathObservationEpoch::from_shared([(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/mismatch").unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            Arc::new(PathObservationResult::FileBytes(
+                PathOperationResult::Missing,
+            )),
+        )])
+        .unwrap_err()
+        .into();
+        let outer: <HostBzlModuleObservationKey as Key>::Value =
+            SourcePreparationOutcome::Complete(Err(error));
+        assert!(HostBzlModuleObservationKey::validity(&outer));
+        assert!(HostBzlModuleObservationKey::equality(&outer, &outer));
+    }
+
+    #[tokio::test]
+    async fn observed_bzl_cycles_retain_only_cycle_keys_then_parent_prefix() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let parent = "load('//:child.bzl','child')\na=child\n";
+        let child = "load('//:other.bzl','other')\nchild=other\n";
+        let other = "load('//:child.bzl','child')\nother=child\n";
+
+        let mut parent_transaction = case_transaction_with_other(
+            &dice,
+            "",
+            parent,
+            child,
+            other,
+            true,
+            Some(tracker.clone()),
+        )
+        .await;
+        let epoch = parent_transaction
+            .compute(&PathObservationEpochKey)
+            .await
+            .unwrap();
+        let parent_value = compute_observed_module(&mut parent_transaction, "ext.bzl").await;
+        let parent_value = observed_module(&parent_value);
+        assert!(matches!(
+            parent_value.result(),
+            Err(HostBzlModuleError::Child { error, .. }) if error.cycle().is_some()
+        ));
+        assert_observed_frontier(
+            parent_value,
+            &epoch,
+            &["ext.bzl", "child.bzl", "other.bzl"],
+            &[],
+        );
+
+        for (current, required) in [
+            ("child.bzl", ["child.bzl", "other.bzl"]),
+            ("other.bzl", ["other.bzl", "child.bzl"]),
+        ] {
+            let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let mut transaction =
+                case_transaction_with_other(&case_dice, "", parent, child, other, true, None).await;
+            let current_epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+            let value = compute_observed_module(&mut transaction, current).await;
+            let value = observed_module(&value);
+            assert!(value.result().as_ref().unwrap_err().cycle().is_some());
+            assert_observed_frontier(value, &current_epoch, &required, &["ext.bzl"]);
+        }
+
+        assert_eq!(tracker.legacy_modules.load(Ordering::SeqCst), 0);
+        assert_eq!(tracker.legacy_sources.load(Ordering::SeqCst), 0);
+        assert!(tracker.take_empty_observed_batches(None));
+
+        assert!(!BzlLoadCyclePoisonKey::validity(&()));
+        let family_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let self_source = "load('//:ext.bzl','x')\nx=1\n";
+        let mut seed = case_transaction(&family_dice, "", self_source, "", true, None).await;
+        let self_epoch = seed.compute(&PathObservationEpochKey).await.unwrap();
+        drop(seed);
+        let detector = crate::cycle_detector::bzl_load_cycle_detector();
+        let family_tracker = Arc::new(BzlEventTracker::default());
+        let mut legacy_tx =
+            host_bzl_transaction(&family_dice, detector.clone(), family_tracker.clone()).await;
+        let mut observed_tx =
+            host_bzl_transaction(&family_dice, detector, family_tracker.clone()).await;
+        let label = observed_test_label("ext.bzl");
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let (legacy, observed) = tokio::join!(
+            legacy_tx.compute(&HostBzlModuleEvalKey::new(workspace.dupe(), label.clone())),
+            observed_tx.compute(&HostBzlModuleObservationKey::new(workspace, label)),
+        );
+        drop(legacy_tx);
+        drop(observed_tx);
+        assert!(
+            matches!(legacy.unwrap(), SourcePreparationOutcome::Complete(value) if matches!(value.as_ref(), Err(HostBzlModuleError::Cycle(_))))
+        );
+        let observed = observed.unwrap();
+        let self_value = observed_module(&observed);
+        assert!(self_value.result().as_ref().unwrap_err().cycle().is_some());
+        assert_observed_frontier(self_value, &self_epoch, &["ext.bzl"], &["child.bzl"]);
+        assert!(family_tracker.legacy_modules.load(Ordering::SeqCst) > 0);
+        assert!(family_tracker.observed_modules.load(Ordering::SeqCst) > 0);
+        family_tracker.take();
+        let module_activations = family_tracker.observed_modules.load(Ordering::SeqCst);
+        let source_activations = family_tracker.observed_sources.load(Ordering::SeqCst);
+        let mut repeated = host_bzl_transaction(
+            &family_dice,
+            crate::cycle_detector::bzl_load_cycle_detector(),
+            family_tracker.clone(),
+        )
+        .await;
+        let repeated = compute_observed_module(&mut repeated, "ext.bzl").await;
+        assert!(HostBzlModuleObservationKey::equality(&observed, &repeated));
+        assert!(family_tracker.observed_modules.load(Ordering::SeqCst) > module_activations);
+        assert!(family_tracker.observed_sources.load(Ordering::SeqCst) > source_activations);
+        let activations = family_tracker.take();
+        let evaluated = activations
+            .iter()
+            .any(|a| a.kind == ActivationKind::Evaluated);
+        assert!(evaluated);
+    }
+
+    #[tokio::test]
+    async fn observed_bzl_cancellation_publishes_no_parent_and_recovers() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(BzlEventTracker::default());
+        let source = "load('//:ext.bzl','x')\nx=1\n";
+        let mut cancelled =
+            case_transaction(&dice, "", source, "", true, Some(tracker.clone())).await;
+        let key = HostBzlModuleObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            observed_test_label("ext.bzl"),
+        );
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(tracker.take().is_empty());
+        let mut successor = case_transaction(&dice, "", source, "", true, Some(tracker)).await;
+        let recovered = compute_observed_module(&mut successor, "ext.bzl").await;
+        assert!(matches!(
+            observed_module(&recovered).result(),
+            Err(error) if error.cycle().is_some()
+        ));
     }
 }
 
