@@ -2256,3 +2256,54 @@ duplicated driver, reconstructed Host read, event authority, legacy/public
 behavior change, loading/glob/BUILD/package-load/core/repository/materializer
 work or cap excess. Acceptance schedules only docs-only
 `WP-2A-m1-host-glob-frontier-design`.
+
+### Accepted observed Host-glob input frontiers (2026-08-17)
+
+Commit `bd4fb8db` accepts the two natural-owner observed siblings. Workspace
+`PathDirectoryListingObservationKey` retains the resolved-path epoch plus the
+exact final `DirectoryEntries` result. Bzlmod
+`HostRootPackageBoundaryObservationKey` retains repository-ignore plus, when
+not ignored, package-lookup observations. Each shares one mode-aware driver
+with its legacy owner while keeping key families disjoint.
+
+Need and cancellation publish no carrier. Aggregation mismatch/conflict remains
+a typed completed outer error, and the ignored short-circuit never activates
+lookup. Deterministic left-first union retains the first exact Arc for equal
+duplicates. Parent event ownership remains absent.
+
+Focused proof, 45 workspace tests, 397 Bzlmod library tests plus every
+integration group, direct loading check, formatting, artifact/diff hygiene and
+independent DICE/ownership/compact-memory/nine-category review accepted. Exact
+accounting is 111 production + 179 tests = 290 net workspace lines at 4,636
+physical, 119 production boundary-module lines at 397 physical, 223 boundary
+test lines at 1,073 physical, and four production lines in each crate root.
+Aggregate implementation is 238 production + 402 tests = 640 net Rust lines.
+
+Existing admitted listing, resolution, repository-ignore, marker, boundary and
+Host-glob behavior remains exact. Carrier association, epoch aggregation and
+exact-Arc identity are Slug-native. Higher Host-glob traversal, BUILD/package
+loading, core/public, repository/materializer and native-Windows ordering
+remain deferred.
+
+### Active Host-glob frontier design (2026-08-17)
+
+Run docs-only `WP-2A-m1-host-glob-frontier-design` from accepted predecessors
+`b9fda97d`, `f5a9b249` and `bd4fb8db`. Audit the live loading adapter ->
+traversal -> segment-candidate -> boundary graph and freeze the smallest
+complete callerless observed frontier consuming the new observed listing and
+boundary siblings.
+
+The design must cover every decisive traversal prefix, breadth-first ordinal
+and candidate order, recursive progress, boundary stops, grouped Need,
+first-ranked error, final sorted paths, deterministic epoch union, exact
+first-Arc retention, activation isolation, zero parent events, cancellation,
+warm reuse and A/B/A. Retain only one semantic Result Arc plus the existing
+Arc-backed epoch; all traversal collections and union scratch stay
+compute-local.
+
+Write only canonical/current/Stage 2 under 40/320/280/640 net ledger caps.
+STOP on code/oracle/Cargo writes, another container/cache/graph/store/lock,
+reconstructed or historical Host reads, event ownership, BUILD/package-load/
+core/public/repository/materializer work or behavior widening. Acceptance
+schedules exactly one bounded callerless Host-glob implementation, or exactly
+one smaller docs-only natural-owner prerequisite if the audit proves it.
