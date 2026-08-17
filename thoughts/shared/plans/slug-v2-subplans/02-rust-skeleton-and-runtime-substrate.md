@@ -2091,7 +2091,7 @@ recomputation, parent cancellation was only inferred, and the test cap was
 exhausted. The Rust diff remains provisional and is carried into the bounded
 proof-completion `REPLAN` below; no frontier acceptance is recorded here.
 
-### Active Host `.bzl` frontier proof completion (2026-08-17)
+### Accepted Host `.bzl` frontier proof completion (2026-08-17)
 
 Run `WP-2A-m1-host-bzl-module-frontier-proof-completion` from design commit
 `78eb0ea0` and the provisional two-file implementation. Preserve its one
@@ -2125,3 +2125,57 @@ materializer work, or cap excess. `REPLAN` if any terminal/order changes, the
 test seam does not compile out, poison or cancellation cannot be proved,
 cleanup finds a split, or another correction is needed. Acceptance schedules
 only docs-only `WP-2A-m1-host-glob-frontier-design`.
+
+Commit `b9fda97d` accepts the bounded proof completion. Against
+`78eb0ea0`, `bzl_module.rs` is 343 production + 480 test = 823 net lines
+and 5,915 physical lines; `cycle_detector.rs` is 46 production + zero test =
+46 net lines and 598 physical lines. Aggregate implementation is 389
+production + 480 test = 869 net Rust lines.
+
+The final real-driver proof covers source, Input, parse, load-label, child,
+evaluation and Freeze terminals; exact decisive observation Arcs; direct and
+indirect cycle frontiers; simultaneous Legacy/Observed family separation;
+invalid poison recomputation; poll-to-Pending cancellation/drop and recovery;
+complete-only equality/validity; warm/A-B/A; and selected-key event ownership.
+Input and Freeze each require exactly one observed `@@//:ext.bzl` activation
+with one empty completed event batch. Independent proof, ownership and
+nine-category cleanup review accepted the result.
+
+Validation passed four focused observed tests, 114 library plus 66 integration
+`slug_loading_v2` tests, direct `slug_core_v2` check, formatting, artifact
+scan and diff hygiene. Strict Clippy stopped first in unchanged
+`allocative_derive`; archive status retained only its inherited baseline.
+Admitted Host `.bzl` behavior remains exact; frontier association and tagged
+cycle identity remain Slug-native; Host glob, final package loading, core and
+public activation remain deferred.
+
+### Active Host-glob frontier design (2026-08-17)
+
+Run docs-only `WP-2A-m1-host-glob-frontier-design` from accepted predecessor
+`b9fda97d`. Audit the live adapter -> traversal -> segment-candidate ->
+package-boundary graph and freeze the smallest complete callerless observed
+frontier, or one uniquely smaller observed-predecessor prerequisite.
+
+The design must include exact directory-listing results, selected and negative
+path-resolution/symlink probes, package-boundary predecessors and every
+decisive traversal prefix. Preserve breadth-first ordinal/candidate order,
+recursive progress, boundary stops, grouped Need, first-ranked error and final
+sorted paths. Child cache state beyond a decisive terminal remains
+dependency-owned and must not enter the parent carrier.
+
+Reuse `PathObservationEpoch::from_shared`, first-Arc duplicate retention and
+typed outer frontier errors. A completed value may retain only one semantic
+Result Arc plus the existing Arc-backed epoch. Need, cancellation and outer
+errors publish no parent carrier/event. Do not retain queues, visited sets,
+child carriers, evaluators, transactions or event batches, and do not invent a
+new container, graph, store, cache or reconstructed Host observer.
+
+Write only canonical/current/Stage 2 under 40/320/280/640 net ledger caps.
+Read only the bounded loading Host-glob/attempt owners, Bzlmod package-boundary
+owners, workspace path observation/resolution owners, directly referenced
+tests/manifests and the required utility-reuse sources named by the manifest.
+STOP on code/oracle writes, BUILD/package-load activation, public/core/
+repository/materializer work, a generic certificate framework, reverse
+dependencies or behavior widening. Acceptance schedules exactly one bounded
+callerless Host-glob implementation or exactly one smaller docs-only
+predecessor design.
