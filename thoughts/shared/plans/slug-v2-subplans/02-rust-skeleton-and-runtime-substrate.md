@@ -2190,7 +2190,7 @@ A listing-only or boundary-only successor still leaves the same future glob
 terminal incomplete, so this packet `REPLAN`s to the joint lower-owner design
 below rather than accepting or activating Host glob.
 
-### Active observed Host-glob input-frontiers design (2026-08-17)
+### Frozen observed Host-glob input-frontiers design (2026-08-17)
 
 Run docs-only `WP-2A-m1-observed-host-glob-input-frontiers-design` from
 accepted recursive Host-`.bzl` predecessor `b9fda97d` and the Host-glob audit
@@ -2215,3 +2215,44 @@ reconstructed Host reads, loading/glob/BUILD/package-load/core/public work,
 legacy behavior/API widening or cap excess. Acceptance schedules only the
 bounded joint implementation; after its acceptance return to docs-only Host-
 glob frontier design.
+
+Commit `f5a9b249` accepts the Host-glob `REPLAN` and two-owner design. The
+workspace sibling retains the exact resolved-path prefix plus final
+`DirectoryEntries` result. The Bzlmod sibling retains repository-ignore plus,
+when not ignored, package-lookup observations. Both use one mode-aware driver
+with separate legacy/observed child families, complete-only equality/validity,
+typed outer aggregation failures, left-first exact-Arc union and no parent event
+authority.
+
+Retained state is only the semantic result plus the accepted Arc-backed
+`PathObservationEpoch`. Need, outer error and cancellation publish no parent
+carrier; child cache state remains dependency-owned. Existing serial semantics
+and admitted Host values remain exact; association and aggregation are
+Slug-native; Host-glob traversal and all higher consumers remain deferred.
+
+The exact future allowlist is workspace `path_resolution.rs` and `lib.rs`,
+Bzlmod `host_package_boundary/{mod,tests}.rs` and `lib.rs`. Caps are 115/180/
+295/4,641 for workspace path resolution, 4/0/4/576 for its lib, 120/0/120/398
+for the Bzlmod boundary module, 0/240/240/1,090 for boundary tests and
+4/0/4/391 for Bzlmod lib; aggregate 243 production, 420 tests and 663 total,
+with no correction.
+
+### Active observed Host-glob input-frontiers implementation (2026-08-17)
+
+Run `WP-2A-m1-observed-host-glob-input-frontiers-implementation` from accepted
+design `f5a9b249`. Implement only the two callerless observed siblings and
+their doc-hidden crate-root exports. Preserve legacy Value/API/order through one
+mode-aware driver per owner; neither sibling may compute the other key family
+or own events.
+
+Require focused parity, Need/inner/outer/error/exact-Arc/first-duplicate/warm/
+A-B-A/nonactivation proof, full workspace and Bzlmod tests, direct loading
+check, formatting, inherited Clippy/archive dispositions, exact cap accounting,
+artifact/diff hygiene and independent DICE/ownership/compact-memory/
+nine-category cleanup acceptance.
+
+STOP on any other file, third key/carrier, second container/store/cache/graph,
+duplicated driver, reconstructed Host read, event authority, legacy/public
+behavior change, loading/glob/BUILD/package-load/core/repository/materializer
+work or cap excess. Acceptance schedules only docs-only
+`WP-2A-m1-host-glob-frontier-design`.
