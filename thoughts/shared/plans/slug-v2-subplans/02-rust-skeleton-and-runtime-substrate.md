@@ -2067,7 +2067,7 @@ The exact implementation allowlist is `bzl_module.rs` and
 correction is authorized; the large module requires independent cohesion and
 cleanup review.
 
-### Active Host `.bzl` module frontier implementation (2026-08-14)
+### Superseded Host `.bzl` module frontier implementation (2026-08-14)
 
 Run `WP-2A-m1-host-bzl-module-frontier-implementation` from accepted source
 frontier `2225cf99` and the frozen design above. Require discriminating
@@ -2083,3 +2083,45 @@ module key-to-key compute, `cycle.path` retention in a member, detector-held
 epochs, reconstructed Host reads, partial cycle prefixes, duplicate evaluator,
 glob/package-load/core/repository/materializer work or cap excess. Completion
 schedules only docs-only `WP-2A-m1-host-glob-frontier-design`.
+
+Independent proof review did not accept this no-correction packet. Its live
+two-file implementation and validation were coherent, but Input and Freeze
+were shaped below the driver, poison invalidity was not exercised through warm
+recomputation, parent cancellation was only inferred, and the test cap was
+exhausted. The Rust diff remains provisional and is carried into the bounded
+proof-completion `REPLAN` below; no frontier acceptance is recorded here.
+
+### Active Host `.bzl` frontier proof completion (2026-08-17)
+
+Run `WP-2A-m1-host-bzl-module-frontier-proof-completion` from design commit
+`78eb0ea0` and the provisional two-file implementation. Preserve its one
+mode-aware driver, exact source/child epoch union, distinct detector families,
+rotated `cycle.keys` reacquisition, poison dependency, selected-key event
+ownership, retained semantic Arc plus epoch, and all exact/Slug-native/deferred
+classifications.
+
+Close only the four proof gaps. Drive invalid UTF-8 through the observed key's
+actual source observation. Add one `#[cfg(test)]` per-transaction marker at the
+immediate pre-freeze boundary to force only the existing Freeze terminal. Run
+the same cycle twice on one `Dice` to prove the poison dependency forces fresh
+observed cycle/source activation with equal caller-independent frontiers. Poll
+an observed self-cycle compute to its first `Pending`, drop the future, assert
+no parent carrier/event, and prove a successor transaction completes. The
+accepted observed source-key cancellation contract covers its direct await;
+do not add another controllable key or production synchronization seam.
+
+The Rust allowlist remains exactly `bzl_module.rs` and `cycle_detector.rs`.
+Caps against their original 5,092/552 baselines are respectively
+360/480/840/5,932 and 115/0/115/667, aggregate 475 production, 480 tests and
+955 total net lines. Completion ledgers are capped at 180 net lines with no
+correction. Require focused/full loading, direct core, formatting, strict
+Clippy/archive dispositions, exact accounting, artifact/diff hygiene, and
+independent proof/ownership/nine-category cleanup acceptance.
+
+STOP on another file/key/carrier/detector/container/event owner, a general or
+production-visible fault seam, legacy/public/consumer behavior, duplicate
+evaluation, reconstructed observations, glob/package-load/core/repository/
+materializer work, or cap excess. `REPLAN` if any terminal/order changes, the
+test seam does not compile out, poison or cancellation cannot be proved,
+cleanup finds a split, or another correction is needed. Acceptance schedules
+only docs-only `WP-2A-m1-host-glob-frontier-design`.

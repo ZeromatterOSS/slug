@@ -1,12 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-bzl-module-frontier-implementation`
+Packet: `WP-2A-m1-host-bzl-module-frontier-proof-completion`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Result: add one callerless loading-private observed Host `.bzl` module key
-whose complete success and semantic-error values retain the exact recursive
-source frontier, without activating glob/package loading, core publication, or
-public overlap.
+Result: finish and prove the callerless loading-private observed Host `.bzl`
+module frontier without changing its two-file design or activating glob,
+package loading, core publication, or public overlap.
 
 ## Accepted predecessor and learned facts
 
@@ -30,7 +29,22 @@ Relevant unchanged Bazel 9.2 behavior remains source-anchored to
 regression evidence. No new oracle is needed because the sibling is callerless
 and the legacy behavior is not changed.
 
-## Frozen implementation contract
+## REPLAN basis
+
+The live two-file implementation is coherent: one mode-aware driver, distinct
+Legacy/Observed detector tags, exact source/child epoch union, rotated
+`cycle.keys` source reacquisition, poison dependency, and selected-key event
+ownership. Focused/full loading tests, a direct core check, formatting, diff
+hygiene, and independent ownership/cleanup review pass.
+
+The no-correction packet is not accepted. Independent review found that Input
+and Freeze were shaped below the real driver, poison invalidity was not proved
+through warm recomputation, and parent cancellation was only inferred. Its
+400-line test cap is exhausted. This packet is the required `REPLAN`; the
+carried Rust diff remains provisional evidence rather than an accepted
+frontier.
+
+## Frozen completion contract
 
 1. In `bzl_module.rs`, add loading-private
    `ObservedHostBzlModule { result:
@@ -143,6 +157,29 @@ Add focused colocated proof for:
   source/module activation, and unchanged legacy event/cycle tests; and
 - warm reuse, source mutation and A/B/A restoration for non-cycle terminals.
 
+Close the four review gaps through the real driver:
+
+- replace the selected source's exact `FileBytes` observation with invalid
+  UTF-8 and assert the Input terminal, decisive exact Arcs, semantic completion,
+  and one empty completed parent event batch;
+- add one same-file `#[cfg(test)]` per-transaction marker consulted only at
+  the immediate pre-freeze boundary. It forces the existing Freeze terminal,
+  compiles out of non-test builds, remains compute-local, and is not a general
+  fault framework;
+- run the same cycle twice on one `Dice` with unchanged inputs and prove the
+  poison dependency causes fresh observed cycle/source activation while both
+  caller-independent frontiers remain equal; and
+- pin an observed self-cycle compute, poll it to its first `Pending`, drop the
+  future, assert no parent carrier/event, and prove a successor transaction
+  completes. Reuse the existing `poll_then_cancel_synthetic_compute` pattern.
+  The accepted source-key cancellation contract covers the direct source await;
+  do not add a controllable source key or production synchronization seam.
+
+The test marker, pinned future, source bytes, evaluator, events, detector guard,
+cycle scratch, and transactions remain test or compute-local and release on
+completion/drop. Compact or replace the shaped Input/Freeze assertions instead
+of retaining redundant coverage.
+
 Run focused observed-module/cycle tests, unchanged legacy Host module/cycle
 tests, full `slug_loading_v2`, direct `slug_core_v2` check,
 `cargo fmt --all -- --check`, strict Clippy with inherited-baseline
@@ -164,15 +201,16 @@ Write exactly:
 
 Caps from the live 5,092/552-line baselines are:
 
-- `bzl_module.rs`: 330 production, 400 in-module tests, 730 total net and
-  5,822 physical lines;
+- `bzl_module.rs`: 360 production, 480 in-module tests, 840 total net and
+  5,932 physical lines;
 - `cycle_detector.rs`: 115 production, zero tests, 115 total net and 667
   physical lines; and
-- aggregate: 445 production, 400 tests and 845 total net Rust lines.
+- aggregate: 475 production, 480 tests and 955 total net Rust lines.
 
 Completion ledgers are capped at 180 net lines. No correction is authorized.
 Read-only authority is the design packet's prior sources plus the exact Bazel
-9.2 classes named above and directly referenced focused tests.
+9.2 classes named above, the existing `poll_then_cancel_synthetic_compute`
+implementation, and directly referenced focused tests.
 
 ## STOP / REPLAN
 
@@ -180,17 +218,18 @@ STOP on every other Rust file; Cargo/oracle/generated writes; a public export,
 consumer or behavior change; a second module/cycle key, carrier, detector,
 graph, channel, lock, task, container or event owner; key-to-key module compute;
 mixed-family detector nodes; `cycle.path` source retention in a cycle member;
-detector-held epochs; direct/reconstructed/historical Host reads; partial
-cycle/member prefixes; outer-error laundering; duplicate evaluator/driver;
-glob/package-load/core/repository/materializer/watcher/JVM work; or cap/ceiling
-excess.
+detector-held epochs; a general or production-observable fault framework;
+direct/reconstructed/historical Host reads; partial cycle/member prefixes;
+outer-error laundering; duplicate evaluator/driver; glob/package-load/core/
+repository/materializer/watcher/JVM work; or cap/ceiling excess.
 
 REPLAN if family distinction cannot coexist in the one guard; a cycle member
 cannot record direct accepted source-key dependencies for every `cycle.keys`
 member; poison invalidity cannot prevent context-stale reuse; semantic/outer/
 Need/event ownership cannot remain distinct; the legacy driver or cycle
-diagnostic changes; a third Rust file is required; cleanup finds a concrete
-split boundary; or any correction is needed.
+diagnostic changes; the freeze marker does not compile out; poll-then-drop
+publishes a parent carrier/event or cannot recover; a third Rust file is
+required; cleanup finds a concrete split boundary; or any correction is needed.
 
 ## Immediate successor
 
