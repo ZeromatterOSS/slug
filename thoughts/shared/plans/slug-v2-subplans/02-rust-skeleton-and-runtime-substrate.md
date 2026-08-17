@@ -2149,7 +2149,7 @@ Admitted Host `.bzl` behavior remains exact; frontier association and tagged
 cycle identity remain Slug-native; Host glob, final package loading, core and
 public activation remain deferred.
 
-### Active Host-glob frontier design (2026-08-17)
+### Replanned Host-glob frontier design (2026-08-17)
 
 Run docs-only `WP-2A-m1-host-glob-frontier-design` from accepted predecessor
 `b9fda97d`. Audit the live adapter -> traversal -> segment-candidate ->
@@ -2179,3 +2179,39 @@ repository/materializer work, a generic certificate framework, reverse
 dependencies or behavior widening. Acceptance schedules exactly one bounded
 callerless Host-glob implementation or exactly one smaller docs-only
 predecessor design.
+
+Source and ownership audit found that a direct Host-glob carrier would be
+partial. Workspace `PathDirectoryListingKey` discards the resolved-path epoch
+plus exact `DirectoryEntries` result, while Bzlmod
+`HostRootPackageBoundaryKey` discards the repository-ignore plus package-lookup
+epochs. Loading cannot reconstruct either frontier without crossing the natural
+owner and risking listing, symlink, ignored-versus-deleted or marker semantics.
+A listing-only or boundary-only successor still leaves the same future glob
+terminal incomplete, so this packet `REPLAN`s to the joint lower-owner design
+below rather than accepting or activating Host glob.
+
+### Active observed Host-glob input-frontiers design (2026-08-17)
+
+Run docs-only `WP-2A-m1-observed-host-glob-input-frontiers-design` from
+accepted recursive Host-`.bzl` predecessor `b9fda97d` and the Host-glob audit
+above. Freeze exactly two callerless siblings: a workspace observed directory
+listing that retains resolution plus final `DirectoryEntries` observations,
+and a Bzlmod observed root-package boundary that retains repository-ignore
+plus package-lookup observations.
+
+Both designs must preserve their legacy key Value/API/order through one
+mode-aware driver per natural owner, keep semantic errors inside the existing
+family, keep aggregation mismatch/conflict as completed outer
+`ObservedPathFrontierError`, and publish no carrier for Need, outer error or
+cancellation. Reuse `PathObservationEpoch::from_shared` with accumulated-left
+first-Arc retention; retain only the semantic result plus the existing
+Arc-backed epoch. Neither sibling may compute its legacy key or own events.
+
+Write only canonical/current/Stage 2 under 40/300/260/600 net lines. Candidate
+future Rust scope is exactly workspace `path_resolution.rs` and `lib.rs`,
+Bzlmod `host_package_boundary/{mod,tests}.rs` and `lib.rs`. STOP on code,
+Cargo/oracle writes, a third key/carrier, another container/store/cache/graph,
+reconstructed Host reads, loading/glob/BUILD/package-load/core/public work,
+legacy behavior/API widening or cap excess. Acceptance schedules only the
+bounded joint implementation; after its acceptance return to docs-only Host-
+glob frontier design.
