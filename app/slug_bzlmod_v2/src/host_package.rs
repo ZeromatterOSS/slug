@@ -53,10 +53,12 @@ use crate::repository_ignore::HostRepositoryIgnoreError;
 use crate::repository_ignore::HostRepositoryIgnoreKey;
 use crate::repository_ignore::HostRepositoryIgnoreObservationKey;
 use crate::repository_ignore::HostRouteRepositoryIgnoreKey;
+use crate::repository_ignore::HostRouteRepositoryIgnoreObservationKey;
 use crate::source_preparation::DirectLocalModuleSupport;
 use crate::source_preparation::DirectLocalModuleSupportError;
 use crate::source_preparation::DirectLocalUnsupportedCycle;
 use crate::source_preparation::HostRepositoryPathKey;
+use crate::source_preparation::HostRepositoryPathObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
@@ -556,6 +558,200 @@ impl fmt::Display for ExternalRepositoryPackageLookupKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct ExternalRepositoryPackageLookupObservationKey(ExternalRepositoryPackageLookupKey);
+
+impl ExternalRepositoryPackageLookupObservationKey {
+    pub(crate) fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
+        ExternalRepositoryPackageLookupKey::new(route, package).map(Self)
+    }
+}
+
+impl fmt::Display for ExternalRepositoryPackageLookupObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedExternalRepositoryPackageLookup {
+    result: Arc<Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedExternalRepositoryPackageLookup {
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ExternalRepositoryPackageLookupMode {
+    Legacy,
+    Observed,
+}
+
+type ExternalRepositoryPackageLookupCarrier =
+    Arc<Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>>;
+type ExternalRepositoryPackageLookupDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (ExternalRepositoryPackageLookupCarrier, PathObservationEpoch),
+        ObservedPathFrontierError,
+    >,
+>;
+
+fn external_lookup_complete(
+    result: Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>,
+    observations: PathObservationEpoch,
+) -> ExternalRepositoryPackageLookupDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn drive_external_repository_package_lookup(
+    ctx: &mut DiceComputations<'_>,
+    key: &ExternalRepositoryPackageLookupKey,
+    mode: ExternalRepositoryPackageLookupMode,
+) -> ExternalRepositoryPackageLookupDriverOutcome {
+    if let Some(message) = invalid_package_name(key.package.package()) {
+        return external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }),
+            PathObservationEpoch::empty(),
+        );
+    }
+    let deleted = match dice_invariant(
+        ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
+            key.route.workspace().dupe(),
+        ))
+        .await,
+    ) {
+        Ok(deleted) => deleted,
+        Err(error) => {
+            return external_lookup_complete(
+                Err(ExternalRepositoryPackageLookupError::PolicyInput(error)),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    if deleted.contains(&key.package) {
+        return external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::Deleted),
+            PathObservationEpoch::empty(),
+        );
+    }
+
+    let (repository_ignore, mut observations) = match mode {
+        ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
+            ctx.compute(&HostRouteRepositoryIgnoreKey::new(key.route.clone()))
+                .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(value) => (value, PathObservationEpoch::empty()),
+        },
+        ExternalRepositoryPackageLookupMode::Observed => match dice_invariant(
+            ctx.compute(&HostRouteRepositoryIgnoreObservationKey(
+                HostRouteRepositoryIgnoreKey::new(key.route.clone()),
+            ))
+            .await,
+        ) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(value)) => {
+                (value.result().clone(), value.observations().dupe())
+            }
+        },
+    };
+    let repository_ignore = match repository_ignore.as_ref() {
+        Ok(value) => value,
+        Err(error) => {
+            return external_lookup_complete(
+                Err(ExternalRepositoryPackageLookupError::RepositoryIgnore(
+                    error.clone(),
+                )),
+                observations,
+            );
+        }
+    };
+    if repository_ignore
+        .matching_entry(key.package.package())
+        .is_some()
+    {
+        return external_lookup_complete(
+            Ok(ExternalRepositoryPackageLookup::Deleted),
+            observations,
+        );
+    }
+
+    for build_file_name in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
+        let marker = PathBuf::from(key.package.package().as_str()).join(build_file_name.as_str());
+        let path = match mode {
+            ExternalRepositoryPackageLookupMode::Legacy => match dice_invariant(
+                ctx.compute(&HostRepositoryPathKey::new(key.route.clone(), marker))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => result,
+            },
+            ExternalRepositoryPackageLookupMode::Observed => match dice_invariant(
+                ctx.compute(&HostRepositoryPathObservationKey(
+                    HostRepositoryPathKey::new(key.route.clone(), marker),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(value)) => {
+                    observations = match union_observations(&observations, &value.observations) {
+                        Ok(observations) => observations,
+                        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                    };
+                    value.result.as_ref().clone()
+                }
+            },
+        };
+        let path = match path {
+            Ok(path) => path,
+            Err(error) => {
+                return external_lookup_complete(
+                    Err(ExternalRepositoryPackageLookupError::Path(error)),
+                    observations,
+                );
+            }
+        };
+        match path.resolved().state() {
+            ResolvedPathState::Present(lstat)
+                if matches!(
+                    lstat.kind(),
+                    PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                ) =>
+            {
+                return external_lookup_complete(
+                    Ok(ExternalRepositoryPackageLookup::Package(build_file_name)),
+                    observations,
+                );
+            }
+            ResolvedPathState::Missing | ResolvedPathState::Present(_) => {}
+        }
+    }
+    external_lookup_complete(
+        Ok(ExternalRepositoryPackageLookup::NoBuildFile),
+        observations,
+    )
+}
+
 #[async_trait]
 impl Key for ExternalRepositoryPackageLookupKey {
     type Value = SourcePreparationOutcome<
@@ -563,88 +759,57 @@ impl Key for ExternalRepositoryPackageLookupKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        if let Some(message) = invalid_package_name(self.package.package()) {
-            return SourcePreparationOutcome::Complete(Arc::new(Ok(
-                ExternalRepositoryPackageLookup::InvalidPackageName { message },
-            )));
-        }
-        let deleted = match dice_invariant(
-            ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
-                self.route.workspace().dupe(),
-            ))
-            .await,
-        ) {
-            Ok(deleted) => deleted,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    ExternalRepositoryPackageLookupError::PolicyInput(error),
-                )));
-            }
-        };
-        if deleted.contains(&self.package) {
-            return SourcePreparationOutcome::Complete(Arc::new(Ok(
-                ExternalRepositoryPackageLookup::Deleted,
-            )));
-        }
-        let repository_ignore = match dice_invariant(
-            ctx.compute(&HostRouteRepositoryIgnoreKey::new(self.route.clone()))
-                .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.dupe(),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        ExternalRepositoryPackageLookupError::RepositoryIgnore(error.clone()),
-                    )));
-                }
-            },
-        };
-        if repository_ignore
-            .matching_entry(self.package.package())
-            .is_some()
+        match drive_external_repository_package_lookup(
+            ctx,
+            self,
+            ExternalRepositoryPackageLookupMode::Legacy,
+        )
+        .await
         {
-            return SourcePreparationOutcome::Complete(Arc::new(Ok(
-                ExternalRepositoryPackageLookup::Deleted,
-            )));
-        }
-
-        for build_file_name in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
-            let marker =
-                PathBuf::from(self.package.package().as_str()).join(build_file_name.as_str());
-            let path = match dice_invariant(
-                ctx.compute(&HostRepositoryPathKey::new(self.route.clone(), marker))
-                    .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        ExternalRepositoryPackageLookupError::Path(error),
-                    )));
-                }
-                SourcePreparationOutcome::Complete(Ok(path)) => path,
-            };
-            match path.resolved().state() {
-                ResolvedPathState::Present(lstat)
-                    if matches!(
-                        lstat.kind(),
-                        PathNodeKind::RegularFile | PathNodeKind::SpecialFile
-                    ) =>
-                {
-                    return SourcePreparationOutcome::Complete(Arc::new(Ok(
-                        ExternalRepositoryPackageLookup::Package(build_file_name),
-                    )));
-                }
-                ResolvedPathState::Missing | ResolvedPathState::Present(_) => {}
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => {
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy external package lookup produced observed outer error: {error}")
             }
         }
-        SourcePreparationOutcome::Complete(Arc::new(Ok(
-            ExternalRepositoryPackageLookup::NoBuildFile,
-        )))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for ExternalRepositoryPackageLookupObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedExternalRepositoryPackageLookup, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_external_repository_package_lookup(
+            ctx,
+            &self.0,
+            ExternalRepositoryPackageLookupMode::Observed,
+        )
+        .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedExternalRepositoryPackageLookup {
+                    result,
+                    observations,
+                }))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -4563,5 +4728,12 @@ mod tests {
             )]),
             Err(slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. })
         ));
+    }
+
+    #[cfg(unix)]
+    mod observation_tests {
+        use super::*;
+
+        include!("host_package_observation_tests.rs");
     }
 }
