@@ -3706,3 +3706,33 @@ Design docs write only canonical/current/Stage 2/routing under
 activation, another owner/file, family/event drift, retained state, direct Host
 read, cap excess or M1 close. Acceptance schedules one implementation, whose
 acceptance returns directly to loading-query publication design.
+
+The frozen key is a doc-hidden structural newtype over the legacy route key;
+its doc-hidden terminal exposes one projected semantic Result Arc and the
+observed root-module child's Arc-backed epoch for the later query consumer.
+The legacy and observed keys call one pure route projection, so builtin,
+direct-local, unknown, unsupported and root-module-error semantics cannot
+drift. Legacy selects only `HostRootModuleFileKey`; observed selects only
+`HostRootModuleFileObservationKey`.
+
+The observed driver maps Need to Need, child typed outer to typed outer, and
+every semantic success/error to Complete. It moves or dupes the child's epoch
+unchanged and never unions epochs or reconstructs path Result Arcs. The child
+root-module semantic carrier is compute-local/dependency-owned after route
+projection. Retained parent state is exactly one route Result Arc plus one
+epoch; no root-module carrier, event batch, vector, map, lock or task is added.
+
+Only the observed Host root-module child owns the MODULE batch. A discriminating
+anchor-then-route transaction must show one observed child activation and one
+cold batch, followed by warm suppression; reverse legacy/observed activation
+audits forbid cross-family computation. Route tests cover builtin, local,
+unknown, unsupported and root semantic error parity; exact terminal Arc and
+every forwarded demand/Result Arc; Need and injected mismatch/conflict outer;
+cancellation/recovery; edit/delete/recreate/A-B-A; equality/validity and compact
+post-return retention.
+
+Implementation remains limited to `host_module.rs` and `lib.rs` under the
+frozen 140/240/380 host-module, 8 lib and 388 aggregate semantic caps and
+4,578/405 physical caps. Public loading query is not activated. Acceptance
+returns directly to its observed-publication design; no additional audit or
+milestone close intervenes.
