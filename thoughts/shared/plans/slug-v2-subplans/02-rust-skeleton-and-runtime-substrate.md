@@ -5087,3 +5087,36 @@ retention and cleanup. STOP on Rust now, another future file/export/caller,
 mixed cycle families, incomplete carrier, event/state drift, cap excess or M1
 closure. After design ACCEPT schedule one implementation; afterward return only
 to a docs-only package-load/upper-owner audit.
+
+### External-Bzl module evaluation observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-external-bzl-module-evaluation-observation-implementation` from Rust
+base `ac7b8bdf` and accepted design `b82496b6`. Write exactly
+`bzl_module.rs`, `cycle_detector.rs`, and `host_package_load_tests.rs` within
+400/160/560 semantic, 1,120 aggregate, and 6,595/758/2,891/10,244 physical
+caps. Keep touched helpers below 200 lines.
+
+Implement the private external observed sibling/carrier and one matching-family
+driver. Preserve source -> prevalidated AST-order recursive children -> local
+evaluation/freeze, exact legacy Result Arc, left-first union-before-semantic,
+first equal Arc, frozen empty/source/prior/merged/full prefixes and immediate
+carrierless Need/outer with no Need union.
+
+Extend only the existing detector with compact external route+label identity,
+legacy/observed nodes and a mode-aware matching-family guard. Complete observed
+cycles by merging the other cycle identities' observed source epochs in cycle
+order before semantic inspection; preserve poison, one-waiter discipline and
+exact legacy cycle behavior. Keep each sibling the sole local semantic-Complete
+`.bzl` batch owner and publish none for Need/outer/cancel.
+
+Retain only one local semantic Result Arc plus compact epoch; module closure is
+the existing semantic payload and all carrier/union/load/evaluator/cycle-source
+scratch remains local or existing request detector state. Add no caller/export,
+package load, BUILD/query/build activation, state/event owner or Host read.
+Preserve exact `.bzl` semantics/cycles/events, Slug-native observation family,
+and deferred upper publication/identity bytes. Run the complete Arc/prefix/
+terminal/cycle/event/family/lifecycle proof, serial validation, retention/
+cleanup and independent review. STOP/REPLAN on any contract or cap breach.
+After ACCEPT return only to the docs-only package-load/upper-owner audit; do not
+close M1.
