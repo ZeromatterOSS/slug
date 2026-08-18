@@ -3213,3 +3213,55 @@ cache/interner/lock/task/Host read, repository work or cap excess. `REPLAN`
 if no bounded natural owner preserves the recursive configured-analysis and
 event contracts. Acceptance schedules only the prerequisite implementation;
 neutral-root implementation resumes in a later packet after that acceptance.
+
+The audit selects `slug_analysis_v2::ConfiguredNodeAnalysisKey` as the
+complete natural owner. Freeze the doc-hidden structural sibling
+`ConfiguredNodeAnalysisObservationKey(ConfiguredNodeAnalysisKey)`, a
+doc-hidden observed preparation entry point and one private
+`ConfiguredAnalysisMode::{Legacy, Observed}` semantic driver. The existing
+legacy preparation/key API and its success-only equality/validity remain
+unchanged; neither sibling computes the other.
+
+Observed preparation has separate Need, semantic `AnalysisError` and typed
+`ObservedPathFrontierError` channels. The observed key terminal is one shared
+semantic Result Arc inside the typed outer Result and carries no observation
+epoch. Need is invalid/unequal; semantic success is valid/equal; semantic error
+remains invalid/unequal like legacy; typed complete outer error is valid/equal
+by outer value and fails closed at the future neutral caller. Typed outer wins
+Need and semantic error in joined batches; absent outer, the existing
+Need-over-semantic rule and deterministic first-error order remain exact.
+Cancellation publishes nothing.
+
+Every live child edge is mode-aware: requested/default-setting packages,
+root-module anchors, iterative toolchain packages, selected toolchain analysis,
+aliases/generated/platform/constraint nodes, declared recursive dependencies
+and null source nodes choose only their matching sibling family. In particular,
+observed null sources use `ResolvedPathObservationKey`, never legacy
+`ResolvedPathKey`. Observed child epochs remain dependency-owned and are
+dropped from the analysis projection; no loaded package, epoch or event batch
+enters key identity or terminal state.
+
+The future neutral root calls observed preparation after classification. Its
+requested-package compute is the same structural observed key and therefore a
+DICE reuse with one package event owner; the repeated target lookup is semantic
+validation, not a second routing classification. The observed analysis key is
+the sole analysis event owner and stores one local batch only for a completed
+semantic terminal, while Need/outer store none. Cold child-before-parent order,
+warm suppression, root settings/default transitions and public results/events
+remain exact.
+
+Future Rust writes only `slug_analysis_v2/src/{dice,lib}.rs` and
+`slug_analysis_v2/tests/root_analysis.rs`. Keep the small private unit module
+for terminal/forced-outer tests and extend the existing integration owner for
+activation, events, recursion, configuration and lifecycle; no split/new test
+file is needed. From exact `31a8b1d3` baselines 2,208/53/452, caps are 620
+DICE production, 50 DICE test, 8 lib production, 560 integration-test and 1,238
+aggregate semantic net lines; physical caps are 2,880/65/1,015 and 3,960
+combined. Cargo/BUILD, fixtures and oracles remain unchanged.
+
+Implementation proof must show complete observed-only activation including
+source/toolchain recursion, one package and analysis event authority, terminal
+and mixed-error algebra, warm/edit/restore behavior, exact legacy parity and
+neutral/exported/filegroup/PackageAll/multi/external/cquery isolation. Require
+focused/full analysis plus affected core/loading validation, formatting,
+diff/archive checks, retention and AI-cleanup scans, and independent review.

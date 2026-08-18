@@ -41,49 +41,95 @@ Write only:
 Do not edit Rust, Cargo/BUILD metadata, fixtures, oracle data, generated files
 or any other plan. Do not restore the rejected candidate from `/tmp`.
 
-## Design objective
+## Frozen ownership decision
 
-Audit `slug_analysis_v2/src/dice.rs` around
-`prepare_configured_node_analysis`, `ConfiguredNodeAnalysisKey`,
-`compute_configured_child`, root string-setting default lookup and every
-recursive configured-analysis/package edge. Freeze the smallest DICE-owned
-observed continuation that lets a neutral root rule proceed without activating
-legacy `RootPackageLoadKey` after observed classification.
+The natural owner is the configured-analysis family in
+`slug_analysis_v2/src/dice.rs`. Add the public-but-hidden structural sibling
+`ConfiguredNodeAnalysisObservationKey(ConfiguredNodeAnalysisKey)` and the
+public-but-hidden `prepare_configured_node_analysis_observed` entry point. One
+private `ConfiguredAnalysisMode::{Legacy, Observed}` driver owns preparation
+and analysis semantics for both siblings; neither key computes the other.
+Keep the existing legacy API, key value, error text, equality and validity
+unchanged.
 
-Decide whether the natural owner is:
+The observed preparation outcome is a named alias for
+`LoadingPreparationOutcome<Result<Result<ConfiguredNodeAnalysisObservationKey,
+AnalysisError>, ObservedPathFrontierError>>`. The observed key value is
+`LoadingPreparationOutcome<Result<Arc<Result<Arc<ConfiguredNodeResult>,
+AnalysisError>>, ObservedPathFrontierError>>`. Need remains outside both Result
+layers; the inner error is the existing semantic analysis error and the outer
+error is only the typed observation-frontier failure. The shared driver moves
+the same semantic Result Arc into either projection.
 
-1. a structurally distinct observed configured-analysis key plus observed
-   preparation entry point sharing one mode-aware semantic driver with the
-   legacy key; or
-2. one strictly smaller prerequisite that can preserve the already-loaded
-   observed package/result/event authority through root preparation and the
-   recursive analysis closure.
+Mode-aware child helpers select exactly one matching family for every live
+edge:
 
-Do not design a key carrying a `LoadedPackage` value or event batch as
-identity, a side store, direct Host read, caller-managed cache, or a parent that
-computes both analysis/package families. The result must keep DICE dependencies
-structural and leave child observation epochs dependency-owned; the neutral
-build terminal still retains no partial rule-analysis epoch.
+- requested-package and root string-setting package loads use only
+  `RootPackageLoadKey` or only `RootPackageLoadObservationKey`;
+- execution-platform and toolchain anchor/package closure uses only the
+  matching root-module anchor and package family, including iterative native
+  reference packages and selected toolchain analysis;
+- alias, generated-file, platform/constraint, declared dependency and null
+  source recursion prepares and computes only the matching configured-analysis
+  sibling; and
+- null source resolution uses `ResolvedPathKey` only for legacy and
+  `ResolvedPathObservationKey` only for observed analysis.
 
-Freeze:
+Observed package, anchor and resolved-path epochs are deliberately discarded
+from the analysis terminal after their semantic values are projected. They
+remain owned by the already-cached DICE children. No `LoadedPackage`, event
+batch or epoch enters key identity or the observed analysis value. Existing
+vectors/maps remain compute-local.
 
-- legacy and observed key identities, complete-only equality/validity and
-  exact family selection;
-- root requested-package preparation, required string-setting validation,
-  explicit/default configuration and recursive child/toolchain/platform
-  behavior;
-- Need, semantic error, typed outer error and cancellation precedence;
-- exactly one package/`.bzl`/analysis event authority and unchanged cold
-  order/warm suppression;
-- no duplicate retained package, event batch, epoch, collection, cache,
-  interner, lock or task;
-- how the neutral root calls the new seam without an existing build-root child
-  or legacy package activation;
-- future Rust allowlist, test-module ownership, production/test/aggregate and
-  physical caps measured from `31a8b1d3`; and
-- focused activation/event/configuration/lifecycle proof plus broad
-  core/loading validation, formatting, archive, retention, cleanup and
-  independent review.
+The neutral singleton-root owner calls observed preparation after its initial
+observed package classification. Preparation requests the same structural
+`RootPackageLoadObservationKey`, so DICE reuses that child and event batch; its
+target lookup is semantic validation, not a second routing classification or
+event owner. The neutral owner then computes only the observed analysis key.
+It does not pass a loaded package across crates, compute an existing build-root
+child, retain a rule-analysis epoch or validate a partial rule carrier.
+
+## Terminal, event and ordering contract
+
+Observed Need is invalid and unequal. `Complete(Ok(semantic_success))` is valid
+and equal by the existing configured result. `Complete(Ok(semantic_error))`
+remains invalid and unequal exactly like the legacy analysis key.
+`Complete(Err(outer))` is valid/equal by typed outer value, matching the
+observed loading frontier while remaining fail-closed at the neutral caller.
+
+Preserve the existing Need-over-semantic-error rule for joined preparation and
+analysis children. Any typed outer error beats Need and semantic error because
+it is an integrity failure; among outers, retain the first child in the
+existing deterministic input/result order. Sequential stages keep their live
+order. DICE infrastructure failures retain their current semantic
+`AnalysisError` mapping. Cancellation publishes no terminal or local event.
+
+The matching package key remains the sole MODULE/`.bzl`/BUILD event owner.
+The selected configured-analysis sibling stores exactly one local analysis
+event batch on a completed semantic terminal, including a semantic error, and
+stores none for Need or outer failure. Re-requesting the same observed package
+or anchor key is DICE reuse, not a second event authority. Cold child-before-
+parent order and warm suppression remain exact.
+
+## Future implementation boundary
+
+Against Rust base `31a8b1d3`, write only:
+
+- `app/slug_analysis_v2/src/dice.rs`;
+- `app/slug_analysis_v2/src/lib.rs`; and
+- `app/slug_analysis_v2/tests/root_analysis.rs`.
+
+Keep the existing small private unit-test module in `dice.rs`; extend it only
+for terminal algebra/forced-outer discrimination. Put activation, events,
+configuration, recursion and lifecycle coverage in the existing 452-line
+`root_analysis.rs` integration owner, which already owns in-memory path epochs
+and DICE event tracking. No test relocation or new file is authorized.
+
+Semantic caps are 620 production plus 50 colocated test lines in `dice.rs`, 8
+production lines in `lib.rs`, 560 test lines in `root_analysis.rs`, and 1,238
+aggregate net lines. Physical caps are 2,880, 65 and 1,015 lines respectively,
+with 3,960 combined, from exact baselines 2,208/53/452. No Cargo or BUILD edit
+is required.
 
 ## Compatibility
 
@@ -99,23 +145,30 @@ raw bytes and exact Bazel identity bytes remain unsupported/deferred.
 
 The future implementation must discriminate:
 
-- neutral root rule activation with observed anchor/package/analysis only and
-  zero legacy package/analysis sibling activation;
+- observed preparation and analysis with only observed anchor, package,
+  resolved-path and configured-analysis keys, and zero legacy siblings;
+- neutral root rule activation through the same observed package key followed
+  by the observed preparation/key seam, with no second event batch;
 - exactly one MODULE/`.bzl`/BUILD event sequence, one analysis event, warm
   suppression and no failed-attempt publication;
 - default, explicit, edited and restored root string-setting configurations;
-- recursive configured dependencies/action closure without a legacy-family
-  escape;
-- rule semantic/Need/error/outer/cancellation parity and no terminal carrier;
+- recursive configured dependencies, null sources, aliases, generated files,
+  platforms and toolchains without a family escape;
+- success/semantic-error/Need/outer equality and validity, mixed outer-over-
+  Need-over-semantic ordering, cancellation and no terminal carrier;
 - unchanged exported-source exact carrier/revision lifecycle and filegroup
   loaded-only behavior; and
 - PackageAll, multi-target, external and cquery family isolation.
 
-Reuse accepted Bazel 9.2 and Slug evidence; add no fixture or oracle.
+Run focused observed-analysis tests, the complete `slug_analysis_v2` suite,
+the affected core/loading suites, formatting, diff-check and the archive
+checker. Reuse accepted Bazel 9.2 and Slug evidence; add no fixture or oracle.
+Finish with Buck2-retention and AI-cleanup scans plus independent review.
 
 ## STOP / REPLAN
 
-STOP on implementation, any unlisted file, public API/behavior drift, a second
+STOP on implementation, any unlisted file, public API/behavior drift beyond
+the named doc-hidden sibling/entry point, a second
 package/event family, duplicate driver/event owner, value-carrying key, partial
 carrier, new store/cache/interner/lock/task/direct Host read, repository work or
 docs cap excess. `REPLAN` if the complete recursive configured-analysis
