@@ -4288,3 +4288,50 @@ algebra, compact retention, proof/validation and one successor. Write only
 canonical/current/Stage 2/routing under 40/220/180/30 and 470 aggregate docs
 caps. STOP on Rust, source/load/query activation, duplicate family/events,
 partial carriers, retained scratch, multiple successors or M1 closure.
+
+### External source/load audit selects direct-local MODULE file prerequisite (2026-08-18)
+
+The resumed live audit from `ba35d0f6` formally `REPLAN`s to the private
+`DirectLocalModuleFileKey` at `source_preparation.rs:1052-1147`.
+`RepositoryPackageSourceKey` reaches it through direct-local evaluation,
+preparation and inspection before the already-observed package lookup or BUILD
+source. The file key itself still computes legacy `RootRepositoryRouteKey`
+and legacy `HostRepositorySourceFileKey(MODULE.bazel)`; an upper-only cutover
+would retain two route/source families.
+
+Run docs-only `WP-2A-m1-direct-local-module-file-observation-design` from
+scheduling base `ba35d0f6` and Rust base `33717f27`. Freeze one structural
+crate-private observed sibling/carrier and one mode-aware driver. Legacy keeps
+the exact route-then-MODULE behavior; observed selects only
+`RootRepositoryRouteObservationKey` then
+`HostRepositorySourceFileObservationKey`, unions each complete epoch before
+semantic inspection, and retains one semantic Result Arc plus the exact
+route/source prefix. Need and typed outer have no carrier; semantic route/source
+errors retain their decisive prefix. RouteCompute has an empty epoch,
+SourceCompute has the route-only prefix, and child source terminals have the
+route+source prefix. Need is invalid/self-unequal; typed outer Complete compares
+by outer error; carrier Complete compares semantic result plus epoch.
+
+Inspection consumes the file key. Preparation separately calls the include
+package preflight directly, while the standalone horizon key calls the same
+helper; their eventual observed mode is a later owner decision. The file parent
+remains eventless, the observed root-module child remains the sole MODULE event
+owner, and evaluation events stay deferred. Keep child carriers dependency-owned
+and union scratch compute-local; add no retained collection/store/cache/lock/
+task, direct Host read, request revision or source certificate.
+
+Future implementation writes only `source_preparation.rs` and existing
+`source_preparation_observation_tests.rs`. Against Rust base `33717f27`,
+cap production at 160/12,750 physical, tests at 360/880, aggregate semantic at
+520 and combined physical at 13,630. Proof covers exact child Arcs and order,
+every Need/outer/semantic prefix, route-terminal source suppression, stable
+first Arc and union errors, parity, both family directions, upper nonactivation,
+child event ownership, polled cancellation/recovery, warm suppression and
+route/source lifecycle, including Need invalidity and outer/carrier Complete
+equality and validity.
+
+STOP on any other file/caller/export, mixed families, rebuilt/partial epochs,
+moved events, retained scratch, upper activation, cap excess or M1 closure.
+After independent design ACCEPT, schedule exactly one bounded implementation;
+after its ACCEPT, return to the docs-only observed direct-local evaluation and
+upper source/load audit before query.
