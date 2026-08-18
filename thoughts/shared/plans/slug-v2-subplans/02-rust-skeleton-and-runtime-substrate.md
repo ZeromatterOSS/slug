@@ -3103,3 +3103,36 @@ loading validation, formatting/check/diff/archive gates, retention and AI
 cleanup scans, and independent review. Any third Rust file, duplicate family,
 event owner, partial carrier, public drift, unbounded split or cap excess is
 `REPLAN`.
+
+### Active neutral singleton-root-Single owner implementation (2026-08-18)
+
+Run `WP-2A-m1-root-single-neutral-owner-implementation` from Rust base
+`31a8b1d3` and frozen design `3e90fc88`. Write only core `runtime/dice.rs` and
+new `runtime/tests/build_command_tests.rs`.
+
+First retain shared fixtures through `resolved_identity` in the inline parent
+tests module and move only the contiguous test tail beginning at
+`multi_target_exported_sources_do_not_enter_revision_bridge` into the nested
+file via `include!("tests/build_command_tests.rs")`. Then add the private
+`SingletonRootSingleBuildCommandKey` and optional-carrier terminal exactly as
+frozen. Use one observed anchor/package/classification path, shared post-package
+branch/finalization helpers, and no existing build-root child or second package
+family. Select PackageAll observed, then neutral root Single, then legacy.
+
+The terminal retains one semantic Result Arc plus `Some(epoch)` exactly for
+exported success/RootSource error owning the exact source certificate; every
+other terminal has `None`. Preserve complete-only equality/validity, Need and
+typed outer handling, request revision/source finalization, full selected-
+carrier Arc validation, consuming event-preserving projection and one child/
+command event authority. Rule/filegroup child epochs remain dependency-owned,
+with no terminal duplicate or partial validation.
+
+Against `31a8b1d3`, category caps excluding only the exact test relocation are
+360 production, 450 test and 810 aggregate net semantic lines; final physical
+caps are 12,275 for DICE, 2,800 for the new test file and 15,075 combined.
+Require the frozen activation/Arc/terminal/event/lifecycle/revision/parity
+proof, focused and broad core/loading validation, fmt/check/diff/archive gates,
+Buck2 retention and AI cleanup scans, and independent implementation review.
+STOP on any other file, public drift, duplicate family/event owner, partial
+carrier, new retained store/collection/lock/task/Host read, repository work or
+cap excess. Acceptance returns to exactly one docs-only next-owner audit.
