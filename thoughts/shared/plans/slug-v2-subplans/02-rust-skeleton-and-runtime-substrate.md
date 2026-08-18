@@ -2686,3 +2686,49 @@ cleanup proof. STOP on any other file, caller/public/repository activation,
 semantic drift, retained evaluator/request state, another key/cache/lock/task,
 direct Host read, fixture/oracle write or cap excess. Acceptance returns only
 to docs-only Host-glob frontier design.
+
+### Accepted final Host-glob loading frontier (2026-08-17)
+
+Commit `daf5eef9` accepts the private `RootPackageLoadObservationKey` and the
+shared Legacy/Observed package and ephemeral adapter drivers. Observed mode
+selects only the accepted anchor, BUILD source, recursive Host-`.bzl` and
+traversal siblings; all existing callers remain legacy.
+
+Completed child epochs union before semantic inspection in anchor, source,
+direct `.bzl` AST and first-demand glob replay order. Semantic errors retain
+their decisive prefix; Need, typed outer error and cancellation publish no
+carrier or parent event. Stable union preserves the first exact Arc. The
+parent retains only one package Result Arc plus one Arc-backed epoch; replay,
+prepared maps, evaluator state, event batches and union scratch remain local.
+
+All 194 `slug_loading_v2` tests and direct `slug_core_v2` checking passed with
+only inherited warnings. Formatting, scope, caps and diff hygiene passed;
+strict Clippy/archive stops remain inherited. Independent implementation and
+cleanup review accepted the recursive-closure, event, terminal, lifecycle,
+family and exact-Arc proofs.
+
+Against `2bccb48e`, traversal is +10 at 788 physical, adapter +89 at 255,
+adapter tests +230 at 634, `bzl_module.rs` +275 at 6,190 and package tests +372
+at 2,331. Production is +374, tests +602 and aggregate net Rust growth +976.
+Observable package/glob/event behavior remains exact; synchronous replay,
+frontier association and deterministic Arc union are Slug-native.
+
+### Resumed post-loading Host-glob frontier design (2026-08-17)
+
+Run docs-only `WP-2A-m1-host-glob-frontier-design` from frozen design
+`5816e435` and accepted implementation `daf5eef9`. Audit every live consumer
+above `RootPackageLoadKey` and the already accepted private loading/publication
+frontiers. Select the uniquely smallest complete owner that can consume the
+observed root-package carrier without erasing its epoch; record one smaller
+prerequisite or `REPLAN` if no bounded owner exists.
+
+Freeze semantic/outer/Need and event-publication polarity, exact dependency
+order, family isolation, equality/invalidation, cancellation, compact retained
+state and activation proof. This packet is design-only: public/core,
+repository and materializer callers remain unchanged.
+
+Write only canonical/current/Stage 2 under the completion scheduling allowance.
+STOP on Rust/Cargo/oracle writes, partial certificates, reconstructed Host
+reads, duplicated loading, changed public semantics or activation, new retained
+collections, or docs cap excess. Acceptance schedules exactly one bounded
+successor or records the blocking `REPLAN`.
