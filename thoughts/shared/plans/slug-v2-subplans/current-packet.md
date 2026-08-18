@@ -4,84 +4,122 @@ Packet: `WP-2A-m1-host-glob-frontier-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
 Accepted predecessors: `5816e435`, `daf5eef9`
-Result: audit and freeze the next complete natural owner above the accepted
-private observed root-package loading frontier.
+Result: freeze the singleton root-package-all build frontier as the next
+complete retained consumer above observed root-package loading.
 
-## Design task
+## Selected natural owner
 
-Start from the live checkout and enumerate every direct and transitive consumer
-of `RootPackageLoadKey`, including any loading lookup, package projection,
-request/certificate, core bridge and event-publication boundary already accepted
-by the canonical plan. Trace where the semantic package Arc is retained,
-projected or republished and where the new observation epoch would currently be
-erased.
+The live graph has two direct `RootPackageLoadKey` consumers. Cquery uses one
+rdeps seed package transiently for target-existence validation and retains no
+package result. `BuildCommandRootKey` retains each loaded package inside
+`BuildRequestedTarget` and its command Result, so it is the uniquely smallest
+next retained semantic owner.
 
-Select the uniquely smallest complete owner that can consume
-`RootPackageLoadObservationKey` without reconstructing Host observations. If an
-already accepted private loading-side or publication-side owner is the complete
-boundary, freeze its observed sibling/shared driver. If one smaller prerequisite
-is required, record only that prerequisite. Do not activate or edit a caller in
-this docs-only packet and do not publish a partial certificate.
+The bounded complete identity is exactly one root-repository
+`TargetPattern::PackageAll`. It depends only on the root-module anchor and root
+package and finishes as `BuildTargetCompletion::LoadedOnly` with an empty action
+closure. Empty roots are only the accepted anchor frontier. Starlark rules,
+exported files, multiple targets, external targets and cquery add distinct
+analysis/source/aggregation/repository/transient frontiers and stay deferred.
 
-## Required audit
+## Frozen carrier and driver
 
-- map every live root-package consumer and its semantic/event authority;
-- identify the exact natural owner of the next retained semantic Result Arc and
-  whether it already has an observation/certificate carrier;
-- preserve existing dependency and event order, semantic errors, Need, typed
-  outer errors, cancellation and terminal publication;
-- freeze strict Legacy/Observed family isolation without one sibling computing
-  the other or duplicating loading;
-- classify all retained state versus compute-local request, projection, event,
-  child and union scratch;
-- specify complete-only equality/validity, exact-Arc union, warm/edit/delete/
-  recreate/A-B-A, cancellation and activation/nonactivation proof; and
-- classify changed behavior as exact, Slug-native or unsupported/deferred and
-  cite accepted evidence or pinned Bazel 9.2 source for exact claims.
+Add private `BuildCommandRootObservationKey(BuildCommandRootKey)`. Its
+constructor admits only the singleton root package-all structural identity and
+has a distinct Display. `ObservedBuildCommandRoot` retains exactly:
 
-Read only the bounded loading/publication/core owners and their directly related
-tests, plus accepted predecessor implementations and plan evidence. Read
-`docs/developers/dice.md` before proposing any key or compute ownership change.
-Do not run or add an oracle unless the audit demonstrates a specific parity gap.
+- one `Arc<Result<BuildCommandEvaluation, BuildCommandError>>`; and
+- one Arc-backed `PathObservationEpoch`.
+
+Its Value is `SourcePreparationOutcome<Result<ObservedBuildCommandRoot,
+ObservedPathFrontierError>>` with complete-only equality/validity. Derive
+`Allocative` and use `Dupe` only for cheap Arc-backed values. Do not add a
+retained map, vector, string, interner, cache or hash wrapper. This reuses the
+existing Buck2-derived DICE, immutable Arc and memory-accounting patterns; no
+Stage 9 ledger import is needed.
+
+Expose `RootPackageLoadObservationKey` and `ObservedRootPackageLoad` only as
+doc-hidden sealed loading API required by core. One shared Legacy/Observed
+singleton-package-all driver selects matching anchor and package families.
+Legacy enters it only for that same structural identity; all other legacy
+branches retain their current path. Neither sibling computes the other and all
+public/native command callers remain legacy.
+
+## Order, terminals and events
+
+Compute and union the observed anchor before the observed root package. Union
+each completed child epoch before inspecting its semantic Result. The package
+child includes its complete anchor/BUILD/direct-`.bzl`/glob closure, so the
+duplicate anchor keeps the first exact Arc.
+
+An anchor semantic error retains the anchor epoch. A package semantic error
+retains anchor plus the package's decisive prefix. Need and typed child/union
+outer error return no carrier or event, and cancellation publishes nothing.
+Success retains the full epoch and the unchanged loaded-only command result.
+
+Anchor and package event batches remain child-owned. The build sibling stores
+no event data. Child values, target projection, loaded-only branch state and
+union construction remain compute-local.
+
+## Required proof
+
+Add discriminating proof for:
+
+- legacy/observed singleton package-all semantic parity and unchanged output;
+- exact anchor-then-package observation Arcs, including duplicate first-Arc;
+- anchor/package semantic prefix, Need and typed outer no-carrier/event polarity;
+- strict anchor/package/build family and public-caller isolation;
+- complete-only equality/validity, warm reuse, edit/delete/recreate and A-B-A;
+- cancellation publication suppression and recovery; and
+- unchanged legacy behavior for empty, Starlark, exported, multi-target,
+  external and cquery paths.
+
+Reuse accepted root anchor/package lifecycle/event evidence and pinned Bazel
+package-pattern behavior. No fixture or oracle is required.
 
 ## Authority and caps
 
-This packet is docs-only. Write only:
+This design packet is docs-only. Write only canonical, this manifest and Stage
+2 under 40/320/280/640 net-line caps. Require exact ledger accounting,
+cross-document consistency, independent natural-owner/retention review and
+`git diff --check`.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest; and
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
+The future implementation may write only:
 
-Completion scheduling is limited to 180 aggregate net lines. The design packet
-itself remains under 40 canonical, 320 manifest, 280 Stage 2 and 640 aggregate
-net lines. Require exact ledger accounting, plan consistency, independent design
-review and `git diff --check`.
+- `app/slug_loading_v2/src/bzl_module.rs`;
+- `app/slug_loading_v2/src/lib.rs`; and
+- `app/slug_core_v2/src/runtime/dice.rs`.
+
+Against `daf5eef9`, formatted caps are 24 net/6,214 physical for Bzl module,
+4/82 for loading lib, 260 production plus 420 test net/13,730 physical for core
+dice, and 708 aggregate net Rust lines. Completion-only scheduling may write
+canonical/current/Stage 2 under 180 aggregate net lines. Require independent
+ownership, retention and nine-category cleanup review.
 
 ## Compatibility boundary
 
-Accepted package evaluation, Host-glob matching/results/order/diagnostics and
-event behavior remain exact. Synchronous replay, frontier association,
-deterministic first-Arc union and typed outer errors remain Slug-native. Public
-or core activation, repository package globbing/materialization, native-Windows
-raw-byte ordering and exact Bazel identity bytes remain unsupported/deferred in
-this packet.
+Existing singleton root package-all package, output and child-event behavior
+remains exact. Carrier association, stable first-Arc union and typed outer
+errors are Slug-native. Analyzed/exported/multi-target/external/cquery frontier
+composition, public/core activation, repository materialization,
+native-Windows raw-byte ordering and exact Bazel identity bytes remain
+unsupported/deferred.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo, fixture or oracle writes; any caller/public/core/repository/
-materializer activation; a partial certificate; reconstructed or historical
-Host reads; duplicated loading or event ownership; changed request/dependency/
-error/event order; a new retained standard collection, cache, graph, store,
-lock or task; or cap excess.
+STOP on any other file; Cargo, fixture or oracle writes; command/public caller
+activation; analyzed/exported/multi/external/cquery composition; a partial
+frontier; reconstructed Host reads; changed legacy semantics, output, events or
+dependency order; duplicated full build driver; another retained collection,
+cache, graph, store, lock or task; missing `Allocative`; or cap excess.
 
-`REPLAN` to exactly one smaller docs-only natural-owner prerequisite if the next
-consumer cannot receive the observed root-package carrier locally, an accepted
-intermediate frontier is incomplete, family isolation would duplicate loading,
-or proof needs another code owner/seam/oracle. Record an unsupported boundary if
-no bounded Rust-native owner exists.
+`REPLAN` if singleton package-all has another unobserved semantic input, the
+shared narrow driver changes other legacy branches, loading visibility cannot
+remain sealed, child event ownership changes, or proof needs another file/key/
+seam/oracle.
 
 ## Immediate successor
 
-On independent design acceptance schedule exactly one bounded implementation or
-one uniquely smaller docs-only prerequisite. Do not combine public/core cutover,
-repository package globbing or materialization.
+On independent acceptance schedule only the bounded private singleton
+root-package-all build-frontier implementation. Do not combine any caller/public
+cutover or another build/cquery/repository frontier.

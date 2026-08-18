@@ -2732,3 +2732,54 @@ STOP on Rust/Cargo/oracle writes, partial certificates, reconstructed Host
 reads, duplicated loading, changed public semantics or activation, new retained
 collections, or docs cap excess. Acceptance schedules exactly one bounded
 successor or records the blocking `REPLAN`.
+
+### Frozen singleton root-package-all build frontier design (2026-08-17)
+
+The live consumer audit finds exactly two direct `RootPackageLoadKey` calls.
+`CqueryCommandRoot` uses one rdeps seed package transiently for target-existence
+validation and retains no package result. `BuildCommandRootKey` clones the
+loaded package into `BuildRequestedTarget` and then its retained command Result,
+so it is the uniquely smallest next retained semantic owner.
+
+The complete bounded slice is structurally exactly one root-repository
+`TargetPattern::PackageAll`. Empty build roots are only the already accepted
+anchor frontier. Starlark rules add configured analysis/action closure,
+exported files add request revision and FileBytes, multiple targets add branch
+aggregation, external targets add repository/materialization, and cquery is a
+distinct transient/public owner; all remain deferred.
+
+Add a private `BuildCommandRootObservationKey(BuildCommandRootKey)` whose
+constructor admits only that singleton package-all identity. Its observed value
+retains exactly one `Arc<Result<BuildCommandEvaluation, BuildCommandError>>` and
+one Arc-backed `PathObservationEpoch`, derives `Allocative`, and uses
+complete-only equality/validity. No new collection, interner, cache or hash
+surface is admitted; this reuses the existing Buck2-derived DICE, `Arc`, `Dupe`
+and memory-accounting patterns reviewed in the Stage 9 extraction ledger.
+
+Expose the accepted loading observation key/carrier only as doc-hidden sealed
+API needed by core. One shared Legacy/Observed singleton-package-all driver
+selects matching anchor and root-package families, unions anchor then package
+before semantic inspection, and constructs the unchanged loaded-only command
+evaluation with an empty action closure. Legacy uses this helper only for the
+same structural singleton; every other legacy branch remains unchanged. Neither
+sibling computes the other and all command/public callers remain legacy.
+
+Semantic anchor or package errors retain the epoch through their decisive rank.
+Need and typed outer error publish no carrier or event; cancellation publishes
+nothing. Equal observations preserve the first exact Arc. Anchor and package
+events remain child-owned; the build root adds none. Scratch child values,
+projection state and union construction remain compute-local.
+
+Future implementation writes only loading `bzl_module.rs`/`lib.rs` and core
+`runtime/dice.rs`. Against `daf5eef9`, caps are 24 net/6,214 physical for Bzl
+module, 4/82 for loading lib, 260 production plus 420 test net/13,730 physical
+for core dice, and 708 aggregate net Rust lines. Require singleton parity,
+exact order/Arcs, semantic/Need/outer/event polarity, strict family/caller
+isolation, complete equality/validity, warm/edit/delete/recreate/A-B-A,
+cancellation and independent ownership/retention/cleanup proof.
+
+Existing singleton root package-all package/output/event behavior is exact.
+Carrier association, stable Arc union and typed outer errors are Slug-native.
+Analyzed/exported/multi-target/external/cquery frontier composition and
+public/core activation remain unsupported/deferred. Accepted Slug lifecycle and
+pinned Bazel package-pattern evidence are sufficient; no oracle is required.
