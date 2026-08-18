@@ -33,7 +33,9 @@ use tokio::sync::mpsc;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
+use crate::bzl_module::ExternalBzlCycleIdentity;
 use crate::bzl_module::ExternalBzlModuleEvalKey;
+use crate::bzl_module::ExternalBzlModuleObservationKey;
 use crate::bzl_module::HostBzlCycleIdentity;
 use crate::bzl_module::HostBzlModuleEvalKey;
 use crate::bzl_module::HostBzlModuleObservationKey;
@@ -94,7 +96,9 @@ impl HostBzlLoadCycle {
                 observed = Some(true);
                 identity.clone()
             }
-            BzlLoadCycleNode::Legacy(_) | BzlLoadCycleNode::External(_) => {
+            BzlLoadCycleNode::Legacy(_)
+            | BzlLoadCycleNode::ExternalLegacy(_)
+            | BzlLoadCycleNode::ExternalObserved(_) => {
                 panic!("Host bzl cycle contained another loading-key family")
             }
         };
@@ -107,37 +111,44 @@ impl HostBzlLoadCycle {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 pub(crate) struct ExternalBzlLoadCycle {
-    pub(crate) path: Arc<[ExternalBzlModuleEvalKey]>,
-    pub(crate) keys: Arc<[ExternalBzlModuleEvalKey]>,
+    pub(crate) path: Arc<[ExternalBzlCycleIdentity]>,
+    pub(crate) keys: Arc<[ExternalBzlCycleIdentity]>,
 }
 
 impl ExternalBzlLoadCycle {
-    fn from_detected(cycle: DetectedBzlLoadCycle) -> Self {
+    fn empty() -> Self {
         Self {
-            path: cycle
-                .path
-                .iter()
-                .map(|key| match key {
-                    BzlLoadCycleNode::External(key) => key.clone(),
-                    BzlLoadCycleNode::Legacy(_)
-                    | BzlLoadCycleNode::HostLegacy(_)
-                    | BzlLoadCycleNode::HostObserved(_) => {
-                        panic!("external bzl cycle contained another loading-key family")
-                    }
-                })
-                .collect(),
-            keys: cycle
-                .keys
-                .iter()
-                .map(|key| match key {
-                    BzlLoadCycleNode::External(key) => key.clone(),
-                    BzlLoadCycleNode::Legacy(_)
-                    | BzlLoadCycleNode::HostLegacy(_)
-                    | BzlLoadCycleNode::HostObserved(_) => {
-                        panic!("external bzl cycle contained another loading-key family")
-                    }
-                })
-                .collect(),
+            path: Arc::from([]),
+            keys: Arc::from([]),
+        }
+    }
+
+    fn from_detected(cycle: DetectedBzlLoadCycle) -> Self {
+        let mut observed = None;
+        let mut identity = |key: &BzlLoadCycleNode| match key {
+            BzlLoadCycleNode::ExternalLegacy(identity) => {
+                if observed == Some(true) {
+                    panic!("external bzl cycle mixed legacy and observed module families");
+                }
+                observed = Some(false);
+                identity.clone()
+            }
+            BzlLoadCycleNode::ExternalObserved(identity) => {
+                if observed == Some(false) {
+                    panic!("external bzl cycle mixed legacy and observed module families");
+                }
+                observed = Some(true);
+                identity.clone()
+            }
+            BzlLoadCycleNode::Legacy(_)
+            | BzlLoadCycleNode::HostLegacy(_)
+            | BzlLoadCycleNode::HostObserved(_) => {
+                panic!("external bzl cycle contained another loading-key family")
+            }
+        };
+        Self {
+            path: cycle.path.iter().map(&mut identity).collect(),
+            keys: cycle.keys.iter().map(identity).collect(),
         }
     }
 }
@@ -147,7 +158,8 @@ enum BzlLoadCycleNode {
     Legacy(BzlModuleEvalKey),
     HostLegacy(HostBzlCycleIdentity),
     HostObserved(HostBzlCycleIdentity),
-    External(ExternalBzlModuleEvalKey),
+    ExternalLegacy(ExternalBzlCycleIdentity),
+    ExternalObserved(ExternalBzlCycleIdentity),
 }
 
 #[derive(Debug, Clone)]
@@ -166,7 +178,8 @@ impl BzlLoadCycle {
                     BzlLoadCycleNode::Legacy(key) => key.clone(),
                     BzlLoadCycleNode::HostLegacy(_)
                     | BzlLoadCycleNode::HostObserved(_)
-                    | BzlLoadCycleNode::External(_) => {
+                    | BzlLoadCycleNode::ExternalLegacy(_)
+                    | BzlLoadCycleNode::ExternalObserved(_) => {
                         panic!("legacy bzl cycle contained a Host loading key")
                     }
                 })
@@ -178,7 +191,8 @@ impl BzlLoadCycle {
                     BzlLoadCycleNode::Legacy(key) => key.clone(),
                     BzlLoadCycleNode::HostLegacy(_)
                     | BzlLoadCycleNode::HostObserved(_)
-                    | BzlLoadCycleNode::External(_) => {
+                    | BzlLoadCycleNode::ExternalLegacy(_)
+                    | BzlLoadCycleNode::ExternalObserved(_) => {
                         panic!("legacy bzl cycle contained a Host loading key")
                     }
                 })
@@ -266,7 +280,9 @@ impl UserCycleDetectorGuard for HostBzlLoadCycleGuard {
                 key.downcast_ref::<HostBzlModuleObservationKey>()
                     .map(|key| BzlLoadCycleNode::HostObserved(key.cycle_identity()))
             }
-            BzlLoadCycleNode::Legacy(_) | BzlLoadCycleNode::External(_) => {
+            BzlLoadCycleNode::Legacy(_)
+            | BzlLoadCycleNode::ExternalLegacy(_)
+            | BzlLoadCycleNode::ExternalObserved(_) => {
                 panic!("Host bzl cycle guard had another family node")
             }
         };
@@ -284,7 +300,7 @@ impl UserCycleDetectorGuard for HostBzlLoadCycleGuard {
 /// receiver mutex has exactly one outstanding waiter and cannot be re-entered
 /// by the same guard while its child DICE future is polled.
 pub(crate) struct ExternalBzlLoadCycleGuard {
-    key: ExternalBzlModuleEvalKey,
+    key: BzlLoadCycleNode,
     sender: mpsc::UnboundedSender<Event>,
     receiver: Mutex<oneshot::Receiver<DetectedBzlLoadCycle>>,
 }
@@ -297,21 +313,39 @@ impl ExternalBzlLoadCycleGuard {
         let mut receiver = self.receiver.lock().await;
         tokio::select! {
             value = future => Ok(value),
-            cycle = &mut *receiver => Err(cycle.map(ExternalBzlLoadCycle::from_detected).unwrap_or_else(|_| ExternalBzlLoadCycle {
-                path: Arc::from([]),
-                keys: Arc::from([]),
-            })),
+            cycle = &mut *receiver => Err(cycle.map(ExternalBzlLoadCycle::from_detected).unwrap_or_else(|_| ExternalBzlLoadCycle::empty())),
         }
     }
 }
 
 impl UserCycleDetectorGuard for ExternalBzlLoadCycleGuard {
     fn add_edge(&self, key: &DynKey) {
-        if let Some(key) = key.downcast_ref::<ExternalBzlModuleEvalKey>() {
-            let _ignored = self.sender.send(Event::Edge(
-                BzlLoadCycleNode::External(self.key.clone()),
-                BzlLoadCycleNode::External(key.clone()),
-            ));
+        let child = match &self.key {
+            BzlLoadCycleNode::ExternalLegacy(_) => {
+                assert!(
+                    key.downcast_ref::<ExternalBzlModuleObservationKey>()
+                        .is_none(),
+                    "legacy external bzl guard observed an observed-family dependency",
+                );
+                key.downcast_ref::<ExternalBzlModuleEvalKey>()
+                    .map(|key| BzlLoadCycleNode::ExternalLegacy(key.cycle_identity()))
+            }
+            BzlLoadCycleNode::ExternalObserved(_) => {
+                assert!(
+                    key.downcast_ref::<ExternalBzlModuleEvalKey>().is_none(),
+                    "observed external bzl guard observed a legacy-family dependency",
+                );
+                key.downcast_ref::<ExternalBzlModuleObservationKey>()
+                    .map(|key| BzlLoadCycleNode::ExternalObserved(key.cycle_identity()))
+            }
+            BzlLoadCycleNode::Legacy(_)
+            | BzlLoadCycleNode::HostLegacy(_)
+            | BzlLoadCycleNode::HostObserved(_) => {
+                panic!("external bzl cycle guard had another family node")
+            }
+        };
+        if let Some(child) = child {
+            let _ignored = self.sender.send(Event::Edge(self.key.clone(), child));
         }
     }
 
@@ -393,12 +427,9 @@ impl BzlLoadCycleDetector {
         })
     }
 
-    fn start_external(&self, key: ExternalBzlModuleEvalKey) -> Arc<ExternalBzlLoadCycleGuard> {
+    fn start_external(&self, key: BzlLoadCycleNode) -> Arc<ExternalBzlLoadCycleGuard> {
         let (sender, receiver) = oneshot::channel();
-        let _ignored = self.sender.send(Event::Started(
-            BzlLoadCycleNode::External(key.clone()),
-            sender,
-        ));
+        let _ignored = self.sender.send(Event::Started(key.clone(), sender));
         Arc::new(ExternalBzlLoadCycleGuard {
             key,
             sender: self.sender.clone(),
@@ -428,8 +459,17 @@ impl UserCycleDetector for BzlLoadCycleDetector {
                     as Arc<dyn UserCycleDetectorGuard>,
             );
         }
-        key.downcast_ref::<ExternalBzlModuleEvalKey>()
-            .map(|key| self.start_external(key.clone()) as Arc<dyn UserCycleDetectorGuard>)
+        if let Some(key) = key.downcast_ref::<ExternalBzlModuleEvalKey>() {
+            return Some(
+                self.start_external(BzlLoadCycleNode::ExternalLegacy(key.cycle_identity()))
+                    as Arc<dyn UserCycleDetectorGuard>,
+            );
+        }
+        key.downcast_ref::<ExternalBzlModuleObservationKey>()
+            .map(|key| {
+                self.start_external(BzlLoadCycleNode::ExternalObserved(key.cycle_identity()))
+                    as Arc<dyn UserCycleDetectorGuard>
+            })
     }
 
     fn finished_computing_key(&self, key: &DynKey) {
@@ -440,7 +480,9 @@ impl UserCycleDetector for BzlLoadCycleDetector {
         } else if let Some(key) = key.downcast_ref::<HostBzlModuleObservationKey>() {
             self.finish(BzlLoadCycleNode::HostObserved(key.cycle_identity()));
         } else if let Some(key) = key.downcast_ref::<ExternalBzlModuleEvalKey>() {
-            self.finish(BzlLoadCycleNode::External(key.clone()));
+            self.finish(BzlLoadCycleNode::ExternalLegacy(key.cycle_identity()));
+        } else if let Some(key) = key.downcast_ref::<ExternalBzlModuleObservationKey>() {
+            self.finish(BzlLoadCycleNode::ExternalObserved(key.cycle_identity()));
         }
     }
 }

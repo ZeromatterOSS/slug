@@ -19,6 +19,7 @@ use dice::UserComputationData;
 use dupe::Dupe;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::OverrideAttributeValue;
 use slug_bzlmod_v2::RepoRuleId;
@@ -59,8 +60,10 @@ use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
 use starlark_map::small_map::SmallMap;
 
+use super::ExternalBzlCycleIdentity;
 use super::ExternalBzlModuleError;
 use super::ExternalBzlModuleEvalKey;
+use super::ExternalBzlModuleObservationKey;
 use super::ForceRootPackageObservationOuter;
 use super::HostPackageLoadMode;
 use super::ObservedRootPackageLoad;
@@ -251,6 +254,9 @@ impl ActivationTracker for EventTracker {
             && !name.starts_with("host-package-load:")
             && !name.starts_with("observed-host-package-load:")
             && !name.starts_with("external-bzl-module:")
+            && !name.starts_with("observed-external-bzl-module:")
+            && !name.starts_with("host-repository-source-file:")
+            && !name.starts_with("observed-host-repository-source-file:")
             && !name.starts_with("host-route-repo-file:")
             && !name.starts_with("repository-package-source:")
             && !name.starts_with("repository-package-load:")
@@ -399,6 +405,16 @@ fn external_bzl_key(
     let package = PackagePath::parse(package).unwrap();
     let label = resolve_external_load_label(&package, &format!(":{target}")).unwrap();
     ExternalBzlModuleEvalKey::new(route, label)
+}
+
+fn observed_external_bzl_key(
+    route: RootRepositoryRoute,
+    package: &str,
+    target: &str,
+) -> ExternalBzlModuleObservationKey {
+    let package = PackagePath::parse(package).unwrap();
+    let label = resolve_external_load_label(&package, &format!(":{target}")).unwrap();
+    ExternalBzlModuleObservationKey::new(route, label)
 }
 
 fn event_texts(batch: &EventBatch) -> Vec<&str> {
@@ -1267,6 +1283,7 @@ async fn host_package_retained_graph_replays_all_input_lifecycles() {
 }
 
 type ExternalBzlOutcome = <ExternalBzlModuleEvalKey as Key>::Value;
+type ObservedExternalBzlOutcome = <ExternalBzlModuleObservationKey as Key>::Value;
 type RepositoryPackageOutcome = <RepositoryPackageLoadKey as Key>::Value;
 
 fn repository_package_terminal(outcome: &RepositoryPackageOutcome) -> &crate::LoadedPackage {
@@ -1301,6 +1318,404 @@ fn external_error(outcome: &ExternalBzlOutcome) -> &ExternalBzlModuleError {
         panic!("complete external source epoch returned Need");
     };
     value.as_ref().as_ref().unwrap_err()
+}
+
+fn observed_external(outcome: &ObservedExternalBzlOutcome) -> &super::ObservedExternalBzlModule {
+    let LoadingPreparationOutcome::Complete(Ok(value)) = outcome else {
+        panic!("expected complete observed external bzl outcome: {outcome:?}");
+    };
+    value
+}
+
+fn observed_external_error(outcome: &ObservedExternalBzlOutcome) -> &ExternalBzlModuleError {
+    observed_external(outcome)
+        .result()
+        .as_ref()
+        .as_ref()
+        .unwrap_err()
+}
+
+fn assert_same_epoch_arcs(left: &PathObservationEpoch, right: &PathObservationEpoch) {
+    assert_eq!(left.observations().len(), right.observations().len());
+    for ((left_demand, left_result), (right_demand, right_result)) in
+        left.observations().iter().zip(right.observations().iter())
+    {
+        assert_eq!(left_demand, right_demand);
+        assert_eq!(left_result, right_result);
+        assert!(Arc::ptr_eq(left_result, right_result));
+    }
+}
+
+#[tokio::test]
+async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
+    let files: &[(&str, &[u8])] = &[
+        (
+            "root.bzl",
+            b"load(\":left.bzl\", \"LEFT\")\nload(\":right.bzl\", \"RIGHT\")\nprint(\"ROOT_BZL\")\nRESULT = LEFT + RIGHT\n",
+        ),
+        (
+            "left.bzl",
+            b"load(\":helper.bzl\", \"H\")\nprint(\"LEFT_BZL\")\nLEFT = H\n",
+        ),
+        (
+            "right.bzl",
+            b"load(\":helper.bzl\", \"H\")\nprint(\"RIGHT_BZL\")\nRIGHT = H\n",
+        ),
+        ("helper.bzl", b"print(\"HELPER_BZL\")\nH = 1\n"),
+    ];
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch = EpochBuilder::external_sources(files, 140).build();
+    let mut cold = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
+    let route = external_route(&mut cold).await;
+    tracker.take();
+    let key = observed_external_bzl_key(route.clone(), "", "root.bzl");
+    let value = cold.compute(&key).await.unwrap();
+    let carrier = observed_external(&value);
+    let module = carrier.result().as_ref().as_ref().unwrap();
+    assert_eq!(module.manifest.reachable.len(), 4);
+    assert!(ExternalBzlModuleObservationKey::validity(&value));
+    assert!(ExternalBzlModuleObservationKey::equality(&value, &value));
+
+    let batches = tracker.take();
+    assert!(batches.iter().all(|entry| {
+        !entry.key.starts_with("external-bzl-module:")
+            && !entry.key.starts_with("host-repository-source-file:")
+            && !entry.key.starts_with("repository-package-load:")
+    }));
+    let evaluated = batches
+        .iter()
+        .filter(|entry| {
+            entry.key.starts_with("observed-external-bzl-module:")
+                && entry.kind == ActivationKind::Evaluated
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(evaluated.len(), 4);
+    assert_eq!(
+        evaluated
+            .iter()
+            .map(|entry| entry.key.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "observed-external-bzl-module:@@dep+//:helper.bzl",
+            "observed-external-bzl-module:@@dep+//:left.bzl",
+            "observed-external-bzl-module:@@dep+//:right.bzl",
+            "observed-external-bzl-module:@@dep+//:root.bzl",
+        ]
+    );
+    assert_eq!(
+        evaluated
+            .iter()
+            .map(|entry| event_texts(entry.batch.as_ref().unwrap()))
+            .collect::<Vec<_>>(),
+        [
+            vec!["HELPER_BZL"],
+            vec!["LEFT_BZL"],
+            vec!["RIGHT_BZL"],
+            vec!["ROOT_BZL"],
+        ]
+    );
+
+    let mut expected = PathObservationEpoch::empty();
+    for path in ["root.bzl", "left.bzl", "helper.bzl", "right.bzl"] {
+        let source = cold
+            .compute(&HostRepositorySourceFileObservationKey::new(
+                route.clone(),
+                PathBuf::from(path),
+            ))
+            .await
+            .unwrap();
+        let LoadingPreparationOutcome::Complete(Ok(source)) = source else {
+            panic!("expected complete observed external source");
+        };
+        expected = super::union_host_observations(&expected, source.observations()).unwrap();
+    }
+    assert_same_epoch_arcs(carrier.observations(), &expected);
+    tracker.take();
+    let legacy_value = cold
+        .compute(&external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    assert_eq!(external_terminal(&legacy_value).manifest.reachable.len(), 4);
+    assert!(tracker.take().iter().all(|entry| {
+        !entry.key.starts_with("observed-external-bzl-module:")
+            && !entry
+                .key
+                .starts_with("observed-host-repository-source-file:")
+    }));
+
+    let warm_tracker = Arc::new(EventTracker::default());
+    let mut warm = transaction(&dice, epoch, true, Some(warm_tracker.dupe())).await;
+    let warm_route = external_route(&mut warm).await;
+    warm_tracker.take();
+    let warm_value = warm
+        .compute(&observed_external_bzl_key(warm_route, "", "root.bzl"))
+        .await
+        .unwrap();
+    assert!(ExternalBzlModuleObservationKey::equality(
+        &value,
+        &warm_value
+    ));
+    assert_same_epoch_arcs(
+        carrier.observations(),
+        observed_external(&warm_value).observations(),
+    );
+    assert!(warm_tracker.take().iter().all(|entry| {
+        !entry.key.starts_with("observed-external-bzl-module:")
+            || (entry.kind == ActivationKind::Reused && entry.batch.is_none())
+    }));
+
+    let a_fingerprint = module.manifest.fingerprint;
+    let edited_root =
+        b"load(\":left.bzl\", \"LEFT\")\nload(\":right.bzl\", \"RIGHT\")\nRESULT = LEFT + RIGHT + 1\n";
+    for (variant, source, restored) in [
+        (141, Some(edited_root.as_slice()), false),
+        (142, None, false),
+        (143, Some(edited_root.as_slice()), false),
+        (144, Some(files[0].1), true),
+    ] {
+        let mut next_files = files[1..].to_vec();
+        if let Some(source) = source {
+            next_files.insert(0, ("root.bzl", source));
+        }
+        let mut next_epoch = EpochBuilder::external_sources(&next_files, variant);
+        if source.is_none() {
+            next_epoch.missing("/workspace/dep/root.bzl");
+        }
+        let mut next = transaction(&dice, next_epoch.build(), false, None).await;
+        let route = external_route(&mut next).await;
+        let next = next
+            .compute(&observed_external_bzl_key(route, "", "root.bzl"))
+            .await
+            .unwrap();
+        match observed_external(&next).result().as_ref() {
+            Ok(module) => assert_eq!(module.manifest.fingerprint == a_fingerprint, restored),
+            Err(error) => {
+                assert!(source.is_none() && matches!(error, ExternalBzlModuleError::Absent { .. }))
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn observed_external_bzl_terminals_keep_decisive_prefixes_and_stop_children() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+
+    let mut absent_epoch = EpochBuilder::external_sources(&[], 150);
+    absent_epoch.missing("/workspace/dep/missing.bzl");
+    let mut absent = transaction(&dice, absent_epoch.build(), false, None).await;
+    let route = external_route(&mut absent).await;
+    let absent_value = absent
+        .compute(&observed_external_bzl_key(route.clone(), "", "missing.bzl"))
+        .await
+        .unwrap();
+    assert!(matches!(
+        observed_external_error(&absent_value),
+        ExternalBzlModuleError::Absent { .. }
+    ));
+    assert!(ExternalBzlModuleObservationKey::validity(&absent_value));
+    let source = absent
+        .compute(&HostRepositorySourceFileObservationKey::new(
+            route,
+            PathBuf::from("missing.bzl"),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(source)) = source else {
+        panic!("expected missing source carrier");
+    };
+    assert_same_epoch_arcs(
+        observed_external(&absent_value).observations(),
+        source.observations(),
+    );
+
+    let tracker = Arc::new(EventTracker::default());
+    let mut need = transaction(
+        &dice,
+        EpochBuilder::external_sources(&[], 152).build(),
+        true,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let route = external_route(&mut need).await;
+    tracker.take();
+    let need_value = need
+        .compute(&observed_external_bzl_key(route, "", "need.bzl"))
+        .await
+        .unwrap();
+    assert!(matches!(need_value, LoadingPreparationOutcome::Need(_)));
+    assert!(!ExternalBzlModuleObservationKey::validity(&need_value));
+    assert!(!ExternalBzlModuleObservationKey::equality(
+        &need_value,
+        &need_value,
+    ));
+    let activations = tracker.take();
+    assert!(
+        activations
+            .iter()
+            .filter(|entry| entry.key.starts_with("observed-external-bzl-module:"))
+            .all(|entry| entry.key.ends_with("need.bzl") && entry.batch.is_none())
+    );
+
+    let outer = PathObservationEpoch::from_shared([(
+        EpochBuilder::demand("/outer", PathObservationOperation::Lstat),
+        Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Missing,
+        )),
+    )])
+    .unwrap_err()
+    .into();
+    assert!(matches!(
+        super::external_bzl_observed_child::<()>(LoadingPreparationOutcome::Complete(Err(outer))),
+        std::ops::ControlFlow::Break(LoadingPreparationOutcome::Complete(Err(_)))
+    ));
+    let demand = EpochBuilder::demand("/same", PathObservationOperation::Lstat);
+    let result = |variant| {
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::RegularFile,
+            variant,
+            variant,
+            variant,
+            variant,
+            0o644,
+        )))
+    };
+    let first = PathObservationEpoch::new([(demand.dupe(), result(1))]).unwrap();
+    let duplicate = PathObservationEpoch::new([(demand.dupe(), result(1))]).unwrap();
+    let conflict = PathObservationEpoch::new([(demand.dupe(), result(2))]).unwrap();
+    let first_arc = first.get(&demand).unwrap().dupe();
+    let merged = super::union_host_observations(&first, &duplicate).unwrap();
+    assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first_arc));
+    assert!(super::union_host_observations(&merged, &conflict).is_err());
+    let absent_prefix = super::finish_external_bzl_source(
+        Ok(slug_bzlmod_v2::HostRepositorySourceFileValue::Absent),
+        CanonicalLabel::parse("@@dep+//:missing.bzl").unwrap(),
+        first.dupe(),
+    )
+    .unwrap_err();
+    let LoadingPreparationOutcome::Complete(Ok((result, retained))) = absent_prefix else {
+        panic!("cycle source Absent did not remain semantic");
+    };
+    assert!(matches!(
+        result.as_ref(),
+        Err(ExternalBzlModuleError::Absent { .. })
+    ));
+    assert_same_epoch_arcs(&retained, &first);
+}
+
+#[tokio::test]
+async fn observed_external_bzl_child_positions_stop_at_need_or_semantic() {
+    const PARENT: &[u8] =
+        b"load(\":a.bzl\", \"A\")\nload(\":b.bzl\", \"B\")\nload(\":c.bzl\", \"C\")\n";
+    const CHILDREN: [(&str, &[u8]); 3] = [
+        ("a.bzl", b"A = 1\n"),
+        ("b.bzl", b"B = 1\n"),
+        ("c.bzl", b"C = 1\n"),
+    ];
+    for position in 0..CHILDREN.len() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let tracker = Arc::new(EventTracker::default());
+        let mut files = vec![("parent.bzl", PARENT)];
+        files.extend(
+            CHILDREN
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != position)
+                .map(|(_, file)| *file),
+        );
+        let mut tx = transaction(
+            &dice,
+            EpochBuilder::external_sources(&files, 170 + position as i64).build(),
+            true,
+            Some(tracker.dupe()),
+        )
+        .await;
+        let route = external_route(&mut tx).await;
+        tracker.take();
+        let value = tx
+            .compute(&observed_external_bzl_key(route, "", "parent.bzl"))
+            .await
+            .unwrap();
+        assert!(matches!(value, LoadingPreparationOutcome::Need(_)));
+        let activations = tracker.take();
+        assert!(
+            CHILDREN[position + 1..]
+                .iter()
+                .all(|(name, _)| { activations.iter().all(|entry| !entry.key.contains(name)) })
+        );
+
+        let mut semantic_files = vec![("parent.bzl", PARENT)];
+        semantic_files.extend(CHILDREN.iter().copied());
+        let mut epoch = EpochBuilder::external_sources(&semantic_files, 180 + position as i64);
+        epoch.missing(&format!("/workspace/dep/{}", CHILDREN[position].0));
+        let mut tx = transaction(&dice, epoch.build(), false, None).await;
+        let route = external_route(&mut tx).await;
+        let value = tx
+            .compute(&observed_external_bzl_key(route.clone(), "", "parent.bzl"))
+            .await
+            .unwrap();
+        assert!(matches!(
+            observed_external_error(&value),
+            ExternalBzlModuleError::Child { error, .. }
+                if matches!(error.as_ref(), ExternalBzlModuleError::Absent { .. })
+        ));
+        let mut expected = PathObservationEpoch::empty();
+        for path in
+            std::iter::once("parent.bzl").chain(CHILDREN[..=position].iter().map(|(name, _)| *name))
+        {
+            let source = tx
+                .compute(&HostRepositorySourceFileObservationKey::new(
+                    route.clone(),
+                    PathBuf::from(path),
+                ))
+                .await
+                .unwrap();
+            let LoadingPreparationOutcome::Complete(Ok(source)) = source else {
+                panic!("expected positional source carrier");
+            };
+            expected = super::union_host_observations(&expected, source.observations()).unwrap();
+        }
+        assert_same_epoch_arcs(observed_external(&value).observations(), &expected);
+    }
+}
+
+#[tokio::test]
+async fn observed_external_bzl_poll_drop_publishes_no_parent_and_recovers() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch = EpochBuilder::external_sources(&[("root.bzl", b"VALUE = 1\n")], 190).build();
+    let mut cancelled = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
+    let route = external_route(&mut cancelled).await;
+    tracker.take();
+    let key = observed_external_bzl_key(route, "", "root.bzl");
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    assert!(
+        tracker
+            .take()
+            .iter()
+            .all(|entry| { entry.key != key.to_string() || entry.batch.is_none() })
+    );
+    drop(cancelled);
+    let mut successor = transaction(&dice, epoch, true, Some(tracker.dupe())).await;
+    let route = external_route(&mut successor).await;
+    let recovered = successor
+        .compute(&observed_external_bzl_key(route, "", "root.bzl"))
+        .await
+        .unwrap();
+    assert!(observed_external(&recovered).result().is_ok());
+    let recovered_batches = tracker
+        .take()
+        .into_iter()
+        .filter(|entry| entry.key == key.to_string() && entry.kind == ActivationKind::Evaluated)
+        .collect::<Vec<_>>();
+    assert_eq!(recovered_batches.len(), 1);
+    assert!(event_texts(recovered_batches[0].batch.as_ref().unwrap()).is_empty());
 }
 
 #[test]
@@ -1681,7 +2096,7 @@ async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
         self_detected
             .keys
             .iter()
-            .map(ExternalBzlModuleEvalKey::canonical_label)
+            .map(ExternalBzlCycleIdentity::canonical_label)
             .map(|label| label.to_string())
             .collect::<Vec<_>>(),
         ["@@dep+//:self.bzl"]
@@ -1708,7 +2123,7 @@ async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
         detected
             .path
             .iter()
-            .map(ExternalBzlModuleEvalKey::canonical_label)
+            .map(ExternalBzlCycleIdentity::canonical_label)
             .map(|label| label.to_string())
             .collect::<Vec<_>>(),
         ["@@dep+//:entry.bzl"]
@@ -1717,7 +2132,7 @@ async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
         detected
             .keys
             .iter()
-            .map(ExternalBzlModuleEvalKey::canonical_label)
+            .map(ExternalBzlCycleIdentity::canonical_label)
             .map(|label| label.to_string())
             .collect::<Vec<_>>(),
         ["@@dep+//:one.bzl", "@@dep+//:two.bzl"]
@@ -1741,6 +2156,138 @@ async fn external_bzl_module_cycle_releases_and_recovers_with_fresh_detector() {
         .await
         .unwrap();
     assert_eq!(external_terminal(&fixed_value).manifest.reachable.len(), 3);
+}
+
+#[tokio::test]
+async fn observed_external_bzl_cycle_retains_all_sources_and_recovers() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let self_epoch = EpochBuilder::external_sources(
+        &[("self.bzl", b"load(\":self.bzl\", \"VALUE\")\nVALUE = 1\n")],
+        159,
+    )
+    .build();
+    let mut self_cycle = transaction(&dice, self_epoch, false, None).await;
+    let self_route = external_route(&mut self_cycle).await;
+    let self_value = tokio::time::timeout(
+        Duration::from_secs(5),
+        self_cycle.compute(&observed_external_bzl_key(
+            self_route.clone(),
+            "",
+            "self.bzl",
+        )),
+    )
+    .await
+    .expect("observed external self-cycle must release")
+    .unwrap();
+    let self_detected = observed_external_error(&self_value).cycle().unwrap();
+    assert!(self_detected.path.is_empty());
+    assert_eq!(
+        self_detected.keys[0].canonical_label().to_string(),
+        "@@dep+//:self.bzl"
+    );
+    let self_source = self_cycle
+        .compute(&HostRepositorySourceFileObservationKey::new(
+            self_route,
+            PathBuf::from("self.bzl"),
+        ))
+        .await
+        .unwrap();
+    let LoadingPreparationOutcome::Complete(Ok(self_source)) = self_source else {
+        panic!("expected self-cycle source carrier");
+    };
+    assert_same_epoch_arcs(
+        observed_external(&self_value).observations(),
+        self_source.observations(),
+    );
+    let cycle_epoch = EpochBuilder::external_sources(
+        &[
+            ("entry.bzl", b"load(\":one.bzl\", \"ONE\")\nVALUE = ONE\n"),
+            ("one.bzl", b"load(\":two.bzl\", \"TWO\")\nONE = TWO\n"),
+            ("two.bzl", b"load(\":one.bzl\", \"ONE\")\nTWO = ONE\n"),
+        ],
+        160,
+    )
+    .build();
+    let tracker = Arc::new(EventTracker::default());
+    let mut cycle = transaction(&dice, cycle_epoch, true, Some(tracker.dupe())).await;
+    let route = external_route(&mut cycle).await;
+    tracker.take();
+    let key = observed_external_bzl_key(route.clone(), "", "entry.bzl");
+    let value = tokio::time::timeout(Duration::from_secs(5), cycle.compute(&key))
+        .await
+        .expect("observed external cycle detector must release recursive DICE wait")
+        .unwrap();
+    let detected = observed_external_error(&value).cycle().unwrap();
+    assert_eq!(
+        detected
+            .path
+            .iter()
+            .map(ExternalBzlCycleIdentity::canonical_label)
+            .map(|label| label.to_string())
+            .collect::<Vec<_>>(),
+        ["@@dep+//:entry.bzl"]
+    );
+    assert_eq!(
+        detected
+            .keys
+            .iter()
+            .map(ExternalBzlCycleIdentity::canonical_label)
+            .map(|label| label.to_string())
+            .collect::<Vec<_>>(),
+        ["@@dep+//:one.bzl", "@@dep+//:two.bzl"]
+    );
+    let mut expected = PathObservationEpoch::empty();
+    for path in ["entry.bzl", "one.bzl", "two.bzl"] {
+        let source = cycle
+            .compute(&HostRepositorySourceFileObservationKey::new(
+                route.clone(),
+                PathBuf::from(path),
+            ))
+            .await
+            .unwrap();
+        let LoadingPreparationOutcome::Complete(Ok(source)) = source else {
+            panic!("expected cycle source carrier");
+        };
+        expected = super::union_host_observations(&expected, source.observations()).unwrap();
+    }
+    assert_same_epoch_arcs(observed_external(&value).observations(), &expected);
+    let cycle_batches = tracker
+        .take()
+        .into_iter()
+        .filter(|entry| entry.key.starts_with("observed-external-bzl-module:"))
+        .collect::<Vec<_>>();
+    assert!(
+        cycle_batches
+            .iter()
+            .all(|entry| { matches!(entry.batch, Some(ref batch) if batch.events().is_empty()) })
+    );
+
+    let fixed_epoch = EpochBuilder::external_sources(
+        &[
+            ("entry.bzl", b"load(\":one.bzl\", \"ONE\")\nVALUE = ONE\n"),
+            ("one.bzl", b"load(\":two.bzl\", \"TWO\")\nONE = TWO\n"),
+            ("two.bzl", b"TWO = 2\n"),
+        ],
+        161,
+    )
+    .build();
+    let mut fixed = transaction(&dice, fixed_epoch, false, None).await;
+    let route = external_route(&mut fixed).await;
+    let fixed_value = fixed
+        .compute(&observed_external_bzl_key(route, "", "entry.bzl"))
+        .await
+        .unwrap();
+    assert_eq!(
+        observed_external(&fixed_value)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .manifest
+            .reachable
+            .len(),
+        3
+    );
 }
 
 #[tokio::test]
