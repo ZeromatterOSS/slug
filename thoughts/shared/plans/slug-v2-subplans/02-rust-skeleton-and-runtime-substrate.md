@@ -4254,3 +4254,37 @@ latest-diff review. STOP on every other file, source/load/include/query
 activation, mixed families, partial/rebuilt carriers, moved events, retained
 state, cap excess or M1 closure. After ACCEPT, schedule only the docs-only
 external package source/load design.
+
+### External repository package lookup observation accepted (2026-08-18)
+
+Commit `33717f27` accepts design `1f246c0d`. One shared mode-aware lookup
+driver preserves canonical policy, routed ignore, `BUILD.bazel`, then `BUILD`
+order and selects only matching legacy/observed child families. The observed
+carrier owns one semantic Result Arc plus the exact reached epoch. Canonical
+deletion has an empty epoch; ignore deletion retains the ignore prefix;
+selected/path-error terminals retain the decisive marker; `NoBuildFile`
+retains both markers. Need/typed outer has no carrier.
+
+Proof covers both deletion origins, priority/kinds, exact child Arcs, every
+child Need and typed outer position, semantic prefixes, Complete validity,
+both family directions, child-before-parent event order, parent eventlessness,
+polled cancellation and same-DICE success recovery, warm reuse and A/B/A.
+Accounting against `2a8dd968` is +165 production/+7 glue at 4,739 physical,
+358 new tests, +530 aggregate and 5,097 combined. Focused 3/3 and full bzlmod,
+loading/query, fmt/check/diff/retention/cleanup pass; the core baselines remain
+234/235 and 12/13. Independent review returns `ACCEPT`. M1 remains partial.
+
+### External package source/load observation design resumed (2026-08-18)
+
+Run docs-only `WP-2A-m1-external-package-source-load-observation-design-resume`
+from scheduling/Rust base `33717f27`. Audit observed lookup reuse in
+`RepositoryPackageSourceKey` and `DirectLocalIncludePackageHorizonKey`, direct
+local module support, selected BUILD source, recursive
+`ExternalBzlModuleEvalKey`, and `RepositoryPackageLoadKey`.
+
+Select one first complete natural owner or uniquely smaller prerequisite and
+freeze exact future files/caps, deterministic prefix/error/event/cancellation
+algebra, compact retention, proof/validation and one successor. Write only
+canonical/current/Stage 2/routing under 40/220/180/30 and 470 aggregate docs
+caps. STOP on Rust, source/load/query activation, duplicate family/events,
+partial carriers, retained scratch, multiple successors or M1 closure.
