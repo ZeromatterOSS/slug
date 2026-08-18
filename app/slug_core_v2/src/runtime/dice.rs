@@ -80,6 +80,7 @@ use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchor;
 use slug_bzlmod_v2::RootModuleLoadingAnchorError;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_bzlmod_v2::RootModuleLockfileModeKey;
 use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
@@ -100,10 +101,12 @@ use slug_identity_v2::TargetPattern;
 use slug_loading_v2::BzlModuleEvaluator;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::LoadingPreparationOutcome;
+use slug_loading_v2::ObservedRootPackageLoad;
 use slug_loading_v2::RepositoryPackageLoadError;
 use slug_loading_v2::RepositoryPackageLoadKey;
 use slug_loading_v2::RootPackageLoadError;
 use slug_loading_v2::RootPackageLoadKey;
+use slug_loading_v2::RootPackageLoadObservationKey;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_loading_v2::keys::WorkspaceDirectoryEntry;
 use slug_loading_v2::keys::WorkspaceDirectoryEntryKind;
@@ -127,6 +130,7 @@ use slug_query_v2::preflight_cquery_query;
 use slug_query_v2::render_unfactored_dot;
 use slug_query_v2::validate_cquery_query;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
@@ -1962,6 +1966,31 @@ struct BuildCommandRootKey {
     explicit_root_string_setting: Option<RootStringSettingValue>,
 }
 
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling is callerless until a later cutover packet.
+struct BuildCommandRootObservationKey(BuildCommandRootKey);
+
+#[derive(Debug, Clone, Eq, PartialEq, Allocative, Dupe)]
+#[allow(dead_code)] // Private observed carrier is callerless until a later cutover packet.
+struct ObservedBuildCommandRoot {
+    result: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
+    observations: PathObservationEpoch,
+}
+
+#[cfg(test)]
+struct ForceBuildCommandRootObservationOuter(ObservedPathFrontierError);
+
+#[allow(dead_code)]
+impl ObservedBuildCommandRoot {
+    fn result(&self) -> &Arc<Result<BuildCommandEvaluation, BuildCommandError>> {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
 #[derive(Clone)]
 struct CqueryCommandRoot {
     expression: QueryExpression,
@@ -2550,6 +2579,23 @@ impl BuildCommandRootKey {
         key.explicit_root_string_setting = explicit;
         Ok(key)
     }
+
+    fn singleton_root_package_all(&self) -> Option<PackagePath> {
+        let [pattern] = self.targets.as_ref() else {
+            return None;
+        };
+        match TargetPattern::parse(pattern).ok()? {
+            TargetPattern::PackageAll { repo, package } if repo.is_root() => Some(package),
+            _ => None,
+        }
+    }
+}
+
+#[allow(dead_code)]
+impl BuildCommandRootObservationKey {
+    fn new(key: BuildCommandRootKey) -> Option<Self> {
+        key.singleton_root_package_all().map(|_| Self(key))
+    }
 }
 
 impl BuildCommandEvaluation {
@@ -3129,6 +3175,182 @@ impl fmt::Display for BuildCommandRootKey {
     }
 }
 
+impl fmt::Display for BuildCommandRootObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)] // Observed mode is private and callerless outside tests until cutover.
+enum SingletonPackageAllMode {
+    Legacy,
+    Observed,
+}
+
+type SingletonPackageAllDriverOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
+    Result<
+        (
+            Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+>;
+
+fn singleton_package_all_complete(
+    result: Result<BuildCommandEvaluation, BuildCommandError>,
+    observations: PathObservationEpoch,
+) -> SingletonPackageAllDriverOutcome {
+    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn union_build_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+async fn compute_singleton_package_all(
+    key: &BuildCommandRootKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: SingletonPackageAllMode,
+) -> SingletonPackageAllDriverOutcome {
+    let package = key
+        .singleton_root_package_all()
+        .expect("singleton package-all driver requires its restricted identity");
+    let anchor = match mode {
+        SingletonPackageAllMode::Legacy => ctx
+            .compute(&RootModuleLoadingAnchorKey::new(key.workspace.dupe()))
+            .await
+            .expect("build root-module anchor DICE invariant")
+            .map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty()))),
+        SingletonPackageAllMode::Observed => ctx
+            .compute(&RootModuleLoadingAnchorObservationKey::new(
+                key.workspace.dupe(),
+            ))
+            .await
+            .expect("observed build root-module anchor DICE invariant")
+            .map(|value| {
+                value.map(|observed| (observed.result().clone(), observed.observations().dupe()))
+            }),
+    };
+    let (anchor, mut observations) = match anchor {
+        slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Need(need);
+        }
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error));
+        }
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    let anchor = match anchor {
+        Ok(anchor) => anchor,
+        Err(error) => {
+            return singleton_package_all_complete(
+                Err(BuildCommandError::new(BuildCommandErrorKind::RootAnchor(
+                    error,
+                ))),
+                observations,
+            );
+        }
+    };
+
+    let loaded = match mode {
+        SingletonPackageAllMode::Legacy => ctx
+            .compute(&RootPackageLoadKey::new(
+                key.workspace.dupe(),
+                package.clone(),
+            ))
+            .await
+            .expect("build root-package DICE invariant")
+            .map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty()))),
+        SingletonPackageAllMode::Observed => ctx
+            .compute(&RootPackageLoadObservationKey::new(
+                key.workspace.dupe(),
+                package.clone(),
+            ))
+            .await
+            .expect("observed build root-package DICE invariant")
+            .map(|value| {
+                value.map(|observed: ObservedRootPackageLoad| {
+                    (
+                        observed.result().as_ref().clone(),
+                        observed.observations().dupe(),
+                    )
+                })
+            }),
+    };
+    let (loaded, incoming) = match loaded {
+        slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Need(need);
+        }
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error));
+        }
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    observations = match mode {
+        SingletonPackageAllMode::Legacy => observations,
+        SingletonPackageAllMode::Observed => {
+            match union_build_observations(&observations, &incoming) {
+                Ok(observations) => observations,
+                Err(error) => {
+                    return slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error));
+                }
+            }
+        }
+    };
+    #[cfg(test)]
+    if matches!(mode, SingletonPackageAllMode::Observed) {
+        if let Ok(forced) = ctx
+            .per_transaction_data()
+            .data
+            .get::<ForceBuildCommandRootObservationOuter>()
+        {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(forced.0.clone()));
+        }
+    }
+    let loaded = match loaded {
+        Ok(loaded) => loaded,
+        Err(error) => {
+            return singleton_package_all_complete(
+                Err(BuildCommandError::new(BuildCommandErrorKind::Package(
+                    error,
+                ))),
+                observations,
+            );
+        }
+    };
+    let target = BuildRequestedTarget {
+        pattern: key.targets[0].dupe(),
+        package: loaded,
+        analysis: None,
+        completion: BuildTargetCompletion::LoadedOnly,
+        source_certificate: None,
+    };
+    singleton_package_all_complete(
+        Ok(BuildCommandEvaluation {
+            anchor,
+            targets: Arc::from([target]),
+            action_closure: Arc::from([]),
+        }),
+        observations,
+    )
+}
+
 fn build_complete(
     result: Result<BuildCommandEvaluation, BuildCommandError>,
 ) -> BuildCommandOutcome {
@@ -3636,6 +3858,22 @@ impl Key for BuildCommandRootKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
+        if self.singleton_root_package_all().is_some() {
+            return match compute_singleton_package_all(self, ctx, SingletonPackageAllMode::Legacy)
+                .await
+            {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                    slug_bzlmod_v2::SourcePreparationOutcome::Need(need)
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                    debug_assert_eq!(observations, PathObservationEpoch::empty());
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(result)
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+                    panic!("legacy singleton package-all produced an observed outer error: {error}")
+                }
+            };
+        }
         let anchor = match ctx
             .compute(&RootModuleLoadingAnchorKey::new(self.workspace.clone()))
             .await
@@ -3696,6 +3934,42 @@ impl Key for BuildCommandRootKey {
                         }))
                     }
                 }
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for BuildCommandRootObservationKey {
+    type Value = slug_bzlmod_v2::SourcePreparationOutcome<
+        Result<ObservedBuildCommandRoot, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match compute_singleton_package_all(&self.0, ctx, SingletonPackageAllMode::Observed).await {
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need)
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error))
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(ObservedBuildCommandRoot {
+                    result,
+                    observations,
+                }))
             }
         }
     }
@@ -12965,6 +13239,380 @@ probe = rule(implementation = _impl)
                 .await;
         let build_restored = restored_build.compute(&package).await.unwrap();
         assert!(BuildCommandRootKey::equality(&build_v1, &build_restored));
+    }
+
+    type ObservedBuildOutcome = slug_bzlmod_v2::SourcePreparationOutcome<
+        Result<ObservedBuildCommandRoot, ObservedPathFrontierError>,
+    >;
+
+    fn singleton_package_all_key(pattern: &str) -> BuildCommandRootKey {
+        BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            &[TargetPattern::parse(pattern).unwrap()],
+            build_test_configuration("target"),
+        )
+        .unwrap()
+    }
+
+    fn complete_observed_build(outcome: &ObservedBuildOutcome) -> &ObservedBuildCommandRoot {
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("observed build did not complete successfully: {outcome:?}");
+        };
+        observed
+    }
+
+    #[derive(Debug, Clone)]
+    struct ObservedBuildActivation {
+        key: String,
+        kind: dice::ActivationKind,
+        batch: Option<EventBatch>,
+    }
+
+    #[derive(Default)]
+    struct ObservedBuildTracker(Mutex<Vec<ObservedBuildActivation>>);
+
+    impl ObservedBuildTracker {
+        fn take(&self) -> Vec<ObservedBuildActivation> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    impl ActivationTracker for ObservedBuildTracker {
+        fn key_activated(
+            &self,
+            _key: &DynKey,
+            _deps: &mut dyn Iterator<Item = &DynKey>,
+            _activation: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            if key.downcast_ref::<BuildCommandRootKey>().is_none()
+                && key
+                    .downcast_ref::<BuildCommandRootObservationKey>()
+                    .is_none()
+                && key.downcast_ref::<RootModuleLoadingAnchorKey>().is_none()
+                && key
+                    .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
+                    .is_none()
+                && key.downcast_ref::<RootPackageLoadKey>().is_none()
+                && key
+                    .downcast_ref::<RootPackageLoadObservationKey>()
+                    .is_none()
+            {
+                return;
+            }
+            self.0.lock().unwrap().push(ObservedBuildActivation {
+                key: key.to_string(),
+                kind: activation.kind(),
+                batch: activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            });
+        }
+    }
+
+    fn assert_observed_epoch_uses_input_arcs(
+        observed: &PathObservationEpoch,
+        input: &PathObservationEpoch,
+    ) {
+        assert!(!observed.observations().is_empty());
+        for (demand, result) in observed.observations() {
+            assert!(
+                Arc::ptr_eq(result, input.get(demand).unwrap()),
+                "observation did not retain the injected Arc for {demand:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn observed_build_identity_and_epoch_union_are_restricted_and_left_stable() {
+        let accepted = singleton_package_all_key("//pkg:all");
+        let observed = BuildCommandRootObservationKey::new(accepted.clone()).unwrap();
+        assert_eq!(observed.to_string(), format!("observed-{accepted}"));
+
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let configuration = build_test_configuration("target");
+        for targets in [
+            vec![],
+            vec![TargetPattern::parse("//pkg:t").unwrap()],
+            vec![
+                TargetPattern::parse("//pkg:all").unwrap(),
+                TargetPattern::parse("//other:all").unwrap(),
+            ],
+            vec![TargetPattern::parse("@repo//pkg:t").unwrap()],
+        ] {
+            let legacy =
+                BuildCommandRootKey::new(workspace.clone(), &targets, configuration.clone())
+                    .unwrap();
+            assert!(BuildCommandRootObservationKey::new(legacy).is_none());
+        }
+
+        let demand = BuildRootEpoch::demand("/same", PathObservationOperation::Lstat);
+        let result = PathObservationResult::Lstat(PathOperationResult::Missing);
+        let left = PathObservationEpoch::new([(demand.dupe(), result.clone())]).unwrap();
+        let duplicate = PathObservationEpoch::new([(demand.dupe(), result)]).unwrap();
+        let first = left.get(&demand).unwrap().dupe();
+        let merged = union_build_observations(&left, &duplicate).unwrap();
+        assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+        let conflicting = PathObservationEpoch::new([(
+            demand,
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                1,
+                1,
+                1,
+                0o644,
+            ))),
+        )])
+        .unwrap();
+        assert!(union_build_observations(&merged, &conflicting).is_err());
+    }
+
+    #[tokio::test]
+    async fn observed_build_matches_legacy_arcs_events_and_isolates_key_families() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedBuildTracker::default());
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut builder = BuildRootEpoch::base(1);
+        builder.package("pkg", "print('PACKAGE')\nfilegroup(name = 'target')\n", 1);
+        let epoch = builder.build();
+        let legacy_key = singleton_package_all_key("//pkg:all");
+        let observed_key = BuildCommandRootObservationKey::new(legacy_key.clone()).unwrap();
+        let mut observed_transaction =
+            build_root_transaction_with_data(&dice, epoch.dupe(), user_data).await;
+        let observed_outcome = observed_transaction.compute(&observed_key).await.unwrap();
+        let observed = complete_observed_build(&observed_outcome);
+        let evaluation = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(evaluation.loaded_package_count(), 1);
+        assert_eq!(evaluation.analyzed_target_count(), 0);
+        assert_eq!(evaluation.declared_action_count(), 0);
+        assert_eq!(evaluation.targets[0].pattern.as_ref(), "//pkg:all");
+        assert!(evaluation.action_closure.is_empty());
+        assert_observed_epoch_uses_input_arcs(observed.observations(), &epoch);
+        assert!(BuildCommandRootObservationKey::validity(&observed_outcome));
+        assert!(BuildCommandRootObservationKey::equality(
+            &observed_outcome,
+            &observed_outcome
+        ));
+
+        let activations = tracker.take();
+        assert!(activations.iter().any(|entry| {
+            entry.key.starts_with("observed-build-command-root:")
+                && entry.kind == dice::ActivationKind::Evaluated
+                && entry.batch.is_none()
+        }));
+        assert!(activations.iter().any(|entry| {
+            entry.key.starts_with("observed-host-package-load:")
+                && entry.batch.as_ref().is_some_and(|batch| {
+                    batch.events().iter().any(|event| {
+                        matches!(
+                            event,
+                            EvaluationEvent::StarlarkPrint { text, .. } if text == "PACKAGE"
+                        )
+                    })
+                })
+        }));
+        assert!(
+            activations
+                .iter()
+                .all(|entry| !entry.key.starts_with("build-command-root:")
+                    && !entry.key.starts_with("root-module-loading-anchor:")
+                    && !entry.key.starts_with("host-package-load:"))
+        );
+
+        let legacy_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        let mut legacy = build_root_transaction_with_data(&dice, epoch, legacy_data).await;
+        let legacy_outcome = legacy.compute(&legacy_key).await.unwrap();
+        let slug_bzlmod_v2::SourcePreparationOutcome::Complete(legacy_result) = legacy_outcome
+        else {
+            panic!("legacy singleton package-all returned Need");
+        };
+        assert_eq!(observed.result().as_ref(), legacy_result.as_ref());
+        let activations = tracker.take();
+        assert!(
+            activations
+                .iter()
+                .any(|entry| entry.key.starts_with("build-command-root:"))
+        );
+        assert!(activations.iter().all(|entry| {
+            !entry.key.starts_with("observed-build-command-root:")
+                && !entry
+                    .key
+                    .starts_with("observed-root-module-loading-anchor:")
+                && !entry.key.starts_with("observed-host-package-load:")
+        }));
+    }
+
+    #[tokio::test]
+    async fn observed_build_terminal_polarity_keeps_only_complete_semantic_prefixes() {
+        let key =
+            BuildCommandRootObservationKey::new(singleton_package_all_key("//pkg:all")).unwrap();
+
+        let need_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut need = build_root_transaction(&need_dice, BuildRootEpoch::base(2).build()).await;
+        let need = need.compute(&key).await.unwrap();
+        assert!(matches!(
+            need,
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(_)
+        ));
+        assert!(!BuildCommandRootObservationKey::validity(&need));
+        assert!(!BuildCommandRootObservationKey::equality(&need, &need));
+
+        let anchor_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut anchor_epoch = BuildRootEpoch::base(3);
+        anchor_epoch.file("/workspace/MODULE.bazel", "this is invalid (", 3);
+        anchor_epoch.package("pkg", "filegroup(name = 'target')\n", 3);
+        let anchor_epoch = anchor_epoch.build();
+        let mut anchor = build_root_transaction(&anchor_dice, anchor_epoch.dupe()).await;
+        let anchor = anchor.compute(&key).await.unwrap();
+        let anchor = complete_observed_build(&anchor);
+        assert!(matches!(
+            anchor.result().as_ref(),
+            Err(BuildCommandError {
+                kind: BuildCommandErrorKind::RootAnchor(_),
+            })
+        ));
+        assert_observed_epoch_uses_input_arcs(anchor.observations(), &anchor_epoch);
+        assert!(
+            anchor
+                .observations()
+                .observations()
+                .iter()
+                .all(|(demand, _)| !demand.path().as_path().starts_with("/workspace/pkg"))
+        );
+
+        let package_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut package_epoch = BuildRootEpoch::base(4);
+        package_epoch.deleted_package("pkg", 4);
+        let package_epoch = package_epoch.build();
+        let mut package = build_root_transaction(&package_dice, package_epoch.dupe()).await;
+        let package = package.compute(&key).await.unwrap();
+        let package = complete_observed_build(&package);
+        assert!(matches!(
+            package.result().as_ref(),
+            Err(BuildCommandError {
+                kind: BuildCommandErrorKind::Package(_),
+            })
+        ));
+        assert_observed_epoch_uses_input_arcs(package.observations(), &package_epoch);
+        assert!(
+            package
+                .observations()
+                .observations()
+                .iter()
+                .any(|(demand, _)| demand.path().as_path().starts_with("/workspace/pkg"))
+        );
+
+        let outer_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let outer_error = PathObservationEpoch::from_shared([(
+            BuildRootEpoch::demand("/mismatch", PathObservationOperation::Lstat),
+            Arc::new(PathObservationResult::FileBytes(
+                PathOperationResult::Missing,
+            )),
+        )])
+        .unwrap_err()
+        .into();
+        let mut outer_data = UserComputationData::default();
+        outer_data
+            .data
+            .set(ForceBuildCommandRootObservationOuter(outer_error));
+        let mut outer_epoch = BuildRootEpoch::base(5);
+        outer_epoch.package("pkg", "filegroup(name = 'target')\n", 5);
+        let mut outer =
+            build_root_transaction_with_data(&outer_dice, outer_epoch.build(), outer_data).await;
+        let outer = outer.compute(&key).await.unwrap();
+        assert!(matches!(
+            outer,
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(_))
+        ));
+        assert!(BuildCommandRootObservationKey::validity(&outer));
+        assert!(BuildCommandRootObservationKey::equality(&outer, &outer));
+    }
+
+    #[tokio::test]
+    async fn observed_build_replays_lifecycle_and_cancellation_without_parent_publication() {
+        let key =
+            BuildCommandRootObservationKey::new(singleton_package_all_key("//pkg:all")).unwrap();
+        let epoch = |variant: i64, target: Option<&str>| {
+            let mut epoch = BuildRootEpoch::base(variant);
+            match target {
+                Some(target) => {
+                    epoch.package("pkg", &format!("filegroup(name = '{target}')\n"), variant)
+                }
+                None => epoch.deleted_package("pkg", variant),
+            }
+            epoch.build()
+        };
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut missing = build_root_transaction(&dice, epoch(10, None)).await;
+        let missing = missing.compute(&key).await.unwrap();
+        assert!(complete_observed_build(&missing).result().is_err());
+        let mut created = build_root_transaction(&dice, epoch(11, Some("v1"))).await;
+        let created = created.compute(&key).await.unwrap();
+        let mut warm = build_root_transaction(&dice, epoch(11, Some("v1"))).await;
+        let warm = warm.compute(&key).await.unwrap();
+        assert!(BuildCommandRootObservationKey::equality(&created, &warm));
+        assert!(Arc::ptr_eq(
+            complete_observed_build(&created).result(),
+            complete_observed_build(&warm).result()
+        ));
+        let mut edited = build_root_transaction(&dice, epoch(12, Some("v2"))).await;
+        let edited = edited.compute(&key).await.unwrap();
+        assert!(!BuildCommandRootObservationKey::equality(&created, &edited));
+        let mut deleted = build_root_transaction(&dice, epoch(13, None)).await;
+        assert!(
+            complete_observed_build(&deleted.compute(&key).await.unwrap())
+                .result()
+                .is_err()
+        );
+        let mut restored = build_root_transaction(&dice, epoch(11, Some("v1"))).await;
+        let restored = restored.compute(&key).await.unwrap();
+        assert!(BuildCommandRootObservationKey::equality(
+            &created, &restored
+        ));
+
+        let cancelled_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedBuildTracker::default());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let complete_epoch = epoch(20, Some("target"));
+        let mut cancelled =
+            build_root_transaction_with_data(&cancelled_dice, complete_epoch.dupe(), data).await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(Future::poll(future.as_mut(), context).is_pending());
+            Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        assert!(
+            tracker
+                .take()
+                .iter()
+                .all(|entry| { !entry.key.starts_with("observed-build-command-root:") })
+        );
+        drop(cancelled);
+
+        let mut recovery = build_root_transaction(&cancelled_dice, complete_epoch).await;
+        let recovered = recovery.compute(&key).await.unwrap();
+        assert!(complete_observed_build(&recovered).result().is_ok());
     }
 
     #[test]

@@ -1549,22 +1549,26 @@ pub struct RootPackageLoadKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)] // Private observed sibling is callerless until a later cutover packet.
-pub(crate) struct RootPackageLoadObservationKey(RootPackageLoadKey);
+#[doc(hidden)]
+pub struct RootPackageLoadObservationKey(RootPackageLoadKey);
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 #[allow(dead_code)] // Retained only by the callerless observed key.
-pub(crate) struct ObservedRootPackageLoad {
+#[doc(hidden)]
+pub struct ObservedRootPackageLoad {
     result: Arc<Result<LoadedPackage, RootPackageLoadError>>,
     observations: PathObservationEpoch,
 }
 
 #[allow(dead_code)]
 impl ObservedRootPackageLoad {
-    pub(crate) fn result(&self) -> &Arc<Result<LoadedPackage, RootPackageLoadError>> {
+    #[doc(hidden)]
+    pub fn result(&self) -> &Arc<Result<LoadedPackage, RootPackageLoadError>> {
         &self.result
     }
 
-    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+    #[doc(hidden)]
+    pub fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
@@ -1799,7 +1803,8 @@ impl RootPackageLoadKey {
 
 #[allow(dead_code)]
 impl RootPackageLoadObservationKey {
-    pub(crate) fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+    #[doc(hidden)]
+    pub fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
         Self(RootPackageLoadKey::new(workspace, package))
     }
 }

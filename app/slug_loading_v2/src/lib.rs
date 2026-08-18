@@ -44,10 +44,14 @@ pub use bzl_module::BzlLoadManifest;
 pub use bzl_module::BzlModuleEvaluator;
 pub use bzl_module::BzlModuleIdentity;
 pub use bzl_module::EvaluatedBzlModule;
+#[doc(hidden)]
+pub use bzl_module::ObservedRootPackageLoad;
 pub use bzl_module::RepositoryPackageLoadError;
 pub use bzl_module::RepositoryPackageLoadKey;
 pub use bzl_module::RootPackageLoadError;
 pub use bzl_module::RootPackageLoadKey;
+#[doc(hidden)]
+pub use bzl_module::RootPackageLoadObservationKey;
 pub use bzl_module::discover_build_file_companion;
 pub use cycle_detector::bzl_load_cycle_detector;
 pub use glob::GlobSpec;
