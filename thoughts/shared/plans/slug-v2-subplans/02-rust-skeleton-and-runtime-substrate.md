@@ -3974,3 +3974,88 @@ cleanup and independent implementation review. STOP on every other file,
 upper loading or query activation, partial/rebuilt carriers, family/event/memory
 drift, cap excess or M1 closure. After ACCEPT, schedule only the docs-only
 external package source/load frontier design from the implementation commit.
+### Routed Host path/source implementation accepted (2026-08-18)
+
+Commit `e4ee0a8e` accepts the two matching-family source-preparation siblings
+from design `a4a69ab3`. `HostRepositoryPathObservationKey` forwards the
+exact observed resolution epoch; `HostRepositorySourceFileObservationKey`
+appends the exact selected FileBytes Result Arc after the path prefix with
+stable left-first `PathObservationEpoch::from_shared`. Need has no carrier,
+typed outer remains outer, and semantic invalid/materialization/path/source
+terminals retain exactly their reached prefix. Neither sibling stores events or
+adds a Host read, lock, task, cache, store or retained scratch collection.
+
+Final accounting against `e4555dca` is +330 production plus +5 test glue in
+`source_preparation.rs`, +513 focused tests, and +4 in `lib.rs`: +852
+aggregate semantic lines. Physical sizes are 12,582/513/399 = 13,494. Focused
+proof passes 6/6; full bzlmod passes 405 unit plus 193 integration tests;
+loading 194 and query 120 pass; the established core 234/235 and runtime 12/13
+baselines are unchanged. Fmt, check, diff/accounting, retained-state and cleanup
+gates pass. Independent latest-diff review returns `ACCEPT`. M1 remains
+partial.
+
+### External package source/load resumes with routed-policy REPLAN (2026-08-18)
+
+The resumed `WP-2A-m1-external-package-source-load-observation-design` audit
+finds the next carrierless boundary before package source. Live
+`ExternalRepositoryPackageLookupKey` computes
+`HostRouteRepositoryIgnoreKey` before BUILD marker paths. The ignore producer
+computes `HostRouteRepoFileKey`, then routed `.bazelignore` source, then
+parser observations. The REPO producer computes routed `REPO.bazel` source
+and owns the sole local Complete REPO event batch. Neither route-local producer
+retains the complete selected epoch.
+
+Inlining this route-wide work into a package-key identity would duplicate
+REPO/ignore evaluation per package, move the event owner, and miss
+`DirectLocalModuleSupport` include horizons that independently re-enter
+`ExternalRepositoryPackageLookupKey`. Independent owner review therefore
+accepts formal `REPLAN` to the uniquely smaller docs-only
+`WP-2A-m1-routed-repository-policy-observation-design`.
+
+Freeze one crate-private `HostRouteRepoFileObservationKey` in
+`repo_file.rs` and one crate-private
+`HostRouteRepositoryIgnoreObservationKey` in `repository_ignore.rs`.
+Each legacy/observed pair shares one driver and selects only its matching
+`HostRepositorySourceFile{,Observation}Key` family. Complete observed values
+retain one semantic Result Arc plus one Arc-backed epoch; Need carries no
+carrier; typed source/parser/union outer stays outer; semantic errors retain
+their decisive prefix.
+
+Preserve computation and union order exactly: REPO policy before REPO source
+and evaluation; then routed REPO carrier, routed `.bazelignore` source, and
+parser observations. Union every completed child epoch left-first before
+semantic inspection, keep the first equal exact Arc, and fail typed-outer on
+mismatch/conflict. Parser-specific path operations join last. A pre-source
+policy error has an empty epoch.
+
+The observed REPO sibling remains the sole local Complete batch owner for its
+family; observed ignore stores no batch. Need, outer and cancellation publish
+nothing. Keep event buffers and epoch-union/parser vectors compute-local and
+retain no new collection, store, cache, interner, lock, task or Host read.
+Routed REPO/ignore values, errors, prefix behavior, UTF-8 modes and events stay
+exact; sibling/carrier/outer mechanics are Slug-native. Package lookup/source/
+load, recursive external `.bzl`, query, multi-build, one-shot and identity
+bytes remain deferred.
+
+Future implementation writes exactly `repo_file.rs` and
+`repository_ignore.rs` from Rust base `e4ee0a8e`. Caps are 120 production
+plus 170 tests and 2,600 physical lines for the 2,281-line REPO owner; 160
+production plus 210 tests and 3,200 physical lines for the 2,783-line ignore
+owner; 660 aggregate semantic and 5,800 combined physical lines. Tests stay
+colocated.
+
+Proof must cover structural identity, parity, Complete-only equality/validity,
+both family-isolation directions, exact demand/value/Arc membership and
+left-first duplicates, policy/source/parser terminal order, Need/outer/semantic
+prefixes, missing/wrong-kind/symlink/parse/evaluation cases, event order and
+warm suppression, real cancellation/recovery, lifecycle A/B/A, no upper lookup
+activation and compact retention. Run full bzlmod/loading/query and established
+core gates plus fmt/check/diff/accounting/retention/cleanup and independent
+review.
+
+STOP on Rust during design; a future third file or public export; upper lookup,
+loading or query activation; mixed child families; Result-Arc reconstruction;
+semantic inspection before union; partial carriers; moved/duplicate events;
+retained scratch; cap excess; or M1 closure. After design acceptance, schedule
+only the bounded implementation; after implementation acceptance, return
+directly to external package source/load design.
