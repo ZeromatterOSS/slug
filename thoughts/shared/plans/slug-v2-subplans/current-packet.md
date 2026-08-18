@@ -1,132 +1,139 @@
-# Current bounded work packet
+# Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-single-observed-analysis-seam-implementation`
+Packet: `WP-2A-m1-root-single-neutral-owner-implementation-retry`
+Milestone: M1 one semantic spine
+Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
+Core Rust base: `31a8b1d3`
+Frozen design: `3e90fc88`
+Accepted prerequisite: `69d37ddb`
+Result: publicly publish the exact observed root exported-source carrier through
+one neutral singleton-root-`Single` owner while preserving exact rule/filegroup
+behavior and every broader legacy family.
 
-Implement only the accepted configured-analysis prerequisite frozen in
-`e2cc4119`. Rust remains based on `31a8b1d3`; this packet does not restore or
-activate the rejected neutral-root candidate.
-
-## Authority
+## Authority and caps
 
 Write only:
 
-- `app/slug_analysis_v2/src/dice.rs`;
-- `app/slug_analysis_v2/src/lib.rs`; and
-- `app/slug_analysis_v2/tests/root_analysis.rs`.
+- `app/slug_core_v2/src/runtime/dice.rs`; and
+- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` (new).
 
-Do not edit core, loading, workspace or bzlmod Rust; Cargo/BUILD metadata;
-fixtures, oracle data, generated files, plans or routing records.
+Against `31a8b1d3`, exclude only the frozen line-identical test-body relocation
+from category growth, never from physical accounting. Caps remain 360
+production, 450 test and 810 aggregate net semantic lines. Final physical caps
+are 12,275 for `dice.rs`, 2,800 for `build_command_tests.rs` and 15,075
+combined.
 
 ## Required implementation
 
-Add the doc-hidden structural sibling
-`ConfiguredNodeAnalysisObservationKey(ConfiguredNodeAnalysisKey)`, its
-doc-hidden constructor/accessors, the doc-hidden
-`prepare_configured_node_analysis_observed` entry point and the named observed
-preparation outcome alias. Export only the sibling, entry point and alias from
-`lib.rs`. Neither configured-analysis key may compute the other.
+Before semantic edits, retain the shared build/cquery fixture block through
+`resolved_identity` in the inline parent `tests` module. Move only the
+contiguous test tail beginning at
+`multi_target_exported_sources_do_not_enter_revision_bridge` through the final
+build-branch collection test into `runtime/tests/build_command_tests.rs`.
+Replace it with nested
+`mod build_command_tests { include!("tests/build_command_tests.rs"); }`; the
+new file begins `use super::*;`. Change no relocated test body or production
+visibility.
 
-Refactor preparation and analysis through one private
-`ConfiguredAnalysisMode::{Legacy, Observed}` semantic driver. Preserve the
-existing legacy API, key value, semantic Arc shape, errors, equality/validity,
-event behavior and call graph. Use bounded mode-aware child helpers so every
-live edge selects only the matching family:
+Add private `SingletonRootSingleBuildCommandKey(BuildCommandRootKey)`, admitted
+only for a structurally validated singleton root-repository
+`TargetPattern::Single`. Its DICE value is complete-only
+`SourcePreparationOutcome<Result<SingletonRootSingleBuildCommandTerminal,
+ObservedPathFrontierError>>`; equality uses `complete_eq` and validity
+requires Complete. Need and observed outer error publish no terminal.
 
-- requested and root string-setting package loads;
-- execution-platform and toolchain root-module anchors;
-- initial and iterative toolchain package batches plus selected implementation;
-- alias, generated-file, platform/constraint and declared-dependency recursion;
-- configured and null child preparation/analysis; and
-- null-source path resolution.
+The terminal owns one exact semantic
+`Arc<Result<BuildCommandEvaluation, BuildCommandError>>` plus
+`Option<PathObservationEpoch>`. Store `Some(epoch)` exactly when that same
+semantic result owns a `SourceCertificate`: exported-source success or
+completed `RootSource` error. Build the epoch as the stable left-first union
+of the observed anchor epoch, observed root-package epoch and certificate's
+exact FileBytes demand/Result Arc. Every other terminal stores `None`; never
+expose a partial rule-analysis carrier.
 
-Observed mode must use `RootPackageLoadObservationKey`,
-`RootModuleLoadingAnchorObservationKey`,
-`ConfiguredNodeAnalysisObservationKey` and
-`ResolvedPathObservationKey` exclusively. Legacy mode must continue using
-only its existing siblings. Project each observed child's semantic value while
-leaving its observation epoch dependency-owned; retain no epoch, loaded
-package, event batch or other carrier in the observed analysis key/value.
+Implement `NativeCommandRoot` directly for the neutral key. Preserve the
+current sole-root-Single request-revision initialization and analysis-error
+root relaxation; expose source certificate/observations only through the
+terminal invariant; preserve Need; map observed outer error to typed session
+failure. After acceptance, consume the terminal, move its exact semantic Arc
+and existing event buffer, and drop the optional epoch.
 
-The observed key value is
-`LoadingPreparationOutcome<Result<Arc<Result<Arc<ConfiguredNodeResult>,
-AnalysisError>>, ObservedPathFrontierError>>`. Need is invalid/unequal;
-completed semantic success is valid/equal by the configured result; completed
-semantic error remains invalid/unequal like legacy; completed typed outer error
-is valid/equal by outer value. The shared driver must move the same semantic
-Result Arc into either key projection.
+Extract one post-package `compute_loaded_build_branch` helper shared by legacy
+and neutral paths, plus only the minimum shared final action-closure/result
+helper needed to avoid a duplicate driver. The neutral driver alone computes:
 
-For joined children, typed outer error wins Need and semantic error, and the
-first outer in existing deterministic input/result order wins. Without outer,
-preserve existing Need-over-semantic and first-semantic ordering. Sequential
-stage order and current DICE-infrastructure-to-`AnalysisError` mapping remain
-unchanged. Cancellation publishes no terminal or local event.
+1. observed root loading anchor;
+2. observed root package;
+3. target lookup/kind once;
+4. existing revision then FileBytes for exported source;
+5. `prepare_configured_node_analysis_observed` then
+   `ConfiguredNodeAnalysisObservationKey` for rules, projecting only its exact
+   semantic Result Arc and leaving every child epoch dependency-owned; or the
+   existing loaded-only filegroup continuation; and
+6. exact terminal construction.
 
-The matching package child remains the only MODULE/`.bzl`/BUILD event owner.
-The selected configured-analysis sibling stores exactly one local analysis
-event batch for a completed semantic terminal, including semantic error, and
-none for Need or outer. Do not add another event owner or suppress events in
-the child keys.
+It computes neither existing build-root sibling, no legacy anchor/package/
+configured-analysis key and no second package family. Public constructor
+selection is existing observed PackageAll, then neutral singleton root Single,
+then unchanged legacy root. Multi-target, external, recursive and cquery
+identities remain unchanged.
 
-## Proof
+The neutral root stores no event batch. Observed anchor/package and observed
+configured-analysis children remain the only semantic event owners; generic
+selected-closure acceptance remains the only command publisher. Rule/filegroup
+child epochs are dependency-owned; retain no duplicate terminal epoch,
+classification, event batch, collection, cache, interner, lock or task. Hold
+no lock across DICE and perform no direct Host read.
 
-Keep the existing private unit tests and add only focused terminal/forced-outer
-coverage there. Extend `tests/root_analysis.rs` for:
+## Compatibility and proof
 
-- distinct legacy/observed key identity and success/semantic-error/Need/outer
-  equality and validity;
-- observed requested/default-setting preparation with zero legacy package,
-  anchor, resolved-path or analysis activation;
-- recursive configured/null, alias/generated/platform and toolchain closure
-  without a family escape;
-- exactly one cold MODULE/`.bzl`/BUILD and analysis event sequence, warm
-  suppression and no Need/outer/cancel publication;
-- default, explicit, edited, restored and A/B/A root settings;
-- semantic parity with legacy results/errors and unchanged legacy lifecycle;
-  and
-- complete semantic Result-Arc reuse through the shared projection.
+Existing public exported-source, rule and filegroup result/output/error/event
+bytes remain exact. The internal neutral family cutover, carrier association,
+shared-Arc validation, revision retry and fail-closed outer handling are
+Slug-native. Broader analyzed observation, multi-target, external/repository/
+materializer, cquery, native-Windows raw bytes and exact Bazel identity bytes
+remain unsupported/deferred. Reuse accepted Bazel/source evidence; add no
+fixture or oracle.
 
-Run focused tests, full `cargo test -p slug_analysis_v2`, affected
-`slug_loading_v2` and `slug_core_v2 --lib` suites serially,
-`cargo fmt --all -- --check`, `git diff --check`, and the archive checker.
-Reuse existing
-Bazel 9.2 evidence; add no fixture/oracle. Finish with Buck2 retained-state and
-AI code-cleanup scans plus independent implementation review.
+Require discriminating tests for:
 
-## Compatibility and memory
+- neutral identity, complete equality/validity and zero legacy package,
+  anchor, configured-analysis or resolved-path activation;
+- exported success and RootSource error carrier/certificate/selected exact Arc
+  identity, including pointer-distinct/missing/extra/value mismatch abort;
+- anchor/package/target/rule/filegroup terminals retaining no partial carrier;
+- Need, semantic error, observed outer error and cancellation precedence;
+- exactly one cold MODULE/`.bzl`/BUILD then analysis event sequence, warm
+  suppression and no failed-attempt publication;
+- validation before revision finalization/commit, concurrent source retry and
+  unchanged/changed/missing/error/delete/recreate/A-B-A lifecycle;
+- exact public rule analysis, root setting/default transition, and filegroup
+  result/event behavior; and
+- accepted PackageAll plus multi/external/cquery nonactivation.
 
-Public source/rule/filegroup results, outputs, errors and events remain exact,
-as do root string-setting/default transitions and configured action closure.
-The observed analysis family and typed association are Slug-native. Broader
-analyzed observation, multi-target/external/cquery cutover, repository or
-materializer work, native-Windows raw bytes and exact Bazel identity bytes
-remain deferred.
+Run focused neutral/public/native-demand tests; the complete core library and
+integration suites; the complete loading and analysis suites; formatting,
+direct check, `git diff --check` and `scripts/v2_archive_status.sh`. Record
+only demonstrated inherited broad/Clippy/archive stops. Run Buck2 retention and
+AI cleanup scans and an independent implementation review.
 
-Retained state is only the existing semantic Result Arc in the analysis value.
-Observed child Arc-backed epochs remain in their DICE values. Mode, package
-projections, vectors/maps, joined outcomes and event scratch remain
-compute-local. Add no retained collection/cache/interner/store, lock, task,
-direct Host read or duplicate semantic driver.
+## STOP / REPLAN
 
-## Caps and STOP
+STOP on any other file; changed relocated test body; public API/behavior drift;
+existing build-root child or legacy/second package or configured-analysis
+family; duplicate/partial carrier; new event owner, retained store/collection/
+cache/interner/lock/task/Host read; repository/materializer work; Cargo/BUILD/
+fixture/oracle/generated writes; or cap excess. `REPLAN` on a required third
+Rust file, partial selected epoch, duplicate driver/event authority, unsafe
+revision ordering, unbounded split or any inability to preserve exact public
+rule/filegroup behavior.
 
-Against `31a8b1d3`, caps are 620 production plus 50 colocated test lines in
-`dice.rs`, 8 production lines in `lib.rs`, 560 test lines in
-`root_analysis.rs`, and 1,238 aggregate net lines. Physical caps are
-2,880/65/1,015 and 3,960 combined from exact baselines 2,208/53/452.
+## Immediate predecessors
 
-STOP on any other file, cap excess, public behavior/API beyond the named
-doc-hidden seam, a legacy edge in observed mode, observed edge in legacy mode,
-one sibling computing the other, duplicate driver/event owner, value-carrying
-key, retained epoch/carrier, new state/lock/task/Host read, repository work,
-fixture/oracle change or nondiscriminating proof. `REPLAN` if exact family
-isolation requires another owner or cannot preserve recursive analysis/event
-semantics within these caps.
-
-After implementation acceptance, return to docs-only scheduling for the
-neutral singleton-root-`Single` implementation retry using frozen design
-`3e90fc88` plus this prerequisite. Do not combine that core activation with
-this packet or close M1.
-
-This scheduling diff is measured from `e2cc4119`: allow at most 40 net lines
-in canonical, 80 in Stage 2, 160 in this manifest and 280 aggregate.
-`git diff --check` must pass.
+`3e90fc88` accepts the neutral-owner design after `23f9c8d1` recorded the
+constructor-kind REPLAN. The first implementation attempt then stopped because
+configured rules re-entered the legacy package family. `69d37ddb` accepts the
+callerless observed configured-analysis preparation/key family through root
+settings, recursive/null/delegating nodes, platforms and toolchains. This retry
+must consume that exact seam; it may not reconstruct or bypass analysis
+preparation in core.

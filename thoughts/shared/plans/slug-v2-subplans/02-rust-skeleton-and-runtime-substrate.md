@@ -3297,3 +3297,60 @@ drift or cap excess.
 After acceptance, return to docs-only scheduling for the neutral singleton-
 root-`Single` implementation retry using `3e90fc88` plus the accepted
 prerequisite. Do not combine the Rust packets or close M1.
+
+### Observed configured-analysis seam implementation accepted (2026-08-18)
+
+`69d37ddb` accepts the callerless configured-analysis prerequisite frozen in
+`e2cc4119`. A structural
+`ConfiguredNodeAnalysisObservationKey(ConfiguredNodeAnalysisKey)`, observed
+preparation entry point and one private legacy/observed semantic driver now
+select only matching package, anchor, configured-analysis and resolved-path
+families through root settings, recursive/null/delegating nodes, platforms and
+the complete toolchain closure. Child epochs remain dependency-owned; the
+analysis value retains only the existing exact semantic Result Arc.
+
+The terminal algebra is complete: typed outer wins joined Need and semantic
+error; absent outer, existing Need and deterministic semantic ordering remain;
+semantic success alone is valid/equal, semantic error remains invalid/unequal,
+outer is valid/equal, and cancellation publishes no parent or local event.
+The matching observed package and analysis keys remain the sole child event
+owners. Production projection preserves exact Result-Arc identity.
+
+Proof covers observed-only recursion, null source, alias/generated, platform/
+toolchain closure, real mixed outer/Need/semantic precedence, semantic-error
+empty-batch publication, cancellation/recovery, exact cold MODULE/`.bzl`/
+BUILD then analysis order with warm suppression, default/explicit/edit/
+restore root settings and legacy semantic parity. Validation passed 48 analysis
+tests and 194 loading tests. Core remained at its documented 228/229 stale
+external-visibility wording baseline; the archive checker reproduced only its
+recorded missing-ref/non-V2-thoughts baseline. Formatting and diff checks,
+Buck2 retention, AI cleanup and independent corrected-diff review passed.
+
+Accounting against `31a8b1d3` is DICE +474 production/+31 colocated tests
+(+505 net, 2,713 physical), lib +6/59, and root integration tests +560/1,012;
+aggregate +1,071 net and 3,784 physical. All frozen caps pass and no retained
+epoch/collection/cache/lock/task/Host read or family escape was added.
+
+### Active neutral singleton-root-Single owner implementation retry (2026-08-18)
+
+Run only `WP-2A-m1-root-single-neutral-owner-implementation-retry` from core
+Rust base `31a8b1d3`, frozen design `3e90fc88` and accepted analysis
+prerequisite `69d37ddb`. Keep the exact two-file authority, line-identical
+test-tail relocation, 360/450/810 semantic caps and 12,275/2,800/15,075
+physical caps.
+
+Preserve the frozen neutral anchor/package/classification, exported-source
+certificate/epoch/revision publication and complete-only terminal. The
+corrected rule continuation must use
+`prepare_configured_node_analysis_observed` and
+`ConfiguredNodeAnalysisObservationKey` exclusively; filegroups remain
+loaded-only. No existing build-root child, legacy package/configured-analysis
+family, second event owner or partial carrier may activate. Public selection
+remains observed PackageAll, neutral singleton root Single, then legacy.
+
+Require exact source/rule/filegroup behavior, selected-carrier Arc validation,
+one cold child-before-analysis event sequence, warm suppression, terminal/
+cancellation/lifecycle proof, PackageAll/multi/external/cquery isolation,
+complete core/loading/analysis validation, formatting/diff/archive gates,
+retention and cleanup scans, and independent review. Acceptance returns to one
+docs-only next-owner audit; do not close M1.
