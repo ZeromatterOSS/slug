@@ -2934,3 +2934,58 @@ accounting, Buck2 retention scan, AI cleanup and independent implementation
 review. STOP on any other file, behavior or public API drift, broader
 activation, partial validation, direct Host read, Cargo/oracle write or cap
 excess. Acceptance returns only to a docs-only next-owner audit.
+
+### Accepted singleton root-package-all publication (2026-08-18)
+
+Commit `31a8b1d3` activates the private observed sibling only for constructor-
+admitted singleton root `PackageAll`. `NativeCommandRoot` preserves Need,
+semantic Result errors and typed outer failure, while generic native acceptance
+validates the complete canonical carrier and selected epochs plus empty
+repository selection before finalization or commit. The consuming private
+terminal map moves the exact semantic Arc, preserves events and drops the
+carrier epoch; all non-admitted build identities remain legacy.
+
+The implementation closes two exact-Arc preparation gaps under the same
+bounded correction: path-progress unions use existing-left shared Arcs, and a
+fresh preflight epoch reuses a prior Arc only for an equal demand/value while
+retaining the fresh Arc for changed or new observations. Selected snapshots use
+`PathObservationEpoch::from_shared`. Reusable invariant: every command-retained
+path-epoch transform on the preflight/retry/selection path must preserve equal
+shared result Arcs. A further undiscovered erasure requires `REPLAN`.
+
+Focused observed/native-demand/build-root/event tests and all loading tests
+pass. Core library is 228/229 with the unchanged external-query diagnostic
+failure; core integration is 12/13 with the unchanged missing injected epoch.
+Strict Clippy stops in unchanged `allocative_derive`. Formatting, direct check,
+diff hygiene, Buck2 retention/AI cleanup and independent review pass. DICE is
+exactly +150 production/+300 tests, +450 net and 14,148 physical; events is
++7/+11, +18 net and 1,609 physical; aggregate is +468. A stable crate-local
+temporary workspace prevents unrelated parallel `/tmp` ancestor mutations
+from creating a false warm invalidation without weakening source observation.
+
+### Active root exported-source publication audit (2026-08-18)
+
+Run docs-only `WP-2A-m1-root-exported-source-publication-audit` from accepted
+publication `31a8b1d3`. Audit the existing `BuildCommandRootKey`, observed
+sibling, sole public build constructor, source-certificate revision finalizer
+and exact-epoch validator. Decide whether the uniquely smallest complete next
+identity is one root-repository `TargetPattern::Single` selected as
+`PackageTargetKind::ExportedFile`, or whether one smaller prerequisite is
+required.
+
+Reuse accepted exact behavior/evidence in `42f4a64b` and `f0849151`, pinned
+Bazel 9.2 `TargetDefinitionContext`/`InputFile`, `ExportsFilesTest`,
+`BuildViewTest.testTopLevelInputFile`, `FileFunction`/`FileStateValue`, and
+Buck2 DICE transaction/publication/cancellation rules. Freeze anchor, package,
+lookup/kind, revision and FileBytes order; exact union/Arc survival through
+retry; terminal/event/failure polarity; activation isolation; compact
+lifetimes; and the future allowlist, caps, proof and large-file cohesion choice.
+
+Existing root exported-source bytes remain exact. Carrier association,
+shared-Arc validation and revision publication remain Slug-native. Rules,
+multi-target, external/repository/materializer, cquery, native-Windows raw bytes
+and exact identity bytes remain deferred. Write only canonical/current/Stage 2
+under 40/160/140/300 net documentation caps. STOP on Rust/Cargo/oracle writes,
+implementation, broader activation, another retained owner, direct Host read,
+public behavior/API drift or cap excess. Acceptance schedules one bounded
+design, one uniquely smaller prerequisite, or records `REPLAN`.

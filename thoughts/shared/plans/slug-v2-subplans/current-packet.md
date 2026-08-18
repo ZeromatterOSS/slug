@@ -1,83 +1,95 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-package-all-build-publication-implementation`
+Packet: `WP-2A-m1-root-exported-source-publication-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Accepted implementation: `95002997`
-Accepted design: `857ef363`
-Result: publish the observed singleton root-package-all build carrier through
-the existing native acceptance and public return boundary.
+Accepted predecessor: `31a8b1d3`
+Result: select the smallest complete owner for one root-repository exported
+source carrier and public publication, or record one bounded prerequisite.
 
 ## Authority
 
-Write only:
+This packet is documentation-only. Write only:
 
-- `app/slug_core_v2/src/runtime/dice.rs`; and
-- `app/slug_core_v2/src/runtime/events.rs`.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Against `95002997`, caps are 150 production plus 300 test net lines and 14,151
-physical lines for `dice.rs`; 16 production plus 30 test net lines and 1,640
-physical lines for `events.rs`; and 496 aggregate net Rust lines.
+Against `31a8b1d3`, caps are 40 net canonical lines, 160 current-manifest
+lines, 140 Stage 2 lines and 300 aggregate documentation lines.
 
-## Required implementation
+## Learned facts and evidence
 
-Implement `NativeCommandRoot` for the private observed build key and add a
-private default optional terminal-observations hook overridden only by that
-sibling. Need remains Need; completed observed outer error becomes typed native
-session failure; semantic errors remain in the carrier Result Arc. Add no
-request revision, source certificate or root relaxation.
+The accepted exact public source behavior and retained revision bridge are
+already pinned by `42f4a64b` and `f0849151`. Pinned Bazel 9.2
+`TargetDefinitionContext`/`InputFile`, `ExportsFilesTest`,
+`BuildViewTest.testTopLevelInputFile`, `FileFunction` and `FileStateValue`
+establish declaration, top-level selection and source-file observation. Buck2
+DICE dependency recording, equality cutoff, transaction publication and
+cancellation remain governed by `docs/developers/dice.md`; no donor scheduler,
+side store or custom revision engine is admissible.
 
-Construct the selected path epoch with `PathObservationEpoch::from_shared`.
-Immediately after successful `prepare_accept` and before revision finalization
-or snapshot commit, validate the complete carrier and selected epochs in
-canonical demand order: equal length and demand keys, semantic Result equality
-and exact `Arc::ptr_eq`. Require empty selected repository request and
-validation sets. Every mismatch fails closed without panic, snapshot or event.
+Live ownership is bounded: `BuildCommandRootKey` alone orders the loading
+anchor, root package, target lookup/kind, request revision, FileBytes demand,
+action closure and semantic terminal. `BuildCommandRootObservationKey` and the
+native/public acceptance seam accepted in `31a8b1d3` already retain and validate
+one semantic Result Arc plus one exact Arc-backed epoch. The sole-root exported
+source legacy path already retains its exact FileBytes source certificate and
+uses the revision finalizer; rules add configured analysis/actions, multiple
+targets add branch aggregation, external targets add repository/materializer
+selection, and cquery is a distinct result owner.
 
-Add a private infallible consuming `AcceptedCommand::map_terminal` that moves
-the exact semantic Arc, preserves events and drops the carrier epoch. Select
-observed only after the existing public constructor admits structurally exact
-singleton root-repository `PackageAll`; every other identity remains on the
-identical legacy key/driver.
+## Required audit decision
 
-Retain only the public semantic Result Arc/events and existing accepted compact
-Arc-backed path epoch. Carrier, comparison and attempt scratch stay local. Add
-no Host read, lock, task, cache, interner, collection, graph or event owner.
+Determine whether the existing observed build sibling can admit exactly one
+root-repository `TargetPattern::Single` whose loaded target is
+`PackageTargetKind::ExportedFile`, using one shared legacy/observed driver and
+the existing revision/source-certificate/publication owners. Freeze:
 
-## Required proof
+- anchor -> package -> lookup/kind -> revision -> FileBytes order;
+- exact carrier union and first-Arc identity through revision retry;
+- semantic error, typed outer error, Need, cancellation and event polarity;
+- complete carrier-versus-selected validation before each finalization/commit;
+- unchanged, changed, absent, error and A-B-A source-certificate behavior;
+- strict PackageAll/exported-source observed activation with every rule,
+  filegroup, multi-target, external and cquery identity still legacy; and
+- compact retention and a bounded test-module split if the 14k-line DICE owner
+  would otherwise grow further.
 
-Cover success and semantic-prefix exact-Arc equality; pointer-distinct equal
-values and missing/extra/value mismatches; Need and observed outer abort;
-cancellation and selection/injection/materializer failure without publication;
-unchanged event order/replay; singleton observed versus non-singleton legacy
-activation; empty repository selection; warm/edit/delete/recreate/A-B-A; and
-post-return retained state. Run focused and broader core/loading tests, direct
-checks, formatting, diff/cap accounting, Buck2-utility retention scan, AI code
-cleanup and independent implementation review. Reuse accepted evidence; no
-fixture or oracle write is authorized.
+Select one bounded design successor, one uniquely smaller prerequisite, or
+`REPLAN`. Name the future Rust allowlist, production/test/physical caps,
+validation, cleanup and residual risk. Reuse accepted evidence; no new fixture
+or oracle is justified unless the audit finds an observable gap.
 
-## Compatibility boundary
+## Compatibility and lifetimes
 
-Existing singleton package/output/event behavior remains exact. Carrier versus
-selected-snapshot association, exact shared-Arc validation and fail-closed
-observed outer errors are Slug-native. Analyzed/exported/multi-target/external/
-cquery publication, repository/materializer breadth, native-Windows raw-byte
-ordering and exact Bazel identity bytes remain unsupported/deferred.
+Existing root exported-source result/output/event bytes remain exact.
+Carrier association, exact shared-Arc identity, revision retry and fail-closed
+outer handling remain Slug-native. Rule analysis/actions, multi-target,
+external/repository/materializer, cquery, native-Windows raw bytes and exact
+Bazel identity bytes remain unsupported/deferred.
+
+The only admissible retained state is the existing public semantic Arc/events,
+accepted compact epoch and existing source certificate. Carrier/union/
+comparison/retry scratch is command- or compute-local; no cache, interner,
+collection, lock, task, Host read, graph or event owner may be added.
 
 ## STOP / REPLAN
 
-STOP on any other file; Cargo/fixture/oracle write; broader caller, repository
-or materializer activation; partial epoch validation; changed public terminal,
-output, event, retry, selection, publication or restoration behavior; direct or
-reconstructed Host read; another retained owner; public API; or cap excess.
+STOP on Rust, Cargo, BUILD, fixture, oracle or generated-artifact writes;
+implementation claims; broader activation; another retained owner; direct or
+reconstructed Host reads; public behavior/API drift; repository/materializer
+work; or docs cap excess. `REPLAN` if exact FileBytes Arcs cannot survive the
+revision-finalization cycle, the existing observed key cannot remain the
+natural complete owner, or safe implementation requires another semantic
+store, public API or cross-owner duplicate driver.
 
-`REPLAN` if exact selected Arcs cannot survive preparation, validation cannot
-precede irreversible acceptance, projection needs a public/fallible API,
-repository selection is nonempty or non-admitted identities cannot remain
-legacy.
+## Immediate predecessor
 
-## Immediate successor
-
-On independent acceptance commit this packet, record validation and exact cap
-accounting, then return to one docs-only next-owner audit. Do not combine another
-build/cquery/repository frontier or milestone close.
+`31a8b1d3` accepted singleton root-package-all public publication: focused
+publication/retry/event tests and all loading tests pass; broad core retains
+only two named inherited failures; Clippy stops in unchanged
+`allocative_derive`; DICE is +150 production/+300 tests at 14,148 physical,
+events +7/+11 at 1,609, aggregate +468. Every command-retained path-epoch
+transform on the preflight/retry/selection path preserves equal shared result
+Arcs.
