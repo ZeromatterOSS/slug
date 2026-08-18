@@ -2852,3 +2852,55 @@ aggregate net lines. STOP on implementation, caller activation, partial epoch
 validation, public behavior drift, another retained structure, direct Host
 read, repository/materializer breadth or cap excess. Acceptance schedules
 exactly one bounded implementation successor or records the blocking `REPLAN`.
+
+### Frozen singleton root-package-all publication design (2026-08-17)
+
+The private generic `NativeCommandRoot` boundary is the uniquely smallest
+complete owner: its driver selects the terminal closure, prepares the selected
+snapshot and owns finalization/commit, while the sole public build constructor
+owns identity admission. A private consuming `AcceptedCommand` projection is
+the minimum event-preserving public-return seam. No smaller prerequisite is
+required.
+
+Implement `NativeCommandRoot` for the private observed build key with the
+observed carrier as terminal. A default optional observations hook on the
+private trait is overridden only by that sibling. Need remains Need; a completed
+observed outer error becomes a typed native session failure; semantic errors
+remain in the carrier Result Arc. No request revision, source certificate or
+root relaxation is admitted.
+
+Construct only the selected path epoch through
+`PathObservationEpoch::from_shared`. Immediately after successful
+`prepare_accept`, while the updater is uncommitted and before any revision
+finalization or snapshot commit, compare the complete selected and carrier
+epochs. Require identical canonical `SortedMap` demand order, semantic Result
+values and exact `Arc::ptr_eq` results, plus empty selected repository request
+and validation sets. Canonical epoch order is distinct from the already proved
+anchor-then-package producer order. Missing, extra, unequal or pointer-distinct
+state is a fail-closed typed error, never a panic, and publishes nothing.
+
+Add a private infallible consuming `AcceptedCommand::map_terminal` that moves
+the exact semantic Arc, preserves the event buffer and drops the carrier epoch.
+Select observed only after the existing constructor admits structurally exact
+singleton root-repository `PackageAll`; every other identity stays on the same
+legacy key/driver. The public value retains only its semantic Arc/events and the
+accepted snapshot only its existing compact Arc-backed epoch. Validation,
+carrier and attempt scratch remain local; add no Host read, lock, task, cache,
+collection or event owner.
+
+Require success/semantic-prefix exact-Arc proof; pointer-distinct equal values
+and missing/extra/value mismatches; Need/outer/cancellation/selection/injection/
+materializer aborts without publication; event order/replay; strict singleton
+observed and non-singleton legacy activation; empty repository selection;
+warm/edit/delete/recreate/A-B-A; and post-return retention. Existing singleton
+package/output/event behavior remains exact. Association, exact shared-Arc
+validation and fail-closed outer errors are Slug-native. All broader public
+build/cquery/repository shapes and exact identity bytes remain deferred.
+
+Future implementation writes only core `runtime/dice.rs` and
+`runtime/events.rs`. Against `95002997`, caps are 150 production plus 300 test
+net/14,151 physical for DICE, 16 production plus 30 test net/1,640 physical for
+events and 496 aggregate net Rust lines. STOP on any other file, public API,
+broader activation, partial validation, behavior/event drift, another retained
+owner, direct Host read, Cargo/oracle write or cap excess. Acceptance schedules
+exactly one bounded singleton publication implementation.
