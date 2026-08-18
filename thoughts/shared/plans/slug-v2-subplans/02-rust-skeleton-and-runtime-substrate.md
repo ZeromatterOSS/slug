@@ -4762,3 +4762,31 @@ another file/caller/export, mixed families, epoch/event/state drift, upper
 activation, cap excess or M1 closure. After independent design ACCEPT, schedule
 one implementation; after implementation ACCEPT, return to the upper-source
 audit.
+
+### Direct-local evaluation observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-direct-local-evaluation-observation-implementation` from Rust base
+`cc34e31d` and independently accepted design `bfd4f1f6`. Write only
+`source_preparation.rs` and `source_preparation_observation_tests.rs`; caps
+remain 240 source/380 proof/620 aggregate semantic and
+13,800/2,500/16,300 physical.
+
+Implement the private evaluation sibling/carrier and one matching-family
+driver. Forward the observed preparation epoch unchanged; keep
+PreparationCompute empty, every semantic evaluation terminal full, and Need/
+typed outer carrierless. Preserve exact legacy Arc projection and local event
+batches; semantic Complete alone stores the parent batch, while Need/outer/
+cancel publish none. Refactor the existing support helper through the accepted
+eventless mode-aware projection without adding a key, caller, retained child
+Arc or event owner. `host_package.rs` and every upper source/load/query/build
+path remain dormant.
+
+Retain only the semantic evaluation Result Arc plus compact epoch; all vectors,
+evaluator/event/support scratch remains local. Preserve exact evaluation
+semantics/results/events, Slug-native carrier/outer/support association and
+deferred upper publication/identity bytes. Run the complete prefix, Arc,
+event/family/nonactivation, support, cancellation/lifecycle, retention and
+cleanup proof plus serial validation and independent latest-diff review. STOP
+on another file/caller/export, mixed family, epoch/event/state drift, cap excess
+or M1 closure. After ACCEPT, return only to the docs-only upper-source audit.
