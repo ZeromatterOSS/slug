@@ -2349,3 +2349,83 @@ or adapter activation, another key/carrier/container/cache/graph/store/lock,
 events, direct or historical Host reads, changed order/polarity/batching, or
 BUILD/package-load/core/public/repository/materializer work. Acceptance
 schedules only the bounded observed segment-frontier implementation.
+
+### Frozen observed Host-glob segment frontier design (2026-08-17)
+
+Freeze exactly one private `HostGlobSegmentCandidatesObservationKey` with the
+legacy logical-directory/pattern identity and distinct Display. Its complete
+carrier is `ObservedHostGlobSegmentCandidates { result:
+Arc<Result<HostGlobSegmentCandidates, HostGlobSegmentError>>, observations:
+PathObservationEpoch }`. Its Value is
+`SourcePreparationOutcome<Result<ObservedHostGlobSegmentCandidates,
+ObservedPathFrontierError>>`; equality and validity remain complete-only.
+
+One `Legacy | Observed` driver owns literal and wildcard behavior. Legacy
+computes only `ResolvedPathKey`/`PathDirectoryListingKey`; observed computes
+only their observation siblings. Neither segment key computes the other.
+Literal mapping is unchanged and retains the exact resolved-path epoch for
+completed success or semantic error.
+
+Wildcard observed order is exact:
+
+1. compute the observed directory listing and start with its epoch;
+2. filter and slot raw entries exactly as legacy;
+3. if no matched symlink is pending, complete without another base-resolution
+   compute;
+4. otherwise compute the observed base resolution to recover `real_path`,
+   union listing then base, and preserve the listing's exact Arcs for equal
+   duplicate demands;
+5. compute matched symlink resolutions concurrently and process the ordered
+   `join_all` result in pending-slot order; and
+6. union completed symlink epochs in that order only through the first
+   semantic-error slot, or through the full batch when no semantic error exists.
+
+Outer handling is prefix-bounded by that same first semantic terminal. An outer
+frontier error encountered before the first semantic error wins over prior
+Needs and publishes no carrier. Once the first semantic error is reached, it
+wins over any prior Need and later outcomes cannot change it; its carrier
+retains listing/base observations plus completed symlink epochs through and
+including that slot. Later completed or outer outcomes stay dependency-owned.
+When no semantic error exists, the first outer error in the full pending order
+wins over Need; otherwise any Need returns Need with no carrier, and success
+retains every completed epoch. Listing or literal outer errors publish no
+carrier, while their semantic errors retain their complete epoch. Cancellation
+publishes nothing.
+
+Preserve existing matched-symlink batch concurrency, slot projection,
+missing/error/cycle/infinite-expansion mapping, listing/symlink consistency
+check, error-over-Need rule and candidate sort. Parent event data remains
+absent. Warm reuse and A/B/A are explained only by DICE dependencies; no
+request overlay, direct/historical read, test seam, lock, task, cache, graph,
+interner or retained work collection is added.
+
+Retained state is exactly one semantic Result Arc plus the accepted Arc-backed
+epoch. Listings, slots, pending entries, join outcomes, needs, errors and union
+scratch are compute-local. The accepted `SmallMap`/`SmallSet`, immutable Arc
+slices, `Dupe` and `Allocative` utility boundary remains unchanged.
+
+The exact implementation allowlist is
+`app/slug_loading_v2/src/host_glob/{mod,tests}.rs`. Against the
+`bd4fb8db` baseline, caps are 280 production lines in `mod.rs`, 420 test
+lines in `tests.rs`, 700 aggregate net lines, 1,003 physical lines for
+`mod.rs`, and 1,309 for `tests.rs`. No correction is authorized.
+
+The existing wildcard function exceeds the 150-line complexity trigger.
+Keep the segment owner cohesive but extract bounded mode-aware lower-input and
+pending-symlink helpers so no enlarged driver mixes traversal, presentation,
+persistence or transport responsibility.
+
+Require literal and wildcard parity, exact Arc/order/prefix proof, no-pending
+short-circuit, and a discriminating earlier-Need + semantic-error + later outer
+child case asserting the semantic outcome, prefix epoch membership and first
+Arc. Also require the no-semantic full-batch outer-over-Need case,
+equality/validity, warm and A/B/A, cancellation recovery, zero events, zero
+cross-family/traversal activation, focused/full loading, direct core check,
+formatting, strict Clippy/archive dispositions, exact accounting, artifact/diff
+hygiene and independent ownership/compact-memory/nine-category cleanup
+acceptance.
+
+Existing admitted segment behavior remains exact. Carrier association, epoch
+aggregation, decisive-prefix retention and outer-error precedence are
+Slug-native. Traversal, adapter, BUILD/package-load, core/public,
+repository/materializer and native-Windows work remain unsupported/deferred.
