@@ -5319,3 +5319,44 @@ observation mechanics are Slug-native; one-shot workspace evaluation, external
 exported-source publication, multi-build aggregation, unsupported query breadth
 and exact identity bytes stay deferred. After independent design ACCEPT,
 schedule exactly one bounded implementation; otherwise REPLAN.
+
+### Loading-query observed-publication design accepted (2026-08-18)
+
+`44c1b444` accepts the resumed design from scheduling base `9d17ca1b` and Rust
+base `a9270586`. `RootQueryCommandKey` is the complete publication owner;
+private root/external graph and root-subtree siblings plus the mode-aware
+environment are cohesive mechanisms, not another prerequisite. All lower Host
+edges now have accepted observed carriers.
+
+The frozen root retains one exact query Result Arc plus compact epoch and no
+child carrier. Each private graph/subtree DICE value retains one natural Result
+Arc plus epoch with `Allocative` and `Dupe`; all environment/traversal/event/
+union scratch stays local. Sequential and joined terminal algebra, exact child
+event ownership, selected-epoch validation, public consuming projection,
+family isolation and core exported-source deferral are complete.
+
+Future scope is exactly seven Rust/test files with +1,154 production/+1,312
+test/+2,466 aggregate semantic and 19,515 physical caps. The 719-line query
+test range in core DICE relocates byte-exactly into one nested include. Design
+review ACCEPTs ownership, feasibility, retention, proof, arithmetic and STOP/
+REPLAN boundaries.
+
+### Loading-query observed-publication implementation active (2026-08-18)
+
+Run only `WP-2A-m1-loading-query-observed-publication-implementation` from
+Rust base `a9270586` and accepted design `44c1b444`. Write exactly evaluator,
+loading_environment, graph, lib, new observed-loading-query proof, core DICE
+and the new relocated query-command proof file within the frozen per-file and
+aggregate caps.
+
+Implement only the structural observed root/private graph/subtree siblings,
+matching-family drivers, mode-aware ephemeral environment, exact epoch/Arc
+association and the existing native publication projection. Preserve actual
+evaluator order, full issued subtree-batch algebra, child-only events,
+carrierless Need/outer, legacy direct APIs and compact dependency-owned state.
+
+Run the complete terminal/Arc/event/family/lifecycle proof, full dependents,
+format/diff/accounting, retention/cleanup and independent review serially.
+STOP on another file/caller, semantic/public drift, retained scratch, relocation
+body drift, cap excess or M1 closure. After ACCEPT return to exactly one
+docs-only next-owner audit.

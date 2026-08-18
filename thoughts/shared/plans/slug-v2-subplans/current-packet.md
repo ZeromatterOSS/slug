@@ -1,110 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-observed-publication-design-resume`
+Packet: `WP-2A-m1-loading-query-observed-publication-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `9d17ca1b`
 Rust base: `a9270586`
-Result: freeze the complete observed native loading-query publication boundary;
-do not implement it.
+Accepted design: `44c1b444`
+Result: implement and validate only observed native loading-query publication.
 
 ## Authority and caps
 
 Write exactly:
-
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`: <=40 net;
-- this manifest: <=220 net;
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`:
-  <=200 net;
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`: <=30 net.
-
-Aggregate docs growth is <=490 net lines against `9d17ca1b`. Do not write
-Rust, Cargo/BUILD metadata, fixtures, oracles or generated artifacts. Do not
-activate a caller, change public behavior, or close M1.
-
-## Natural owner and boundary
-
-Freeze `RootQueryCommandKey` as the sole complete native query publication
-owner. It owns anchor -> parsed-query evaluation -> graph/output completion and
-one semantic query Result Arc; its `LoadingQueryEnvironment` is the sole
-aggregation point for root/external graph requests, package provenance,
-recursive subtree expansion and BUILD companion lookup. Generic
-`drive_command` remains the only retry, selected-snapshot and publication
-owner.
-
-Add a doc-hidden public structural `RootQueryCommandObservationKey` and
-`ObservedRootQueryCommand`. Add private observed siblings only for
-`RootUnconfiguredPackageGraphKey`, `ExternalUnconfiguredPackageGraphKey` and
-`RootSubtreePackageSetKey`. These graph/subtree siblings and one mode-aware
-query environment are cohesive mechanisms of the root packet: none covers all
-query edges or publishes a command, and splitting them would leave callerless
-partial carriers around the same ephemeral environment.
-
-The accepted anchor, route, root/repository package load, package boundary,
-directory-listing and resolved-path siblings now cover every Host edge. The
-external source/load gap that forced the earlier REPLAN is closed through
-`a9270586`. Keep one-shot/direct query APIs legacy.
-
-Core external exported-source build remains separate and deferred. Its owner
-performs route -> package -> selected source, has additional FileBytes,
-target-kind and certificate/revision concerns, and currently returns no source
-certificate. Do not combine it with certificate-free query publication.
-
-## Carrier, order and terminal algebra
-
-The observed root Value is exactly
-`LoadingPreparationOutcome<Result<ObservedRootQueryCommand,
-ObservedPathFrontierError>>`. The carrier retains the existing exact
-`Arc<Result<QueryOutput, QueryError>>` plus one compact
-`PathObservationEpoch`. Private graph/package-set carriers likewise retain
-only their natural local semantic Result Arc plus one epoch.
-
-Use shared Legacy/Observed drivers for root command, graph projection and
-subtree traversal. Legacy selects only current keys. Observed selects only the
-accepted observed anchor/route/load/boundary/listing/resolution families.
-Order is anchor first, then the unchanged parsed-query evaluator/callback
-order. At every route, package, graph, provenance, boundary, marker and listing
-completion, merge the Complete child epoch left-first before semantic
-inspection. Equal duplicates keep the first exact Arc; conflict or operation
-mismatch is typed outer.
-
-Sequential work stops at the first Need, typed outer or semantic terminal in
-existing evaluator order. Need/outer is carrierless and discards the attempted
-epoch; semantic query error retains the reached prefix. Reuse the private
-restart sentinel for compatible Need aggregation and a parallel private outer
-sentinel/channel; neither may escape as public `QueryError`.
-
-For an already-issued subtree marker/listing `compute_join`, inspect the full
-input-ordered batch, merge every Complete epoch, then choose first typed outer
-or epoch error > combined compatible Need > first semantic > success. Preserve
-BFS/root/basename/child ordering. REPLAN rather than inventing a new query
-error if existing Need kinds cannot union.
-
-## Events, publication and retention
-
-Root/graph/subtree/environment siblings are eventless. Anchor, package, Bzl and
-BUILD children remain sole local batch owners. Semantic completion preserves
-their exact public order; Need/outer/cancellation publishes none and warm reuse
-emits none.
-
-Implement `NativeCommandRoot` only for the observed sibling, expose its epoch
-through `observations()`, use existing selected-epoch exact-Arc validation, and
-consume/project through existing `AcceptedCommand::map_terminal`. The public
-`AcceptedCommand<Arc<Result<QueryOutput, QueryError>>>` and event buffer remain
-unchanged. Query initializes no request revision and owns no source
-certificate.
-
-Retain only the semantic query Result Arc plus compact epoch at the root; it
-retains no child carrier Arc. Each graph/subtree DICE sibling retains exactly
-its one natural local semantic Result Arc plus compact epoch. Only the
-ephemeral environment, candidate arena, resolved graph, traversal/listing
-vectors and event/union scratch stay compute-local. All root and private DICE
-carriers implement `Allocative` and `Dupe`. Add no cache, interner, store,
-lock, task, Host read or second event/publication owner.
-
-## Future implementation boundary
-
-Against Rust base `a9270586`, future Rust is exactly:
 
 1. `app/slug_query_v2/src/evaluator.rs`: +170 production/+20 colocated proof,
    <=417 physical;
@@ -118,36 +23,70 @@ Against Rust base `a9270586`, future Rust is exactly:
 7. new `app/slug_core_v2/src/runtime/tests/query_command_tests.rs`: exact
    719-line relocation plus <=360 proof, <=1,120 physical.
 
-Replace that contiguous query-test range with only
+Caps against `a9270586` are +1,154 production, +1,312 tests and +2,466
+aggregate semantic lines, 19,515 combined physical. Replace the contiguous
+query-test range only with
 `mod query_command_tests { include!("tests/query_command_tests.rs"); }`; the
-included file begins with `use super::*;`. Relocated bodies remain byte exact.
-Caps are +1,154 production, +1,312 tests, +2,466 aggregate semantic lines and
-19,515 combined physical lines. Existing large query/graph/core files are
-cohesive owner exceptions; touched helpers remain below 200 lines.
+included file starts with `use super::*;` and all relocated bodies remain byte
+exact. Existing large query/graph/core files are cohesive owner exceptions;
+touched helpers stay below 200 lines.
 
-## Proof, compatibility and terminal
+## Required implementation
 
-Require identity/Display/equality/validity/Allocative and exact semantic Arc
-projection; anchor and every environment edge Need/outer/semantic prefix;
-root/external graph projection; every subtree boundary/marker/listing batch
-position, Need union, first Arc/conflict/mismatch and BFS order; direct,
-external, recursive, visibility, buildfiles/loadfiles and generated-file
-queries; exact selected epoch values and per-demand `Arc::ptr_eq`; public
-Result-Arc identity; cold anchor/Bzl/BUILD event order, semantic-error batches
-and warm suppression; both family directions plus concurrent isolation;
-poll-drop/no-publication/recovery; root/external BUILD and `.bzl`
-edit/delete/recreate A-B-A; retained bytes/manifest/result lifetimes; zero
-upper-build activation; exact caps, retention, cleanup and full dependent
-validation.
+Add doc-hidden public structural `RootQueryCommandObservationKey` and
+`ObservedRootQueryCommand`, plus private observed root/external graph and
+root-subtree siblings. Use shared Legacy/Observed root, graph and subtree
+drivers and one mode-aware ephemeral `LoadingQueryEnvironment`. Direct and
+one-shot query APIs remain legacy; only the existing native public query
+constructor selects the observed root.
 
-Exact compatibility is public query values/errors/order/events and all legacy
-direct APIs. Sibling/carrier/epoch/typed-outer/selected validation is
-Slug-native. One-shot `evaluate_workspace_targets`, external exported-source
-publication/certificates, multi-build aggregation, unsupported query breadth
-and exact identity bytes remain unsupported/deferred.
+The root Value is
+`LoadingPreparationOutcome<Result<ObservedRootQueryCommand,
+ObservedPathFrontierError>>`; its carrier retains the exact existing query
+Result Arc plus compact epoch. Each graph/subtree DICE sibling retains exactly
+one natural local Result Arc plus epoch. Root retains no child carrier Arc; all
+carriers implement `Allocative` and `Dupe`. Environment, arena, resolved graph,
+traversal/listing vectors and event/union scratch stay compute-local.
 
-STOP on any Rust now; another file/caller/public owner; semantic/order/family/
-event drift; retained scratch; cap excess; or M1 closure. REPLAN if exact epoch
-association needs another owner/state, outer cannot remain private, relocation
-is not exact/buildable, or the bounded caps cannot hold. After independent
-design ACCEPT, schedule exactly one implementation successor and nothing else.
+Preserve anchor-first and exact evaluator/callback order. Observed mode selects
+only accepted anchor/route/root-or-repository-load/boundary/listing/resolution
+siblings. Merge each Complete child epoch left-first before semantic
+inspection; equal duplicates keep the first exact Arc and conflict/mismatch is
+typed outer. Sequential first Need/outer/semantic stops immediately; semantic
+error keeps the reached prefix. Reuse private Need and outer sentinel channels.
+Issued subtree joins scan the full input order and choose first outer/epoch
+error > combined compatible Need > first semantic > success.
+
+Root/graph/subtree/environment siblings are eventless; child keys remain sole
+batch owners. Need/outer/cancel publishes none and warm reuse is suppressed.
+Implement the observed `NativeCommandRoot`, expose its epoch to existing exact
+selected-snapshot validation, and consume/project through
+`AcceptedCommand::map_terminal` without changing the public query Result Arc or
+event buffer. Add no revision, certificate, cache/store/lock/task, Host read or
+second event/publication owner, and no interner.
+
+## Proof and terminal
+
+Prove identity/equality/validity/Allocative/Dupe and exact semantic Arc;
+anchor and every environment terminal prefix; root/external graph projection;
+every subtree boundary/marker/listing batch position, Need union, first Arc,
+conflict/mismatch and BFS order; direct/external/recursive/visibility/
+buildfiles/loadfiles/generated queries; exact selected epoch/Arc identity;
+public Result-Arc identity; exact cold/error child events and warm suppression;
+both family directions and concurrent isolation; cancellation/recovery;
+root/external BUILD and `.bzl` A-B-delete-recreate-A; retained lifetimes; and
+zero upper-build activation.
+
+Exact public query behavior and all legacy/direct APIs remain exact. Private
+observation/outer/selected association is Slug-native. One-shot workspace
+evaluation, external exported-source publication, multi-build aggregation,
+unsupported query breadth and exact identity bytes remain deferred.
+
+Run focused proof, full query/loading/bzlmod/core validation, fmt, diff-check,
+exact accounting, retention/cleanup and independent review serially. STOP on
+any other file/caller, semantic/order/family/event drift, public API expansion,
+retained scratch, relocation/body drift, cap excess or M1 closure. REPLAN if
+the exact epoch needs another owner/state, private outer cannot remain private,
+existing Need kinds cannot union without inventing a new query error, or the
+bounded scope cannot hold. After ACCEPT commit and return to exactly one
+docs-only next-owner audit; do not close M1.
