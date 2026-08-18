@@ -4934,3 +4934,35 @@ prefix/Arc/family/event/nonactivation/cancellation/lifecycle/retention proof,
 serial validation, cleanup and independent review. STOP on another file/caller,
 mixed family, epoch/event/state drift, upper activation, cap excess or M1
 closure. After ACCEPT return only to the docs-only upper-source audit.
+
+
+### Repository-package source observation proof-cap REPLAN (2026-08-18)
+
+The retained three-file candidate implements the frozen source owner correctly
+and passes focused 2/2 plus full 425-unit/193-integration bzlmod validation.
+Production is +216 at 4,955 physical, proof +343 at 701, lib +4 at 403,
+aggregate +563 at 6,059; scope/diff/fmt are clean. Review accepts ownership,
+order, prefix semantics, exact Arc projection, eventlessness, retention and the
+156/95-line helper split.
+
+Acceptance stops because only 17 proof lines remain under the frozen 360 cap,
+while support-position typed outer, exact semantic-prefix/error variants,
+selected-source error/Absent, compute-error prefixes and complete child event/
+family isolation remain undiscriminated. Weakening proof or exceeding the cap
+is forbidden; this is a proof-cap REPLAN, not a production redesign.
+
+### Repository-package source proof-cap correction design active (2026-08-18)
+
+Run only
+`WP-2A-m1-repository-package-source-observation-proof-cap-correction-design`
+from scheduling base `e4fdfd9e` and Rust base `1815c019`. The dirty candidate
+is retained but non-writable. Write only canonical/current/Stage/routing docs.
+Keep host/lib caps and every semantic/event/memory/family contract unchanged;
+raise only proof 360/750 -> 480/880 and aggregate 626/6,205 -> 746/6,335.
+
+Freeze the missing exact terminal-prefix, every-position Need/outer, production
+union conflict/mismatch, child event order/text, reverse-family isolation and
+upper-nonactivation discriminators. Permit only one pure live-driver reducer
+needed to expose support outer/prefix behavior; add no key/state/event/caller or
+semantic change. After independent ACCEPT schedule exactly the same three-file
+implementation retry, then return to the upper-source audit.
