@@ -4647,3 +4647,64 @@ independent review. STOP on another file/export/caller, mixed families,
 event/state drift, retained traversal scratch, cap excess or M1 closure. After
 ACCEPT, return only to a docs-only evaluation/upper-source publication owner
 audit.
+
+### Direct-local preparation observation accepted (2026-08-18)
+
+Commit `cc34e31d` accepts
+`WP-2A-m1-direct-local-preparation-observation-implementation` from Rust base
+`79248832` and design `9cdcf9e0`. One private structural sibling and one shared
+mode-aware preparation driver select only matching inspection, current-frontier
+package-horizon and fragment-source families. Legacy projects the exact local
+semantic Arc; Host nonregistry preparation remains legacy-only.
+
+Observed preparation retains inspection first, then each BFS level's
+first-occurrence lookup and source epochs left-first. The source reducer merges
+Complete epochs before semantic inspection and implements the frozen
+prefix-bounded outer/Need/semantic algebra; later outcomes remain
+dependency-owned. Need/typed outer has no carrier. Preparation adds no event
+owner and retains only one semantic Result Arc plus one compact epoch; frontier,
+ancestry, outcomes, Need union and parser scratch remain compute-local.
+
+Proof reconstructs the exact inspection -> p lookup -> p source -> q lookup ->
+q source carrier with per-demand Arc identity, rejects standalone-horizon and
+legacy-family activation, and asserts ROOT then route-wide REPO child batches
+with warm suppression. The production reducer is discriminated at every slot
+for SourceCompute, source and validation semantics, Need, typed outer and epoch
+conflict, plus all mixed precedence and full Need union cases. Nested success,
+Absent, cycle, edit/restoration and real polled cancellation/recovery pass.
+
+Accounting against `79248832` is +403 source at 13,536 physical lines, +537
+proof at 2,098 physical lines, +940 aggregate and 15,634 combined. Focused 3/3,
+421 bzlmod unit plus 193 integration, 194 loading and 120 query tests pass.
+Core remains at the documented 234/235 unit and 12/13 integration inherited
+baselines. Fmt/check/diff pass; strict Clippy stops in unchanged
+`allocative_derive`, and the archive checker reproduces only its inherited
+missing-ref/metadata baseline. Buck2 retention, AI cleanup and independent
+latest-diff review return `ACCEPT`. Exact preparation semantics and child
+events remain exact; the sibling/carrier/outer algebra is Slug-native; upper
+evaluation/source/load/publication and identity bytes remain deferred. M1 is
+partial.
+
+### Direct-local evaluation/upper-source owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-direct-local-evaluation-upper-source-owner-audit` from
+accepted base `cc34e31d`; write only canonical/current/Stage 2 docs. Rust,
+Cargo/BUILD, fixtures, oracles, generated artifacts, public activation and M1
+closure are stopped.
+
+Trace the accepted observed preparation carrier through
+`DirectLocalModuleEvaluationKey`, any reusable support/helper below it,
+`RepositoryPackageSourceKey`, recursive `ExternalBzlModuleEvalKey`, and
+`RepositoryPackageLoadKey`. Account for every matching-family child, exact Arc
+and epoch, terminal prefix, Need/outer/cancellation path, Complete event batch,
+retained versus scratch collection, warm reuse and lifecycle edge. Decide
+whether evaluation is the first complete owner, one uniquely smaller observed
+support/fragment producer is required, or the constraints require formal
+REPLAN. Do not combine existing parent families or assume a child epoch may be
+dropped without proving invalidation and publication completeness.
+
+Terminate in exactly one docs-only bounded design, one uniquely smaller
+prerequisite design returning directly to this audit, or formal REPLAN. Any
+design must freeze exact/Slug-native/deferred compatibility, future Rust files
+and measured caps, full terminal/equality/event/memory/family proof, validation,
+cleanup and independent review before one implementation packet may follow.
