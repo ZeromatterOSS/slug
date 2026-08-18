@@ -1,35 +1,24 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-external-package-source-load-observation-design`
+Packet: `WP-2A-m1-host-repository-source-observation-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `7bc9e1da`
+Scheduling base: `a4a69ab3`
 Rust base: `e4555dca`
-Result: freeze the private observed routed Host path/source substrate as the
-uniquely smaller prerequisite before external package-load and loading-query
-publication; do not implement it.
+Design authority: `a4a69ab3`
+Result: implement the private observed routed Host path/source substrate
+required before external package-load and loading-query publication; do not
+activate an upper loader or public query caller.
 
 ## Authority and caps
 
 Write only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest;
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`; and
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
-
-Cap net growth at 40 canonical, 220 manifest, 180 Stage 2, 30 routing and 470
-aggregate lines against `7bc9e1da`.
-
-## Frozen future Rust boundary
-
-The accepted design schedules one implementation that may write only:
-
 - `app/slug_bzlmod_v2/src/source_preparation.rs`;
 - new `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`; and
 - `app/slug_bzlmod_v2/src/lib.rs`.
 
-Against Rust base `e4555dca`, future semantic net growth is capped at 340
+Against Rust base `e4555dca`, semantic net growth is capped at 340
 production plus 10 test-glue lines in `source_preparation.rs`, 520 test lines in
 the new test file, 6 production lines in `lib.rs`, and 876 aggregate lines.
 Current physical bases are 12,247 and 395 lines; final physical size is capped
@@ -143,32 +132,26 @@ Run serially:
    `git diff --check e4555dca`, exact semantic/physical accounting, Buck2
    retention scan and AI cleanup categories 1-9.
 
-Require independent design review. After ACCEPT, commit this docs-only design
-and schedule exactly one bounded Host repository source-observation
-implementation from Rust base `e4555dca` plus the accepted design. After its
-implementation review and commit, schedule exactly one docs-only external
+Require independent latest-diff implementation review. After ACCEPT, commit
+the Rust packet and schedule exactly one docs-only external
 package source/load frontier design; that design must return directly to
 loading-query publication after its bounded implementation. Do not close M1.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; public or
-upper-loader activation; a third key family; a production split; existing test
+STOP on any other file; Cargo, BUILD, fixture, oracle or generated-file writes;
+public or upper-loader activation; a third key family; a production split; existing test
 body movement; computing legacy and observed children together; direct
 `ResolvedPathKey` or direct FileBytes observation in any upper observed parent
-after these shared source drivers exist; Result-Arc reconstruction; partial carrier on
-Need/outer; duplicate event ownership; retained scratch or a new
+after these shared source drivers exist; Result-Arc reconstruction; partial
+carrier on Need/outer; duplicate event ownership; retained scratch or a new
 store/cache/interner/lock/task/Host read; semantic drift; nondiscriminating
-proof; missing future allowlist/caps; multiple successors; docs cap excess; or
-M1 closure. `REPLAN` if the exact resolution/FileBytes
+proof; cap excess; or M1 closure. `REPLAN` if the exact resolution/FileBytes
 Arcs cannot survive one same-owner carrier, source preparation requires another
 file/owner, event authority moves, or the frozen include/caps cannot build.
 
 ## Immediate predecessor
 
-`7bc9e1da` scheduled this audit after accepted route implementation
-`e4555dca`. The audit finds that every external package BUILD and recursive
-`.bzl` upper path converges on `HostRepositoryPathKey` and
-`HostRepositorySourceFileKey`, whose legacy resolved-path and FileBytes
-computes discard the only complete epoch. It therefore selects this uniquely
+`a4a69ab3` independently accepts the docs-only audit and frozen design from
+Rust base `e4555dca`. It selects these two same-owner siblings as the uniquely
 smaller prerequisite before package loading or query publication.

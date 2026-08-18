@@ -3952,3 +3952,25 @@ After independent design ACCEPT, schedule only
 `e4555dca` plus the accepted design. After that implementation ACCEPT, return
 to one docs-only external package source/load frontier design and then loading
 query; do not close M1.
+
+
+### Active routed Host source observation implementation (2026-08-18)
+
+Run `WP-2A-m1-host-repository-source-observation-implementation` from Rust
+base `e4555dca` and independently accepted design `a4a69ab3`. Write only
+`source_preparation.rs`, new
+`source_preparation_observation_tests.rs`, and `slug_bzlmod_v2/src/lib.rs`.
+
+Preserve the frozen two structural siblings, matching-only shared drivers,
+Complete semantic Arc plus exact epoch carrier, resolution-before-FileBytes
+left-first union, Need/typed-outer/semantic polarity, zero local events, compact
+retention, legacy parity and reverse-family nonactivation. Keep the exact
+340+10/520/6 = 876 semantic caps and 12,600/540/405 = 13,545 physical caps,
+including the test-only nested include and no existing body movement.
+
+Run focused lifecycle/cancellation/Arc proof, full bzlmod/loading/query and
+established core checks, formatting/check/diff/accounting, retention scan,
+cleanup and independent implementation review. STOP on every other file,
+upper loading or query activation, partial/rebuilt carriers, family/event/memory
+drift, cap excess or M1 closure. After ACCEPT, schedule only the docs-only
+external package source/load frontier design from the implementation commit.
