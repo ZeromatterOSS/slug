@@ -4531,31 +4531,48 @@ discriminate semantic-before-later-Need/outer, Need-before-semantic-before-
 outer, no-semantic outer-over-Need, first of two semantics, exact prefix/first
 Arc and full Need union.
 
-### Direct-local include-package horizon observation implementation active (2026-08-18)
+### Direct-local include-package horizon observation accepted (2026-08-18)
 
-Run only
+`79248832` accepts
 `WP-2A-m1-direct-local-include-horizon-observation-implementation` from Rust
-base `a61de5d4` and independently accepted design `f4ed1ce2`. Write only
-`source_preparation.rs` and `source_preparation_observation_tests.rs`.
+base `a61de5d4` and design `f4ed1ce2`. One private structural observed
+sibling and one shared mode-aware driver preserve parse-first, first-occurrence
+dedupe, full ordered join, left-first exact child Arcs and the prefix-bounded
+outer/Need/semantic algebra. The carrier retains one semantic Result Arc plus
+one compact epoch; scratch remains compute-local and child keys remain the
+only event owners.
 
-Preserve the legacy horizon key/value while adding one private structural
-observed sibling/carrier and one reusable mode-aware package-batch driver.
-Standalone keys compute matching inspection; existing preparation calls legacy
-mode with its requests. Preserve parse-first, first-occurrence dedupe, full
-ordered join, incremental left-first epoch snapshots and the frozen
-prefix-bounded terminal algebra exactly. Need/outer has no carrier.
+Accounting is +283 source production, +420 proof and +703 aggregate at
+13,133/1,561/14,694 physical lines. Focused and full bzlmod validation pass
+(418 unit plus integrations), as do 194 loading and 120 query tests. The
+unchanged baselines remain 234/235 core unit, 12/13 core integration, Clippy's
+`allocative_derive` failure and the archive metadata stops. Formatting,
+check, diff/accounting, Buck2 retention, AI cleanup and independent review
+pass. Exact include/package/lookup semantics and child events remain exact;
+the sibling/carrier/outer algebra is Slug-native; upper activation and identity
+bytes remain deferred.
 
-Retain one local semantic Result Arc with its exact occurrence collection plus
-one compact epoch; no child Arc, outcome map, prefix snapshots or additional
-collection survives compute. Keep the horizon eventless and all upper owners
-dormant. Exact include/package/lookup semantics and events, Slug-native
-sibling/carrier/outer algebra, and deferred preparation/fragment/evaluation/
-source/load/query classes remain unchanged.
+### Direct-local upper observation owner audit active (2026-08-18)
 
-Caps are 300 production/13,200 physical, 420 tests/1,580 physical, 720
-aggregate semantic and 14,780 combined against `a61de5d4`. Run the complete
-mixed-order/prefix/Arc/family/event/cancellation/lifecycle proof, serial
-downstream validation, retention/cleanup and independent review. STOP on any
-other file/caller/export, upper activation, family/event drift, retained batch
-state, cap excess or M1 closure. After ACCEPT, schedule only the docs-only
-preparation/fragment/evaluation and upper source/load audit.
+Run only `WP-2A-m1-direct-local-upper-observation-owner-audit` from
+`79248832`; write only canonical/current/Stage 2 docs. Rust, fixtures,
+oracles and public activation are stopped.
+
+Audit the complete chain from `DirectLocalModulePreparationKey` through the
+shared recursive nonregistry preparation and fragment-source frontier,
+`DirectLocalModuleEvaluationKey`, `RepositoryPackageSourceKey`,
+`ExternalBzlModuleEvalKey`, and `RepositoryPackageLoadKey`. Account for
+every matching-family dependency, exact Result Arc and epoch, prefix terminal,
+Need/typed outer/cancellation path, local event batch, retained versus scratch
+collection, warm reuse and A/B/A edge. The key question is whether observed
+preparation is the first complete owner or whether an observed recursive
+fragment source/composition producer is a uniquely smaller prerequisite.
+
+The terminal is exactly one docs-only bounded design, one uniquely smaller
+prerequisite design that returns directly to this audit, or formal REPLAN.
+Any design must freeze future Rust files and measured semantic/physical caps,
+terminal/equality algebra, Arc/epoch order, event/cancellation publication,
+compact lifetimes, compatibility classes, discriminating proof, validation and
+independent review before implementation. STOP on Rust, mixed families,
+duplicate event ownership, retained scratch/state, upper activation, multiple
+successors or M1 closure.

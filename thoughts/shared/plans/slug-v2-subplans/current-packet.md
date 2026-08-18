@@ -1,106 +1,94 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-direct-local-include-horizon-observation-implementation`
+Packet: `WP-2A-m1-direct-local-upper-observation-owner-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling/design base: `f4ed1ce2`
-Rust base: `a61de5d4`
-Result: implement only the accepted shared observed direct-local
-include-package horizon producer.
+Scheduling/Rust base: `79248832`
+Result: audit only the first complete natural owner after the accepted
+direct-local include-horizon carrier.
 
 ## Authority
 
 Write only:
 
-- `app/slug_bzlmod_v2/src/source_preparation.rs`
-- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
 
-Caps against Rust base `a61de5d4`: 300 production and 13,200 physical lines
-in `source_preparation.rs`; 420 tests and 1,580 physical lines in the proof
-file; 720 aggregate semantic and 14,780 combined physical.
+Docs caps against `79248832`: 40 net canonical, 180 net manifest, 180 net
+Stage 2, and 400 aggregate. Write no Rust, Cargo, BUILD, fixture, oracle, or
+generated artifact.
 
-## Required implementation
+## Accepted predecessor
 
-Keep `DirectLocalIncludePackageHorizonKey` and its Value exact. Refactor
-`preflight_direct_local_include_package_horizon` and the direct branch of
-`preflight_nonregistry_include_horizon` through one shared mode-aware driver.
-Add one crate-private structural observed horizon sibling/carrier. Legacy keeps
-the accepted inspection then
-legacy `ExternalRepositoryPackageLookupKey` family. Observed selects the
-accepted observed inspection and observed lookup sibling for every unique
-include package. Do not activate preparation, fragment source, evaluation,
-upper source/load or query.
+`79248832` accepts the private observed direct-local include-package horizon:
+one mode-aware inspection/package driver, parse-first first-occurrence package
+dedupe, full ordered join, prefix-bounded terminal algebra, exact child Result
+Arcs, child-only event ownership, and compact Result-Arc-plus-epoch retention.
+Accounting is +283 in `source_preparation.rs`, +420 in the proof file, +703
+aggregate, at 13,133/1,561/14,694 physical lines.
 
-Retain one local semantic horizon Result Arc plus one compact epoch. The exact
-semantic Result may retain its existing occurrence collection; retain no child
-semantic Arc or additional collection. The reusable mode-aware package-batch
-driver takes route, request slice and an initial inspection epoch. Standalone
-keys compute the matching inspection then call it; existing preparation keeps
-calling legacy mode with its precomputed requests, and later observed
-preparation may pass its observed prefix without recomputing inspection.
+Focused and full bzlmod validation passed (418 unit tests plus integrations);
+loading passed 194 and query passed 120. The unchanged core baselines remain
+234/235 unit and 12/13 integration. Clippy still stops in
+`allocative_derive`; archive status still reports the inherited archive
+metadata baseline. Formatting, check, diff hygiene, retention/cleanup review,
+and independent implementation review passed.
 
-Parse all labels in request order before lookup; first bad label returns the
-inspection prefix and activates no lookup. Deduplicate valid packages by first
-occurrence, then `compute_join` all unique packages in that order. For every
-Complete child, union its epoch left-first before semantic inspection and keep
-only compute-local prefix snapshots. Define the first semantic terminal in
-first-occurrence order: DICE LookupCompute uses the prior prefix; child lookup
-semantic uses its merged prefix.
+## Audit boundary
 
-Precedence is prefix-bounded through that first semantic. First typed outer or
-union error in the prefix wins with no carrier; otherwise an earlier Need wins
-and returns the deterministic union of all batch Needs; otherwise return the
-semantic with its snapshot. Later outer/Need/conflict is dependency-owned and
-cannot replace or extend that semantic carrier. With no semantic terminal,
-inspect the full batch: first typed outer/union error wins over the combined
-Need, otherwise Need, otherwise success retains the full epoch. Do not retain
-the outcome map or prefix snapshots.
+Inspect the live first-owner chain without changing it:
 
-Need and typed outer carry no carrier. InspectionCompute is empty; inspection
-semantic and bad-label failures retain the inspection prefix. LookupCompute
-retains only completed earlier prefixes; lookup semantic failure retains the
-decisive lookup prefix; success retains every reached lookup. Complete-only
-validity/equality remains Need invalid/self-unequal, typed outer by outer error,
-carrier by semantic result plus epoch.
+1. `DirectLocalModulePreparationKey` currently recomputes the legacy
+   `DirectLocalModuleInspectionKey`, calls the shared nonregistry preparation,
+   and reaches the legacy direct horizon plus recursive fragment-source reads.
+2. `prepare_nonregistry_module` owns breadth/frontier order, recursive include
+   ancestry/cycle capability, fragment source selection, validation, and the
+   final closure collection.
+3. `DirectLocalModuleEvaluationKey` consumes preparation, evaluates the root
+   plus fragments, and is the sole direct-local evaluation event-batch owner.
+4. `RepositoryPackageSourceKey` consumes direct-local module support, legacy
+   external package lookup, and BUILD source bytes; `RepositoryPackageLoadKey`
+   plus `ExternalBzlModuleEvalKey` own BUILD/.bzl parsing, recursion, and local
+   evaluation batches.
 
-The horizon remains eventless; inspection/root-module/routed-policy children
-remain the only event owners. Add no parser/batch scratch retention, store,
-cache/interner, lock/task, direct Host read, request revision, source
-certificate, export or caller.
+Audit every direct and recursive fragment edge, source/result Arc, observation
+epoch, Need, typed outer, semantic failure, cancellation, event authority,
+warm reuse, and A/B/A dependency. Determine whether the smallest complete next
+owner is an observed preparation sibling, a uniquely smaller observed fragment
+source/composition prerequisite, or another bounded producer. Do not assume
+that evaluation or upper source/load can discard a child epoch merely because
+the child DICE value remains dependency-owned: the audit must identify the
+complete carrier required for later publication validation.
 
-## Compatibility
+Name the relevant Bazel 9.2 `ModuleFileFunction`/module-extension and BUILD
+load behavior and Buck2 DICE dependency/equality/cancellation evidence. Reuse
+the existing source-preparation, loading, and query fixtures; add none. Exact
+MODULE/include/BUILD/.bzl bytes, errors, values, order, and child events remain
+exact. Any structural sibling/carrier/typed outer is Slug-native. Broader
+public query/build activation, identity bytes, other repositories, and
+unadmitted loading breadth remain unsupported/deferred.
 
-Include parsing, package identity/order, lookup selection/errors, horizon
-values and child events remain exact Bazel 9 admitted behavior. The structural
-sibling/carrier, observed batch outer algebra and epoch retention are
-Slug-native. Preparation, fragment loading, evaluation, upper
-source/load/query/publication and identity bytes remain unsupported/deferred.
+## Required terminal
 
-## Proof and validation
+End with exactly one:
 
-Freeze proof for identity/Display, exact legacy parity, empty/single/duplicate
-and multi-package include horizons, bad label, invalid/deleted/no-BUILD/lookup
-semantic errors, inspection and every lookup Need/typed outer/compute position,
-exact prefix membership and Result Arcs, stable equal-duplicate first Arc,
-conflict/operation mismatch, full equality/validity, both family directions,
-zero preparation/fragment/evaluation/source/load/query activation, child-only
-events/warm suppression, real polled cancellation/recovery, and package/path
-edit/delete/recreate plus A/B/A. Discriminate earlier semantic plus later
-Need/outer, earlier Need plus semantic plus later outer, no-semantic
-outer-over-Need, first of two semantics, exact decisive prefix/first Arc and
-full Need union.
+- one docs-only bounded design for the first complete natural owner;
+- one uniquely smaller docs-only prerequisite design and a direct return to
+  this audit; or
+- formal `REPLAN` with the conflicting owner/family/event/carrier evidence.
 
-Run focused tests, full bzlmod/loading/query, established core baselines,
-fmt/check/diff/accounting, Buck2 retention and AI cleanup, then one independent
-latest-diff review. After ACCEPT, commit and return only to a docs-only
-preparation/fragment/evaluation and upper source/load audit.
+For the selected successor, freeze its future Rust allowlist and measured
+per-file production/test/physical caps; complete terminal/Need/outer/equality
+algebra; exact Arc/epoch order; event and cancellation publication; compact
+retained versus compute-local memory; lifecycle/family/nonactivation proof;
+compatibility classes; validation; cleanup; and one independent design review.
+Schedule implementation only after that design is independently accepted.
 
 ## STOP / REPLAN
 
-STOP on every other file, Cargo/BUILD/fixture/oracle writes, another
-file/export/caller, preparation/fragment/evaluation or upper activation, mixed
-families, partial/rebuilt epochs, moved events, retained scratch/state, direct
-Host reads, multiple successors or M1 closure. `REPLAN` if the standalone key
-and preparation preflight cannot share one natural horizon driver, exact child
-Arcs cannot survive, another owner/file is required, or legacy semantics/event
-ownership must change.
+STOP on Rust or public behavior, another fixture/oracle, upper activation,
+family mixing, duplicate event ownership, retained scratch/store/cache/lock/task,
+a second successor, or M1 closure. `REPLAN` if no uniquely smallest complete
+owner can preserve exact semantics, child-only event authority, complete
+observation carriers, and bounded memory without broadening the packet.
