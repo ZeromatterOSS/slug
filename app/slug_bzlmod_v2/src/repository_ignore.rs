@@ -50,7 +50,9 @@ use crate::repo_file::HostRepoFileKey;
 use crate::repo_file::HostRepoFileObservationKey;
 use crate::repo_file::HostRouteRepoFileError;
 use crate::repo_file::HostRouteRepoFileKey;
+use crate::repo_file::HostRouteRepoFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
+use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::RepositorySourceFileKey;
@@ -1287,69 +1289,224 @@ impl fmt::Display for HostRouteRepositoryIgnoreKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostRouteRepositoryIgnoreObservationKey(pub(crate) HostRouteRepositoryIgnoreKey);
+
+impl fmt::Display for HostRouteRepositoryIgnoreObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostRouteRepositoryIgnore {
+    result: Arc<HostRouteRepositoryIgnoreResult>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRouteRepositoryIgnore {
+    pub(crate) fn result(&self) -> &Arc<HostRouteRepositoryIgnoreResult> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type HostRouteRepositoryIgnoreResult = Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>;
+type HostRouteRepositoryIgnoreProjection =
+    (Arc<HostRouteRepositoryIgnoreResult>, PathObservationEpoch);
+type HostRouteRepositoryIgnoreDriverOutcome = SourcePreparationOutcome<
+    Result<HostRouteRepositoryIgnoreProjection, ObservedPathFrontierError>,
+>;
+
+fn route_ignore_complete(
+    result: Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>,
+    observations: PathObservationEpoch,
+) -> HostRouteRepositoryIgnoreDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn drive_host_route_repository_ignore(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRouteRepositoryIgnoreKey,
+    observed_mode: bool,
+) -> HostRouteRepositoryIgnoreDriverOutcome {
+    let (repo, mut observations) = match observed_mode {
+        false => {
+            match dice_invariant(
+                ctx.compute(&HostRouteRepoFileKey::new(key.route.clone()))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(repo) => {
+                    (repo.as_ref().clone(), PathObservationEpoch::empty())
+                }
+            }
+        }
+        true => {
+            let observed = match dice_invariant(
+                ctx.compute(&HostRouteRepoFileObservationKey(HostRouteRepoFileKey::new(
+                    key.route.clone(),
+                )))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            )
+        }
+    };
+    let repo = match repo {
+        Ok(repo) => repo,
+        Err(error) => {
+            return route_ignore_complete(
+                Err(HostRepositoryIgnoreError::RouteRepoFile(error)),
+                observations,
+            );
+        }
+    };
+    let (source, source_observations) = match observed_mode {
+        false => {
+            match dice_invariant(
+                ctx.compute(&HostRepositorySourceFileKey::new(
+                    key.route.clone(),
+                    ".bazelignore".into(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(source) => {
+                    (source, PathObservationEpoch::empty())
+                }
+            }
+        }
+        true => {
+            let observed = match dice_invariant(
+                ctx.compute(&HostRepositorySourceFileObservationKey::new(
+                    key.route.clone(),
+                    ".bazelignore".into(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            )
+        }
+    };
+    observations = match union_observations(&observations, &source_observations) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    let source = match source {
+        Ok(HostRepositorySourceFileValue::Absent) => None,
+        Ok(HostRepositorySourceFileValue::Present {
+            bytes,
+            logical_path,
+        }) => Some((bytes, logical_path)),
+        Err(RepositorySourceFileError::WrongKind {
+            actual: PathNodeKind::Directory,
+            ..
+        }) => None,
+        Err(error) => {
+            return route_ignore_complete(
+                Err(HostRepositoryIgnoreError::RepositorySource(error)),
+                observations,
+            );
+        }
+    };
+    let mut prefixes = Vec::new();
+    if let Some((bytes, logical_path)) = source {
+        let parsed = match parse_ignore_file_observed(ctx, &logical_path, &bytes).await {
+            PathOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
+            }
+            PathOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            PathOutcome::Complete(Ok(parsed)) => parsed,
+        };
+        observations = match union_observations(&observations, &parsed.observations) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        match parsed.result {
+            Ok(parsed) => prefixes = parsed,
+            Err(error) => return route_ignore_complete(Err(error), observations),
+        }
+    }
+    route_ignore_complete(
+        Ok(RepositoryIgnoreMatcher::new(
+            prefixes,
+            repo.ignored_directories().iter().cloned(),
+        )),
+        observations,
+    )
+}
+
 #[async_trait]
 impl Key for HostRouteRepositoryIgnoreKey {
     type Value =
         SourcePreparationOutcome<Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let repo = match dice_invariant(
-            ctx.compute(&HostRouteRepoFileKey::new(self.route.clone()))
-                .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => {
-                return SourcePreparationOutcome::Need(need);
+        match drive_host_route_repository_ignore(ctx, self, false).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => {
+                SourcePreparationOutcome::Complete(result)
             }
-            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.dupe(),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostRepositoryIgnoreError::RouteRepoFile(error.clone()),
-                    )));
-                }
-            },
-        };
-        let source = match dice_invariant(
-            ctx.compute(&HostRepositorySourceFileKey::new(
-                self.route.clone(),
-                ".bazelignore".into(),
-            ))
-            .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent)) => None,
-            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Present {
-                bytes,
-                logical_path,
-            })) => Some((bytes, logical_path)),
-            SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
-                actual: PathNodeKind::Directory,
-                ..
-            })) => None,
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostRepositoryIgnoreError::RepositorySource(error),
-                )));
-            }
-        };
-        let mut prefixes = Vec::new();
-        if let Some((bytes, logical_path)) = source {
-            match parse_ignore_file(ctx, &logical_path, &bytes).await {
-                PathOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
-                }
-                PathOutcome::Complete(Err(error)) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
-                }
-                PathOutcome::Complete(Ok(file_prefixes)) => prefixes = file_prefixes,
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy routed ignore cannot produce an observed outer error")
             }
         }
-        SourcePreparationOutcome::Complete(Arc::new(Ok(RepositoryIgnoreMatcher::new(
-            prefixes,
-            repo.ignored_directories().iter().cloned(),
-        ))))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostRouteRepositoryIgnoreObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostRouteRepositoryIgnore, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_route_repository_ignore(ctx, &self.0, true)
+            .await
+            .map(|outcome| {
+                outcome.map(|(result, observations)| ObservedHostRouteRepositoryIgnore {
+                    result,
+                    observations,
+                })
+            })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1563,8 +1720,14 @@ mod tests {
     use dupe::Dupe;
     #[cfg(unix)]
     use slug_events_v2::CaptureEvaluationEvents;
+    #[cfg(unix)]
+    use slug_events_v2::EvaluationEvent;
+    #[cfg(unix)]
+    use slug_events_v2::EventBatch;
     use slug_identity_v2::PackagePath;
     use slug_workspace_v2::NormalizedAbsolutePath;
+    #[cfg(unix)]
+    use slug_workspace_v2::ObservedPathFrontierError;
     #[cfg(unix)]
     use slug_workspace_v2::PathLstat;
     #[cfg(unix)]
@@ -1601,11 +1764,19 @@ mod tests {
     #[cfg(unix)]
     use crate::RootPackagePolicyInputs;
     #[cfg(unix)]
+    use crate::SourcePreparationOutcome;
+    #[cfg(unix)]
     use crate::host_file::HostFileBytesKey;
     #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
     #[cfg(unix)]
     use crate::repo_file::HostRepoFileKey;
+    #[cfg(unix)]
+    use crate::repo_file::tests::routed_policy_epoch;
+    #[cfg(unix)]
+    use crate::repo_file::tests::routed_policy_route;
+    #[cfg(unix)]
+    use crate::repo_file::tests::routed_policy_transaction;
 
     fn path(value: &str) -> PackagePath {
         PackagePath::parse(value).unwrap()
@@ -2100,7 +2271,7 @@ mod tests {
             bytes("/root-b/.bazelignore", b"literal\n"),
         ])
         .unwrap();
-        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let dice = dice::Dice::builder().build(dice::DetectCycles::Enabled);
         let mut updater = dice.updater();
         inject_root_package_policy_inputs(&mut updater, inputs).unwrap();
         updater
@@ -2723,6 +2894,294 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[derive(Default)]
+    struct RoutedPolicyTracker {
+        activations: Mutex<Vec<(String, Option<EventBatch>)>>,
+    }
+
+    #[cfg(unix)]
+    impl RoutedPolicyTracker {
+        fn take(&self) -> Vec<(String, Option<EventBatch>)> {
+            std::mem::take(&mut *self.activations.lock().unwrap())
+        }
+    }
+
+    #[cfg(unix)]
+    impl ActivationTracker for RoutedPolicyTracker {
+        fn key_activated(
+            &self,
+            _: &DynKey,
+            _: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            self.activations.lock().unwrap().push((
+                key.to_string(),
+                activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            ));
+        }
+    }
+
+    #[cfg(unix)]
+    async fn compute_observed_routed_policy(
+        dice: &Arc<Dice>,
+        tracker: &Arc<RoutedPolicyTracker>,
+        epoch: PathObservationEpoch,
+        inject_policy: bool,
+    ) -> SourcePreparationOutcome<
+        Result<super::ObservedHostRouteRepositoryIgnore, ObservedPathFrontierError>,
+    > {
+        let mut transaction = routed_policy_transaction(
+            dice,
+            tracker.dupe() as Arc<dyn ActivationTracker>,
+            epoch,
+            inject_policy,
+        )
+        .await;
+        transaction
+            .compute(&super::HostRouteRepositoryIgnoreObservationKey(
+                super::HostRouteRepositoryIgnoreKey::new(routed_policy_route()),
+            ))
+            .await
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_routed_policy_retains_semantic_prefixes_and_outer_polarity() {
+        let complete_epoch = routed_policy_epoch(
+            Some((b"", PathNodeKind::RegularFile)),
+            Some((b"", PathNodeKind::RegularFile)),
+            90,
+        );
+        let policy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let policy_tracker = Arc::new(RoutedPolicyTracker::default());
+        let policy = compute_observed_routed_policy(
+            &policy_dice,
+            &policy_tracker,
+            complete_epoch.dupe(),
+            false,
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(Ok(policy)) = policy else {
+            panic!("missing policy must be a completed semantic terminal");
+        };
+        assert!(matches!(
+            policy.result().as_ref(),
+            Err(super::HostRepositoryIgnoreError::RouteRepoFile(
+                crate::repo_file::HostRouteRepoFileError::PolicyProjection(_)
+            ))
+        ));
+        assert!(policy.observations().observations().is_empty());
+        assert!(
+            !policy_tracker
+                .take()
+                .iter()
+                .any(|(key, _)| key.starts_with("observed-host-repository-source-file:"))
+        );
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(RoutedPolicyTracker::default());
+        let need =
+            compute_observed_routed_policy(&dice, &tracker, PathObservationEpoch::empty(), true)
+                .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(
+            !super::HostRouteRepositoryIgnoreObservationKey::validity(&need)
+                && !super::HostRouteRepositoryIgnoreObservationKey::equality(&need, &need)
+        );
+        let parse_epoch = routed_policy_epoch(
+            Some((b"", PathNodeKind::RegularFile)),
+            Some((b"/absolute\n", PathNodeKind::RegularFile)),
+            92,
+        );
+        let parsed =
+            compute_observed_routed_policy(&dice, &tracker, parse_epoch.dupe(), true).await;
+        tracker.take();
+        let SourcePreparationOutcome::Complete(Ok(parsed)) = parsed else {
+            panic!("ignore parse failure must retain a carrier");
+        };
+        assert!(matches!(
+            parsed.result().as_ref(),
+            Err(super::HostRepositoryIgnoreError::InvalidAbsolute { .. })
+        ));
+        for (demand, result) in parse_epoch.observations() {
+            assert!(Arc::ptr_eq(
+                parsed.observations().get(demand).unwrap(),
+                result
+            ));
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_routed_policy_retains_exact_arcs_events_and_family_isolation() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(RoutedPolicyTracker::default());
+        let epoch = routed_policy_epoch(
+            Some((
+                b"print('REPO')\nignore_directories(['repo/**'])\n",
+                PathNodeKind::RegularFile,
+            )),
+            Some((b"ignored\n", PathNodeKind::RegularFile)),
+            81,
+        );
+        let route = routed_policy_route();
+        let mut transaction = routed_policy_transaction(
+            &dice,
+            tracker.dupe() as Arc<dyn ActivationTracker>,
+            epoch.dupe(),
+            true,
+        )
+        .await;
+        let ignore_key = super::HostRouteRepositoryIgnoreObservationKey(
+            super::HostRouteRepositoryIgnoreKey::new(route.clone()),
+        );
+        let ignore = transaction.compute(&ignore_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(ignore)) = &ignore else {
+            panic!("observed routed ignore must complete");
+        };
+        let matcher = ignore.result().as_ref().as_ref().unwrap();
+        assert_eq!(
+            matcher.matching_entry(&PackagePath::parse("repo/child").unwrap()),
+            Some("repo/**")
+        );
+        assert_eq!(
+            matcher.matching_entry(&PackagePath::parse("ignored/child").unwrap()),
+            Some("ignored")
+        );
+        assert_eq!(
+            ignore.observations().observations().len(),
+            epoch.observations().len()
+        );
+        for (demand, result) in epoch.observations() {
+            assert!(Arc::ptr_eq(
+                ignore.observations().get(demand).unwrap(),
+                result
+            ));
+        }
+        let cold = tracker.take();
+        let repo_source = cold
+            .iter()
+            .position(|(key, _)| key.starts_with("observed-host-repository-source-file:"))
+            .unwrap();
+        let repo_parent = cold
+            .iter()
+            .position(|(key, _)| key.starts_with("observed-host-route-repo-file:"))
+            .unwrap();
+        let ignore_source = cold
+            .iter()
+            .rposition(|(key, _)| key.starts_with("observed-host-repository-source-file:"))
+            .unwrap();
+        assert!(repo_source < repo_parent && repo_parent < ignore_source);
+        assert!(cold.iter().any(|(key, batch)| {
+            key.starts_with("observed-host-route-repo-file:")
+                && matches!(
+                    batch.as_ref().map(EventBatch::events),
+                    Some([EvaluationEvent::StarlarkPrint { text, .. }]) if text == "REPO"
+                )
+        }));
+        assert!(cold.iter().all(|(key, batch)| {
+            !key.starts_with("observed-host-route-repository-ignore:") || batch.is_none()
+        }));
+        assert!(!cold.iter().any(|(key, _)| {
+            key.starts_with("host-route-")
+                || key.starts_with("host-repository-source-file:")
+                || key.starts_with("external-repository-package-lookup:")
+        }));
+
+        let warm = transaction.compute(&ignore_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(warm)) = &warm else {
+            panic!("warm routed ignore must complete");
+        };
+        assert!(Arc::ptr_eq(ignore.result(), warm.result()));
+        assert!(tracker.take().iter().all(|(_, batch)| batch.is_none()));
+
+        let cancelled_tracker = Arc::new(RoutedPolicyTracker::default());
+        let mut cancelled = routed_policy_transaction(
+            &dice,
+            cancelled_tracker.dupe() as Arc<dyn ActivationTracker>,
+            PathObservationEpoch::empty(),
+            true,
+        )
+        .await;
+        let mut future = Box::pin(cancelled.compute(&ignore_key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(cancelled);
+        assert!(
+            cancelled_tracker
+                .take()
+                .iter()
+                .all(|(_, batch)| batch.is_none())
+        );
+
+        let recovered =
+            compute_observed_routed_policy(&dice, &cancelled_tracker, epoch.dupe(), true).await;
+        let SourcePreparationOutcome::Complete(Ok(recovered)) = &recovered else {
+            panic!("successor transaction must recover");
+        };
+        assert!(Arc::ptr_eq(ignore.result(), recovered.result()));
+        assert!(
+            cancelled_tracker
+                .take()
+                .iter()
+                .all(|(_, batch)| batch.is_none())
+        );
+
+        let legacy_tracker = Arc::new(RoutedPolicyTracker::default());
+        let mut legacy = routed_policy_transaction(
+            &dice,
+            legacy_tracker.dupe() as Arc<dyn ActivationTracker>,
+            epoch,
+            true,
+        )
+        .await;
+        let legacy_value = legacy
+            .compute(&super::HostRouteRepositoryIgnoreKey::new(route))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(legacy_value) = legacy_value else {
+            panic!("legacy routed ignore must complete");
+        };
+        assert_eq!(legacy_value.as_ref(), ignore.result().as_ref());
+        let legacy_activations = legacy_tracker.take();
+        assert!(
+            !legacy_activations
+                .iter()
+                .any(|(key, _)| key.starts_with("observed-"))
+        );
+        let observed_events = cold
+            .iter()
+            .find(|(key, _)| key.starts_with("observed-host-route-repo-file:"))
+            .and_then(|(_, batch)| batch.as_ref())
+            .unwrap()
+            .events();
+        assert_eq!(
+            legacy_activations
+                .iter()
+                .find(|(key, _)| key.starts_with("host-route-repo-file:"))
+                .and_then(|(_, batch)| batch.as_ref())
+                .unwrap()
+                .events(),
+            observed_events
+        );
+    }
+
+    #[cfg(unix)]
     #[test]
     fn observed_ignore_union_retains_the_first_arc_and_rejects_conflicts() {
         let demand = PathObservationDemand::new(
@@ -2737,7 +3196,7 @@ mod tests {
         let union = super::union_observations(&left, &right).unwrap();
         assert!(Arc::ptr_eq(union.get(&demand).unwrap(), &first));
         let changed = PathObservationEpoch::new([(
-            demand,
+            demand.dupe(),
             PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
                 PathNodeKind::RegularFile,
                 1,
@@ -2749,6 +3208,66 @@ mod tests {
         )])
         .unwrap();
         assert!(super::union_observations(&left, &changed).is_err());
+        let outer = SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+            slug_workspace_v2::PathObservationEpochError::ConflictingDemand(demand),
+        )));
+        assert!(super::HostRouteRepositoryIgnoreObservationKey::validity(
+            &outer
+        ));
+    }
+
+    #[cfg(windows)]
+    #[derive(Debug, Clone, PartialEq, Eq, Hash, allocative::Allocative)]
+    struct ObservedWindowsParserNeedKey;
+
+    #[cfg(windows)]
+    impl std::fmt::Display for ObservedWindowsParserNeedKey {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            f.write_str("observed-windows-parser-need")
+        }
+    }
+
+    #[cfg(windows)]
+    #[async_trait::async_trait]
+    impl dice::Key for ObservedWindowsParserNeedKey {
+        type Value = slug_workspace_v2::PathOutcome<()>;
+
+        async fn compute(
+            &self,
+            ctx: &mut dice::DiceComputations,
+            _: &dice::CancellationContext,
+        ) -> Self::Value {
+            super::parse_ignore_file_observed(
+                ctx,
+                &NormalizedAbsolutePath::new(r"C:\workspace\.bazelignore").unwrap(),
+                br"C:\PROGRA~1",
+            )
+            .await
+            .map(|_| ())
+        }
+
+        fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+            x.complete_eq(y)
+        }
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn observed_windows_parser_requests_long_path_before_completion() {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::PathObservationEpochKey,
+                PathObservationEpoch::empty(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let outcome = transaction
+            .compute(&ObservedWindowsParserNeedKey)
+            .await
+            .unwrap();
+        assert!(matches!(outcome, slug_workspace_v2::PathOutcome::Need(_)));
     }
 
     #[cfg(windows)]
@@ -2764,11 +3283,6 @@ mod tests {
         let epoch =
             super::append_observation(&PathObservationEpoch::empty(), demand.dupe(), result.dupe())
                 .unwrap();
-        assert!(Arc::ptr_eq(epoch.get(&demand).unwrap(), &result));
-        let equal = Arc::new(PathObservationResult::WindowsLongPath(Arc::from(
-            r"C:\Program Files".encode_utf16().collect::<Vec<_>>(),
-        )));
-        let epoch = super::append_observation(&epoch, demand.dupe(), equal).unwrap();
         assert!(Arc::ptr_eq(epoch.get(&demand).unwrap(), &result));
         let mismatch = Arc::new(PathObservationResult::Lstat(
             slug_workspace_v2::PathOperationResult::Missing,

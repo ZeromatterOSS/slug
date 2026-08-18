@@ -67,6 +67,7 @@ use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::host_file::ObservedHostFileBytes;
 use crate::source_preparation::HostRepositorySourceFileKey;
+use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::RepositorySourceFileKey;
@@ -1179,6 +1180,44 @@ impl fmt::Display for HostRouteRepoFileKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostRouteRepoFileObservationKey(pub(crate) HostRouteRepoFileKey);
+
+impl fmt::Display for HostRouteRepoFileObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostRouteRepoFile {
+    result: Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRouteRepoFile {
+    pub(crate) fn result(&self) -> &Arc<Result<HostRepoFileValue, HostRouteRepoFileError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Clone, Copy)]
+enum HostRouteRepoFileMode {
+    Legacy,
+    Observed,
+}
+
+type HostRouteRepoFileProjection = (
+    Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>,
+    PathObservationEpoch,
+);
+type HostRouteRepoFileDriverOutcome =
+    SourcePreparationOutcome<Result<HostRouteRepoFileProjection, ObservedPathFrontierError>>;
+
 fn store_route_repo_batch(ctx: &mut DiceComputations<'_>, capture_events: bool, batch: EventBatch) {
     if capture_events {
         ctx.store_evaluation_data(batch)
@@ -1186,71 +1225,151 @@ fn store_route_repo_batch(ctx: &mut DiceComputations<'_>, capture_events: bool, 
     }
 }
 
+fn route_repo_complete(
+    ctx: &mut DiceComputations<'_>,
+    capture_events: bool,
+    result: Result<HostRepoFileValue, HostRouteRepoFileError>,
+    observations: PathObservationEpoch,
+    batch: EventBatch,
+) -> HostRouteRepoFileDriverOutcome {
+    store_route_repo_batch(ctx, capture_events, batch);
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn drive_host_route_repo_file(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRouteRepoFileKey,
+    mode: HostRouteRepoFileMode,
+) -> HostRouteRepoFileDriverOutcome {
+    let capture_events = ctx
+        .per_transaction_data()
+        .data
+        .get::<CaptureEvaluationEvents>()
+        .is_ok();
+    let semantics = match dice_invariant(
+        ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
+            key.route.workspace().dupe(),
+        ))
+        .await,
+    ) {
+        Ok(semantics) => semantics,
+        Err(error) => {
+            return route_repo_complete(
+                ctx,
+                capture_events,
+                Err(HostRouteRepoFileError::PolicyProjection(error)),
+                PathObservationEpoch::empty(),
+                EventBatch::empty(),
+            );
+        }
+    };
+    let source_key = HostRepositorySourceFileKey::new(key.route.clone(), "REPO.bazel".into());
+    let (source, observations) = match mode {
+        HostRouteRepoFileMode::Legacy => match dice_invariant(ctx.compute(&source_key).await) {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(source) => (source, PathObservationEpoch::empty()),
+        },
+        HostRouteRepoFileMode::Observed => {
+            let observed = match dice_invariant(
+                ctx.compute(&HostRepositorySourceFileObservationKey::new(
+                    key.route.clone(),
+                    "REPO.bazel".into(),
+                ))
+                .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+            };
+            (
+                observed.result().as_ref().clone(),
+                observed.observations().dupe(),
+            )
+        }
+    };
+    let (bytes, logical_path) = match source {
+        Ok(HostRepositorySourceFileValue::Absent) => {
+            return route_repo_complete(
+                ctx,
+                capture_events,
+                Ok(HostRepoFileValue::empty()),
+                observations,
+                EventBatch::empty(),
+            );
+        }
+        Ok(HostRepositorySourceFileValue::Present {
+            bytes,
+            logical_path,
+        }) => (bytes, logical_path),
+        Err(error) => {
+            return route_repo_complete(
+                ctx,
+                capture_events,
+                Err(HostRouteRepoFileError::Source(error)),
+                observations,
+                EventBatch::empty(),
+            );
+        }
+    };
+    let recording = capture_events.then(RecordingRepoEventReporter::default);
+    let direct = DirectRepoEventReporter;
+    let reporter: &dyn RepoEventReporter = recording
+        .as_ref()
+        .map_or(&direct, |recording| recording as &dyn RepoEventReporter);
+    let result = evaluate_repo_file(&logical_path, &bytes, semantics.utf8_mode, reporter)
+        .map_err(HostRouteRepoFileError::Evaluation);
+    route_repo_complete(
+        ctx,
+        capture_events,
+        result,
+        observations,
+        recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch),
+    )
+}
+
 #[async_trait]
 impl Key for HostRouteRepoFileKey {
     type Value = SourcePreparationOutcome<Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let capture_events = ctx
-            .per_transaction_data()
-            .data
-            .get::<CaptureEvaluationEvents>()
-            .is_ok();
-        let semantics = match dice_invariant(
-            ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
-                self.route.workspace().dupe(),
-            ))
-            .await,
-        ) {
-            Ok(semantics) => semantics,
-            Err(error) => {
-                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostRouteRepoFileError::PolicyProjection(error),
-                )));
+        match drive_host_route_repo_file(ctx, self, HostRouteRepoFileMode::Legacy).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => {
+                SourcePreparationOutcome::Complete(result)
             }
-        };
-        let source = match dice_invariant(
-            ctx.compute(&HostRepositorySourceFileKey::new(
-                self.route.clone(),
-                "REPO.bazel".into(),
-            ))
-            .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => {
-                return SourcePreparationOutcome::Need(need);
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy routed REPO cannot produce an observed outer error")
             }
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostRouteRepoFileError::Source(error),
-                )));
-            }
-            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent)) => {
-                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
-                return SourcePreparationOutcome::Complete(Arc::new(
-                    Ok(HostRepoFileValue::empty()),
-                ));
-            }
-            SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Present {
-                bytes,
-                logical_path,
-            })) => (bytes, logical_path),
-        };
+        }
+    }
 
-        let recording = capture_events.then(RecordingRepoEventReporter::default);
-        let direct = DirectRepoEventReporter;
-        let reporter: &dyn RepoEventReporter = recording
-            .as_ref()
-            .map_or(&direct, |recording| recording as &dyn RepoEventReporter);
-        let value = evaluate_repo_file(&source.1, &source.0, semantics.utf8_mode, reporter)
-            .map_err(HostRouteRepoFileError::Evaluation);
-        store_route_repo_batch(
-            ctx,
-            capture_events,
-            recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch),
-        );
-        SourcePreparationOutcome::Complete(Arc::new(value))
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostRouteRepoFileObservationKey {
+    type Value =
+        SourcePreparationOutcome<Result<ObservedHostRouteRepoFile, ObservedPathFrontierError>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_route_repo_file(ctx, &self.0, HostRouteRepoFileMode::Observed)
+            .await
+            .map(|outcome| {
+                outcome.map(|(result, observations)| ObservedHostRouteRepoFile {
+                    result,
+                    observations,
+                })
+            })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1263,7 +1382,7 @@ impl Key for HostRouteRepoFileKey {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     #[cfg(unix)]
     use std::sync::Arc;
     #[cfg(unix)]
@@ -1300,6 +1419,12 @@ mod tests {
     use slug_events_v2::EvaluationEvent;
     #[cfg(unix)]
     use slug_events_v2::EventBatch;
+    #[cfg(unix)]
+    use slug_identity_v2::ApparentRepoName;
+    #[cfg(unix)]
+    use slug_identity_v2::CanonicalLabel;
+    #[cfg(unix)]
+    use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NormalizedAbsolutePath;
     #[cfg(unix)]
     use slug_workspace_v2::ObservedPathFrontierError;
@@ -1329,6 +1454,8 @@ mod tests {
     use slug_workspace_v2::PathOperationResult;
     #[cfg(unix)]
     use slug_workspace_v2::PathOutcome;
+    #[cfg(unix)]
+    use starlark_map::small_map::SmallMap;
 
     use super::HostRepoFileError;
     #[cfg(unix)]
@@ -1344,9 +1471,269 @@ mod tests {
     use super::observed_host_repo_terminal;
     use super::repo_globals;
     #[cfg(unix)]
+    use crate::OverrideAttributeValue;
+    #[cfg(unix)]
+    use crate::RepoSpec;
+    #[cfg(unix)]
     use crate::RootPackagePolicyInputs;
     #[cfg(unix)]
+    use crate::RootRepositoryRoute;
+    #[cfg(unix)]
+    use crate::SourcePreparationOutcome;
+    #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationEpochEntry;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationKind;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationRequest;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationRequestId;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResult;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResultEpoch;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResultEpochKey;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationSuccess;
+
+    #[cfg(unix)]
+    pub(crate) fn routed_policy_route() -> RootRepositoryRoute {
+        RootRepositoryRoute::for_test(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new("dep_alias").unwrap(),
+            "dep".into(),
+            CanonicalRepoName::new("dep+").unwrap(),
+            RepoSpec {
+                rule_id: crate::RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "local_repository".into(),
+                },
+                attributes: Arc::new(SmallMap::from_iter([(
+                    CompactString::new("path"),
+                    OverrideAttributeValue::String("dep".into()),
+                )])),
+            },
+        )
+    }
+
+    #[cfg(unix)]
+    pub(crate) fn routed_policy_epoch(
+        repo: Option<(&'static [u8], PathNodeKind)>,
+        ignore: Option<(&'static [u8], PathNodeKind)>,
+        variant: i64,
+    ) -> PathObservationEpoch {
+        let lstat = |kind| PathLstat::new(kind, variant, variant, variant, variant, 0o755);
+        let demand = |path, operation| {
+            PathObservationDemand::new(PathObservationNamespace::Host, path, operation)
+        };
+        let mut entries = ["/", "/workspace", "/workspace/dep"]
+            .map(|path| {
+                (
+                    demand(
+                        NormalizedAbsolutePath::new(path).unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    PathObservationResult::Lstat(PathOperationResult::Present(lstat(
+                        PathNodeKind::Directory,
+                    ))),
+                )
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
+        for (name, source) in [("REPO.bazel", repo), (".bazelignore", ignore)] {
+            let path = NormalizedAbsolutePath::new(format!("/workspace/dep/{name}")).unwrap();
+            entries.push((
+                demand(path.dupe(), PathObservationOperation::Lstat),
+                PathObservationResult::Lstat(match source {
+                    Some((_, kind)) => PathOperationResult::Present(lstat(kind)),
+                    None => PathOperationResult::Missing,
+                }),
+            ));
+            if let Some((source, kind)) = source
+                && kind != PathNodeKind::Directory
+            {
+                entries.push((
+                    demand(path, PathObservationOperation::FileBytes),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        source,
+                    ))),
+                ));
+            }
+        }
+        PathObservationEpoch::new(entries).unwrap()
+    }
+
+    #[cfg(unix)]
+    pub(crate) async fn routed_policy_transaction(
+        dice: &Arc<Dice>,
+        tracker: Arc<dyn ActivationTracker>,
+        epoch: PathObservationEpoch,
+        inject_policy: bool,
+    ) -> dice::DiceTransaction {
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        if inject_policy {
+            inject_root_package_policy_inputs(
+                &mut updater,
+                RootPackagePolicyInputs::new(
+                    workspace.dupe(),
+                    Arc::from([workspace.dupe()]),
+                    std::iter::empty::<&str>(),
+                    None,
+                    Some("warning"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        }
+        let route = routed_policy_route();
+        let request = Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: workspace.dupe(),
+                canonical_repo: route.canonical_repo().clone(),
+            },
+            repo_spec: route.repo_spec().clone(),
+            kind: RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+            },
+        });
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace,
+                    [RepositoryMaterializationEpochEntry {
+                        request,
+                        result: RepositoryMaterializationResult::Success(
+                            RepositoryMaterializationSuccess::Local,
+                        ),
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[cfg(unix)]
+    async fn compute_observed_routed_repo(
+        dice: &Arc<Dice>,
+        tracker: &Arc<ObservedRepoEventTracker>,
+        epoch: PathObservationEpoch,
+    ) -> SourcePreparationOutcome<Result<super::ObservedHostRouteRepoFile, ObservedPathFrontierError>>
+    {
+        let mut transaction = routed_policy_transaction(
+            dice,
+            tracker.dupe() as Arc<dyn ActivationTracker>,
+            epoch,
+            true,
+        )
+        .await;
+        transaction
+            .compute(&super::HostRouteRepoFileObservationKey(
+                super::HostRouteRepoFileKey::new(routed_policy_route()),
+            ))
+            .await
+            .unwrap()
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_routed_repo_retains_terminals_events_and_a_b_a() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedRepoEventTracker::default());
+        let wrong_epoch = routed_policy_epoch(
+            Some((b"", PathNodeKind::Directory)),
+            Some((b"", PathNodeKind::RegularFile)),
+            70,
+        );
+        let SourcePreparationOutcome::Complete(Ok(wrong)) =
+            compute_observed_routed_repo(&dice, &tracker, wrong_epoch.dupe()).await
+        else {
+            panic!("wrong-kind routed REPO must retain a carrier");
+        };
+        assert!(matches!(
+            wrong.result().as_ref(),
+            Err(super::HostRouteRepoFileError::Source(_))
+        ));
+        assert!(
+            !wrong
+                .observations()
+                .observations()
+                .keys()
+                .any(|demand| demand.path().as_path().ends_with(".bazelignore"))
+        );
+        let failed_epoch = routed_policy_epoch(
+            Some((
+                b"print('PREFIX')\nfail('boom')\n",
+                PathNodeKind::RegularFile,
+            )),
+            None,
+            71,
+        );
+        let SourcePreparationOutcome::Complete(Ok(failed)) =
+            compute_observed_routed_repo(&dice, &tracker, failed_epoch).await
+        else {
+            panic!("routed REPO evaluation failure must retain a carrier");
+        };
+        assert!(matches!(
+            failed.result().as_ref(),
+            Err(super::HostRouteRepoFileError::Evaluation { .. })
+        ));
+        assert!(tracker.take().iter().any(|activation| matches!(
+            activation.batch.as_ref().map(EventBatch::events),
+            Some([
+                EvaluationEvent::StarlarkPrint { text, .. },
+                EvaluationEvent::Diagnostic { .. }
+            ]) if text == "PREFIX"
+        )));
+
+        const A: &[u8] = b"print('A')\nignore_directories(['a'])\n";
+        const B: &[u8] = b"print('B')\nignore_directories(['b'])\n";
+        let a = routed_policy_epoch(Some((A, PathNodeKind::RegularFile)), None, 72);
+        let b = routed_policy_epoch(Some((B, PathNodeKind::RegularFile)), None, 73);
+        let mut first = None;
+        for (epoch, expected) in [
+            (a.dupe(), "A"),
+            (b, "B"),
+            (routed_policy_epoch(None, None, 74), ""),
+            (a.dupe(), "A"),
+        ] {
+            let SourcePreparationOutcome::Complete(Ok(value)) =
+                compute_observed_routed_repo(&dice, &tracker, epoch).await
+            else {
+                panic!("routed REPO lifecycle must complete");
+            };
+            if expected.is_empty() {
+                assert_empty_batches(tracker.take());
+            } else {
+                assert_print(tracker.take(), expected);
+            }
+            first.get_or_insert_with(|| value.dupe());
+            if expected == "A" {
+                assert_eq!(
+                    value.result().as_ref(),
+                    first.as_ref().unwrap().result().as_ref()
+                );
+            }
+        }
+    }
 
     fn path() -> NormalizedAbsolutePath {
         #[cfg(unix)]
@@ -1815,6 +2202,13 @@ mod tests {
     }
 
     #[cfg(unix)]
+    fn assert_empty_batches(activations: Vec<RepoActivation>) {
+        assert!(activations.into_iter().all(
+            |activation| matches!(activation.batch, Some(batch) if batch.events().is_empty())
+        ));
+    }
+
+    #[cfg(unix)]
     fn assert_print(activations: Vec<RepoActivation>, expected: &str) {
         assert!(matches!(
             activations.as_slice(),
@@ -1843,7 +2237,11 @@ mod tests {
         }
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-            if key.downcast_ref::<HostRepoFileObservationKey>().is_some() {
+            if key.downcast_ref::<HostRepoFileObservationKey>().is_some()
+                || key
+                    .downcast_ref::<super::HostRouteRepoFileObservationKey>()
+                    .is_some()
+            {
                 self.activations.lock().unwrap().push(RepoActivation {
                     kind: activation.kind(),
                     batch: activation
