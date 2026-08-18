@@ -2307,3 +2307,45 @@ reconstructed or historical Host reads, event ownership, BUILD/package-load/
 core/public/repository/materializer work or behavior widening. Acceptance
 schedules exactly one bounded callerless Host-glob implementation, or exactly
 one smaller docs-only natural-owner prerequisite if the audit proves it.
+
+### Replanned observed Host-glob segment frontier (2026-08-17)
+
+The accepted Host-glob audit found the uniquely smaller missing owner.
+`HostGlobSegmentCandidatesKey` erases a literal fragment's resolved-path
+observations and a wildcard fragment's matched-symlink resolved-path
+observations before traversal can aggregate them. The observed directory
+listing accepted in `bd4fb8db` already owns base resolution plus exact
+`DirectoryEntries`, but it cannot own candidate-specific symlink resolution.
+
+Pinned Bazel 9.2 confirms the same boundary:
+`PatternWithoutWildcardProducer` queries the literal `FileValue`, while
+`PatternWithWildcardProducer` queries the directory listing and then batches
+only matched symlink `FileValue` reads. `DirectoryDirentProducer` owns the
+subsequent ignore/package lookup separately. No additional oracle or lower
+natural-owner prerequisite is required.
+
+Run docs-only `WP-2A-m1-observed-host-glob-segment-frontier-design` from
+accepted matcher/segment evidence `9f42c3e5` and `bd12c015`, lower-frontier
+design `f5a9b249`, and implementation `bd4fb8db`. Freeze one private
+observed sibling beside `HostGlobSegmentCandidatesKey` using one
+legacy/observed driver and disjoint child families.
+
+The design must preserve literal/wildcard mapping, matched-symlink batch
+concurrency and pending-slot order, first semantic error, semantic error over
+Need, candidate sort and all existing errors. Observed order is listing first,
+then the segment driver's additional cached base-resolution compute only for
+nonempty pending-symlink work, then completed symlink epochs in pending-slot
+order. Stable epoch union retains the listing's first exact Arc for duplicate
+base observations. Need, cancellation and outer error publish no carrier/event.
+
+Retain only one semantic Result Arc plus the accepted Arc-backed epoch.
+Listings, slots, pending work, join outcomes, needs, errors and union scratch
+remain compute-local. Candidate future Rust scope is only
+`host_glob/{mod,tests}.rs`; design-time writes remain canonical/current/Stage
+2 under 40/320/280/640 net ledger caps.
+
+STOP on Rust/oracle/Cargo writes, workspace/Bzlmod changes, observed traversal
+or adapter activation, another key/carrier/container/cache/graph/store/lock,
+events, direct or historical Host reads, changed order/polarity/batching, or
+BUILD/package-load/core/public/repository/materializer work. Acceptance
+schedules only the bounded observed segment-frontier implementation.
