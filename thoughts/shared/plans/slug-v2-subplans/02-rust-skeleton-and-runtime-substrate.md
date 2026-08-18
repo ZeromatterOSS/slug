@@ -5025,3 +5025,65 @@ reuse and lifecycle. Select exactly one bounded observed external-evaluation or
 package-load design, one uniquely smaller prerequisite, or formal REPLAN; freeze
 future files/caps/proof/STOP before implementation and schedule only one
 successor.
+
+### Post-package-source owner audit accepted (2026-08-18)
+
+The audit from `69e4fa43` selects a distinct observed sibling of
+`ExternalBzlModuleEvalKey` as the uniquely smallest complete next owner. The
+live key alone reads its `.bzl` source, prevalidates load labels, recursively
+evaluates children in source order, constructs the frozen manifest/closure and
+owns one local Complete `.bzl` event batch. The accepted observed Host source
+carrier covers its only lower mutable edge.
+
+`RepositoryPackageLoadKey` is later: it first consumes repository package
+source, then the external-Bzl closure and separately owns the BUILD batch.
+Choosing it now would cross an unobserved recursive family and mix independent
+event owners. Query/build consumers are later again. The cycle detector is not
+a smaller semantic producer: its existing Host precedent already supports
+distinct legacy/observed nodes around one common identity, and the external
+family extension is a bounded recursion seam of this owner. No REPLAN or lower
+prerequisite is required.
+
+### External-Bzl module evaluation observation design active (2026-08-18)
+
+Run only `WP-2A-m1-external-bzl-module-evaluation-observation-design` from scheduling
+base `69e4fa43` and Rust base `ac7b8bdf`; write only canonical/current/Stage 2/
+routing-log docs within 40/180/120/30 and 370 aggregate net lines. Future Rust
+after independent ACCEPT is exactly `bzl_module.rs`,
+`cycle_detector.rs`, and existing `host_package_load_tests.rs`, capped at
+400/160/560 semantic lines, 1,120 aggregate, and 6,595/758/2,891/10,244
+physical lines. Large `bzl_module.rs` is the cohesive owner; touched helpers
+remain below 200 lines.
+
+Freeze one private external observed sibling/carrier and one Legacy/Observed
+driver. Preserve source then AST-order recursive children, exact legacy Result
+Arc, matching-family source/child selection, union-before-semantic, left-first
+first Arc and carrierless Need/outer. Source compute has empty prior prefix;
+source/parse/load-label keeps source; child compute keeps prior; child semantic
+keeps merged; evaluation/freeze/success keeps full reached epoch. Sequential
+evaluation has no Need union.
+
+Extend only the existing request-scoped detector with separate external legacy/
+observed nodes over a compact common route+label cycle identity and one
+mode-aware guard; cycle path/key slices retain exact label/order behavior.
+On observed cycle, union accepted observed sources for other cycle identities in
+cycle order before returning the complete semantic cycle carrier; changed
+source terminals supersede stale cycle state. Preserve poison, single-waiter
+locking, family rejection and exact legacy cycle value.
+
+Each sibling remains sole owner of its matching local semantic-Complete `.bzl`
+batch, including empty/error batches. Need/outer/cancel publishes none;
+recursive child batches precede parent; package BUILD/query/build remain
+dormant. Retain only the existing semantic frozen-module graph in one Result
+Arc plus compact epoch; all source/child/cycle/union/evaluator scratch stays
+local or in existing request-scoped detector state.
+
+Preserve exact `.bzl` values/errors/load order/manifest/cycle/events and legacy
+Arc behavior; classify sibling/carrier/outer/epoch/detector family split as
+Slug-native; defer package-load/query/build publication and identity bytes.
+Prove all prefixes/positions, exact epoch Arcs/duplicates/conflicts/mismatch,
+recursive reuse, cycles, events/families/nonactivation, warm/cancel/lifecycle,
+retention and cleanup. STOP on Rust now, another future file/export/caller,
+mixed cycle families, incomplete carrier, event/state drift, cap excess or M1
+closure. After design ACCEPT schedule one implementation; afterward return only
+to a docs-only package-load/upper-owner audit.
