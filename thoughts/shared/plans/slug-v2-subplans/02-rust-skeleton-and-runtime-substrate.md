@@ -4907,3 +4907,30 @@ cleanup. STOP on Rust now, another file/caller, mixed family, epoch/event/state
 drift, upper activation, cap excess or M1 closure. After design ACCEPT schedule
 one implementation; after implementation ACCEPT return only to the docs-only
 upper-source audit.
+
+
+### Repository-package source observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-repository-package-source-observation-implementation` from Rust base
+`1815c019` and accepted design `4c838b83`. Write exactly
+`host_package.rs`, existing `host_package_observation_tests.rs`, and
+`lib.rs`; caps remain 260/360/6 semantic, 626 aggregate, and
+5,050/750/405/6,205 physical.
+
+Implement one doc-hidden public observed source sibling/carrier and one shared
+matching-family driver. Preserve support -> lookup -> selected source order,
+left-first union-before-semantic, the frozen support/support+lookup/full
+prefixes, exact first Arc, immediate carrierless Need/outer, semantic DICE-
+compute polarity, exact legacy local Arc projection and sequential no-Need-
+union behavior. Export only the later-loading association and add no caller.
+
+Keep the parent eventless and all child event owners/order exact. Retain only
+one local source Result Arc plus compact epoch; child Arcs and path/union/
+outcome scratch remain local. Preserve exact source semantics/bytes and events,
+Slug-native sibling/carrier/outer/epoch, and deferred recursive external
+`.bzl`, load/query/build publication and identity bytes. Run the complete
+prefix/Arc/family/event/nonactivation/cancellation/lifecycle/retention proof,
+serial validation, cleanup and independent review. STOP on another file/caller,
+mixed family, epoch/event/state drift, upper activation, cap excess or M1
+closure. After ACCEPT return only to the docs-only upper-source audit.
