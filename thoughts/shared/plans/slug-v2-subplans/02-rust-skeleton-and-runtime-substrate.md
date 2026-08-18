@@ -2623,3 +2623,46 @@ reconstructed Host reads, changed event/request/error order, new retained
 collections or public/core/repository/materializer activation. Acceptance
 schedules one bounded private loading implementation or one uniquely smaller
 docs-only prerequisite.
+
+### Frozen final Host-glob loading-frontier design (2026-08-17)
+
+The audit selects one private `RootPackageLoadObservationKey` sibling as the
+uniquely smallest complete retained owner. The adapter owns only a one-pattern
+projection, callable include/exclude order belongs to `PackageRecorder`, and
+prepared insertion/replay belongs to `evaluate_host_package_attempts`; only
+`RootPackageLoadKey` owns the full anchor, BUILD source, direct Host-`.bzl`,
+dynamic Host-glob and terminal-event sequence.
+
+The observed carrier is one package Result Arc plus one epoch with
+complete-only equality/validity. One Legacy/Observed package driver selects
+matching anchor, source, recursive Host-`.bzl` and traversal families. The
+adapter is a shared ephemeral seam returning existing semantic
+`HostGlobPrepared` plus the observed traversal epoch, never another DICE key.
+
+Observed union order is anchor, source, direct Host-`.bzl` AST order, then
+first-demand glob-request replay order. Union precedes semantic inspection.
+Semantic errors retain the decisive prefix; outer errors and Need return no
+carrier/event, and Need stops later evaluation. Success retains the full
+epoch. Stable union preserves the first exact Arc.
+
+Attempt replay inserts only semantic prepared results into its compute-local
+map, unions the corresponding request epoch, then reruns the unchanged
+synchronous evaluator. Only the terminal attempt event batch remains
+parent-owned; recursive Host-`.bzl` events stay child-owned. No evaluator
+borrow crosses await and no prepared map, AST/module/evaluator, child carrier,
+batch or union scratch enters retained state.
+
+Future scope is exactly `host_glob/{traversal,adapter,adapter_tests}.rs`,
+`bzl_module.rs` and `host_package_load_tests.rs`. Against `2bccb48e`,
+caps are 12/790 traversal, 170/336 adapter, 230/634 adapter tests, 450/6,365
+Bzl module, 650/2,609 package tests and 1,512 aggregate net Rust lines. The
+large Bzl owner remains cohesive because splitting replay, event/error
+ownership and the root key would widen private seams.
+
+Pinned Bazel 9.2 `PackageFunction.java:1001-1252`,
+`PackageFunctionTest` glob order/invalidation/boundary tests, `UnixGlob` and
+the accepted Slug glob/Host-`.bzl`/root-package evidence close the proof gap;
+no oracle is required. Existing package/glob/event behavior remains exact.
+Carrier/outer association and deterministic first-Arc union are Slug-native.
+Public/core/repository/materializer/native-Windows and identity-byte work stay
+deferred.
