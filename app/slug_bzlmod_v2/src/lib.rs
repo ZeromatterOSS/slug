@@ -75,6 +75,8 @@ pub use host_module::HostRepositorySourceCapability;
 pub use host_module::HostRepositorySourceCapabilitySource;
 #[doc(hidden)]
 pub use host_module::ObservedRootModuleLoadingAnchor;
+#[doc(hidden)]
+pub use host_module::ObservedRootRepositoryRoute;
 pub use host_module::RootModuleLoadingAnchor;
 pub use host_module::RootModuleLoadingAnchorError;
 pub use host_module::RootModuleLoadingAnchorKey;
@@ -83,6 +85,8 @@ pub use host_module::RootModuleLoadingAnchorObservationKey;
 pub use host_module::RootRepositoryRoute;
 pub use host_module::RootRepositoryRouteError;
 pub use host_module::RootRepositoryRouteKey;
+#[doc(hidden)]
+pub use host_module::RootRepositoryRouteObservationKey;
 pub use host_module::RootRepositorySource;
 #[doc(hidden)]
 pub use host_package::ObservedRootPackageSource;

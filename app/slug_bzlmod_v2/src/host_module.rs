@@ -1251,6 +1251,29 @@ pub struct RootRepositoryRouteKey {
     apparent_repo: ApparentRepoName,
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedRootRepositoryRoute {
+    result: Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRootRepositoryRoute {
+    #[doc(hidden)]
+    pub fn result(&self) -> &Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>> {
+        &self.result
+    }
+
+    #[doc(hidden)]
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RootRepositoryRouteObservationKey(RootRepositoryRouteKey);
+
 impl RootRepositoryRouteKey {
     pub fn new(
         workspace: NormalizedAbsolutePath,
@@ -1266,6 +1289,16 @@ impl RootRepositoryRouteKey {
     }
 }
 
+impl RootRepositoryRouteObservationKey {
+    #[doc(hidden)]
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        apparent_repo: ApparentRepoName,
+    ) -> Result<Self, String> {
+        RootRepositoryRouteKey::new(workspace, apparent_repo).map(Self)
+    }
+}
+
 impl fmt::Display for RootRepositoryRouteKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -1277,10 +1310,105 @@ impl fmt::Display for RootRepositoryRouteKey {
     }
 }
 
+impl fmt::Display for RootRepositoryRouteObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
 fn is_local_path_override(spec: &RepoSpec) -> bool {
     let local_bzl = CanonicalLabel::parse("@@bazel_tools//tools/build_defs/repo:local.bzl")
         .expect("pinned local repository label is canonical");
     spec.rule_id.bzl_file == local_bzl && spec.rule_id.rule_name == "local_repository"
+}
+
+fn project_root_repository_route(
+    key: &RootRepositoryRouteKey,
+    carrier: &HostRootModuleFileCarrier,
+) -> Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>> {
+    let value = match carrier.as_ref() {
+        Err(error) => Err(RootRepositoryRouteError {
+            kind: RootRepositoryRouteErrorKind::Root(error.clone()),
+        }),
+        Ok(root) => {
+            if key.apparent_repo.as_str() == "bazel_tools" {
+                return Arc::new(Ok(RootRepositoryRoute {
+                    workspace: key.workspace.dupe(),
+                    apparent_repo: key.apparent_repo.clone(),
+                    module_name: CompactString::new("bazel_tools"),
+                    canonical_repo: CanonicalRepoName::new("bazel_tools")
+                        .expect("built-in repository name is canonical"),
+                    source: RootRepositorySource::BuiltinBazelTools(
+                        BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
+                    ),
+                }));
+            }
+            let dependency = root.module.dependencies.iter().find(|dependency| {
+                !dependency.nodep
+                    && dependency
+                        .repo_name
+                        .as_deref()
+                        .unwrap_or(dependency.name.as_str())
+                        == key.apparent_repo.as_str()
+            });
+            match dependency {
+                None => Err(RootRepositoryRouteError {
+                    kind: RootRepositoryRouteErrorKind::Unknown {
+                        apparent_repo: key.apparent_repo.clone(),
+                    },
+                }),
+                Some(dependency) => {
+                    let repo_spec = match root.overrides.get(dependency.name.as_str()) {
+                        Some(RootModuleOverride::NonRegistry(spec))
+                            if is_local_path_override(spec) =>
+                        {
+                            spec.clone()
+                        }
+                        _ => {
+                            return Arc::new(Err(RootRepositoryRouteError {
+                                kind: RootRepositoryRouteErrorKind::Unsupported {
+                                    apparent_repo: key.apparent_repo.clone(),
+                                    module_name: dependency.name.clone(),
+                                },
+                            }));
+                        }
+                    };
+                    let canonical_repo = CanonicalRepoName::new(format!("{}+", dependency.name))
+                        .expect("validated module name forms a canonical repository");
+                    Ok(RootRepositoryRoute {
+                        workspace: key.workspace.dupe(),
+                        apparent_repo: key.apparent_repo.clone(),
+                        module_name: dependency.name.clone(),
+                        canonical_repo,
+                        source: RootRepositorySource::DirectLocal(repo_spec),
+                    })
+                }
+            }
+        }
+    };
+    Arc::new(value)
+}
+
+type ObservedRootRepositoryRouteOutcome =
+    SourcePreparationOutcome<Result<ObservedRootRepositoryRoute, ObservedPathFrontierError>>;
+
+fn project_observed_root_repository_route(
+    key: &RootRepositoryRouteKey,
+    outcome: ObservedHostRootModuleFileOutcome,
+) -> ObservedRootRepositoryRouteOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            SourcePreparationOutcome::Complete(Err(error))
+        }
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            let result = project_root_repository_route(key, &observed.result);
+            SourcePreparationOutcome::Complete(Ok(ObservedRootRepositoryRoute {
+                result,
+                observations: observed.observations,
+            }))
+        }
+    }
 }
 
 #[async_trait]
@@ -1302,70 +1430,36 @@ impl Key for RootRepositoryRouteKey {
             }
             SourcePreparationOutcome::Complete(carrier) => carrier,
         };
-        let value = match carrier.as_ref() {
-            Err(error) => Err(RootRepositoryRouteError {
-                kind: RootRepositoryRouteErrorKind::Root(error.clone()),
-            }),
-            Ok(root) => {
-                if self.apparent_repo.as_str() == "bazel_tools" {
-                    return SourcePreparationOutcome::Complete(Arc::new(Ok(RootRepositoryRoute {
-                        workspace: self.workspace.dupe(),
-                        apparent_repo: self.apparent_repo.clone(),
-                        module_name: CompactString::new("bazel_tools"),
-                        canonical_repo: CanonicalRepoName::new("bazel_tools")
-                            .expect("built-in repository name is canonical"),
-                        source: RootRepositorySource::BuiltinBazelTools(
-                            BuiltinBazelToolsSnapshot::CURRENT.route_identity(),
-                        ),
-                    })));
-                }
-                let dependency = root.module.dependencies.iter().find(|dependency| {
-                    !dependency.nodep
-                        && dependency
-                            .repo_name
-                            .as_deref()
-                            .unwrap_or(dependency.name.as_str())
-                            == self.apparent_repo.as_str()
-                });
-                match dependency {
-                    None => Err(RootRepositoryRouteError {
-                        kind: RootRepositoryRouteErrorKind::Unknown {
-                            apparent_repo: self.apparent_repo.clone(),
-                        },
-                    }),
-                    Some(dependency) => {
-                        let repo_spec = match root.overrides.get(dependency.name.as_str()) {
-                            Some(RootModuleOverride::NonRegistry(spec))
-                                if is_local_path_override(spec) =>
-                            {
-                                spec.clone()
-                            }
-                            _ => {
-                                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                                    RootRepositoryRouteError {
-                                        kind: RootRepositoryRouteErrorKind::Unsupported {
-                                            apparent_repo: self.apparent_repo.clone(),
-                                            module_name: dependency.name.clone(),
-                                        },
-                                    },
-                                )));
-                            }
-                        };
-                        let canonical_repo =
-                            CanonicalRepoName::new(format!("{}+", dependency.name))
-                                .expect("validated module name forms a canonical repository");
-                        Ok(RootRepositoryRoute {
-                            workspace: self.workspace.dupe(),
-                            apparent_repo: self.apparent_repo.clone(),
-                            module_name: dependency.name.clone(),
-                            canonical_repo,
-                            source: RootRepositorySource::DirectLocal(repo_spec),
-                        })
-                    }
-                }
-            }
-        };
-        SourcePreparationOutcome::Complete(Arc::new(value))
+        SourcePreparationOutcome::Complete(project_root_repository_route(self, &carrier))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for RootRepositoryRouteObservationKey {
+    type Value = ObservedRootRepositoryRouteOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        project_observed_root_repository_route(
+            &self.0,
+            dice_invariant(
+                ctx.compute(&HostRootModuleFileObservationKey::new(
+                    self.0.workspace.dupe(),
+                ))
+                .await,
+            ),
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1426,14 +1520,17 @@ mod tests {
     use super::HostRootModuleFileObservationKey;
     use super::HostRootModuleFileValue;
     use super::ObservedHostRootModuleFile;
+    use super::ObservedRootRepositoryRoute;
     use super::RootModuleLoadingAnchor;
     use super::RootModuleLoadingAnchorError;
     use super::RootModuleLoadingAnchorKey;
     use super::RootModuleLoadingAnchorObservationKey;
     use super::RootRepositoryRoute;
     use super::RootRepositoryRouteKey;
+    use super::RootRepositoryRouteObservationKey;
     use super::RootRepositorySource;
     use super::project_observed_root_module_loading_anchor;
+    use super::project_observed_root_repository_route;
     use crate::BzlmodCommandPolicyKey;
     use crate::BzlmodEnvironmentPolicyKey;
     use crate::EvaluatedRootModule;
@@ -1647,6 +1744,10 @@ mod tests {
                 && key.downcast_ref::<RootModuleLoadingAnchorKey>().is_none()
                 && key
                     .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
+                    .is_none()
+                && key.downcast_ref::<RootRepositoryRouteKey>().is_none()
+                && key
+                    .downcast_ref::<RootRepositoryRouteObservationKey>()
                     .is_none()
                 && key.downcast_ref::<HostRepoFileKey>().is_none()
                 && key.downcast_ref::<HostFileBytesKey>().is_none()
@@ -1931,6 +2032,66 @@ mod tests {
             )
             .await
             .unwrap()
+    }
+
+    fn observed_route_key(apparent_repo: &str) -> RootRepositoryRouteObservationKey {
+        let apparent_repo = ApparentRepoName::new(apparent_repo).unwrap();
+        RootRepositoryRouteObservationKey::new(workspace(), apparent_repo).unwrap()
+    }
+
+    async fn observed_route_transaction(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        tracker: Option<Arc<EventTracker>>,
+    ) -> dice::DiceTransaction {
+        let mut user_data = UserComputationData {
+            activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        inject_root_package_policy_inputs(&mut updater, policy(&["/workspace"])).unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace().as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        updater.commit().await
+    }
+
+    async fn observed_route_frontier(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        apparent_repo: &str,
+        tracker: Option<Arc<EventTracker>>,
+        compute_anchor: bool,
+    ) -> <RootRepositoryRouteObservationKey as Key>::Value {
+        let mut transaction = observed_route_transaction(dice, epoch, tracker).await;
+        if compute_anchor {
+            transaction
+                .compute(&RootModuleLoadingAnchorObservationKey::new(workspace()))
+                .await
+                .unwrap();
+        }
+        transaction
+            .compute(&observed_route_key(apparent_repo))
+            .await
+            .unwrap()
+    }
+
+    fn complete_observed_route(
+        outcome: &<RootRepositoryRouteObservationKey as Key>::Value,
+    ) -> &ObservedRootRepositoryRoute {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("observed route did not complete: {outcome:?}");
+        };
+        observed
     }
 
     fn complete_value(outcome: &super::HostRootModuleFileOutcome) -> &HostRootModuleFileValue {
@@ -2267,6 +2428,178 @@ mod tests {
                 .to_string()
                 .contains("is not a direct local_path_override")
         );
+    }
+
+    #[test]
+    fn observed_route_projection_preserves_arcs_and_terminal_polarity() {
+        let key =
+            RootRepositoryRouteKey::new(workspace(), ApparentRepoName::new("bazel_tools").unwrap())
+                .unwrap();
+        let demand = EpochBuilder::demand("/", PathObservationOperation::Lstat);
+        let shared = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), shared.dupe())]).unwrap();
+        let projected = project_observed_root_repository_route(
+            &key,
+            SourcePreparationOutcome::Complete(Ok(ObservedHostRootModuleFile {
+                result: Arc::new(Ok(empty_value())),
+                observations: epoch,
+            })),
+        );
+        let SourcePreparationOutcome::Complete(Ok(projected)) = projected else {
+            panic!("observed route projection must complete");
+        };
+        assert!(
+            projected
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .is_builtin_bazel_tools()
+        );
+        assert!(Arc::ptr_eq(
+            projected.observations().get(&demand).unwrap(),
+            &shared
+        ));
+        let held = projected.result().dupe();
+        let cloned = projected.dupe();
+        assert!(Arc::ptr_eq(&held, cloned.result()));
+
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(demand.dupe()),
+        ));
+        assert!(matches!(
+            project_observed_root_repository_route(&key, need),
+            SourcePreparationOutcome::Need(_)
+        ));
+        let outer =
+            ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(demand));
+        let projected = project_observed_root_repository_route(
+            &key,
+            SourcePreparationOutcome::Complete(Err(outer.dupe())),
+        );
+        let SourcePreparationOutcome::Complete(Err(projected)) = projected else {
+            panic!("observed route outer error must remain outer");
+        };
+        assert_eq!(projected, outer);
+    }
+
+    #[tokio::test]
+    async fn observed_route_reuses_module_family_events_and_recovers_across_edits() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(EventTracker::default());
+        let source = |name: &str| {
+            format!(
+                "print('ROUTE_{name}')\nmodule(name = \"root\")\nbazel_dep(name = \"dep\", version = \"1.0.0\")\nlocal_path_override(module_name = \"dep\", path = \"{name}\")\n"
+            )
+        };
+        let a = EpochBuilder::root(source("a"), 41).build();
+        let mut cancelled = observed_route_transaction(&dice, a.dupe(), Some(tracker.dupe())).await;
+        let key = observed_route_key("dep");
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(cancelled);
+        assert!(tracker.take().is_empty());
+        let first =
+            observed_route_frontier(&dice, a.dupe(), "dep", Some(tracker.dupe()), true).await;
+        assert!(RootRepositoryRouteObservationKey::validity(&first));
+        let first_route = complete_observed_route(&first);
+        for (demand, expected) in a.observations() {
+            assert!(Arc::ptr_eq(
+                first_route.observations().get(demand).unwrap(),
+                expected
+            ));
+        }
+        let entries = tracker.take();
+        let module_entries = entries.iter().filter(|entry| {
+            entry
+                .key
+                .starts_with("bzlmod-observed-host-root-module-file:")
+                && entry.batch.is_some()
+        });
+        assert_eq!(module_entries.clone().count(), 1);
+        assert!(entries.iter().any(|entry| {
+            entry
+                .key
+                .starts_with("observed-root-module-loading-anchor:")
+        }));
+        let module_entry = module_entries.into_iter().next().unwrap();
+        assert_eq!(
+            event_texts(module_entry.batch.as_ref().unwrap()),
+            ["ROUTE_a"]
+        );
+        assert!(entries.iter().all(|entry| {
+            !entry.key.starts_with("root-repository-route:")
+                && !entry.key.starts_with("host-root-module-file:")
+        }));
+
+        let warm =
+            observed_route_frontier(&dice, a.dupe(), "dep", Some(tracker.dupe()), true).await;
+        assert!(RootRepositoryRouteObservationKey::equality(&first, &warm));
+        assert!(Arc::ptr_eq(
+            complete_observed_route(&first).result(),
+            complete_observed_route(&warm).result()
+        ));
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+
+        let changed = observed_route_frontier(
+            &dice,
+            EpochBuilder::root(source("b"), 42).build(),
+            "dep",
+            Some(tracker.dupe()),
+            false,
+        )
+        .await;
+        assert!(!RootRepositoryRouteObservationKey::equality(
+            &first, &changed
+        ));
+        tracker.take();
+        let restored = observed_route_frontier(&dice, a, "dep", Some(tracker.dupe()), false).await;
+        assert!(RootRepositoryRouteObservationKey::equality(
+            &first, &restored
+        ));
+
+        let need = observed_route_frontier(
+            &Dice::builder().build(DetectCycles::Enabled),
+            PathObservationEpoch::empty(),
+            "dep",
+            None,
+            false,
+        )
+        .await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!RootRepositoryRouteObservationKey::validity(&need));
+        assert!(!RootRepositoryRouteObservationKey::equality(&need, &need));
+
+        for (source, apparent, message) in [
+            (
+                "module(name = \"root\")\n",
+                "missing",
+                "could not be resolved",
+            ),
+            (
+                "module(name = \"root\")\nbazel_dep(name = \"registry_dep\", version = \"1.0.0\")\n",
+                "registry_dep",
+                "is not a direct local_path_override",
+            ),
+            ("this is not valid module syntax", "missing", "syntax"),
+        ] {
+            let outcome = observed_route_frontier(
+                &Dice::builder().build(DetectCycles::Enabled),
+                EpochBuilder::root(source, 51).build(),
+                apparent,
+                None,
+                false,
+            )
+            .await;
+            let route = complete_observed_route(&outcome);
+            let error = route.result().as_ref().as_ref().unwrap_err();
+            assert!(error.to_string().contains(message));
+        }
     }
 
     #[tokio::test]
