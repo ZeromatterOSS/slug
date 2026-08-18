@@ -3736,3 +3736,29 @@ frozen 140/240/380 host-module, 8 lib and 388 aggregate semantic caps and
 4,578/405 physical caps. Public loading query is not activated. Acceptance
 returns directly to its observed-publication design; no additional audit or
 milestone close intervenes.
+
+### Active observed root-repository-route implementation (2026-08-18)
+
+Run `WP-2A-m1-root-repository-route-observation-implementation` from Rust base
+`03f2db3e` and frozen design `1ce16378`. Write only
+`slug_bzlmod_v2/src/{host_module,lib}.rs`.
+
+Add the doc-hidden observed route key/carrier and one pure projection shared
+with the legacy key. Legacy selects only the legacy Host root-module child;
+observed selects only the observed child, forwards its exact epoch unchanged,
+and retains only the projected route Result Arc plus epoch. Preserve Need,
+typed outer, semantic result/error, complete-only equality/validity and
+child-only MODULE event ownership.
+
+Require the frozen parity, exact Arc/demand, family nonactivation,
+anchor-plus-route cold/warm event, Need/outer, cancellation/recovery,
+lifecycle and compact-retention proof. Run focused/full bzlmod, loading/core,
+format/check/diff/archive, exact accounting, retention/cleanup and independent
+review. Caps remain host-module 140/240/380 and 4,578 physical, lib 8 and 405
+physical, 388 aggregate semantic lines.
+
+STOP on another file, query/public activation, family/event/semantic drift,
+epoch union or Result-Arc reconstruction, retained state, direct Host read,
+Cargo/oracle work or cap excess. `REPLAN` if the frozen two-file owner cannot
+hold. Acceptance returns directly to docs-only loading-query publication
+design; do not close M1.

@@ -1,22 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-repository-route-observation-design`
+Packet: `WP-2A-m1-root-repository-route-observation-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `b7d3405c`
 Rust base: `03f2db3e`
-Result: freeze the uniquely smaller observed root-repository-route producer
-required before public loading-query publication can remain family-isolated.
+Frozen design: `1ce16378`
+Result: implement the observed root-repository-route prerequisite without
+activating public loading query.
 
 ## Authority and caps
 
-Write only the canonical plan, this manifest, Stage 2 and the orchestration
-routing log. Net caps are 40 canonical, 180 Stage 2, 180 manifest, 30 routing
-and 390 aggregate lines.
+Write only:
 
-## Required design
+- `app/slug_bzlmod_v2/src/host_module.rs`; and
+- `app/slug_bzlmod_v2/src/lib.rs`.
 
-Freeze one doc-hidden `RootRepositoryRouteObservationKey` newtype around
+Against `03f2db3e`, cap host-module growth at 140 production, 240 test and
+380 aggregate semantic lines with 4,578 physical lines; cap lib growth at 8
+production lines and 405 physical lines; cap aggregate semantic growth at 388.
+
+## Required implementation
+
+Add one doc-hidden `RootRepositoryRouteObservationKey` newtype around
 `RootRepositoryRouteKey`, plus a doc-hidden `ObservedRootRepositoryRoute`.
 Export both only for the later cross-crate query consumer. Both route keys call
 one pure projection from the existing root-module semantic carrier; legacy
@@ -42,13 +47,7 @@ key stores no local `EventBatch`; computing observed anchor then observed route
 in one transaction reuses the same structural observed module child and cannot
 replay its batch.
 
-Freeze the implementation allowlist to
-`app/slug_bzlmod_v2/src/host_module.rs` and
-`app/slug_bzlmod_v2/src/lib.rs`. Against `03f2db3e`, cap host-module growth
-at 140 production, 240 test and 380 aggregate semantic lines with 4,578
-physical lines; cap lib growth at 8 production lines and 405 physical lines;
-cap aggregate semantic growth at 388. Keep the cohesive host-module owner
-unless exact sizing proves a split mandatory, in which case `REPLAN`.
+Keep the cohesive host-module owner. Do not split or move existing tests.
 
 ## Compatibility and proof
 
@@ -73,23 +72,17 @@ scans, and independent review.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; public
-activation; query-crate changes; another route/store/cache/event owner; legacy
-and observed module-family cross-activation; semantic/error/event drift;
+STOP on any other file; Cargo, BUILD, fixture, oracle or generated-file write;
+public activation; query-crate changes; another route/store/cache/event owner;
+legacy and observed module-family cross-activation; semantic/error/event drift;
 epoch union or Result-Arc reconstruction; a retained collection/lock/task/
-direct Host read; cap increase; implementation claim; or M1 closure. `REPLAN`
+direct Host read; cap excess; or M1 closure. `REPLAN`
 if the two keys cannot share one projection, the carrier cannot forward exact
 child Result Arcs, another Rust file is required, or the cohesive physical cap
 cannot hold.
 
 ## Immediate predecessor
 
-The audit at `b7d3405c` found `RootQueryCommandKey` to be the next complete
-public owner only after one prerequisite. Direct or transitive external labels
-compute `RootRepositoryRouteKey`, which activates legacy
-`HostRootModuleFileKey` beside the query root's future observed anchor and
-would violate family/event isolation. Constructor syntax cannot exclude that
-path. The route producer is the uniquely smaller prerequisite; accepted
-observed anchor/package/path children already cover every other query edge.
-Multi-build still needs aggregate source-certificate/revision design, and the
-one-shot evaluator remains outside native publication.
+`1ce16378` freezes the observed route design selected by the audit at
+`b7d3405c`. It is the only prerequisite before returning directly to
+loading-query publication design.
