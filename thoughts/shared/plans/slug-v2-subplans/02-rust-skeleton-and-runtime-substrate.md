@@ -3136,3 +3136,80 @@ Buck2 retention and AI cleanup scans, and independent implementation review.
 STOP on any other file, public drift, duplicate family/event owner, partial
 carrier, new retained store/collection/lock/task/Host read, repository work or
 cap excess. Acceptance returns to exactly one docs-only next-owner audit.
+
+### Neutral singleton-root-Single implementation REPLAN (2026-08-18)
+
+The implementation stopped without accepted Rust. The frozen DICE/test split,
+neutral key, observed anchor/package, source carrier, shared-Arc validation and
+revision retry were implementable in the two-file authority. Focused source
+success, exact pointer identity, pointer-distinct abort/restoration,
+edit/delete/recreate, outer failure and cancellation checks passed.
+
+The complete core suite exposed a false design premise for Starlark rules.
+After the neutral owner computed `RootPackageLoadObservationKey` and classified
+the target, the existing semantic continuation called
+`prepare_configured_node_analysis`; that function computed legacy
+`RootPackageLoadKey`. Its returned `ConfiguredNodeAnalysisKey` computed the
+same legacy package again in its own DICE body. The observed and legacy package
+families consequently both activated and MODULE/`.bzl`/BUILD events replayed
+before the analysis event. The exact public event contract and frozen
+one-family authority both failed.
+
+Directly constructing `ConfiguredNodeAnalysisKey` cannot remove its internal
+legacy package dependency. Skipping preparation would lose required root
+string-setting validation, default selection and transition identity. Fixing
+the defect therefore requires an observed/preloaded configured-analysis seam
+in `slug_analysis_v2`, a third Rust owner forbidden by the packet; duplicating
+that crate's preparation and recursive analysis driver in core would violate
+the natural-owner, cap and no-duplicate-driver constraints. This is the
+packet's explicit `REPLAN` condition.
+
+The unaccepted Rust and relocated test candidate were removed from the
+worktree. No Rust commit, new file, public activation or behavior claim is
+accepted. The candidate remains recoverable only as temporary local evidence;
+it is not a source of authority.
+
+### Active observed configured-analysis seam design (2026-08-18)
+
+Run docs-only `WP-2A-m1-root-single-observed-analysis-seam-design` from
+scheduling base `a87a3c8d` and Rust base `31a8b1d3`. Audit
+`slug_analysis_v2::prepare_configured_node_analysis`,
+`ConfiguredNodeAnalysisKey::compute_inner`, recursive configured-child
+preparation, root string-setting default lookup and every package edge in the
+configured analysis closure.
+
+Freeze the uniquely smallest DICE-owned observed continuation that accepts the
+neutral root's observed classification without activating legacy
+`RootPackageLoadKey`. Prefer a structurally distinct observed preparation/key
+family sharing one mode-aware semantic driver with the legacy family only if
+that ownership remains complete through recursive children, toolchains,
+platforms and default transitions. Otherwise name one strictly smaller
+prerequisite and stop. Do not carry `LoadedPackage` values or event batches in
+key identity, create a side store/cache/task/lock, read Host state directly, or
+compute both families.
+
+Preserve exact public source, rule and filegroup results/outputs/errors/events,
+exact root string-setting/default-transition semantics and the configured
+action closure. The internal neutral/observed analysis cutover remains
+Slug-native. Observed child epochs stay dependency-owned; rule terminals retain
+no partial carrier. Freeze complete-only terminal algebra, Need/semantic/outer/
+cancellation order, one package/`.bzl`/analysis event authority, warm
+suppression, memory lifetimes, the neutral caller seam and future Rust
+allowlist/caps.
+
+Future proof must show zero legacy package/analysis activation for a neutral
+root rule, exactly one cold MODULE/`.bzl`/BUILD plus analysis event sequence,
+warm suppression, default/explicit/edit/restored root settings, recursive
+configured dependencies without family escape, unchanged exported-source
+carrier/revision lifecycle, filegroup loaded-only behavior, and unchanged
+PackageAll/multi/external/cquery selection. Reuse accepted evidence; add no
+fixture or oracle.
+
+Write only canonical/current/Stage 2 and the existing neutral-owner routing row
+under 40/160/180/30 and 410 aggregate net documentation caps. STOP on Rust,
+Cargo/BUILD, fixtures/oracles, public drift, duplicate family/driver/event
+owner, value-carrying key, partial carrier, new retained store/collection/
+cache/interner/lock/task/Host read, repository work or cap excess. `REPLAN`
+if no bounded natural owner preserves the recursive configured-analysis and
+event contracts. Acceptance schedules only the prerequisite implementation;
+neutral-root implementation resumes in a later packet after that acceptance.

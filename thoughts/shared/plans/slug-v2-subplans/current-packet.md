@@ -1,126 +1,134 @@
-# Current Slug V2 Packet
+# Current bounded work packet
 
-Packet: `WP-2A-m1-root-single-neutral-owner-implementation`
-Milestone: M1 one semantic spine
-Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Rust base: `31a8b1d3`
-Frozen design: `3e90fc88`
-Result: publicly publish the exact observed root exported-source carrier through
-one neutral singleton-root-`Single` owner while preserving exact rule/filegroup
-behavior and every broader legacy family.
+Packet: `WP-2A-m1-root-single-observed-analysis-seam-design`
 
-## Authority and caps
+This packet is documentation-only. It records the failed implementation
+premise in frozen design `3e90fc88` and designs the uniquely smallest
+configured-analysis seam needed before neutral singleton-root-`Single`
+implementation may resume. Rust remains at accepted base `31a8b1d3`; the
+rejected implementation candidate is not accepted.
+
+## Why REPLAN fired
+
+The two-file neutral-owner implementation reached the intended observed
+anchor, observed root-package, target-kind classification and exported-source
+carrier. Focused source success, exact-Arc validation, pointer-distinct abort,
+revision edit/delete/recreate and cancellation checks passed. The complete core
+library exposed a disallowed rule-analysis path: after the neutral owner loaded
+`RootPackageLoadObservationKey`, both
+`slug_analysis_v2::prepare_configured_node_analysis` and
+`ConfiguredNodeAnalysisKey::compute_inner` independently computed
+`RootPackageLoadKey`.
+
+That second legacy package family replayed MODULE/`.bzl`/BUILD events and
+violated the frozen one-family/event-authority contract. Constructing
+`ConfiguredNodeAnalysisKey` directly does not solve it because the key itself
+loads the legacy package. Bypassing preparation would also lose exact root
+string-setting validation/default transitions. A DICE-only correction is
+therefore impossible within the accepted two-file allowlist and caps. The
+implementation diff was discarded; no Rust or relocated test file remains.
+
+## Authority
 
 Write only:
 
-- `app/slug_core_v2/src/runtime/dice.rs`; and
-- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` (new).
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest;
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`;
+- at terminal close only, update the existing 2026-08-18 neutral-owner row in
+  `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-Against `31a8b1d3`, exclude only the frozen line-identical test-body relocation
-from category growth, never from physical accounting. Caps are 360 production,
-450 test and 810 aggregate net semantic lines. Final physical caps are 12,275
-for `dice.rs`, 2,800 for `build_command_tests.rs` and 15,075 combined.
+Do not edit Rust, Cargo/BUILD metadata, fixtures, oracle data, generated files
+or any other plan. Do not restore the rejected candidate from `/tmp`.
 
-## Required implementation
+## Design objective
 
-Before semantic edits, retain the shared build/cquery fixture block through
-`resolved_identity` in the inline parent `tests` module. Move only the
-contiguous test tail beginning at
-`multi_target_exported_sources_do_not_enter_revision_bridge` through the final
-build-branch collection test into `runtime/tests/build_command_tests.rs`.
-Replace it with nested
-`mod build_command_tests { include!("tests/build_command_tests.rs"); }`; the
-new file begins `use super::*;`. Change no relocated test body or production
-visibility.
+Audit `slug_analysis_v2/src/dice.rs` around
+`prepare_configured_node_analysis`, `ConfiguredNodeAnalysisKey`,
+`compute_configured_child`, root string-setting default lookup and every
+recursive configured-analysis/package edge. Freeze the smallest DICE-owned
+observed continuation that lets a neutral root rule proceed without activating
+legacy `RootPackageLoadKey` after observed classification.
 
-Add private `SingletonRootSingleBuildCommandKey(BuildCommandRootKey)`, admitted
-only for a structurally validated singleton root-repository
-`TargetPattern::Single`. Its DICE value is complete-only
-`SourcePreparationOutcome<Result<SingletonRootSingleBuildCommandTerminal,
-ObservedPathFrontierError>>`; equality uses `complete_eq` and validity requires
-Complete. Need and observed outer error publish no terminal.
+Decide whether the natural owner is:
 
-The terminal owns one exact semantic
-`Arc<Result<BuildCommandEvaluation, BuildCommandError>>` plus
-`Option<PathObservationEpoch>`. Store `Some(epoch)` exactly when that same
-semantic result owns a `SourceCertificate`: exported-source success or
-completed `RootSource` error. Build the epoch as the stable left-first union of
-the observed anchor epoch, observed root-package epoch and certificate's exact
-FileBytes demand/Result Arc. Every other terminal stores `None`; never expose a
-partial rule-analysis carrier.
+1. a structurally distinct observed configured-analysis key plus observed
+   preparation entry point sharing one mode-aware semantic driver with the
+   legacy key; or
+2. one strictly smaller prerequisite that can preserve the already-loaded
+   observed package/result/event authority through root preparation and the
+   recursive analysis closure.
 
-Implement `NativeCommandRoot` directly for the neutral key. Preserve the
-current sole-root-Single request-revision initialization and analysis-error
-root relaxation; expose source certificate/observations only through the
-terminal invariant; preserve Need; map observed outer error to typed session
-failure. After acceptance, consume the terminal, move its exact semantic Arc
-and existing event buffer, and drop the optional epoch.
+Do not design a key carrying a `LoadedPackage` value or event batch as
+identity, a side store, direct Host read, caller-managed cache, or a parent that
+computes both analysis/package families. The result must keep DICE dependencies
+structural and leave child observation epochs dependency-owned; the neutral
+build terminal still retains no partial rule-analysis epoch.
 
-Extract one post-package `compute_loaded_build_branch` helper shared by legacy
-and neutral paths, plus only the minimum shared final action-closure/result
-helper needed to avoid a duplicate driver. The neutral driver alone computes:
+Freeze:
 
-1. observed root loading anchor;
-2. observed root package;
-3. target lookup/kind once;
-4. existing revision then FileBytes for exported source, or the existing
-   rule/filegroup semantic continuation; and
-5. exact terminal construction.
+- legacy and observed key identities, complete-only equality/validity and
+  exact family selection;
+- root requested-package preparation, required string-setting validation,
+  explicit/default configuration and recursive child/toolchain/platform
+  behavior;
+- Need, semantic error, typed outer error and cancellation precedence;
+- exactly one package/`.bzl`/analysis event authority and unchanged cold
+  order/warm suppression;
+- no duplicate retained package, event batch, epoch, collection, cache,
+  interner, lock or task;
+- how the neutral root calls the new seam without an existing build-root child
+  or legacy package activation;
+- future Rust allowlist, test-module ownership, production/test/aggregate and
+  physical caps measured from `31a8b1d3`; and
+- focused activation/event/configuration/lifecycle proof plus broad
+  core/loading validation, formatting, archive, retention, cleanup and
+  independent review.
 
-It computes neither existing build-root sibling, no legacy anchor/package key
-and no second package family. Public constructor selection is existing observed
-PackageAll, then neutral singleton root Single, then unchanged legacy root.
-Multi-target, external, recursive and cquery identities remain unchanged.
+## Compatibility
 
-The neutral root stores no event batch. Observed anchor/package and configured-
-analysis children remain the only semantic event owners; generic selected-
-closure acceptance remains the only command publisher. Rule/filegroup child
-epochs are dependency-owned; retain no duplicate terminal epoch,
-classification, event batch, collection, cache, interner, lock or task. Hold no
-lock across DICE and perform no direct Host read.
+Existing public exported-source, Starlark-rule and filegroup results, outputs,
+errors and event bytes remain exact. Root string-setting/default-transition
+semantics and configured action closure remain exact for the admitted slice.
+The internal neutral/observed analysis-family cutover, carrier association and
+shared-Arc mechanics are Slug-native. Broader analyzed observation,
+multi-target, external/repository/materializer, cquery migration, native-Windows
+raw bytes and exact Bazel identity bytes remain unsupported/deferred.
 
-## Compatibility and proof
+## Proof required by the design
 
-Existing public exported-source, rule and filegroup result/output/error/event
-bytes remain exact. The internal neutral family cutover, carrier association,
-shared-Arc validation, revision retry and fail-closed outer handling are
-Slug-native. Broader analyzed observation, multi-target, external/repository/
-materializer, cquery, native-Windows raw bytes and exact Bazel identity bytes
-remain unsupported/deferred. Reuse accepted Bazel/source evidence; add no
-fixture or oracle.
+The future implementation must discriminate:
 
-Require discriminating tests for:
+- neutral root rule activation with observed anchor/package/analysis only and
+  zero legacy package/analysis sibling activation;
+- exactly one MODULE/`.bzl`/BUILD event sequence, one analysis event, warm
+  suppression and no failed-attempt publication;
+- default, explicit, edited and restored root string-setting configurations;
+- recursive configured dependencies/action closure without a legacy-family
+  escape;
+- rule semantic/Need/error/outer/cancellation parity and no terminal carrier;
+- unchanged exported-source exact carrier/revision lifecycle and filegroup
+  loaded-only behavior; and
+- PackageAll, multi-target, external and cquery family isolation.
 
-- neutral identity, complete equality/validity and exact family activation;
-- exported success and RootSource error carrier/certificate/selected exact Arc
-  identity, including pointer-distinct/missing/extra/value mismatch abort;
-- anchor/package/target/rule/filegroup terminals retaining no partial carrier;
-- Need, semantic error, observed outer error and cancellation precedence;
-- cold child-event order, warm suppression and no failed-attempt publication;
-- validation before revision finalization/commit, concurrent source retry and
-  unchanged/changed/missing/error/delete/recreate/A-B-A lifecycle;
-- exact public rule analysis and filegroup result/event behavior; and
-- accepted PackageAll plus multi/external/cquery nonactivation.
-
-Run focused neutral/public/native-demand tests; the complete core library and
-integration suites; the complete loading suite; formatting, direct check,
-`git diff --check` and `scripts/v2_archive_status.sh`. Record only demonstrated
-inherited broad/Clippy stops. Run Buck2 retention and AI cleanup scans and an
-independent implementation review.
+Reuse accepted Bazel 9.2 and Slug evidence; add no fixture or oracle.
 
 ## STOP / REPLAN
 
-STOP on any other file; changed relocated test body; public API/behavior drift;
-existing build-root child or second package family; duplicate/partial carrier;
-new event owner, retained store/collection/cache/interner/lock/task/Host read;
-repository/materializer work; Cargo/BUILD/fixture/oracle/generated writes; or
-cap excess. `REPLAN` on a required third Rust file, partial selected epoch,
-duplicate driver/event authority, unsafe revision ordering, unbounded split or
-any inability to preserve exact public rule/filegroup behavior.
+STOP on implementation, any unlisted file, public API/behavior drift, a second
+package/event family, duplicate driver/event owner, value-carrying key, partial
+carrier, new store/cache/interner/lock/task/direct Host read, repository work or
+docs cap excess. `REPLAN` if the complete recursive configured-analysis
+closure requires an unbounded duplicate, cannot preserve exact root
+configuration/event behavior, or has no single natural owner.
 
-## Immediate predecessor
+## Documentation caps and successor
 
-`3e90fc88` accepts the neutral-owner design after `23f9c8d1` recorded the
-constructor-kind REPLAN. Reserved review accepted the conditional complete
-carrier and one-family driver, then corrected the test split to keep shared
-fixtures in the parent and use an explicit nested `include!` path.
+Against scheduling base `a87a3c8d`, allow at most 40 net lines in canonical,
+180 in Stage 2, 160 in this manifest and 30 in the routing row, 410 aggregate.
+`git diff --check` must pass.
+
+After independent design acceptance, schedule exactly one bounded
+observed-analysis prerequisite implementation. Neutral-root implementation
+resumes only after that prerequisite is accepted; do not combine both Rust
+packets, activate cquery, or close M1.
