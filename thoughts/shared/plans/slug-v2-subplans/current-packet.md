@@ -1,32 +1,31 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-direct-local-include-horizon-observation-design`
+Packet: `WP-2A-m1-direct-local-include-horizon-observation-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling/Rust base: `a61de5d4`
-Result: design only the shared observed direct-local include-package horizon
-producer before preparation/evaluation.
+Scheduling/design base: `f4ed1ce2`
+Rust base: `a61de5d4`
+Result: implement only the accepted shared observed direct-local
+include-package horizon producer.
 
 ## Authority
 
 Write only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`
+- `app/slug_bzlmod_v2/src/source_preparation.rs`
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`
 
-Docs caps against `a61de5d4`: 40 canonical, 200 current, 240 Stage 2, 30
-routing and 510 aggregate net lines. Rust, Cargo, fixtures and oracles are
-read-only.
+Caps against Rust base `a61de5d4`: 300 production and 13,200 physical lines
+in `source_preparation.rs`; 420 tests and 1,580 physical lines in the proof
+file; 720 aggregate semantic and 14,780 combined physical.
 
-## Required design
+## Required implementation
 
-Audit `DirectLocalIncludePackageHorizonKey`,
+Keep `DirectLocalIncludePackageHorizonKey` and its Value exact. Refactor
 `preflight_direct_local_include_package_horizon` and the direct branch of
-`preflight_nonregistry_include_horizon`. Freeze one crate-private structural
-observed horizon sibling/carrier and one shared mode-aware horizon driver only
-if that is the first complete owner. Legacy keeps the accepted inspection then
+`preflight_nonregistry_include_horizon` through one shared mode-aware driver.
+Add one crate-private structural observed horizon sibling/carrier. Legacy keeps
+the accepted inspection then
 legacy `ExternalRepositoryPackageLookupKey` family. Observed selects the
 accepted observed inspection and observed lookup sibling for every unique
 include package. Do not activate preparation, fragment source, evaluation,
@@ -91,18 +90,14 @@ Need/outer, earlier Need plus semantic plus later outer, no-semantic
 outer-over-Need, first of two semantics, exact decisive prefix/first Arc and
 full Need union.
 
-If accepted, future Rust may write only
-`app/slug_bzlmod_v2/src/source_preparation.rs` and
-`app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`. Proposed
-caps against `a61de5d4`: 300 production and 13,200 physical lines in the
-owner, 420 tests and 1,580 physical lines in the proof file, 720 aggregate
-semantic and 14,780 combined physical. Schedule exactly one implementation,
-then return to a docs-only preparation/fragment/evaluation and upper
-source/load audit.
+Run focused tests, full bzlmod/loading/query, established core baselines,
+fmt/check/diff/accounting, Buck2 retention and AI cleanup, then one independent
+latest-diff review. After ACCEPT, commit and return only to a docs-only
+preparation/fragment/evaluation and upper source/load audit.
 
 ## STOP / REPLAN
 
-STOP on Rust/Cargo/BUILD/fixture/oracle writes, implementation, another
+STOP on every other file, Cargo/BUILD/fixture/oracle writes, another
 file/export/caller, preparation/fragment/evaluation or upper activation, mixed
 families, partial/rebuilt epochs, moved events, retained scratch/state, direct
 Host reads, multiple successors or M1 closure. `REPLAN` if the standalone key

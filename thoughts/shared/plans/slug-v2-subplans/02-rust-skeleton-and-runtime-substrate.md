@@ -4530,3 +4530,32 @@ over combined Need, otherwise success keeps the full epoch. Proof must
 discriminate semantic-before-later-Need/outer, Need-before-semantic-before-
 outer, no-semantic outer-over-Need, first of two semantics, exact prefix/first
 Arc and full Need union.
+
+### Direct-local include-package horizon observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-direct-local-include-horizon-observation-implementation` from Rust
+base `a61de5d4` and independently accepted design `f4ed1ce2`. Write only
+`source_preparation.rs` and `source_preparation_observation_tests.rs`.
+
+Preserve the legacy horizon key/value while adding one private structural
+observed sibling/carrier and one reusable mode-aware package-batch driver.
+Standalone keys compute matching inspection; existing preparation calls legacy
+mode with its requests. Preserve parse-first, first-occurrence dedupe, full
+ordered join, incremental left-first epoch snapshots and the frozen
+prefix-bounded terminal algebra exactly. Need/outer has no carrier.
+
+Retain one local semantic Result Arc with its exact occurrence collection plus
+one compact epoch; no child Arc, outcome map, prefix snapshots or additional
+collection survives compute. Keep the horizon eventless and all upper owners
+dormant. Exact include/package/lookup semantics and events, Slug-native
+sibling/carrier/outer algebra, and deferred preparation/fragment/evaluation/
+source/load/query classes remain unchanged.
+
+Caps are 300 production/13,200 physical, 420 tests/1,580 physical, 720
+aggregate semantic and 14,780 combined against `a61de5d4`. Run the complete
+mixed-order/prefix/Arc/family/event/cancellation/lifecycle proof, serial
+downstream validation, retention/cleanup and independent review. STOP on any
+other file/caller/export, upper activation, family/event drift, retained batch
+state, cap excess or M1 closure. After ACCEPT, schedule only the docs-only
+preparation/fragment/evaluation and upper source/load audit.
