@@ -4966,3 +4966,26 @@ upper-nonactivation discriminators. Permit only one pure live-driver reducer
 needed to expose support outer/prefix behavior; add no key/state/event/caller or
 semantic change. After independent ACCEPT schedule exactly the same three-file
 implementation retry, then return to the upper-source audit.
+
+### Repository-package source observation implementation retry active (2026-08-18)
+
+Run only
+`WP-2A-m1-repository-package-source-observation-implementation-retry` from
+Rust base `1815c019` and accepted correction `9ff3422d`. Write exactly
+`host_package.rs`, `host_package_observation_tests.rs`, and `lib.rs`.
+Keep host/lib caps at 260/5,050 and 6/405; use corrected proof 480/880 and
+aggregate 746/6,335.
+
+Preserve the accepted eventless source sibling, matching-family support ->
+lookup -> selected-source order, left-first union-before-semantic, exact first
+Arc, frozen support/support+lookup/full prefixes, carrierless Need/outer,
+semantic DICE-compute polarity, exact legacy Arc projection, compact Result
+Arc+epoch retention, and zero recursive external-Bzl/load/query/build
+activation. Permit only the accepted pure live-driver reducer.
+
+Complete exact every-position terminal and prefix proof, conflict/mismatch,
+child-owned ROOT -> route-REPO -> evaluation batch text/order, warm suppression,
+reverse-family/upper exclusion, cancellation recovery, BUILD selection A-B-A,
+exact bytes/epoch Arcs, retention and cleanup. STOP on another file, semantic/
+event/state/caller change, cap excess or M1 closure. After independent ACCEPT,
+return only to the docs-only upper-source owner audit.
