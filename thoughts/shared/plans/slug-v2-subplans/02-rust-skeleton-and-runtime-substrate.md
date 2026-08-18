@@ -3354,3 +3354,58 @@ cancellation/lifecycle proof, PackageAll/multi/external/cquery isolation,
 complete core/loading/analysis validation, formatting/diff/archive gates,
 retention and cleanup scans, and independent review. Acceptance returns to one
 docs-only next-owner audit; do not close M1.
+
+### Neutral singleton-root-Single owner accepted (2026-08-18)
+
+Commit `941db0d0` accepts the frozen neutral owner from core base `31a8b1d3`,
+design `3e90fc88` and observed-analysis prerequisite `69d37ddb`. The private
+structural key is admitted only for singleton root-repository `Single` and
+public selection remains observed PackageAll, neutral Single, then legacy.
+One shared mode-aware driver computes observed anchor then observed package,
+classifies the target once, uses only observed configured analysis for rules,
+and leaves filegroups loaded-only. Neither an existing build-root child nor a
+legacy/second package or configured-analysis family activates.
+
+The complete-only terminal retains one exact semantic Result Arc plus
+`Some(PathObservationEpoch)` exactly for exported-source success or completed
+RootSource error owning a source certificate. The stable left-first carrier
+contains anchor/package observations plus the certificate's exact FileBytes
+Result Arc. Rule/filegroup terminals retain `None`; child epochs remain
+dependency-owned. Native acceptance validates the complete selected carrier,
+moves the semantic Arc and existing event buffer, and drops the carrier. Child
+keys remain the sole local event owners.
+
+Proof covers identity/terminal algebra, zero legacy-family activation, exact
+certificate/carrier/selected Arcs, pointer-distinct abort/restoration, one cold
+MODULE/`.bzl`/BUILD/analysis sequence, warm suppression, cancellation,
+source lifecycle/revision retry, exact public rule/filegroup behavior and
+PackageAll/multi/external/cquery isolation. Focused tests pass; loading is
+194/194 and analysis 48/48. Core is 231/232 after three new tests and
+integration 12/13, with only the documented external-query diagnostic and
+missing injected-epoch baselines. Direct check, formatting and diff hygiene
+pass; Clippy and archive stop only on recorded repository-wide baselines.
+
+Accounting excluding the byte-identical 2,267-line test relocation is +359
+production, +430 test/split and +789 aggregate semantic lines. Physical sizes
+are 12,271 DICE, 2,666 extracted tests and 14,937 combined. Buck2 retention,
+AI cleanup and independent implementation review found no new retained
+collection/cache/interner/lock/task/Host read or duplicate owner.
+
+### Active post-neutral publication-owner audit (2026-08-18)
+
+Run docs-only `WP-2A-m1-post-neutral-publication-owner-audit` from `941db0d0`.
+Trace remaining multi-target/recursive/external build identities, query/cquery
+roots and one-shot adapters through DICE selection, selected snapshot,
+revision finalization and consuming publication. Rank the first natural owner
+that can provide a complete carrier without activating both legacy and
+observed families; select one bounded design, one uniquely smaller
+prerequisite, or `REPLAN`.
+
+Preserve exact public results/errors/events and all accepted singleton owners.
+Internal carrier association, shared-Arc validation and owner cutover remain
+Slug-native; repository/materializer breadth and exact Bazel identity bytes
+remain deferred. Name the future allowlist/caps, proof, event/retention owner,
+STOP/REPLAN and one successor. Write only canonical/current/Stage 2/routing
+under 40/160/180/30 and 410 aggregate documentation caps. STOP on Rust,
+Cargo/BUILD, fixtures/oracles, public drift, duplicate owners, retained state,
+direct Host reads, premature M1 close or cap excess.
