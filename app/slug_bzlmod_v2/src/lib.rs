@@ -89,10 +89,14 @@ pub use host_module::RootRepositoryRouteKey;
 pub use host_module::RootRepositoryRouteObservationKey;
 pub use host_module::RootRepositorySource;
 #[doc(hidden)]
+pub use host_package::ObservedRepositoryPackageSource;
+#[doc(hidden)]
 pub use host_package::ObservedRootPackageSource;
 pub use host_package::RepositoryPackageSource;
 pub use host_package::RepositoryPackageSourceError;
 pub use host_package::RepositoryPackageSourceKey;
+#[doc(hidden)]
+pub use host_package::RepositoryPackageSourceObservationKey;
 pub use host_package::RootPackageBzlTarget;
 pub use host_package::RootPackageBzlTargetError;
 pub use host_package::RootPackageSource;

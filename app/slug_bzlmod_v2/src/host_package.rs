@@ -14,6 +14,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::ops::ControlFlow;
 #[cfg(unix)]
 use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
@@ -60,11 +61,13 @@ use crate::source_preparation::DirectLocalUnsupportedCycle;
 use crate::source_preparation::HostRepositoryPathKey;
 use crate::source_preparation::HostRepositoryPathObservationKey;
 use crate::source_preparation::HostRepositorySourceFileKey;
+use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
 use crate::source_preparation::direct_local_module_support;
+use crate::source_preparation::direct_local_module_support_observed;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
 pub(crate) enum HostBuildFileName {
@@ -847,6 +850,28 @@ impl fmt::Display for RepositoryPackageSourceKey {
     }
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative)]
+pub struct RepositoryPackageSourceObservationKey(RepositoryPackageSourceKey);
+
+impl RepositoryPackageSourceObservationKey {
+    pub fn new(route: RootRepositoryRoute, package: PackageIdentifier) -> Option<Self> {
+        RepositoryPackageSourceKey::new(route, package).map(Self)
+    }
+}
+
+impl Hash for RepositoryPackageSourceObservationKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
+impl fmt::Display for RepositoryPackageSourceObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
 /// The selected BUILD identity and bytes required by external package loading.
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub struct RepositoryPackageSource {
@@ -866,6 +891,23 @@ impl RepositoryPackageSource {
 
     pub fn bytes(&self) -> &Arc<[u8]> {
         &self.bytes
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedRepositoryPackageSource {
+    result: Arc<Result<RepositoryPackageSource, RepositoryPackageSourceError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRepositoryPackageSource {
+    pub fn result(&self) -> &Arc<Result<RepositoryPackageSource, RepositoryPackageSourceError>> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
     }
 }
 
@@ -985,6 +1027,298 @@ impl std::error::Error for RepositoryPackageSourceError {
     }
 }
 
+#[derive(Clone, Copy)]
+enum RepositoryPackageSourceMode {
+    Legacy,
+    Observed,
+}
+
+type RepositoryPackageSourceDriverOutcome =
+    SourcePreparationOutcome<Result<ObservedRepositoryPackageSource, ObservedPathFrontierError>>;
+
+fn repository_package_source_driver_complete(
+    value: Result<RepositoryPackageSource, RepositoryPackageSourceError>,
+    observations: PathObservationEpoch,
+) -> RepositoryPackageSourceDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedRepositoryPackageSource {
+        result: Arc::new(value),
+        observations,
+    }))
+}
+
+fn repository_package_source_error_complete(
+    inner: RepositoryPackageSourceErrorInner,
+    observations: PathObservationEpoch,
+) -> RepositoryPackageSourceDriverOutcome {
+    repository_package_source_driver_complete(
+        Err(RepositoryPackageSourceError::new(inner)),
+        observations,
+    )
+}
+
+fn repository_package_source_observed_child<T>(
+    outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
+) -> ControlFlow<RepositoryPackageSourceDriverOutcome, T> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => ControlFlow::Continue(value),
+    }
+}
+
+fn finish_repository_package_source_support(
+    support: &Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>,
+    observations: PathObservationEpoch,
+) -> ControlFlow<RepositoryPackageSourceDriverOutcome, PathObservationEpoch> {
+    match support {
+        Ok(DirectLocalModuleSupport::Supported) => ControlFlow::Continue(observations),
+        Ok(DirectLocalModuleSupport::Unsupported(cycle)) => {
+            ControlFlow::Break(repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::Unsupported {
+                    cycle: cycle.clone(),
+                },
+                observations,
+            ))
+        }
+        Err(error) => ControlFlow::Break(repository_package_source_error_complete(
+            RepositoryPackageSourceErrorInner::ModuleEvaluation {
+                error: error.clone(),
+            },
+            observations,
+        )),
+    }
+}
+
+async fn drive_repository_package_source(
+    key: &RepositoryPackageSourceKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: RepositoryPackageSourceMode,
+) -> RepositoryPackageSourceDriverOutcome {
+    let (support, mut observations) = match mode {
+        RepositoryPackageSourceMode::Legacy => {
+            match direct_local_module_support(ctx, &key.route).await {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    (result, PathObservationEpoch::empty())
+                }
+            }
+        }
+        RepositoryPackageSourceMode::Observed => {
+            match repository_package_source_observed_child(
+                direct_local_module_support_observed(ctx, &key.route).await,
+            ) {
+                ControlFlow::Break(outcome) => return outcome,
+                ControlFlow::Continue(observed) => {
+                    (observed.result().dupe(), observed.observations().dupe())
+                }
+            }
+        }
+    };
+    observations = match finish_repository_package_source_support(support.as_ref(), observations) {
+        ControlFlow::Break(outcome) => return outcome,
+        ControlFlow::Continue(observations) => observations,
+    };
+
+    let lookup_key =
+        ExternalRepositoryPackageLookupKey::new(key.route.clone(), key.package.clone())
+            .expect("public source key enforces route/package identity");
+    let lookup = match mode {
+        RepositoryPackageSourceMode::Legacy => match ctx.compute(&lookup_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => result,
+            Err(error) => {
+                return repository_package_source_error_complete(
+                    RepositoryPackageSourceErrorInner::LookupCompute {
+                        package: key.package.clone(),
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                );
+            }
+        },
+        RepositoryPackageSourceMode::Observed => {
+            match ctx
+                .compute(&ExternalRepositoryPackageLookupObservationKey(lookup_key))
+                .await
+            {
+                Ok(outcome) => match repository_package_source_observed_child(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => {
+                        observations =
+                            match union_observations(&observations, observed.observations()) {
+                                Ok(observations) => observations,
+                                Err(error) => {
+                                    return SourcePreparationOutcome::Complete(Err(error));
+                                }
+                            };
+                        observed.result().dupe()
+                    }
+                },
+                Err(error) => {
+                    return repository_package_source_error_complete(
+                        RepositoryPackageSourceErrorInner::LookupCompute {
+                            package: key.package.clone(),
+                            message: Arc::from(error.to_string()),
+                        },
+                        observations,
+                    );
+                }
+            }
+        }
+    };
+    let build_file_name = match lookup.as_ref() {
+        Ok(ExternalRepositoryPackageLookup::Package(name)) => *name,
+        Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }) => {
+            return repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::InvalidPackageName {
+                    package: key.package.clone(),
+                    message: message.clone(),
+                },
+                observations,
+            );
+        }
+        Ok(ExternalRepositoryPackageLookup::Deleted) => {
+            return repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::Deleted {
+                    package: key.package.clone(),
+                },
+                observations,
+            );
+        }
+        Ok(ExternalRepositoryPackageLookup::NoBuildFile) => {
+            return repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::NoBuildFile {
+                    package: key.package.clone(),
+                },
+                observations,
+            );
+        }
+        Err(error) => {
+            return repository_package_source_error_complete(
+                RepositoryPackageSourceErrorInner::Lookup {
+                    package: key.package.clone(),
+                    error: error.clone(),
+                },
+                observations,
+            );
+        }
+    };
+    finish_repository_package_source(key, ctx, mode, build_file_name, observations).await
+}
+
+async fn finish_repository_package_source(
+    key: &RepositoryPackageSourceKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: RepositoryPackageSourceMode,
+    build_file_name: HostBuildFileName,
+    mut observations: PathObservationEpoch,
+) -> RepositoryPackageSourceDriverOutcome {
+    let logical_path =
+        Arc::new(PathBuf::from(key.package.package().as_str()).join(build_file_name.as_str()));
+    let source = match mode {
+        RepositoryPackageSourceMode::Legacy => match ctx
+            .compute(&HostRepositorySourceFileKey::new(
+                key.route.clone(),
+                logical_path.as_ref().clone(),
+            ))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => result,
+            Err(error) => {
+                return repository_package_source_error_complete(
+                    RepositoryPackageSourceErrorInner::SourceCompute {
+                        logical_path,
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                );
+            }
+        },
+        RepositoryPackageSourceMode::Observed => match ctx
+            .compute(&HostRepositorySourceFileObservationKey::new(
+                key.route.clone(),
+                logical_path.as_ref().clone(),
+            ))
+            .await
+        {
+            Ok(outcome) => match repository_package_source_observed_child(outcome) {
+                ControlFlow::Break(outcome) => return outcome,
+                ControlFlow::Continue(observed) => {
+                    observations = match union_observations(&observations, observed.observations())
+                    {
+                        Ok(observations) => observations,
+                        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                    };
+                    observed.result().as_ref().clone()
+                }
+            },
+            Err(error) => {
+                return repository_package_source_error_complete(
+                    RepositoryPackageSourceErrorInner::SourceCompute {
+                        logical_path,
+                        message: Arc::from(error.to_string()),
+                    },
+                    observations,
+                );
+            }
+        },
+    };
+    finish_repository_package_source_value(build_file_name, logical_path, &source, observations)
+}
+
+fn finish_repository_package_source_value(
+    build_file_name: HostBuildFileName,
+    logical_path: Arc<PathBuf>,
+    source: &Result<HostRepositorySourceFileValue, RepositorySourceFileError>,
+    observations: PathObservationEpoch,
+) -> RepositoryPackageSourceDriverOutcome {
+    match source {
+        Ok(HostRepositorySourceFileValue::Present {
+            bytes,
+            logical_path,
+        }) => repository_package_source_driver_complete(
+            Ok(RepositoryPackageSource {
+                logical_path: logical_path.dupe(),
+                build_file_name,
+                bytes: bytes.dupe(),
+            }),
+            observations,
+        ),
+        Ok(HostRepositorySourceFileValue::Absent) => repository_package_source_error_complete(
+            RepositoryPackageSourceErrorInner::SelectedSourceAbsent { logical_path },
+            observations,
+        ),
+        Err(error) => repository_package_source_error_complete(
+            RepositoryPackageSourceErrorInner::Source {
+                logical_path,
+                error: error.clone(),
+            },
+            observations,
+        ),
+    }
+}
+
+fn project_legacy_repository_package_source(
+    outcome: RepositoryPackageSourceDriverOutcome,
+) -> SourcePreparationOutcome<Arc<Result<RepositoryPackageSource, RepositoryPackageSourceError>>> {
+    outcome.map(|observed| {
+        observed
+            .expect("legacy repository package source cannot produce an observed outer error")
+            .result
+    })
+}
+
 #[async_trait]
 impl Key for RepositoryPackageSourceKey {
     type Value = SourcePreparationOutcome<
@@ -992,125 +1326,9 @@ impl Key for RepositoryPackageSourceKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        match direct_local_module_support(ctx, &self.route).await {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                Ok(DirectLocalModuleSupport::Supported) => {}
-                Ok(DirectLocalModuleSupport::Unsupported(cycle)) => {
-                    return repository_package_source_complete(Err(
-                        RepositoryPackageSourceError::new(
-                            RepositoryPackageSourceErrorInner::Unsupported {
-                                cycle: cycle.clone(),
-                            },
-                        ),
-                    ));
-                }
-                Err(error) => {
-                    return repository_package_source_complete(Err(
-                        RepositoryPackageSourceError::new(
-                            RepositoryPackageSourceErrorInner::ModuleEvaluation {
-                                error: error.clone(),
-                            },
-                        ),
-                    ));
-                }
-            },
-        }
-        let lookup = match ctx
-            .compute(
-                &ExternalRepositoryPackageLookupKey::new(self.route.clone(), self.package.clone())
-                    .expect("public source key enforces route/package identity"),
-            )
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
-            Err(error) => {
-                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::LookupCompute {
-                        package: self.package.clone(),
-                        message: Arc::from(error.to_string()),
-                    },
-                )));
-            }
-        };
-        let build_file_name = match lookup.as_ref() {
-            Ok(ExternalRepositoryPackageLookup::Package(name)) => *name,
-            Ok(ExternalRepositoryPackageLookup::InvalidPackageName { message }) => {
-                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::InvalidPackageName {
-                        package: self.package.clone(),
-                        message: message.clone(),
-                    },
-                )));
-            }
-            Ok(ExternalRepositoryPackageLookup::Deleted) => {
-                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::Deleted {
-                        package: self.package.clone(),
-                    },
-                )));
-            }
-            Ok(ExternalRepositoryPackageLookup::NoBuildFile) => {
-                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::NoBuildFile {
-                        package: self.package.clone(),
-                    },
-                )));
-            }
-            Err(error) => {
-                return repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::Lookup {
-                        package: self.package.clone(),
-                        error: error.clone(),
-                    },
-                )));
-            }
-        };
-        let logical_path =
-            Arc::new(PathBuf::from(self.package.package().as_str()).join(build_file_name.as_str()));
-        match ctx
-            .compute(&HostRepositorySourceFileKey::new(
-                self.route.clone(),
-                logical_path.as_ref().clone(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Ok(
-                HostRepositorySourceFileValue::Present {
-                    bytes,
-                    logical_path,
-                },
-            ))) => repository_package_source_complete(Ok(RepositoryPackageSource {
-                logical_path,
-                build_file_name,
-                bytes,
-            })),
-            Ok(SourcePreparationOutcome::Complete(Ok(HostRepositorySourceFileValue::Absent))) => {
-                repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::SelectedSourceAbsent { logical_path },
-                )))
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::Source {
-                        logical_path,
-                        error,
-                    },
-                )))
-            }
-            Err(error) => {
-                repository_package_source_complete(Err(RepositoryPackageSourceError::new(
-                    RepositoryPackageSourceErrorInner::SourceCompute {
-                        logical_path,
-                        message: Arc::from(error.to_string()),
-                    },
-                )))
-            }
-        }
+        project_legacy_repository_package_source(
+            drive_repository_package_source(self, ctx, RepositoryPackageSourceMode::Legacy).await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1122,12 +1340,22 @@ impl Key for RepositoryPackageSourceKey {
     }
 }
 
-fn repository_package_source_complete(
-    value: Result<RepositoryPackageSource, RepositoryPackageSourceError>,
-) -> SourcePreparationOutcome<Arc<Result<RepositoryPackageSource, RepositoryPackageSourceError>>> {
-    SourcePreparationOutcome::Complete(Arc::new(value))
-}
+#[async_trait]
+impl Key for RepositoryPackageSourceObservationKey {
+    type Value = RepositoryPackageSourceDriverOutcome;
 
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_repository_package_source(&self.0, ctx, RepositoryPackageSourceMode::Observed).await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 /// A validated root-repository `.bzl` target in Bazel's internal byte shape.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Allocative, Dupe)]
 pub struct RootPackageBzlTarget {
