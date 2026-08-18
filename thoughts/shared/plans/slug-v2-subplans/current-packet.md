@@ -22,7 +22,7 @@ Documentation caps against `7280b9c2` are 40 canonical, 140 manifest, 100
 Stage 2, 30 routing and 310 aggregate net lines. The unaccepted Rust candidate
 remains in place but is not writable under this packet.
 
-## Required design
+## Frozen correction
 
 Record the implementation `REPLAN`: the frozen relocated range remains
 byte-identical, the default-parallel 16-test cquery batch fails only in
@@ -31,15 +31,25 @@ test passes in isolation. Concurrent `tempfile::tempdir()` siblings mutate the
 shared observed `/tmp` ancestor after runtime construction, producing a real
 Host observation replay rather than a production terminal/event defect.
 
-Freeze exactly one exception in that relocated test. Before constructing its
-runtime, create a dedicated test-exclusive parent beneath the crate target
-tree, then create the workspace with `tempfile::tempdir_in` under that already
-existing parent. The parent must be stable before observation begins and must
-not be shared with other temp-workspace tests. Preserve every test assertion
-and all other relocated bodies byte-identically.
+Freeze exactly one exception in that relocated test. Replace only its first
+workspace-construction line with:
 
-Count the exception hunk as test semantic growth. Preserve the existing
-160 production, 300 test, 460 aggregate semantic caps and
+```rust
+let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+    .join("../../target/slug-cquery-restores-structural-configuration");
+fs::create_dir_all(&stable_parent).unwrap();
+let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+```
+
+This test-exclusive parent exists before runtime construction and no other
+cquery test writes beneath it. Preserve every assertion and every other
+relocated body byte-identically. Existing parent-module `Path` and `fs`
+imports remain sufficient through `use super::*;`; add no import or fixture.
+
+Count the replacement as +3 test semantic lines. The retained candidate is
+currently 11,513 physical DICE lines and 835 physical child-test lines; the
+replacement yields 838 child-test and 12,351 combined lines. Preserve the
+existing 160 production, 300 test, 460 aggregate semantic caps and
 12,435/1,200/13,635 physical caps against `941db0d0`; no increase is
 authorized. The existing cfg(test) activation audit may remain only if its
 new lines are charged to tests and the nonrelocated root-count test body stays

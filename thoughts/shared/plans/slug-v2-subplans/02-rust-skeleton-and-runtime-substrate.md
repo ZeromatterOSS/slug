@@ -3555,3 +3555,14 @@ review. Write only canonical/current/Stage 2/routing docs under
 assertion weakening, production design or cap change, extra files, Cargo/
 fixture/oracle writes or M1 close. `REPLAN` if the isolated parent does not
 remove the parallel replay or another relocated body must change.
+
+The frozen replacement is exact: derive
+`../../target/slug-cquery-restores-structural-configuration` from
+`env!("CARGO_MANIFEST_DIR")`, call `fs::create_dir_all` on that fixed
+test-exclusive parent, and pass it to `tempfile::tempdir_in`; all three steps
+precede runtime construction. Existing parent imports flow through
+`use super::*;`. This replaces the original one-line `tempdir` construction
+with four lines, charging +3 semantic test lines. The measured retained
+candidate is 11,513 physical DICE lines plus 835 child-test lines; after the
+replacement it is 838 child-test and 12,351 combined, within the unchanged
+12,435/1,200/13,635 caps. No import, fixture or other body exception is needed.
