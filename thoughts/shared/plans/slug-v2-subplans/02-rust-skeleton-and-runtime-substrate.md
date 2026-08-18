@@ -4423,3 +4423,32 @@ Rust now, another owner/file/export, path reads or epoch reconstruction, mixed
 families/events, retained scratch, upper activation or M1 closure. After design
 ACCEPT, schedule one implementation; after implementation ACCEPT, return to
 the docs-only include-horizon/preparation/evaluation and source/load audit.
+
+### Direct-local MODULE inspection observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-direct-local-module-inspection-observation-implementation` from
+Rust base `99d78875` and independently accepted design `e7b705a9`. Write
+only `source_preparation.rs` and the existing
+`source_preparation_observation_tests.rs`.
+
+Keep the legacy inspection key/value exact. Add one crate-private structural
+observed sibling/carrier and one mode-aware inspection driver. Legacy selects
+only the legacy file key; observed selects only the accepted observed file
+key. Forward the child's unchanged epoch because parsing adds no path
+observation. Need/typed outer carries no carrier; InputCompute is empty; file
+semantic, parser semantic, Absent and Present retain the complete file epoch.
+Retain only the exact semantic inspection Result Arc, including its existing
+include-request collection, plus the epoch; all parser scratch is local.
+
+Preserve exact MODULE parsing, values/errors and child events. The
+sibling/carrier/outer is Slug-native; horizon/preparation/evaluation and upper
+source/load/query/publication remain deferred. Caps against `99d78875` are
+140 production/12,900 physical, 300 tests/1,175 physical, 440 aggregate
+semantic and 14,075 combined. Prove identity/parity, every terminal prefix,
+exact Arcs, family isolation, zero upper activation, child-only events,
+cancellation/recovery, warm reuse and lifecycle. Run serial focused/full
+validation, fmt/check/diff/accounting, retention/cleanup and independent review.
+STOP on every other file/caller/export, path read or epoch rebuild, mixed
+family/event ownership, additional retained state, cap excess or M1 closure.
+After ACCEPT, schedule only the docs-only next-owner audit.
