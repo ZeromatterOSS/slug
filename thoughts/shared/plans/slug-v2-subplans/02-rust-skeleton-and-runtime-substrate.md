@@ -4335,3 +4335,36 @@ moved events, retained scratch, upper activation, cap excess or M1 closure.
 After independent design ACCEPT, schedule exactly one bounded implementation;
 after its ACCEPT, return to the docs-only observed direct-local evaluation and
 upper source/load audit before query.
+
+### Direct-local MODULE file observation implementation active (2026-08-18)
+
+Run only `WP-2A-m1-direct-local-module-file-observation-implementation` from
+Rust base `33717f27` and independently accepted design `707eb1b5`. Write
+only `source_preparation.rs` and existing
+`source_preparation_observation_tests.rs`.
+
+Implement one structural crate-private observed sibling/carrier and one
+mode-aware driver. Preserve legacy route then MODULE source exactly. Observed
+mode selects only matching observed route/source children, unions each complete
+epoch left-first before semantic inspection, retains one semantic Result Arc
+plus one compact epoch, and preserves exact child path Result Arcs. Route/
+source Need and typed outer have no carrier. Prefixes are empty for RouteCompute,
+route-only for route semantic and SourceCompute, and route+source for source
+semantic/Absent/Present. Preserve the accepted Need/outer/carrier Complete
+equality and validity algebra.
+
+Keep the file parent eventless and all later parsing/include/evaluation events
+and state deferred. Prove parity, exact Arcs/order, both family directions,
+every terminal prefix, source suppression, union errors, upper nonactivation,
+child-only events, cancellation/recovery, warm reuse and full lifecycle.
+Route/MODULE bytes, source kind, semantic values/errors and child events remain
+exact; the sibling/carrier/typed outer is Slug-native; inspection through upper
+source/load/query/publication and identity bytes remain deferred.
+
+Caps are 160 production/12,750 physical, 360 tests/880 physical, 520 aggregate
+semantic and 13,630 combined physical against `33717f27`. Run focused/full
+serial validation, fmt/check/diff/accounting, retention/cleanup and independent
+latest-diff review. STOP on every other file, upper/public activation, mixed
+families, rebuilt epochs, event/state drift, cap excess or M1 closure. After
+ACCEPT, schedule only the docs-only direct-local evaluation and upper source/
+load audit.
