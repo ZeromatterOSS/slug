@@ -4059,3 +4059,29 @@ semantic inspection before union; partial carriers; moved/duplicate events;
 retained scratch; cap excess; or M1 closure. After design acceptance, schedule
 only the bounded implementation; after implementation acceptance, return
 directly to external package source/load design.
+### Active routed repository policy observation implementation (2026-08-18)
+
+Run only
+`WP-2A-m1-routed-repository-policy-observation-implementation` from Rust base
+`e4ee0a8e` and independently accepted design `7f60a5c4`. Write exactly
+`slug_bzlmod_v2/src/repo_file.rs` and
+`slug_bzlmod_v2/src/repository_ignore.rs`.
+
+Preserve the two structural crate-private siblings, one matching-family driver
+per legacy/observed pair, semantic Result Arc plus exact Arc-backed epoch,
+policy-before-source and REPO-source-before-ignore-source-before-parser order,
+union-before-semantic inspection, Need/typed-outer/semantic polarity, exact
+first Arc, current per-family REPO event ownership, eventless ignore parent,
+compact retention, legacy parity and reverse-family nonactivation.
+
+Caps remain 120 production/170 tests/2,600 physical for the 2,281-line REPO
+owner; 160 production/210 tests/3,200 physical for the 2,783-line ignore owner;
+660 aggregate semantic and 5,800 combined physical. Keep tests colocated and add
+no public export or third file.
+
+Run focused lifecycle/cancellation/Arc/event proof, full bzlmod/loading/query
+and established core checks, formatting/check/diff/accounting, retention scan,
+cleanup and independent latest-diff review. STOP on every other file, upper
+lookup/loading/query activation, mixed families, partial/rebuilt carriers,
+event/memory drift, cap excess or M1 closure. After ACCEPT, schedule only the
+docs-only external package source/load frontier design.
