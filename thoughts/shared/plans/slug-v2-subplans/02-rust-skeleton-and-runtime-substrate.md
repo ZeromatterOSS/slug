@@ -3880,3 +3880,75 @@ only canonical/current/Stage 2/routing under 40/220/180/30 and 470 aggregate
 caps. STOP on Rust, public query activation, duplicate family/event ownership,
 partial carriers, reconstructed Arcs, retained scratch, missing future caps,
 multiple successors or M1 closure.
+
+
+### External source/load design selects routed Host source prerequisite (2026-08-18)
+
+The complete source/load audit from `7bc9e1da` reaches a uniquely smaller
+prerequisite before external BUILD or recursive `.bzl` evaluation can own a
+carrier. Every admitted route-local REPO, ignore, BUILD-marker, BUILD source and
+external load source eventually uses `HostRepositoryPathKey` and
+`HostRepositorySourceFileKey` in
+`slug_bzlmod_v2::source_preparation`. The path key computes legacy
+`ResolvedPathKey`; the source key then computes direct `PathObservationKey`
+FileBytes. Both discard the exact shared Result Arcs before any upper package or
+module producer can compose them.
+
+Adding observed REPO/ignore/BUILD/module siblings first would therefore either
+recompute a second path family or retain an incomplete epoch. The bounded first
+owner is instead a structurally distinct
+`HostRepositoryPathObservationKey` plus
+`HostRepositorySourceFileObservationKey` in the existing source-preparation
+owner. Only the source sibling is exported doc-hidden for later loading use.
+Each legacy/observed pair shares one mode-aware driver and selects only its own
+resolution/path child family.
+
+Observed values use
+`SourcePreparationOutcome<Result<Carrier, ObservedPathFrontierError>>`.
+Each Complete carrier owns one semantic
+`Arc<Result<..., RepositorySourceFileError>>` and one Arc-backed
+`PathObservationEpoch`. Invalid input and pre-path materialization errors
+complete semantically with an empty epoch; Need has no carrier; a typed observed
+outer stays outer. The observed path sibling forwards the exact
+`ResolvedPathObservationKey` epoch. The observed source sibling keeps that
+epoch left-first and appends the selected FileBytes Result Arc with
+`PathObservationEpoch::from_shared`; equal duplicate demands retain the path
+carrier's first Arc, while mismatch/conflict stays typed outer. Missing,
+wrong-kind, observation error and selected-file race terminals retain their
+exact decisive prefix.
+
+Neither sibling stores events. Materialization and future REPO/ignore/BUILD/
+`.bzl` parents remain their existing batch owners; no duplicate batch, Host
+read, store, cache, map, lock, task or retained request graph is introduced.
+Only the semantic Arc and compact Arc-backed epoch survive in the carrier.
+Routed source semantics and diagnostics stay exact; the structural sibling,
+typed outer and carrier association are Slug-native. Upper loading, query,
+multi-build, one-shot and identity-byte surfaces remain deferred.
+
+The future implementation writes exactly
+`source_preparation.rs`, new
+`source_preparation_observation_tests.rs`, and `slug_bzlmod_v2/src/lib.rs`.
+Because `source_preparation.rs` is a cohesive 12,247-line owner, production
+stays in place while all new tests enter a nested
+`mod observation_tests { use super::*; include!("source_preparation_observation_tests.rs"); }`
+at the existing test tail. Existing test bodies do not move.
+
+Against Rust base `e4555dca`, caps are 340 production plus 10 test-glue lines
+in `source_preparation.rs`, 520 tests in the new file, 6 production lines in
+`lib.rs`, and 876 aggregate semantic lines. Physical caps are 12,600, 540 and
+405 per file and 13,545 combined from bases 12,247/0/395.
+
+Proof must discriminate legacy/observed identity and reverse activation,
+Complete-only validity/equality, semantic parity, local/immutable namespaces,
+invalid/missing/wrong-kind/regular/special/symlink/race outcomes, exact
+Lstat/ReadLink/FileBytes demand/value/Arc membership and first-Arc duplicates,
+Need/outer/union-error/semantic polarity, cold/warm and
+edit/delete/recreate/A-B-A lifecycle, zero local events, real polled-pending
+cancellation/recovery and compact post-return retention. Reuse accepted Bazel
+9.2 `FileFunction` and direct-local source evidence; no fixture/oracle changes.
+
+After independent design ACCEPT, schedule only
+`WP-2A-m1-host-repository-source-observation-implementation` from Rust base
+`e4555dca` plus the accepted design. After that implementation ACCEPT, return
+to one docs-only external package source/load frontier design and then loading
+query; do not close M1.
