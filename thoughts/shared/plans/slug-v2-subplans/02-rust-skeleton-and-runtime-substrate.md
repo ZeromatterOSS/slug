@@ -4123,3 +4123,26 @@ After independent design acceptance, schedule exactly one
 Rust base `e4ee0a8e`, semantic design `7f60a5c4`, and the accepted
 correction design. After implementation acceptance, return directly to the
 external package source/load design; do not activate query or close M1.
+
+### Active routed repository policy observation retry (2026-08-18)
+
+Run only
+`WP-2A-m1-routed-repository-policy-observation-implementation-retry` from
+Rust base `e4ee0a8e`, semantic design `7f60a5c4`, and accepted proof/cap
+correction `4381bc61`. Write only `repo_file.rs` and
+`repository_ignore.rs`; retain the current candidate and freeze production
+semantics/ownership.
+
+Keep production caps at 120/160. Correct test caps to 280/360, physical caps to
+2,700/3,350, aggregate semantic to 920, and combined physical to 6,050. Add
+only test-helper restructuring and route proof: real order/parity/semantic
+prefixes, source Need, genuinely polled cancellation and successor recovery,
+events, warm/edit/delete/recreate/A/B/A, family/upper isolation, plus separate
+union/key-value corruption algebra and platform-guarded WindowsLongPath parser
+proof. Do not add a production hook, key, state owner, public export, third
+file, or upper activation.
+
+Run focused tests individually and in their parallel batch, full
+bzlmod/loading/query, established core baselines, fmt/check/diff/accounting,
+retention/cleanup, and independent correction review. After ACCEPT, schedule
+only the docs-only external package source/load design; do not close M1.
