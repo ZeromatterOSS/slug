@@ -4368,3 +4368,58 @@ latest-diff review. STOP on every other file, upper/public activation, mixed
 families, rebuilt epochs, event/state drift, cap excess or M1 closure. After
 ACCEPT, schedule only the docs-only direct-local evaluation and upper source/
 load audit.
+
+### Direct-local MODULE file observation accepted (2026-08-18)
+
+Commit `99d78875` accepts design `707eb1b5`. One shared mode-aware file
+driver preserves the legacy route-then-MODULE path and selects only the
+matching observed route/source children for the sibling. Completed observed
+epochs join left-first before semantic inspection; equal demands preserve the
+first exact Result Arc. Need and typed outer return without a carrier.
+RouteCompute retains an empty epoch, route semantic and SourceCompute retain
+route-only, and source semantic/Absent/Present retain route+source.
+
+The file parent remains eventless and retains only one local semantic Result
+Arc plus one compact Arc-backed epoch. Proof covers real legacy parity, every
+prefix and typed child outcome, exact selected Arcs, both family directions,
+upper nonactivation, sole child event ownership, warm suppression, polled
+cancellation/recovery, edit/delete/recreate and A/B/A. AI cleanup and Buck2
+retention review found no added collection, cache, store, lock, task, Host read
+or duplicate owner.
+
+Accounting against `33717f27` is +159 production at 12,741 physical lines and
++355 tests at 868 physical lines, +514 semantic and 13,609 combined. Focused
+3/3, 414 unit plus 193 integration bzlmod tests, 194 loading tests and 120 query
+tests pass. Fmt/check/diff pass. Core remains at the documented 234/235 and
+12/13 inherited baselines; Clippy/archive stops are inherited. Independent
+latest-diff review returns `ACCEPT`. M1 remains partial.
+
+### Direct-local MODULE inspection observation design active (2026-08-18)
+
+Run only `WP-2A-m1-direct-local-module-inspection-observation-design` from
+scheduling/Rust base `99d78875`. Live ownership places the private
+`DirectLocalModuleInspectionKey` immediately above the accepted file carrier.
+It computes only that file key, then performs pure in-memory MODULE inspection;
+the include horizon, preparation and evaluation keys remain later consumers.
+This is the uniquely smaller complete producer before any upper source/load
+cutover.
+
+Freeze one crate-private structural sibling/carrier and one mode-aware
+inspection driver. Legacy selects only `DirectLocalModuleFileKey`; observed
+selects only `DirectLocalModuleFileObservationKey`. The observed carrier owns
+one local semantic inspection Result Arc and forwards the child's unchanged
+epoch. File Need/typed outer has no carrier; InputCompute is empty; file
+semantic, parser semantic, Absent and Present retain the file epoch.
+Complete-only validity/equality, child-only events, cancellation, warm reuse,
+exact Arcs, both family directions and upper nonactivation remain mandatory.
+
+Exact compatibility covers MODULE parsing, inspection values/errors and child
+events. The sibling/carrier/outer algebra is Slug-native. Include horizon,
+preparation/evaluation, upper source/load/query/publication and identity bytes
+remain deferred. Future Rust is limited to `source_preparation.rs` and
+`source_preparation_observation_tests.rs`, proposed at 140 production/300
+tests/440 aggregate semantic and 12,900/1,175/14,075 physical caps. STOP on
+Rust now, another owner/file/export, path reads or epoch reconstruction, mixed
+families/events, retained scratch, upper activation or M1 closure. After design
+ACCEPT, schedule one implementation; after implementation ACCEPT, return to
+the docs-only include-horizon/preparation/evaluation and source/load audit.
