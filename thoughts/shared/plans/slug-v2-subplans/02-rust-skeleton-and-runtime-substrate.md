@@ -4230,3 +4230,27 @@ STOP on source/load/include/query activation, public export, moved events,
 retained state, other files or M1 closure. After design ACCEPT, schedule one
 bounded implementation; after its ACCEPT, return directly to external package
 source/load design.
+
+### External repository package lookup observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-external-repository-package-lookup-observation-implementation` from
+Rust base `2a8dd968` and independently accepted design `1f246c0d`. Write only
+`host_package.rs` and new `host_package_observation_tests.rs`.
+
+Preserve the frozen structural sibling, one mode-aware legacy/observed driver,
+matching route-ignore/path child families, semantic Result Arc plus exact
+Arc-backed epoch, empty canonical-delete versus retained ignore-delete prefix,
+ignore-before-marker and `BUILD.bazel`-before-`BUILD` union order, Need/typed
+outer/semantic polarity, exact first Arc, child-only events, compact retention,
+parity and reverse-family isolation.
+
+Caps are 240 production plus 8 test glue and 4,850 physical lines in
+`host_package.rs`, 360 tests and 380 physical lines in the new file, 608
+aggregate semantic and 5,230 combined physical. Run focused prefix/Arc/
+event/cancellation/lifecycle proof, full bzlmod/loading/query, established core
+baselines, fmt/check/diff/accounting, retention scan, cleanup and independent
+latest-diff review. STOP on every other file, source/load/include/query
+activation, mixed families, partial/rebuilt carriers, moved events, retained
+state, cap excess or M1 closure. After ACCEPT, schedule only the docs-only
+external package source/load design.

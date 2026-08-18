@@ -1,27 +1,22 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-external-repository-package-lookup-observation-design`
+Packet: `WP-2A-m1-external-repository-package-lookup-observation-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `d451587f`
+Scheduling base: `1f246c0d`
 Rust base: `2a8dd968`
-Result: freeze the uniquely smaller observed external package-marker lookup
-producer before package source/load observation resumes.
+Semantic design: `1f246c0d`
+Result: implement and accept only the frozen observed external package-marker
+lookup producer before package source/load observation resumes.
 
 ## Authority
 
-Write only:
+Write exactly `app/slug_bzlmod_v2/src/host_package.rs` and new
+`app/slug_bzlmod_v2/src/host_package_observation_tests.rs`. Do not write any
+other Rust, Cargo metadata, BUILD files, fixtures, oracles, generated files,
+docs, exports, or callers.
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest;
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`; and
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
-
-Do not write Rust, Cargo metadata, BUILD files, fixtures, oracles, generated
-files, or callers. Docs caps are 40 net canonical, 220 Stage 2, 200 manifest,
-30 routing, and 490 aggregate.
-
-## Natural owner and future scope
+## Natural owner and scope
 
 `ExternalRepositoryPackageLookupKey` in `slug_bzlmod_v2::host_package` is the
 first complete reusable owner after accepted route policy `2a8dd968`. It alone
@@ -31,7 +26,7 @@ owns canonical deletion policy, route ignore, and ordered `BUILD.bazel` then
 selection above it would duplicate one subtree or leave the include horizon on
 legacy inputs.
 
-The future implementation writes exactly:
+The implementation writes exactly:
 
 - `app/slug_bzlmod_v2/src/host_package.rs`; and
 - new `app/slug_bzlmod_v2/src/host_package_observation_tests.rs`.
@@ -101,7 +96,7 @@ exact-Arc epoch retention are Slug-native. Package source/load, direct-local
 observed horizon, recursive external `.bzl`, query publication, multi-build,
 one-shot, and identity bytes remain deferred.
 
-Future proof must discriminate both `Deleted` origins; invalid/policy error;
+Proof must discriminate both `Deleted` origins; invalid/policy error;
 ignore match/error; `BUILD.bazel` priority; regular/special/missing/wrong-kind
 markers; path errors and `NoBuildFile`; exact empty/ignore/first-marker/full
 demand/value/`Arc::ptr_eq` prefixes; first-Arc duplicates; Need and typed outer
@@ -127,6 +122,6 @@ test movement; cap excess; multiple successors; or M1 closure.
 `REPLAN` if the lookup owner cannot expose the complete route-ignore and both
 marker epochs without another owner/file, if legacy parity requires duplicate
 drivers, or if event publication cannot remain child-owned. After independent
-design `ACCEPT`, schedule exactly one bounded implementation from `2a8dd968`;
-after implementation `ACCEPT`, return directly to external package source/load
-design. Do not activate query or close M1.
+implementation `ACCEPT`, commit the two Rust files and schedule only one
+docs-only external package source/load design. Do not activate query or close
+M1.
