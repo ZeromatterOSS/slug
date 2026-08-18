@@ -4989,3 +4989,39 @@ reverse-family/upper exclusion, cancellation recovery, BUILD selection A-B-A,
 exact bytes/epoch Arcs, retention and cleanup. STOP on another file, semantic/
 event/state/caller change, cap excess or M1 closure. After independent ACCEPT,
 return only to the docs-only upper-source owner audit.
+
+### Repository-package source observation accepted (2026-08-18)
+
+Accepted implementation `ac7b8bdf` completes the eventless repository-package
+source sibling. One shared driver selects only matching observed support,
+lookup and selected-source children, unions Complete epochs left-first before
+semantic inspection, preserves exact first Arcs and retains only the local
+source Result Arc plus compact epoch. Need/typed outer remains carrierless;
+support, lookup and source semantic prefixes are exact; legacy projection moves
+the exact local Arc; no recursive external-Bzl/load/query/build caller is
+activated.
+
+Final accounting against `1815c019` is host +228 at 4,967 physical, proof
++480 at 838, lib +4 at 403, aggregate +712 at 6,208. Focused source proof is
+3/3, full bzlmod is 426 unit plus 193 integration tests, loading is 194 and
+query is 120. Fmt/diff pass. Archive status has only the inherited missing-ref/
+record and retained authoring-doc baseline. Retention/AI cleanup and independent
+review ACCEPT the compact carrier, bounded helpers, exact terminal/event/family
+proof and absence of new collection/cache/lock/task/Host-read state.
+
+### Post-package-source upper-owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-post-package-source-upper-owner-audit` from accepted base
+`ac7b8bdf`. Write only canonical/current/Stage/routing docs within
+40/200/180/30 and 430 aggregate net lines. Rust, Cargo/BUILD, fixtures, oracles,
+generated artifacts, caller/public activation and M1 closure are stopped.
+
+Trace observed package source through recursive `ExternalBzlModuleEvalKey`,
+its source/children/local `.bzl` batch, `RepositoryPackageLoadKey`, BUILD
+evaluation/local batch and only enough upper consumers to prove the first
+complete owner. Account exact Result Arcs, complete epoch order, matching family,
+terminal precedence, recursive/event/cancellation/lifetime ownership, warm
+reuse and lifecycle. Select exactly one bounded observed external-evaluation or
+package-load design, one uniquely smaller prerequisite, or formal REPLAN; freeze
+future files/caps/proof/STOP before implementation and schedule only one
+successor.
