@@ -4584,7 +4584,7 @@ final closure. The fragment helper owns no reusable fact, and the accepted
 observed per-file source key removes any need for another fragment DICE key.
 `ModuleFileFunction.advanceHorizon` is the Bazel 9.2 owner analogue.
 
-### Direct-local preparation observation design active (2026-08-18)
+### Direct-local preparation observation design accepted (2026-08-18)
 
 Run only `WP-2A-m1-direct-local-preparation-observation-design` from
 scheduling base `b7110fe5` and Rust base `79248832`; write only
@@ -4621,3 +4621,29 @@ cancellation/lifecycle, retention/cleanup and validation proof. STOP on Rust
 now, another file/export/caller, standalone-horizon recomputation, mixed
 families, event/state drift, upper activation, cap excess or M1 closure. After
 independent design ACCEPT, schedule exactly one implementation.
+
+### Direct-local preparation observation implementation active (2026-08-18)
+
+Run only
+`WP-2A-m1-direct-local-preparation-observation-implementation` from Rust
+base `79248832` and accepted design `9cdcf9e0`. Write only
+`source_preparation.rs` and
+`source_preparation_observation_tests.rs`.
+
+Implement the private structural preparation sibling/carrier and shared
+mode-aware owner exactly as frozen: observed inspection, root validation, then
+per-BFS current-slice horizon and first-occurrence observed fragment sources.
+Preserve left-first cumulative epochs, the prefix-bounded source terminal
+algebra, exact legacy Arc projection, Host/observed family isolation,
+eventless preparation, compact Result-Arc-plus-epoch retention and zero upper
+activation. Do not compute the standalone horizon key from the recursive
+driver.
+
+Caps against `79248832` are 430 production/13,600 physical, 550 tests/2,130
+physical, 980 aggregate and 15,730 combined. Run the frozen positional,
+nested/cycle, Arc/epoch, family/event/nonactivation,
+cancellation/lifecycle/retention proof plus serial validation, cleanup and
+independent review. STOP on another file/export/caller, mixed families,
+event/state drift, retained traversal scratch, cap excess or M1 closure. After
+ACCEPT, return only to a docs-only evaluation/upper-source publication owner
+audit.
