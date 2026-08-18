@@ -1,81 +1,81 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-direct-local-evaluation-observation-implementation`
+Packet: `WP-2A-m1-direct-local-evaluation-upper-source-owner-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Design/scheduling base: `bfd4f1f6`
-Rust base: `cc34e31d`
-Result: implement only the accepted private observed direct-local evaluation
-sibling and eventless support projection seam.
+Scheduling/Rust base: `1815c019`
+Result: audit only the first complete owner above accepted observed direct-local
+evaluation; choose one bounded design, one uniquely smaller prerequisite, or
+formal REPLAN.
 
 ## Authority and caps
 
 Write only:
 
-- `app/slug_bzlmod_v2/src/source_preparation.rs`
-- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`
+- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
 
-Against `cc34e31d`: at most 240 source net lines and 13,800 physical lines;
-380 proof net lines and 2,500 physical lines; 620 aggregate semantic lines and
-16,300 combined physical. Keep touched helpers below 200 lines.
+Against `1815c019`: at most 40 canonical net lines and 80 physical lines;
+180 current-manifest net lines and 220 physical lines; 180 Stage 2 net lines
+and 5,000 physical lines; 400 aggregate net lines. This packet authorizes no
+Rust, Cargo/BUILD, fixture, oracle or generated-artifact write.
 
-## Required implementation
+## Required audit
 
-Keep `DirectLocalModuleEvaluationKey` and its Value exact. Add one private
-structural `DirectLocalModuleEvaluationObservationKey` and carrier containing
-only the local evaluation Result Arc plus the accepted preparation epoch. One
-Legacy/Observed evaluation driver selects only matching preparation families
-and projects the exact local Arc to legacy. Evaluation adds no path edge:
-PreparationCompute is empty; preparation semantic, Unsupported, RootAbsent,
-evaluation error and success keep the full unchanged preparation epoch;
-preparation Need/typed outer has no carrier. Need is invalid/self-unequal;
-Complete outer compares by outer value; Complete carrier compares semantic
-Result+epoch.
+Trace the accepted callerless observed support outcome through
+`RepositoryPackageSourceKey`, its package-lookup and selected BUILD-source
+children, recursive `ExternalBzlModuleEvalKey`, `RepositoryPackageLoadKey`,
+and the remaining loading-query/build consumers. For every candidate record:
 
-The shared driver remains the sole local evaluation-event authority. Store the
-exact matching-family local batch only for semantic Complete carriers,
-including legacy-equivalent empty batches. Need, typed outer and cancellation
-publish none. Child events remain child-owned and precede the evaluation batch.
+- the smallest DICE key or reusable driver that owns the complete semantic
+  terminal and every mutable path dependency;
+- matching legacy/observed family selection, exact shared Result-Arc and epoch
+  order, terminal prefixes, Need/typed-outer/semantic precedence, validity and
+  equality;
+- the sole owner and order of each Complete event batch, plus cancellation and
+  failed-attempt publication behavior;
+- retained semantic graphs/epochs versus compute-local AST, frontier, load,
+  event and outcome scratch;
+- cold/warm, create/edit/delete/recreate, A/B/A, family-nonactivation and public
+  retry consequences.
 
-Refactor `direct_local_module_support` through one crate-private, eventless
-mode-aware support projection. Legacy behavior and exact returned support Arc
-remain unchanged. The callerless observed branch forwards evaluation Need/
-outer and associates projected Supported/Unsupported/error semantics with the
-evaluation epoch for the later package-source owner. Add no key, retained
-evaluation Arc, event or caller; do not edit or activate `host_package.rs`.
+Determine whether `RepositoryPackageSourceKey` can be the first complete
+observed owner using the accepted support, external-package lookup and selected
+source carriers; whether recursive external `.bzl` source/evaluation requires
+one uniquely smaller sibling frontier first; or whether the constraints require
+formal REPLAN. Do not select `RepositoryPackageLoadKey` merely because it is
+higher: it also owns recursive load evaluation and a BUILD event batch.
 
-Retain only the existing evaluated semantic graph inside one Result Arc plus
-one compact epoch. Included-file vectors, evaluator/module scratch, event
-staging and support projection stay compute-local. Add no state/store/cache,
-collection/interner, lock/task, Host read, revision/certificate, export or
-second event owner.
+## Compatibility and terminal
 
-## Compatibility and proof
+Exact surfaces to preserve are admitted direct-local support/source values and
+errors, BUILD and `.bzl` bytes and Starlark semantics, load order, package
+values, and existing child event text/order. Slug-native candidates are
+structural sibling keys, compact path epochs, typed observed outer errors and
+retry association. Recursive external evaluation, package load, loading-query
+and build publication remain unsupported/deferred until an accepted design and
+implementation activate them.
 
-Exact: evaluation values/errors, Starlark semantics, include order, legacy
-result/Arc behavior and child/evaluation events. Slug-native: sibling/carrier,
-typed outer, retry epoch and observed support association. Deferred: observed
-package source, recursive external `.bzl`, package load/query/build
-publication, broader identities and exact identity bytes.
+Terminate in exactly one of:
 
-Prove identity/Display; exact legacy Arc/result/event parity; observed semantic
-parity; exact preparation epoch membership/order and every Result Arc with no
-new demands; every empty/full prefix and Need/outer validity/no-publication;
-print/error and child-before-parent event order/warm suppression; both family
-directions and zero support/source/ExternalBzl/load/query activation; real
-poll-drop cancellation/recovery; edit/delete/recreate and A/B/A; eventless
-support Supported/Unsupported/error projection; compact Allocative retention,
-Buck2/AI cleanup, focused/full bzlmod/loading/query and established core
-baselines, fmt/check/diff/accounting, Clippy/archive disposition, and one
-independent latest-diff review.
+1. one docs-only bounded design for the smallest complete natural owner;
+2. one docs-only uniquely smaller prerequisite design that returns directly to
+   this audit after its implementation; or
+3. formal REPLAN with the concrete incompatible ownership constraints.
+
+Any selected design must freeze exact future Rust files and measured semantic/
+physical caps, full carrier and terminal algebra, event and lifetime authority,
+family isolation, discriminating proof, validation, Buck2 retention review, AI
+cleanup and independent review. Only after independent design ACCEPT may one
+implementation packet follow.
 
 ## STOP / REPLAN
 
-STOP on every other file, Cargo/BUILD/fixture/oracle write, a caller/export,
-`host_package.rs`, mixed families, rebuilt/partial epoch, moved/duplicate
-events, parent batch on Need/outer/cancel, retained scratch/state, upper
-activation, public behavior, cap excess, multiple successors or M1 closure.
-`REPLAN` if evaluation adds a path edge, exact preparation Arcs cannot survive,
-the support seam needs retained state/API/event ownership, another file/owner
-is required, or legacy result/event semantics must change. After ACCEPT,
-return only to a docs-only upper-source owner audit.
+STOP on Rust, Cargo/BUILD, fixtures/oracles, caller or public activation,
+identity-byte claims, mixed legacy/observed families, reconstructed or partial
+epochs, duplicate/moved events, retained frontier/AST/outcome scratch, new
+stores/locks/tasks/direct Host reads, unmeasured future caps, multiple
+successors or M1 closure. `REPLAN` if no bounded owner can retain the complete
+selected dependency epoch and existing event semantics without crossing an
+unaccepted family or adding a new ownership boundary.

@@ -4790,3 +4790,65 @@ event/family/nonactivation, support, cancellation/lifecycle, retention and
 cleanup proof plus serial validation and independent latest-diff review. STOP
 on another file/caller/export, mixed family, epoch/event/state drift, cap excess
 or M1 closure. After ACCEPT, return only to the docs-only upper-source audit.
+
+
+### Direct-local evaluation observation accepted (2026-08-18)
+
+Commit `1815c019` accepts
+`WP-2A-m1-direct-local-evaluation-observation-implementation` from Rust base
+`cc34e31d` and design `bfd4f1f6`. One private structural evaluation sibling
+and one shared matching-family driver compute only the corresponding
+preparation key. Legacy projects the exact local evaluation Result Arc;
+observed forwards the accepted preparation epoch unchanged.
+
+PreparationCompute retains an empty prefix. Preparation semantic, Unsupported,
+RootAbsent, evaluation error and success retain the complete preparation
+prefix. Need and typed outer remain carrierless, invalid/valid by the frozen
+algebra, and publish no parent batch. Each sibling is its own sole semantic-
+Complete evaluation-event owner; child batches precede the evaluation batch
+and warm reuse suppresses replay.
+
+The crate-private callerless observed support seam projects
+Supported/Unsupported/error semantics with the same epoch without exposing the
+private key, retaining the child evaluation Arc, adding an event, or activating
+`host_package.rs`. Evaluation retains only one semantic Result Arc plus one
+compact epoch; evaluator, module, include, event and support scratch remain
+compute-local. Family isolation, exact epoch Result-Arc identity, lifecycle,
+A/B/A, real cancellation/recovery and upper nonactivation are discriminated.
+
+Accounting against `cc34e31d` is +211 source at 13,747 physical lines, +372
+proof at 2,470 physical lines, +583 aggregate and 16,217 combined. Focused 2/2
+and the full 423 bzlmod unit plus 193 integration tests pass; the previously
+recorded 194 loading and 120 query suites remain green. Core retains only the
+documented 234/235 unit and 12/13 integration inherited baselines. Fmt and
+diff-check pass; Buck2 retention, AI cleanup and independent latest-diff review
+return `ACCEPT`. Exact evaluation semantics/results/events remain exact; the
+sibling/carrier/outer/support association is Slug-native; upper source/load/
+publication and identity bytes remain deferred. M1 is partial.
+
+### Direct-local evaluation/upper-source owner audit active (2026-08-18)
+
+Run only
+`WP-2A-m1-direct-local-evaluation-upper-source-owner-audit` from accepted
+base `1815c019`. Write only canonical/current/Stage 2 docs; caps are 40
+canonical, 180 manifest, 180 Stage and 400 aggregate net lines. Rust,
+Cargo/BUILD, fixtures, oracles, generated artifacts, caller/public activation
+and M1 closure are stopped.
+
+Trace the accepted observed support through `RepositoryPackageSourceKey`,
+external package lookup and selected BUILD source, recursive
+`ExternalBzlModuleEvalKey`, `RepositoryPackageLoadKey`, and the remaining
+loading-query/build consumers. Account for matching family, exact Result Arcs
+and epoch order, every terminal prefix and Need/outer/semantic rule, Complete
+event ownership/order, cancellation publication, compact retained state, warm
+reuse and lifecycle behavior.
+
+Decide whether repository package source is the first complete owner, one
+uniquely smaller recursive external-source/evaluation prerequisite is required,
+or the constraints require formal REPLAN. Preserve exact support/source/BUILD/
+`.bzl` semantics and child events, classify structural siblings/epochs/outers
+as Slug-native, and keep upper publication and identity bytes deferred. End in
+exactly one bounded docs-only design, one prerequisite design returning to this
+audit, or formal REPLAN. Freeze future files and measured caps only after the
+owner is proven; authorize implementation only after independent design
+ACCEPT.
