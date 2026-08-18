@@ -2453,3 +2453,53 @@ workspace/Bzlmod or traversal/adapter changes, direct Host reads, events,
 changed order/batching/polarity, retained work collections, fixture/oracle
 writes, higher loading/core/public/repository/materializer work or cap excess.
 Acceptance returns only to docs-only `WP-2A-m1-host-glob-frontier-design`.
+
+### Accepted observed Host-glob segment frontier (2026-08-17)
+
+Commit `dc6f6e02` accepts the private
+`HostGlobSegmentCandidatesObservationKey` beside its legacy owner. One shared
+mode-aware driver keeps legacy and observed listing/resolution families
+disjoint while preserving literal, wildcard, matched-symlink batching, slot
+projection, first semantic error, error-over-Need and candidate order.
+
+The observed carrier retains exactly one semantic Result Arc plus one
+Arc-backed epoch. Wildcard aggregation is listing, conditional direct base,
+then pending-slot order with stable first-Arc retention. Outer handling is
+prefix-bounded by the first semantic terminal; without a semantic terminal the
+full batch chooses first outer over Need. Need, outer error and cancellation
+publish no carrier or event data. All queues, slots, pending work, join results
+and union scratch remain compute-local.
+
+Focused proof passed 22 tests; full `slug_loading_v2` passed 117 unit tests and
+every integration group; direct `slug_core_v2` check, formatting, artifact,
+scope, family and diff hygiene passed. Strict workspace Clippy stopped first in
+unchanged `allocative_derive`; packet-local Clippy reached only inherited
+unrelated loading diagnostics. Archive status retained only its recorded
+baseline failures. Independent DICE/ownership, retained-memory and
+nine-category cleanup review accepted.
+
+Against `bd4fb8db`, `mod.rs` is +277 production lines at 1,000 physical and
+`tests.rs` is +416 test lines at 1,305 physical; aggregate is +693 net Rust
+lines. Existing admitted segment behavior remains exact. Carrier association,
+decisive-prefix aggregation and exact-Arc identity are Slug-native.
+
+### Resumed Host-glob frontier design (2026-08-17)
+
+Return to docs-only `WP-2A-m1-host-glob-frontier-design` from accepted
+predecessors `b9fda97d`, `f5a9b249`, `bd4fb8db`, `dc696b2d` and `dc6f6e02`.
+Re-audit the adapter -> traversal -> segment-candidate -> package-boundary
+graph now that every known natural-owner observation sibling is available.
+
+Freeze the smallest complete callerless observed traversal frontier, including
+breadth-first order, recursive progress, boundary stops, grouped Need,
+first-ranked error, final path sort, deterministic exact-Arc union, family
+isolation, zero events, cancellation, warm reuse and A/B/A. Retain only one
+semantic Result Arc plus one Arc-backed epoch; all traversal collections and
+union scratch stay compute-local.
+
+Write only canonical/current/Stage 2 under 40/320/280/640 net ledger caps.
+STOP on code/oracle/Cargo writes, BUILD/package-load/core/public/repository/
+materializer work, reconstructed Host reads, event ownership, another retained
+container/cache/graph/store/lock or behavior widening. Acceptance schedules
+exactly one bounded callerless Host-glob implementation, or one uniquely
+smaller docs-only prerequisite if the audit proves it remains necessary.
