@@ -5154,3 +5154,38 @@ exact Result Arcs and epoch order, terminal precedence, events, lifetime and
 lifecycle. Select exactly one bounded package-load design, one uniquely smaller
 prerequisite, or formal REPLAN; freeze future files/caps/proof/STOP before one
 successor and do not implement in this packet.
+
+### Package-load owner audit accepted (2026-08-18)
+
+The audit from `f1d01834` selects `RepositoryPackageLoadKey` as the uniquely
+smallest complete next owner. It alone sequences package source, BUILD parse
+and label prevalidation, AST-order external-Bzl children, synchronous package
+attempt/postvalidation, one local semantic Result Arc and its Complete BUILD
+batch. The attempt helper is compute-local, not a smaller DICE/event producer;
+extracting it would split source/module lifetime and batch authority. Accepted
+observed package-source and external-Bzl carriers cover every lower mutable
+edge. No prerequisite or REPLAN is required.
+
+### Repository-package-load observation design active (2026-08-18)
+
+Run only `WP-2A-m1-repository-package-load-observation-design` from scheduling
+base `f1d01834` and Rust base `93f43264`; write only canonical/current/Stage/
+routing docs within 40/180/180/30 and 430 aggregate. Stop Rust, caller/upper
+activation and M1 closure.
+
+Freeze a doc-hidden public structural sibling/carrier and one matching-family
+Legacy/Observed driver. Preserve source -> parse/prevalidation -> AST-order
+children -> attempt/postvalidation, exact legacy Result Arc, left-first
+union-before-semantic, frozen empty/source/prior/merged/full prefixes and
+immediate carrierless Need/outer. Each sibling owns only its semantic-Complete
+local BUILD batch; children precede it and Need/outer/cancel publish none.
+
+Future Rust is exactly `bzl_module.rs`, `lib.rs`, and
+`host_package_load_tests.rs` within +360/+4/+560, +924 aggregate and
+6,955/86/3,438/10,479 physical caps. Retain only the existing LoadedPackage
+semantic graph in one Result Arc plus compact epoch; all BUILD/load/evaluator/
+event/union scratch stays local. Prove complete prefixes, Arcs, events,
+families, lifecycle and memory. Preserve exact BUILD/package semantics and
+events, Slug-native observation association and deferred upper publication.
+After design ACCEPT schedule one implementation, then only a docs-only
+upper-owner audit.
