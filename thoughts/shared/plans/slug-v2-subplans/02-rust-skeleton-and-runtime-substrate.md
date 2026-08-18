@@ -4146,3 +4146,51 @@ Run focused tests individually and in their parallel batch, full
 bzlmod/loading/query, established core baselines, fmt/check/diff/accounting,
 retention/cleanup, and independent correction review. After ACCEPT, schedule
 only the docs-only external package source/load design; do not close M1.
+
+### Routed repository policy observation accepted (2026-08-18)
+
+Commit `2a8dd968` accepts the route-local REPO/ignore observed siblings from
+design `7f60a5c4` and proof correction `4381bc61`. The matching-family drivers
+preserve policy before REPO source/evaluation and routed REPO before ignore
+source/parser operations. Every completed child epoch joins left-first before
+semantic inspection; equal demands keep the first exact Result Arc. Need and
+typed outer carry no carrier, while semantic terminals retain their exact
+empty/REPO/source/full prefix.
+
+The routed REPO key remains its family's sole local Complete event owner and
+the ignore parent remains eventless. Real compute proof covers cold order,
+semantic prefixes, legacy parity, both family-isolation directions, warm
+suppression, genuinely polled cancellation and recovery, edit/delete/recreate
+and A/B/A. Separate corruption/platform proof covers union conflicts,
+Complete-only validity, WindowsLongPath Need and operation mismatch without a
+production hook.
+
+Final accounting against `e4ee0a8e` is +119 production/+279 tests at 2,679
+physical lines in `repo_file.rs`, +157 production/+357 tests at 3,297 physical
+lines in `repository_ignore.rs`, and +912 semantic/5,976 physical combined.
+Focused 3/3 plus union, full bzlmod/loading/query, fmt/check/diff, retained-state
+and cleanup gates pass. Core 234/235 and runtime 12/13 retain only the two
+documented inherited baselines. Independent latest-diff review returns
+`ACCEPT`. M1 remains partial.
+
+### External package source/load observation design active (2026-08-18)
+
+Run only `WP-2A-m1-external-package-source-load-observation-design` from
+scheduling and Rust base `2a8dd968`. Audit the live
+`ExternalRepositoryPackageLookupKey -> RepositoryPackageSourceKey ->
+RepositoryPackageLoadKey` path, both direct-local include re-entry and
+recursive `ExternalBzlModuleEvalKey` loading, now using the accepted routed
+route/path/source policy carriers as available prerequisites.
+
+Select the first natural producer that can retain one semantic Result Arc plus
+every exact reached path Result Arc without activating a second family or
+moving child event ownership. Freeze deterministic child/union order,
+Need/typed-outer/semantic precedence, cancellation/no-publication, exact Arc
+survival, warm reuse and compact dependency-owned lifetimes. The terminal is
+one bounded source/load design, one uniquely smaller prerequisite, or formal
+`REPLAN`, with exact future files/caps/proof and one successor.
+
+Write only canonical/current/Stage 2/routing under 40/220/180/30 and 470
+aggregate docs caps. STOP on Rust, Cargo, fixtures/oracles, public query
+activation, duplicate family/events, partial/rebuilt carriers, retained
+scratch, multiple successors or M1 closure.

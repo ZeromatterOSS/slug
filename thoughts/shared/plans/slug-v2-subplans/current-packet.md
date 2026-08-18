@@ -1,130 +1,84 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-routed-repository-policy-observation-implementation-retry`
+Packet: `WP-2A-m1-external-package-source-load-observation-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `4381bc61`
-Rust base: `e4ee0a8e`
-Semantic design: `7f60a5c4`
-Proof/cap correction: `4381bc61`
-Result: complete and accept only the retained two-file routed REPO/ignore
-candidate with the corrected discriminating proof.
+Scheduling base: `2a8dd968`
+Rust base: `2a8dd968`
+Result: audit the remaining external package lookup/source/load frontier and
+freeze exactly one bounded observed-owner design, a uniquely smaller
+prerequisite, or formal `REPLAN`.
 
-## Authority and caps
+## Authority
 
-Write exactly:
+Write only:
 
-- `app/slug_bzlmod_v2/src/repo_file.rs`; and
-- `app/slug_bzlmod_v2/src/repository_ignore.rs`.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest;
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-Against Rust base `e4ee0a8e`, cap `repo_file.rs` at 120 production plus
-280 test lines and 2,700 physical lines; cap `repository_ignore.rs` at 160
-production plus 360 test lines and 3,350 physical lines. Aggregate semantic
-growth is capped at 920 and combined physical size at 6,050. Current retained
-candidate accounting is +119 production/+157 tests at 2,557 and +157
-production/+201 tests at 3,141: +634 semantic and 5,698 physical combined.
+Do not write Rust, Cargo metadata, BUILD files, fixtures, oracles, generated
+files, or public/query callers. Docs caps are 40 net canonical, 220 Stage 2,
+180 manifest, 30 routing, and 470 aggregate.
 
-## Frozen implementation contract
+## Accepted predecessor
 
-Preserve the retained candidate's structurally distinct crate-private
-`HostRouteRepoFileObservationKey` and
-`HostRouteRepositoryIgnoreObservationKey`, one mode-aware driver per
-legacy/observed pair, and matching legacy versus observed
-`HostRepositorySourceFile{,Observation}Key` activation. Neither sibling may
-compute the other family, `ExternalRepositoryPackageLookupKey`, or an upper
-loading key.
+Commit `2a8dd968` accepts the route-local REPO/ignore observed producers from
+semantic design `7f60a5c4` and proof-cap correction `4381bc61`. Final
+accounting against `e4ee0a8e` is +119 production/+279 tests at 2,679 physical
+lines in `repo_file.rs`, +157 production/+357 tests at 3,297 physical lines in
+`repository_ignore.rs`, and +912 semantic/5,976 physical combined.
 
-Each observed carrier retains exactly one semantic Result Arc of the legacy
-value type plus one Arc-backed `PathObservationEpoch`, is
-`Allocative`/cheaply cloneable, and exposes only borrowed crate-visible
-accessors. Need has no carrier. Typed source/parser/epoch outer remains outer.
-Semantic policy/source/parse/evaluation/ignore errors remain inside a Complete
-carrier and only Complete values are valid/equal.
+Focused routed tests pass 3/3 plus the union discriminator; full bzlmod,
+loading, and query pass. The established core 234/235 and runtime 12/13
+baselines remain unchanged. Fmt, check, diff/accounting, Buck2 retained-state,
+AI cleanup, Windows-only proof portability, and independent latest-diff review
+all pass. The accepted carriers retain only one semantic Result Arc and one
+Arc-backed epoch; no store, lock, task, direct Host read, or event owner moved.
 
-Preserve policy before routed `REPO.bazel` source before evaluation. Policy
-projection failure is semantic with an empty epoch and no source activation.
-Every completed source epoch is retained before semantic inspection. Missing
-source produces the legacy empty value; source/evaluation errors retain that
-source prefix.
+## Audit scope
 
-Preserve routed REPO before routed `.bazelignore` source before parser
-observations. Union completed epochs left-first with
-`PathObservationEpoch::from_shared` before semantic inspection. Equal
-duplicates retain the earlier exact Arc; mismatch/conflict is typed outer.
-Semantic REPO retains only its prefix. Missing/directory ignore source keeps
-legacy empty behavior. Parser-specific operations join last; parser semantic
-errors retain the reached full prefix, while parser Need/outer has no carrier.
+Start from the live external stack, not the earlier carrierless audit:
 
-The legacy and observed routed REPO keys remain the sole local Complete batch
-owners for their respective families. Ignore parents store no batch.
-Source/parser children keep existing ownership. Need, typed outer, and
-cancellation publish no parent batch. Preserve cold child-before-parent order,
-semantic-error batches, cancellation discard, recovery, and warm suppression.
+- `ExternalRepositoryPackageLookupKey` policy, accepted routed-ignore, and
+  ordered `BUILD.bazel`/`BUILD` marker-path edges;
+- both consumers of that lookup: `RepositoryPackageSourceKey` and
+  `DirectLocalIncludePackageHorizonKey`;
+- direct-local module support, selected BUILD source, and exact FileBytes;
+- `ExternalBzlModuleEvalKey` recursive `.bzl` source/load closure; and
+- `RepositoryPackageLoadKey` BUILD parse/load/evaluation and event ownership.
 
-Retain no route graph, parser vector, prefix list, queue, store, cache,
-interner, lock, task, or direct Host read. Evaluation buffers, union inputs,
-and parser scratch remain compute-local. Completed keys retain only the
-semantic Result Arc, Arc-backed epoch, and existing DICE-owned REPO event
-batch. Routed semantics/events remain exact; observed identity/carrier/outer
-mechanics remain Slug-native; upper external loading/query stays deferred.
+Inventory every legacy/observed path, route-policy, source, lookup, module,
+and package edge. Identify the first natural producer that can retain one
+semantic Result Arc plus every exact reached path Result Arc without computing
+a second family or moving an existing child event batch. Constructor syntax,
+direct-local include re-entry, recursive `.bzl` order, Need/typed-outer/
+semantic precedence, cancellation, and compact dependency-owned lifetimes are
+part of completeness.
 
-## Corrected proof
+The terminal decision must be exactly one of:
 
-Production semantics are frozen. Permit only test-only helper restructuring
-and focused proof beyond the retained candidate.
+1. freeze one bounded source/load observed design with exact future files,
+   semantic/physical caps, proof, validation, retention, and one successor;
+2. select one uniquely smaller observed prerequisite and freeze that design;
+   or
+3. record formal `REPLAN` with the conflicting ownership evidence.
 
-Real route computations must prove:
-
-1. policy-before-source, REPO-source-before-ignore-source-before-parser, and
-   exact cold child-before-parent activation/event order;
-2. exact legacy/observed semantic and event parity for success, missing,
-   wrong-kind/source, REPO parse/evaluation, and ignore parse errors;
-3. empty/REPO/source/full decisive epochs and exact demand/value/
-   `Arc::ptr_eq` membership;
-4. source Need, a genuinely polled cancellation, no partial batch, successor
-   recovery, warm suppression, edit/delete/recreate, and A/B/A; and
-5. both family-isolation directions and zero upper lookup/package activation.
-
-Keep corruption/platform proof separate: exercise left-first equal duplicates,
-mismatch/conflict typed outer, Complete-only validity, and no Need/outer carrier
-at the route union/key-value algebra. Exercise WindowsLongPath parser
-operation, Need, and typed-operation outer only through the existing
-platform-guarded parser seam. Do not invent a Unix path or production test
-hook. Existing lower source/parser tables may supply file-kind, symlink, UTF-8,
-and parser cases only when route proof preserves their corresponding terminal
-and decisive prefix.
-
-Run serially:
-
-1. route semantic/outer/cancellation tests individually, then their
-   default-parallel batch;
-2. full `slug_bzlmod_v2`, `slug_loading_v2`, and `slug_query_v2`;
-3. established `slug_core_v2` library/runtime checks, recording only the
-   unchanged inherited baselines; and
-4. fmt, `cargo check -p slug_bzlmod_v2`, `git diff --check e4ee0a8e`,
-   exact accounting, Buck2 retention scan, AI cleanup categories 1-9, and
-   independent latest-correction review.
-
-After `ACCEPT`, commit this Rust packet and schedule exactly one docs-only
-external package source/load frontier design. Do not activate query or close
-M1.
+Public `RootQueryCommandKey` remains legacy and unactivated. Multi-build,
+one-shot publication, root-package loading, and identity-byte breadth remain
+deferred. Exact external bytes/values/errors/labels/events stay exact;
+structural siblings, carriers, and typed outer handling are Slug-native.
 
 ## STOP / REPLAN
 
-STOP on any other file; Cargo, BUILD, fixture, oracle, generated-file, or
-public-export write; production semantic/ownership change; a production test
-hook; upper lookup/package/loading/query activation; a third family; mixed
-source families; reconstructed Result Arcs; inspection before union; partial
-carrier; moved/duplicate event ownership; retained scratch/new state; false
-platform proof; cap excess; multiple successors; or M1 closure.
+STOP on implementation, public activation, a second legacy/observed subtree,
+partial or reconstructed epochs, moved/duplicate event ownership, retained
+scratch or a new store/cache/lock/task/Host read, missing future files/caps,
+multiple successors, or M1 closure.
 
-`REPLAN` if discriminating proof requires a production seam, another
-owner/file, the existing platform parser seam cannot cover its declared
-algebra, or corrected caps still cannot contain the proof.
-
-## Immediate predecessor
-
-`4381bc61` independently accepts the formal proof-cap correction after the
-sound retained candidate exhausted its original 22-line test headroom. It
-keeps production semantics/caps fixed, separates real computation from
-corruption/platform algebra, and authorizes only this bounded retry.
+`REPLAN` if no single producer or bounded composition can cover direct package
+selection, direct-local include re-entry, and recursive external `.bzl`
+loading without family or event duplication. After independent design review,
+schedule only its one bounded implementation or prerequisite; do not activate
+query or close M1.
