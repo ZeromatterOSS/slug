@@ -4085,3 +4085,41 @@ cleanup and independent latest-diff review. STOP on every other file, upper
 lookup/loading/query activation, mixed families, partial/rebuilt carriers,
 event/memory drift, cap excess or M1 closure. After ACCEPT, schedule only the
 docs-only external package source/load frontier design.
+
+### Routed repository policy proof-cap REPLAN (2026-08-18)
+
+The unaccepted two-file implementation preserves the accepted natural owners
+and passes compile, 406 bzlmod unit tests, full bzlmod/loading/query, and the
+unchanged core 234/235 plus runtime 12/13 baselines. Independent review finds
+no production ownership, carrier, event, memory, or family-isolation defect.
+
+Actual accounting against `e4ee0a8e` is +119 production/+157 tests and 2,557
+physical lines in `repo_file.rs`, plus +157 production/+201 tests and 3,141
+physical lines in `repository_ignore.rs`: +634 semantic and 5,698 physical
+combined. Only 13 and 9 frozen test lines remain. The current route proof
+covers success, exact Arcs, isolation, warm reuse, upper nonactivation, and a
+real pending drop, but not successor recovery, full route semantic prefixes,
+legacy parity, or A/B/A. Typed epoch outer is corruption-only and routed parser
+Need is Windows-only, so completing the proof in 22 lines would require a
+nondiscriminating assertion or an unauthorized seam. Independent review
+accepts formal `REPLAN`.
+
+Run only
+`WP-2A-m1-routed-repository-policy-proof-cap-correction-design` from
+scheduling base `181964f0`, retaining the dirty Rust candidate without
+editing it. Freeze production semantics and the two-file owner boundary.
+Permit the retry only test-helper restructuring and focused route proof:
+real-compute order/parity/semantic-prefix/Need/cancellation-recovery/event/
+lifecycle cases, plus separately honest union/key-value corruption algebra and
+platform-guarded WindowsLongPath parser proof. No production injection seam,
+third key/file, public export, upper activation, event move, or retained state
+is authorized.
+
+Keep production caps at 120/160. Correct test caps to 280/360, physical caps to
+2,700/3,350, aggregate semantic to 920, and combined physical to 6,050. These
+allow at most 123/159 additional test lines beyond the measured candidate.
+After independent design acceptance, schedule exactly one
+`WP-2A-m1-routed-repository-policy-observation-implementation-retry` from
+Rust base `e4ee0a8e`, semantic design `7f60a5c4`, and the accepted
+correction design. After implementation acceptance, return directly to the
+external package source/load design; do not activate query or close M1.
