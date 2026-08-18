@@ -2666,3 +2666,23 @@ no oracle is required. Existing package/glob/event behavior remains exact.
 Carrier/outer association and deterministic first-Arc union are Slug-native.
 Public/core/repository/materializer/native-Windows and identity-byte work stay
 deferred.
+
+### Active final Host-glob loading-frontier implementation (2026-08-17)
+
+Run `WP-2A-m1-host-glob-frontier-implementation` from accepted design
+`5816e435`. Implement only the private observed root-package sibling and shared
+mode-aware package/ephemeral-adapter drivers in the frozen five-file allowlist
+under the 12/170/230/450/650 per-file and 632/880/1,512 aggregate net caps.
+
+Preserve anchor -> BUILD source -> direct Host-`.bzl` AST order -> first-demand
+glob replay order, union-before-semantic prefix terminals, first exact Arc,
+immediate Need, matching terminal event batches and strict Legacy/Observed
+family isolation. Synchronous attempt control/replay remains Slug-native;
+observable package/glob/event behavior remains exact.
+
+Require the frozen adapter/package parity, order/Arc/prefix, replay/event,
+lifecycle, cancellation, activation, validation, accounting and independent
+cleanup proof. STOP on any other file, caller/public/repository activation,
+semantic drift, retained evaluator/request state, another key/cache/lock/task,
+direct Host read, fixture/oracle write or cap excess. Acceptance returns only
+to docs-only Host-glob frontier design.

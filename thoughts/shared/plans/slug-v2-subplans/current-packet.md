@@ -1,11 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-glob-frontier-design`
+Packet: `WP-2A-m1-host-glob-frontier-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Accepted predecessors: `b9fda97d`, `dc6f6e02`, `2bccb48e`
-Result: freeze the complete private observed loading frontier at the natural
-`RootPackageLoadKey` owner.
+Accepted design: `5816e435`
+Result: implement the complete private observed loading frontier at the
+natural `RootPackageLoadKey` owner.
 
 ## Frozen design
 
@@ -93,7 +93,7 @@ lifecycle evidence. No new fixture or oracle is needed.
 
 ## Authority and caps
 
-Future implementation writes only:
+Write only:
 
 - `app/slug_loading_v2/src/host_glob/traversal.rs`;
 - `app/slug_loading_v2/src/host_glob/adapter.rs`;
@@ -114,6 +114,9 @@ No cap-only correction is authorized. `bzl_module.rs` remains the cohesive
 owner because attempt replay, event boundary, errors and RootPackageLoad live
 together; splitting would widen private seams. Require independent
 ownership/cohesion/retention and nine-category cleanup review.
+
+Completion-only scheduling may write canonical, this manifest and Stage 2
+under 180 aggregate net lines.
 
 ## Validation and compatibility
 
@@ -143,6 +146,7 @@ adapter needs another DICE key, proof needs another file/seam/oracle, or
 
 ## Immediate successor
 
-On independent acceptance schedule only
-`WP-2A-m1-host-glob-frontier-implementation` from the design commit. Do not
-combine public/core cutover, repository package globbing or materialization.
+On acceptance return only to docs-only
+`WP-2A-m1-host-glob-frontier-design` using `5816e435` plus the implementation
+commit. Do not combine public/core cutover, repository package globbing or
+materialization.
