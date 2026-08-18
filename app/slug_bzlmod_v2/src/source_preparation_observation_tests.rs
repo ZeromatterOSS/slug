@@ -2094,5 +2094,377 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
     };
     assert!(found.path_observations().is_some());
     assert!(found.root_module_bootstrap_request().is_some());
+}
 
+fn observed_evaluation_key(apparent: &str) -> DirectLocalModuleEvaluationObservationKey {
+    DirectLocalModuleEvaluationObservationKey(
+        DirectLocalModuleEvaluationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            ApparentRepoName::new(apparent).unwrap(),
+        )
+        .unwrap(),
+    )
+}
+
+fn complete_observed_direct_local_evaluation(
+    value: &<DirectLocalModuleEvaluationObservationKey as Key>::Value,
+) -> &ObservedDirectLocalModuleEvaluation {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed direct-local evaluation must complete")
+    };
+    observed
+}
+
+#[tokio::test]
+async fn observed_evaluation_forwards_exact_preparation_events_families_and_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let module = b"module(name='dep')\nprint('eval-root')\ninclude('//p:a.MODULE.bazel')\n";
+    let fragment = b"print('eval-fragment')\n";
+    let fragments = [("p/a.MODULE.bazel", Some(fragment.as_slice()))];
+    let key = observed_evaluation_key("dep");
+    assert_eq!(
+        key.to_string(),
+        "observed-direct-local-module-evaluation:\"/workspace\":@dep"
+    );
+    let (mut cold, _) = direct_local_preparation_transaction(
+        &dice,
+        module,
+        &fragments,
+        71,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let cold_value = cold.compute(&key).await.unwrap();
+    let observed = complete_observed_direct_local_evaluation(&cold_value);
+    let DirectLocalModuleEvaluation::Supported(evaluated) =
+        observed.result.as_ref().as_ref().unwrap()
+    else {
+        panic!("direct-local evaluation must be supported")
+    };
+    assert_eq!(evaluated.module.base.expected_key.name.as_str(), "dep");
+
+    let activations = tracker.take();
+    for expected in [
+        "observed-direct-local-module-evaluation:",
+        "observed-direct-local-module-preparation:",
+        "observed-direct-local-module-inspection:",
+        "observed-host-repository-source-file:",
+    ] {
+        assert!(
+            activations.iter().any(|entry| entry.key.starts_with(expected)),
+            "missing {expected}"
+        );
+    }
+    for forbidden in [
+        "direct-local-module-evaluation:",
+        "direct-local-module-preparation:",
+        "repository-package-source:",
+        "external-bzl-module:",
+        "repository-package-load:",
+        "root-query",
+    ] {
+        assert!(
+            !activations.iter().any(|entry| entry.key.starts_with(forbidden)),
+            "unexpected {forbidden}"
+        );
+    }
+    let event_owners = activations
+        .iter()
+        .filter(|entry| entry.batch.is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(event_owners.len(), 3, "{event_owners:?}");
+    assert!(event_owners[0]
+        .key
+        .starts_with("bzlmod-observed-host-root-module-file:"));
+    assert!(event_owners[1]
+        .key
+        .starts_with("observed-host-route-repo-file:"));
+    assert!(event_owners[2]
+        .key
+        .starts_with("observed-direct-local-module-evaluation:"));
+    let texts = event_owners[2]
+        .batch
+        .as_ref()
+        .unwrap()
+        .events()
+        .iter()
+        .filter_map(|event| match event {
+            EvaluationEvent::StarlarkPrint { text, .. } => Some(text.as_str()),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(texts, ["eval-root", "eval-fragment"]);
+
+    let preparation = cold
+        .compute(&DirectLocalModulePreparationObservationKey(
+            direct_local_preparation_key("dep"),
+        ))
+        .await
+        .unwrap();
+    assert_exact_epoch(
+        &complete_observed_direct_local_preparation(&preparation).observations,
+        &observed.observations,
+    );
+    tracker.take();
+    let warm = cold.compute(&key).await.unwrap();
+    assert!(Arc::ptr_eq(
+        &observed.result,
+        &complete_observed_direct_local_evaluation(&warm).result
+    ));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+
+    let support = direct_local_module_support_observed(&mut cold, &evaluated.route).await;
+    let SourcePreparationOutcome::Complete(Ok(support)) = support else {
+        panic!("observed support must complete")
+    };
+    assert!(matches!(
+        support.result().as_ref(),
+        Ok(DirectLocalModuleSupport::Supported)
+    ));
+    assert_exact_epoch(&observed.observations, support.observations());
+    tracker.take();
+
+    let legacy_key = DirectLocalModuleEvaluationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        ApparentRepoName::new("dep").unwrap(),
+    )
+    .unwrap();
+    let legacy = cold.compute(&legacy_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy evaluation must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result.as_ref());
+    assert!(!tracker.take().iter().any(|entry| entry.key.contains("observed-")));
+
+    let changed_fragments = [(
+        "p/a.MODULE.bazel",
+        Some(b"bazel_dep(name='leaf',version='2')\n".as_slice()),
+    )];
+    let (mut changed, _) =
+        direct_local_preparation_transaction(&dice, module, &changed_fragments, 72, None).await;
+    assert_ne!(
+        observed.result.as_ref(),
+        complete_observed_direct_local_evaluation(&changed.compute(&key).await.unwrap())
+            .result
+            .as_ref()
+    );
+    let (mut absent, _) =
+        direct_local_file_transaction(&dice, "dep", None, None, 73, None).await;
+    let absent_value = absent.compute(&key).await.unwrap();
+    assert!(matches!(
+        complete_observed_direct_local_evaluation(&absent_value).result.as_ref(),
+        Err(DirectLocalModuleEvaluationError::RootAbsent { .. })
+    ));
+    let absent_preparation = absent
+        .compute(&DirectLocalModulePreparationObservationKey(
+            direct_local_preparation_key("dep"),
+        ))
+        .await
+        .unwrap();
+    assert_exact_epoch(
+        &complete_observed_direct_local_preparation(&absent_preparation).observations,
+        &complete_observed_direct_local_evaluation(&absent_value).observations,
+    );
+    let (mut restored, _) =
+        direct_local_preparation_transaction(&dice, module, &fragments, 74, None).await;
+    assert_eq!(
+        observed.result.as_ref(),
+        complete_observed_direct_local_evaluation(&restored.compute(&key).await.unwrap())
+            .result
+            .as_ref()
+    );
+
+    for (variant, source, expected) in [
+        (76, b"unknown_identifier\n".as_slice(), "preparation"),
+        (
+            77,
+            b"module(name='dep')\nfail('evaluation')\n".as_slice(),
+            "evaluation",
+        ),
+    ] {
+        let (mut terminal, _) =
+            direct_local_preparation_transaction(&dice, source, &[], variant, None).await;
+        let value = terminal.compute(&key).await.unwrap();
+        let preparation = terminal
+            .compute(&DirectLocalModulePreparationObservationKey(
+                direct_local_preparation_key("dep"),
+            ))
+            .await
+            .unwrap();
+        let found = complete_observed_direct_local_evaluation(&value);
+        assert!(match found.result.as_ref() {
+            Err(DirectLocalModuleEvaluationError::Preparation(_)) => expected == "preparation",
+            Err(DirectLocalModuleEvaluationError::Evaluation(_)) => expected == "evaluation",
+            _ => false,
+        });
+        assert_exact_epoch(
+            &complete_observed_direct_local_preparation(&preparation).observations,
+            &found.observations,
+        );
+    }
+    let cycle_fragment = b"include('//p:a.MODULE.bazel')\n";
+    let (mut cycle, _) = direct_local_preparation_transaction(
+        &dice,
+        cycle_fragment,
+        &[("p/a.MODULE.bazel", Some(cycle_fragment.as_slice()))],
+        78,
+        None,
+    )
+    .await;
+    let cycle_value = cycle.compute(&key).await.unwrap();
+    let cycle_preparation = cycle
+        .compute(&DirectLocalModulePreparationObservationKey(
+            direct_local_preparation_key("dep"),
+        ))
+        .await
+        .unwrap();
+    assert!(matches!(
+        complete_observed_direct_local_evaluation(&cycle_value).result.as_ref(),
+        Ok(DirectLocalModuleEvaluation::Unsupported(_))
+    ));
+    assert_exact_epoch(
+        &complete_observed_direct_local_preparation(&cycle_preparation).observations,
+        &complete_observed_direct_local_evaluation(&cycle_value).observations,
+    );
+
+    let cancelled_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let cancelled_tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut cancelled, _) = direct_local_preparation_transaction(
+        &cancelled_dice,
+        module,
+        &fragments,
+        75,
+        Some(cancelled_tracker.dupe()),
+    )
+    .await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(cancelled_tracker.take().is_empty());
+    let (mut recovered, _) = direct_local_preparation_transaction(
+        &cancelled_dice,
+        module,
+        &fragments,
+        75,
+        Some(cancelled_tracker.dupe()),
+    )
+    .await;
+    assert!(complete_observed_direct_local_evaluation(&recovered.compute(&key).await.unwrap())
+        .result
+        .is_ok());
+
+    let need_tracker = Arc::new(HostSourceFamilyTracker::default());
+    let need_dice = Dice::builder().build(DetectCycles::Enabled);
+    let (mut pending, _) = direct_local_preparation_transaction(
+        &need_dice,
+        b"include('//missing:a.MODULE.bazel')\n",
+        &[],
+        79,
+        Some(need_tracker.dupe()),
+    )
+    .await;
+    let need_value = pending.compute(&key).await.unwrap();
+    assert!(matches!(need_value, SourcePreparationOutcome::Need(_)));
+    assert!(need_tracker.take().iter().all(|entry| {
+        !entry
+            .key
+            .starts_with("observed-direct-local-module-evaluation:")
+            || entry.batch.is_none()
+    }));
+}
+
+#[test]
+fn observed_evaluation_projection_prefix_and_outer_algebra_are_exact() {
+    let semantic = Arc::new(Err(DirectLocalModuleEvaluationError::PreparationCompute {
+        message: "compute".into(),
+    }));
+    let carrier = SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalModuleEvaluation {
+        result: semantic.dupe(),
+        observations: PathObservationEpoch::empty(),
+    }));
+    let SourcePreparationOutcome::Complete(projected) =
+        project_legacy_direct_local_evaluation(carrier)
+    else {
+        panic!("legacy evaluation projection must complete")
+    };
+    assert!(Arc::ptr_eq(&semantic, &projected));
+
+    let (demand, result, epoch) = observed_horizon_epoch("evaluation");
+    let full = direct_local_evaluation_complete(
+        Err(DirectLocalModuleEvaluationError::RootAbsent {
+            canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+        }),
+        epoch.dupe(),
+    );
+    assert!(Arc::ptr_eq(
+        complete_observed_direct_local_evaluation(&full)
+            .observations
+            .get(&demand)
+            .unwrap(),
+        &result
+    ));
+    assert!(direct_local_evaluation_publishes_batch(&full));
+    let need = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand.dupe()));
+    let need_child = direct_local_evaluation_observed_child(SourcePreparationOutcome::Need(
+        need.dupe(),
+    ));
+    assert!(matches!(
+        need_child,
+        ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == need
+    ));
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand,
+            result_operation: PathObservationOperation::FileBytes,
+        },
+    );
+    let ControlFlow::Break(outer_value) = direct_local_evaluation_observed_child(
+        SourcePreparationOutcome::Complete(Err(outer.dupe())),
+    ) else {
+        panic!("typed outer must stop evaluation")
+    };
+    assert!(DirectLocalModuleEvaluationObservationKey::validity(&outer_value));
+    assert!(DirectLocalModuleEvaluationObservationKey::equality(
+        &outer_value,
+        &outer_value
+    ));
+    assert!(!direct_local_evaluation_publishes_batch(&outer_value));
+    let need_value = SourcePreparationOutcome::Need(need);
+    assert!(!DirectLocalModuleEvaluationObservationKey::validity(&need_value));
+    assert!(!DirectLocalModuleEvaluationObservationKey::equality(
+        &need_value,
+        &need_value
+    ));
+    assert!(!direct_local_evaluation_publishes_batch(&need_value));
+
+    let occurrence = horizon_occurrence("p", 1);
+    let capability = DirectLocalIncludeCycleCapability {
+        package: occurrence.package,
+        target: occurrence.target,
+        repeated_raw_label: occurrence.raw_label.clone(),
+        repeated_location: occurrence.location.clone(),
+        ancestor_raw_label: occurrence.raw_label,
+        ancestor_location: occurrence.location,
+    };
+    let unsupported = direct_local_module_support_result(
+        &local_route(),
+        &Ok(DirectLocalModuleEvaluation::Unsupported(capability)),
+    );
+    assert!(matches!(
+        unsupported,
+        Ok(DirectLocalModuleSupport::Unsupported(_))
+    ));
+    let ordinary = direct_local_module_support_result(
+        &local_route(),
+        &Err(DirectLocalModuleEvaluationError::PreparationCompute {
+            message: "ordinary".into(),
+        }),
+    );
+    assert!(matches!(ordinary, Err(DirectLocalModuleSupportError { .. })));
 }

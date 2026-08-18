@@ -3200,6 +3200,10 @@ fn project_legacy_direct_local_preparation(
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct DirectLocalModuleEvaluationKey(NormalizedAbsolutePath, ApparentRepoName);
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+struct DirectLocalModuleEvaluationObservationKey(DirectLocalModuleEvaluationKey);
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum DirectLocalModuleEvaluation {
     Supported(DirectLocalEvaluatedModule),
@@ -3220,6 +3224,30 @@ enum DirectLocalModuleEvaluationError {
     Evaluation(DirectNonregistryEvaluationError),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedDirectLocalModuleEvaluation {
+    result: Arc<Result<DirectLocalModuleEvaluation, DirectLocalModuleEvaluationError>>,
+    observations: PathObservationEpoch,
+}
+
+type DirectLocalModuleEvaluationDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedDirectLocalModuleEvaluation, ObservedPathFrontierError>,
+>;
+
+fn direct_local_evaluation_observed_child(
+    outcome: DirectLocalModulePreparationDriverOutcome,
+) -> ControlFlow<DirectLocalModuleEvaluationDriverOutcome, ObservedDirectLocalModulePreparation> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(result) => result.map_or_else(
+            |error| ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))),
+            ControlFlow::Continue,
+        ),
+    }
+}
+
 impl DirectLocalModuleEvaluationKey {
     fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
@@ -3231,6 +3259,12 @@ impl fmt::Display for DirectLocalModuleEvaluationKey {
         f.write_str("direct-local-module-evaluation:")?;
         self.0.fmt(f)?;
         write!(f, ":@{}", self.1.as_str())
+    }
+}
+
+impl fmt::Display for DirectLocalModuleEvaluationObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
     }
 }
 
@@ -3262,6 +3296,155 @@ impl std::error::Error for DirectLocalModuleEvaluationError {
     }
 }
 
+async fn drive_direct_local_module_evaluation(
+    ctx: &mut DiceComputations<'_>,
+    key: &DirectLocalModuleEvaluationKey,
+    mode: HostRepositoryObservationMode,
+) -> DirectLocalModuleEvaluationDriverOutcome {
+    let capture_events = ctx
+        .per_transaction_data()
+        .data
+        .get::<CaptureEvaluationEvents>()
+        .is_ok();
+    let mut event_batch = None;
+    let outcome = async {
+        let preparation_key = DirectLocalModulePreparationKey::new(key.0.dupe(), key.1.clone())
+            .expect("direct evaluation key rejects root names");
+        let (preparation, observations) = match mode {
+            HostRepositoryObservationMode::Legacy => match ctx.compute(&preparation_key).await {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(preparation)) => {
+                    (preparation, PathObservationEpoch::empty())
+                }
+                Err(error) => {
+                    return direct_local_evaluation_complete(
+                        Err(DirectLocalModuleEvaluationError::PreparationCompute {
+                            message: Arc::from(error.to_string()),
+                        }),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+            },
+            HostRepositoryObservationMode::Observed => match ctx
+                .compute(&DirectLocalModulePreparationObservationKey(preparation_key))
+                .await
+            {
+                Ok(outcome) => match direct_local_evaluation_observed_child(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => (observed.result, observed.observations),
+                },
+                Err(error) => {
+                    return direct_local_evaluation_complete(
+                        Err(DirectLocalModuleEvaluationError::PreparationCompute {
+                            message: Arc::from(error.to_string()),
+                        }),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+            },
+        };
+        let preparation = match preparation.as_ref() {
+            Ok(preparation) => preparation,
+            Err(error) => {
+                return direct_local_evaluation_complete(
+                    Err(DirectLocalModuleEvaluationError::Preparation(error.clone())),
+                    observations,
+                );
+            }
+        };
+        let closure = match preparation {
+            DirectLocalModulePreparation::Unsupported(capability) => {
+                return direct_local_evaluation_complete(
+                    Ok(DirectLocalModuleEvaluation::Unsupported(capability.clone())),
+                    observations,
+                );
+            }
+            DirectLocalModulePreparation::Supported(closure) => closure,
+        };
+        let route = closure.root.0.0.clone();
+        let root_bytes = match (&closure.root.0.1, &closure.root.1) {
+            (HostRepositorySourceFileValue::Present { bytes, .. }, Some(_)) => bytes,
+            (HostRepositorySourceFileValue::Absent, None) => {
+                return direct_local_evaluation_complete(
+                    Err(DirectLocalModuleEvaluationError::RootAbsent {
+                        canonical_repo: route.canonical_repo().clone(),
+                    }),
+                    observations,
+                );
+            }
+            _ => panic!("direct preparation preserves root source and inspection together"),
+        };
+        let root_logical_id =
+            crate::LogicalModuleFileId::new(format!("{}//:MODULE.bazel", route.canonical_repo()));
+        let included = closure
+            .fragments
+            .iter()
+            .map(|fragment| DirectNonregistryIncludeFile {
+                raw_label: fragment.raw_label.as_str(),
+                logical_id: crate::LogicalModuleFileId::new(format!(
+                    "{}:{}",
+                    fragment.package, fragment.target
+                )),
+                source: fragment.bytes.as_ref(),
+            })
+            .collect::<Vec<_>>();
+        let expected_key = NonrootModuleKey::new(route.module_name(), "");
+        let (evaluation, captured) = evaluate_direct_nonregistry_module_closure_with_events(
+            expected_key,
+            root_logical_id,
+            root_bytes.as_ref(),
+            &included,
+            capture_events,
+        );
+        event_batch = captured;
+        direct_local_evaluation_complete(
+            evaluation
+                .map(|module| {
+                    DirectLocalModuleEvaluation::Supported(DirectLocalEvaluatedModule {
+                        route,
+                        module,
+                    })
+                })
+                .map_err(DirectLocalModuleEvaluationError::Evaluation),
+            observations,
+        )
+    }
+    .await;
+    if capture_events && direct_local_evaluation_publishes_batch(&outcome) {
+        ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+            .expect("direct-local MODULE evaluation stores exactly one event batch");
+    }
+    outcome
+}
+
+fn direct_local_evaluation_publishes_batch(
+    outcome: &DirectLocalModuleEvaluationDriverOutcome,
+) -> bool {
+    matches!(outcome, SourcePreparationOutcome::Complete(Ok(_observed)))
+}
+
+fn direct_local_evaluation_complete(
+    result: Result<DirectLocalModuleEvaluation, DirectLocalModuleEvaluationError>,
+    observations: PathObservationEpoch,
+) -> DirectLocalModuleEvaluationDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalModuleEvaluation {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn project_legacy_direct_local_evaluation(
+    outcome: DirectLocalModuleEvaluationDriverOutcome,
+) -> <DirectLocalModuleEvaluationKey as Key>::Value {
+    outcome.map(|observed| {
+        observed
+            .expect("legacy direct-local evaluation cannot produce an observed outer error")
+            .result
+    })
+}
+
 #[async_trait]
 impl Key for DirectLocalModuleEvaluationKey {
     type Value = SourcePreparationOutcome<
@@ -3269,103 +3452,10 @@ impl Key for DirectLocalModuleEvaluationKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let capture_events = ctx
-            .per_transaction_data()
-            .data
-            .get::<CaptureEvaluationEvents>()
-            .is_ok();
-        let mut event_batch = None;
-        let outcome = async {
-            let preparation = match ctx
-                .compute(
-                    &DirectLocalModulePreparationKey::new(self.0.dupe(), self.1.clone())
-                        .expect("direct evaluation key rejects root names"),
-                )
-                .await
-            {
-                Ok(SourcePreparationOutcome::Need(need)) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                Ok(SourcePreparationOutcome::Complete(preparation)) => preparation,
-                Err(error) => {
-                    return direct_local_evaluation_error(
-                        DirectLocalModuleEvaluationError::PreparationCompute {
-                            message: Arc::from(error.to_string()),
-                        },
-                    );
-                }
-            };
-            let preparation = match preparation.as_ref() {
-                Ok(preparation) => preparation,
-                Err(error) => {
-                    return direct_local_evaluation_error(
-                        DirectLocalModuleEvaluationError::Preparation(error.clone()),
-                    );
-                }
-            };
-            let closure = match preparation {
-                DirectLocalModulePreparation::Unsupported(capability) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Ok(
-                        DirectLocalModuleEvaluation::Unsupported(capability.clone()),
-                    )));
-                }
-                DirectLocalModulePreparation::Supported(closure) => closure,
-            };
-            let route = closure.root.0.0.clone();
-            let root_bytes = match (&closure.root.0.1, &closure.root.1) {
-                (HostRepositorySourceFileValue::Present { bytes, .. }, Some(_)) => bytes,
-                (HostRepositorySourceFileValue::Absent, None) => {
-                    return direct_local_evaluation_error(
-                        DirectLocalModuleEvaluationError::RootAbsent {
-                            canonical_repo: route.canonical_repo().clone(),
-                        },
-                    );
-                }
-                _ => panic!("direct preparation preserves root source and inspection together"),
-            };
-            let root_logical_id = crate::LogicalModuleFileId::new(format!(
-                "{}//:MODULE.bazel",
-                route.canonical_repo()
-            ));
-            let included = closure
-                .fragments
-                .iter()
-                .map(|fragment| DirectNonregistryIncludeFile {
-                    raw_label: fragment.raw_label.as_str(),
-                    logical_id: crate::LogicalModuleFileId::new(format!(
-                        "{}:{}",
-                        fragment.package, fragment.target
-                    )),
-                    source: fragment.bytes.as_ref(),
-                })
-                .collect::<Vec<_>>();
-            let expected_key = NonrootModuleKey::new(route.module_name(), "");
-            let (evaluation, captured) = evaluate_direct_nonregistry_module_closure_with_events(
-                expected_key,
-                root_logical_id,
-                root_bytes.as_ref(),
-                &included,
-                capture_events,
-            );
-            event_batch = captured;
-            match evaluation {
-                Ok(module) => SourcePreparationOutcome::Complete(Arc::new(Ok(
-                    DirectLocalModuleEvaluation::Supported(DirectLocalEvaluatedModule {
-                        route,
-                        module,
-                    }),
-                ))),
-                Err(error) => direct_local_evaluation_error(
-                    DirectLocalModuleEvaluationError::Evaluation(error),
-                ),
-            }
-        }
-        .await;
-        if capture_events && outcome.is_complete() {
-            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("direct-local MODULE evaluation stores exactly one event batch");
-        }
-        outcome
+        project_legacy_direct_local_evaluation(
+            drive_direct_local_module_evaluation(ctx, self, HostRepositoryObservationMode::Legacy)
+                .await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3377,10 +3467,32 @@ impl Key for DirectLocalModuleEvaluationKey {
     }
 }
 
+#[async_trait]
+impl Key for DirectLocalModuleEvaluationObservationKey {
+    type Value = DirectLocalModuleEvaluationDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_direct_local_module_evaluation(ctx, &self.0, HostRepositoryObservationMode::Observed)
+            .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[cfg(test)]
 fn direct_local_evaluation_error(
     error: DirectLocalModuleEvaluationError,
 ) -> <DirectLocalModuleEvaluationKey as Key>::Value {
-    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+    project_legacy_direct_local_evaluation(direct_local_evaluation_complete(
+        Err(error),
+        PathObservationEpoch::empty(),
+    ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -3452,46 +3564,145 @@ impl std::error::Error for DirectLocalModuleSupportError {
     }
 }
 
-pub(crate) async fn direct_local_module_support(
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedDirectLocalModuleSupport {
+    result: Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>>,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedDirectLocalModuleSupport {
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+pub(crate) type DirectLocalModuleSupportDriverOutcome =
+    SourcePreparationOutcome<Result<ObservedDirectLocalModuleSupport, ObservedPathFrontierError>>;
+
+fn direct_local_module_support_result(
+    route: &RootRepositoryRoute,
+    value: &Result<DirectLocalModuleEvaluation, DirectLocalModuleEvaluationError>,
+) -> Result<DirectLocalModuleSupport, DirectLocalModuleSupportError> {
+    match value {
+        Err(error) => Err(DirectLocalModuleSupportError {
+            inner: DirectLocalModuleSupportErrorInner::Evaluation(error.clone()),
+        }),
+        Ok(DirectLocalModuleEvaluation::Supported(_)) => Ok(DirectLocalModuleSupport::Supported),
+        Ok(DirectLocalModuleEvaluation::Unsupported(capability)) => Ok(
+            DirectLocalModuleSupport::Unsupported(DirectLocalUnsupportedCycle {
+                apparent_repo: route.apparent_repo().clone(),
+                module_name: CompactString::new(route.module_name()),
+                repeated_raw_label: capability.repeated_raw_label.clone(),
+                repeated_location: capability.repeated_location.clone(),
+                ancestor_raw_label: capability.ancestor_raw_label.clone(),
+                ancestor_location: capability.ancestor_location.clone(),
+            }),
+        ),
+    }
+}
+
+fn direct_local_module_support_complete(
+    result: Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>,
+    observations: PathObservationEpoch,
+) -> DirectLocalModuleSupportDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalModuleSupport {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+async fn drive_direct_local_module_support(
     ctx: &mut DiceComputations<'_>,
     route: &RootRepositoryRoute,
-) -> SourcePreparationOutcome<Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>>>
-{
+    mode: HostRepositoryObservationMode,
+) -> DirectLocalModuleSupportDriverOutcome {
     let key = DirectLocalModuleEvaluationKey::new(
         route.workspace().dupe(),
         route.apparent_repo().clone(),
     )
     .expect("repository source routes are nonroot");
-    match ctx.compute(&key).await {
-        Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-        Err(error) => {
-            SourcePreparationOutcome::Complete(Arc::new(Err(DirectLocalModuleSupportError {
-                inner: DirectLocalModuleSupportErrorInner::Compute {
-                    message: Arc::from(error.to_string()),
-                },
-            })))
-        }
-        Ok(SourcePreparationOutcome::Complete(value)) => {
-            SourcePreparationOutcome::Complete(Arc::new(match value.as_ref() {
-                Err(error) => Err(DirectLocalModuleSupportError {
-                    inner: DirectLocalModuleSupportErrorInner::Evaluation(error.clone()),
-                }),
-                Ok(DirectLocalModuleEvaluation::Supported(_)) => {
-                    Ok(DirectLocalModuleSupport::Supported)
-                }
-                Ok(DirectLocalModuleEvaluation::Unsupported(capability)) => Ok(
-                    DirectLocalModuleSupport::Unsupported(DirectLocalUnsupportedCycle {
-                        apparent_repo: route.apparent_repo().clone(),
-                        module_name: CompactString::new(route.module_name()),
-                        repeated_raw_label: capability.repeated_raw_label.clone(),
-                        repeated_location: capability.repeated_location.clone(),
-                        ancestor_raw_label: capability.ancestor_raw_label.clone(),
-                        ancestor_location: capability.ancestor_location.clone(),
+    let (value, observations) = match mode {
+        HostRepositoryObservationMode::Legacy => match ctx.compute(&key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(value)) => (value, PathObservationEpoch::empty()),
+            Err(error) => {
+                return direct_local_module_support_complete(
+                    Err(DirectLocalModuleSupportError {
+                        inner: DirectLocalModuleSupportErrorInner::Compute {
+                            message: Arc::from(error.to_string()),
+                        },
                     }),
-                ),
-            }))
-        }
-    }
+                    PathObservationEpoch::empty(),
+                );
+            }
+        },
+        HostRepositoryObservationMode::Observed => match ctx
+            .compute(&DirectLocalModuleEvaluationObservationKey(key))
+            .await
+        {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                (observed.result, observed.observations)
+            }
+            Err(error) => {
+                return direct_local_module_support_complete(
+                    Err(DirectLocalModuleSupportError {
+                        inner: DirectLocalModuleSupportErrorInner::Compute {
+                            message: Arc::from(error.to_string()),
+                        },
+                    }),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        },
+    };
+    direct_local_module_support_complete(
+        direct_local_module_support_result(route, value.as_ref()),
+        observations,
+    )
+}
+
+#[allow(dead_code)]
+pub(crate) async fn direct_local_module_support_observed(
+    ctx: &mut DiceComputations<'_>,
+    route: &RootRepositoryRoute,
+) -> DirectLocalModuleSupportDriverOutcome {
+    drive_direct_local_module_support(ctx, route, HostRepositoryObservationMode::Observed).await
+}
+
+fn project_legacy_direct_local_module_support(
+    outcome: DirectLocalModuleSupportDriverOutcome,
+) -> SourcePreparationOutcome<Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>>>
+{
+    outcome.map(|observed| {
+        observed
+            .expect("legacy direct-local support cannot produce an observed outer error")
+            .result
+    })
+}
+
+pub(crate) async fn direct_local_module_support(
+    ctx: &mut DiceComputations<'_>,
+    route: &RootRepositoryRoute,
+) -> SourcePreparationOutcome<Arc<Result<DirectLocalModuleSupport, DirectLocalModuleSupportError>>>
+{
+    project_legacy_direct_local_module_support(
+        drive_direct_local_module_support(ctx, route, HostRepositoryObservationMode::Legacy).await,
+    )
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Allocative, Dupe)]
