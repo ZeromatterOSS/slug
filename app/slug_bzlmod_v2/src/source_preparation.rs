@@ -87,7 +87,9 @@ use crate::builtin_repository::BuiltinBazelToolsModuleKey;
 use crate::host_package::ExternalRepositoryPackageLookup;
 use crate::host_package::ExternalRepositoryPackageLookupError;
 use crate::host_package::ExternalRepositoryPackageLookupKey;
+use crate::host_package::ExternalRepositoryPackageLookupObservationKey;
 use crate::host_package::HostBuildFileName;
+use crate::host_package::ObservedExternalRepositoryPackageLookup;
 use crate::host_package::invalid_package_name;
 use crate::module_eval::DirectNonregistryEvaluationError;
 use crate::module_eval::DirectNonregistryIncludeFile;
@@ -1108,7 +1110,7 @@ impl fmt::Display for DirectLocalModuleFileObservationKey {
 type DirectLocalModuleFileDriverOutcome =
     SourcePreparationOutcome<Result<ObservedDirectLocalModuleFile, ObservedPathFrontierError>>;
 
-fn merge_direct_local_file_observations(
+fn merge_direct_local_observations(
     first: &PathObservationEpoch,
     second: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
@@ -1195,7 +1197,7 @@ async fn drive_direct_local_module_file(
                     ControlFlow::Continue(observed) => observed,
                 },
             };
-            let observations = match merge_direct_local_file_observations(
+            let observations = match merge_direct_local_observations(
                 &PathObservationEpoch::empty(),
                 observed.observations(),
             ) {
@@ -1248,13 +1250,12 @@ async fn drive_direct_local_module_file(
                     ControlFlow::Continue(observed) => observed,
                 },
             };
-            let observations = match merge_direct_local_file_observations(
-                &route_observations,
-                observed.observations(),
-            ) {
-                Ok(observations) => observations,
-                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
-            };
+            let observations =
+                match merge_direct_local_observations(&route_observations, observed.observations())
+                {
+                    Ok(observations) => observations,
+                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                };
             (observed.result().as_ref().clone(), observations)
         }
     };
@@ -1513,6 +1514,9 @@ impl Key for DirectLocalModuleInspectionObservationKey {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct DirectLocalIncludePackageHorizonKey(NormalizedAbsolutePath, ApparentRepoName);
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+struct DirectLocalIncludePackageHorizonObservationKey(DirectLocalIncludePackageHorizonKey);
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct DirectLocalIncludePackageHorizon {
     route: RootRepositoryRoute,
@@ -1551,7 +1555,29 @@ enum DirectLocalIncludePackageFailure {
     Lookup(ExternalRepositoryPackageLookupError),
     LookupCompute { message: Arc<str> },
 }
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedDirectLocalIncludePackageHorizon {
+    result: Arc<Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>>,
+    observations: PathObservationEpoch,
+}
+
+type DirectLocalIncludePackageHorizonDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedDirectLocalIncludePackageHorizon, ObservedPathFrontierError>,
+>;
+type DirectLocalIncludePackageLookupOutcome = Result<
+    SourcePreparationOutcome<
+        Result<
+            (
+                Arc<Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>>,
+                PathObservationEpoch,
+            ),
+            ObservedPathFrontierError,
+        >,
+    >,
+    Arc<str>,
+>;
 impl DirectLocalIncludePackageHorizonKey {
+    #[allow(dead_code)]
     fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
         (!apparent_repo.is_root()).then_some(Self(workspace, apparent_repo))
     }
@@ -1561,6 +1587,12 @@ impl fmt::Display for DirectLocalIncludePackageHorizonKey {
         f.write_str("direct-local-include-package-horizon:")?;
         self.0.fmt(f)?;
         write!(f, ":@{}", self.1.as_str())
+    }
+}
+
+impl fmt::Display for DirectLocalIncludePackageHorizonObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
     }
 }
 
@@ -1619,33 +1651,14 @@ impl Key for DirectLocalIncludePackageHorizonKey {
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let inspection = match ctx
-            .compute(
-                &DirectLocalModuleInspectionKey::new(self.0.dupe(), self.1.clone())
-                    .expect("direct horizon key rejects root names"),
+        project_legacy_direct_local_include_horizon(
+            drive_direct_local_include_horizon_key(
+                ctx,
+                self,
+                HostRepositoryObservationMode::Legacy,
             )
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(inspection)) => inspection,
-            Err(error) => {
-                return direct_local_include_inspection_error(Err(Arc::from(error.to_string())));
-            }
-        };
-        let inspection = match inspection.as_ref() {
-            Ok(inspection) => inspection,
-            Err(error) => {
-                return direct_local_include_inspection_error(Ok(error.clone()));
-            }
-        };
-        let route = inspection.0.0.clone();
-        let requests = inspection
-            .1
-            .as_ref()
-            .map_or(&[][..], |inspection| inspection.includes.as_ref());
-        preflight_direct_local_include_package_horizon(ctx, route, requests).await
+            .await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1657,23 +1670,217 @@ impl Key for DirectLocalIncludePackageHorizonKey {
     }
 }
 
+#[async_trait]
+impl Key for DirectLocalIncludePackageHorizonObservationKey {
+    type Value = DirectLocalIncludePackageHorizonDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_direct_local_include_horizon_key(
+            ctx,
+            &self.0,
+            HostRepositoryObservationMode::Observed,
+        )
+        .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+fn direct_local_horizon_complete(
+    result: Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>,
+    observations: PathObservationEpoch,
+) -> DirectLocalIncludePackageHorizonDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalIncludePackageHorizon {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn direct_local_horizon_inspection_error(
+    error: Result<DirectLocalModuleInspectionError, Arc<str>>,
+    observations: PathObservationEpoch,
+) -> DirectLocalIncludePackageHorizonDriverOutcome {
+    direct_local_horizon_complete(
+        Err(match error {
+            Ok(error) => DirectLocalIncludePackageHorizonError::Inspection(error),
+            Err(message) => DirectLocalIncludePackageHorizonError::InspectionCompute { message },
+        }),
+        observations,
+    )
+}
+
+fn direct_local_horizon_observed_inspection(
+    outcome: DirectLocalModuleInspectionDriverOutcome,
+) -> ControlFlow<DirectLocalIncludePackageHorizonDriverOutcome, ObservedDirectLocalModuleInspection>
+{
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(result) => result.map_or_else(
+            |error| ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))),
+            ControlFlow::Continue,
+        ),
+    }
+}
+
+async fn drive_direct_local_include_horizon_key(
+    ctx: &mut DiceComputations<'_>,
+    key: &DirectLocalIncludePackageHorizonKey,
+    mode: HostRepositoryObservationMode,
+) -> DirectLocalIncludePackageHorizonDriverOutcome {
+    let inspection_key = DirectLocalModuleInspectionKey::new(key.0.dupe(), key.1.clone())
+        .expect("direct horizon key rejects root names");
+    let (inspection, observations) = match mode {
+        HostRepositoryObservationMode::Legacy => match ctx.compute(&inspection_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(inspection)) => {
+                (inspection.as_ref().clone(), PathObservationEpoch::empty())
+            }
+            Err(error) => {
+                return direct_local_horizon_inspection_error(
+                    Err(Arc::from(error.to_string())),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        },
+        HostRepositoryObservationMode::Observed => {
+            match ctx
+                .compute(&DirectLocalModuleInspectionObservationKey(inspection_key))
+                .await
+            {
+                Err(error) => {
+                    return direct_local_horizon_inspection_error(
+                        Err(Arc::from(error.to_string())),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+                Ok(outcome) => match direct_local_horizon_observed_inspection(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => {
+                        (observed.result.as_ref().clone(), observed.observations)
+                    }
+                },
+            }
+        }
+    };
+    let inspection = match inspection {
+        Ok(inspection) => inspection,
+        Err(error) => {
+            return direct_local_horizon_inspection_error(Ok(error), observations);
+        }
+    };
+    let route = inspection.0.0.clone();
+    let requests = inspection
+        .1
+        .as_ref()
+        .map_or(&[][..], |inspection| inspection.includes.as_ref());
+    drive_direct_local_include_package_horizon(ctx, route, requests, observations, mode).await
+}
+
 async fn preflight_direct_local_include_package_horizon(
     ctx: &mut DiceComputations<'_>,
     route: RootRepositoryRoute,
     requests: &[NonrootIncludeRequest],
 ) -> <DirectLocalIncludePackageHorizonKey as Key>::Value {
+    project_legacy_direct_local_include_horizon(
+        drive_direct_local_include_package_horizon(
+            ctx,
+            route,
+            requests,
+            PathObservationEpoch::empty(),
+            HostRepositoryObservationMode::Legacy,
+        )
+        .await,
+    )
+}
+
+async fn drive_direct_local_include_package_horizon(
+    ctx: &mut DiceComputations<'_>,
+    route: RootRepositoryRoute,
+    requests: &[NonrootIncludeRequest],
+    initial_observations: PathObservationEpoch,
+    mode: HostRepositoryObservationMode,
+) -> DirectLocalIncludePackageHorizonDriverOutcome {
+    let occurrences = match parse_direct_local_include_horizon(&route, requests) {
+        Ok(occurrences) => occurrences,
+        Err(error) => return direct_local_horizon_complete(Err(error), initial_observations),
+    };
+    let mut unique = SmallSet::with_capacity(occurrences.len());
+    let mut packages = Vec::with_capacity(occurrences.len());
+    for occurrence in &occurrences {
+        if unique.insert(occurrence.package.clone()) {
+            packages.push(occurrence.package.clone());
+        }
+    }
+    let computed = ctx
+        .compute_join(packages.clone(), |ctx, package| {
+            let route = route.clone();
+            Box::pin(async move {
+                let result = match mode {
+                    HostRepositoryObservationMode::Legacy => ctx
+                        .compute(
+                            &ExternalRepositoryPackageLookupKey::new(route, package.clone())
+                                .expect("occurrence package uses the inspection route"),
+                        )
+                        .await
+                        .map(|outcome| {
+                            outcome.map(|result| Ok((result, PathObservationEpoch::empty())))
+                        }),
+                    HostRepositoryObservationMode::Observed => ctx
+                        .compute(
+                            &ExternalRepositoryPackageLookupObservationKey::new(
+                                route,
+                                package.clone(),
+                            )
+                            .expect("occurrence package uses the inspection route"),
+                        )
+                        .await
+                        .map(|outcome| {
+                            outcome.map(|result| {
+                                result.map(|observed: ObservedExternalRepositoryPackageLookup| {
+                                    (observed.result().dupe(), observed.observations().dupe())
+                                })
+                            })
+                        }),
+                }
+                .map_err(|error| Arc::<str>::from(error.to_string()));
+                (package, result)
+            })
+        })
+        .await;
+    let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
+    finish_direct_local_include_package_horizon_observed(
+        route,
+        occurrences,
+        &packages,
+        outcomes,
+        initial_observations,
+    )
+}
+
+fn parse_direct_local_include_horizon(
+    route: &RootRepositoryRoute,
+    requests: &[NonrootIncludeRequest],
+) -> Result<Vec<DirectLocalIncludePackageOccurrence>, DirectLocalIncludePackageHorizonError> {
     let mut occurrences = Vec::with_capacity(requests.len());
     for request in requests {
         let parsed = match parse_root_include(request) {
             Ok(parsed) => parsed,
             Err(message) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    DirectLocalIncludePackageHorizonError::BadLabel {
-                        raw_label: request.path.clone(),
-                        location: request.location.clone(),
-                        message,
-                    },
-                )));
+                return Err(DirectLocalIncludePackageHorizonError::BadLabel {
+                    raw_label: request.path.clone(),
+                    location: request.location.clone(),
+                    message,
+                });
             }
         };
         occurrences.push(DirectLocalIncludePackageOccurrence {
@@ -1686,50 +1893,16 @@ async fn preflight_direct_local_include_package_horizon(
             location: request.location.clone(),
         });
     }
-
-    let mut unique = SmallSet::with_capacity(occurrences.len());
-    for occurrence in &occurrences {
-        unique.insert(occurrence.package.clone());
-    }
-    let computed = ctx
-        .compute_join(unique, |ctx, package| {
-            let route = route.clone();
-            Box::pin(async move {
-                let result = ctx
-                    .compute(
-                        &ExternalRepositoryPackageLookupKey::new(route, package.clone())
-                            .expect("occurrence package uses the inspection route"),
-                    )
-                    .await
-                    .map_err(|error| Arc::<str>::from(error.to_string()));
-                (package, result)
-            })
-        })
-        .await;
-    let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
-    finish_direct_local_include_package_horizon(route, occurrences, outcomes)
+    Ok(occurrences)
 }
 
-fn direct_local_include_inspection_error(
-    error: Result<DirectLocalModuleInspectionError, Arc<str>>,
-) -> <DirectLocalIncludePackageHorizonKey as Key>::Value {
-    let error = match error {
-        Ok(error) => DirectLocalIncludePackageHorizonError::Inspection(error),
-        Err(message) => DirectLocalIncludePackageHorizonError::InspectionCompute { message },
-    };
-    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
-}
-
-fn finish_direct_local_include_package_horizon(
+fn finish_direct_local_include_package_horizon_observed(
     route: RootRepositoryRoute,
     occurrences: Vec<DirectLocalIncludePackageOccurrence>,
-    outcomes: SmallMap<
-        PackageIdentifier,
-        Result<<ExternalRepositoryPackageLookupKey as Key>::Value, Arc<str>>,
-    >,
-) -> SourcePreparationOutcome<
-    Arc<Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>>,
-> {
+    packages: &[PackageIdentifier],
+    outcomes: SmallMap<PackageIdentifier, DirectLocalIncludePackageLookupOutcome>,
+    mut observations: PathObservationEpoch,
+) -> DirectLocalIncludePackageHorizonDriverOutcome {
     let mut all_need: Option<SourcePreparationNeeds> = None;
     for outcome in outcomes.values() {
         if let Ok(SourcePreparationOutcome::Need(incoming)) = outcome {
@@ -1742,25 +1915,44 @@ fn finish_direct_local_include_package_horizon(
         }
     }
 
-    for occurrence in &occurrences {
+    let mut saw_need = false;
+    let mut remaining_occurrences = occurrences.iter();
+    for package in packages {
+        let occurrence = remaining_occurrences
+            .find(|occurrence| &occurrence.package == package)
+            .expect("each unique package has a first occurrence");
         let outcome = outcomes
-            .get(&occurrence.package)
-            .expect("every occurrence package was computed");
+            .get(package)
+            .expect("every unique package was computed");
         let value = match outcome {
             Err(message) => {
-                return package_horizon_error(
+                if saw_need {
+                    return SourcePreparationOutcome::Need(
+                        all_need.expect("an earlier package contributed a Need"),
+                    );
+                }
+                return direct_local_horizon_package_error(
                     occurrence,
                     DirectLocalIncludePackageFailure::LookupCompute {
                         message: message.dupe(),
                     },
+                    observations,
                 );
             }
             Ok(SourcePreparationOutcome::Need(_)) => {
-                return SourcePreparationOutcome::Need(
-                    all_need.expect("the current occurrence contributed a Need"),
-                );
+                saw_need = true;
+                continue;
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(error.dupe()));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok((value, incoming)))) => {
+                observations = match merge_direct_local_observations(&observations, incoming) {
+                    Ok(observations) => observations,
+                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                };
+                value
+            }
         };
         let failure = match value.as_ref() {
             Ok(ExternalRepositoryPackageLookup::Package(_)) => continue,
@@ -1777,29 +1969,51 @@ fn finish_direct_local_include_package_horizon(
             }
             Err(error) => DirectLocalIncludePackageFailure::Lookup(error.clone()),
         };
-        return package_horizon_error(occurrence, failure);
+        if saw_need {
+            return SourcePreparationOutcome::Need(
+                all_need.expect("an earlier package contributed a Need"),
+            );
+        }
+        return direct_local_horizon_package_error(occurrence, failure, observations);
     }
 
-    SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalIncludePackageHorizon {
-        route,
-        occurrences: occurrences.into(),
-    })))
+    if saw_need {
+        SourcePreparationOutcome::Need(all_need.expect("a package contributed a Need"))
+    } else {
+        direct_local_horizon_complete(
+            Ok(DirectLocalIncludePackageHorizon {
+                route,
+                occurrences: occurrences.into(),
+            }),
+            observations,
+        )
+    }
 }
 
-fn package_horizon_error(
+fn direct_local_horizon_package_error(
     occurrence: &DirectLocalIncludePackageOccurrence,
     failure: DirectLocalIncludePackageFailure,
-) -> SourcePreparationOutcome<
-    Arc<Result<DirectLocalIncludePackageHorizon, DirectLocalIncludePackageHorizonError>>,
-> {
-    SourcePreparationOutcome::Complete(Arc::new(Err(
-        DirectLocalIncludePackageHorizonError::Package {
+    observations: PathObservationEpoch,
+) -> DirectLocalIncludePackageHorizonDriverOutcome {
+    direct_local_horizon_complete(
+        Err(DirectLocalIncludePackageHorizonError::Package {
             raw_label: occurrence.raw_label.clone(),
             location: occurrence.location.clone(),
             package: occurrence.package.clone(),
             failure,
-        },
-    )))
+        }),
+        observations,
+    )
+}
+
+fn project_legacy_direct_local_include_horizon(
+    outcome: DirectLocalIncludePackageHorizonDriverOutcome,
+) -> <DirectLocalIncludePackageHorizonKey as Key>::Value {
+    outcome.map(|observed| {
+        observed
+            .expect("legacy direct-local horizon cannot produce an observed outer error")
+            .result
+    })
 }
 
 impl fmt::Display for RepositorySourceFileKey {
@@ -8332,12 +8546,6 @@ mod tests {
             },
         }
     }
-    fn lookup_complete(
-        value: Result<ExternalRepositoryPackageLookup, ExternalRepositoryPackageLookupError>,
-    ) -> Result<<ExternalRepositoryPackageLookupKey as Key>::Value, Arc<str>> {
-        Ok(SourcePreparationOutcome::Complete(Arc::new(value)))
-    }
-
     #[test]
     fn direct_identity_and_typed_errors() {
         assert_eq!(
@@ -8885,101 +9093,176 @@ mod tests {
         );
         let p = horizon_occurrence("p", 1);
         let q = horizon_occurrence("q", 2);
-        let finish = |occurrences, outcomes| {
-            finish_direct_local_include_package_horizon(local_route(), occurrences, outcomes)
+        let r = horizon_occurrence("r", 3);
+        let packages = vec![p.package.clone(), q.package.clone(), r.package.clone()];
+        let prefix = epoch(&root("dep", "1"), "dep", Some(b""));
+        let inspection = direct_local_horizon_inspection_error(
+            Ok(DirectLocalModuleInspectionError::InputCompute(
+                "input".into(),
+            )),
+            prefix.dupe(),
+        );
+        let SourcePreparationOutcome::Complete(Ok(inspection)) = inspection else {
+            panic!("inspection semantic must complete")
         };
-        let complete = finish(Vec::new(), SmallMap::new());
-        assert!(DirectLocalIncludePackageHorizonKey::validity(&complete));
-        assert!(DirectLocalIncludePackageHorizonKey::equality(
-            &complete, &complete
+        assert!(matches!(
+            inspection.result.as_ref(),
+            Err(DirectLocalIncludePackageHorizonError::Inspection(_))
         ));
-        let failure = |value: <DirectLocalIncludePackageHorizonKey as Key>::Value| match value {
-            SourcePreparationOutcome::Complete(value) => {
-                value.as_ref().as_ref().unwrap_err().clone()
-            }
-            SourcePreparationOutcome::Need(_) => panic!("expected terminal"),
+        assert_eq!(inspection.observations, prefix);
+        let bad_request = NonrootIncludeRequest {
+            path: "@bad//:x.MODULE.bazel".into(),
+            location: p.location.clone(),
         };
-        for (error, sourced) in [
-            (Err(Arc::from("compute")), false),
-            (
-                Ok(DirectLocalModuleInspectionError::InputCompute(Arc::from(
-                    "input",
-                ))),
-                true,
-            ),
-        ] {
-            let SourcePreparationOutcome::Complete(mapped) =
-                direct_local_include_inspection_error(error)
-            else {
-                panic!("inspection mapping")
-            };
-            let mapped = mapped.as_ref().as_ref().unwrap_err();
-            assert_eq!(std::error::Error::source(mapped).is_some(), sourced);
-        }
-        let typed = ExternalRepositoryPackageLookupError::Path(RepositorySourceFileError::Cycle {
-            repo_relative_path: Arc::new(PathBuf::from("p/BUILD.bazel")),
+        assert!(matches!(
+            parse_direct_local_include_horizon(&local_route(), &[bad_request]),
+            Err(DirectLocalIncludePackageHorizonError::BadLabel { .. })
+        ));
+
+        let need = SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
+            workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
         });
-        for (outcome, kind, source) in [
+        let ControlFlow::Break(inspection_need) =
+            direct_local_horizon_observed_inspection(SourcePreparationOutcome::Need(need.dupe()))
+        else {
+            panic!("inspection Need must stop")
+        };
+        assert!(matches!(inspection_need, SourcePreparationOutcome::Need(_)));
+        let outer = ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand: PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new("/workspace/dep/BUILD.bazel").unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                result_operation: PathObservationOperation::FileBytes,
+            },
+        );
+        let ControlFlow::Break(inspection_outer) = direct_local_horizon_observed_inspection(
+            SourcePreparationOutcome::Complete(Err(outer.dupe())),
+        ) else {
+            panic!("inspection outer must stop")
+        };
+        assert!(
+            matches!(&inspection_outer, SourcePreparationOutcome::Complete(Err(error)) if error == &outer)
+        );
+
+        let child_epoch = |slot| {
+            let demand = PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("/workspace/dep/{slot}/BUILD.bazel")).unwrap(),
+                PathObservationOperation::Lstat,
+            );
+            PathObservationEpoch::from_shared([(
+                demand,
+                Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+            )])
+            .unwrap()
+        };
+        let success = |slot| {
+            Ok(SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Ok(ExternalRepositoryPackageLookup::Package(
+                    HostBuildFileName::BuildDotBazel,
+                ))),
+                child_epoch(slot),
+            ))))
+        };
+        let batch = |slot, terminal: DirectLocalIncludePackageLookupOutcome| {
+            packages
+                .iter()
+                .enumerate()
+                .map(|(index, package)| {
+                    (
+                        package.clone(),
+                        if index == slot {
+                            terminal.clone()
+                        } else {
+                            success(index)
+                        },
+                    )
+                })
+                .collect()
+        };
+        let reduce = |outcomes| {
+            finish_direct_local_include_package_horizon_observed(
+                local_route(),
+                vec![p.clone(), q.clone(), r.clone()],
+                &packages,
+                outcomes,
+                prefix.dupe(),
+            )
+        };
+        for slot in 0..3 {
+            let compute = reduce(batch(slot, Err("lookup compute".into())));
+            let observed = match &compute {
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+                _ => panic!("lookup compute is semantic"),
+            };
+            assert!(matches!(
+                observed.result.as_ref(),
+                Err(DirectLocalIncludePackageHorizonError::Package {
+                    failure: DirectLocalIncludePackageFailure::LookupCompute { .. },
+                    ..
+                })
+            ));
+            assert_eq!(
+                observed.observations.observations().len(),
+                prefix.observations().len() + slot
+            );
+            assert!(DirectLocalIncludePackageHorizonObservationKey::validity(
+                &compute
+            ));
+            assert!(DirectLocalIncludePackageHorizonObservationKey::equality(
+                &compute, &compute
+            ));
+            assert!(matches!(
+                reduce(batch(slot, Ok(SourcePreparationOutcome::Need(need.dupe())))),
+                SourcePreparationOutcome::Need(_)
+            ));
+            assert!(
+                matches!(reduce(batch(slot, Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))))), SourcePreparationOutcome::Complete(Err(error)) if error == outer)
+            );
+        }
+        for (result, kind, sourced) in [
             (
-                Err(Arc::from("lookup compute failed")),
-                "LookupCompute",
-                false,
-            ),
-            (
-                lookup_complete(Ok(ExternalRepositoryPackageLookup::InvalidPackageName {
-                    message: Arc::from("invalid"),
-                })),
+                Ok(ExternalRepositoryPackageLookup::InvalidPackageName {
+                    message: "invalid".into(),
+                }),
                 "InvalidPackageName",
                 false,
             ),
-            (lookup_complete(Err(typed)), "Lookup", true),
-        ] {
-            let mut outcomes = SmallMap::new();
-            outcomes.insert(p.package.clone(), outcome);
-            let error = failure(finish(vec![p.clone()], outcomes));
-            assert!(format!("{error:?}").contains(kind));
-            assert!(error.to_string().contains("dep/MODULE.bazel:1:3"));
-            assert_eq!(std::error::Error::source(&error).is_some(), source);
-        }
-        let mut outcomes = SmallMap::new();
-        outcomes.insert(
-            q.package.clone(),
-            lookup_complete(Ok(ExternalRepositoryPackageLookup::Deleted)),
-        );
-        outcomes.insert(
-            p.package.clone(),
-            lookup_complete(Ok(ExternalRepositoryPackageLookup::NoBuildFile)),
-        );
-        assert!(matches!(
-            failure(finish(vec![p.clone(), q.clone()], outcomes)),
-            DirectLocalIncludePackageHorizonError::Package { raw_label, failure: DirectLocalIncludePackageFailure::NoBuildFile, .. }
-                if raw_label == p.raw_label
-        ));
-        let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
-            PathObservationDemand::new(
-                PathObservationNamespace::Host,
-                NormalizedAbsolutePath::new("/workspace/dep/p/BUILD.bazel").unwrap(),
-                PathObservationOperation::Lstat,
+            (
+                Err(ExternalRepositoryPackageLookupError::Path(
+                    RepositorySourceFileError::Cycle {
+                        repo_relative_path: Arc::new(PathBuf::from("p/BUILD.bazel")),
+                    },
+                )),
+                "Lookup",
+                true,
             ),
-        ));
-        let bootstrap_need =
-            SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
-                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
-            });
-        let mut outcomes = SmallMap::new();
-        outcomes.insert(
-            p.package.clone(),
-            Ok(SourcePreparationOutcome::Need(path_need)),
-        );
-        outcomes.insert(
-            q.package.clone(),
-            Ok(SourcePreparationOutcome::Need(bootstrap_need)),
-        );
-        let SourcePreparationOutcome::Need(union) = finish(vec![p, q], outcomes) else {
-            panic!("expected union")
-        };
-        assert_eq!(union.path_observations().unwrap().demands().len(), 1);
-        assert!(union.root_module_bootstrap_request().is_some());
+        ] {
+            let value = reduce(batch(
+                1,
+                Ok(SourcePreparationOutcome::Complete(Ok((
+                    Arc::new(result),
+                    child_epoch(1),
+                )))),
+            ));
+            let observed = match &value {
+                SourcePreparationOutcome::Complete(Ok(observed)) => observed,
+                _ => panic!("lookup semantic must complete"),
+            };
+            let observed_result = observed.result.dupe();
+            let error = observed_result.as_ref().as_ref().unwrap_err();
+            assert!(format!("{error:?}").contains(kind));
+            assert_eq!(std::error::Error::source(error).is_some(), sourced);
+            let SourcePreparationOutcome::Complete(legacy) =
+                project_legacy_direct_local_include_horizon(value)
+            else {
+                panic!("legacy projection must complete")
+            };
+            assert!(Arc::ptr_eq(&legacy, &observed_result));
+        }
     }
     #[tokio::test]
     async fn direct_include_horizon_parses_first_deduplicates_and_preserves_occurrences() {
@@ -10765,7 +11048,7 @@ mod tests {
         let (key_owner, _) = owner
             .split_once("async fn preflight_direct_local_include_package_horizon")
             .unwrap();
-        assert!(key_owner.contains("preflight_direct_local_include_package_horizon(ctx"));
+        assert!(key_owner.contains("drive_direct_local_include_horizon_key("));
         assert!(owner.contains("DirectLocalModuleInspectionKey"));
         assert!(owner.contains("ExternalRepositoryPackageLookupKey"));
         assert!(owner.contains("parse_root_include"));

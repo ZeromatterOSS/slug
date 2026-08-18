@@ -2,7 +2,7 @@
 struct HostSourceActivation {
     key: String,
     kind: ActivationKind,
-    event_free: bool,
+    batch: Option<EventBatch>,
 }
 
 #[derive(Debug, Default)]
@@ -33,7 +33,10 @@ impl ActivationTracker for HostSourceFamilyTracker {
         self.activations.lock().unwrap().push(HostSourceActivation {
             key: key.to_string(),
             kind: activation.kind(),
-            event_free: activation.evaluation_data().is_none(),
+            batch: activation
+                .evaluation_data()
+                .and_then(|data| data.downcast_ref::<EventBatch>())
+                .map(Dupe::dupe),
         });
     }
 }
@@ -158,7 +161,7 @@ async fn observed_host_source_preserves_exact_symlink_epoch_and_isolates_familie
     assert_exact_epoch(&epoch, warm_observed.observations());
 
     let activations = tracker.take();
-    assert!(activations.iter().all(|entry| entry.event_free));
+    assert!(activations.iter().all(|entry| entry.batch.is_none()));
     assert!(activations
         .iter()
         .any(|entry| matches!(entry.kind, ActivationKind::Evaluated | ActivationKind::Reused)));
@@ -483,7 +486,7 @@ async fn observed_host_source_cancellation_publishes_nothing_and_recovers_aba() 
         first_observed.result().as_ref(),
         Ok(HostRepositorySourceFileValue::Present { bytes, .. }) if bytes.as_ref() == b"a"
     ));
-    assert!(tracker.take().iter().all(|entry| entry.event_free));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
 
     let mut changed =
         observed_source_transaction(&dice, material("dep"), epoch(b"b"), None).await;
@@ -528,7 +531,7 @@ async fn direct_local_file_transaction(
     tracker: Option<Arc<HostSourceFamilyTracker>>,
 ) -> (dice::DiceTransaction, PathObservationEpoch) {
     let root_source = format!(
-        "bazel_dep(name='dep',version='1')\nlocal_path_override(module_name='dep',path='{local_path}')\n"
+        "print('ROOT')\nbazel_dep(name='dep',version='1')\nlocal_path_override(module_name='dep',path='{local_path}')\n"
     );
     let route_path = format!("/workspace/{local_path}");
     let epoch = horizon_epoch(
@@ -657,7 +660,7 @@ async fn observed_direct_local_file_preserves_arcs_events_families_and_lifecycle
     }
     let event_owners = activations
         .iter()
-        .filter(|entry| entry.kind == ActivationKind::Evaluated && !entry.event_free)
+        .filter(|entry| entry.kind == ActivationKind::Evaluated && entry.batch.is_some())
         .map(|entry| entry.key.as_str())
         .collect::<Vec<_>>();
     assert_eq!(event_owners.len(), 1);
@@ -675,7 +678,7 @@ async fn observed_direct_local_file_preserves_arcs_events_families_and_lifecycle
     assert!(tracker
         .take()
         .iter()
-        .all(|entry| entry.event_free));
+        .all(|entry| entry.batch.is_none()));
 
     let legacy = cold.compute(&direct_local_file_key("dep")).await.unwrap();
     let SourcePreparationOutcome::Complete(legacy) = legacy else {
@@ -815,7 +818,7 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
     let equal = Arc::new(first.as_ref().clone());
     let left = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
     let right = PathObservationEpoch::from_shared([(demand.dupe(), equal)]).unwrap();
-    let merged = merge_direct_local_file_observations(&left, &right).unwrap();
+    let merged = merge_direct_local_observations(&left, &right).unwrap();
     assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
     let conflict = PathObservationEpoch::from_shared([(
         demand.dupe(),
@@ -825,7 +828,7 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
     )])
     .unwrap();
     assert!(matches!(
-        merge_direct_local_file_observations(&left, &conflict),
+        merge_direct_local_observations(&left, &conflict),
         Err(ObservedPathFrontierError::Epoch(
             slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
         )) if found == demand
@@ -945,7 +948,7 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
     }
     let owners = activations
         .iter()
-        .filter(|entry| entry.kind == ActivationKind::Evaluated && !entry.event_free)
+        .filter(|entry| entry.kind == ActivationKind::Evaluated && entry.batch.is_some())
         .collect::<Vec<_>>();
     assert_eq!(owners.len(), 1);
     assert!(owners[0]
@@ -961,7 +964,7 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
         &cold_observed.result,
         &complete_observed_direct_local_inspection(&warm).result
     ));
-    assert!(tracker.take().iter().all(|entry| entry.event_free));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
     let legacy = cold.compute(&legacy_key).await.unwrap();
     let SourcePreparationOutcome::Complete(legacy) = legacy else {
         panic!("legacy direct-local inspection must complete")
@@ -1138,4 +1141,421 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
             .as_ref(),
         Ok(DirectLocalModuleInspection(_, Some(_)))
     ));
+}
+
+fn direct_local_horizon_key(apparent: &str) -> DirectLocalIncludePackageHorizonKey {
+    DirectLocalIncludePackageHorizonKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        ApparentRepoName::new(apparent).unwrap(),
+    )
+    .unwrap()
+}
+
+fn complete_observed_direct_local_horizon(
+    value: &<DirectLocalIncludePackageHorizonObservationKey as Key>::Value,
+) -> &ObservedDirectLocalIncludePackageHorizon {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed direct-local horizon must complete")
+    };
+    observed
+}
+
+async fn direct_local_horizon_transaction(
+    dice: &Arc<Dice>,
+    module: &[u8],
+    packages: &[(&str, bool)],
+    variant: i64,
+    tracker: Option<Arc<HostSourceFamilyTracker>>,
+) -> (dice::DiceTransaction, PathObservationEpoch) {
+    let (transaction, _) =
+        direct_local_file_transaction(dice, "dep", Some(module), None, variant, tracker).await;
+    let root_source = "print('ROOT')\nbazel_dep(name='dep',version='1')\nlocal_path_override(module_name='dep',path='dep')\n";
+    let epoch = horizon_epoch(
+        root_source,
+        PathObservationNamespace::Host,
+        "/workspace/dep",
+        Some(module),
+        Some(b"print('REPO')\n"),
+        None,
+        None,
+        packages,
+        &[],
+        &[],
+        &[],
+        &[],
+        &[],
+        variant,
+    );
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            [NormalizedAbsolutePath::new("/workspace").unwrap()],
+            std::iter::empty::<&str>(),
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    (updater.commit().await, epoch)
+}
+
+fn observed_horizon_epoch(
+    name: &str,
+) -> (
+    PathObservationDemand,
+    Arc<PathObservationResult>,
+    PathObservationEpoch,
+) {
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(format!("/workspace/dep/{name}/BUILD.bazel")).unwrap(),
+        PathObservationOperation::Lstat,
+    );
+    let result = Arc::new(PathObservationResult::Lstat(
+        PathOperationResult::Missing,
+    ));
+    let epoch = PathObservationEpoch::from_shared([(demand.dupe(), result.dupe())]).unwrap();
+    (demand, result, epoch)
+}
+
+fn observed_horizon_lookup(
+    value: ExternalRepositoryPackageLookup,
+    observations: PathObservationEpoch,
+) -> DirectLocalIncludePackageLookupOutcome {
+    Ok(SourcePreparationOutcome::Complete(Ok((
+        Arc::new(Ok(value)),
+        observations,
+    ))))
+}
+
+#[test]
+fn observed_horizon_reducer_is_prefix_bounded_left_first_and_complete_only() {
+    let p = horizon_occurrence("p", 1);
+    let q = horizon_occurrence("q", 2);
+    let r = horizon_occurrence("r", 3);
+    let packages = vec![p.package.clone(), q.package.clone(), r.package.clone()];
+    let (p_demand, p_result, p_epoch) = observed_horizon_epoch("p");
+    let (_, _, q_epoch) = observed_horizon_epoch("q");
+    let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/dep/p/pending").unwrap(),
+            PathObservationOperation::Lstat,
+        ),
+    ));
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand: PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/workspace/dep/r/BUILD.bazel").unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+            result_operation: PathObservationOperation::FileBytes,
+        },
+    );
+    let reduce = |outcomes, initial| {
+        finish_direct_local_include_package_horizon_observed(
+            local_route(),
+            vec![p.clone(), q.clone(), r.clone()],
+            &packages,
+            outcomes,
+            initial,
+        )
+    };
+    let success = || {
+        observed_horizon_lookup(
+            ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
+            PathObservationEpoch::empty(),
+        )
+    };
+    let batch = |p_value, q_value, r_value| {
+        SmallMap::from_iter([
+            (p.package.clone(), p_value),
+            (q.package.clone(), q_value),
+            (r.package.clone(), r_value),
+        ])
+    };
+    let outcomes = batch(
+        observed_horizon_lookup(ExternalRepositoryPackageLookup::NoBuildFile, p_epoch.dupe()),
+        Ok(SourcePreparationOutcome::Need(path_need.dupe())),
+        Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+    );
+    let first_semantic = reduce(outcomes, PathObservationEpoch::empty());
+    let observed = complete_observed_direct_local_horizon(&first_semantic);
+    assert!(matches!(
+        observed.result.as_ref(),
+        Err(DirectLocalIncludePackageHorizonError::Package {
+            raw_label,
+            failure: DirectLocalIncludePackageFailure::NoBuildFile,
+            ..
+        }) if raw_label == &p.raw_label
+    ));
+    assert_eq!(observed.observations.observations().len(), 1);
+    assert!(Arc::ptr_eq(
+        observed.observations.get(&p_demand).unwrap(),
+        &p_result
+    ));
+    let first_of_two = reduce(
+        batch(
+            observed_horizon_lookup(ExternalRepositoryPackageLookup::NoBuildFile, p_epoch.dupe()),
+            observed_horizon_lookup(
+                ExternalRepositoryPackageLookup::Deleted,
+                PathObservationEpoch::empty(),
+            ),
+            success(),
+        ),
+        PathObservationEpoch::empty(),
+    );
+    assert_eq!(
+        complete_observed_direct_local_horizon(&first_of_two)
+            .result
+            .as_ref(),
+        observed.result.as_ref()
+    );
+    let outcomes = batch(
+        Ok(SourcePreparationOutcome::Need(path_need.dupe())),
+        observed_horizon_lookup(ExternalRepositoryPackageLookup::Deleted, q_epoch),
+        Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+    );
+    assert!(matches!(
+        reduce(outcomes, PathObservationEpoch::empty()),
+        SourcePreparationOutcome::Need(need) if need == path_need
+    ));
+    let outcomes = batch(
+        Ok(SourcePreparationOutcome::Need(path_need.dupe())),
+        Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+        success(),
+    );
+    let no_semantic_outer = reduce(outcomes, PathObservationEpoch::empty());
+    assert!(matches!(
+        &no_semantic_outer,
+        SourcePreparationOutcome::Complete(Err(error)) if error == &outer
+    ));
+    assert!(
+        DirectLocalIncludePackageHorizonObservationKey::validity(&no_semantic_outer)
+            && DirectLocalIncludePackageHorizonObservationKey::equality(
+                &no_semantic_outer,
+                &no_semantic_outer
+            )
+    );
+    let equal = Arc::new(p_result.as_ref().clone());
+    let equal_epoch =
+        PathObservationEpoch::from_shared([(p_demand.dupe(), equal)]).unwrap();
+    let successes = batch(
+        observed_horizon_lookup(
+            ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
+            equal_epoch,
+        ),
+        success(),
+        success(),
+    );
+    let stable = reduce(successes, p_epoch.dupe());
+    assert!(Arc::ptr_eq(
+        complete_observed_direct_local_horizon(&stable)
+            .observations
+            .get(&p_demand)
+            .unwrap(),
+        &p_result
+    ));
+    let different = Arc::new(PathObservationResult::Lstat(
+        PathOperationResult::Error(PathObservationError::NotALink),
+    ));
+    let conflict_epoch =
+        PathObservationEpoch::from_shared([(p_demand.dupe(), different)]).unwrap();
+    let conflict = batch(
+        observed_horizon_lookup(
+            ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
+            conflict_epoch,
+        ),
+        success(),
+        success(),
+    );
+    assert!(matches!(
+        reduce(conflict, p_epoch),
+        SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
+        ))) if found == p_demand
+    ));
+    let bootstrap_need =
+        SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
+            workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+        });
+    let needs = batch(
+        Ok(SourcePreparationOutcome::Need(path_need)),
+        Ok(SourcePreparationOutcome::Need(bootstrap_need)),
+        success(),
+    );
+    let SourcePreparationOutcome::Need(union) =
+        reduce(needs, PathObservationEpoch::empty())
+    else {
+        panic!("full batch Needs must be unioned")
+    };
+    assert!(union.path_observations().is_some());
+    assert!(union.root_module_bootstrap_request().is_some());
+    let need = SourcePreparationOutcome::Need(union);
+    assert!(
+        !DirectLocalIncludePackageHorizonObservationKey::validity(&need)
+            && !DirectLocalIncludePackageHorizonObservationKey::equality(&need, &need)
+    );
+}
+#[tokio::test]
+async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let module = b"include(\"//p:first.MODULE.bazel\")\ninclude(\"//p:second.MODULE.bazel\")\ninclude(\"//q:third.MODULE.bazel\")\n";
+    let key = DirectLocalIncludePackageHorizonObservationKey(direct_local_horizon_key("dep"));
+    assert_eq!(
+        key.to_string(),
+        "observed-direct-local-include-package-horizon:\"/workspace\":@dep"
+    );
+    let (mut cold, _) = direct_local_horizon_transaction(
+        &dice,
+        module,
+        &[("p", true), ("q", true)],
+        51,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let cold_value = cold.compute(&key).await.unwrap();
+    let observed = complete_observed_direct_local_horizon(&cold_value);
+    let horizon = observed.result.as_ref().as_ref().unwrap();
+    assert_eq!(
+        horizon
+            .occurrences
+            .iter()
+            .map(|occurrence| occurrence.package.package().as_str())
+            .collect::<Vec<_>>(),
+        ["p", "p", "q"]
+    );
+    let inspection = cold
+        .compute(&DirectLocalModuleInspectionObservationKey(
+            direct_local_inspection_key("dep"),
+        ))
+        .await
+        .unwrap();
+    let mut expected = complete_observed_direct_local_inspection(&inspection)
+        .observations
+        .dupe();
+    for package in ["p", "q"] {
+        let package = PackageIdentifier::new(
+            local_route().canonical_repo().clone(),
+            PackagePath::parse(package).unwrap(),
+        );
+        let lookup = cold
+            .compute(
+                &ExternalRepositoryPackageLookupObservationKey::new(local_route(), package)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(lookup)) = lookup else {
+            panic!("observed package lookup must complete")
+        };
+        expected = merge_direct_local_observations(&expected, lookup.observations()).unwrap();
+    }
+    assert_exact_epoch(&expected, &observed.observations);
+    let activations = tracker.take();
+    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    for prefix in [
+        "observed-direct-local-include-package-horizon:",
+        "observed-direct-local-module-inspection:",
+        "observed-external-repository-package-lookup:",
+    ] {
+        assert!(has(prefix), "missing {prefix}");
+    }
+    for prefix in [
+        "direct-local-include-package-horizon:",
+        "direct-local-module-inspection:",
+        "external-repository-package-lookup:",
+        "direct-local-module-preparation:",
+        "direct-local-module-evaluation:",
+        "repository-package-source:",
+        "repository-package-load:",
+        "root-query",
+    ] {
+        assert!(!has(prefix), "unexpected {prefix}");
+    }
+    let event_owners = activations
+        .iter()
+        .filter(|entry| entry.batch.is_some())
+        .map(|entry| (entry.key.as_str(), entry.batch.as_ref().unwrap()))
+        .collect::<Vec<_>>();
+    assert_eq!(event_owners.len(), 3, "{event_owners:?}");
+    assert!(event_owners[0].0.starts_with("bzlmod-observed-host-root-module-file:"));
+    assert!(event_owners[1..].iter().all(|(key, _)| key.starts_with("observed-host-route-repo-file:")));
+    assert!(matches!(event_owners[0].1.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "ROOT"));
+    assert!(event_owners[1..].iter().all(|(_, batch)| matches!(batch.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "REPO")));
+    let warm = cold.compute(&key).await.unwrap();
+    assert!(Arc::ptr_eq(
+        &observed.result,
+        &complete_observed_direct_local_horizon(&warm).result
+    ));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+    let legacy = cold.compute(&direct_local_horizon_key("dep")).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy horizon must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result.as_ref());
+    assert!(!tracker
+        .take()
+        .iter()
+        .any(|entry| entry.key.contains("observed-")));
+    let (mut changed, _) =
+        direct_local_horizon_transaction(&dice, module, &[("p", true), ("q", false)], 52, None)
+            .await;
+    assert!(matches!(
+        complete_observed_direct_local_horizon(&changed.compute(&key).await.unwrap())
+            .result
+            .as_ref(),
+        Err(DirectLocalIncludePackageHorizonError::Package {
+            failure: DirectLocalIncludePackageFailure::NoBuildFile,
+            ..
+        })
+    ));
+    let (mut restored, _) =
+        direct_local_horizon_transaction(&dice, module, &[("p", true), ("q", true)], 53, None)
+            .await;
+    assert_eq!(
+        observed.result.as_ref(),
+        complete_observed_direct_local_horizon(&restored.compute(&key).await.unwrap())
+            .result
+            .as_ref()
+    );
+
+    let cancelled_tracker = Arc::new(HostSourceFamilyTracker::default());
+    let cancelled_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let (mut cancelled, _) = direct_local_horizon_transaction(
+        &cancelled_dice,
+        module,
+        &[("p", true), ("q", true)],
+        54,
+        Some(cancelled_tracker.dupe()),
+    )
+    .await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(cancelled_tracker.take().is_empty());
+    let (mut recovered, _) = direct_local_horizon_transaction(
+        &cancelled_dice,
+        module,
+        &[("p", true), ("q", true)],
+        54,
+        Some(cancelled_tracker.dupe()),
+    )
+    .await;
+    assert!(complete_observed_direct_local_horizon(&recovered.compute(&key).await.unwrap())
+        .result
+        .is_ok());
 }
