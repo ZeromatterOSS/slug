@@ -2783,3 +2783,24 @@ Carrier association, stable Arc union and typed outer errors are Slug-native.
 Analyzed/exported/multi-target/external/cquery frontier composition and
 public/core activation remain unsupported/deferred. Accepted Slug lifecycle and
 pinned Bazel package-pattern evidence are sufficient; no oracle is required.
+
+### Active singleton root-package-all build frontier implementation (2026-08-17)
+
+Run `WP-2A-m1-root-package-all-build-frontier-implementation` from design
+`5eb036c2`. Implement only the private observed build sibling, shared narrow
+singleton package-all driver and doc-hidden loading frontier seam in
+`bzl_module.rs`, loading `lib.rs` and core `runtime/dice.rs`.
+
+Preserve anchor then package union-before-semantic order, first exact Arc,
+semantic prefix, no-carrier Need/outer/cancellation, child-owned events,
+complete-only equality/validity and strict family/public-caller isolation. Use
+only one Allocative semantic Result Arc plus the existing Arc-backed epoch; no
+new retained collection or cache.
+
+Caps remain 24/6,214 Bzl module, 4/82 loading lib, 260 production plus 420 test
+core dice at 13,730 physical, and 708 aggregate net Rust lines. Require full
+frozen proof, validation, accounting, Buck2-utility retention scan and
+independent ownership/cleanup review. STOP on any other file or frontier,
+caller activation, behavior/event drift, direct Host read, another retained
+structure, Cargo/oracle write or cap excess. Acceptance returns only to a
+docs-only next-owner design.
