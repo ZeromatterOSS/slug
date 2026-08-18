@@ -1,11 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-observed-publication-design`
+Packet: `WP-2A-m1-external-package-source-load-observation-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `e4555dca`
-Result: freeze the smallest complete observed-publication boundary for the
-existing public loading-query command; do not implement it.
+Scheduling base: `7bc9e1da`
+Rust base: `e4555dca`
+Result: freeze the smallest complete observed external-package BUILD and
+`.bzl` source/load frontier required before loading-query publication; do not
+implement it.
 
 ## Authority and caps
 
@@ -17,104 +19,105 @@ Write only:
 - `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
 Cap net growth at 40 canonical, 220 manifest, 180 Stage 2, 30 routing and 470
-aggregate lines against `e4555dca`.
+aggregate lines against `7bc9e1da`.
 
-## Natural-owner audit
+## REPLAN evidence and natural-owner audit
 
-Start from live `RootQueryCommandKey`, its sole `NativeCommandRoot`
-implementation and public constructor. Trace every root-mode edge in
-`slug_query_v2::{evaluator,loading_environment,graph}` before freezing the
-design. The existing command key owns parsing, root anchor, dynamic query
-evaluation, graph/output completion and one semantic Result Arc; generic
-`drive_command` owns retry, selected-snapshot validation and publication.
+The loading-query design cannot freeze `RootQueryCommandKey` yet.
+`ExternalUnconfiguredPackageGraphKey` reaches
+`RepositoryPackageLoadKey -> RepositoryPackageSourceKey`. That source reaches
+`ExternalRepositoryPackageLookupKey`, `HostRouteRepositoryIgnoreKey`,
+`HostRepositoryPathKey`, `HostRepositorySourceFileKey` and direct-local
+module support. External BUILD loads additionally reach
+`ExternalBzlModuleEvalKey -> HostRepositorySourceFileKey`.
 
-Inventory at least:
+These values retain routes, resolved paths, bytes, semantic package/module
+values and event batches, but no complete `PathObservationEpoch`.
+`HostRepositoryPathKey` computes legacy `ResolvedPathKey`; selected source
+bytes compute direct `PathObservationKey`. A query terminal cannot reconstruct
+their exact shared Result Arcs, and computing an observed family beside the
+legacy keys would duplicate source and event authority.
 
-- the root module anchor;
-- root and external package graphs and package-load provenance;
-- direct/transitive external repository routing;
-- root recursive subtree discovery, package boundaries, directory listings and
-  non-UTF-8 marker probes;
-- BUILD companion boundary and marker resolution; and
-- every load/build provenance edge reached by `buildfiles`,
-  `loadfiles`, visibility, `siblings`, `deps`, `rdeps`, recursive
-  patterns, generated files and label-kind completion.
+Audit the complete live chain in:
 
-The accepted observed anchor, root package load, package boundary, path
-listing/resolution and repository route are candidates, not assumed proof of a
-complete graph. In particular, prove whether external
-`RepositoryPackageLoadKey` / `RepositoryPackageSourceKey` and their route
-children already expose a complete exact-Arc epoch. If any selected path can
-still reach a carrierless legacy Host observation, choose the uniquely smaller
-producer prerequisite or `REPLAN`; do not hide it inside the command carrier.
+- `slug_bzlmod_v2::source_preparation` for materialization, routed path
+  resolution, selected source bytes and direct-local module preparation;
+- `slug_bzlmod_v2::{repo_file,repository_ignore,host_package}` for routed
+  REPO/ignore, BUILD-marker lookup and selected BUILD source;
+- `slug_loading_v2::bzl_module` for external BUILD evaluation, recursive
+  external `.bzl` loading and package completion; and
+- their crate-root exports and existing focused test owners.
 
-Keep one-shot `evaluate_loading_query*` and non-root workspaces on their
-existing legacy path. They are not native-demand publication callers.
+Choose the first parent or cohesive sibling family that can expose one complete
+external package semantic Result Arc plus every exact selected path Result Arc
+without computing a second legacy subtree. If BUILD and recursive `.bzl`
+paths require more than one semantic owner, freeze their ordered carrier
+composition explicitly. Select a uniquely smaller prerequisite if the source
+substrate itself must land before package loading; otherwise `REPLAN`.
+Do not broaden into root-package, query evaluation or public activation.
 
-## Contract to freeze if the owner is complete
+## Contract to freeze
 
-Freeze one observed command terminal containing exactly one
-`Arc<Result<QueryOutput, QueryError>>` plus one Arc-backed
-`PathObservationEpoch`, with typed `ObservedPathFrontierError` outside the
-semantic Result. Reuse the existing command identity unless the audit proves a
-structurally distinct sibling is required. The native adapter must project the
-exact semantic Arc and expose the complete epoch to generic selected-snapshot
-validation before acceptance; query has no source certificate, request
-revision or event owner.
+Use private structural observation-key siblings and shared mode-aware drivers.
+Legacy callers compute only legacy children and preserve current values/events;
+observed callers compute only observed children. The final observed external
+package-load value must retain exactly its semantic
+`Arc<Result<LoadedPackage, RepositoryPackageLoadError>>` plus one Arc-backed
+`PathObservationEpoch`. Intermediate carriers remain dependency-owned once
+their epochs have been merged into the parent.
 
-Use one mode-aware query environment/graph driver wherever legacy one-shot and
-observed native paths share semantics. Observed mode selects only observed
-families and accumulates child epochs compute-locally in actual evaluator order.
-Specify deterministic left-first duplicate-Arc selection and the precise
-Need/typed-outer/semantic ordering for sequential stages and joined batches.
-No partial carrier may accompany Need or typed outer. Semantic success or error
-retains exactly the complete decisive epoch required by selection; later
-dependency-owned child state must not make the carrier incomplete.
+Freeze deterministic left-first epoch order for materialization/resolution,
+REPO and ignore inputs, BUILD marker probes, selected BUILD bytes, external
+load resolution and recursive `.bzl` bytes. Duplicate equal demands preserve
+the first exact Arc. Need publishes no carrier; typed
+`ObservedPathFrontierError` remains outer; semantic source/load errors remain
+Complete with the decisive prefix epoch. Specify ordered/joined outer, Need and
+semantic precedence at every batch rather than relying on `?` short-circuit.
 
-Observed package/module/path children remain the sole local event owners.
-Cancellation or typed outer discards the attempt buffer; semantic completion
-preserves the existing successful-child event behavior; warm acceptance replays
-no child batch. The terminal and public accepted command retain no query
-environment, graph scratch, candidate arena, traversal queue or new collection
-beyond the existing semantic output and selected compact epoch.
+The existing REPO, BUILD and `.bzl` evaluation children remain the sole event
+owners. Observed parents store no duplicate batch. Cancellation or typed outer
+publishes nothing; semantic completion preserves existing successful-child
+batch order; warm replay is suppressed. Retained values add no materialization
+request graph, closure vector, include queue, map, store, cache, lock, task or
+direct Host read.
 
 ## Compatibility, proof and future boundary
 
-Public query labels, graph/order/label-kind output, errors, exit codes, policy,
-external apparent/canonical routing and child event text/order remain exact.
-Observed family identity, carrier association, typed outer and exact-Arc
-selected validation are Slug-native. Multi-build certificate aggregation,
-one-shot publication, wider query/aquery identities and exact Bazel identity
-bytes remain deferred.
+External package values, target kinds, apparent/canonical labels, BUILD
+basename priority, REPO/ignore semantics, source bytes, errors, exit codes and
+child event text/order remain exact. Observation siblings, typed outer and
+carrier association are Slug-native. Root query publication, multi-build,
+one-shot evaluation, broader repository kinds and exact identity bytes remain
+deferred.
 
-Require discriminating public proof for syntax/no-activation, direct and
-recursive roots, external direct/transitive owners, load/build provenance,
-visibility/package-group recursion, generated files and BUILD companions;
-exact complete selected demand/value/`Arc::ptr_eq` equality; zero legacy
-family activation; cold child order and warm suppression; compatible and
-incompatible Need, typed outer versus Need/semantic, semantic error, pending
-cancellation with no publication and recovery; edit/delete/recreate/A-B-A; and
-legacy one-shot isolation. Include retention and AI-cleanup review.
+Require discriminating proof for direct local package success, missing and
+wrong-kind BUILD files, REPO and ignore edits, unsupported module/load cycles,
+recursive external `.bzl` success/error, compatible and incompatible Need,
+typed outer versus Need/semantic, exact demand/value/`Arc::ptr_eq` membership,
+first-Arc duplicates, cold child order, warm suppression, pending cancellation
+and recovery, edit/delete/recreate/A-B-A, complete-only equality/validity,
+reverse family nonactivation and compact post-return retention. Prove the later
+query consumer can receive a complete carrier while it remains unactivated.
 
-Freeze the exact future Rust/test allowlist, semantic and physical caps, any
-large-file split, validation commands and one bounded implementation successor
-only after the live audit proves completeness. Prefer existing colocated query
-and native-command owners; do not add a store, cache, lock, task, Host read or
-second publication/event owner.
+Freeze the exact future Rust/test allowlist, per-file production/test/physical
+caps, any necessary large-file split, validation commands and exactly one
+bounded implementation successor only after the audit proves the cohesive
+owner. Use current physical sizes and semantic sections as the cap bases.
 
 ## STOP / REPLAN
 
 STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; public
-behavior changes; implementation; a second command/publication owner; source
-certificate or revision work; unproved external-package observation
-completeness; family/event drift; retained query scratch; missing future caps or
-allowlist; multiple successors; docs cap excess; or M1 closure. `REPLAN` on
-any carrierless legacy Host edge, incomplete selected epoch, error-order
-contradiction, required file outside the frozen future allowlist, or no bounded
-cohesive implementation.
+query activation; root-package or one-shot changes; computing legacy and
+observed source/load families together; duplicate event ownership; epoch or
+Result-Arc reconstruction; partial carrier on Need/outer; retained scratch or a
+new store/cache/lock/task/Host read; missing future allowlist/caps; multiple
+successors; docs cap excess; or M1 closure. `REPLAN` if no bounded cohesive
+source/load frontier exists, BUILD and external `.bzl` carriers cannot compose
+without duplicated evaluation, another crate is required beyond the frozen
+future boundary, or exact child Arcs cannot survive projection.
 
 ## Immediate predecessor
 
-`e4555dca` accepts the observed root-repository-route prerequisite from
-frozen design `1ce16378`. It closes the route-family blocker selected by the
-post-cquery audit and authorizes this design audit only.
+`7bc9e1da` schedules and audits loading-query observed publication after
+accepted route implementation `e4555dca`. The audit proves the query owner is
+still incomplete and authorizes this docs-only prerequisite design.

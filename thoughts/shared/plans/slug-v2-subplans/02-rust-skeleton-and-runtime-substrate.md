@@ -3834,3 +3834,49 @@ Docs authority is canonical/current/Stage 2/routing under 40/220/180/30 and 470
 aggregate net-line caps. STOP on Rust, Cargo, fixtures/oracles, implementation,
 unproved external completeness, a second publication owner, retained state,
 family/event drift, multiple successors, cap excess or M1 closure.
+
+
+### Loading-query design selects external source/load prerequisite (2026-08-18)
+
+The `RootQueryCommandKey` natural-owner audit from `7bc9e1da` formally
+`REPLAN`s before query implementation. Root and external graph traversal can
+select accepted observed anchor/package/path/route siblings, but external
+package evaluation still crosses a carrierless source/load stack.
+
+`ExternalUnconfiguredPackageGraphKey` computes
+`RepositoryPackageLoadKey -> RepositoryPackageSourceKey`.
+`ExternalRepositoryPackageLookupKey` then reaches routed REPO/ignore,
+`HostRepositoryPathKey` and `HostRepositorySourceFileKey`; external BUILD
+loads also reach `ExternalBzlModuleEvalKey -> HostRepositorySourceFileKey`.
+Those keys compute legacy resolved-path and direct FileBytes observations but
+retain no complete `PathObservationEpoch`. A query carrier therefore cannot
+match the exact native selected epoch without recomputation or missing Arcs.
+
+Run docs-only
+`WP-2A-m1-external-package-source-load-observation-design` from scheduling
+base `7bc9e1da` and Rust base `e4555dca`. Audit source preparation,
+route-local REPO/ignore and BUILD selection, direct-local module support,
+external BUILD evaluation and recursive external `.bzl` loading. Select the
+first cohesive observed producer frontier that supplies one external package
+semantic Result Arc plus every exact selected path Result Arc without computing
+a second legacy subtree.
+
+Freeze structural observed siblings and shared mode-aware drivers, deterministic
+left-first materialization/resolution/REPO/ignore/marker/BUILD/load epoch order,
+Need/typed-outer/semantic prefix algebra, sole existing child event ownership,
+cancellation/no-publication, warm suppression and compact lifetimes. Root query
+remains unactivated and root-package/one-shot paths remain unchanged.
+
+Exact external package/source/load bytes, values, errors, labels and event order
+stay exact; sibling/carrier/outer mechanics are Slug-native; query publication,
+multi-build, one-shot and identity bytes remain deferred. Require direct local
+BUILD and recursive `.bzl` lifecycle, error/Need/outer order, exact
+demand/value/Arc membership, family nonactivation, event, cancellation and
+retention proof.
+
+The design must freeze exact future Rust/test files, semantic/physical caps,
+large-file decisions, validation and one implementation successor. Docs write
+only canonical/current/Stage 2/routing under 40/220/180/30 and 470 aggregate
+caps. STOP on Rust, public query activation, duplicate family/event ownership,
+partial carriers, reconstructed Arcs, retained scratch, missing future caps,
+multiple successors or M1 closure.
