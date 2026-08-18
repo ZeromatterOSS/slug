@@ -2429,3 +2429,27 @@ Existing admitted segment behavior remains exact. Carrier association, epoch
 aggregation, decisive-prefix retention and outer-error precedence are
 Slug-native. Traversal, adapter, BUILD/package-load, core/public,
 repository/materializer and native-Windows work remain unsupported/deferred.
+
+### Active observed Host-glob segment frontier implementation (2026-08-17)
+
+Run `WP-2A-m1-observed-host-glob-segment-frontier-implementation` from
+accepted design `dc696b2d`. Implement only the private observed sibling and
+one shared mode-aware driver in `host_glob/{mod,tests}.rs`.
+
+Preserve literal/wildcard semantics, matched-symlink ordered batching,
+listing-first/base-second/pending-slot epoch order and exact first-Arc
+retention. Outer handling is prefix-bounded by the first semantic-error slot;
+with no semantic error the full batch chooses first outer over Need. Need,
+outer error and cancellation publish no carrier/event.
+
+Require exact-Arc/decisive-prefix/mixed-terminal proof, no-pending direct-base
+short-circuit, family and traversal nonactivation, warm/A-B-A/cancellation,
+full loading, direct core, formatting, inherited Clippy/archive dispositions,
+exact 280/420/700 and 1,003/1,309 caps, artifact/diff hygiene and independent
+ownership/compact-memory/nine-category cleanup acceptance.
+
+STOP on another Rust file/key/carrier/container/cache/graph/store/lock,
+workspace/Bzlmod or traversal/adapter changes, direct Host reads, events,
+changed order/batching/polarity, retained work collections, fixture/oracle
+writes, higher loading/core/public/repository/materializer work or cap excess.
+Acceptance returns only to docs-only `WP-2A-m1-host-glob-frontier-design`.
