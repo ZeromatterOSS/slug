@@ -4194,3 +4194,39 @@ Write only canonical/current/Stage 2/routing under 40/220/180/30 and 470
 aggregate docs caps. STOP on Rust, Cargo, fixtures/oracles, public query
 activation, duplicate family/events, partial/rebuilt carriers, retained
 scratch, multiple successors or M1 closure.
+
+### External source/load audit selects package-marker lookup prerequisite (2026-08-18)
+
+The live audit from `d451587f` formally `REPLAN`s to the uniquely smaller
+`ExternalRepositoryPackageLookupKey` owner. That key alone owns canonical
+deleted-package policy, accepted routed ignore, then `BUILD.bazel` and `BUILD`
+marker paths. Both `RepositoryPackageSourceKey` and the independent
+`DirectLocalIncludePackageHorizonKey` consume it; selecting observed inputs
+only in either upper consumer would duplicate the lookup subtree or leave the
+other on legacy route/path children.
+
+Run docs-only
+`WP-2A-m1-external-repository-package-lookup-observation-design` from
+scheduling base `d451587f` and Rust base `2a8dd968`. Freeze a structurally
+distinct crate-private observed sibling/carrier in `host_package.rs`, one
+legacy/observed mode-aware driver, and matching routed-ignore/path child
+families. The carrier retains exactly one semantic Result Arc plus one
+Arc-backed epoch; no lib export or event owner is added.
+
+The prefix contract distinguishes canonical policy deletion from ignore
+deletion: invalid name, policy error, and canonical deleted membership use an
+empty epoch; route-ignore error or match retains the complete ignore epoch.
+Union ignore before inspection, then completed `BUILD.bazel` and `BUILD` path
+epochs in order before inspection. Selected/path-error terminals retain their
+decisive marker; missing/wrong-kind continues; `NoBuildFile` retains both.
+Need/typed outer has no carrier and equal demands keep the earlier exact Arc.
+
+Future implementation writes only `host_package.rs` plus new
+`host_package_observation_tests.rs` under 240 production/8 glue/360 tests and
+608 aggregate semantic caps, with 4,850/380/5,230 physical caps. Proof covers
+both Deleted origins, priority/kinds, every prefix, exact Arcs, child Need/
+outer, events, family isolation, cancellation/recovery, warm reuse and A/B/A.
+STOP on source/load/include/query activation, public export, moved events,
+retained state, other files or M1 closure. After design ACCEPT, schedule one
+bounded implementation; after its ACCEPT, return directly to external package
+source/load design.
