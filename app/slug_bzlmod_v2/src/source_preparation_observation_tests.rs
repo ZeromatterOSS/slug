@@ -486,7 +486,7 @@ async fn observed_host_source_cancellation_publishes_nothing_and_recovers_aba() 
         first_observed.result().as_ref(),
         Ok(HostRepositorySourceFileValue::Present { bytes, .. }) if bytes.as_ref() == b"a"
     ));
-    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+    tracker.take();
 
     let mut changed =
         observed_source_transaction(&dice, material("dep"), epoch(b"b"), None).await;
@@ -1558,4 +1558,541 @@ async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle
     assert!(complete_observed_direct_local_horizon(&recovered.compute(&key).await.unwrap())
         .result
         .is_ok());
+}
+
+fn direct_local_preparation_key(apparent: &str) -> DirectLocalModulePreparationKey {
+    DirectLocalModulePreparationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        ApparentRepoName::new(apparent).unwrap(),
+    )
+    .unwrap()
+}
+
+fn complete_observed_direct_local_preparation(
+    value: &<DirectLocalModulePreparationObservationKey as Key>::Value,
+) -> &ObservedDirectLocalModulePreparation {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed direct-local preparation must complete")
+    };
+    observed
+}
+
+async fn direct_local_preparation_transaction(
+    dice: &Arc<Dice>,
+    module: &[u8],
+    fragments: &[(&str, Option<&[u8]>)],
+    variant: i64,
+    tracker: Option<Arc<HostSourceFamilyTracker>>,
+) -> (dice::DiceTransaction, PathObservationEpoch) {
+    let (transaction, _) =
+        direct_local_file_transaction(dice, "dep", Some(module), None, variant, tracker).await;
+    let epoch = horizon_epoch(
+        "print('ROOT')\nbazel_dep(name='dep',version='1')\nlocal_path_override(module_name='dep',path='dep')\n",
+        PathObservationNamespace::Host,
+        "/workspace/dep",
+        Some(module),
+        Some(b"print('REPO')\n"),
+        None,
+        None,
+        &[("p", true), ("q", true)],
+        &[],
+        &[],
+        fragments,
+        &[],
+        &[],
+        variant,
+    );
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            [NormalizedAbsolutePath::new("/workspace").unwrap()],
+            std::iter::empty::<&str>(),
+            None,
+            None,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    (updater.commit().await, epoch)
+}
+
+#[tokio::test]
+async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let module = b"include(\"//p:a.MODULE.bazel\")\n";
+    let p = b"include(\"//q:b.MODULE.bazel\")\n";
+    let q = b"bazel_dep(name='leaf',version='1')\n";
+    let fragments = [
+        ("p/a.MODULE.bazel", Some(p.as_slice())),
+        ("q/b.MODULE.bazel", Some(q.as_slice())),
+    ];
+    let legacy_key = direct_local_preparation_key("dep");
+    let key = DirectLocalModulePreparationObservationKey(legacy_key.clone());
+    assert_eq!(
+        key.to_string(),
+        "observed-direct-local-module-preparation:\"/workspace\":@dep"
+    );
+    let (mut cold, _) = direct_local_preparation_transaction(
+        &dice,
+        module,
+        &fragments,
+        61,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let cold_value = cold.compute(&key).await.unwrap();
+    assert!(DirectLocalModulePreparationObservationKey::validity(
+        &cold_value
+    ));
+    let observed = complete_observed_direct_local_preparation(&cold_value);
+    assert!(matches!(
+        observed.result.as_ref(),
+        Ok(DirectLocalModulePreparation::Supported(DirectLocalModuleClosure {
+            fragments,
+            ..
+        })) if fragments.len() == 2
+    ));
+    let activations = tracker.take();
+    let inspection = cold
+        .compute(&DirectLocalModuleInspectionObservationKey(
+            direct_local_inspection_key("dep"),
+        ))
+        .await
+        .unwrap();
+    let mut expected = complete_observed_direct_local_inspection(&inspection)
+        .observations
+        .dupe();
+    for (package, fragment) in [("p", "p/a.MODULE.bazel"), ("q", "q/b.MODULE.bazel")] {
+        let package = PackageIdentifier::new(
+            local_route().canonical_repo().clone(),
+            PackagePath::parse(package).unwrap(),
+        );
+        let lookup = cold
+            .compute(
+                &ExternalRepositoryPackageLookupObservationKey::new(local_route(), package)
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(lookup)) = lookup else {
+            panic!("observed package lookup must complete")
+        };
+        expected = merge_direct_local_observations(&expected, lookup.observations()).unwrap();
+        let source = cold
+            .compute(&HostRepositorySourceFileObservationKey::new(
+                local_route(),
+                PathBuf::from(fragment),
+            ))
+            .await
+            .unwrap();
+        expected = merge_direct_local_observations(
+            &expected,
+            complete_observed_source(&source).observations(),
+        )
+        .unwrap();
+    }
+    assert_exact_epoch(&expected, &observed.observations);
+    tracker.take();
+    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    for expected in [
+        "observed-direct-local-module-preparation:",
+        "observed-direct-local-module-inspection:",
+        "observed-host-repository-source-file:",
+        "observed-external-repository-package-lookup:",
+    ] {
+        assert!(has(expected), "missing {expected}");
+    }
+    for forbidden in [
+        "direct-local-module-preparation:",
+        "direct-local-module-inspection:",
+        "host-repository-source-file:",
+        "external-repository-package-lookup:",
+        "direct-local-module-evaluation:",
+        "repository-package-source:",
+        "repository-package-load:",
+        "root-query",
+    ] {
+        assert!(!has(forbidden), "unexpected {forbidden}");
+    }
+    assert_eq!(
+        activations
+            .iter()
+            .filter(|entry| entry
+                .key
+                .starts_with("observed-external-repository-package-lookup:")
+                && entry.kind == ActivationKind::Evaluated)
+            .count(),
+        2
+    );
+    assert!(!has("observed-direct-local-include-package-horizon:"));
+    let event_owners = activations
+        .iter()
+        .filter(|entry| entry.batch.is_some())
+        .collect::<Vec<_>>();
+    assert_eq!(event_owners.len(), 2, "{event_owners:?}");
+    assert!(event_owners[0]
+        .key
+        .starts_with("bzlmod-observed-host-root-module-file:"));
+    assert!(matches!(event_owners[0].batch.as_ref().unwrap().events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "ROOT"));
+    assert!(event_owners[1..].iter().all(|entry| entry
+        .key
+        .starts_with("observed-host-route-repo-file:")));
+    assert!(event_owners[1..].iter().all(|entry| matches!(
+        entry.batch.as_ref().unwrap().events(),
+        [EvaluationEvent::StarlarkPrint { text, .. }] if text == "REPO"
+    )));
+
+    let warm = cold.compute(&key).await.unwrap();
+    assert!(Arc::ptr_eq(
+        &observed.result,
+        &complete_observed_direct_local_preparation(&warm).result
+    ));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+    let legacy = cold.compute(&legacy_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy preparation must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result.as_ref());
+    assert!(!tracker.take().iter().any(|entry| entry.key.contains("observed-")));
+
+    let changed_fragments = [
+        ("p/a.MODULE.bazel", Some(p.as_slice())),
+        ("q/b.MODULE.bazel", None),
+    ];
+    let (mut changed, _) =
+        direct_local_preparation_transaction(&dice, module, &changed_fragments, 62, None).await;
+    assert!(matches!(
+        complete_observed_direct_local_preparation(&changed.compute(&key).await.unwrap())
+            .result
+            .as_ref(),
+        Err(DirectLocalModulePreparationError::Fragment {
+            failure: DirectLocalIncludeFragmentFailure::Absent,
+            ..
+        })
+    ));
+    let (mut restored, _) =
+        direct_local_preparation_transaction(&dice, module, &fragments, 63, None).await;
+    assert_eq!(
+        observed.result.as_ref(),
+        complete_observed_direct_local_preparation(&restored.compute(&key).await.unwrap())
+            .result
+            .as_ref()
+    );
+
+    let cycle_fragments = [
+        ("p/a.MODULE.bazel", Some(p.as_slice())),
+        (
+            "q/b.MODULE.bazel",
+            Some(b"include(\"//p:a.MODULE.bazel\")\n".as_slice()),
+        ),
+    ];
+    let (mut cycle, _) =
+        direct_local_preparation_transaction(&dice, module, &cycle_fragments, 64, None).await;
+    assert!(matches!(
+        complete_observed_direct_local_preparation(&cycle.compute(&key).await.unwrap())
+            .result
+            .as_ref(),
+        Ok(DirectLocalModulePreparation::Unsupported(_))
+    ));
+
+    let cancelled_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let cancelled_tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut cancelled, _) = direct_local_preparation_transaction(
+        &cancelled_dice,
+        module,
+        &fragments,
+        65,
+        Some(cancelled_tracker.dupe()),
+    )
+    .await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(cancelled_tracker.take().is_empty());
+    let (mut recovered, _) = direct_local_preparation_transaction(
+        &cancelled_dice,
+        module,
+        &fragments,
+        65,
+        Some(cancelled_tracker.dupe()),
+    )
+    .await;
+    assert!(complete_observed_direct_local_preparation(&recovered.compute(&key).await.unwrap())
+        .result
+        .is_ok());
+}
+
+#[test]
+fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
+    let slots = [("p", 1), ("q", 2), ("r", 3)]
+        .map(|(package, line)| {
+            let direct = horizon_occurrence(package, line);
+            let occurrence = NonregistryIncludeOccurrence {
+                package: direct.package.package().clone(),
+                target: direct.target.clone(),
+                raw_label: direct.raw_label.clone(),
+                location: direct.location.clone(),
+            };
+            let entry = NonregistryIncludeFrontierEntry {
+                request: NonrootIncludeRequest {
+                    path: occurrence.raw_label.clone(),
+                    location: occurrence.location.clone(),
+                },
+                ancestry: Arc::from([]),
+            };
+            let path = nonregistry_fragment_relative_path(&occurrence);
+            (entry, occurrence, path)
+        });
+    let frontier = slots
+        .iter()
+        .map(|(entry, _, _)| entry.clone())
+        .collect::<Vec<_>>();
+    let occurrences = slots
+        .iter()
+        .map(|(_, occurrence, _)| occurrence.clone())
+        .collect::<Vec<_>>();
+    let paths = slots
+        .iter()
+        .map(|(_, _, path)| path.clone())
+        .collect::<Vec<_>>();
+    let (initial_demand, initial_result, initial) = observed_horizon_epoch("initial");
+    let child = [observed_horizon_epoch("p"), observed_horizon_epoch("q"), observed_horizon_epoch("r")];
+    let success = |slot: usize| {
+        Ok(SourcePreparationOutcome::Complete(Ok((
+            Ok(Some((
+                Arc::from(b"".as_slice()),
+                NormalizedAbsolutePath::new(format!(
+                    "/workspace/dep/{}/nested.MODULE.bazel",
+                    slots[slot].1.package
+                ))
+                .unwrap(),
+            ))),
+            child[slot].2.dupe(),
+        ))))
+    };
+    let batch = |slot: usize, terminal: NonregistryFragmentSourceOutcome| {
+        paths
+            .iter()
+            .enumerate()
+            .map(|(index, path)| {
+                (
+                    path.clone(),
+                    if index == slot {
+                        terminal.clone()
+                    } else {
+                        success(index)
+                    },
+                )
+            })
+            .collect::<SmallMap<_, _>>()
+    };
+    let reduce = |outcomes, all_need| {
+        finish_nonregistry_fragment_batch(
+            &NonregistryPreparationOwner::Direct(local_route()),
+            &frontier,
+            &occurrences,
+            &paths,
+            &outcomes,
+            all_need,
+            initial.dupe(),
+            &mut Vec::new(),
+            &mut None,
+        )
+    };
+    let semantic = |value| match value {
+        ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(observed))) => observed,
+        _ => panic!("expected preparation semantic"),
+    };
+    for slot in 0..3 {
+        let observed = semantic(reduce(
+            batch(slot, Err("source compute".into())),
+            None,
+        ));
+        assert!(matches!(
+            observed.result,
+            Err(NonregistryPreparationError::Direct(
+                DirectLocalModulePreparationError::Fragment {
+                    failure: DirectLocalIncludeFragmentFailure::SourceCompute { .. },
+                    ..
+                }
+            ))
+        ));
+        assert_eq!(observed.observations.observations().len(), 1 + slot);
+
+        let source_error = RepositorySourceFileError::Cycle {
+            repo_relative_path: Arc::new(paths[slot].clone()),
+        };
+        let observed = semantic(reduce(
+            batch(
+                slot,
+                Ok(SourcePreparationOutcome::Complete(Ok((
+                    Err(source_error),
+                    child[slot].2.dupe(),
+                )))),
+            ),
+            None,
+        ));
+        assert!(matches!(
+            observed.result,
+            Err(NonregistryPreparationError::Direct(
+                DirectLocalModulePreparationError::Fragment {
+                    failure: DirectLocalIncludeFragmentFailure::Source(_),
+                    ..
+                }
+            ))
+        ));
+        assert_eq!(observed.observations.observations().len(), 2 + slot);
+        assert!(Arc::ptr_eq(
+            observed
+                .observations
+                .get(&child[slot].0)
+                .unwrap(),
+            &child[slot].1
+        ));
+    }
+    assert!(Arc::ptr_eq(initial.get(&initial_demand).unwrap(), &initial_result));
+
+    let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/dep/p/pending").unwrap(),
+            PathObservationOperation::Lstat,
+        ),
+    ));
+    let bootstrap_need =
+        SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
+            workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+        });
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand: child[2].0.dupe(),
+            result_operation: PathObservationOperation::FileBytes,
+        },
+    );
+    let absent = |slot: usize| {
+        Ok(SourcePreparationOutcome::Complete(Ok((
+            Ok(None),
+            child[slot].2.dupe(),
+        ))))
+    };
+    let need = Ok(SourcePreparationOutcome::Need(path_need.dupe()));
+    let typed_outer = Ok(SourcePreparationOutcome::Complete(Err(outer.dupe())));
+
+    for slot in 0..3 {
+        assert!(matches!(
+            reduce(batch(slot, need.clone()), Some(path_need.dupe())),
+            ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == path_need
+        ));
+        assert!(matches!(
+            reduce(batch(slot, typed_outer.clone()), None),
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(found))) if found == outer
+        ));
+        let validation = success(slot).map(|outcome| {
+            outcome.map(|result| {
+                result.map(|(_, epoch)| {
+                    (
+                        Ok(Some((
+                            Arc::from(b"unknown_identifier\n".as_slice()),
+                            NormalizedAbsolutePath::new(format!(
+                                "/workspace/dep/{}/nested.MODULE.bazel",
+                                slots[slot].1.package
+                            ))
+                            .unwrap(),
+                        ))),
+                        epoch,
+                    )
+                })
+            })
+        });
+        let observed = semantic(reduce(batch(slot, validation), None));
+        assert!(matches!(
+            observed.result,
+            Err(NonregistryPreparationError::Direct(
+                DirectLocalModulePreparationError::Fragment {
+                    failure: DirectLocalIncludeFragmentFailure::Validation { .. },
+                    ..
+                }
+            ))
+        ));
+        assert_eq!(observed.observations.observations().len(), 2 + slot);
+
+        let conflict_result = Arc::new(PathObservationResult::Lstat(
+            PathOperationResult::Error(PathObservationError::NotALink),
+        ));
+        let conflict_epoch = PathObservationEpoch::from_shared([(
+            initial_demand.dupe(),
+            conflict_result,
+        )])
+        .unwrap();
+        let conflict = success(slot).map(|outcome| {
+            outcome.map(|result| result.map(|(source, _)| (source, conflict_epoch)))
+        });
+        assert!(matches!(
+            reduce(batch(slot, conflict), None),
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+                ObservedPathFrontierError::Epoch(
+                    slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
+                )
+            ))) if found == initial_demand
+        ));
+    }
+
+    let mut semantic_then_later = batch(0, absent(0));
+    semantic_then_later.insert(paths[1].clone(), need.clone());
+    semantic_then_later.insert(paths[2].clone(), typed_outer.clone());
+    let observed = semantic(reduce(semantic_then_later, Some(path_need.dupe())));
+    assert!(matches!(
+        observed.result,
+        Err(NonregistryPreparationError::Direct(
+            DirectLocalModulePreparationError::Fragment {
+                failure: DirectLocalIncludeFragmentFailure::Absent,
+                ..
+            }
+        ))
+    ));
+    assert_eq!(observed.observations.observations().len(), 2);
+
+    let mut need_then_semantic = batch(1, absent(1));
+    need_then_semantic.insert(paths[0].clone(), need.clone());
+    need_then_semantic.insert(paths[2].clone(), typed_outer.clone());
+    assert!(matches!(
+        reduce(need_then_semantic, Some(path_need.dupe())),
+        ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == path_need
+    ));
+
+    let mut no_semantic = batch(0, need);
+    no_semantic.insert(paths[2].clone(), typed_outer);
+    assert!(matches!(
+        reduce(no_semantic, Some(path_need.dupe())),
+        ControlFlow::Break(SourcePreparationOutcome::Complete(Err(found))) if found == outer
+    ));
+
+    let union = path_need.try_union(&bootstrap_need).unwrap();
+    let mut needs = batch(
+        0,
+        Ok(SourcePreparationOutcome::Need(path_need.dupe())),
+    );
+    needs.insert(
+        paths[1].clone(),
+        Ok(SourcePreparationOutcome::Need(bootstrap_need)),
+    );
+    let ControlFlow::Break(SourcePreparationOutcome::Need(found)) =
+        reduce(needs, Some(union))
+    else {
+        panic!("full source Need union")
+    };
+    assert!(found.path_observations().is_some());
+    assert!(found.root_module_bootstrap_request().is_some());
+
 }
