@@ -5392,3 +5392,24 @@ relocated byte. After design ACCEPT,
 retry the same implementation and require isolated corrected tests plus full
 default-parallel core, loading, query and bzlmod. No semantic owner, caller,
 public surface or M1 closure changes.
+
+### Loading-query implementation retry active (2026-08-18)
+
+Accepted correction design `e22404a8` authorizes exactly the retained seven
+query Rust files plus `host_package_load_tests.rs`. Run only
+`WP-2A-m1-loading-query-observed-publication-implementation-retry` from Rust
+base `a9270586`, semantic design `44c1b444` and correction `e22404a8`.
+
+Keep all production semantics/caps unchanged. Replace only the obsolete
+loading nonactivation assertion with the frozen query-positive/core-negative
+split, and only three named `tempdir()` sites with distinct pre-created
+crate-target parents plus `tempdir_in`. Preserve every other relocated byte.
+Corrected caps are +1,154 production/+1,328 tests/+2,482 aggregate and 19,531
+physical, including 372/1,132 for relocated query proof and +4/3,442 for the
+loading assertion.
+
+Require isolated corrected tests, default-parallel full core, full query/
+loading/bzlmod, exact Arc/epoch/event/family/lifecycle proof, fmt/diff/accounting,
+cleanup and independent review. STOP every other file/body/caller or semantic
+change, cap excess and M1 closure. After ACCEPT schedule only a docs-only
+next-owner audit.

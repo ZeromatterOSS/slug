@@ -1,83 +1,84 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-proof-and-parallel-authority-correction-design`
+Packet: `WP-2A-m1-loading-query-observed-publication-implementation-retry`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `113a74b2`
 Rust base: `a9270586`
 Accepted query design: `44c1b444`
-Result: freeze only the bounded proof and parallel-workspace authority correction, then retry the same retained implementation.
+Accepted correction design: `e22404a8`
+Result: finish and validate only the retained observed native loading-query publication candidate.
 
-## Docs authority and retained candidate
+## Exact authority and caps
 
-Write exactly canonical/current/Stage 2/routing docs within 40/180/140/30 and
-390 aggregate net-line caps. The retained seven-file Rust candidate is
-non-writable during this design. Stop Cargo, Rust, fixtures, oracles, public
-activation and M1 closure.
+Write exactly:
 
-The candidate implements the accepted query owner. Focused query, structural
-identity and selected-Arc proof pass; full query is 121/121 and bzlmod is
-complete. Production ownership, terminal algebra, event ownership, compact
-retention and compatibility classes are not reopened.
+1. `app/slug_query_v2/src/evaluator.rs`: +170 production/+20 proof, <=417;
+2. `app/slug_query_v2/src/loading_environment.rs`: +360/+60, <=2,346;
+3. `app/slug_query_v2/src/graph.rs`: +520/+100, <=3,771;
+4. `app/slug_query_v2/src/lib.rs`: +4, <=81;
+5. new `app/slug_query_v2/tests/observed_loading_query.rs`: +760, <=780;
+6. `app/slug_core_v2/src/runtime/dice.rs`: +100/+12 glue, <=11,000 after
+   exact relocation of base lines 7,318-8,036;
+7. new `app/slug_core_v2/src/runtime/tests/query_command_tests.rs`: exact
+   719-line relocation plus <=372 proof, <=1,132; and
+8. `app/slug_loading_v2/src/host_package_load_tests.rs`: <=4 test lines and
+   <=3,442 solely for the frozen assertion replacement.
 
-## Frozen correction
+Caps against `a9270586` are +1,154 production, +1,328 tests, +2,482 aggregate
+semantic and 19,531 combined physical. Existing large owner/proof files remain
+cohesive exceptions; touched helpers stay below 200 lines.
 
-The accepted loading proof at `host_package_load_tests.rs:1439-1444` still
-asserts that query graph/environment/core do not name
-`RepositoryPackageLoadObservationKey`. The query design now necessarily uses
-that accepted sibling in graph/environment. The retry may replace only that
-static assertion with this exact split proof (subject only to rustfmt wrapping):
+## Frozen implementation
 
-```rust
-let query = concat!(
-    include_str!("../../slug_query_v2/src/graph.rs"),
-    include_str!("../../slug_query_v2/src/loading_environment.rs"),
-);
-let core = include_str!("../../slug_core_v2/src/runtime/dice.rs");
-assert!(query.contains("RepositoryPackageLoadObservationKey"));
-assert!(!core.contains("RepositoryPackageLoadObservationKey"));
-```
+Preserve the doc-hidden structural observed query root, private observed root/
+external graph and subtree siblings, shared Legacy/Observed drivers and the
+mode-aware compute-local environment. Direct and one-shot APIs remain legacy;
+only the existing native public query constructor selects observed.
 
-No loading production or other loading test may change.
+Retain exactly the root query Result Arc plus compact epoch; private graph and
+subtree DICE values each retain one natural Result Arc plus epoch. All carriers
+are `Allocative` and `Dupe`. Environment, arena, resolved graph, traversal,
+listing, event and union scratch remain compute-local. Add no cache, interner,
+store, lock, task, Host read, revision, certificate or event owner.
 
-Three public query proofs use `tempfile::tempdir()` under mutable shared `/tmp`.
-New Host observation correctly sees parallel sibling churn, so isolated tests
-pass while default-parallel core replays events or rejects selected epochs.
-Authorize exactly one one-line-to-four-line replacement in each of:
+Preserve anchor-first/evaluator order, matching observed child families and
+left-first union-before-semantic exact Arcs. Sequential Need/outer/semantic
+stops immediately; issued subtree batches scan fully and reduce first outer/
+epoch error > compatible Need union > first semantic > success. REPLAN rather
+than invent a QueryError if existing Needs cannot union.
 
-1. `real_query_command_drives_typed_results_and_cold_events_without_warm_replay`;
-2. `direct_external_query_uses_host_route_native_materialization_and_apparent_output`;
-3. `observed_query_publication_preserves_terminal_and_selected_epoch_arcs`.
+Root/graph/subtree/environment remain eventless. Child keys alone own batches;
+Need/outer/cancel publishes none. Existing native terminal validation compares
+the full selected epoch by value and Arc identity, and consuming projection
+preserves the exact public Result Arc and event buffer.
 
-Each replacement creates its own fixed test-exclusive directory below
-`CARGO_MANIFEST_DIR/../../target` before any runtime, then uses
-`tempfile::tempdir_in`. All other relocated bytes remain exact. The three
-replacements add exactly +9 semantic/physical test lines; allow +12 rounded
-margin only in `runtime/tests/query_command_tests.rs`.
+## Exact correction
 
-The retry keeps every prior production/test cap except that core query proof
-becomes relocation plus <=372 new proof and <=1,132 physical. Aggregate test,
-semantic and physical caps become +1,328/+2,482/19,531. Add exactly
-`app/slug_loading_v2/src/host_package_load_tests.rs` with <=4 semantic test
-lines and <=3,442 physical solely for the exact assertion replacement above.
+In `host_package_load_tests.rs`, replace only the obsolete concatenated upper
+nonactivation block with the exact query-positive/core-negative assertion
+frozen in `e22404a8`; no loading production or other loading test changes.
+
+In the three named tests from `e22404a8`, replace only
+`tempfile::tempdir()` with a distinct fixed crate-target parent created before
+runtime plus `tempfile::tempdir_in`. These are the sole exceptions to exact
+relocated bytes. All other relocated bodies remain byte-identical to base.
 
 ## Compatibility, proof and terminal
 
-Exact public query behavior, loading proof truth and all legacy/direct APIs
-remain exact. Stable test parents and the existing private observation/outer/
-selected association are Slug-native. One-shot evaluation, external exported-
-source publication, multi-build, unsupported breadth and exact identity bytes
-remain deferred.
+Exact public query values/errors/order/events, loading proof truth and all
+legacy/direct APIs remain exact. Private observation/outer/selected association
+and stable test parents are Slug-native. One-shot workspace evaluation,
+external exported-source publication, multi-build aggregation, unsupported
+query breadth and exact identity bytes remain deferred.
 
-The retry must run all three corrected query tests in isolation, the full
-default-parallel core suite, full query/loading/bzlmod, fmt, diff-check, exact
-relocation/accounting, cleanup and independent review. Loading must no longer
-report the obsolete nonactivation failure; core must no longer replay warm
-events, reject repository selection or lose exact Arc identity under parallel
-execution.
+Run the three corrected query tests in isolation, then default-parallel full
+core, full query/loading/bzlmod, fmt, diff-check, exact relocation/accounting,
+retention/cleanup and independent review serially. Preserve all earlier proof:
+identity, prefixes, batch positions, exact Arcs, expression breadth, events,
+family isolation, cancellation, lifecycle and zero upper-build activation.
 
-After independent design ACCEPT schedule exactly
-`WP-2A-m1-loading-query-observed-publication-implementation-retry` with the
-eight-file authority above. STOP on any production/design change, other test
-body/file, weakened assertion, shared parent, cap excess or M1 closure. REPLAN
-if the exact bounded correction cannot make default-parallel validation pass.
+STOP on another file/caller, production semantic/order/family/event change,
+weakened proof, shared stable parent, any other relocated-body drift, retained
+scratch, cap excess or M1 closure. REPLAN if the bounded correction does not
+make default-parallel validation pass. After ACCEPT commit and return to one
+docs-only next-owner audit; do not close M1.
