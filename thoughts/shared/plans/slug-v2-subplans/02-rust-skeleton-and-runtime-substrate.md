@@ -2575,3 +2575,51 @@ independent cleanup proof. STOP on any other file, adapter or caller activation,
 behavior change, another retained structure, direct Host read, fixture/oracle
 write or cap excess. Acceptance returns only to docs-only Host-glob frontier
 design.
+
+### Accepted observed Host-glob traversal frontier (2026-08-17)
+
+Commit `2bccb48e` accepts the private
+`HostGlobTraversalObservationKey` beside its legacy owner. One shared serial
+driver selects only matching segment and package-boundary families while
+preserving breadth-first ordinals, recursive progress, boundary stops, grouped
+Need, first-ranked semantic error and final path sorting.
+
+Observed aggregation is each state's segment then boundary slots followed by
+later breadth-first states. Completed epochs union before semantic inspection;
+outer precedence is bounded by the first semantic terminal and stable union
+preserves the first exact Arc. Need, outer error and cancellation publish no
+carrier/event. Retained state is one semantic Result Arc plus one Arc-backed
+epoch; queues, visited state, paths, child values and union state are local.
+
+Focused proof passed 18 tests and all `slug_loading_v2` targets passed
+122+30+24+5+6+1 tests. Direct `slug_core_v2`, formatting, scope, artifact and
+diff checks passed. Changed files are Clippy-clean; strict crate/workspace
+Clippy and archive checks retain only their inherited baselines. Independent
+DICE/ownership, retention and cleanup review accepted.
+
+Against `dc6f6e02`, `mod.rs` is zero net at 1,000 physical,
+`traversal.rs` is +248 at 778 and `traversal_tests.rs` is +414 at 1,237;
+aggregate net Rust growth is +662. Existing traversal behavior remains exact;
+carrier association and deterministic epoch aggregation are Slug-native.
+
+### Resumed final Host-glob loading-frontier design (2026-08-17)
+
+Run docs-only `WP-2A-m1-host-glob-frontier-design` from accepted traversal
+`2bccb48e`. Audit `RootPackageLoadKey` in anchor, selected BUILD source,
+direct recursive Host `.bzl`, synchronous attempt replay and first-seen glob
+request order. Decide whether the complete package owner can consume every
+accepted observed child directly or needs one uniquely smaller adapter
+prerequisite; never publish a partial certificate.
+
+Freeze deterministic exact-Arc union, semantic/outer/Need precedence, event
+ownership, family isolation, equality/invalidation, cancellation and compact
+retention. Prepared requests, evaluator/module/AST state, event batches and
+union scratch remain compute-local. Existing public/core and repository
+callers stay unchanged.
+
+Write only canonical/current/Stage 2 under 40/320/280/640 net line caps. STOP
+on code/Cargo/oracle writes, partial certificates, duplicated evaluation,
+reconstructed Host reads, changed event/request/error order, new retained
+collections or public/core/repository/materializer activation. Acceptance
+schedules one bounded private loading implementation or one uniquely smaller
+docs-only prerequisite.
