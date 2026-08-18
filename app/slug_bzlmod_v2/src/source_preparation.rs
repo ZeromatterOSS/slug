@@ -10,6 +10,7 @@
 use std::fmt;
 use std::hash::Hash;
 use std::hash::Hasher;
+use std::ops::ControlFlow;
 use std::path::Component;
 use std::path::Path;
 use std::path::PathBuf;
@@ -1054,8 +1055,18 @@ struct DirectLocalModuleFileKey {
     apparent_repo: slug_identity_v2::ApparentRepoName,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct DirectLocalModuleFileObservationKey(DirectLocalModuleFileKey);
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct DirectLocalModuleFile(RootRepositoryRoute, HostRepositorySourceFileValue);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedDirectLocalModuleFile {
+    result: Arc<Result<DirectLocalModuleFile, DirectLocalModuleFileError>>,
+    observations: PathObservationEpoch,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum DirectLocalModuleFileError {
@@ -1070,12 +1081,13 @@ impl DirectLocalModuleFileKey {
         workspace: NormalizedAbsolutePath,
         apparent_repo: slug_identity_v2::ApparentRepoName,
     ) -> Result<Self, String> {
-        (!apparent_repo.is_root())
-            .then_some(Self {
-                workspace,
-                apparent_repo,
-            })
-            .ok_or_else(|| "direct local module file requires a nonroot apparent name".to_owned())
+        if apparent_repo.is_root() {
+            return Err("direct local module file requires a nonroot apparent name".to_owned());
+        }
+        Ok(Self {
+            workspace,
+            apparent_repo,
+        })
     }
 }
 
@@ -1087,59 +1099,206 @@ impl fmt::Display for DirectLocalModuleFileKey {
     }
 }
 
+impl fmt::Display for DirectLocalModuleFileObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type DirectLocalModuleFileDriverOutcome =
+    SourcePreparationOutcome<Result<ObservedDirectLocalModuleFile, ObservedPathFrontierError>>;
+
+fn merge_direct_local_file_observations(
+    first: &PathObservationEpoch,
+    second: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        first
+            .observations()
+            .iter()
+            .chain(second.observations())
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+fn direct_local_file_complete(
+    result: Result<DirectLocalModuleFile, DirectLocalModuleFileError>,
+    observations: PathObservationEpoch,
+) -> DirectLocalModuleFileDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalModuleFile {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn direct_local_observed_child<T>(
+    outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
+) -> ControlFlow<DirectLocalModuleFileDriverOutcome, T> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(result) => result.map_or_else(
+            |error| ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))),
+            ControlFlow::Continue,
+        ),
+    }
+}
+
+async fn drive_direct_local_module_file(
+    ctx: &mut DiceComputations<'_>,
+    key: &DirectLocalModuleFileKey,
+    mode: HostRepositoryObservationMode,
+) -> DirectLocalModuleFileDriverOutcome {
+    let route_key =
+        crate::RootRepositoryRouteKey::new(key.workspace.dupe(), key.apparent_repo.clone())
+            .expect("direct key rejects root names");
+    let (route, route_observations) = match mode {
+        HostRepositoryObservationMode::Legacy => match ctx.compute(&route_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(route)) => {
+                (route.as_ref().clone(), PathObservationEpoch::empty())
+            }
+            Err(error) => {
+                return direct_local_file_complete(
+                    Err(DirectLocalModuleFileError::RouteCompute(
+                        error.to_string().into(),
+                    )),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        },
+        HostRepositoryObservationMode::Observed => {
+            let outcome = ctx
+                .compute(
+                    &crate::RootRepositoryRouteObservationKey::new(
+                        key.workspace.dupe(),
+                        key.apparent_repo.clone(),
+                    )
+                    .expect("direct key rejects root names"),
+                )
+                .await;
+            let observed = match outcome {
+                Err(error) => {
+                    return direct_local_file_complete(
+                        Err(DirectLocalModuleFileError::RouteCompute(
+                            error.to_string().into(),
+                        )),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+                Ok(outcome) => match direct_local_observed_child(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => observed,
+                },
+            };
+            let observations = match merge_direct_local_file_observations(
+                &PathObservationEpoch::empty(),
+                observed.observations(),
+            ) {
+                Ok(observations) => observations,
+                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+            };
+            (observed.result().as_ref().clone(), observations)
+        }
+    };
+    let route = match route {
+        Ok(route) => route,
+        Err(error) => {
+            return direct_local_file_complete(
+                Err(DirectLocalModuleFileError::Route(error)),
+                route_observations,
+            );
+        }
+    };
+    let source_key = HostRepositorySourceFileKey::new(route.clone(), PathBuf::from("MODULE.bazel"));
+    let (source, observations) = match mode {
+        HostRepositoryObservationMode::Legacy => match ctx.compute(&source_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(source)) => (source, route_observations),
+            Err(error) => {
+                return direct_local_file_complete(
+                    Err(DirectLocalModuleFileError::SourceCompute(
+                        error.to_string().into(),
+                    )),
+                    route_observations,
+                );
+            }
+        },
+        HostRepositoryObservationMode::Observed => {
+            let outcome = ctx
+                .compute(&HostRepositorySourceFileObservationKey(source_key))
+                .await;
+            let observed = match outcome {
+                Err(error) => {
+                    return direct_local_file_complete(
+                        Err(DirectLocalModuleFileError::SourceCompute(
+                            error.to_string().into(),
+                        )),
+                        route_observations,
+                    );
+                }
+                Ok(outcome) => match direct_local_observed_child(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => observed,
+                },
+            };
+            let observations = match merge_direct_local_file_observations(
+                &route_observations,
+                observed.observations(),
+            ) {
+                Ok(observations) => observations,
+                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+            };
+            (observed.result().as_ref().clone(), observations)
+        }
+    };
+    direct_local_file_complete(
+        source
+            .map(|source| DirectLocalModuleFile(route, source))
+            .map_err(DirectLocalModuleFileError::Source),
+        observations,
+    )
+}
+
 #[async_trait]
 impl Key for DirectLocalModuleFileKey {
     type Value =
         SourcePreparationOutcome<Arc<Result<DirectLocalModuleFile, DirectLocalModuleFileError>>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let route_key =
-            crate::RootRepositoryRouteKey::new(self.workspace.dupe(), self.apparent_repo.clone())
-                .expect("direct key rejects root names");
-        let route = match ctx.compute(&route_key).await {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(route)) => route,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    DirectLocalModuleFileError::RouteCompute(Arc::from(error.to_string())),
-                )));
-            }
-        };
-        let route = match route.as_ref() {
-            Ok(route) => route.clone(),
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    DirectLocalModuleFileError::Route(error.clone()),
-                )));
-            }
-        };
-        match ctx
-            .compute(&HostRepositorySourceFileKey::new(
-                route.clone(),
-                PathBuf::from("MODULE.bazel"),
-            ))
+        drive_direct_local_module_file(ctx, self, HostRepositoryObservationMode::Legacy)
             .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
-            Ok(SourcePreparationOutcome::Complete(Ok(source))) => {
-                SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleFile(
-                    route, source,
-                ))))
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                SourcePreparationOutcome::Complete(Arc::new(Err(
-                    DirectLocalModuleFileError::Source(error),
-                )))
-            }
-            Err(error) => SourcePreparationOutcome::Complete(Arc::new(Err(
-                DirectLocalModuleFileError::SourceCompute(Arc::from(error.to_string())),
-            ))),
-        }
+            .map(|observed| {
+                observed
+                    .expect("legacy direct-local file cannot produce an observed outer error")
+                    .result
+            })
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x.complete_eq(y)
     }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalModuleFileObservationKey {
+    type Value = DirectLocalModuleFileDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_direct_local_module_file(ctx, &self.0, HostRepositoryObservationMode::Observed).await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }

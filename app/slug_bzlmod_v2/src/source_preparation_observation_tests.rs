@@ -30,21 +30,11 @@ impl ActivationTracker for HostSourceFamilyTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-        if key
-            .downcast_ref::<HostRepositoryPathObservationKey>()
-            .is_some()
-            || key
-                .downcast_ref::<HostRepositorySourceFileObservationKey>()
-                .is_some()
-            || key.downcast_ref::<HostRepositoryPathKey>().is_some()
-            || key.downcast_ref::<HostRepositorySourceFileKey>().is_some()
-        {
-            self.activations.lock().unwrap().push(HostSourceActivation {
-                key: key.to_string(),
-                kind: activation.kind(),
-                event_free: activation.evaluation_data().is_none(),
-            });
-        }
+        self.activations.lock().unwrap().push(HostSourceActivation {
+            key: key.to_string(),
+            kind: activation.kind(),
+            event_free: activation.evaluation_data().is_none(),
+        });
     }
 }
 
@@ -510,4 +500,369 @@ async fn observed_host_source_cancellation_publishes_nothing_and_recovers_aba() 
         first_observed.result().as_ref(),
         complete_observed_source(&restored).result().as_ref()
     );
+}
+
+fn direct_local_file_key(apparent: &str) -> DirectLocalModuleFileKey {
+    DirectLocalModuleFileKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        ApparentRepoName::new(apparent).unwrap(),
+    )
+    .unwrap()
+}
+
+fn complete_direct_local_file(
+    value: &<DirectLocalModuleFileObservationKey as Key>::Value,
+) -> &ObservedDirectLocalModuleFile {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed direct-local file must complete")
+    };
+    observed
+}
+
+async fn direct_local_file_transaction(
+    dice: &Arc<Dice>,
+    local_path: &str,
+    module: Option<&[u8]>,
+    module_kind: Option<PathNodeKind>,
+    variant: i64,
+    tracker: Option<Arc<HostSourceFamilyTracker>>,
+) -> (dice::DiceTransaction, PathObservationEpoch) {
+    let root_source = format!(
+        "bazel_dep(name='dep',version='1')\nlocal_path_override(module_name='dep',path='{local_path}')\n"
+    );
+    let route_path = format!("/workspace/{local_path}");
+    let epoch = horizon_epoch(
+        &root_source,
+        PathObservationNamespace::Host,
+        &route_path,
+        module,
+        None,
+        module_kind,
+        None,
+        &[],
+        &[],
+        &[],
+        &[],
+        &[],
+        &[],
+        variant,
+    );
+    let mut data = UserComputationData {
+        activation_tracker: tracker.map(|tracker| tracker as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(data);
+    updater
+        .changed_to(vec![(
+            slug_workspace_v2::WorkspaceSnapshotKey {
+                workspace: PathBuf::from("/workspace"),
+            },
+            Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                    PathBuf::from("/workspace/MODULE.bazel"),
+                    slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                        root_source.clone(),
+                    )),
+                )])),
+            }),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            slug_workspace_v2::WorkspaceRawSnapshotKey {
+                workspace: PathBuf::from("/workspace"),
+            },
+            Arc::new(slug_workspace_v2::WorkspaceRawSnapshot {
+                files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                    PathBuf::from("/workspace/MODULE.bazel.lock"),
+                    slug_workspace_v2::WorkspaceRawFileValue::Absent,
+                )])),
+            }),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+            material(local_path),
+        )])
+        .unwrap();
+    inject_root_module_request_inputs(
+        &mut updater,
+        Path::new("/workspace"),
+        crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        crate::LockfileMode::Update,
+    )
+    .unwrap();
+    (updater.commit().await, epoch)
+}
+
+#[tokio::test]
+async fn observed_direct_local_file_preserves_arcs_events_families_and_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let key = DirectLocalModuleFileObservationKey(direct_local_file_key("dep"));
+    assert_eq!(
+        key.to_string(),
+        "observed-direct-local-module-file:\"/workspace\":@dep"
+    );
+
+    let (mut cold, epoch) =
+        direct_local_file_transaction(&dice, "dep", Some(b"a"), None, 1, Some(tracker.dupe()))
+            .await;
+    let cold_value = cold.compute(&key).await.unwrap();
+    assert!(DirectLocalModuleFileObservationKey::validity(&cold_value));
+    let cold_observed = complete_direct_local_file(&cold_value);
+    assert!(matches!(
+        cold_observed.result.as_ref(),
+        Ok(DirectLocalModuleFile(_, HostRepositorySourceFileValue::Present { bytes, .. }))
+            if bytes.as_ref() == b"a"
+    ));
+    for (demand, result) in cold_observed.observations.observations() {
+        assert!(Arc::ptr_eq(epoch.get(demand).unwrap(), result));
+        let PathOutcome::Complete(selected) = cold
+            .compute(&PathObservationKey::new(demand.dupe()))
+            .await
+            .unwrap()
+        else {
+            panic!("retained direct-local demand must be selected")
+        };
+        assert!(Arc::ptr_eq(&selected, result));
+    }
+
+    let activations = tracker.take();
+    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    assert!(has("observed-direct-local-module-file:"));
+    assert!(has("observed-root-repository-route:"));
+    assert!(has("observed-host-repository-source-file:"));
+    assert!(!has("direct-local-module-file:"));
+    assert!(!has("root-repository-route:"));
+    assert!(!has("host-repository-source-file:"));
+    for forbidden in [
+        "direct-local-module-inspection:",
+        "direct-local-include-package-horizon:",
+        "direct-local-module-preparation:",
+        "direct-local-module-evaluation:",
+        "repository-package-source:",
+        "repository-package-load:",
+        "root-query",
+    ] {
+        assert!(!has(forbidden), "unexpected activation {forbidden}");
+    }
+    let event_owners = activations
+        .iter()
+        .filter(|entry| entry.kind == ActivationKind::Evaluated && !entry.event_free)
+        .map(|entry| entry.key.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(event_owners.len(), 1);
+    assert!(event_owners[0].starts_with("bzlmod-observed-host-root-module-file:"));
+
+    let warm = cold.compute(&key).await.unwrap();
+    assert!(DirectLocalModuleFileObservationKey::equality(
+        &cold_value,
+        &warm
+    ));
+    assert!(Arc::ptr_eq(
+        &cold_observed.result,
+        &complete_direct_local_file(&warm).result
+    ));
+    assert!(tracker
+        .take()
+        .iter()
+        .all(|entry| entry.event_free));
+
+    let legacy = cold.compute(&direct_local_file_key("dep")).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy direct-local file must complete")
+    };
+    assert_eq!(legacy.as_ref(), cold_observed.result.as_ref());
+    assert!(!tracker
+        .take()
+        .iter()
+        .any(|entry| entry.key.contains("observed-")));
+
+    for (path, module, expected, variant) in [
+        ("other", Some(&b"b"[..]), Some(&b"b"[..]), 2),
+        ("other", None, None, 3),
+        ("dep", Some(&b"a"[..]), Some(&b"a"[..]), 4),
+    ] {
+        let (mut transaction, _) =
+            direct_local_file_transaction(&dice, path, module, None, variant, None).await;
+        let value = transaction.compute(&key).await.unwrap();
+        let result = complete_direct_local_file(&value).result.as_ref();
+        let actual = match result.as_ref().unwrap() {
+            DirectLocalModuleFile(_, HostRepositorySourceFileValue::Present { bytes, .. }) => {
+                Some(bytes.as_ref())
+            }
+            DirectLocalModuleFile(_, HostRepositorySourceFileValue::Absent) => None,
+        };
+        assert_eq!(actual, expected);
+    }
+}
+
+#[tokio::test]
+async fn observed_direct_local_file_covers_needs_prefixes_suppression_and_cancellation() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = DirectLocalModuleFileObservationKey(direct_local_file_key("dep"));
+
+    let (mut route_need, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b"a"), None, 10, None).await;
+    let mut updater = route_need.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .unwrap();
+    route_need = updater.commit().await;
+    let route_need = route_need.compute(&key).await.unwrap();
+    assert!(matches!(route_need, SourcePreparationOutcome::Need(_)));
+    assert!(!DirectLocalModuleFileObservationKey::validity(&route_need));
+    assert!(!DirectLocalModuleFileObservationKey::equality(
+        &route_need,
+        &route_need
+    ));
+
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let missing = DirectLocalModuleFileObservationKey(direct_local_file_key("missing"));
+    let (mut route_error, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b"a"), None, 11, Some(tracker.dupe()))
+            .await;
+    let route_error = route_error.compute(&missing).await.unwrap();
+    let route_error = complete_direct_local_file(&route_error);
+    assert!(matches!(
+        route_error.result.as_ref(),
+        Err(DirectLocalModuleFileError::Route(_))
+    ));
+    assert!(!route_error.observations.observations().is_empty());
+    assert!(!tracker.take().iter().any(|entry| {
+        entry
+            .key
+            .starts_with("observed-host-repository-source-file:")
+    }));
+
+    let (mut source_need, _) = direct_local_file_transaction(
+        &dice,
+        "dep",
+        None,
+        Some(PathNodeKind::RegularFile),
+        12,
+        None,
+    )
+    .await;
+    assert!(matches!(
+        source_need.compute(&key).await.unwrap(),
+        SourcePreparationOutcome::Need(_)
+    ));
+
+    let (mut wrong_kind, _) = direct_local_file_transaction(
+        &dice,
+        "dep",
+        None,
+        Some(PathNodeKind::Directory),
+        13,
+        None,
+    )
+    .await;
+    let wrong_kind = wrong_kind.compute(&key).await.unwrap();
+    let wrong_kind = complete_direct_local_file(&wrong_kind);
+    assert!(matches!(
+        wrong_kind.result.as_ref(),
+        Err(DirectLocalModuleFileError::Source(
+            RepositorySourceFileError::WrongKind { .. }
+        ))
+    ));
+    assert!(wrong_kind.observations.observations().len() > route_error.observations.observations().len());
+
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut cancelled, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b"c"), None, 14, Some(tracker.dupe()))
+            .await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(tracker.take().is_empty());
+    let (mut recovered, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b"c"), None, 14, Some(tracker.dupe()))
+            .await;
+    assert!(matches!(
+        complete_direct_local_file(&recovered.compute(&key).await.unwrap())
+            .result
+            .as_ref(),
+        Ok(DirectLocalModuleFile(_, HostRepositorySourceFileValue::Present { bytes, .. }))
+            if bytes.as_ref() == b"c"
+    ));
+}
+
+#[test]
+fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let first = Arc::new(PathObservationResult::FileBytes(
+        PathOperationResult::Present(Arc::from(b"same".as_slice())),
+    ));
+    let equal = Arc::new(first.as_ref().clone());
+    let left = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+    let right = PathObservationEpoch::from_shared([(demand.dupe(), equal)]).unwrap();
+    let merged = merge_direct_local_file_observations(&left, &right).unwrap();
+    assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+    let conflict = PathObservationEpoch::from_shared([(
+        demand.dupe(),
+        Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(b"different".as_slice())),
+        )),
+    )])
+    .unwrap();
+    assert!(matches!(
+        merge_direct_local_file_observations(&left, &conflict),
+        Err(ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
+        )) if found == demand
+    ));
+
+    let route_compute = direct_local_file_complete(
+        Err(DirectLocalModuleFileError::RouteCompute("route".into())),
+        PathObservationEpoch::empty(),
+    );
+    let source_compute = direct_local_file_complete(
+        Err(DirectLocalModuleFileError::SourceCompute("source".into())),
+        left.dupe(),
+    );
+    assert!(complete_direct_local_file(&route_compute).observations.observations().is_empty());
+    assert!(Arc::ptr_eq(
+        complete_direct_local_file(&source_compute).observations.get(&demand).unwrap(),
+        &first
+    ));
+    for value in [&route_compute, &source_compute] {
+        assert!(DirectLocalModuleFileObservationKey::validity(value));
+        assert!(DirectLocalModuleFileObservationKey::equality(value, value));
+    }
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand: demand.dupe(),
+            result_operation: PathObservationOperation::Lstat,
+        },
+    );
+    for child in [
+        direct_local_observed_child::<()>(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+        direct_local_observed_child::<()>(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+    ] {
+        let ControlFlow::Break(value) = child else {
+            panic!("typed outer must suppress its next child")
+        };
+        assert!(matches!(&value, SourcePreparationOutcome::Complete(Err(error)) if error == &outer));
+        assert!(DirectLocalModuleFileObservationKey::validity(&value));
+        assert!(DirectLocalModuleFileObservationKey::equality(&value, &value));
+    }
 }
