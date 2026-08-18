@@ -1,4 +1,6 @@
+use std::ffi::OsString;
 use std::os::unix::ffi::OsStrExt;
+use std::os::unix::ffi::OsStringExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -42,6 +44,10 @@ use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::PathDirectoryEntries;
+use slug_workspace_v2::PathDirectoryEntry;
+use slug_workspace_v2::PathDirectoryEntryKind;
+use slug_workspace_v2::PathDirectoryName;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
@@ -55,9 +61,14 @@ use starlark_map::small_map::SmallMap;
 
 use super::ExternalBzlModuleError;
 use super::ExternalBzlModuleEvalKey;
+use super::ForceRootPackageObservationOuter;
+use super::HostPackageLoadMode;
+use super::ObservedRootPackageLoad;
 use super::RepositoryBzlLabel;
 use super::RepositoryPackageLoadError;
 use super::RepositoryPackageLoadKey;
+use super::RootPackageLoadObservationKey;
+use super::merge_root_package_observations;
 use super::resolve_external_load_label;
 use super::resolve_host_load_label;
 use crate::LoadingPreparationOutcome;
@@ -109,6 +120,19 @@ impl EpochBuilder {
             PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
                 source.as_ref(),
             ))),
+        );
+    }
+
+    fn listing(&mut self, path: &str, entries: &[(&[u8], PathDirectoryEntryKind)]) {
+        let entries = PathDirectoryEntries::new(entries.iter().map(|(name, kind)| {
+            PathDirectoryEntry::new(
+                PathDirectoryName::new(OsString::from_vec(name.to_vec())).unwrap(),
+                *kind,
+            )
+        }));
+        self.entries.insert(
+            Self::demand(path, PathObservationOperation::DirectoryEntries),
+            PathObservationResult::DirectoryEntries(PathOperationResult::Present(entries)),
         );
     }
 
@@ -202,7 +226,11 @@ impl ActivationTracker for EventTracker {
         deps: &mut dyn Iterator<Item = &DynKey>,
         _activation: ActivationData,
     ) {
-        if key.downcast_ref::<RootPackageLoadKey>().is_some() {
+        if key.downcast_ref::<RootPackageLoadKey>().is_some()
+            || key
+                .downcast_ref::<RootPackageLoadObservationKey>()
+                .is_some()
+        {
             self.package_dependencies
                 .lock()
                 .unwrap()
@@ -217,8 +245,11 @@ impl ActivationTracker for EventTracker {
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
         let name = key.to_string();
         if !name.starts_with("host-root-module-file:")
+            && !name.starts_with("observed-host-root-module-file:")
             && !name.starts_with("host-bzl-module:")
+            && !name.starts_with("observed-host-bzl-module:")
             && !name.starts_with("host-package-load:")
+            && !name.starts_with("observed-host-package-load:")
             && !name.starts_with("external-bzl-module:")
             && !name.starts_with("host-route-repo-file:")
             && !name.starts_with("repository-package-source:")
@@ -243,7 +274,15 @@ async fn transaction(
     capture_events: bool,
     tracker: Option<Arc<EventTracker>>,
 ) -> DiceTransaction {
-    transaction_with_policy(dice, epoch, package_policy(), capture_events, tracker).await
+    transaction_with_policy(
+        dice,
+        epoch,
+        package_policy(),
+        capture_events,
+        tracker,
+        false,
+    )
+    .await
 }
 
 async fn transaction_with_policy(
@@ -252,6 +291,7 @@ async fn transaction_with_policy(
     policy: RootPackagePolicyInputs,
     capture_events: bool,
     tracker: Option<Arc<EventTracker>>,
+    force_outer: bool,
 ) -> DiceTransaction {
     let mut user_data = UserComputationData {
         cycle_detector: Some(bzl_load_cycle_detector()),
@@ -260,6 +300,17 @@ async fn transaction_with_policy(
     };
     if capture_events {
         user_data.data.set(CaptureEvaluationEvents);
+    }
+    if force_outer {
+        let error = PathObservationEpoch::from_shared([(
+            EpochBuilder::demand("/mismatch", PathObservationOperation::Lstat),
+            Arc::new(PathObservationResult::FileBytes(
+                PathOperationResult::Missing,
+            )),
+        )])
+        .unwrap_err()
+        .into();
+        user_data.data.set(ForceRootPackageObservationOuter(error));
     }
     let mut updater = dice.updater_with_data(user_data);
     updater
@@ -317,6 +368,10 @@ fn package_key() -> RootPackageLoadKey {
     RootPackageLoadKey::new(workspace(), PackagePath::parse("pkg").unwrap())
 }
 
+fn observed_package_key() -> RootPackageLoadObservationKey {
+    RootPackageLoadObservationKey::new(workspace(), PackagePath::parse("pkg").unwrap())
+}
+
 async fn external_route(transaction: &mut DiceTransaction) -> RootRepositoryRoute {
     external_route_named(transaction, "dep").await
 }
@@ -358,6 +413,14 @@ fn event_texts(batch: &EventBatch) -> Vec<&str> {
 }
 
 type HostPackageOutcome = <RootPackageLoadKey as Key>::Value;
+type ObservedHostPackageOutcome = <RootPackageLoadObservationKey as Key>::Value;
+
+fn observed_package(value: &ObservedHostPackageOutcome) -> &ObservedRootPackageLoad {
+    let LoadingPreparationOutcome::Complete(Ok(value)) = value else {
+        panic!("expected complete observed package outcome: {value:?}")
+    };
+    value
+}
 
 fn target_names(outcome: &HostPackageOutcome) -> Vec<&str> {
     let LoadingPreparationOutcome::Complete(value) = outcome else {
@@ -385,11 +448,59 @@ async fn compute_package(
     epoch: PathObservationEpoch,
     policy: RootPackagePolicyInputs,
 ) -> HostPackageOutcome {
-    transaction_with_policy(dice, epoch, policy, false, None)
+    transaction_with_policy(dice, epoch, policy, false, None, false)
         .await
         .compute(&package_key())
         .await
         .unwrap()
+}
+
+fn observed_glob_epoch(build: &str, variant: i64) -> PathObservationEpoch {
+    let mut epoch = EpochBuilder::workspace_sources(
+        "print('ROOT')\n",
+        build,
+        &[
+            (
+                "one.bzl",
+                "load(':nested.bzl', 'NESTED')\nprint('ONE')\nONE = NESTED\n",
+            ),
+            ("two.bzl", "print('TWO')\nTWO = 2\n"),
+            ("nested.bzl", "print('NESTED')\nNESTED = 1\n"),
+        ],
+        variant,
+    );
+    epoch.node("/workspace/pkg/a.txt", PathNodeKind::RegularFile, variant);
+    epoch.directory("/workspace/pkg/sub", variant);
+    epoch.node(
+        "/workspace/pkg/sub/b.txt",
+        PathNodeKind::RegularFile,
+        variant,
+    );
+    epoch.node(
+        "/workspace/pkg/sub/no.txt",
+        PathNodeKind::RegularFile,
+        variant,
+    );
+    epoch.missing("/workspace/pkg/sub/BUILD.bazel");
+    epoch.missing("/workspace/pkg/sub/BUILD");
+    epoch.listing(
+        "/workspace/pkg",
+        &[
+            (b"BUILD.bazel", PathDirectoryEntryKind::File),
+            (b"one.bzl", PathDirectoryEntryKind::File),
+            (b"two.bzl", PathDirectoryEntryKind::File),
+            (b"a.txt", PathDirectoryEntryKind::File),
+            (b"sub", PathDirectoryEntryKind::Directory),
+        ],
+    );
+    epoch.listing(
+        "/workspace/pkg/sub",
+        &[
+            (b"b.txt", PathDirectoryEntryKind::File),
+            (b"no.txt", PathDirectoryEntryKind::File),
+        ],
+    );
+    epoch.build()
 }
 
 #[test]
@@ -435,6 +546,267 @@ fn root_load_resolution_is_mapping_free_and_rejects_path_escape() {
         error.to_string(),
         "parsing //:a.bzl: broken\ncompilation of module 'a.bzl' failed"
     );
+}
+
+#[tokio::test]
+async fn observed_root_package_preserves_semantics_arcs_order_events_and_families() {
+    const BUILD: &str = concat!(
+        "load(':one.bzl', 'ONE')\n",
+        "load(':two.bzl', 'TWO')\n",
+        "print('BUILD')\n",
+        "exports_files(glob(['*.txt']) + glob(['sub/*.txt'], exclude = ['sub/no.txt']))\n",
+        "filegroup(name = 'g', srcs = glob(['*.txt']))\n",
+    );
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch = observed_glob_epoch(BUILD, 1);
+    let mut transaction = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
+    let observed_key = observed_package_key();
+    let observed = transaction.compute(&observed_key).await.unwrap();
+    let legacy = transaction.compute(&package_key()).await.unwrap();
+    let observed_value = observed_package(&observed);
+    let LoadingPreparationOutcome::Complete(legacy_value) = &legacy else {
+        panic!("legacy package must complete")
+    };
+    assert_eq!(observed_value.result().as_ref(), legacy_value.as_ref());
+    assert_eq!(
+        observed_value
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .targets
+            .iter()
+            .map(|target| target.name.as_str())
+            .collect::<Vec<_>>(),
+        ["a.txt", "sub/b.txt", "g"]
+    );
+    assert!(
+        observed_value
+            .observations()
+            .get(&EpochBuilder::demand(
+                "/workspace/pkg",
+                PathObservationOperation::DirectoryEntries,
+            ))
+            .is_some()
+    );
+    for (demand, result) in observed_value.observations().observations() {
+        assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+    }
+
+    let batches = tracker.take();
+    let batch = |prefix: &str| {
+        batches
+            .iter()
+            .find(|entry| entry.key.starts_with(prefix))
+            .and_then(|entry| entry.batch.as_ref())
+            .unwrap()
+    };
+    assert_eq!(event_texts(batch("observed-host-package-load:")), ["BUILD"]);
+    assert_eq!(event_texts(batch("host-package-load:")), ["BUILD"]);
+    let observed_bzl_batch = |suffix: &str| {
+        batches
+            .iter()
+            .find(|entry| {
+                entry.key.starts_with("observed-host-bzl-module:") && entry.key.ends_with(suffix)
+            })
+            .and_then(|entry| entry.batch.as_ref())
+            .unwrap()
+    };
+    assert_eq!(event_texts(observed_bzl_batch("one.bzl")), ["ONE"]);
+    assert_eq!(event_texts(observed_bzl_batch("nested.bzl")), ["NESTED"]);
+    for path in ["one.bzl", "nested.bzl"] {
+        for operation in [
+            PathObservationOperation::Lstat,
+            PathObservationOperation::FileBytes,
+        ] {
+            let demand = EpochBuilder::demand(&format!("/workspace/pkg/{path}"), operation);
+            assert!(Arc::ptr_eq(
+                observed_value.observations().get(&demand).unwrap(),
+                epoch.get(&demand).unwrap()
+            ));
+        }
+    }
+
+    let dependencies = tracker.take_package_dependencies();
+    assert_eq!(dependencies.len(), 2);
+    let observed_dependencies = dependencies
+        .iter()
+        .find(|deps| {
+            deps.first()
+                .is_some_and(|dep| dep.starts_with("observed-root-module-loading-anchor:"))
+        })
+        .unwrap();
+    let legacy_dependencies = dependencies
+        .iter()
+        .find(|deps| {
+            deps.first()
+                .is_some_and(|dep| dep.starts_with("root-module-loading-anchor:"))
+        })
+        .unwrap();
+    assert!(observed_dependencies.iter().all(
+        |dep| !dep.starts_with("host-bzl-module:") && !dep.starts_with("host-glob-traversal:")
+    ));
+    assert!(
+        legacy_dependencies
+            .iter()
+            .all(|dep| !dep.starts_with("observed-"))
+    );
+    assert_eq!(
+        observed_dependencies
+            .iter()
+            .filter(|dep| dep.starts_with("observed-host-bzl-module:"))
+            .map(|dep| dep.rsplit(':').next().unwrap())
+            .collect::<Vec<_>>(),
+        ["one.bzl", "two.bzl"]
+    );
+    assert_eq!(
+        observed_dependencies
+            .iter()
+            .filter(|dep| dep.starts_with("observed-host-glob-traversal:"))
+            .map(|dep| dep.rsplit(':').next().unwrap())
+            .collect::<Vec<_>>(),
+        ["2a2e747874", "7375622f2a2e747874", "7375622f6e6f2e747874"]
+    );
+    assert!(RootPackageLoadObservationKey::validity(&observed));
+    assert!(RootPackageLoadObservationKey::equality(
+        &observed, &observed
+    ));
+}
+
+#[tokio::test]
+async fn observed_root_package_reuses_restores_and_preserves_terminal_polarity() {
+    const BUILD_A: &str = "exports_files(['a.txt'])\n";
+    const BUILD_B: &str = "filegroup(name = 'changed')\n";
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let key = observed_package_key();
+
+    let mut cold = transaction(&dice, observed_glob_epoch(BUILD_A, 1), false, None).await;
+    let first = cold.compute(&key).await.unwrap();
+    let mut warm = transaction(&dice, observed_glob_epoch(BUILD_A, 1), false, None).await;
+    let repeated = warm.compute(&key).await.unwrap();
+    assert!(RootPackageLoadObservationKey::equality(&first, &repeated));
+
+    let mut changed = transaction(&dice, observed_glob_epoch(BUILD_B, 2), false, None).await;
+    let changed = changed.compute(&key).await.unwrap();
+    assert!(!RootPackageLoadObservationKey::equality(&first, &changed));
+    let mut restored = transaction(&dice, observed_glob_epoch(BUILD_A, 1), false, None).await;
+    let restored = restored.compute(&key).await.unwrap();
+    assert!(RootPackageLoadObservationKey::equality(&first, &restored));
+
+    let mut deleted_epoch = EpochBuilder::workspace_sources("", "", &[], 3);
+    deleted_epoch.missing("/workspace/pkg/BUILD.bazel");
+    deleted_epoch.missing("/workspace/pkg/BUILD");
+    let mut deleted = transaction(&dice, deleted_epoch.build(), false, None).await;
+    let deleted = deleted.compute(&key).await.unwrap();
+    assert!(observed_package(&deleted).result().is_err());
+    let mut recreated = transaction(&dice, observed_glob_epoch(BUILD_A, 1), false, None).await;
+    let recreated = recreated.compute(&key).await.unwrap();
+    assert!(RootPackageLoadObservationKey::equality(&first, &recreated));
+
+    let need_tracker = Arc::new(EventTracker::default());
+    let mut need = transaction(
+        &dice,
+        PathObservationEpoch::empty(),
+        true,
+        Some(need_tracker.dupe()),
+    )
+    .await;
+    let need = need.compute(&key).await.unwrap();
+    assert!(matches!(need, LoadingPreparationOutcome::Need(_)));
+    assert!(!RootPackageLoadObservationKey::validity(&need));
+    assert!(
+        need_tracker
+            .take()
+            .iter()
+            .all(|entry| entry.batch.is_none())
+    );
+
+    let outer_tracker = Arc::new(EventTracker::default());
+    let outer_dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut outer = transaction_with_policy(
+        &outer_dice,
+        observed_glob_epoch(BUILD_A, 1),
+        package_policy(),
+        true,
+        Some(outer_tracker.dupe()),
+        true,
+    )
+    .await;
+    let outer = outer.compute(&key).await.unwrap();
+    assert!(matches!(outer, LoadingPreparationOutcome::Complete(Err(_))));
+    assert!(RootPackageLoadObservationKey::validity(&outer));
+    assert!(RootPackageLoadObservationKey::equality(&outer, &outer));
+    assert!(outer_tracker.take().iter().any(|entry| {
+        entry.key.starts_with("observed-host-package-load:") && entry.batch.is_none()
+    }));
+
+    let invalid_dice = Dice::builder().build(DetectCycles::Enabled);
+    let invalid_epoch = EpochBuilder::workspace_sources("", "[", &[], 9).build();
+    let mut invalid = transaction(&invalid_dice, invalid_epoch.dupe(), true, None).await;
+    let invalid = invalid.compute(&key).await.unwrap();
+    let invalid = observed_package(&invalid);
+    assert!(invalid.result().is_err());
+    assert!(
+        invalid
+            .observations()
+            .get(&EpochBuilder::demand(
+                "/workspace/pkg",
+                PathObservationOperation::DirectoryEntries,
+            ))
+            .is_none()
+    );
+    for (demand, result) in invalid.observations().observations() {
+        assert!(Arc::ptr_eq(result, invalid_epoch.get(demand).unwrap()));
+    }
+}
+
+#[test]
+fn root_package_epoch_union_is_left_stable_and_conflicts_are_outer() {
+    let result = |variant| {
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::RegularFile,
+            variant,
+            variant,
+            variant,
+            variant,
+            0o644,
+        )))
+    };
+    let demand = EpochBuilder::demand("/same", PathObservationOperation::Lstat);
+    let first = PathObservationEpoch::new([(demand.dupe(), result(1))]).unwrap();
+    let duplicate = PathObservationEpoch::new([(demand.dupe(), result(1))]).unwrap();
+    let conflict = PathObservationEpoch::new([(demand.dupe(), result(2))]).unwrap();
+    let first_arc = first.get(&demand).unwrap().dupe();
+    let merged =
+        merge_root_package_observations(HostPackageLoadMode::Observed, first.dupe(), &duplicate)
+            .unwrap();
+    assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first_arc));
+    assert!(
+        merge_root_package_observations(HostPackageLoadMode::Observed, merged, &conflict).is_err()
+    );
+}
+
+#[tokio::test]
+async fn observed_root_package_cancellation_publishes_no_parent_and_recovers() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(EventTracker::default());
+    let epoch = observed_glob_epoch("exports_files(['a.txt'])\n", 1);
+    let mut cancelled = transaction(&dice, epoch.dupe(), true, Some(tracker.dupe())).await;
+    let key = observed_package_key();
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    assert!(tracker.take().is_empty());
+    drop(cancelled);
+
+    let mut successor = transaction(&dice, epoch, true, Some(tracker)).await;
+    let recovered = successor.compute(&key).await.unwrap();
+    assert!(observed_package(&recovered).result().is_ok());
 }
 
 #[tokio::test]

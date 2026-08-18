@@ -267,10 +267,10 @@ pub(super) type HostGlobTraversalOutcome =
     SourcePreparationOutcome<Arc<Result<HostGlobTraversal, HostGlobTraversalError>>>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-struct HostGlobTraversalObservationKey(HostGlobTraversalKey);
+pub(super) struct HostGlobTraversalObservationKey(HostGlobTraversalKey);
 
 impl HostGlobTraversalObservationKey {
-    fn new(
+    pub(super) fn new(
         workspace: NormalizedAbsolutePath,
         logical_package_root: NormalizedAbsolutePath,
         package: PackagePath,
@@ -289,9 +289,19 @@ impl fmt::Display for HostGlobTraversalObservationKey {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-struct ObservedHostGlobTraversal {
+pub(super) struct ObservedHostGlobTraversal {
     result: Arc<Result<HostGlobTraversal, HostGlobTraversalError>>,
     observations: PathObservationEpoch,
+}
+
+impl ObservedHostGlobTraversal {
+    pub(super) fn result(&self) -> &Arc<Result<HostGlobTraversal, HostGlobTraversalError>> {
+        &self.result
+    }
+
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
 type HostGlobTraversalDriverOutcome = SourcePreparationOutcome<

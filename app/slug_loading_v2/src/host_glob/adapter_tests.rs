@@ -33,11 +33,13 @@ use slug_workspace_v2::PathDirectoryEntries;
 use slug_workspace_v2::PathDirectoryEntry;
 use slug_workspace_v2::PathDirectoryEntryKind;
 use slug_workspace_v2::PathDirectoryName;
+use slug_workspace_v2::PathIoErrorKind;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationEpochKey;
+use slug_workspace_v2::PathObservationError;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
@@ -47,6 +49,7 @@ use super::*;
 use crate::host_glob::HostGlobInvalidPattern;
 use crate::host_glob::traversal::HostGlobTraversal;
 use crate::host_glob::traversal::HostGlobTraversalKey;
+use crate::host_glob::traversal::HostGlobTraversalObservationKey;
 
 type ScriptEntry = (PathObservationDemand, PathObservationResult);
 
@@ -99,9 +102,62 @@ impl Key for AdapterConsumerKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RequestAdapterConsumerKey {
+    observed: bool,
+    pattern: Arc<[u8]>,
+}
+
+impl std::fmt::Display for RequestAdapterConsumerKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "test-host-glob-request-adapter:observed={}",
+            self.observed
+        )
+    }
+}
+
+#[async_trait]
+impl Key for RequestAdapterConsumerKey {
+    type Value = Result<HostGlobRequestOutcome, HostGlobRequestInputError>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        compute_host_glob_request(
+            ctx,
+            path("/workspace"),
+            path("/workspace"),
+            PackagePath::parse("pkg").unwrap(),
+            HostGlobLoadingRequest::new(self.pattern.clone(), HostGlobLoadingOperation::Files),
+            self.observed,
+        )
+        .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        match (x, y) {
+            (Ok(x), Ok(y)) => x.complete_eq(y),
+            (Err(x), Err(y)) => x == y,
+            _ => false,
+        }
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        match value {
+            Ok(value) => value.is_complete(),
+            Err(_) => true,
+        }
+    }
+}
+
 #[derive(Default)]
 struct AdapterTracker {
     traversal_evaluated: AtomicUsize,
+    observed_traversal_evaluated: AtomicUsize,
 }
 
 impl ActivationTracker for AdapterTracker {
@@ -115,6 +171,14 @@ impl ActivationTracker for AdapterTracker {
             && matches!(activation, ActivationData::Evaluated(_))
         {
             self.traversal_evaluated.fetch_add(1, Ordering::SeqCst);
+        }
+        if key
+            .downcast_ref::<HostGlobTraversalObservationKey>()
+            .is_some()
+            && matches!(activation, ActivationData::Evaluated(_))
+        {
+            self.observed_traversal_evaluated
+                .fetch_add(1, Ordering::SeqCst);
         }
     }
 }
@@ -197,6 +261,15 @@ fn complete_paths(value: &HostGlobLoadingOutcome) -> &[Arc<[u8]>] {
         .as_ref()
         .expect("expected successful adapter outcome")
         .paths()
+}
+
+fn complete_request(
+    value: &Result<HostGlobRequestOutcome, HostGlobRequestInputError>,
+) -> (&HostGlobPrepared, &PathObservationEpoch) {
+    let Ok(SourcePreparationOutcome::Complete(Ok((prepared, observations)))) = value else {
+        panic!("expected complete request adapter outcome: {value:?}")
+    };
+    (prepared, observations)
 }
 
 #[tokio::test]
@@ -401,4 +474,161 @@ async fn files_and_directories_operation_reaches_the_adapter_exactly() {
             .collect::<Vec<_>>(),
         vec![b"dir".as_slice(), b"file".as_slice()]
     );
+}
+
+#[tokio::test]
+async fn request_adapter_preserves_semantics_exact_epoch_arcs_and_family_isolation() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(AdapterTracker::default());
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![(b"entry.txt", PathDirectoryEntryKind::File)],
+        ),
+    ]);
+    let epoch = PathObservationEpoch::new(entries).unwrap();
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    });
+    inject_root_package_policy_inputs(&mut updater, policy()).unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+
+    let key = |observed| RequestAdapterConsumerKey {
+        observed,
+        pattern: Arc::from(&b"*"[..]),
+    };
+    let legacy = transaction.compute(&key(false)).await.unwrap();
+    let observed = transaction.compute(&key(true)).await.unwrap();
+    let (legacy, legacy_epoch) = complete_request(&legacy);
+    let (observed, observed_epoch) = complete_request(&observed);
+    assert!(legacy_epoch.observations().is_empty());
+    assert_eq!(legacy.as_ref(), observed.as_ref());
+    assert_eq!(
+        observed
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .paths()
+            .iter()
+            .map(|path| path.as_ref())
+            .collect::<Vec<_>>(),
+        [b"entry.txt".as_slice()]
+    );
+    assert!(!observed_epoch.observations().is_empty());
+    for (demand, result) in observed_epoch.observations() {
+        assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+    }
+    assert_eq!(tracker.traversal_evaluated.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        tracker.observed_traversal_evaluated.load(Ordering::SeqCst),
+        1
+    );
+}
+
+#[tokio::test]
+async fn observed_request_adapter_preserves_all_terminal_polarities() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(AdapterTracker::default());
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.clone() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    });
+    inject_root_package_policy_inputs(&mut updater, policy()).unwrap();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::empty(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+
+    let invalid = transaction
+        .compute(&RequestAdapterConsumerKey {
+            observed: true,
+            pattern: Arc::from(&b"?"[..]),
+        })
+        .await
+        .unwrap();
+    assert!(matches!(invalid, Err(HostGlobRequestInputError(_))));
+    assert_eq!(
+        tracker.observed_traversal_evaluated.load(Ordering::SeqCst),
+        0
+    );
+
+    let need = transaction
+        .compute(&RequestAdapterConsumerKey {
+            observed: true,
+            pattern: Arc::from(&b"entry"[..]),
+        })
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+
+    let literal = demand("/workspace/pkg/entry", PathObservationOperation::Lstat);
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        (
+            literal.dupe(),
+            PathObservationResult::Lstat(PathOperationResult::Error(PathObservationError::Io {
+                kind: PathIoErrorKind::PermissionDenied,
+                raw_os_error: Some(13),
+            })),
+        ),
+    ]);
+    let epoch = PathObservationEpoch::new(entries).unwrap();
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let semantic = transaction
+        .compute(&RequestAdapterConsumerKey {
+            observed: true,
+            pattern: Arc::from(&b"entry"[..]),
+        })
+        .await
+        .unwrap();
+    let (prepared, observations) = complete_request(&semantic);
+    assert!(prepared.is_err());
+    assert!(Arc::ptr_eq(
+        observations.get(&literal).unwrap(),
+        epoch.get(&literal).unwrap()
+    ));
+
+    let mut data = UserComputationData::default();
+    data.data.set(ForceHostGlobRequestOuter(
+        PathObservationEpoch::from_shared([(
+            demand("/mismatch", PathObservationOperation::Lstat),
+            Arc::new(PathObservationResult::FileBytes(
+                PathOperationResult::Missing,
+            )),
+        )])
+        .unwrap_err()
+        .into(),
+    ));
+    let outer_dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = outer_dice.updater_with_data(data);
+    inject_root_package_policy_inputs(&mut updater, policy()).unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    let mut outer = updater.commit().await;
+    assert!(matches!(
+        outer
+            .compute(&RequestAdapterConsumerKey {
+                observed: true,
+                pattern: Arc::from(&b"entry"[..]),
+            })
+            .await
+            .unwrap(),
+        Ok(SourcePreparationOutcome::Complete(Err(_)))
+    ));
 }

@@ -47,6 +47,7 @@ use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorError;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_bzlmod_v2::RootPackageBzlTarget;
 use slug_bzlmod_v2::RootPackageBzlTargetError;
 use slug_bzlmod_v2::RootPackageSource;
@@ -591,6 +592,20 @@ struct HostPackageAttemptTerminal {
 #[allow(dead_code)]
 type HostPackageAttemptOutcome = SourcePreparationOutcome<Arc<HostPackageAttemptTerminal>>;
 
+type HostPackageAttemptDriverOutcome = SourcePreparationOutcome<
+    Result<(Arc<HostPackageAttemptTerminal>, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)] // Private observed sibling is callerless until a later cutover packet.
+enum HostPackageLoadMode {
+    Legacy,
+    Observed,
+}
+
+#[cfg(test)]
+struct ForceRootPackageObservationOuter(ObservedPathFrontierError);
+
 #[allow(dead_code)]
 struct HostPackageAttemptInput<'a> {
     workspace: NormalizedAbsolutePath,
@@ -730,51 +745,82 @@ fn evaluate_host_package_attempt(
 }
 
 #[allow(dead_code)]
-async fn evaluate_host_package_attempts(
+async fn evaluate_host_package_attempts_driver(
     ctx: &mut DiceComputations<'_>,
     input: HostPackageAttemptInput<'_>,
-) -> HostPackageAttemptOutcome {
+    mode: HostPackageLoadMode,
+) -> HostPackageAttemptDriverOutcome {
     let mut prepared = Arc::new(SmallMap::new());
+    let mut observations = PathObservationEpoch::empty();
     loop {
         // The synchronous attempt returns only compact terminal state or one
         // request, so no evaluator/module/recorder borrow can cross this await.
         match evaluate_host_package_attempt(&input, prepared.dupe()) {
             HostPackageAttemptStep::Terminal(terminal) => {
-                return SourcePreparationOutcome::Complete(Arc::new(terminal));
+                return SourcePreparationOutcome::Complete(Ok((Arc::new(terminal), observations)));
             }
             HostPackageAttemptStep::Pending {
                 request,
                 event_batch,
             } => {
-                let outcome = match compute_host_glob_request(
+                let outcome = compute_host_glob_request(
                     ctx,
                     input.workspace.dupe(),
                     input.logical_package_root.dupe(),
                     input.package.clone(),
                     request.dupe(),
+                    matches!(mode, HostPackageLoadMode::Observed),
                 )
-                .await
-                {
+                .await;
+                let outcome = match outcome {
                     Ok(outcome) => outcome,
                     Err(error) => {
-                        return SourcePreparationOutcome::Complete(Arc::new(
-                            HostPackageAttemptTerminal {
+                        return SourcePreparationOutcome::Complete(Ok((
+                            Arc::new(HostPackageAttemptTerminal {
                                 result: Err(HostPackageAttemptError::Input(error)),
                                 event_batch,
-                            },
-                        ));
+                            }),
+                            observations,
+                        )));
                     }
                 };
                 match outcome {
                     SourcePreparationOutcome::Need(need) => {
                         return SourcePreparationOutcome::Need(need);
                     }
-                    SourcePreparationOutcome::Complete(value) => {
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        return SourcePreparationOutcome::Complete(Err(error));
+                    }
+                    SourcePreparationOutcome::Complete(Ok((value, incoming))) => {
+                        observations =
+                            match merge_root_package_observations(mode, observations, &incoming) {
+                                Ok(observations) => observations,
+                                Err(error) => {
+                                    return SourcePreparationOutcome::Complete(Err(error));
+                                }
+                            };
                         let replaced = Arc::make_mut(&mut prepared).insert(request, value);
                         debug_assert!(replaced.is_none());
                     }
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+async fn evaluate_host_package_attempts(
+    ctx: &mut DiceComputations<'_>,
+    input: HostPackageAttemptInput<'_>,
+) -> HostPackageAttemptOutcome {
+    match evaluate_host_package_attempts_driver(ctx, input, HostPackageLoadMode::Legacy).await {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((terminal, observations))) => {
+            debug_assert!(observations.observations().is_empty());
+            SourcePreparationOutcome::Complete(terminal)
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            panic!("legacy Host package attempt produced frontier error: {error}")
         }
     }
 }
@@ -1501,6 +1547,28 @@ pub struct RootPackageLoadKey {
     package: PackagePath,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling is callerless until a later cutover packet.
+pub(crate) struct RootPackageLoadObservationKey(RootPackageLoadKey);
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)] // Retained only by the callerless observed key.
+pub(crate) struct ObservedRootPackageLoad {
+    result: Arc<Result<LoadedPackage, RootPackageLoadError>>,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedRootPackageLoad {
+    pub(crate) fn result(&self) -> &Arc<Result<LoadedPackage, RootPackageLoadError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 enum RepositoryPackageLoadErrorInner {
     Source {
@@ -1729,9 +1797,22 @@ impl RootPackageLoadKey {
     }
 }
 
+#[allow(dead_code)]
+impl RootPackageLoadObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, package: PackagePath) -> Self {
+        Self(RootPackageLoadKey::new(workspace, package))
+    }
+}
+
 impl fmt::Display for RootPackageLoadKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "host-package-load:{}//{}", self.workspace, self.package)
+    }
+}
+
+impl fmt::Display for RootPackageLoadObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
     }
 }
 
@@ -1761,7 +1842,7 @@ fn host_bzl_complete(
     SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
-fn union_host_bzl_observations(
+fn union_host_observations(
     left: &PathObservationEpoch,
     right: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
@@ -1803,7 +1884,7 @@ async fn complete_observed_host_bzl_cycle(
                 }
                 SourcePreparationOutcome::Complete(Ok(source)) => source,
             };
-            observations = match union_host_bzl_observations(&observations, source.observations()) {
+            observations = match union_host_observations(&observations, source.observations()) {
                 Ok(observations) => observations,
                 Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
             };
@@ -1984,7 +2065,7 @@ async fn compute_host_bzl_module(
                 observations
             }
             HostBzlModuleMode::Observed => {
-                match union_host_bzl_observations(&observations, &incoming) {
+                match union_host_observations(&observations, &incoming) {
                     Ok(observations) => observations,
                     Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
                 }
@@ -2900,15 +2981,280 @@ impl Key for ExternalBzlModuleEvalKey {
     }
 }
 
-fn root_package_complete(
+type RootPackageLoadCarrier = Arc<Result<LoadedPackage, RootPackageLoadError>>;
+type RootPackageLoadDriverOutcome = SourcePreparationOutcome<
+    Result<(RootPackageLoadCarrier, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+fn root_package_driver_complete(
     result: Result<LoadedPackage, RootPackageLoadError>,
-) -> SourcePreparationOutcome<Arc<Result<LoadedPackage, RootPackageLoadError>>> {
-    SourcePreparationOutcome::Complete(Arc::new(result))
+    observations: PathObservationEpoch,
+) -> RootPackageLoadDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn merge_root_package_observations(
+    mode: HostPackageLoadMode,
+    current: PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    match mode {
+        HostPackageLoadMode::Legacy => {
+            debug_assert!(incoming.observations().is_empty());
+            Ok(current)
+        }
+        HostPackageLoadMode::Observed => union_host_observations(&current, incoming),
+    }
+}
+
+async fn compute_root_package(
+    key: &RootPackageLoadKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: HostPackageLoadMode,
+    capture_events: bool,
+    event_batch: &mut Option<EventBatch>,
+) -> RootPackageLoadDriverOutcome {
+    let anchor = match mode {
+        HostPackageLoadMode::Legacy => host_dice_invariant(
+            ctx.compute(&RootModuleLoadingAnchorKey::new(key.workspace.dupe()))
+                .await,
+        )
+        .map(|result| Ok((result.as_ref().clone(), PathObservationEpoch::empty()))),
+        HostPackageLoadMode::Observed => host_dice_invariant(
+            ctx.compute(&RootModuleLoadingAnchorObservationKey::new(
+                key.workspace.dupe(),
+            ))
+            .await,
+        )
+        .map(|value| {
+            value.map(|observed| (observed.result().clone(), observed.observations().dupe()))
+        }),
+    };
+    let (anchor, mut observations) = match anchor {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    if let Err(error) = anchor {
+        return root_package_driver_complete(
+            Err(RootPackageLoadError::new(
+                RootPackageLoadErrorInner::RootModule(error),
+            )),
+            observations,
+        );
+    }
+
+    let source = match mode {
+        HostPackageLoadMode::Legacy => host_dice_invariant(
+            ctx.compute(&RootPackageSourceKey::for_build(
+                key.workspace.dupe(),
+                key.package.clone(),
+            ))
+            .await,
+        )
+        .map(|result| Ok((result.as_ref().clone(), PathObservationEpoch::empty()))),
+        HostPackageLoadMode::Observed => host_dice_invariant(
+            ctx.compute(&RootPackageSourceObservationKey::for_build(
+                key.workspace.dupe(),
+                key.package.clone(),
+            ))
+            .await,
+        )
+        .map(|value| {
+            value.map(|observed| (observed.result().clone(), observed.observations().dupe()))
+        }),
+    };
+    let (source, incoming) = match source {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    observations = match merge_root_package_observations(mode, observations, &incoming) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    #[cfg(test)]
+    if matches!(mode, HostPackageLoadMode::Observed) {
+        if let Ok(forced) = ctx
+            .per_transaction_data()
+            .data
+            .get::<ForceRootPackageObservationOuter>()
+        {
+            return SourcePreparationOutcome::Complete(Err(forced.0.clone()));
+        }
+    }
+    let source = match source {
+        Ok(source) => source,
+        Err(error) => {
+            return root_package_driver_complete(
+                Err(RootPackageLoadError::new(
+                    RootPackageLoadErrorInner::Source(error),
+                )),
+                observations,
+            );
+        }
+    };
+    let source_text = match host_source_text(&source) {
+        Ok(source) => source,
+        Err(error) => {
+            return root_package_driver_complete(
+                Err(RootPackageLoadError::new(RootPackageLoadErrorInner::Input(
+                    error,
+                ))),
+                observations,
+            );
+        }
+    };
+    let source_name = match host_source_name(&source) {
+        Ok(name) => name,
+        Err(error) => {
+            return root_package_driver_complete(
+                Err(RootPackageLoadError::new(RootPackageLoadErrorInner::Input(
+                    error,
+                ))),
+                observations,
+            );
+        }
+    };
+    let ast = match AstModule::parse_with_string_encoding(
+        &source_name,
+        source_text.as_ref().clone(),
+        &Dialect::Standard,
+        StringEncoding::BazelInternal,
+    ) {
+        Ok(ast) => ast,
+        Err(error) => {
+            return root_package_driver_complete(
+                Err(RootPackageLoadError::new(
+                    RootPackageLoadErrorInner::Parse {
+                        package: key.package.clone(),
+                        message: Arc::from(error.to_string()),
+                    },
+                )),
+                observations,
+            );
+        }
+    };
+    let mut loaded_modules = Vec::new();
+    for load in ast.loads() {
+        let load = load.module_id.to_owned();
+        let label = match resolve_host_load_label(&key.package, &load) {
+            Ok(label) => label,
+            Err(error) => {
+                return root_package_driver_complete(
+                    Err(RootPackageLoadError::new(
+                        RootPackageLoadErrorInner::LoadLabel {
+                            package: key.package.clone(),
+                            error,
+                        },
+                    )),
+                    observations,
+                );
+            }
+        };
+        let child = match mode {
+            HostPackageLoadMode::Legacy => {
+                let child = HostBzlModuleEvalKey::new(key.workspace.dupe(), label.clone());
+                host_dice_invariant(ctx.compute(&child).await)
+                    .map(|result| Ok((result.as_ref().clone(), PathObservationEpoch::empty())))
+            }
+            HostPackageLoadMode::Observed => {
+                let child = HostBzlModuleObservationKey::new(key.workspace.dupe(), label.clone());
+                host_dice_invariant(ctx.compute(&child).await).map(|value| {
+                    value
+                        .map(|observed| (observed.result().clone(), observed.observations().dupe()))
+                })
+            }
+        };
+        let (child, incoming) = match child {
+            SourcePreparationOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+        };
+        observations = match merge_root_package_observations(mode, observations, &incoming) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        let module = match child {
+            Ok(module) => module,
+            Err(error) => {
+                let build_name: String = source
+                    .relative_path()
+                    .iter()
+                    .copied()
+                    .map(char::from)
+                    .collect();
+                let inner = RootPackageLoadErrorInner::Bzl {
+                    origin: Arc::from(if key.package.as_str().is_empty() {
+                        build_name
+                    } else {
+                        format!("{}/{build_name}", key.package)
+                    }),
+                    load: Arc::from(load),
+                    label,
+                    error: Arc::new(error),
+                };
+                return root_package_driver_complete(
+                    Err(RootPackageLoadError::new(inner)),
+                    observations,
+                );
+            }
+        };
+        loaded_modules.push((load, module));
+    }
+    let package_dir = source.package_root().as_path().join(key.package.as_str());
+    let attempts = evaluate_host_package_attempts_driver(
+        ctx,
+        HostPackageAttemptInput {
+            workspace: key.workspace.dupe(),
+            logical_package_root: source.package_root().dupe(),
+            package: key.package.clone(),
+            package_dir,
+            build_file: source.logical_path().as_path().to_path_buf(),
+            source: source_text,
+            package_label: CompactString::new(key.package.as_str()),
+            loaded_modules: &loaded_modules,
+            capture_events,
+        },
+        mode,
+    )
+    .await;
+    let (terminal, incoming) = match attempts {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    observations = match merge_root_package_observations(mode, observations, &incoming) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    *event_batch = Some(terminal.event_batch.clone());
+    root_package_driver_complete(
+        terminal
+            .result
+            .clone()
+            .map_err(|error| RootPackageLoadError::new(RootPackageLoadErrorInner::Attempt(error))),
+        observations,
+    )
+}
+
+fn stores_root_package_event_batch(value: &RootPackageLoadDriverOutcome) -> bool {
+    matches!(value, SourcePreparationOutcome::Complete(Ok(_)))
 }
 
 #[async_trait]
 impl Key for RootPackageLoadKey {
-    type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, RootPackageLoadError>>>;
+    type Value = SourcePreparationOutcome<RootPackageLoadCarrier>;
 
     async fn compute(
         &self,
@@ -2921,150 +3267,79 @@ impl Key for RootPackageLoadKey {
             .get::<CaptureEvaluationEvents>()
             .is_ok();
         let mut event_batch = None;
-        let value = async {
-            match host_dice_invariant(
-                ctx.compute(&RootModuleLoadingAnchorKey::new(self.workspace.dupe()))
-                    .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(anchor) => {
-                    if let Err(error) = anchor.as_ref() {
-                        return root_package_complete(Err(RootPackageLoadError::new(
-                            RootPackageLoadErrorInner::RootModule(error.clone()),
-                        )));
-                    }
-                }
-            }
-            let source = match host_dice_invariant(
-                ctx.compute(&RootPackageSourceKey::for_build(
-                    self.workspace.dupe(),
-                    self.package.clone(),
-                ))
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(source) => match source.as_ref() {
-                    Ok(source) => source.dupe(),
-                    Err(error) => {
-                        return root_package_complete(Err(RootPackageLoadError::new(
-                            RootPackageLoadErrorInner::Source(error.clone()),
-                        )));
-                    }
-                },
-            };
-            let source_text = match host_source_text(&source) {
-                Ok(source) => source,
-                Err(error) => {
-                    return root_package_complete(Err(RootPackageLoadError::new(
-                        RootPackageLoadErrorInner::Input(error),
-                    )));
-                }
-            };
-            let source_name = match host_source_name(&source) {
-                Ok(name) => name,
-                Err(error) => {
-                    return root_package_complete(Err(RootPackageLoadError::new(
-                        RootPackageLoadErrorInner::Input(error),
-                    )));
-                }
-            };
-            let ast = match AstModule::parse_with_string_encoding(
-                &source_name,
-                source_text.as_ref().clone(),
-                &Dialect::Standard,
-                StringEncoding::BazelInternal,
-            ) {
-                Ok(ast) => ast,
-                Err(error) => {
-                    return root_package_complete(Err(RootPackageLoadError::new(
-                        RootPackageLoadErrorInner::Parse {
-                            package: self.package.clone(),
-                            message: Arc::from(error.to_string()),
-                        },
-                    )));
-                }
-            };
-            let mut loaded_modules = Vec::new();
-            for load in ast.loads() {
-                let load = load.module_id.to_owned();
-                let label = match resolve_host_load_label(&self.package, &load) {
-                    Ok(label) => label,
-                    Err(error) => {
-                        return root_package_complete(Err(RootPackageLoadError::new(
-                            RootPackageLoadErrorInner::LoadLabel {
-                                package: self.package.clone(),
-                                error,
-                            },
-                        )));
-                    }
-                };
-                let child = HostBzlModuleEvalKey::new(self.workspace.dupe(), label.clone());
-                let child_value = host_dice_invariant(ctx.compute(&child).await);
-                let module = match child_value {
-                    SourcePreparationOutcome::Need(need) => {
-                        return SourcePreparationOutcome::Need(need);
-                    }
-                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                        Ok(module) => module.clone(),
-                        Err(error) => {
-                            let build_name: String = source
-                                .relative_path()
-                                .iter()
-                                .copied()
-                                .map(char::from)
-                                .collect();
-                            let inner = RootPackageLoadErrorInner::Bzl {
-                                origin: Arc::from(if self.package.as_str().is_empty() {
-                                    build_name
-                                } else {
-                                    format!("{}/{build_name}", self.package)
-                                }),
-                                load: Arc::from(load),
-                                label,
-                                error: Arc::new(error.clone()),
-                            };
-                            return root_package_complete(Err(RootPackageLoadError::new(inner)));
-                        }
-                    },
-                };
-                loaded_modules.push((load, module));
-            }
-            let package_dir = source.package_root().as_path().join(self.package.as_str());
-            let attempts = evaluate_host_package_attempts(
-                ctx,
-                HostPackageAttemptInput {
-                    workspace: self.workspace.dupe(),
-                    logical_package_root: source.package_root().dupe(),
-                    package: self.package.clone(),
-                    package_dir,
-                    build_file: source.logical_path().as_path().to_path_buf(),
-                    source: source_text,
-                    package_label: CompactString::new(self.package.as_str()),
-                    loaded_modules: &loaded_modules,
-                    capture_events,
-                },
-            )
-            .await;
-            match attempts {
-                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
-                SourcePreparationOutcome::Complete(terminal) => {
-                    event_batch = Some(terminal.event_batch.clone());
-                    root_package_complete(terminal.result.clone().map_err(|error| {
-                        RootPackageLoadError::new(RootPackageLoadErrorInner::Attempt(error))
-                    }))
-                }
-            }
-        }
+        let value = compute_root_package(
+            self,
+            ctx,
+            HostPackageLoadMode::Legacy,
+            capture_events,
+            &mut event_batch,
+        )
         .await;
-        if capture_events && value.is_complete() {
+        if capture_events && stores_root_package_event_batch(&value) {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
-                .expect("HostPackageLoadKey stores one local Complete event batch");
+                .expect("RootPackageLoadKey stores one local Complete event batch");
         }
-        value
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy root package produced frontier error: {error}")
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for RootPackageLoadObservationKey {
+    type Value =
+        SourcePreparationOutcome<Result<ObservedRootPackageLoad, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = compute_root_package(
+            &self.0,
+            ctx,
+            HostPackageLoadMode::Observed,
+            capture_events,
+            &mut event_batch,
+        )
+        .await;
+        if capture_events && stores_root_package_event_batch(&value) {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect("RootPackageLoadObservationKey stores one local Complete event batch");
+        }
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedRootPackageLoad {
+                    result,
+                    observations,
+                }))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {

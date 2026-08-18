@@ -15,6 +15,8 @@ use dupe::Dupe;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_identity_v2::PackagePath;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 
 use super::dice_invariant;
 use super::traversal::HostGlobPattern;
@@ -22,6 +24,7 @@ use super::traversal::HostGlobPatternError;
 use super::traversal::HostGlobTraversalError;
 use super::traversal::HostGlobTraversalKey;
 use super::traversal::HostGlobTraversalKeyError;
+use super::traversal::HostGlobTraversalObservationKey;
 use super::traversal::HostGlobTraversalOperation;
 use super::traversal::HostGlobTraversalOutcome;
 
@@ -90,19 +93,36 @@ impl HostGlobRequestMatches {
 
 pub(crate) type HostGlobPrepared =
     Arc<Result<HostGlobRequestMatches, HostGlobRequestTraversalError>>;
-pub(crate) type HostGlobRequestOutcome = SourcePreparationOutcome<HostGlobPrepared>;
+pub(crate) type HostGlobRequestOutcome = SourcePreparationOutcome<
+    Result<(HostGlobPrepared, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+#[derive(Clone, Copy)]
+enum HostGlobRequestMode {
+    Legacy,
+    Observed,
+}
+
+#[cfg(test)]
+pub(super) struct ForceHostGlobRequestOuter(pub(super) ObservedPathFrontierError);
+
+fn project_traversal_matches(
+    traversal: &super::traversal::HostGlobTraversal,
+) -> HostGlobLoadingMatches {
+    HostGlobLoadingMatches {
+        paths: traversal
+            .matches()
+            .iter()
+            .map(|entry| entry.relative_path.dupe())
+            .collect::<Vec<_>>()
+            .into(),
+    }
+}
 
 fn project_traversal_outcome(outcome: HostGlobTraversalOutcome) -> HostGlobLoadingOutcome {
     outcome.map(|value| {
         Arc::new(match value.as_ref() {
-            Ok(traversal) => Ok(HostGlobLoadingMatches {
-                paths: traversal
-                    .matches()
-                    .iter()
-                    .map(|entry| entry.relative_path.dupe())
-                    .collect::<Vec<_>>()
-                    .into(),
-            }),
+            Ok(traversal) => Ok(project_traversal_matches(traversal)),
             Err(error) => Err(error.clone()),
         })
     })
@@ -136,29 +156,98 @@ pub(crate) async fn compute_host_glob_request(
     logical_package_root: NormalizedAbsolutePath,
     package: PackagePath,
     request: HostGlobLoadingRequest,
+    observed: bool,
+) -> Result<HostGlobRequestOutcome, HostGlobRequestInputError> {
+    compute_host_glob_request_driver(
+        ctx,
+        workspace,
+        logical_package_root,
+        package,
+        request,
+        if observed {
+            HostGlobRequestMode::Observed
+        } else {
+            HostGlobRequestMode::Legacy
+        },
+    )
+    .await
+}
+
+async fn compute_host_glob_request_driver(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    logical_package_root: NormalizedAbsolutePath,
+    package: PackagePath,
+    request: HostGlobLoadingRequest,
+    mode: HostGlobRequestMode,
 ) -> Result<HostGlobRequestOutcome, HostGlobRequestInputError> {
     let operation = match request.operation {
         HostGlobLoadingOperation::Files => HostGlobTraversalOperation::Files,
         HostGlobLoadingOperation::FilesAndDirs => HostGlobTraversalOperation::FilesAndDirs,
     };
-    compute_host_glob_for_loading(
-        ctx,
-        workspace,
-        logical_package_root,
-        package,
-        request.pattern,
-        operation,
-    )
-    .await
-    .map(|outcome| {
-        outcome.map(|value| {
-            Arc::new(match value.as_ref() {
-                Ok(matches) => Ok(HostGlobRequestMatches(matches.dupe())),
-                Err(error) => Err(HostGlobRequestTraversalError(error.clone())),
+    let pattern = HostGlobPattern::new(request.pattern)
+        .map_err(HostGlobLoadingInputError::Pattern)
+        .map_err(HostGlobRequestInputError)?;
+    let outcome = match mode {
+        HostGlobRequestMode::Legacy => {
+            let key = HostGlobTraversalKey::new(
+                workspace,
+                logical_package_root,
+                package,
+                pattern,
+                operation,
+            )
+            .map_err(HostGlobLoadingInputError::Key)
+            .map_err(HostGlobRequestInputError)?;
+            dice_invariant(ctx.compute(&key).await).map(|result| {
+                Ok(ObservedHostGlobTraversalProjection {
+                    result,
+                    observations: PathObservationEpoch::empty(),
+                })
             })
+        }
+        HostGlobRequestMode::Observed => {
+            let key = HostGlobTraversalObservationKey::new(
+                workspace,
+                logical_package_root,
+                package,
+                pattern,
+                operation,
+            )
+            .map_err(HostGlobLoadingInputError::Key)
+            .map_err(HostGlobRequestInputError)?;
+            dice_invariant(ctx.compute(&key).await).map(|value| {
+                value.map(|observed| ObservedHostGlobTraversalProjection {
+                    result: observed.result().dupe(),
+                    observations: observed.observations().dupe(),
+                })
+            })
+        }
+    };
+    #[cfg(test)]
+    if matches!(mode, HostGlobRequestMode::Observed) {
+        if let Ok(forced) = ctx
+            .per_transaction_data()
+            .data
+            .get::<ForceHostGlobRequestOuter>()
+        {
+            return Ok(SourcePreparationOutcome::Complete(Err(forced.0.clone())));
+        }
+    }
+    Ok(outcome.map(|value| {
+        value.map(|observed| {
+            let prepared = Arc::new(match observed.result.as_ref() {
+                Ok(traversal) => Ok(HostGlobRequestMatches(project_traversal_matches(traversal))),
+                Err(error) => Err(HostGlobRequestTraversalError(error.clone())),
+            });
+            (prepared, observed.observations)
         })
-    })
-    .map_err(HostGlobRequestInputError)
+    }))
+}
+
+struct ObservedHostGlobTraversalProjection {
+    result: Arc<Result<super::traversal::HostGlobTraversal, HostGlobTraversalError>>,
+    observations: PathObservationEpoch,
 }
 
 #[cfg(all(test, unix))]
