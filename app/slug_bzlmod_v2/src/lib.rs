@@ -336,6 +336,8 @@ pub use source_preparation::HostRepositoryRelativePath;
 pub use source_preparation::HostRepositoryRelativePathError;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceFileKey;
+#[doc(hidden)]
+pub use source_preparation::HostRepositorySourceFileObservationKey;
 pub use source_preparation::HostRepositorySourceFileValue;
 #[doc(hidden)]
 pub use source_preparation::HostRepositorySourceInput;
@@ -360,6 +362,8 @@ pub use source_preparation::HostRepositorySourceObservationView;
 pub use source_preparation::ModuleSourcePreparation;
 pub use source_preparation::ModuleSourcePreparationError;
 pub use source_preparation::ModuleSourcePreparationKey;
+#[doc(hidden)]
+pub use source_preparation::ObservedHostRepositorySourceFile;
 pub use source_preparation::RegistryModuleFileAttempt;
 pub use source_preparation::RepositoryIo;
 pub use source_preparation::RepositoryIoOutcome;
