@@ -3053,3 +3053,53 @@ Host reads; repository/materializer work; or docs cap excess. `REPLAN` if no
 single owner can preserve exact exported-source revision publication and exact
 rule/filegroup public behavior without a side store, duplicate driver or
 unbounded split. Acceptance may schedule only one bounded implementation.
+
+The frozen owner is
+`SingletonRootSingleBuildCommandKey(BuildCommandRootKey)`, admitted only for a
+validated singleton root `Single`. Its complete-only DICE terminal holds one
+semantic Result Arc plus `Option<PathObservationEpoch>`. The option is `Some`
+exactly when that same semantic result owns the existing source certificate:
+exported success or completed RootSource error. The complete epoch is the
+stable left-first anchor/package/FileBytes union using the certificate's exact
+Result Arc; all other terminals retain `None`, so rule analysis can never
+present a partial carrier. Need and observed outer errors retain no terminal.
+
+The neutral key implements `NativeCommandRoot`, preserves the current
+root-Single revision initialization and analysis-error relaxation, conditionally
+exposes certificate/observations, and uses the existing consuming accepted
+projection. Refactor only the post-package branch and optional final action-
+closure/result step into shared helpers; the neutral driver alone computes one
+observed anchor/package and target lookup before continuing. It computes no
+existing build-root child, legacy loading sibling or second package family.
+PackageAll selection precedes the neutral Single selection; all other public
+roots retain the legacy route.
+
+The neutral root stores no event batch. Observed anchor/package and configured-
+analysis children remain the sole semantic event owners; generic selected-
+closure acceptance remains the command publisher. Rule/filegroup child epochs
+are dependency-owned and the terminal retains no duplicate epoch,
+classification or event batch. Existing `Arc`, `Dupe`, `Allocative` and compact
+`PathObservationEpoch` utilities are sufficient; no new collection/cache/
+interner or Stage 9 ledger change is needed.
+
+Before growth, keep shared build/cquery fixtures in the parent tests module
+through `resolved_identity`, then relocate the test tail from
+`multi_target_exported_sources_do_not_enter_revision_bridge` through the final
+collection test into `runtime/tests/build_command_tests.rs`. Declare a nested
+`mod build_command_tests` at that location and `include!` the literal
+`tests/build_command_tests.rs`; the new file starts `use super::*;`. The roughly
+2,267-line test-body relocation changes no test body or production visibility.
+Future Rust writes only `runtime/dice.rs` and that new test file. Against
+`31a8b1d3`, semantic caps are 360 production, 450 test and 810 aggregate net
+lines, excluding only the exact relocation from category growth; physical caps
+are 12,275, 2,800 and 15,075 combined.
+
+Implementation proof covers key/terminal equality and activation, exact
+certificate/carrier/selected Arcs, no partial rule carrier, terminal/Need/outer/
+cancellation ordering, event cold/warm behavior, mismatch abort, full source
+lifecycle and revision retry, exact public rule/filegroup behavior, and strict
+PackageAll/multi/external/cquery isolation. Require focused and broad core/
+loading validation, formatting/check/diff/archive gates, retention and AI
+cleanup scans, and independent review. Any third Rust file, duplicate family,
+event owner, partial carrier, public drift, unbounded split or cap excess is
+`REPLAN`.

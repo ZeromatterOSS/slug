@@ -52,10 +52,18 @@ Reuse exact public source behavior and revision evidence in `42f4a64b` and
 Buck2 DICE dependency/equality/transaction/cancellation rules. No new fixture
 or oracle is justified unless the design finds an observable gap.
 
-## Required design decision
+## Frozen design
 
-Freeze the exact private key and terminal algebra for one singleton-root-
-`Single` owner. It must:
+Add private `SingletonRootSingleBuildCommandKey(BuildCommandRootKey)`, whose
+constructor accepts only a structurally validated singleton root-repository
+`TargetPattern::Single`. Its DICE value is a complete-only
+`SourcePreparationOutcome<Result<SingletonRootSingleBuildCommandTerminal,
+ObservedPathFrontierError>>`. The terminal owns exactly the semantic
+`Arc<Result<BuildCommandEvaluation, BuildCommandError>>` plus an optional
+`PathObservationEpoch`; equality uses `complete_eq` and validity requires
+Complete. Need and observed outer error publish no terminal.
+
+The owner must:
 
 - be selected structurally by the sole public build constructor only after the
   existing request validation admits exactly one root-repository `Single`;
@@ -68,19 +76,40 @@ Freeze the exact private key and terminal algebra for one singleton-root-
   multi-target, external, recursive and cquery identities unchanged;
 - preserve anchor -> package -> lookup/kind -> revision -> FileBytes order,
   first semantic/outer/Need precedence, cancellation and child/final events;
-- expose a complete carrier for validation only when the terminal owns every
-  selected path demand and exact Result Arc; no partial carrier is admissible;
+- store `Some(epoch)` exactly when the semantic result owns a
+  `SourceCertificate`: exported-source success or completed `RootSource`
+  error. That epoch is the stable left-first union of anchor, package and the
+  certificate's exact FileBytes demand/Result Arc. Every other terminal stores
+  `None`; no partial carrier is admissible;
 - preserve the exact FileBytes Arc in the source certificate and through every
   retry/preflight/selection union, with complete validation before revision
   finalization or snapshot commit; and
 - project the accepted terminal to the existing public result/event shape
   without retaining classification scratch or a second semantic value.
 
-Decide whether the terminal is an enum with an optional observed carrier or a
-single carrier algebra, and prove that rule analysis cannot accidentally
-publish a partial epoch. Freeze one child/final event authority for cold, warm,
-Need, semantic error, typed outer error, revision retry and cancellation.
-Name exact equality/validity behavior and demonstrate that no lock spans DICE.
+Implement `NativeCommandRoot` directly for the neutral key. It always
+initializes the existing request revision, matching the current syntactically
+sole root-Single path; it exposes the source certificate and observations only
+through the terminal invariant above, preserves the current analysis-error
+root relaxation, maps observed outer error to typed session computation
+failure, and preserves Need. The accepted terminal projection consumes the
+terminal, moves its exact semantic Arc and existing event buffer, and drops the
+optional carrier.
+
+Refactor the current root branch after package loading into one
+`compute_loaded_build_branch` helper used by both legacy multi-target and the
+neutral owner, and one result/action-closure finalizer if needed. The neutral
+driver itself owns observed anchor -> observed package -> target lookup/kind;
+it never computes `BuildCommandRootKey`, `BuildCommandRootObservationKey`, a
+legacy anchor/package key or a second package load. Public selection order is
+accepted PackageAll observed owner, then neutral singleton root-Single owner,
+then unchanged legacy root. No other caller changes.
+
+The neutral root stores no event batch. Existing observed anchor/package and
+configured-analysis children remain the only semantic event owners, and the
+generic selected-closure buffer remains the only command publication owner.
+Cold order stays anchor before package before analysis; Need/cancellation
+publish nothing; warm children do not replay. No lock spans a DICE compute.
 
 The retained exported-source state is at most one semantic Result Arc, one
 compact exact epoch and the existing source certificate. Rule/filegroup
@@ -89,15 +118,42 @@ child epochs remain dependency-owned. Driver vectors, kind classification,
 unions, comparison and retry state are compute- or command-local. Add no cache,
 interner, collection, lock, task, Host read, graph, event store or certificate.
 
-The 14,148-line `runtime/dice.rs` owner is already beyond the complexity
-trigger and has three physical lines of prior packet headroom. Choose a bounded
-cohesive production/test split before authorizing growth: either a focused
-command-owner module with the minimum private seams, or a test sibling that
-materially lowers `dice.rs` while keeping private-owner tests discriminating.
-Do not authorize a nominal split that leaves the large owner growing. Freeze
-the future Rust allowlist, production/test/aggregate net and per-file physical
-caps, focused and direct-dependent validation, Buck2 retention scan, AI cleanup
-and independent implementation review.
+Before semantic edits, retain the shared build/cquery fixture block in the
+existing parent `tests` module through `resolved_identity`, then move the test
+tail beginning at `multi_target_exported_sources_do_not_enter_revision_bridge`
+through the final build-branch collection test into
+`runtime/tests/build_command_tests.rs`. At that location declare
+`mod build_command_tests { include!("tests/build_command_tests.rs"); }`; the new
+file begins `use super::*;`. `include!` resolves relative to `runtime/dice.rs`,
+and the nested child can access every retained private parent fixture without
+exporting it. The roughly 2,267-line test-body relocation changes no test body
+or production visibility and materially lowers `runtime/dice.rs`.
+
+Future Rust writes are exactly:
+
+- `app/slug_core_v2/src/runtime/dice.rs`; and
+- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs` (new).
+
+Against `31a8b1d3`, excluding the line-identical relocation from category
+growth but not from physical accounting, caps are 360 production, 450 new/test
+and 810 aggregate net semantic lines; final physical caps are 12,275 for
+`dice.rs`, 2,800 for `build_command_tests.rs` and 15,075 combined. Any required
+third Rust file or cap excess is `REPLAN`.
+
+## Required implementation proof
+
+Require neutral identity/equality/validity and exact activation matrices;
+exported success plus RootSource error exact carrier/certificate Arc identity;
+anchor/package/target/rule/filegroup terminals with no partial retained carrier;
+Need/semantic/outer/cancellation precedence; cold event order and warm
+suppression; complete carrier-versus-selected validation before revision
+finalization; pointer-distinct/missing/extra/value mismatch abort; unchanged,
+changed, missing, error, delete/recreate and A-B-A source lifecycle; concurrent
+revision retry; rule analysis and filegroup public result/event parity; and
+PackageAll/multi/external/cquery family isolation. Re-run focused core tests,
+the full core library/integration and loading suites, formatting, direct check,
+diff check and archive status; record inherited broad/Clippy stops precisely.
+Run Buck2 retention and AI cleanup scans plus independent implementation review.
 
 ## Compatibility and lifetimes
 
