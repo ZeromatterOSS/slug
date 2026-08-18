@@ -4708,3 +4708,57 @@ prerequisite design returning directly to this audit, or formal REPLAN. Any
 design must freeze exact/Slug-native/deferred compatibility, future Rust files
 and measured caps, full terminal/equality/event/memory/family proof, validation,
 cleanup and independent review before one implementation packet may follow.
+
+### Direct-local evaluation/upper-source owner audit accepted (2026-08-18)
+
+`DirectLocalModuleEvaluationKey` is the uniquely smallest complete next owner.
+It computes exactly one direct-local preparation, then performs only pure
+in-memory root/fragment evaluation, retains the local evaluation Result Arc and
+publishes its one local Complete event batch. The accepted preparation epoch is
+therefore complete for every evaluation terminal.
+
+`direct_local_module_support` is only a projection helper, not a DICE key,
+store or event owner. `RepositoryPackageSourceKey` adds independent legacy
+package-lookup and BUILD-source edges; recursive `ExternalBzlModuleEvalKey`
+adds its own source/evaluation family and event batches; and
+`RepositoryPackageLoadKey` crosses both before its BUILD batch. Selecting any
+of them now would skip evaluation ownership and mix unresolved families. No
+smaller prerequisite and no REPLAN is required.
+
+### Direct-local evaluation observation design active (2026-08-18)
+
+Run only `WP-2A-m1-direct-local-evaluation-observation-design` from scheduling
+base `8f8df3d8` and Rust base `cc34e31d`; write only canonical/current/Stage 2
+docs. Future Rust is exactly `source_preparation.rs` and the existing
+`source_preparation_observation_tests.rs`, capped at 240 source/380 proof/620
+aggregate semantic and 13,800/2,500/16,300 physical lines.
+
+Freeze one private structural evaluation sibling/carrier and one Legacy/
+Observed driver. Legacy computes only legacy preparation; observed computes
+only observed preparation. Forward the accepted preparation epoch unchanged
+before semantic inspection. PreparationCompute is empty; preparation semantic,
+Unsupported, RootAbsent, evaluation error and success retain the full prefix;
+Need/typed outer has no carrier. Complete equality is by outer or semantic
+Result+epoch, while Need is invalid/self-unequal.
+
+Each matching sibling remains the sole local evaluation-batch owner. Semantic
+Complete stores the exact legacy-equivalent batch; preparation Need, typed
+outer and cancellation store none. Child events remain child-owned and precede
+the evaluation batch. Refactor the existing support helper through a
+crate-private eventless mode-aware projection: legacy remains exact; the
+callerless observed branch forwards evaluation Need/outer and associates its
+projected support semantic with the evaluation epoch for the later source
+owner. It adds no key, retained evaluation Arc, event or caller.
+
+Retain only the existing evaluated semantic graph inside one Result Arc plus
+one compact epoch; vectors, evaluator/module state, event staging and support
+projection remain local. Exact evaluation semantics/results/events stay exact;
+the sibling/carrier/outer/support association is Slug-native; package source,
+recursive `.bzl`, package load/query/build publication and identity bytes stay
+deferred. Prove every prefix/polarity, exact child epoch Arcs, event order/warm
+suppression, both family directions, upper nonactivation, support projection,
+cancellation/recovery, lifecycle, retention and cleanup. STOP on Rust now,
+another file/caller/export, mixed families, epoch/event/state drift, upper
+activation, cap excess or M1 closure. After independent design ACCEPT, schedule
+one implementation; after implementation ACCEPT, return to the upper-source
+audit.
