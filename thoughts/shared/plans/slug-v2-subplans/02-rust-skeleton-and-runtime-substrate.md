@@ -4452,3 +4452,81 @@ validation, fmt/check/diff/accounting, retention/cleanup and independent review.
 STOP on every other file/caller/export, path read or epoch rebuild, mixed
 family/event ownership, additional retained state, cap excess or M1 closure.
 After ACCEPT, schedule only the docs-only next-owner audit.
+
+### Direct-local MODULE inspection observation accepted (2026-08-18)
+
+Commit `a61de5d4` accepts design `e7b705a9`. One mode-aware inspection
+driver preserves the legacy file dependency and selects only the accepted
+observed file sibling in observed mode. Need and typed outer break before a
+carrier; InputCompute is empty; file semantic, parser semantic, Absent and
+Present forward the child's unchanged epoch. Pure inspection adds no path read.
+
+The carrier retains one local semantic Result Arc, including its exact
+include-request collection, plus one compact epoch; parser scratch stays local.
+Proof compares real legacy/observed semantics, exact child epoch and per-Result
+Arcs, and a separately held semantic Arc through the production legacy
+projection. It covers Need/outer/error prefixes, both family directions, upper
+nonactivation, sole child events/warm suppression, polled cancellation and
+edit/delete/recreate A/B/A.
+
+Accounting against `99d78875` is +109 production at 12,850 physical lines,
++273 tests at 1,141 physical, +382 semantic and 13,991 combined. Focused 2/2,
+416 unit plus 193 integration bzlmod tests, 194 loading and 120 query tests
+pass; fmt/check/diff pass. Core retains only the documented 234/235 and 12/13
+baselines; Clippy/archive stops are inherited. Retention/cleanup and independent
+latest-diff review return `ACCEPT`. M1 remains partial.
+
+### Direct-local include-package horizon observation design active (2026-08-18)
+
+Run only `WP-2A-m1-direct-local-include-horizon-observation-design` from
+scheduling/Rust base `a61de5d4`. The standalone horizon key and the direct
+branch of recursive nonregistry preflight share the same
+`preflight_direct_local_include_package_horizon` owner. It computes package
+lookup for the first-occurrence-ordered unique include packages. Cutting over
+only the key or only preparation would leave the other on the legacy lookup
+family.
+
+Freeze one crate-private structural observed horizon sibling/carrier and one
+shared mode-aware horizon driver. Legacy selects the accepted legacy inspection
+and package lookup keys; observed selects their accepted observed siblings.
+Union inspection first, then unique lookup epochs in first-occurrence order
+before semantic inspection. Need/typed outer has no carrier. InspectionCompute
+is empty; inspection semantic/bad-label retain inspection; LookupCompute retains
+earlier completed prefixes; lookup semantic retains its decisive prefix;
+success retains all.
+
+The local semantic Result may retain its existing occurrence Arc; no child Arc,
+additional collection or batch scratch is retained. The horizon stays
+eventless and child event owners remain unchanged. Exact compatibility covers
+include/package order, lookup values/errors and child events; the
+sibling/carrier/batch outer algebra is Slug-native; preparation, fragment
+source, evaluation and upper source/load/query remain deferred.
+
+Future Rust is limited to `source_preparation.rs` and
+`source_preparation_observation_tests.rs`, proposed at 300 production/420
+tests/720 aggregate semantic and 13,200/1,580/14,780 physical caps. Proof must
+cover empty/duplicate/multi-package horizons, every child terminal/prefix,
+exact first Arcs, union errors, parity/families/events/cancellation/warm and
+lifecycle. STOP on Rust now, another file/export/caller, preparation/fragment
+or upper activation, event/state drift or M1 closure. After design ACCEPT,
+schedule one implementation; after implementation ACCEPT, return to the
+docs-only preparation/fragment/evaluation and source/load audit.
+
+The frozen reusable package-batch driver takes route, requests and an initial
+inspection epoch. Standalone keys compute matching inspection first; existing
+preparation keeps legacy mode with precomputed requests, while later observed
+preparation may pass its prefix directly. Parse every label before lookup;
+first bad label retains inspection and activates no package. Deduplicate by
+first occurrence and join all unique packages in that order.
+
+Each Complete child epoch merges left-first before its semantic inspection;
+compute-local prefix snapshots identify the exact decisive carrier and are not
+retained. Precedence is bounded through the first semantic terminal. First
+typed outer/union error in that prefix wins, then an earlier Need returns the
+deterministic union of all batch Needs, then the semantic with its snapshot.
+Later outcomes remain dependency-owned and cannot replace or extend that
+carrier. With no semantic, inspect the full batch: first outer/union error wins
+over combined Need, otherwise success keeps the full epoch. Proof must
+discriminate semantic-before-later-Need/outer, Need-before-semantic-before-
+outer, no-semantic outer-over-Need, first of two semantics, exact prefix/first
+Arc and full Need union.
