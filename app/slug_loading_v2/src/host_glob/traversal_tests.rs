@@ -35,6 +35,7 @@ use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochError;
 use slug_workspace_v2::PathObservationEpochKey;
 use slug_workspace_v2::PathObservationError;
 use slug_workspace_v2::PathObservationNamespace;
@@ -50,6 +51,11 @@ type ScriptEntry = (PathObservationDemand, PathObservationResult);
 struct TraversalTracker {
     evaluated: AtomicUsize,
     segment_evaluated: AtomicUsize,
+    observed_evaluated: AtomicUsize,
+    observed_with_data: AtomicUsize,
+    observed_segment_evaluated: AtomicUsize,
+    legacy_boundary_evaluated: AtomicUsize,
+    observed_boundary_evaluated: AtomicUsize,
     activated: Mutex<Vec<String>>,
 }
 
@@ -67,11 +73,43 @@ impl ActivationTracker for TraversalTracker {
             self.evaluated.fetch_add(1, Ordering::SeqCst);
         }
         if key
+            .downcast_ref::<HostGlobTraversalObservationKey>()
+            .is_some()
+            && let ActivationData::Evaluated(ref data) = activation
+        {
+            self.observed_evaluated.fetch_add(1, Ordering::SeqCst);
+            if data.is_some() {
+                self.observed_with_data.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        if key
             .downcast_ref::<super::super::HostGlobSegmentCandidatesKey>()
             .is_some()
             && matches!(activation, ActivationData::Evaluated(_))
         {
             self.segment_evaluated.fetch_add(1, Ordering::SeqCst);
+        }
+        if key
+            .downcast_ref::<HostGlobSegmentCandidatesObservationKey>()
+            .is_some()
+            && matches!(activation, ActivationData::Evaluated(_))
+        {
+            self.observed_segment_evaluated
+                .fetch_add(1, Ordering::SeqCst);
+        }
+        if key.downcast_ref::<HostRootPackageBoundaryKey>().is_some()
+            && matches!(activation, ActivationData::Evaluated(_))
+        {
+            self.legacy_boundary_evaluated
+                .fetch_add(1, Ordering::SeqCst);
+        }
+        if key
+            .downcast_ref::<HostRootPackageBoundaryObservationKey>()
+            .is_some()
+            && matches!(activation, ActivationData::Evaluated(_))
+        {
+            self.observed_boundary_evaluated
+                .fetch_add(1, Ordering::SeqCst);
         }
     }
 }
@@ -165,6 +203,20 @@ fn key(pattern: &[u8], operation: HostGlobTraversalOperation) -> HostGlobTravers
     .unwrap()
 }
 
+fn observed_key(
+    pattern: &[u8],
+    operation: HostGlobTraversalOperation,
+) -> HostGlobTraversalObservationKey {
+    HostGlobTraversalObservationKey::new(
+        path("/workspace"),
+        path("/workspace"),
+        PackagePath::parse("pkg").unwrap(),
+        self::pattern(pattern),
+        operation,
+    )
+    .unwrap()
+}
+
 async fn compute(
     key: &HostGlobTraversalKey,
     entries: Vec<ScriptEntry>,
@@ -181,6 +233,41 @@ async fn compute(
         .unwrap();
     let mut transaction = updater.commit().await;
     transaction.compute(key).await.unwrap()
+}
+
+async fn compute_observed(
+    key: &HostGlobTraversalObservationKey,
+    entries: Vec<ScriptEntry>,
+    deleted: &[&str],
+) -> (ObservedHostGlobTraversalOutcome, PathObservationEpoch) {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let epoch = PathObservationEpoch::new(entries).unwrap();
+    let mut updater = dice.updater();
+    inject_root_package_policy_inputs(&mut updater, policy(deleted)).unwrap();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    (transaction.compute(key).await.unwrap(), epoch)
+}
+
+fn observed_value(outcome: &ObservedHostGlobTraversalOutcome) -> &ObservedHostGlobTraversal {
+    let SourcePreparationOutcome::Complete(Ok(value)) = outcome else {
+        panic!("expected complete observed traversal: {outcome:?}")
+    };
+    value
+}
+
+fn observed_matches(outcome: &ObservedHostGlobTraversalOutcome) -> Vec<Vec<u8>> {
+    observed_value(outcome)
+        .result
+        .as_ref()
+        .as_ref()
+        .expect("expected successful observed traversal")
+        .matches()
+        .iter()
+        .map(|entry| entry.relative_path.to_vec())
+        .collect()
 }
 
 fn matches(outcome: HostGlobTraversalOutcome) -> Vec<Vec<u8>> {
@@ -306,8 +393,13 @@ fn package_path_latin1_lifting_keeps_distinct_raw_byte_names_distinct() {
 
 #[test]
 fn complete_only_equality_and_validity_are_exact() {
-    let complete = complete_traversal(HostGlobTraversal::from_paths(vec![Arc::from(&b"a"[..])]));
-    let equal = complete_traversal(HostGlobTraversal::from_paths(vec![Arc::from(&b"a"[..])]));
+    let complete_value = |path: &'static [u8]| {
+        SourcePreparationOutcome::Complete(Arc::new(Ok(HostGlobTraversal::from_paths(vec![
+            Arc::from(path),
+        ]))))
+    };
+    let complete = complete_value(b"a");
+    let equal = complete_value(b"a");
     let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
         slug_workspace_v2::NeedPathObservations::singleton(demand(
             "/workspace/pkg",
@@ -318,6 +410,28 @@ fn complete_only_equality_and_validity_are_exact() {
     assert!(HostGlobTraversalKey::equality(&complete, &equal));
     assert!(!HostGlobTraversalKey::validity(&need));
     assert!(!HostGlobTraversalKey::equality(&need, &need));
+
+    let observed = SourcePreparationOutcome::Complete(Ok(ObservedHostGlobTraversal {
+        result: Arc::new(Ok(HostGlobTraversal::from_paths(Vec::new()))),
+        observations: PathObservationEpoch::empty(),
+    }));
+    let observed_equal = observed.clone();
+    let observed_need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+        slug_workspace_v2::NeedPathObservations::singleton(demand(
+            "/workspace/pkg",
+            PathObservationOperation::DirectoryEntries,
+        )),
+    ));
+    assert!(HostGlobTraversalObservationKey::validity(&observed));
+    assert!(HostGlobTraversalObservationKey::equality(
+        &observed,
+        &observed_equal
+    ));
+    assert!(!HostGlobTraversalObservationKey::validity(&observed_need));
+    assert!(!HostGlobTraversalObservationKey::equality(
+        &observed_need,
+        &observed_need
+    ));
 }
 
 #[test]
@@ -339,6 +453,319 @@ fn final_raw_paths_sort_and_deduplicate_once() {
             b"\xc3\xa9".as_slice(),
             b"\xe9".as_slice()
         ]
+    );
+}
+
+#[test]
+fn observed_prefix_terminals_preserve_ordered_arcs_and_outer_precedence() {
+    let base = PathObservationEpoch::new([present("/base", PathNodeKind::Directory)]).unwrap();
+    let duplicate = PathObservationEpoch::new([present("/base", PathNodeKind::Directory)]).unwrap();
+    let semantic =
+        PathObservationEpoch::new([present("/semantic", PathNodeKind::Directory)]).unwrap();
+    let later = PathObservationEpoch::new([present("/later", PathNodeKind::Directory)]).unwrap();
+    let base_demand = demand("/base", PathObservationOperation::Lstat);
+    let semantic_demand = demand("/semantic", PathObservationOperation::Lstat);
+    let later_demand = demand("/later", PathObservationOperation::Lstat);
+    let base_arc = base.get(&base_demand).unwrap().dupe();
+    let semantic_arc = semantic.get(&semantic_demand).unwrap().dupe();
+    let need = SourcePreparationNeeds::path(slug_workspace_v2::NeedPathObservations::singleton(
+        demand("/need", PathObservationOperation::Lstat),
+    ));
+    let outer = slug_workspace_v2::ObservedPathFrontierError::from(
+        PathObservationEpochError::OperationMismatch {
+            demand: demand("/outer", PathObservationOperation::Lstat),
+            result_operation: PathObservationOperation::DirectoryEntries,
+        },
+    );
+
+    let mut terminals = TraversalTerminals::new();
+    terminals.add_need(need.clone());
+    terminals.merge_completed(&base);
+    terminals.merge_completed(&duplicate);
+    terminals.merge_completed(&semantic);
+    terminals.record_error(
+        (1, 0),
+        HostGlobTraversalError::Segment {
+            logical_directory: path("/semantic"),
+            fragment_index: 1,
+            error: HostGlobSegmentError::DirectoryDisappeared {
+                logical_directory: path("/semantic"),
+            },
+        },
+    );
+    terminals.record_outer(outer.clone());
+    terminals.merge_completed(&later);
+    let SourcePreparationOutcome::Complete(Ok((result, observations))) =
+        terminals.finish(Vec::new())
+    else {
+        panic!("the first semantic terminal must bound the retained prefix")
+    };
+    assert!(result.is_err());
+    assert_eq!(observations.observations().len(), 2);
+    assert!(Arc::ptr_eq(
+        observations.get(&base_demand).unwrap(),
+        &base_arc
+    ));
+    assert!(Arc::ptr_eq(
+        observations.get(&semantic_demand).unwrap(),
+        &semantic_arc
+    ));
+    assert!(observations.get(&later_demand).is_none());
+
+    let mut terminals = TraversalTerminals::new();
+    terminals.add_need(need);
+    terminals.record_outer(outer);
+    assert!(matches!(
+        terminals.finish(Vec::new()),
+        SourcePreparationOutcome::Complete(Err(_))
+    ));
+}
+
+#[tokio::test]
+async fn observed_traversal_matches_literal_wildcard_recursive_and_operations() {
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![(b"literal", PathDirectoryEntryKind::Directory)],
+        ),
+        present("/workspace/pkg/literal", PathNodeKind::Directory),
+        missing("/workspace/pkg/literal/BUILD.bazel"),
+        missing("/workspace/pkg/literal/BUILD"),
+        listing(
+            "/workspace/pkg/literal",
+            vec![
+                (b"leaf.txt", PathDirectoryEntryKind::File),
+                (b"deep", PathDirectoryEntryKind::Directory),
+            ],
+        ),
+        present("/workspace/pkg/literal/deep", PathNodeKind::Directory),
+        missing("/workspace/pkg/literal/deep/BUILD.bazel"),
+        missing("/workspace/pkg/literal/deep/BUILD"),
+        listing(
+            "/workspace/pkg/literal/deep",
+            vec![(b"deep.txt", PathDirectoryEntryKind::File)],
+        ),
+    ]);
+    for (pattern, operation) in [
+        (b"literal".as_slice(), HostGlobTraversalOperation::Files),
+        (b"literal/*".as_slice(), HostGlobTraversalOperation::Files),
+        (b"literal/**".as_slice(), HostGlobTraversalOperation::Files),
+        (
+            b"literal/**".as_slice(),
+            HostGlobTraversalOperation::FilesAndDirs,
+        ),
+    ] {
+        let legacy = compute(&key(pattern, operation), entries.clone(), &[]).await;
+        let (observed, epoch) =
+            compute_observed(&observed_key(pattern, operation), entries.clone(), &[]).await;
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("legacy traversal must complete")
+        };
+        assert_eq!(observed_value(&observed).result.as_ref(), legacy.as_ref());
+        for (demand, result) in observed_value(&observed).observations.observations() {
+            assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+        }
+    }
+}
+
+#[tokio::test]
+async fn observed_boundary_stop_retains_boundary_but_not_descendant_observations() {
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![
+                (b"keep.txt", PathDirectoryEntryKind::File),
+                (b"nested", PathDirectoryEntryKind::Directory),
+            ],
+        ),
+        present("/workspace/pkg/nested", PathNodeKind::Directory),
+        present(
+            "/workspace/pkg/nested/BUILD.bazel",
+            PathNodeKind::RegularFile,
+        ),
+        listing(
+            "/workspace/pkg/nested",
+            vec![(b"hidden.txt", PathDirectoryEntryKind::File)],
+        ),
+    ]);
+    let (outcome, epoch) = compute_observed(
+        &observed_key(b"**", HostGlobTraversalOperation::Files),
+        entries,
+        &[],
+    )
+    .await;
+    assert_eq!(observed_matches(&outcome), vec![b"keep.txt".to_vec()]);
+    let value = observed_value(&outcome);
+    let marker = demand(
+        "/workspace/pkg/nested/BUILD.bazel",
+        PathObservationOperation::Lstat,
+    );
+    assert!(Arc::ptr_eq(
+        value.observations.get(&marker).unwrap(),
+        epoch.get(&marker).unwrap()
+    ));
+    assert!(
+        value
+            .observations
+            .get(&demand(
+                "/workspace/pkg/nested",
+                PathObservationOperation::DirectoryEntries,
+            ))
+            .is_none()
+    );
+}
+
+#[tokio::test]
+async fn observed_segment_and_boundary_terminals_keep_carriers_but_need_does_not() {
+    let (need, _) = compute_observed(
+        &observed_key(b"literal", HostGlobTraversalOperation::Files),
+        Vec::new(),
+        &[],
+    )
+    .await;
+    assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        lstat_error("/workspace/pkg/literal"),
+    ]);
+    let (segment, epoch) = compute_observed(
+        &observed_key(b"literal", HostGlobTraversalOperation::Files),
+        entries,
+        &[],
+    )
+    .await;
+    assert!(matches!(
+        observed_value(&segment).result.as_ref(),
+        Err(HostGlobTraversalError::Segment { .. })
+    ));
+    let literal = demand("/workspace/pkg/literal", PathObservationOperation::Lstat);
+    assert!(Arc::ptr_eq(
+        observed_value(&segment).observations.get(&literal).unwrap(),
+        epoch.get(&literal).unwrap()
+    ));
+
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![(b"nested", PathDirectoryEntryKind::Directory)],
+        ),
+        present("/workspace/pkg/nested", PathNodeKind::Directory),
+        lstat_error("/workspace/pkg/nested/BUILD.bazel"),
+    ]);
+    let (boundary, epoch) = compute_observed(
+        &observed_key(b"*", HostGlobTraversalOperation::Files),
+        entries,
+        &[],
+    )
+    .await;
+    assert!(matches!(
+        observed_value(&boundary).result.as_ref(),
+        Err(HostGlobTraversalError::Boundary { .. })
+    ));
+    let marker = demand(
+        "/workspace/pkg/nested/BUILD.bazel",
+        PathObservationOperation::Lstat,
+    );
+    assert!(Arc::ptr_eq(
+        observed_value(&boundary).observations.get(&marker).unwrap(),
+        epoch.get(&marker).unwrap()
+    ));
+}
+
+#[tokio::test]
+async fn observed_cancellation_recovery_and_family_activation_are_isolated() {
+    let tracker = Arc::new(TraversalTracker::default());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut entries = prelude();
+    entries.extend([
+        present("/workspace/pkg", PathNodeKind::Directory),
+        listing(
+            "/workspace/pkg",
+            vec![(b"nested", PathDirectoryEntryKind::Directory)],
+        ),
+        present("/workspace/pkg/nested", PathNodeKind::Directory),
+        missing("/workspace/pkg/nested/BUILD.bazel"),
+        missing("/workspace/pkg/nested/BUILD"),
+        present("/workspace/pkg/nested/leaf", PathNodeKind::RegularFile),
+    ]);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    });
+    inject_root_package_policy_inputs(&mut updater, policy(&[])).unwrap();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(entries).unwrap(),
+        )])
+        .unwrap();
+    let observed = observed_key(b"*/leaf", HostGlobTraversalOperation::Files);
+    let mut transaction = updater.commit().await;
+    let mut cancelled = Box::pin(transaction.compute(&observed));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(cancelled.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(cancelled);
+    assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 0);
+    tracker.activated.lock().unwrap().clear();
+    drop(transaction);
+
+    let mut transaction = dice
+        .updater_with_data(UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        })
+        .commit()
+        .await;
+    assert_eq!(
+        observed_matches(&transaction.compute(&observed).await.unwrap()),
+        vec![b"nested/leaf".to_vec()]
+    );
+    assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 1);
+    assert_eq!(tracker.observed_with_data.load(Ordering::SeqCst), 0);
+    assert!(tracker.observed_segment_evaluated.load(Ordering::SeqCst) > 0);
+    assert!(tracker.observed_boundary_evaluated.load(Ordering::SeqCst) > 0);
+    assert_eq!(tracker.segment_evaluated.load(Ordering::SeqCst), 0);
+    assert_eq!(tracker.legacy_boundary_evaluated.load(Ordering::SeqCst), 0);
+    let activated = tracker.activated.lock().unwrap();
+    let ordered = activated
+        .iter()
+        .filter(|key| {
+            key.starts_with("observed-host-glob-segment-candidates:")
+                || key.starts_with("observed-host-root-package-boundary:")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(ordered.len(), 3);
+    assert!(ordered[0].contains("/workspace/pkg"));
+    assert!(ordered[1].ends_with("//pkg/nested"));
+    assert!(ordered[2].contains("/workspace/pkg/nested"));
+    drop(activated);
+
+    let observed_segments = tracker.observed_segment_evaluated.load(Ordering::SeqCst);
+    let observed_boundaries = tracker.observed_boundary_evaluated.load(Ordering::SeqCst);
+    transaction
+        .compute(&key(b"*/leaf", HostGlobTraversalOperation::Files))
+        .await
+        .unwrap();
+    assert!(tracker.segment_evaluated.load(Ordering::SeqCst) > 0);
+    assert!(tracker.legacy_boundary_evaluated.load(Ordering::SeqCst) > 0);
+    assert_eq!(
+        tracker.observed_segment_evaluated.load(Ordering::SeqCst),
+        observed_segments
+    );
+    assert_eq!(
+        tracker.observed_boundary_evaluated.load(Ordering::SeqCst),
+        observed_boundaries
     );
 }
 
@@ -678,27 +1105,6 @@ async fn boundary_error_beats_sibling_need_and_uses_fifo_candidate_rank() {
         .await,
         "pkg/a",
     );
-
-    let ranked_error = |logical_directory: &str| HostGlobTraversalError::Segment {
-        logical_directory: path(logical_directory),
-        fragment_index: 1,
-        error: HostGlobSegmentError::DirectoryDisappeared {
-            logical_directory: path(logical_directory),
-        },
-    };
-    let mut first = None;
-    record_error(&mut first, (2, 0), ranked_error("/workspace/pkg/b"));
-    record_error(&mut first, (1, 7), ranked_error("/workspace/pkg/a"));
-    assert!(matches!(
-        first,
-        Some((
-            (1, 7),
-            HostGlobTraversalError::Segment {
-                logical_directory,
-                ..
-            }
-        )) if logical_directory == path("/workspace/pkg/a")
-    ));
 }
 
 #[tokio::test]
@@ -777,10 +1183,10 @@ async fn same_graph_marker_deleted_and_ignore_transitions_restore_equal_value() 
 }
 
 #[tokio::test]
-async fn same_graph_create_delete_restore_reactivates_and_restores_complete_value() {
+async fn observed_warm_and_create_delete_restore_reactivate_and_restore_value() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
     let tracker = Arc::new(TraversalTracker::default());
-    let key = key(b"entry", HostGlobTraversalOperation::Files);
+    let key = observed_key(b"entry", HostGlobTraversalOperation::Files);
     let script = |present_entry| {
         let mut entries = prelude();
         entries.push(present("/workspace/pkg", PathNodeKind::Directory));
@@ -804,9 +1210,14 @@ async fn same_graph_create_delete_restore_reactivates_and_restores_complete_valu
         .unwrap();
     let mut transaction = updater.commit().await;
     assert_eq!(
-        matches(transaction.compute(&key).await.unwrap()),
+        observed_matches(&transaction.compute(&key).await.unwrap()),
         vec![b"entry".to_vec()]
     );
+    assert_eq!(
+        observed_matches(&transaction.compute(&key).await.unwrap()),
+        vec![b"entry".to_vec()]
+    );
+    assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 1);
 
     for (present_entry, expected) in [(false, Vec::new()), (true, vec![b"entry".to_vec()])] {
         let mut updater = transaction.into_updater();
@@ -817,7 +1228,10 @@ async fn same_graph_create_delete_restore_reactivates_and_restores_complete_valu
             )])
             .unwrap();
         transaction = updater.commit().await;
-        assert_eq!(matches(transaction.compute(&key).await.unwrap()), expected);
+        assert_eq!(
+            observed_matches(&transaction.compute(&key).await.unwrap()),
+            expected
+        );
     }
-    assert_eq!(tracker.evaluated.load(Ordering::SeqCst), 3);
+    assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 3);
 }

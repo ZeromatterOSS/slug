@@ -461,7 +461,7 @@ fn segment_need(need: NeedPathObservations) -> HostGlobSegmentDriverOutcome {
     SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
 }
 
-fn union_segment_observations(
+fn union_observation_epochs(
     left: &PathObservationEpoch,
     right: &PathObservationEpoch,
 ) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
@@ -715,7 +715,7 @@ impl HostGlobSegmentCandidatesKey {
             PathOutcome::Complete(Ok(resolved)) => resolved,
         };
         observations =
-            match union_segment_observations(&observations, &resolved_directory.observations) {
+            match union_observation_epochs(&observations, &resolved_directory.observations) {
                 Ok(observations) => observations,
                 Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
             };
@@ -790,7 +790,7 @@ impl HostGlobSegmentCandidatesKey {
                 }
                 PathOutcome::Complete(Ok(resolved)) => resolved,
             };
-            observations = match union_segment_observations(&observations, &resolved.observations) {
+            observations = match union_observation_epochs(&observations, &resolved.observations) {
                 Ok(observations) => observations,
                 Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
             };
