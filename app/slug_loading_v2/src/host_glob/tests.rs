@@ -28,10 +28,16 @@ use dice::Key;
 use dice::UserComputationData;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
+use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
+use slug_bzlmod_v2::inject_root_package_policy_inputs;
+use slug_identity_v2::PackagePath;
 use slug_workspace_v2::*;
 
+use super::traversal::HostGlobPattern;
+use super::traversal::HostGlobTraversalKey;
+use super::traversal::HostGlobTraversalOperation;
 use super::*;
 
 fn path(value: &str) -> NormalizedAbsolutePath {
@@ -177,6 +183,34 @@ fn key_complete_only_equality_and_need_validity_are_exact() {
     assert!(!HostGlobSegmentCandidatesKey::validity(&need));
     assert!(!HostGlobSegmentCandidatesKey::equality(&need, &need));
     assert!(!HostGlobSegmentCandidatesKey::equality(&complete, &need));
+
+    let observed_complete =
+        SourcePreparationOutcome::Complete(Ok(ObservedHostGlobSegmentCandidates {
+            result: Arc::new(Ok(HostGlobSegmentCandidates::empty())),
+            observations: PathObservationEpoch::empty(),
+        }));
+    let observed_equal = observed_complete.dupe();
+    let observed_need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+        NeedPathObservations::singleton(PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            path("/observed-missing"),
+            PathObservationOperation::Lstat,
+        )),
+    ));
+    assert!(HostGlobSegmentCandidatesObservationKey::validity(
+        &observed_complete
+    ));
+    assert!(HostGlobSegmentCandidatesObservationKey::equality(
+        &observed_complete,
+        &observed_equal
+    ));
+    assert!(!HostGlobSegmentCandidatesObservationKey::validity(
+        &observed_need
+    ));
+    assert!(!HostGlobSegmentCandidatesObservationKey::equality(
+        &observed_need,
+        &observed_need
+    ));
 }
 
 #[test]
@@ -292,6 +326,34 @@ async fn compute(
         .unwrap()
 }
 
+async fn compute_observed(
+    pattern_bytes: &[u8],
+    script: impl IntoIterator<Item = ScriptEntry>,
+) -> (ObservedHostGlobSegmentOutcome, PathObservationEpoch) {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let epoch = PathObservationEpoch::new(script).unwrap();
+    let mut updater = dice.updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let outcome = transaction
+        .compute(&HostGlobSegmentCandidatesObservationKey::new(
+            path("/pkg"),
+            pattern(pattern_bytes),
+        ))
+        .await
+        .unwrap();
+    (outcome, epoch)
+}
+
+fn observed_value(outcome: &ObservedHostGlobSegmentOutcome) -> &ObservedHostGlobSegmentCandidates {
+    let SourcePreparationOutcome::Complete(Ok(value)) = outcome else {
+        panic!("expected complete observed segment: {outcome:?}")
+    };
+    value
+}
+
 fn base_listing(entries: Vec<(OsString, PathDirectoryEntryKind)>) -> Vec<ScriptEntry> {
     vec![
         present("/", PathNodeKind::Directory),
@@ -347,25 +409,364 @@ impl Key for HostGlobConsumerKey {
 struct HostGlobTracker {
     evaluated: AtomicUsize,
     evaluated_with_data: AtomicUsize,
+    observed_evaluated: AtomicUsize,
+    observed_with_data: AtomicUsize,
+    observed_direct_resolutions: AtomicUsize,
+    legacy_resolutions: AtomicUsize,
+    legacy_listings: AtomicUsize,
 }
 
 impl ActivationTracker for HostGlobTracker {
     fn key_activated(
         &self,
         key: &DynKey,
-        _dependencies: &mut dyn Iterator<Item = &DynKey>,
+        dependencies: &mut dyn Iterator<Item = &DynKey>,
         activation: ActivationData,
     ) {
-        if key.downcast_ref::<HostGlobSegmentCandidatesKey>().is_none() {
+        if key
+            .downcast_ref::<HostGlobSegmentCandidatesObservationKey>()
+            .is_some()
+        {
+            if let ActivationData::Evaluated(data) = activation {
+                self.observed_evaluated.fetch_add(1, Ordering::SeqCst);
+                if data.is_some() {
+                    self.observed_with_data.fetch_add(1, Ordering::SeqCst);
+                }
+                self.observed_direct_resolutions.fetch_add(
+                    dependencies
+                        .filter(|dependency| {
+                            dependency
+                                .downcast_ref::<ResolvedPathObservationKey>()
+                                .is_some()
+                        })
+                        .count(),
+                    Ordering::SeqCst,
+                );
+            }
             return;
         }
-        if let ActivationData::Evaluated(data) = activation {
+        if key.downcast_ref::<ResolvedPathKey>().is_some()
+            && matches!(activation, ActivationData::Evaluated(_))
+        {
+            self.legacy_resolutions.fetch_add(1, Ordering::SeqCst);
+        }
+        if key.downcast_ref::<PathDirectoryListingKey>().is_some()
+            && matches!(activation, ActivationData::Evaluated(_))
+        {
+            self.legacy_listings.fetch_add(1, Ordering::SeqCst);
+        }
+        if key.downcast_ref::<HostGlobSegmentCandidatesKey>().is_some()
+            && let ActivationData::Evaluated(data) = activation
+        {
             self.evaluated.fetch_add(1, Ordering::SeqCst);
             if data.is_some() {
                 self.evaluated_with_data.fetch_add(1, Ordering::SeqCst);
             }
         }
     }
+}
+
+#[test]
+fn pending_prefix_ignores_later_outer_and_full_batch_outer_wins_need() {
+    let base_epoch =
+        PathObservationEpoch::new([present("/base", PathNodeKind::Directory)]).unwrap();
+    let base_demand = demand(path("/base"), PathObservationOperation::Lstat);
+    let base_arc = base_epoch.get(&base_demand).unwrap().dupe();
+    let semantic_demand = demand(path("/pkg/b-link"), PathObservationOperation::Lstat);
+    let semantic_error = PathObservationError::Io {
+        kind: PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    let semantic_epoch = PathObservationEpoch::new([
+        present("/base", PathNodeKind::Directory),
+        lstat_result(
+            path("/pkg/b-link"),
+            PathOperationResult::Error(semantic_error),
+        ),
+    ])
+    .unwrap();
+    let semantic_arc = semantic_epoch.get(&semantic_demand).unwrap().dupe();
+    let need_demand = demand(path("/pkg/a-link"), PathObservationOperation::Lstat);
+    let outer_demand = demand(path("/pkg/c-link"), PathObservationOperation::Lstat);
+    let outer = ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+        demand: outer_demand.dupe(),
+        result_operation: PathObservationOperation::DirectoryEntries,
+    });
+    let pending = |slot, name: &'static [u8]| PendingSymlink {
+        slot,
+        component: Arc::from(name),
+        logical_path: path(&format!("/pkg/{}", String::from_utf8_lossy(name))),
+    };
+    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*"));
+    let outcomes = vec![
+        (
+            pending(0, b"a-link"),
+            PathOutcome::Need(NeedPathObservations::singleton(need_demand.dupe())),
+        ),
+        (
+            pending(1, b"b-link"),
+            PathOutcome::Complete(Ok(SegmentInput {
+                result: Err(PathResolutionError::Observation {
+                    namespace: PathObservationNamespace::Host,
+                    requested_path: path("/pkg/b-link"),
+                    demand: semantic_demand.dupe(),
+                    error: semantic_error,
+                }),
+                observations: semantic_epoch,
+            })),
+        ),
+        (
+            pending(2, b"c-link"),
+            PathOutcome::Complete(Err(outer.clone())),
+        ),
+    ];
+    let outcome = key.finish_pending_symlinks(
+        PendingSymlinkBatch {
+            slots: vec![None, None, None],
+            pending: Vec::new(),
+            directory_real_path: path("/pkg"),
+            observations: base_epoch.dupe(),
+        },
+        outcomes,
+    );
+    let SourcePreparationOutcome::Complete(Ok((result, observations))) = outcome else {
+        panic!("the first semantic terminal must bound the prefix")
+    };
+    assert!(matches!(
+        result.as_ref(),
+        Err(HostGlobSegmentError::Observation { component, .. })
+            if component.as_ref() == b"b-link"
+    ));
+    assert_eq!(observations.observations().len(), 2);
+    assert!(Arc::ptr_eq(
+        observations.get(&base_demand).unwrap(),
+        &base_arc
+    ));
+    assert!(Arc::ptr_eq(
+        observations.get(&semantic_demand).unwrap(),
+        &semantic_arc
+    ));
+    assert!(observations.get(&outer_demand).is_none());
+
+    let outcome = key.finish_pending_symlinks(
+        PendingSymlinkBatch {
+            slots: vec![None, None],
+            pending: Vec::new(),
+            directory_real_path: path("/pkg"),
+            observations: base_epoch,
+        },
+        vec![
+            (
+                pending(0, b"a-link"),
+                PathOutcome::Need(NeedPathObservations::singleton(need_demand)),
+            ),
+            (pending(1, b"c-link"), PathOutcome::Complete(Err(outer))),
+        ],
+    );
+    assert!(matches!(
+        outcome,
+        SourcePreparationOutcome::Complete(Err(_))
+    ));
+}
+
+#[tokio::test]
+async fn observed_terminal_matrix_and_matched_symlinks_preserve_exact_arcs() {
+    let denied = PathObservationError::Io {
+        kind: PathIoErrorKind::PermissionDenied,
+        raw_os_error: Some(13),
+    };
+    for (glob, script, expected) in [
+        (
+            b"literal".as_slice(),
+            vec![
+                present("/", PathNodeKind::Directory),
+                present("/pkg", PathNodeKind::Directory),
+                present("/pkg/literal", PathNodeKind::SpecialFile),
+            ],
+            "present",
+        ),
+        (
+            b"*.txt".as_slice(),
+            base_listing(vec![(
+                OsString::from("entry.txt"),
+                PathDirectoryEntryKind::File,
+            )]),
+            "present",
+        ),
+        (
+            b"literal".as_slice(),
+            vec![
+                present("/", PathNodeKind::Directory),
+                present("/pkg", PathNodeKind::Directory),
+                missing("/pkg/literal"),
+            ],
+            "empty",
+        ),
+        (
+            b"literal".as_slice(),
+            vec![
+                present("/", PathNodeKind::Directory),
+                present("/pkg", PathNodeKind::Directory),
+                lstat_result(path("/pkg/literal"), PathOperationResult::Error(denied)),
+            ],
+            "error",
+        ),
+        (
+            b"*".as_slice(),
+            vec![present("/", PathNodeKind::Directory), missing("/pkg")],
+            "error",
+        ),
+    ] {
+        let legacy = compute(glob, script.clone()).await;
+        let (outcome, epoch) = compute_observed(glob, script).await;
+        let value = observed_value(&outcome);
+        let SourcePreparationOutcome::Complete(legacy) = legacy else {
+            panic!("legacy must complete")
+        };
+        assert_eq!(value.result.as_ref(), legacy.as_ref());
+        assert_eq!(value.result.is_err(), expected == "error");
+        if expected == "empty" {
+            assert!(
+                value
+                    .result
+                    .as_ref()
+                    .as_ref()
+                    .unwrap()
+                    .candidates()
+                    .is_empty()
+            );
+        }
+        for (demand, result) in value.observations.observations() {
+            assert!(Arc::ptr_eq(result, epoch.get(demand).unwrap()));
+        }
+    }
+    for target in [Some(("/file", PathNodeKind::RegularFile)), None] {
+        let mut script = base_listing(vec![(
+            OsString::from("match"),
+            PathDirectoryEntryKind::Symlink,
+        )]);
+        script.extend([
+            present("/pkg/match", PathNodeKind::Symlink),
+            read_link("/pkg/match", target.map_or("/missing", |value| value.0)),
+        ]);
+        script.push(target.map_or_else(|| missing("/missing"), |(path, kind)| present(path, kind)));
+        let legacy = compute(b"m*tch", script.clone()).await;
+        let (observed, epoch) = compute_observed(b"m*tch", script).await;
+        let SourcePreparationOutcome::Complete(legacy) = &legacy else {
+            panic!("legacy must complete")
+        };
+        assert_eq!(observed_value(&observed).result.as_ref(), legacy.as_ref());
+        for (demand, result) in epoch.observations() {
+            assert!(Arc::ptr_eq(
+                observed_value(&observed).observations.get(demand).unwrap(),
+                result
+            ));
+        }
+    }
+    let (need, _) = compute_observed(b"literal", []).await;
+    assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+}
+
+#[tokio::test]
+async fn observed_family_isolated_and_traversal_remains_legacy() {
+    let tracker = Arc::new(HostGlobTracker::default());
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let mut updater = dice.updater_with_data(UserComputationData {
+        activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+        ..Default::default()
+    });
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new(base_listing(vec![(
+                OsString::from("file"),
+                PathDirectoryEntryKind::File,
+            )]))
+            .unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let observed_key = HostGlobSegmentCandidatesObservationKey::new(path("/pkg"), pattern(b"*"));
+    let mut cancelled = Box::pin(transaction.compute(&observed_key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(cancelled.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(cancelled);
+    assert_eq!(tracker.observed_evaluated.load(Ordering::SeqCst), 0);
+    drop(transaction);
+    let mut transaction = dice
+        .updater_with_data(UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        })
+        .commit()
+        .await;
+    assert!(matches!(
+        transaction.compute(&observed_key).await.unwrap(),
+        SourcePreparationOutcome::Complete(Ok(_))
+    ));
+    assert_eq!(
+        tracker.observed_direct_resolutions.load(Ordering::SeqCst),
+        0
+    );
+    assert_eq!(tracker.legacy_resolutions.load(Ordering::SeqCst), 0);
+    assert_eq!(tracker.legacy_listings.load(Ordering::SeqCst), 0);
+    assert_eq!(tracker.observed_with_data.load(Ordering::SeqCst), 0);
+    let observed_count = tracker.observed_evaluated.load(Ordering::SeqCst);
+    transaction
+        .compute(&HostGlobSegmentCandidatesKey::new(
+            path("/pkg"),
+            pattern(b"*"),
+        ))
+        .await
+        .unwrap();
+    assert!(tracker.legacy_resolutions.load(Ordering::SeqCst) > 0);
+    assert!(tracker.legacy_listings.load(Ordering::SeqCst) > 0);
+
+    let mut updater = transaction.into_updater();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            path("/workspace"),
+            vec![path("/workspace")],
+            std::iter::empty::<&str>(),
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::new([
+                present("/", PathNodeKind::Directory),
+                present("/workspace", PathNodeKind::Directory),
+                present("/workspace/pkg", PathNodeKind::Directory),
+                present("/workspace/pkg/entry", PathNodeKind::RegularFile),
+            ])
+            .unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let traversal = HostGlobTraversalKey::new(
+        path("/workspace"),
+        path("/workspace"),
+        PackagePath::parse("pkg").unwrap(),
+        HostGlobPattern::new(&b"entry"[..]).unwrap(),
+        HostGlobTraversalOperation::Files,
+    )
+    .unwrap();
+    assert!(matches!(
+        transaction.compute(&traversal).await.unwrap(),
+        SourcePreparationOutcome::Complete(_)
+    ));
+    assert_eq!(
+        tracker.observed_evaluated.load(Ordering::SeqCst),
+        observed_count
+    );
 }
 
 #[tokio::test]
@@ -698,7 +1099,7 @@ async fn listing_symlink_resolution_disagreement_is_a_semantic_error() {
 #[tokio::test]
 async fn same_dice_create_delete_recreate_and_kind_changes_restore_values() {
     let dice = Dice::builder().build(DetectCycles::Enabled);
-    let key = HostGlobSegmentCandidatesKey::new(path("/pkg"), pattern(b"*"));
+    let key = HostGlobSegmentCandidatesObservationKey::new(path("/pkg"), pattern(b"*"));
     let scripts = [
         (
             base_listing(vec![(
@@ -724,8 +1125,9 @@ async fn same_dice_create_delete_recreate_and_kind_changes_restore_values() {
         ),
     ];
     let mut transaction = dice.updater().commit().await;
+    let mut first = None;
 
-    for (script, expected) in scripts {
+    for (index, (script, expected)) in scripts.into_iter().enumerate() {
         let mut updater = transaction.into_updater();
         updater
             .changed_to(vec![(
@@ -735,11 +1137,25 @@ async fn same_dice_create_delete_recreate_and_kind_changes_restore_values() {
             .unwrap();
         transaction = updater.commit().await;
 
-        let value = unwrap_ok(transaction.compute(&key).await.unwrap());
+        let outcome = transaction.compute(&key).await.unwrap();
+        let value = observed_value(&outcome).result.as_ref().as_ref().unwrap();
         assert_eq!(
             value.candidates().first().map(|candidate| candidate.kind),
             expected
         );
+        if index == 0 {
+            first = Some(outcome.dupe());
+            assert!(HostGlobSegmentCandidatesObservationKey::equality(
+                first.as_ref().unwrap(),
+                &transaction.compute(&key).await.unwrap()
+            ));
+        }
+        if index == 3 {
+            assert!(HostGlobSegmentCandidatesObservationKey::equality(
+                first.as_ref().unwrap(),
+                &outcome
+            ));
+        }
     }
 }
 

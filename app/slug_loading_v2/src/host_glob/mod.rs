@@ -28,6 +28,7 @@ use slug_bzlmod_v2::SourcePreparationNeeds;
 use slug_bzlmod_v2::SourcePreparationOutcome;
 use slug_workspace_v2::NeedPathObservations;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 #[cfg(unix)]
 use slug_workspace_v2::PathDirectoryEntryKind;
 #[cfg(unix)]
@@ -35,8 +36,11 @@ use slug_workspace_v2::PathDirectoryListing;
 use slug_workspace_v2::PathDirectoryListingError;
 #[cfg(unix)]
 use slug_workspace_v2::PathDirectoryListingKey;
+#[cfg(unix)]
+use slug_workspace_v2::PathDirectoryListingObservationKey;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationError;
 #[cfg(unix)]
 use slug_workspace_v2::PathObservationNamespace;
@@ -45,7 +49,11 @@ use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::PathResolutionError;
 #[cfg(unix)]
+use slug_workspace_v2::ResolvedPath;
+#[cfg(unix)]
 use slug_workspace_v2::ResolvedPathKey;
+#[cfg(unix)]
+use slug_workspace_v2::ResolvedPathObservationKey;
 #[cfg(unix)]
 use slug_workspace_v2::ResolvedPathState;
 
@@ -397,24 +405,165 @@ impl fmt::Display for HostGlobSegmentCandidatesKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+struct HostGlobSegmentCandidatesObservationKey(HostGlobSegmentCandidatesKey);
+
+impl HostGlobSegmentCandidatesObservationKey {
+    fn new(logical_directory: NormalizedAbsolutePath, pattern: HostGlobSegmentPattern) -> Self {
+        Self(HostGlobSegmentCandidatesKey::new(
+            logical_directory,
+            pattern,
+        ))
+    }
+}
+
+impl fmt::Display for HostGlobSegmentCandidatesObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostGlobSegmentCandidates {
+    result: Arc<Result<HostGlobSegmentCandidates, HostGlobSegmentError>>,
+    observations: PathObservationEpoch,
+}
+
 type HostGlobSegmentOutcome =
     SourcePreparationOutcome<Arc<Result<HostGlobSegmentCandidates, HostGlobSegmentError>>>;
 
-fn terminal_ok(candidates: HostGlobSegmentCandidates) -> HostGlobSegmentOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(Ok(candidates)))
+type HostGlobSegmentDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (
+            Arc<Result<HostGlobSegmentCandidates, HostGlobSegmentError>>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+>;
+type ObservedHostGlobSegmentOutcome =
+    SourcePreparationOutcome<Result<ObservedHostGlobSegmentCandidates, ObservedPathFrontierError>>;
+
+#[derive(Clone, Copy)]
+enum HostGlobSegmentMode {
+    Legacy,
+    Observed,
 }
 
-fn terminal_error(error: HostGlobSegmentError) -> HostGlobSegmentOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+fn segment_complete(
+    result: Result<HostGlobSegmentCandidates, HostGlobSegmentError>,
+    observations: PathObservationEpoch,
+) -> HostGlobSegmentDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
 }
 
-fn path_need(need: NeedPathObservations) -> HostGlobSegmentOutcome {
+fn segment_need(need: NeedPathObservations) -> HostGlobSegmentDriverOutcome {
     SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need))
+}
+
+fn union_segment_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
 }
 
 #[track_caller]
 fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host glob segment DICE invariant failed: {error:?}"))
+}
+
+#[cfg(unix)]
+struct SegmentInput<T, E> {
+    result: Result<T, E>,
+    observations: PathObservationEpoch,
+}
+
+#[cfg(unix)]
+type SegmentInputOutcome<T, E> = PathOutcome<Result<SegmentInput<T, E>, ObservedPathFrontierError>>;
+
+#[cfg(unix)]
+fn legacy_segment_input<T, E>(outcome: PathOutcome<Result<T, E>>) -> SegmentInputOutcome<T, E> {
+    outcome.map(|result| {
+        Ok(SegmentInput {
+            result,
+            observations: PathObservationEpoch::empty(),
+        })
+    })
+}
+
+#[cfg(unix)]
+impl HostGlobSegmentMode {
+    async fn resolve(
+        self,
+        ctx: &mut DiceComputations<'_>,
+        logical_path: NormalizedAbsolutePath,
+    ) -> SegmentInputOutcome<ResolvedPath, PathResolutionError> {
+        match self {
+            Self::Legacy => legacy_segment_input(dice_invariant(
+                ctx.compute(&ResolvedPathKey::new(
+                    PathObservationNamespace::Host,
+                    logical_path,
+                ))
+                .await,
+            )),
+            Self::Observed => match dice_invariant(
+                ctx.compute(&ResolvedPathObservationKey::new(
+                    PathObservationNamespace::Host,
+                    logical_path,
+                ))
+                .await,
+            ) {
+                PathOutcome::Need(need) => PathOutcome::Need(need),
+                PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
+                PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(Ok(SegmentInput {
+                    result: observed.result().clone(),
+                    observations: observed.observations().dupe(),
+                })),
+            },
+        }
+    }
+
+    async fn list(
+        self,
+        ctx: &mut DiceComputations<'_>,
+        logical_path: NormalizedAbsolutePath,
+    ) -> SegmentInputOutcome<PathDirectoryListing, PathDirectoryListingError> {
+        match self {
+            Self::Legacy => legacy_segment_input(dice_invariant(
+                ctx.compute(&PathDirectoryListingKey::new(
+                    PathObservationNamespace::Host,
+                    logical_path,
+                ))
+                .await,
+            )),
+            Self::Observed => match dice_invariant(
+                ctx.compute(&PathDirectoryListingObservationKey::new(
+                    PathObservationNamespace::Host,
+                    logical_path,
+                ))
+                .await,
+            ) {
+                PathOutcome::Need(need) => PathOutcome::Need(need),
+                PathOutcome::Complete(Err(error)) => PathOutcome::Complete(Err(error)),
+                PathOutcome::Complete(Ok(observed)) => PathOutcome::Complete(Ok(SegmentInput {
+                    result: observed.result().clone(),
+                    observations: observed.observations().dupe(),
+                })),
+            },
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -426,65 +575,92 @@ struct PendingSymlink {
 }
 
 #[cfg(unix)]
+struct PendingSymlinkBatch {
+    slots: Vec<Option<HostGlobSegmentCandidate>>,
+    pending: Vec<PendingSymlink>,
+    directory_real_path: NormalizedAbsolutePath,
+    observations: PathObservationEpoch,
+}
+
+#[cfg(unix)]
+type PendingSymlinkOutcome = (
+    PendingSymlink,
+    SegmentInputOutcome<ResolvedPath, PathResolutionError>,
+);
+
+#[cfg(unix)]
 impl HostGlobSegmentCandidatesKey {
-    async fn compute_unix(&self, ctx: &mut DiceComputations<'_>) -> HostGlobSegmentOutcome {
+    async fn compute_unix(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostGlobSegmentMode,
+    ) -> HostGlobSegmentDriverOutcome {
         match self.pattern.kind {
-            HostGlobSegmentPatternKind::Literal => self.compute_literal_unix(ctx).await,
-            HostGlobSegmentPatternKind::SimpleWildcard => self.compute_wildcard_unix(ctx).await,
+            HostGlobSegmentPatternKind::Literal => self.compute_literal_unix(ctx, mode).await,
+            HostGlobSegmentPatternKind::SimpleWildcard => {
+                self.compute_wildcard_unix(ctx, mode).await
+            }
         }
     }
 
-    async fn compute_literal_unix(&self, ctx: &mut DiceComputations<'_>) -> HostGlobSegmentOutcome {
+    async fn compute_literal_unix(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostGlobSegmentMode,
+    ) -> HostGlobSegmentDriverOutcome {
         let component = self.pattern.bytes.dupe();
         let logical_path = logical_child(&self.logical_directory, &component);
-        let resolved = dice_invariant(
-            ctx.compute(&ResolvedPathKey::new(
-                PathObservationNamespace::Host,
-                logical_path,
-            ))
-            .await,
-        );
-        match resolved {
-            PathOutcome::Need(need) => path_need(need),
+        let resolved = match mode.resolve(ctx, logical_path).await {
+            PathOutcome::Need(need) => return segment_need(need),
             PathOutcome::Complete(Err(error)) => {
-                terminal_error(resolution_error(&self.logical_directory, component, error))
+                return SourcePreparationOutcome::Complete(Err(error));
             }
-            PathOutcome::Complete(Ok(resolved)) => match resolved.state() {
-                ResolvedPathState::Missing => terminal_ok(HostGlobSegmentCandidates::empty()),
-                ResolvedPathState::Present(lstat) => {
-                    terminal_ok(HostGlobSegmentCandidates::from_vec(vec![
-                        HostGlobSegmentCandidate {
-                            component,
-                            kind: candidate_kind(lstat.kind()),
-                        },
-                    ]))
-                }
+            PathOutcome::Complete(Ok(resolved)) => resolved,
+        };
+        let result = match resolved.result {
+            Err(error) => Err(resolution_error(&self.logical_directory, component, error)),
+            Ok(resolved) => match resolved.state() {
+                ResolvedPathState::Missing => Ok(HostGlobSegmentCandidates::empty()),
+                ResolvedPathState::Present(lstat) => Ok(HostGlobSegmentCandidates::from_vec(vec![
+                    HostGlobSegmentCandidate {
+                        component,
+                        kind: candidate_kind(lstat.kind()),
+                    },
+                ])),
             },
-        }
+        };
+        segment_complete(result, resolved.observations)
     }
 
     async fn compute_wildcard_unix(
         &self,
         ctx: &mut DiceComputations<'_>,
-    ) -> HostGlobSegmentOutcome {
-        let listing = dice_invariant(
-            ctx.compute(&PathDirectoryListingKey::new(
-                PathObservationNamespace::Host,
-                self.logical_directory.dupe(),
-            ))
-            .await,
-        );
-        let entries = match listing {
-            PathOutcome::Need(need) => return path_need(need),
+        mode: HostGlobSegmentMode,
+    ) -> HostGlobSegmentDriverOutcome {
+        let listing = match mode.list(ctx, self.logical_directory.dupe()).await {
+            PathOutcome::Need(need) => return segment_need(need),
             PathOutcome::Complete(Err(error)) => {
-                return terminal_error(HostGlobSegmentError::DirectoryListing(error));
+                return SourcePreparationOutcome::Complete(Err(error));
             }
-            PathOutcome::Complete(Ok(PathDirectoryListing::Missing)) => {
-                return terminal_error(HostGlobSegmentError::DirectoryDisappeared {
-                    logical_directory: self.logical_directory.dupe(),
-                });
+            PathOutcome::Complete(Ok(listing)) => listing,
+        };
+        let mut observations = listing.observations;
+        let entries = match listing.result {
+            Err(error) => {
+                return segment_complete(
+                    Err(HostGlobSegmentError::DirectoryListing(error)),
+                    observations,
+                );
             }
-            PathOutcome::Complete(Ok(PathDirectoryListing::Present(entries))) => entries,
+            Ok(PathDirectoryListing::Missing) => {
+                return segment_complete(
+                    Err(HostGlobSegmentError::DirectoryDisappeared {
+                        logical_directory: self.logical_directory.dupe(),
+                    }),
+                    observations,
+                );
+            }
+            Ok(PathDirectoryListing::Present(entries)) => entries,
         };
 
         let mut slots = Vec::new();
@@ -521,22 +697,30 @@ impl HostGlobSegmentCandidatesKey {
             }
         }
         if pending.is_empty() {
-            return terminal_ok(HostGlobSegmentCandidates::from_vec(
-                slots.into_iter().flatten().collect(),
-            ));
+            return segment_complete(
+                Ok(HostGlobSegmentCandidates::from_vec(
+                    slots.into_iter().flatten().collect(),
+                )),
+                observations,
+            );
         }
 
         // The listing already resolved this base. Reuse that completed dependency
         // to identify the physical child recorded by ResolvedPath.
-        let resolved_directory = dice_invariant(
-            ctx.compute(&ResolvedPathKey::new(
-                PathObservationNamespace::Host,
-                self.logical_directory.dupe(),
-            ))
-            .await,
-        );
-        let directory_real_path = match resolved_directory {
-            PathOutcome::Complete(Ok(resolved))
+        let resolved_directory = match mode.resolve(ctx, self.logical_directory.dupe()).await {
+            PathOutcome::Need(need) => return segment_need(need),
+            PathOutcome::Complete(Err(error)) => {
+                return SourcePreparationOutcome::Complete(Err(error));
+            }
+            PathOutcome::Complete(Ok(resolved)) => resolved,
+        };
+        observations =
+            match union_segment_observations(&observations, &resolved_directory.observations) {
+                Ok(observations) => observations,
+                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+            };
+        let directory_real_path = match resolved_directory.result {
+            Ok(resolved)
                 if matches!(
                     resolved.state(),
                     ResolvedPathState::Present(lstat)
@@ -551,89 +735,124 @@ impl HostGlobSegmentCandidatesKey {
             ),
         };
 
+        self.complete_pending_symlinks(
+            ctx,
+            mode,
+            PendingSymlinkBatch {
+                slots,
+                pending,
+                directory_real_path,
+                observations,
+            },
+        )
+        .await
+    }
+
+    async fn complete_pending_symlinks(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostGlobSegmentMode,
+        batch: PendingSymlinkBatch,
+    ) -> HostGlobSegmentDriverOutcome {
+        let mut batch = batch;
+        let pending = std::mem::take(&mut batch.pending);
         let outcomes = ctx
             .compute_join(pending, |ctx, pending| {
                 Box::pin(async move {
-                    let outcome = dice_invariant(
-                        ctx.compute(&ResolvedPathKey::new(
-                            PathObservationNamespace::Host,
-                            pending.logical_path.dupe(),
-                        ))
-                        .await,
-                    );
+                    let outcome = mode.resolve(ctx, pending.logical_path.dupe()).await;
                     (pending, outcome)
                 })
             })
             .await;
 
+        self.finish_pending_symlinks(batch, outcomes)
+    }
+
+    fn finish_pending_symlinks(
+        &self,
+        batch: PendingSymlinkBatch,
+        outcomes: Vec<PendingSymlinkOutcome>,
+    ) -> HostGlobSegmentDriverOutcome {
         let mut all_need: Option<NeedPathObservations> = None;
-        let mut first_error = None;
+        let mut observations = batch.observations;
+        let mut slots = batch.slots;
         for (pending, outcome) in outcomes {
-            match outcome {
+            let resolved = match outcome {
                 PathOutcome::Need(need) => {
                     all_need = Some(match all_need {
                         Some(current) => current.union(&need),
                         None => need,
                     });
+                    continue;
                 }
                 PathOutcome::Complete(Err(error)) => {
-                    if first_error.is_none() {
-                        first_error = Some(resolution_error(
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                PathOutcome::Complete(Ok(resolved)) => resolved,
+            };
+            observations = match union_segment_observations(&observations, &resolved.observations) {
+                Ok(observations) => observations,
+                Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+            };
+            let resolved = match resolved.result {
+                Ok(resolved) => resolved,
+                Err(error) => {
+                    return segment_complete(
+                        Err(resolution_error(
                             &self.logical_directory,
                             pending.component,
                             error,
-                        ));
-                    }
+                        )),
+                        observations,
+                    );
                 }
-                PathOutcome::Complete(Ok(resolved)) => {
-                    let physical_child = logical_child(&directory_real_path, &pending.component);
-                    if !resolved
-                        .symlinks()
-                        .iter()
-                        .any(|symlink| symlink.path() == &physical_child)
-                    {
-                        if first_error.is_none() {
-                            first_error =
-                                Some(HostGlobSegmentError::ListingSymlinkResolutionMismatch {
-                                    logical_directory: self.logical_directory.dupe(),
-                                    component: pending.component,
-                                });
-                        }
-                        continue;
-                    }
-                    match resolved.state() {
-                        ResolvedPathState::Missing => {}
-                        ResolvedPathState::Present(lstat) => {
-                            if lstat.kind() == PathNodeKind::Directory
-                                && resolved.ancestor_expansion().is_some()
-                            {
-                                if first_error.is_none() {
-                                    first_error = Some(HostGlobSegmentError::InfiniteExpansion {
-                                        logical_directory: self.logical_directory.dupe(),
-                                        component: pending.component,
-                                    });
-                                }
-                            } else {
-                                slots[pending.slot] = Some(HostGlobSegmentCandidate {
-                                    component: pending.component,
-                                    kind: candidate_kind(lstat.kind()),
-                                });
-                            }
-                        }
-                    }
+            };
+            let physical_child = logical_child(&batch.directory_real_path, &pending.component);
+            if !resolved
+                .symlinks()
+                .iter()
+                .any(|symlink| symlink.path() == &physical_child)
+            {
+                return segment_complete(
+                    Err(HostGlobSegmentError::ListingSymlinkResolutionMismatch {
+                        logical_directory: self.logical_directory.dupe(),
+                        component: pending.component,
+                    }),
+                    observations,
+                );
+            }
+            match resolved.state() {
+                ResolvedPathState::Missing => {}
+                ResolvedPathState::Present(lstat)
+                    if lstat.kind() == PathNodeKind::Directory
+                        && resolved.ancestor_expansion().is_some() =>
+                {
+                    return segment_complete(
+                        Err(HostGlobSegmentError::InfiniteExpansion {
+                            logical_directory: self.logical_directory.dupe(),
+                            component: pending.component,
+                        }),
+                        observations,
+                    );
+                }
+                ResolvedPathState::Present(lstat) => {
+                    slots[pending.slot] = Some(HostGlobSegmentCandidate {
+                        component: pending.component,
+                        kind: candidate_kind(lstat.kind()),
+                    });
                 }
             }
         }
 
-        if let Some(error) = first_error {
-            return terminal_error(error);
-        }
         if let Some(need) = all_need {
-            return path_need(need);
+            return segment_need(need);
         }
-        terminal_ok(HostGlobSegmentCandidates::from_vec(
-            slots.into_iter().flatten().collect(),
-        ))
+        segment_complete(
+            Ok(HostGlobSegmentCandidates::from_vec(
+                slots.into_iter().flatten().collect(),
+            )),
+            observations,
+        )
     }
 }
 
@@ -693,6 +912,27 @@ fn resolution_error(
     }
 }
 
+impl HostGlobSegmentCandidatesKey {
+    async fn compute_driver(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostGlobSegmentMode,
+    ) -> HostGlobSegmentDriverOutcome {
+        #[cfg(unix)]
+        {
+            self.compute_unix(ctx, mode).await
+        }
+        #[cfg(not(unix))]
+        {
+            let _ = (ctx, mode);
+            segment_complete(
+                Err(HostGlobSegmentError::UnsupportedHost),
+                PathObservationEpoch::empty(),
+            )
+        }
+    }
+}
+
 #[async_trait]
 impl Key for HostGlobSegmentCandidatesKey {
     type Value = HostGlobSegmentOutcome;
@@ -702,14 +942,51 @@ impl Key for HostGlobSegmentCandidatesKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        #[cfg(unix)]
-        {
-            self.compute_unix(ctx).await
+        match self.compute_driver(ctx, HostGlobSegmentMode::Legacy).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                SourcePreparationOutcome::Complete(result)
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy Host glob segment produced frontier error: {error}")
+            }
         }
-        #[cfg(not(unix))]
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostGlobSegmentCandidatesObservationKey {
+    type Value = ObservedHostGlobSegmentOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        match self
+            .0
+            .compute_driver(ctx, HostGlobSegmentMode::Observed)
+            .await
         {
-            let _ = ctx;
-            terminal_error(HostGlobSegmentError::UnsupportedHost)
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostGlobSegmentCandidates {
+                    result,
+                    observations,
+                }))
+            }
         }
     }
 
