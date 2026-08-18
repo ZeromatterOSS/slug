@@ -283,6 +283,13 @@ impl<T> AcceptedCommand<T> {
         Self { terminal, events }
     }
 
+    pub(super) fn map_terminal<U>(self, map: impl FnOnce(T) -> U) -> AcceptedCommand<U> {
+        AcceptedCommand {
+            terminal: map(self.terminal),
+            events: self.events,
+        }
+    }
+
     pub fn project(self, projection: impl FnOnce(&T) -> TerminalOutput) -> CommandOutput<T> {
         let output = projection(&self.terminal);
         CommandOutput {
@@ -872,6 +879,17 @@ mod tests {
         let id = CommandAttemptId(id);
         owner.state.lock().unwrap().phase = CommandEffectPhase::Terminal(id);
         (owner, id)
+    }
+
+    #[test]
+    fn accepted_terminal_mapping_moves_value_and_preserves_events() {
+        let events = CommandOutputBuffer {
+            batches: Arc::from([EventBatch::empty()]),
+        };
+        let accepted = AcceptedCommand::new(String::from("terminal"), events);
+        let mapped = accepted.map_terminal(|terminal| terminal.len());
+        assert_eq!(mapped.terminal_for_test(), &8);
+        assert_eq!(mapped.batches_for_test().len(), 1);
     }
 
     #[test]

@@ -452,6 +452,8 @@ struct ExternalQueryActivationAudit {
     forbidden: Mutex<Vec<String>>,
     typed_roots: AtomicUsize,
     configured_roots: Mutex<Vec<ConfiguredTargetKey>>,
+    observed_build_roots: AtomicUsize,
+    legacy_build_roots: AtomicUsize,
 }
 
 #[cfg(test)]
@@ -525,6 +527,22 @@ impl ExternalQueryActivationAudit {
                     .push(configured_target.clone());
             }
         }
+        if key
+            .downcast_ref::<BuildCommandRootObservationKey>()
+            .is_some()
+        {
+            self.observed_build_roots.fetch_add(1, Ordering::Relaxed);
+        }
+        if key.downcast_ref::<BuildCommandRootKey>().is_some() {
+            self.legacy_build_roots.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn build_root_counts(&self) -> (usize, usize) {
+        (
+            self.observed_build_roots.load(Ordering::Relaxed),
+            self.legacy_build_roots.load(Ordering::Relaxed),
+        )
     }
 
     fn take_configured_roots(&self) -> Vec<ConfiguredTargetKey> {
@@ -695,6 +713,7 @@ enum NativeDemandSessionError {
     Revision(RequestRevisionError),
     MissingSelectedPath(PathObservationDemand),
     PathEpoch(slug_workspace_v2::PathObservationEpochError),
+    ObservedTerminal(ObservedTerminalMismatch),
     Effect(CommandEffectError),
     ForeignEffects,
     Computation(anyhow::Error),
@@ -724,12 +743,29 @@ impl fmt::Display for NativeDemandSessionError {
                 f.write_str("a selected path observation was not materialized")
             }
             Self::PathEpoch(error) => write!(f, "path observation epoch failed: {error}"),
+            Self::ObservedTerminal(error) => write!(f, "observed terminal failed: {error}"),
             Self::Effect(error) => write!(f, "command effect selection failed: {error}"),
             Self::ForeignEffects => f.write_str("command effects belong to another command"),
             Self::Computation(error) => write!(f, "command computation failed: {error}"),
             Self::Injection(error) => write!(f, "command input injection failed: {error}"),
             Self::Restoration(error) => write!(f, "command restoration failed: {error}"),
         }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ObservedTerminalMismatch {
+    RepositoryRequests,
+    RepositoryValidations,
+    Length,
+    Demand,
+    Value,
+    ResultArc,
+}
+
+impl fmt::Display for ObservedTerminalMismatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{self:?}")
     }
 }
 
@@ -914,6 +950,10 @@ trait NativeCommandRoot: Clone {
         &self,
         _terminal: &'a Self::Terminal,
     ) -> Option<&'a SourceCertificate> {
+        None
+    }
+
+    fn observations<'a>(&self, _terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
         None
     }
 
@@ -1317,6 +1357,37 @@ impl NativeCommandRoot for BuildCommandRootKey {
             .compute(self)
             .await
             .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))
+    }
+}
+
+#[async_trait]
+impl NativeCommandRoot for BuildCommandRootObservationKey {
+    type Terminal = ObservedBuildCommandRoot;
+
+    fn observations<'a>(&self, terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
+        Some(terminal.observations())
+    }
+
+    async fn compute(
+        &self,
+        transaction: &mut dice::DiceTransaction,
+    ) -> Result<slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>, NativeDemandSessionError>
+    {
+        match transaction
+            .compute(self)
+            .await
+            .map_err(|error| NativeDemandSessionError::Computation(anyhow::anyhow!("{error:#}")))?
+        {
+            slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need))
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(terminal)) => {
+                Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal))
+            }
+            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => Err(
+                NativeDemandSessionError::Computation(anyhow::anyhow!(error.to_string())),
+            ),
+        }
     }
 }
 
@@ -4281,6 +4352,10 @@ impl WorkspaceRuntime {
                 return Err(NativeDemandSessionError::Repository(error));
             }
         };
+        let path_observations = preserve_equal_observation_arcs(
+            &prior.path_observations,
+            preflight.path_observations(),
+        );
         Ok(NativeDemandPreflight {
             command: NativeDemandCommand {
                 runtime: self,
@@ -4296,7 +4371,7 @@ impl WorkspaceRuntime {
                     .collect(),
                 issued_requests: SmallMap::new(),
                 repository_results: preflight.repository_results().clone(),
-                path_observations: preflight.path_observations().clone(),
+                path_observations,
             },
         })
     }
@@ -4370,6 +4445,9 @@ impl WorkspaceRuntime {
                                 return Err(error);
                             }
                         };
+                        if let Some(observations) = attempt_root.observations(&terminal) {
+                            validate_observed_terminal(observations, &prepared.snapshot)?;
+                        }
                         let revision_retry = if let Some(source_certificate) = source_certificate {
                             let selected_updater = prepared
                                 .selected_updater
@@ -4559,10 +4637,25 @@ impl WorkspaceRuntime {
             lockfile_mode,
             registry_urls,
         };
-        let driven = self.drive_command(request, root).map_err(|error| {
-            BuildCommandError::infrastructure(format!("typed build command failed: {error}"))
-        })?;
-        if let Ok(evaluation) = driven.accepted.terminal().as_ref().as_ref() {
+        let accepted = if let Some(observed) = BuildCommandRootObservationKey::new(root.clone()) {
+            self.drive_command(request, observed)
+                .map_err(|error| {
+                    BuildCommandError::infrastructure(format!(
+                        "typed build command failed: {error}"
+                    ))
+                })?
+                .accepted
+                .map_terminal(|terminal| terminal.result)
+        } else {
+            self.drive_command(request, root)
+                .map_err(|error| {
+                    BuildCommandError::infrastructure(format!(
+                        "typed build command failed: {error}"
+                    ))
+                })?
+                .accepted
+        };
+        if let Ok(evaluation) = accepted.terminal().as_ref().as_ref() {
             for analysis in evaluation.analyses() {
                 let configuration = analysis
                     .configured_target_key()
@@ -4579,7 +4672,7 @@ impl WorkspaceRuntime {
                     .map_err(BuildCommandError::infrastructure)?;
             }
         }
-        Ok(driven.accepted)
+        Ok(accepted)
     }
 
     pub fn cquery_command_with_bzlmod_inputs(
@@ -5425,15 +5518,15 @@ impl NativeDemandCommand<'_> {
             .path_observations
             .observations()
             .iter()
-            .map(|(demand, result)| (demand.clone(), result.as_ref().clone()))
+            .map(|(demand, result)| (demand.clone(), result.dupe()))
             .chain(
                 observed
                     .observations()
                     .iter()
-                    .map(|(demand, result)| (demand.clone(), result.as_ref().clone())),
+                    .map(|(demand, result)| (demand.clone(), result.dupe())),
             );
-        self.path_observations =
-            PathObservationEpoch::new(merged).map_err(NativeDemandSessionError::PathEpoch)?;
+        self.path_observations = PathObservationEpoch::from_shared(merged)
+            .map_err(NativeDemandSessionError::PathEpoch)?;
         Ok(NativeDemandProgress::Paths)
     }
 
@@ -5495,14 +5588,14 @@ impl NativeDemandCommand<'_> {
         }
         selected_paths.sort_unstable();
         selected_paths.dedup();
-        let path_observations = PathObservationEpoch::new(
+        let path_observations = PathObservationEpoch::from_shared(
             selected_paths
                 .iter()
                 .map(|demand| {
                     let result = self.path_observations.get(demand).ok_or_else(|| {
                         NativeDemandSessionError::MissingSelectedPath(demand.clone())
                     })?;
-                    Ok((demand.clone(), result.as_ref().clone()))
+                    Ok((demand.clone(), result.dupe()))
                 })
                 .collect::<Result<Vec<_>, NativeDemandSessionError>>()?,
         )
@@ -5558,6 +5651,63 @@ impl NativeDemandCommand<'_> {
             validation,
         ))
     }
+}
+
+fn validate_observed_terminal(
+    observed: &PathObservationEpoch,
+    selected: &AcceptedNativeDemandSnapshot,
+) -> Result<(), NativeDemandSessionError> {
+    if !selected.selected.repository_requests().is_empty() {
+        return Err(NativeDemandSessionError::ObservedTerminal(
+            ObservedTerminalMismatch::RepositoryRequests,
+        ));
+    }
+    if !selected.selected.repository_validations().is_empty() {
+        return Err(NativeDemandSessionError::ObservedTerminal(
+            ObservedTerminalMismatch::RepositoryValidations,
+        ));
+    }
+    let observed = observed.observations();
+    let selected = selected.path_observations.observations();
+    if observed.len() != selected.len() {
+        return Err(NativeDemandSessionError::ObservedTerminal(
+            ObservedTerminalMismatch::Length,
+        ));
+    }
+    for ((observed_demand, observed_result), (selected_demand, selected_result)) in
+        observed.iter().zip(selected.iter())
+    {
+        if observed_demand != selected_demand {
+            return Err(NativeDemandSessionError::ObservedTerminal(
+                ObservedTerminalMismatch::Demand,
+            ));
+        }
+        if observed_result.as_ref() != selected_result.as_ref() {
+            return Err(NativeDemandSessionError::ObservedTerminal(
+                ObservedTerminalMismatch::Value,
+            ));
+        }
+        if !Arc::ptr_eq(observed_result, selected_result) {
+            return Err(NativeDemandSessionError::ObservedTerminal(
+                ObservedTerminalMismatch::ResultArc,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn preserve_equal_observation_arcs(
+    prior: &PathObservationEpoch,
+    observed: &PathObservationEpoch,
+) -> PathObservationEpoch {
+    PathObservationEpoch::from_shared(observed.observations().iter().map(|(demand, result)| {
+        let result = prior
+            .get(demand)
+            .filter(|prior| prior.as_ref() == result.as_ref())
+            .unwrap_or(result);
+        (demand.dupe(), result.dupe())
+    }))
+    .expect("a valid observed epoch remains valid when equal result Arcs are reused")
 }
 
 #[allow(dead_code)]
@@ -10361,6 +10511,23 @@ parent = rule(implementation = _parent, attrs = {"child": attr.label(cfg = left)
         let progress = command.progress(&second_need).unwrap();
         assert_eq!(progress, NativeDemandProgress::Paths);
         assert_eq!(command.command().inputs.generations, fixed);
+        let first_arc = command
+            .command()
+            .path_observations
+            .get(&path)
+            .unwrap()
+            .dupe();
+        let another_need = slug_bzlmod_v2::SourcePreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(unprocessed_path.clone()),
+        );
+        assert_eq!(
+            command.progress(&another_need).unwrap(),
+            NativeDemandProgress::Paths
+        );
+        assert!(Arc::ptr_eq(
+            command.command().path_observations.get(&path).unwrap(),
+            &first_arc
+        ));
 
         command.begin_attempt().unwrap();
         let prepared = runtime.runtime.block_on(async {
@@ -13330,6 +13497,292 @@ probe = rule(implementation = _impl)
         }
     }
 
+    #[derive(Clone)]
+    struct PointerDistinctObservedBuildRoot(BuildCommandRootObservationKey);
+
+    #[async_trait]
+    impl NativeCommandRoot for PointerDistinctObservedBuildRoot {
+        type Terminal = ObservedBuildCommandRoot;
+
+        fn observations<'a>(
+            &self,
+            terminal: &'a Self::Terminal,
+        ) -> Option<&'a PathObservationEpoch> {
+            Some(terminal.observations())
+        }
+
+        async fn compute(
+            &self,
+            transaction: &mut dice::DiceTransaction,
+        ) -> Result<
+            slug_bzlmod_v2::SourcePreparationOutcome<Self::Terminal>,
+            NativeDemandSessionError,
+        > {
+            let outcome = NativeCommandRoot::compute(&self.0, transaction).await?;
+            Ok(match outcome {
+                slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+                    slug_bzlmod_v2::SourcePreparationOutcome::Need(need)
+                }
+                slug_bzlmod_v2::SourcePreparationOutcome::Complete(mut terminal) => {
+                    terminal.observations = PathObservationEpoch::from_shared(
+                        terminal
+                            .observations
+                            .observations()
+                            .iter()
+                            .map(|(demand, result)| {
+                                (demand.dupe(), Arc::new(result.as_ref().clone()))
+                            }),
+                    )
+                    .unwrap();
+                    slug_bzlmod_v2::SourcePreparationOutcome::Complete(terminal)
+                }
+            })
+        }
+    }
+
+    #[test]
+    fn observed_terminal_validation_requires_complete_values_and_exact_arcs() {
+        let workspace = tempfile::tempdir().unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let mut snapshot = accepted_native_snapshot(&runtime);
+        let first = BuildRootEpoch::demand("/first", PathObservationOperation::Lstat);
+        let second = BuildRootEpoch::demand("/second", PathObservationOperation::Lstat);
+        let missing = PathObservationResult::Lstat(PathOperationResult::Missing);
+        let observed = PathObservationEpoch::new([(first.dupe(), missing.clone())]).unwrap();
+        snapshot.path_observations = PathObservationEpoch::from_shared([(
+            first.dupe(),
+            observed.get(&first).unwrap().dupe(),
+        )])
+        .unwrap();
+        snapshot.selected = SelectedWorkspaceDemands::for_test([], [first.dupe()]);
+        validate_observed_terminal(&observed, &snapshot).unwrap();
+        let assert_mismatch = |observed: &PathObservationEpoch,
+                               snapshot: &AcceptedNativeDemandSnapshot,
+                               expected: ObservedTerminalMismatch| {
+            let Err(NativeDemandSessionError::ObservedTerminal(actual)) =
+                validate_observed_terminal(observed, snapshot)
+            else {
+                panic!("observed validation did not return a typed mismatch");
+            };
+            assert_eq!(actual, expected);
+        };
+
+        snapshot.path_observations =
+            PathObservationEpoch::new([(first.dupe(), missing.clone())]).unwrap();
+        assert_mismatch(&observed, &snapshot, ObservedTerminalMismatch::ResultArc);
+        snapshot.path_observations = PathObservationEpoch::new([(
+            first.dupe(),
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                1,
+                1,
+                1,
+                0o644,
+            ))),
+        )])
+        .unwrap();
+        let fresh_changed = snapshot.path_observations.dupe();
+        assert_mismatch(&observed, &snapshot, ObservedTerminalMismatch::Value);
+        snapshot.path_observations = PathObservationEpoch::new([(second.dupe(), missing)]).unwrap();
+        snapshot.selected = SelectedWorkspaceDemands::for_test([], [second]);
+        assert_mismatch(&observed, &snapshot, ObservedTerminalMismatch::Demand);
+        snapshot.path_observations = PathObservationEpoch::empty();
+        snapshot.selected = SelectedWorkspaceDemands::empty();
+        assert_mismatch(&observed, &snapshot, ObservedTerminalMismatch::Length);
+
+        let normalized =
+            NormalizedAbsolutePath::new(workspace.path().canonicalize().unwrap()).unwrap();
+        let request = local_native_request(&normalized, "dep+", ".");
+        snapshot.selected = SelectedWorkspaceDemands::for_test([request.dupe()], []);
+        assert_mismatch(
+            &PathObservationEpoch::empty(),
+            &snapshot,
+            ObservedTerminalMismatch::RepositoryRequests,
+        );
+        snapshot.selected =
+            SelectedWorkspaceDemands::for_test_with_validation([], request, first.dupe());
+        assert_mismatch(
+            &PathObservationEpoch::empty(),
+            &snapshot,
+            ObservedTerminalMismatch::RepositoryValidations,
+        );
+        let fresh_equal = PathObservationEpoch::new([(
+            first.dupe(),
+            observed.get(&first).unwrap().as_ref().clone(),
+        )])
+        .unwrap();
+        let reconciled = preserve_equal_observation_arcs(&observed, &fresh_equal);
+        assert!(Arc::ptr_eq(
+            reconciled.get(&first).unwrap(),
+            observed.get(&first).unwrap()
+        ));
+        let reconciled = preserve_equal_observation_arcs(&observed, &fresh_changed);
+        assert!(Arc::ptr_eq(
+            reconciled.get(&first).unwrap(),
+            fresh_changed.get(&first).unwrap()
+        ));
+        let absent =
+            preserve_equal_observation_arcs(&PathObservationEpoch::empty(), &fresh_changed);
+        assert!(Arc::ptr_eq(
+            absent.get(&first).unwrap(),
+            fresh_changed.get(&first).unwrap()
+        ));
+    }
+
+    #[test]
+    fn public_singleton_observation_replays_lifecycle_and_isolates_legacy() {
+        let workspace = tempfile::tempdir_in(env!("CARGO_MANIFEST_DIR")).unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print('MODULE_EVENT')\nmodule(name = 'publication')\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        let build_file = workspace.path().join("pkg/BUILD.bazel");
+        let write_build = |name: &str| {
+            fs::write(
+                &build_file,
+                format!("print('PACKAGE_EVENT')\nfilegroup(name = '{name}')\n"),
+            )
+            .unwrap();
+        };
+        write_build("a");
+        let audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(audit.dupe());
+        let run = |target: &str| {
+            runtime.build_command_with_bzlmod_inputs(
+                &[TargetPattern::parse(target).unwrap()],
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+        };
+
+        let cold = run("//pkg:all").unwrap();
+        let a = cold.terminal_for_test().dupe();
+        assert!(a.as_ref().is_ok());
+        assert_eq!(
+            accepted_output_text(&cold),
+            ["MODULE_EVENT", "PACKAGE_EVENT"]
+        );
+        assert!(
+            accepted_native_snapshot(&runtime)
+                .selected
+                .repository_requests()
+                .is_empty()
+        );
+        let after_cold = audit.build_root_counts();
+        assert!(after_cold.0 > 0);
+        assert_eq!(after_cold.1, 0);
+
+        let cold_epoch = accepted_native_snapshot(&runtime).path_observations;
+        let warm = run("//pkg:all").unwrap();
+        assert_eq!(accepted_output_text(&warm), Vec::<&str>::new());
+        let warm_epoch = accepted_native_snapshot(&runtime).path_observations;
+        assert!(
+            cold_epoch
+                .observations()
+                .iter()
+                .all(|(demand, result)| { Arc::ptr_eq(result, warm_epoch.get(demand).unwrap()) })
+        );
+        write_build("b");
+        let b = run("//pkg:all").unwrap();
+        assert_ne!(a.as_ref(), b.terminal_for_test().as_ref());
+        fs::remove_file(&build_file).unwrap();
+        assert!(
+            run("//pkg:all")
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .is_err()
+        );
+        write_build("a");
+        let restored = run("//pkg:all").unwrap();
+        assert_eq!(a.as_ref(), restored.terminal_for_test().as_ref());
+
+        let before_legacy = audit.build_root_counts();
+        let legacy = run("//pkg:a").unwrap();
+        assert!(legacy.terminal_for_test().as_ref().is_ok());
+        let after_legacy = audit.build_root_counts();
+        assert_eq!(after_legacy.0, before_legacy.0);
+        assert!(after_legacy.1 > before_legacy.1);
+    }
+
+    #[test]
+    fn pointer_distinct_observed_epoch_aborts_before_publication_and_recovers() {
+        let workspace = tempfile::tempdir().unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "module(name = 'abort')\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("pkg")).unwrap();
+        fs::write(
+            workspace.path().join("pkg/BUILD.bazel"),
+            "filegroup(name = 'a')\n",
+        )
+        .unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let target = TargetPattern::parse("//pkg:all").unwrap();
+        let accepted = runtime
+            .build_command_with_bzlmod_inputs(
+                std::slice::from_ref(&target),
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+            .unwrap();
+        assert!(accepted.terminal_for_test().as_ref().is_ok());
+        let prior = accepted_native_snapshot(&runtime);
+        runtime.native_demand_sessions.take_trace();
+
+        let host = runtime.process_host.default_configuration_inputs().unwrap();
+        let configuration = SlugConfiguration::default_target(&host).unwrap();
+        let key = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap(),
+            std::slice::from_ref(&target),
+            ConfigurationKey::from_slug(configuration),
+        )
+        .unwrap();
+        let error = runtime
+            .drive_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                PointerDistinctObservedBuildRoot(BuildCommandRootObservationKey::new(key).unwrap()),
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            NativeDemandSessionError::ObservedTerminal(ObservedTerminalMismatch::ResultArc)
+        ));
+        assert_current_native_snapshot(&runtime, &prior);
+        let trace = runtime.native_demand_sessions.take_trace();
+        assert!(trace.contains(&NativeDemandTestTrace::AttemptTransactionDroppedBeforeAbort));
+        assert!(!trace.contains(&NativeDemandTestTrace::SelectedInjectionCommitted));
+        assert!(!trace.contains(&NativeDemandTestTrace::AcceptedSnapshotReplaced));
+        assert!(
+            runtime
+                .build_command_with_bzlmod_inputs(
+                    &[target],
+                    BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                    BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                    LockfileMode::Update,
+                    &[],
+                    None,
+                )
+                .unwrap()
+                .terminal_for_test()
+                .as_ref()
+                .is_ok()
+        );
+    }
+
     #[test]
     fn observed_build_identity_and_epoch_union_are_restricted_and_left_stable() {
         let accepted = singleton_package_all_key("//pkg:all");
@@ -13534,13 +13987,10 @@ probe = rule(implementation = _impl)
         outer_epoch.package("pkg", "filegroup(name = 'target')\n", 5);
         let mut outer =
             build_root_transaction_with_data(&outer_dice, outer_epoch.build(), outer_data).await;
-        let outer = outer.compute(&key).await.unwrap();
-        assert!(matches!(
-            outer,
-            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(_))
-        ));
-        assert!(BuildCommandRootObservationKey::validity(&outer));
-        assert!(BuildCommandRootObservationKey::equality(&outer, &outer));
+        let outer = NativeCommandRoot::compute(&key, &mut outer)
+            .await
+            .unwrap_err();
+        assert!(matches!(outer, NativeDemandSessionError::Computation(_)));
     }
 
     #[tokio::test]
