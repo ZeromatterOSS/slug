@@ -5189,3 +5189,24 @@ families, lifecycle and memory. Preserve exact BUILD/package semantics and
 events, Slug-native observation association and deferred upper publication.
 After design ACCEPT schedule one implementation, then only a docs-only
 upper-owner audit.
+
+### Repository-package-load observation implementation active (2026-08-18)
+
+Run only `WP-2A-m1-repository-package-load-observation-implementation` from
+Rust base `93f43264` and accepted design `a342a2c2`. Write exactly
+`bzl_module.rs`, `lib.rs`, and `host_package_load_tests.rs` within
++360/+4/+560, +924 aggregate and 6,955/86/3,438/10,479 physical caps. Keep
+touched helpers below 200 lines.
+
+Implement the doc-hidden public sibling/carrier and one matching-family driver.
+Preserve source -> parse/prevalidation -> AST-order children -> attempt/
+postvalidation, exact legacy Result Arc, left-first union-before-semantic and
+empty/source/prior/merged/full prefixes. Need/outer is immediate and
+carrierless; semantic Complete alone owns the matching local BUILD batch.
+
+Retain only the existing LoadedPackage graph in one Result Arc plus compact
+epoch; all BUILD/load/evaluator/event/union scratch remains local. Add no
+caller, upper activation or new state/event owner. Run the complete Arc/
+terminal/event/family/lifecycle proof, serial validation, cleanup and
+independent review. After ACCEPT return only to a docs-only upper-owner audit;
+do not close M1.
