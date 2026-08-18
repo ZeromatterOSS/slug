@@ -5360,3 +5360,35 @@ format/diff/accounting, retention/cleanup and independent review serially.
 STOP on another file/caller, semantic/public drift, retained scratch, relocation
 body drift, cap excess or M1 closure. After ACCEPT return to exactly one
 docs-only next-owner audit.
+
+### Loading-query proof/parallel authority REPLAN (2026-08-18)
+
+The retained seven-file candidate implements the accepted query owner and
+passes focused observed publication, exact selected-Arc, full query 121/121
+and complete bzlmod validation. Full loading is 137/138 only because the prior
+package-load proof still asserts query sources do not name the now-required
+`RepositoryPackageLoadObservationKey`; that test is outside implementation
+authority and the failure is not inherited.
+
+Default-parallel core is 233/236 while all three failed query proofs pass in
+isolation. Their workspaces use mutable shared `/tmp` ancestry, so new Host
+observation legitimately sees sibling churn and replays events, changes exact
+selected epochs or exposes a repository-selection mismatch. Two bodies are in
+the byte-frozen relocation, so correction also exceeds current authority.
+
+Run docs-only
+`WP-2A-m1-loading-query-proof-and-parallel-authority-correction-design` from
+scheduling base `113a74b2`, retaining the Rust candidate non-writable. Write
+only canonical/current/Stage/routing within 40/180/140/30 and 390 aggregate.
+Freeze the exact split loading assertion from current-packet, requiring the
+query graph/environment dependency and forbidding a direct core dependency,
+plus exactly three stable crate-target-parent `tempdir_in` replacements.
+
+Keep production caps unchanged. Add `host_package_load_tests.rs` only for that
+assertion; raise relocated query proof by +12 semantic/physical margin to
+372/1,132, allow +4/3,442 only for the loading assertion, and set aggregate
+test/semantic/physical caps to 1,328/2,482/19,531. Preserve every other
+relocated byte. After design ACCEPT,
+retry the same implementation and require isolated corrected tests plus full
+default-parallel core, loading, query and bzlmod. No semantic owner, caller,
+public surface or M1 closure changes.

@@ -1,92 +1,83 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-observed-publication-implementation`
+Packet: `WP-2A-m1-loading-query-proof-and-parallel-authority-correction-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
+Scheduling base: `113a74b2`
 Rust base: `a9270586`
-Accepted design: `44c1b444`
-Result: implement and validate only observed native loading-query publication.
+Accepted query design: `44c1b444`
+Result: freeze only the bounded proof and parallel-workspace authority correction, then retry the same retained implementation.
 
-## Authority and caps
+## Docs authority and retained candidate
 
-Write exactly:
+Write exactly canonical/current/Stage 2/routing docs within 40/180/140/30 and
+390 aggregate net-line caps. The retained seven-file Rust candidate is
+non-writable during this design. Stop Cargo, Rust, fixtures, oracles, public
+activation and M1 closure.
 
-1. `app/slug_query_v2/src/evaluator.rs`: +170 production/+20 colocated proof,
-   <=417 physical;
-2. `app/slug_query_v2/src/loading_environment.rs`: +360/+60, <=2,346;
-3. `app/slug_query_v2/src/graph.rs`: +520/+100, <=3,771;
-4. `app/slug_query_v2/src/lib.rs`: +4, <=81;
-5. new `app/slug_query_v2/tests/observed_loading_query.rs`: +760 tests,
-   <=780;
-6. `app/slug_core_v2/src/runtime/dice.rs`: +100 production/+12 test glue,
-   <=11,000 after exact relocation of base lines 7,318-8,036; and
-7. new `app/slug_core_v2/src/runtime/tests/query_command_tests.rs`: exact
-   719-line relocation plus <=360 proof, <=1,120 physical.
+The candidate implements the accepted query owner. Focused query, structural
+identity and selected-Arc proof pass; full query is 121/121 and bzlmod is
+complete. Production ownership, terminal algebra, event ownership, compact
+retention and compatibility classes are not reopened.
 
-Caps against `a9270586` are +1,154 production, +1,312 tests and +2,466
-aggregate semantic lines, 19,515 combined physical. Replace the contiguous
-query-test range only with
-`mod query_command_tests { include!("tests/query_command_tests.rs"); }`; the
-included file starts with `use super::*;` and all relocated bodies remain byte
-exact. Existing large query/graph/core files are cohesive owner exceptions;
-touched helpers stay below 200 lines.
+## Frozen correction
 
-## Required implementation
+The accepted loading proof at `host_package_load_tests.rs:1439-1444` still
+asserts that query graph/environment/core do not name
+`RepositoryPackageLoadObservationKey`. The query design now necessarily uses
+that accepted sibling in graph/environment. The retry may replace only that
+static assertion with this exact split proof (subject only to rustfmt wrapping):
 
-Add doc-hidden public structural `RootQueryCommandObservationKey` and
-`ObservedRootQueryCommand`, plus private observed root/external graph and
-root-subtree siblings. Use shared Legacy/Observed root, graph and subtree
-drivers and one mode-aware ephemeral `LoadingQueryEnvironment`. Direct and
-one-shot query APIs remain legacy; only the existing native public query
-constructor selects the observed root.
+```rust
+let query = concat!(
+    include_str!("../../slug_query_v2/src/graph.rs"),
+    include_str!("../../slug_query_v2/src/loading_environment.rs"),
+);
+let core = include_str!("../../slug_core_v2/src/runtime/dice.rs");
+assert!(query.contains("RepositoryPackageLoadObservationKey"));
+assert!(!core.contains("RepositoryPackageLoadObservationKey"));
+```
 
-The root Value is
-`LoadingPreparationOutcome<Result<ObservedRootQueryCommand,
-ObservedPathFrontierError>>`; its carrier retains the exact existing query
-Result Arc plus compact epoch. Each graph/subtree DICE sibling retains exactly
-one natural local Result Arc plus epoch. Root retains no child carrier Arc; all
-carriers implement `Allocative` and `Dupe`. Environment, arena, resolved graph,
-traversal/listing vectors and event/union scratch stay compute-local.
+No loading production or other loading test may change.
 
-Preserve anchor-first and exact evaluator/callback order. Observed mode selects
-only accepted anchor/route/root-or-repository-load/boundary/listing/resolution
-siblings. Merge each Complete child epoch left-first before semantic
-inspection; equal duplicates keep the first exact Arc and conflict/mismatch is
-typed outer. Sequential first Need/outer/semantic stops immediately; semantic
-error keeps the reached prefix. Reuse private Need and outer sentinel channels.
-Issued subtree joins scan the full input order and choose first outer/epoch
-error > combined compatible Need > first semantic > success.
+Three public query proofs use `tempfile::tempdir()` under mutable shared `/tmp`.
+New Host observation correctly sees parallel sibling churn, so isolated tests
+pass while default-parallel core replays events or rejects selected epochs.
+Authorize exactly one one-line-to-four-line replacement in each of:
 
-Root/graph/subtree/environment siblings are eventless; child keys remain sole
-batch owners. Need/outer/cancel publishes none and warm reuse is suppressed.
-Implement the observed `NativeCommandRoot`, expose its epoch to existing exact
-selected-snapshot validation, and consume/project through
-`AcceptedCommand::map_terminal` without changing the public query Result Arc or
-event buffer. Add no revision, certificate, cache/store/lock/task, Host read or
-second event/publication owner, and no interner.
+1. `real_query_command_drives_typed_results_and_cold_events_without_warm_replay`;
+2. `direct_external_query_uses_host_route_native_materialization_and_apparent_output`;
+3. `observed_query_publication_preserves_terminal_and_selected_epoch_arcs`.
 
-## Proof and terminal
+Each replacement creates its own fixed test-exclusive directory below
+`CARGO_MANIFEST_DIR/../../target` before any runtime, then uses
+`tempfile::tempdir_in`. All other relocated bytes remain exact. The three
+replacements add exactly +9 semantic/physical test lines; allow +12 rounded
+margin only in `runtime/tests/query_command_tests.rs`.
 
-Prove identity/equality/validity/Allocative/Dupe and exact semantic Arc;
-anchor and every environment terminal prefix; root/external graph projection;
-every subtree boundary/marker/listing batch position, Need union, first Arc,
-conflict/mismatch and BFS order; direct/external/recursive/visibility/
-buildfiles/loadfiles/generated queries; exact selected epoch/Arc identity;
-public Result-Arc identity; exact cold/error child events and warm suppression;
-both family directions and concurrent isolation; cancellation/recovery;
-root/external BUILD and `.bzl` A-B-delete-recreate-A; retained lifetimes; and
-zero upper-build activation.
+The retry keeps every prior production/test cap except that core query proof
+becomes relocation plus <=372 new proof and <=1,132 physical. Aggregate test,
+semantic and physical caps become +1,328/+2,482/19,531. Add exactly
+`app/slug_loading_v2/src/host_package_load_tests.rs` with <=4 semantic test
+lines and <=3,442 physical solely for the exact assertion replacement above.
 
-Exact public query behavior and all legacy/direct APIs remain exact. Private
-observation/outer/selected association is Slug-native. One-shot workspace
-evaluation, external exported-source publication, multi-build aggregation,
-unsupported query breadth and exact identity bytes remain deferred.
+## Compatibility, proof and terminal
 
-Run focused proof, full query/loading/bzlmod/core validation, fmt, diff-check,
-exact accounting, retention/cleanup and independent review serially. STOP on
-any other file/caller, semantic/order/family/event drift, public API expansion,
-retained scratch, relocation/body drift, cap excess or M1 closure. REPLAN if
-the exact epoch needs another owner/state, private outer cannot remain private,
-existing Need kinds cannot union without inventing a new query error, or the
-bounded scope cannot hold. After ACCEPT commit and return to exactly one
-docs-only next-owner audit; do not close M1.
+Exact public query behavior, loading proof truth and all legacy/direct APIs
+remain exact. Stable test parents and the existing private observation/outer/
+selected association are Slug-native. One-shot evaluation, external exported-
+source publication, multi-build, unsupported breadth and exact identity bytes
+remain deferred.
+
+The retry must run all three corrected query tests in isolation, the full
+default-parallel core suite, full query/loading/bzlmod, fmt, diff-check, exact
+relocation/accounting, cleanup and independent review. Loading must no longer
+report the obsolete nonactivation failure; core must no longer replay warm
+events, reject repository selection or lose exact Arc identity under parallel
+execution.
+
+After independent design ACCEPT schedule exactly
+`WP-2A-m1-loading-query-observed-publication-implementation-retry` with the
+eight-file authority above. STOP on any production/design change, other test
+body/file, weakened assertion, shared parent, cap excess or M1 closure. REPLAN
+if the exact bounded correction cannot make default-parallel validation pass.
