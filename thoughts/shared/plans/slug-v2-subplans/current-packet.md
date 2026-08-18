@@ -5,9 +5,8 @@ Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
 Accepted predecessors: `b9fda97d`, `f5a9b249`, `bd4fb8db`, `dc696b2d`,
 `dc6f6e02`
-Result: audit and freeze the smallest complete callerless observed Host-glob
-frontier now that listing, package-boundary and segment observations are
-available at their natural owners.
+Result: freeze one complete callerless observed sibling at the natural
+`HostGlobTraversalKey` owner. No smaller prerequisite remains.
 
 ## Design task
 
@@ -16,17 +15,37 @@ package-boundary graph. Account for every decisive traversal prefix,
 breadth-first ordinal and candidate order, recursive progress, boundary stop,
 grouped Need, first-ranked error and final sorted path.
 
-Freeze exactly one bounded observed frontier if the existing three observed
-predecessors make the traversal owner complete. If a natural owner still
-erases required observations, `REPLAN` to exactly one uniquely smaller
-docs-only prerequisite instead of reconstructing or widening the carrier.
+The traversal is complete: its observed segment child supplies literal or
+wildcard listing/base/matched-symlink observations and its observed boundary
+child supplies ignore/package-lookup observations. The traversal alone owns
+breadth-first state, recursive progress, stops, grouped Need, ranked errors and
+final sorted paths; the adapter only projects its result.
 
-The candidate carrier is one semantic Result Arc plus one Arc-backed
-`PathObservationEpoch`. Deterministic aggregation must preserve listing,
-segment and boundary dependency order and the first exact Arc for equal
-duplicates. Child state after a decisive terminal remains dependency-owned.
-Need, cancellation and typed outer aggregation errors publish no carrier or
-parent event data.
+Add private `HostGlobTraversalObservationKey` with the legacy structural
+identity and distinct Display. Its `ObservedHostGlobTraversal` retains one
+`Arc<Result<HostGlobTraversal, HostGlobTraversalError>>` plus one
+`PathObservationEpoch`. Its Value wraps that carrier in
+`SourcePreparationOutcome<Result<_, ObservedPathFrontierError>>` with
+complete-only equality and validity.
+
+One `Legacy | Observed` driver selects only matching segment and boundary key
+families; neither traversal sibling computes the other. Adapter and callers
+remain legacy.
+
+Preserve the serial traversal exactly. Observed mode unions each completed
+child epoch into one compute-local accumulated epoch in each state's segment
+rank, then directory-boundary candidate-slot order, then later breadth-first
+ordinal order. Union before inspecting the child's semantic Result. Reuse the
+parent-module stable `PathObservationEpoch::from_shared` helper so conflicts
+are detected at their exact rank and the first exact Arc wins duplicates.
+
+Outer precedence is prefix-bounded by the first semantic terminal. An outer
+child or union error before, or at the union of, that semantic rank wins over
+prior Need and publishes no carrier. Otherwise the first semantic error wins
+over prior Need and retains only completed epochs through its rank; later
+outcomes remain dependency-owned. Without a semantic error, first outer wins
+over Need; otherwise Need publishes no carrier and success retains every
+completed epoch. Cancellation publishes nothing.
 
 ## Required audit and proof plan
 
@@ -42,6 +61,13 @@ parent event data.
   A/B/A and activation/nonactivation tests; and
 - cite pinned Bazel 9.2 source or accepted evidence for every exact behavior.
 
+The implementation proof must include literal/wildcard/recursive Files and
+FilesAndDirs parity; segment/boundary terminal polarity; exact
+segment-then-boundary/breadth-first/first-Arc order; earlier Need + semantic +
+later outer decisive-prefix retention; no-semantic outer-over-Need; boundary
+stops; complete-only equality/validity; warm/A-B-A; cancellation; zero events;
+and legacy/observed/adapter family isolation.
+
 Read only the bounded loading Host-glob adapter/traversal/segment owners,
 Bzlmod package-boundary owner, workspace observation/resolution owners,
 directly referenced tests/manifests and the utility-reuse sources named by
@@ -50,7 +76,16 @@ specific unproved parity gap.
 
 ## Authority and validation
 
-This is docs-only. Write only:
+This design packet is docs-only. Candidate implementation may write only:
+
+- `app/slug_loading_v2/src/host_glob/mod.rs` for a zero-net helper rename;
+- `app/slug_loading_v2/src/host_glob/traversal.rs`; and
+- `app/slug_loading_v2/src/host_glob/traversal_tests.rs`.
+
+Against `dc6f6e02`, implementation caps are zero net/1,000 physical for
+`mod.rs`, 350 production/880 physical for traversal, 470 tests/1,293 physical
+for traversal tests, and 820 aggregate net Rust lines. No correction is
+authorized. Design-time writes remain only:
 
 - `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
 - this manifest; and
@@ -75,12 +110,11 @@ public/core/repository/materializer work; direct, reconstructed or historical
 Host reads; parent events; another carrier/container/cache/graph/store/lock;
 retained work collections; behavior widening; or ledger excess.
 
-`REPLAN` if one complete traversal carrier cannot be frozen from the accepted
-natural-owner siblings, exact dependency order cannot be stated, family
-isolation requires duplicated drivers, or proof needs another code owner,
-test seam or oracle.
+`REPLAN` if a shared driver changes legacy behavior, a decisive child epoch
+cannot remain complete, prefix terminals cannot be proved, family isolation
+requires duplication, or proof needs another file/key/seam/oracle.
 
 ## Immediate successor
 
-On acceptance schedule exactly one bounded callerless Host-glob frontier
-implementation, or exactly one smaller docs-only natural-owner prerequisite.
+On acceptance schedule only
+`WP-2A-m1-host-glob-frontier-implementation` from the design commit.

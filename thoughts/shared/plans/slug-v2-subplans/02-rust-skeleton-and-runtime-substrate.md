@@ -2503,3 +2503,55 @@ materializer work, reconstructed Host reads, event ownership, another retained
 container/cache/graph/store/lock or behavior widening. Acceptance schedules
 exactly one bounded callerless Host-glob implementation, or one uniquely
 smaller docs-only prerequisite if the audit proves it remains necessary.
+
+### Frozen Host-glob traversal frontier design (2026-08-17)
+
+The resumed audit finds no lower-owner gap. The observed segment child supplies
+literal and wildcard listing/base/matched-symlink epochs; the observed boundary
+child supplies ignore/package-lookup epochs. `HostGlobTraversalKey` is the
+first owner that also has breadth-first state, recursive progress, stops,
+grouped Need, ranked errors and final sorted paths. The adapter only projects.
+
+Freeze private `HostGlobTraversalObservationKey` with the legacy structural
+identity and distinct Display. Its `ObservedHostGlobTraversal` retains one
+semantic Result Arc plus one `PathObservationEpoch`; its outer Value uses
+`ObservedPathFrontierError` and complete-only equality/validity. One
+Legacy/Observed driver selects only matching segment/boundary families.
+Adapter and callers remain legacy.
+
+Observed order is each state's segment epoch, then reached directory-boundary
+epochs in candidate-slot order, then later breadth-first ordinals. One
+compute-local accumulated epoch is updated with the parent-module stable
+`PathObservationEpoch::from_shared` helper before inspecting each child's
+semantic Result, so a conflict is ranked at that child and first Arcs persist.
+
+An outer child or union error before, or at the union of, the first semantic
+terminal wins over prior Need and publishes no carrier. Otherwise the first
+semantic retains only completed epochs through its rank and later outcomes are
+dependency-owned. Without a semantic, first outer wins over Need; otherwise
+Need publishes no carrier and success retains every completed epoch.
+Cancellation publishes nothing.
+
+Queues, visited sets, states, paths, ordinals, needs, errors, child values and
+union scratch stay compute-local. There is no event owner, overlay, direct or
+historical Host read, task, lock, cache, interner, graph, store or retained work
+collection. Keep the owner cohesive with bounded child/finalization helpers and
+no production test seam.
+
+Candidate scope is `host_glob/{mod.rs,traversal.rs,traversal_tests.rs}`;
+`mod.rs` permits only a zero-net helper rename. Against `dc6f6e02`, caps are
+zero net/1,000 physical for `mod.rs`, 350 production/880 physical for
+traversal, 470 tests/1,293 physical for traversal tests, and 820 aggregate net
+Rust lines. No correction is authorized.
+
+Require parity, child terminal polarity, exact Arc/order/prefix proof,
+boundary-stop observations, mixed Need/semantic/outer cases,
+equality/validity, warm/A-B-A, cancellation, zero events, family isolation,
+full loading/core validation, inherited baseline dispositions, exact cap and
+artifact scans, and independent ownership/retention/cleanup acceptance.
+
+Existing traversal behavior remains exact. Carrier association,
+decisive-prefix aggregation and outer precedence are Slug-native. Adapter,
+BUILD/package-load, core/public, repository/materializer and native-Windows
+work remain deferred. Acceptance schedules only the bounded traversal
+implementation.
