@@ -3265,3 +3265,35 @@ and mixed-error algebra, warm/edit/restore behavior, exact legacy parity and
 neutral/exported/filegroup/PackageAll/multi/external/cquery isolation. Require
 focused/full analysis plus affected core/loading validation, formatting,
 diff/archive checks, retention and AI-cleanup scans, and independent review.
+
+### Active observed configured-analysis seam implementation (2026-08-18)
+
+Run `WP-2A-m1-root-single-observed-analysis-seam-implementation` from Rust
+base `31a8b1d3` and frozen design `e2cc4119`. Write only
+`slug_analysis_v2/src/{dice,lib}.rs` and
+`slug_analysis_v2/tests/root_analysis.rs`.
+
+Add the doc-hidden structural observed key/preparation alias and one private
+legacy/observed driver. Select only matching package, anchor, configured-
+analysis and resolved-path families through requested/default settings,
+recursive configured/null/delegating nodes, platforms and the complete
+toolchain closure. Observed child epochs remain dependency-owned; the observed
+analysis value retains only the existing shared semantic Result Arc.
+
+Preserve the frozen Need/semantic/outer/cancellation algebra, legacy success-
+only equality/validity, one package and one analysis event authority, exact
+public behavior and compute-local scratch. The prerequisite remains callerless:
+do not edit core or activate the rejected neutral root in this packet.
+
+Caps from exact 2,208/53/452 baselines are 620 DICE production, 50 DICE test, 8
+lib production, 560 integration test and 1,238 aggregate semantic net lines;
+physical caps are 2,880/65/1,015 and 3,960 combined. Require focused terminal,
+activation, event, recursion, configuration and lifecycle proof; full analysis
+plus affected loading/core validation; formatting/diff/archive checks;
+retention and AI cleanup; and independent review. STOP on any other file,
+family escape, duplicate driver/event owner, retained carrier/state, public
+drift or cap excess.
+
+After acceptance, return to docs-only scheduling for the neutral singleton-
+root-`Single` implementation retry using `3e90fc88` plus the accepted
+prerequisite. Do not combine the Rust packets or close M1.
