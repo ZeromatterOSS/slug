@@ -3650,3 +3650,59 @@ Write only canonical/current/Stage 2/routing docs under 40/180/180/30 and 390
 aggregate net-line caps. STOP on Rust, Cargo, BUILD, fixture, oracle or
 generated writes; implementation or compatibility claims; invented evidence;
 multiple successors; cap excess; or milestone closure.
+
+### Post-cquery owner audit selects route prerequisite (2026-08-18)
+
+The audit selects existing `RootQueryCommandKey` as the next complete public
+publication owner, but independent review found one uniquely smaller
+prerequisite. The root query begins at legacy
+`RootModuleLoadingAnchorKey`; its root graph, provenance, recursive subtree
+and BUILD-companion paths use legacy root package, package-boundary, directory
+listing and resolved-path keys. Accepted observed siblings exist for all of
+those edges.
+
+External labels expose the remaining gap. Direct external singles and
+transitively reached external owners compute `RootRepositoryRouteKey`, whose
+driver computes legacy `HostRootModuleFileKey`. A future observed query
+anchor would compute `HostRootModuleFileObservationKey`; therefore any such
+query would activate both root-module families and risk duplicate MODULE event
+authority. Query syntax cannot prove evaluation remains root-only.
+
+The uniquely smaller prerequisite is an observed root-repository-route sibling
+inside `slug_bzlmod_v2::host_module`. It has the route identity and already
+owns the legacy module-to-route projection, while the accepted observed module
+child supplies the exact semantic root carrier and path epoch. No query graph,
+native command, publication, source certificate or revision change belongs in
+the prerequisite.
+
+Multi-target build is not smaller: its public source-certificate and native
+finalization hooks are singleton-only, so multiple exported sources require an
+aggregate certificate/revision design. One-shot `evaluate_workspace_targets`
+injects snapshots and directly computes legacy loading/analysis outside native
+demand publication. Both remain deferred after loading query.
+
+### Active observed root-repository-route design (2026-08-18)
+
+Run docs-only `WP-2A-m1-root-repository-route-observation-design` from
+scheduling base `b7d3405c` and Rust base `03f2db3e`. Freeze one private
+observed sibling and one shared legacy/observed route-projection driver.
+Observed mode computes only `HostRootModuleFileObservationKey` and retains
+one semantic route Result Arc plus its Arc-backed path epoch; legacy mode
+computes only `HostRootModuleFileKey` and preserves its exact value/API.
+
+Freeze Need, typed outer and semantic route-error polarity, complete-only
+validity/equality, builtin/local/unknown/root-error parity, exact demand/Arc
+membership, first-Arc behavior, family nonactivation, anchor-plus-route child
+reuse, single child event authority, warm/edit/delete/recreate/A-B-A,
+cancellation/recovery and compact lifetimes. Public query remains legacy in
+this packet. Exact behavior stays exact; the sibling/carrier/outer association
+is Slug-native; query publication and broader owners remain deferred.
+
+Future Rust is exactly `slug_bzlmod_v2/src/{host_module,lib}.rs`. Caps against
+`03f2db3e` are host-module 140 production/240 test/380 aggregate semantic and
+4,578 physical, lib 8 production and 405 physical, 388 aggregate semantic.
+Design docs write only canonical/current/Stage 2/routing under
+40/180/180/30 and 390 aggregate caps. STOP on Rust, query changes/public
+activation, another owner/file, family/event drift, retained state, direct Host
+read, cap excess or M1 close. Acceptance schedules one implementation, whose
+acceptance returns directly to loading-query publication design.

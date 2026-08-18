@@ -1,11 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-post-cquery-publication-owner-audit`
+Packet: `WP-2A-m1-root-repository-route-observation-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling and Rust base: `03f2db3e`
-Result: rank the first complete remaining public semantic/publication owner
-after accepted observed cquery publication.
+Scheduling base: `b7d3405c`
+Rust base: `03f2db3e`
+Result: freeze the uniquely smaller observed root-repository-route producer
+required before public loading-query publication can remain family-isolated.
 
 ## Authority and caps
 
@@ -15,51 +16,63 @@ and 390 aggregate lines.
 
 ## Required implementation
 
-Read the live public entry points and DICE owners for the remaining legacy
-semantic/publication paths. At minimum inspect multi-target and recursive build
-aggregation, the loading-query graph root, and the one-shot
-`evaluate_workspace_targets` adapter. Include query/aquery/build constructors
-only where they still own a legacy loading or analysis edge. Trace constructor
-admission, child-family activation, ordered Need/typed-outer/semantic handling,
-event buffering, selected-epoch ownership, source certificates, request
-revision and consuming publication.
+Freeze one private `RootRepositoryRouteObservationKey` structurally distinct
+from `RootRepositoryRouteKey`. Both keys must use one route-projection driver;
+legacy computes only `HostRootModuleFileKey`, observed computes only
+`HostRootModuleFileObservationKey`. The observed terminal retains exactly one
+semantic `Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>` and one
+Arc-backed `PathObservationEpoch`.
 
-Choose exactly one outcome: one docs-only natural-owner design, one uniquely
-smaller prerequisite design, or formal `REPLAN`. The choice must identify the
-first complete owner, explain why smaller alternatives are incomplete, and
-freeze a future Rust allowlist, production/test/aggregate and physical caps,
-error/event/cancellation ordering, exact shared-Arc and retained-memory proof,
-compatibility classes, validation, STOP/REPLAN conditions and one immediate
-successor. Do not infer that all remaining roots share one migration boundary.
+Preserve Need immediately. Preserve a completed observed path-frontier failure
+as typed outer, and preserve unknown repository, root-module semantic failure,
+builtin `bazel_tools` and direct-local route results as semantic Complete
+values. Complete-only equality and validity must match the accepted observed
+key pattern. The observed Host root-module child remains the sole event owner;
+the route key publishes no local event.
+
+Freeze the implementation allowlist to
+`app/slug_bzlmod_v2/src/host_module.rs` and
+`app/slug_bzlmod_v2/src/lib.rs`. Against `03f2db3e`, cap host-module growth
+at 140 production, 240 test and 380 aggregate semantic lines with 4,578
+physical lines; cap lib growth at 8 production lines and 405 physical lines;
+cap aggregate semantic growth at 388. Keep the cohesive host-module owner
+unless exact sizing proves a split mandatory, in which case `REPLAN`.
 
 ## Compatibility and proof
 
-Accepted public behavior remains exact. Existing observation-family
-association, retry/carrier mechanics and collision-safe identity projections
-remain Slug-native. Broader public-root activation and exact Bazel identity
-bytes remain unsupported/deferred unless an already accepted slice says
-otherwise. This audit changes none of those classifications.
+Route values, errors, canonical repository names, builtin identity and local
+override semantics remain exact. The observed sibling, typed outer and
+carrier association are Slug-native. Broader query publication, multi-build
+certificate aggregation, one-shot migration and exact identity bytes remain
+deferred.
 
-Evidence must come from live Rust ownership and accepted packet history. Record
-dependency-owned versus command-retained state, every local event authority,
-whether exact Result Arcs can reach native selection, and why the selected
-owner neither duplicates another family nor silently loses invalidation.
+Require parity and exact carrier Arc proof for builtin, local override, unknown
+repo and root-module error; observed/legacy family nonactivation; one shared
+observed module child and one cold MODULE event when anchor plus route are
+requested together; warm suppression; Need, mismatch/conflict outer,
+cancellation/recovery, edit/delete/recreate and A/B/A; exact demand membership
+and first-Arc union; complete-only equality/validity; retained-state accounting;
+focused/full bzlmod and loading/core checks; formatting/diff/archive gates;
+Buck2 retention and AI cleanup scans; and independent review.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; an
-implementation claim; public behavior or compatibility changes; invented
-source evidence; more than one successor; cap excess; or M1 closure.
-`REPLAN` when no bounded single natural owner exists, required state crosses
-independent event/publication owners, or an exact accepted surface would need
-silent broadening.
+STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; public
+activation; query-crate changes; another route/store/cache/event owner; legacy
+and observed module-family cross-activation; semantic/error/event drift; a
+retained collection/lock/task/direct Host read; cap increase; implementation
+claim; or M1 closure. `REPLAN` if the two keys cannot share one projection,
+the carrier cannot preserve exact child Result Arcs, another Rust file is
+required, or the cohesive physical cap cannot hold.
 
 ## Immediate predecessor
 
-`03f2db3e` accepts observed cquery publication from Rust base `941db0d0`,
-semantic design `895996d5` and test-isolation correction `7b7826e6`.
-Ordered roots and joined deps fully inspect their batches with typed outer over
-Need-union failure over compatible Need over semantic precedence. Exact
-selected Result Arcs, child-only cold events, warm suppression,
-cancellation/recovery and zero legacy-family activation are discriminatingly
-covered. M1 remains partial.
+The audit at `b7d3405c` found `RootQueryCommandKey` to be the next complete
+public owner only after one prerequisite. Direct or transitive external labels
+compute `RootRepositoryRouteKey`, which activates legacy
+`HostRootModuleFileKey` beside the query root's future observed anchor and
+would violate family/event isolation. Constructor syntax cannot exclude that
+path. The route producer is the uniquely smaller prerequisite; accepted
+observed anchor/package/path children already cover every other query edge.
+Multi-build still needs aggregate source-certificate/revision design, and the
+one-shot evaluator remains outside native publication.
