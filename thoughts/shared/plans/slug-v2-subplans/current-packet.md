@@ -1,38 +1,39 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-cquery-parallel-workspace-isolation-correction-design`
+Packet: `WP-2A-m1-cquery-observed-publication-implementation-retry`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
 Rust base: `941db0d0`
-Frozen design: `895996d5`
-Scheduling base: `7280b9c2`
-Result: authorize exactly one stable-parent test-harness exception before
-resuming the retained observed cquery implementation candidate.
+Frozen semantic design: `895996d5`
+Frozen correction: `7b7826e6`
+Result: finish the retained in-owner observed cquery cutover with one authorized
+parallel-workspace test-isolation replacement.
 
 ## Authority and caps
 
 Write only:
 
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`; and
-- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
+- `app/slug_core_v2/src/runtime/dice.rs`; and
+- `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs` (new).
 
-Documentation caps against `7280b9c2` are 40 canonical, 140 manifest, 100
-Stage 2, 30 routing and 310 aggregate net lines. The unaccepted Rust candidate
-remains in place but is not writable under this packet.
+Against `941db0d0`, exclude only the original byte-identical 833-line test
+relocation from semantic growth. The authorized four-line replacement counts
+as +3 test semantic lines. Caps remain 160 production, 300 test and 460
+aggregate semantic lines; physical caps remain 12,435 DICE, 1,200 child-test
+and 13,635 combined.
 
-## Frozen correction
+## Required implementation
 
-Record the implementation `REPLAN`: the frozen relocated range remains
-byte-identical, the default-parallel 16-test cquery batch fails only in
-`cquery_restores_structural_configuration_and_display_projection`, and that
-test passes in isolation. Concurrent `tempfile::tempdir()` siblings mutate the
-shared observed `/tmp` ancestor after runtime construction, producing a real
-Host observation replay rather than a production terminal/event defect.
+Retain the existing candidate and the complete `895996d5` contract: the sole
+`CqueryCommandRoot` uses only accepted observed preparation, configured-analysis
+and rdeps seed-package families; ordered roots and joined deps inspect full
+batches with first typed outer > combined Need > first semantic > ordered
+success; child keys remain sole event owners; cancellation/outer publish no
+attempt; and no root, carrier, revision or retained state is added.
 
-Freeze exactly one exception in that relocated test. Replace only its first
-workspace-construction line with:
+In only
+`cquery_restores_structural_configuration_and_display_projection`, replace the
+original `tempfile::tempdir()` line with exactly:
 
 ```rust
 let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -41,43 +42,46 @@ fs::create_dir_all(&stable_parent).unwrap();
 let workspace = tempfile::tempdir_in(stable_parent).unwrap();
 ```
 
-This test-exclusive parent exists before runtime construction and no other
-cquery test writes beneath it. Preserve every assertion and every other
-relocated body byte-identically. Existing parent-module `Path` and `fs`
-imports remain sufficient through `use super::*;`; add no import or fixture.
+This occurs before runtime construction. Preserve every assertion, every other
+relocated body, parent fixtures/visibility and the nested include. Existing
+`Path`/`fs` imports flow through `use super::*;`; add no import or fixture.
+The cfg(test) activation audit is test growth and the existing nonrelocated
+root-count test body remains unchanged.
 
-Count the replacement as +3 test semantic lines. The retained candidate is
-currently 11,513 physical DICE lines and 835 physical child-test lines; the
-replacement yields 838 child-test and 12,351 combined lines. Preserve the
-existing 160 production, 300 test, 460 aggregate semantic caps and
-12,435/1,200/13,635 physical caps against `941db0d0`; no increase is
-authorized. The existing cfg(test) activation audit may remain only if its
-new lines are charged to tests and the nonrelocated root-count test body stays
-unchanged.
+## Compatibility and proof
 
-The immediate successor resumes the same two-file implementation candidate and
-the complete production/terminal/event/retention contract in `895996d5`.
-Require the isolated lifecycle test and the 16-test default-parallel cquery
-batch, followed by the frozen focused and broader validation.
+Public cquery results, bytes, errors, exit classes and events remain exact.
+Observed-family association, typed outer failure, selected-epoch ownership and
+the stable test parent are Slug-native. All unsupported/deferred boundaries in
+`895996d5` remain.
 
-## Compatibility
+Require zero legacy package/configured-analysis activation for direct,
+multi-root, deps and rdeps paths; exact output/error/events; cold child order
+and warm suppression; mixed outer/Need/semantic ordering; semantic sidecars;
+cancellation/recovery; configuration edit/restore; recursive/null/delegating/
+platform/toolchain closure; exact selected Arc retry survival; no carrier or
+revision; and build/query/aquery/one-shot nonactivation.
 
-Production cquery output/error/event behavior remains exact. The stable
-test-workspace parent and observed-family/typed-outer/selected-epoch mechanics
-are Slug-native. All unsupported/deferred boundaries from `895996d5` remain.
+First run the corrected lifecycle test alone, then the full 16-test cquery
+batch at default parallelism. Run the remaining focused cquery/native-demand
+tests, complete core/analysis/loading suites, formatting, direct check,
+diff/archive gates, exact accounting, Buck2 retention and AI cleanup scans,
+and independent implementation review.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo/BUILD, fixtures/oracles/generated files, any broader test
-body exception, changed production design, assertion weakening, another file,
-cap increase/excess or premature M1 close. `REPLAN` if the stable-parent fix
-does not pass both isolated and default-parallel validation or if another
-relocated body must change. Acceptance schedules only the same implementation
-retry.
+STOP on any other file; any other relocated-body change; assertion weakening;
+public API/syntax/output/error/event drift; legacy or second package/analysis
+family; duplicate root/driver/event owner; carrier/revision invention; retained
+store/collection/cache/interner/lock/task; direct Host read; Cargo/BUILD/
+fixture/oracle/generated write; or cap excess. `REPLAN` if the corrected test
+fails alone or under default parallelism, another body/file is required, or
+the complete terminal algebra cannot remain bounded. Acceptance returns to one
+docs-only next-owner audit and does not close M1.
 
 ## Immediate predecessor
 
-`7280b9c2` scheduled the complete two-file design frozen in `895996d5`.
-Implementation exposed only the parallel `/tmp` ancestor harness artifact;
-independent review required this formal correction before changing the frozen
-relocated lifecycle body.
+`7b7826e6` freezes the sole test-harness correction after the original
+implementation packet formally replanned in `3a51f1f9`. Production authority
+remains the observed cquery design `895996d5` over accepted Rust base
+`941db0d0`.

@@ -3566,3 +3566,26 @@ with four lines, charging +3 semantic test lines. The measured retained
 candidate is 11,513 physical DICE lines plus 835 child-test lines; after the
 replacement it is 838 child-test and 12,351 combined, within the unchanged
 12,435/1,200/13,635 caps. No import, fixture or other body exception is needed.
+
+### Active observed cquery publication implementation retry (2026-08-18)
+
+Run `WP-2A-m1-cquery-observed-publication-implementation-retry` from Rust base
+`941db0d0`, semantic design `895996d5` and correction design `7b7826e6`.
+Write only core `runtime/dice.rs` and new
+`runtime/tests/cquery_command_tests.rs`; retain the unaccepted candidate.
+
+Preserve the sole `CqueryCommandRoot`, observed-only direct/deps/rdeps edges,
+full-batch first-outer > combined-Need > first-semantic > success algebra,
+child-only events, cancellation/no-publication, selected-Arc ownership and zero
+carrier/revision/new retained state. Apply only the frozen four-line stable
+parent replacement in the named lifecycle test; preserve every assertion and
+all other relocated bodies byte-for-byte. Charge +3 test semantic lines.
+
+Caps remain 160/300/460 semantic and 12,435/1,200/13,635 physical lines.
+Run the lifecycle test alone, the 16-test cquery batch at default parallelism,
+the complete frozen proof and broader core/analysis/loading validation, then
+format/check/diff/archive, exact accounting, retention/cleanup and independent
+review. STOP on any other file/body, assertion or production drift, family/
+event/carrier/retention expansion, Cargo/oracle work or cap excess. `REPLAN` on
+another parallel failure or required exception. Acceptance returns to one
+docs-only next-owner audit; do not close M1.
