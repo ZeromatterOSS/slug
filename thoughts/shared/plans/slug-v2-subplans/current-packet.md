@@ -1,87 +1,65 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-cquery-observed-publication-implementation-retry`
+Packet: `WP-2A-m1-post-cquery-publication-owner-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Rust base: `941db0d0`
-Frozen semantic design: `895996d5`
-Frozen correction: `7b7826e6`
-Result: finish the retained in-owner observed cquery cutover with one authorized
-parallel-workspace test-isolation replacement.
+Scheduling and Rust base: `03f2db3e`
+Result: rank the first complete remaining public semantic/publication owner
+after accepted observed cquery publication.
 
 ## Authority and caps
 
-Write only:
-
-- `app/slug_core_v2/src/runtime/dice.rs`; and
-- `app/slug_core_v2/src/runtime/tests/cquery_command_tests.rs` (new).
-
-Against `941db0d0`, exclude only the original byte-identical 833-line test
-relocation from semantic growth. The authorized four-line replacement counts
-as +3 test semantic lines. Caps remain 160 production, 300 test and 460
-aggregate semantic lines; physical caps remain 12,435 DICE, 1,200 child-test
-and 13,635 combined.
+Write only the canonical plan, this manifest, Stage 2 and the orchestration
+routing log. Net caps are 40 canonical, 180 Stage 2, 180 manifest, 30 routing
+and 390 aggregate lines.
 
 ## Required implementation
 
-Retain the existing candidate and the complete `895996d5` contract: the sole
-`CqueryCommandRoot` uses only accepted observed preparation, configured-analysis
-and rdeps seed-package families; ordered roots and joined deps inspect full
-batches with first typed outer > combined Need > first semantic > ordered
-success; child keys remain sole event owners; cancellation/outer publish no
-attempt; and no root, carrier, revision or retained state is added.
+Read the live public entry points and DICE owners for the remaining legacy
+semantic/publication paths. At minimum inspect multi-target and recursive build
+aggregation, the loading-query graph root, and the one-shot
+`evaluate_workspace_targets` adapter. Include query/aquery/build constructors
+only where they still own a legacy loading or analysis edge. Trace constructor
+admission, child-family activation, ordered Need/typed-outer/semantic handling,
+event buffering, selected-epoch ownership, source certificates, request
+revision and consuming publication.
 
-In only
-`cquery_restores_structural_configuration_and_display_projection`, replace the
-original `tempfile::tempdir()` line with exactly:
-
-```rust
-let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
-    .join("../../target/slug-cquery-restores-structural-configuration");
-fs::create_dir_all(&stable_parent).unwrap();
-let workspace = tempfile::tempdir_in(stable_parent).unwrap();
-```
-
-This occurs before runtime construction. Preserve every assertion, every other
-relocated body, parent fixtures/visibility and the nested include. Existing
-`Path`/`fs` imports flow through `use super::*;`; add no import or fixture.
-The cfg(test) activation audit is test growth and the existing nonrelocated
-root-count test body remains unchanged.
+Choose exactly one outcome: one docs-only natural-owner design, one uniquely
+smaller prerequisite design, or formal `REPLAN`. The choice must identify the
+first complete owner, explain why smaller alternatives are incomplete, and
+freeze a future Rust allowlist, production/test/aggregate and physical caps,
+error/event/cancellation ordering, exact shared-Arc and retained-memory proof,
+compatibility classes, validation, STOP/REPLAN conditions and one immediate
+successor. Do not infer that all remaining roots share one migration boundary.
 
 ## Compatibility and proof
 
-Public cquery results, bytes, errors, exit classes and events remain exact.
-Observed-family association, typed outer failure, selected-epoch ownership and
-the stable test parent are Slug-native. All unsupported/deferred boundaries in
-`895996d5` remain.
+Accepted public behavior remains exact. Existing observation-family
+association, retry/carrier mechanics and collision-safe identity projections
+remain Slug-native. Broader public-root activation and exact Bazel identity
+bytes remain unsupported/deferred unless an already accepted slice says
+otherwise. This audit changes none of those classifications.
 
-Require zero legacy package/configured-analysis activation for direct,
-multi-root, deps and rdeps paths; exact output/error/events; cold child order
-and warm suppression; mixed outer/Need/semantic ordering; semantic sidecars;
-cancellation/recovery; configuration edit/restore; recursive/null/delegating/
-platform/toolchain closure; exact selected Arc retry survival; no carrier or
-revision; and build/query/aquery/one-shot nonactivation.
-
-First run the corrected lifecycle test alone, then the full 16-test cquery
-batch at default parallelism. Run the remaining focused cquery/native-demand
-tests, complete core/analysis/loading suites, formatting, direct check,
-diff/archive gates, exact accounting, Buck2 retention and AI cleanup scans,
-and independent implementation review.
+Evidence must come from live Rust ownership and accepted packet history. Record
+dependency-owned versus command-retained state, every local event authority,
+whether exact Result Arcs can reach native selection, and why the selected
+owner neither duplicates another family nor silently loses invalidation.
 
 ## STOP / REPLAN
 
-STOP on any other file; any other relocated-body change; assertion weakening;
-public API/syntax/output/error/event drift; legacy or second package/analysis
-family; duplicate root/driver/event owner; carrier/revision invention; retained
-store/collection/cache/interner/lock/task; direct Host read; Cargo/BUILD/
-fixture/oracle/generated write; or cap excess. `REPLAN` if the corrected test
-fails alone or under default parallelism, another body/file is required, or
-the complete terminal algebra cannot remain bounded. Acceptance returns to one
-docs-only next-owner audit and does not close M1.
+STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; an
+implementation claim; public behavior or compatibility changes; invented
+source evidence; more than one successor; cap excess; or M1 closure.
+`REPLAN` when no bounded single natural owner exists, required state crosses
+independent event/publication owners, or an exact accepted surface would need
+silent broadening.
 
 ## Immediate predecessor
 
-`7b7826e6` freezes the sole test-harness correction after the original
-implementation packet formally replanned in `3a51f1f9`. Production authority
-remains the observed cquery design `895996d5` over accepted Rust base
-`941db0d0`.
+`03f2db3e` accepts observed cquery publication from Rust base `941db0d0`,
+semantic design `895996d5` and test-isolation correction `7b7826e6`.
+Ordered roots and joined deps fully inspect their batches with typed outer over
+Need-union failure over compatible Need over semantic precedence. Exact
+selected Result Arcs, child-only cold events, warm suppression,
+cancellation/recovery and zero legacy-family activation are discriminatingly
+covered. M1 remains partial.

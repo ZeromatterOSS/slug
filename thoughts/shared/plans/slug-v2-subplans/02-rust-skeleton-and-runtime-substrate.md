@@ -3589,3 +3589,64 @@ review. STOP on any other file/body, assertion or production drift, family/
 event/carrier/retention expansion, Cargo/oracle work or cap excess. `REPLAN` on
 another parallel failure or required exception. Acceptance returns to one
 docs-only next-owner audit; do not close M1.
+
+### Observed cquery publication accepted (2026-08-18)
+
+`03f2db3e` accepts
+`WP-2A-m1-cquery-observed-publication-implementation-retry` from Rust base
+`941db0d0`, semantic design `895996d5` and workspace-isolation correction
+`7b7826e6`. The sole existing `CqueryCommandRoot` now uses only observed
+preparation, configured-analysis and rdeps seed-package families for its
+direct-root, joined-deps and rdeps edges. No sibling root, terminal carrier,
+request revision, event owner or retained store was added.
+
+The final reducer scans every ordered batch before deciding first typed outer
+over first incompatible-Need union failure over combined compatible Need over
+first semantic result. Direct roots and joined deps preserve their existing
+orders. Observed package and analysis children remain the only local event
+owners; typed outer and cancellation publish no attempt. Cold/warm selected
+epochs are nonempty, value-equal and exact-Arc identical, while zero legacy
+package or configured-analysis activation is asserted.
+
+The exact 833-line cquery-test tail moved to
+`runtime/tests/cquery_command_tests.rs`; only the frozen one-to-four-line
+stable-parent replacement differs from the Rust base. Focused proof covers
+mixed semantic/compatible and incompatible Need/multiple typed outer order,
+direct/deps/rdeps family isolation, exact public output/events, cold child
+order, warm suppression, configuration restore, real pending cancellation and
+recovery, recursive/null/delegating/platform/toolchain closure and
+nonactivation. The default-parallel cquery filter passes 19/19.
+
+Broader validation passes analysis 48/48 and loading 194/194. Core library is
+234/235 only on the inherited direct-external-query wrong-kind visibility
+baseline; core integration is 12/13 only on the inherited custom-rule
+PathObservationEpoch injection baseline. Direct check, formatting and
+diff-check pass. Archive checking reports only the established missing V1 refs
+and retained non-V2-doc baseline failures. Independent implementation review,
+Buck2 retention scan and AI cleanup accept the two-file result.
+
+Semantic accounting against `941db0d0` is +58 production, +282 test and +340
+aggregate within 160/300/460. Physical sizes are 11,548 DICE, 1,073 child-test
+and 12,621 combined within 12,435/1,200/13,635. M1 remains partial.
+
+### Active post-cquery publication-owner audit (2026-08-18)
+
+Run docs-only `WP-2A-m1-post-cquery-publication-owner-audit` from accepted
+base `03f2db3e`. Inspect live multi-target/recursive build aggregation,
+loading-query graph and one-shot `evaluate_workspace_targets` publication
+boundaries, plus any remaining public query/aquery/build constructor that
+directly owns a legacy loading or analysis edge.
+
+Trace constructor admission, child-family activation, complete terminal
+ordering, event ownership, selected epochs, source certificates, request
+revision, public projection and retained lifetimes. Select exactly one
+docs-only natural-owner design, one uniquely smaller prerequisite, or formal
+`REPLAN`; do not assume these roots share a boundary and do not close M1.
+The selected route must freeze future Rust files and semantic/physical caps,
+exact/Slug-native/deferred classes, discriminating error/event/cancellation/
+Arc/lifecycle proof, memory limits, STOP/REPLAN and one successor.
+
+Write only canonical/current/Stage 2/routing docs under 40/180/180/30 and 390
+aggregate net-line caps. STOP on Rust, Cargo, BUILD, fixture, oracle or
+generated writes; implementation or compatibility claims; invented evidence;
+multiple successors; cap excess; or milestone closure.
