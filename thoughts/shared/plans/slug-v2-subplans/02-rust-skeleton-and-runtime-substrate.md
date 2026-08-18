@@ -3409,3 +3409,55 @@ STOP/REPLAN and one successor. Write only canonical/current/Stage 2/routing
 under 40/160/180/30 and 410 aggregate documentation caps. STOP on Rust,
 Cargo/BUILD, fixtures/oracles, public drift, duplicate owners, retained state,
 direct Host reads, premature M1 close or cap excess.
+
+### Post-neutral audit selects observed cquery publication (2026-08-18)
+
+The audit selects the existing private `CqueryCommandRoot` as the uniquely
+smallest complete next owner. Its public constructor admits only root concrete
+labels, then the root itself owns ordered preparation, configured analysis,
+deps closure, rdeps seed-package validation, query evaluation, native-demand
+retry and consuming publication. Every semantic legacy edge has an accepted
+matching observed package or configured-analysis key from `69d37ddb`.
+
+An observed cquery cutover therefore needs no new command root, DICE wrapper,
+carrier, source certificate, request-revision path, side store or query-crate
+change. Child observation epochs remain dependency-owned and the native
+selected snapshot retains their exact Result Arcs. Observed package and
+analysis keys remain the sole local event owners; cquery retains only its
+existing semantic Result Arc and semantic evaluation collections.
+
+The other candidates are independently larger. Multi-target build can contain
+multiple exported sources but the current publication contract exposes one
+optional source certificate and initializes revision only for singleton root
+Single, so it first needs an aggregate certificate/revision design. Loading
+query owns package traversal in `slug_query_v2` graph/environment modules.
+The one-shot `evaluate_workspace_targets` adapter reconstructs legacy loading
+and analysis outside native-demand publication and remains a separate migration
+boundary. None is a prerequisite for observed cquery.
+
+### Active observed cquery publication design (2026-08-18)
+
+Run docs-only `WP-2A-m1-cquery-observed-publication-design` from scheduling
+base `0e919d2b` and Rust base `941db0d0`. Freeze the in-owner switch to
+`prepare_configured_node_analysis_observed`,
+`ConfiguredNodeAnalysisObservationKey` and
+`RootPackageLoadObservationKey` for direct roots, deps recursion and rdeps
+seed validation. Preserve exact public output/error/event behavior, root
+ordering, query evaluation and generic native acceptance.
+
+Freeze typed outer > Need > semantic precedence across ordered roots and joined
+deps batches, deterministic first sibling error, cancellation/no-publication,
+child-only event ownership, warm suppression, selected-Arc retry survival and
+no terminal carrier/revision. Existing semantic Vec/SmallMap state remains
+unchanged; add no retained collection/cache/interner/lock/task/Host read.
+
+Future Rust is limited to core `runtime/dice.rs` and new
+`runtime/tests/cquery_command_tests.rs`. Caps against `941db0d0` are 160
+production, 300 test, 460 aggregate semantic lines and 12,435/1,200/13,635
+physical lines. Freeze any exact test relocation and the full activation,
+terminal, event, lifecycle, configuration, recursive-closure, public parity
+and nonactivation proof. Design docs write only canonical/current/Stage 2/
+routing under 40/180/180/30 and 430 aggregate caps. STOP on Rust, public drift,
+another file/owner/family/event source, carrier/revision invention, retained
+state, query-crate work or cap excess. Acceptance schedules one implementation;
+do not close M1.
