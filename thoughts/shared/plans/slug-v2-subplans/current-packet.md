@@ -1,88 +1,120 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-repository-route-observation-implementation`
+Packet: `WP-2A-m1-loading-query-observed-publication-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Rust base: `03f2db3e`
-Frozen design: `1ce16378`
-Result: implement the observed root-repository-route prerequisite without
-activating public loading query.
+Scheduling base: `e4555dca`
+Result: freeze the smallest complete observed-publication boundary for the
+existing public loading-query command; do not implement it.
 
 ## Authority and caps
 
 Write only:
 
-- `app/slug_bzlmod_v2/src/host_module.rs`; and
-- `app/slug_bzlmod_v2/src/lib.rs`.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest;
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`; and
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-Against `03f2db3e`, cap host-module growth at 140 production, 240 test and
-380 aggregate semantic lines with 4,578 physical lines; cap lib growth at 8
-production lines and 405 physical lines; cap aggregate semantic growth at 388.
+Cap net growth at 40 canonical, 220 manifest, 180 Stage 2, 30 routing and 470
+aggregate lines against `e4555dca`.
 
-## Required implementation
+## Natural-owner audit
 
-Add one doc-hidden `RootRepositoryRouteObservationKey` newtype around
-`RootRepositoryRouteKey`, plus a doc-hidden `ObservedRootRepositoryRoute`.
-Export both only for the later cross-crate query consumer. Both route keys call
-one pure projection from the existing root-module semantic carrier; legacy
-computes only `HostRootModuleFileKey`, observed computes only
-`HostRootModuleFileObservationKey`.
+Start from live `RootQueryCommandKey`, its sole `NativeCommandRoot`
+implementation and public constructor. Trace every root-mode edge in
+`slug_query_v2::{evaluator,loading_environment,graph}` before freezing the
+design. The existing command key owns parsing, root anchor, dynamic query
+evaluation, graph/output completion and one semantic Result Arc; generic
+`drive_command` owns retry, selected-snapshot validation and publication.
 
-The observed value owns exactly the projected
-`Arc<Result<RootRepositoryRoute, RootRepositoryRouteError>>` and the child
-`PathObservationEpoch`. It forwards that epoch unchanged, including every
-exact child Result Arc; no epoch union or rebuilt Result Arc is permitted.
-Root-module semantic carrier state remains dependency-owned after projection.
+Inventory at least:
 
-The value algebra is
-`SourcePreparationOutcome<Result<ObservedRootRepositoryRoute,
-ObservedPathFrontierError>>`. Preserve Need immediately; preserve a completed
-observed path-frontier failure as typed outer; keep root-module semantic error,
-unknown repository, unsupported nonlocal override, builtin `bazel_tools` and
-direct-local route results inside the semantic Result Arc. Complete-only
-equality and validity match the accepted observed-key pattern.
+- the root module anchor;
+- root and external package graphs and package-load provenance;
+- direct/transitive external repository routing;
+- root recursive subtree discovery, package boundaries, directory listings and
+  non-UTF-8 marker probes;
+- BUILD companion boundary and marker resolution; and
+- every load/build provenance edge reached by `buildfiles`,
+  `loadfiles`, visibility, `siblings`, `deps`, `rdeps`, recursive
+  patterns, generated files and label-kind completion.
 
-The observed Host root-module child remains the sole event owner. The route
-key stores no local `EventBatch`; computing observed anchor then observed route
-in one transaction reuses the same structural observed module child and cannot
-replay its batch.
+The accepted observed anchor, root package load, package boundary, path
+listing/resolution and repository route are candidates, not assumed proof of a
+complete graph. In particular, prove whether external
+`RepositoryPackageLoadKey` / `RepositoryPackageSourceKey` and their route
+children already expose a complete exact-Arc epoch. If any selected path can
+still reach a carrierless legacy Host observation, choose the uniquely smaller
+producer prerequisite or `REPLAN`; do not hide it inside the command carrier.
 
-Keep the cohesive host-module owner. Do not split or move existing tests.
+Keep one-shot `evaluate_loading_query*` and non-root workspaces on their
+existing legacy path. They are not native-demand publication callers.
 
-## Compatibility and proof
+## Contract to freeze if the owner is complete
 
-Route values, errors, canonical repository names, builtin identity and local
-override semantics remain exact. The observed sibling, typed outer and
-carrier association are Slug-native. Broader query publication, multi-build
-certificate aggregation, one-shot migration and exact identity bytes remain
-deferred.
+Freeze one observed command terminal containing exactly one
+`Arc<Result<QueryOutput, QueryError>>` plus one Arc-backed
+`PathObservationEpoch`, with typed `ObservedPathFrontierError` outside the
+semantic Result. Reuse the existing command identity unless the audit proves a
+structurally distinct sibling is required. The native adapter must project the
+exact semantic Arc and expose the complete epoch to generic selected-snapshot
+validation before acceptance; query has no source certificate, request
+revision or event owner.
 
-Require parity and exact projected semantic Arc/forwarded epoch Arc proof for
-builtin, local override, unknown repo, unsupported override and root-module
-error; observed/legacy family nonactivation; one shared observed module child
-and one cold MODULE event when anchor plus route are requested together; warm
-suppression; Need, mismatch/conflict outer, cancellation/recovery,
-edit/delete/recreate and A/B/A; exact demand membership; complete-only
-equality/validity; and post-return proof that only the observed route Result Arc
-plus epoch remain in the parent value.
+Use one mode-aware query environment/graph driver wherever legacy one-shot and
+observed native paths share semantics. Observed mode selects only observed
+families and accumulates child epochs compute-locally in actual evaluator order.
+Specify deterministic left-first duplicate-Arc selection and the precise
+Need/typed-outer/semantic ordering for sequential stages and joined batches.
+No partial carrier may accompany Need or typed outer. Semantic success or error
+retains exactly the complete decisive epoch required by selection; later
+dependency-owned child state must not make the carrier incomplete.
 
-Run focused route/module tests, full bzlmod, loading and core checks,
-formatting/diff/archive gates, exact accounting, Buck2 retention and AI cleanup
-scans, and independent review.
+Observed package/module/path children remain the sole local event owners.
+Cancellation or typed outer discards the attempt buffer; semantic completion
+preserves the existing successful-child event behavior; warm acceptance replays
+no child batch. The terminal and public accepted command retain no query
+environment, graph scratch, candidate arena, traversal queue or new collection
+beyond the existing semantic output and selected compact epoch.
+
+## Compatibility, proof and future boundary
+
+Public query labels, graph/order/label-kind output, errors, exit codes, policy,
+external apparent/canonical routing and child event text/order remain exact.
+Observed family identity, carrier association, typed outer and exact-Arc
+selected validation are Slug-native. Multi-build certificate aggregation,
+one-shot publication, wider query/aquery identities and exact Bazel identity
+bytes remain deferred.
+
+Require discriminating public proof for syntax/no-activation, direct and
+recursive roots, external direct/transitive owners, load/build provenance,
+visibility/package-group recursion, generated files and BUILD companions;
+exact complete selected demand/value/`Arc::ptr_eq` equality; zero legacy
+family activation; cold child order and warm suppression; compatible and
+incompatible Need, typed outer versus Need/semantic, semantic error, pending
+cancellation with no publication and recovery; edit/delete/recreate/A-B-A; and
+legacy one-shot isolation. Include retention and AI-cleanup review.
+
+Freeze the exact future Rust/test allowlist, semantic and physical caps, any
+large-file split, validation commands and one bounded implementation successor
+only after the live audit proves completeness. Prefer existing colocated query
+and native-command owners; do not add a store, cache, lock, task, Host read or
+second publication/event owner.
 
 ## STOP / REPLAN
 
-STOP on any other file; Cargo, BUILD, fixture, oracle or generated-file write;
-public activation; query-crate changes; another route/store/cache/event owner;
-legacy and observed module-family cross-activation; semantic/error/event drift;
-epoch union or Result-Arc reconstruction; a retained collection/lock/task/
-direct Host read; cap excess; or M1 closure. `REPLAN`
-if the two keys cannot share one projection, the carrier cannot forward exact
-child Result Arcs, another Rust file is required, or the cohesive physical cap
-cannot hold.
+STOP on Rust, Cargo, BUILD, fixture, oracle or generated-file writes; public
+behavior changes; implementation; a second command/publication owner; source
+certificate or revision work; unproved external-package observation
+completeness; family/event drift; retained query scratch; missing future caps or
+allowlist; multiple successors; docs cap excess; or M1 closure. `REPLAN` on
+any carrierless legacy Host edge, incomplete selected epoch, error-order
+contradiction, required file outside the frozen future allowlist, or no bounded
+cohesive implementation.
 
 ## Immediate predecessor
 
-`1ce16378` freezes the observed route design selected by the audit at
-`b7d3405c`. It is the only prerequisite before returning directly to
-loading-query publication design.
+`e4555dca` accepts the observed root-repository-route prerequisite from
+frozen design `1ce16378`. It closes the route-family blocker selected by the
+post-cquery audit and authorizes this design audit only.

@@ -3762,3 +3762,75 @@ epoch union or Result-Arc reconstruction, retained state, direct Host read,
 Cargo/oracle work or cap excess. `REPLAN` if the frozen two-file owner cannot
 hold. Acceptance returns directly to docs-only loading-query publication
 design; do not close M1.
+
+
+### Observed root-repository route accepted (2026-08-18)
+
+`e4555dca` accepts
+`WP-2A-m1-root-repository-route-observation-implementation` from Rust base
+`03f2db3e` and frozen design `1ce16378`. The doc-hidden
+`RootRepositoryRouteObservationKey` computes only
+`HostRootModuleFileObservationKey`; the legacy route computes only its legacy
+child. Both use one pure projection, so builtin, local override, unknown,
+unsupported and root-module-error semantics cannot drift.
+
+The observed terminal retains exactly one projected semantic Result Arc and the
+child `PathObservationEpoch`. It forwards every exact path Result Arc without
+union or reconstruction. Need remains Need, typed observed path failure remains
+outer and semantic route errors remain Complete. The observed Host root-module
+child is the sole MODULE event owner; anchor then route shares one child and one
+cold batch, while warm replay emits none.
+
+Proof covers exact epoch Arc membership, legacy/observed family nonactivation,
+Need and outer polarity, complete-only equality/validity, cold/warm,
+edit/restore A-B-A and semantic error classes. The corrected cancellation case
+builds a transaction, polls the real observed-key compute to Pending, drops the
+future and transaction with no publication, then recovers in a successor
+transaction. Independent latest-diff review accepts ownership, memory, event
+and cancellation behavior.
+
+Focused route proof and full bzlmod pass (399 library plus 193 integration
+tests), as do all 194 loading and 120 query tests. Core remains 234/235 library
+and 12/13 integration only on the two established unrelated baselines. Direct
+check, formatting and diff-check pass with inherited warnings. Archive status
+retains only the established missing V1 refs and stale non-V2-doc allowlist
+failures.
+
+Against `03f2db3e`, host-module accounting is +94 production/+239 tests/+333
+net at 4,531 physical lines; lib is +4 at 395; aggregate semantic growth is
++337. Retained parent state is only the route Result Arc plus epoch, with no
+new collection, cache, lock, task, Host read or event owner. M1 remains partial.
+
+### Active loading-query observed-publication design (2026-08-18)
+
+Run docs-only `WP-2A-m1-loading-query-observed-publication-design` from
+accepted base `e4555dca`. Audit live `RootQueryCommandKey`, its sole
+`NativeCommandRoot` adapter/public constructor, and every root-mode edge in
+`slug_query_v2::{evaluator,loading_environment,graph}`. The audit must cover
+anchor, root/external graphs and package provenance, external routing,
+recursive subtree traversal, package boundary/listing/resolution, BUILD
+companions, visibility and load/build provenance.
+
+Accepted observed siblings are candidates rather than assumed completeness.
+Prove specifically whether external repository package load/source paths expose
+a complete exact-Arc epoch. A carrierless legacy Host edge requires the
+uniquely smaller producer prerequisite or formal `REPLAN`; it may not be
+hidden in the command terminal. One-shot/non-root evaluation remains legacy.
+
+If complete, freeze one semantic query Result Arc plus one Arc-backed epoch and
+typed outer failure, exact selected-snapshot validation before publication,
+deterministic left-first child-epoch union in actual evaluator order, precise
+Need/outer/semantic precedence, child-only events, cancellation abort, warm
+suppression and compact lifetimes. Query adds no source certificate, request
+revision, event owner or retained environment/graph/traversal scratch.
+
+Exact public output/error/event behavior stays exact; observed family/carrier/
+outer mechanics are Slug-native; multi-build, one-shot publication and identity
+bytes remain deferred. Freeze an exact future Rust/test allowlist, semantic and
+physical caps, any large-file split, validation matrix and exactly one bounded
+implementation successor only after the audit proves completeness.
+
+Docs authority is canonical/current/Stage 2/routing under 40/220/180/30 and 470
+aggregate net-line caps. STOP on Rust, Cargo, fixtures/oracles, implementation,
+unproved external completeness, a second publication owner, retained state,
+family/event drift, multiple successors, cap excess or M1 closure.
