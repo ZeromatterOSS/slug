@@ -5437,3 +5437,24 @@ caps unchanged. Prove external nonempty requests/validations, root-empty,
 strict-root rejection, exact Arcs, cancel/abort, warm/lifecycle/events/families.
 After design ACCEPT retry the same implementation; no lower prerequisite,
 caller/public change, retained collection or M1 closure is authorized.
+
+### Loading-query implementation retry resumed (2026-08-18)
+
+Accepted selection design `1f2fb3f6` authorizes the same eight-file candidate
+and unchanged caps. Run only
+`WP-2A-m1-loading-query-observed-publication-implementation-retry` from Rust
+base `a9270586`, semantic design `44c1b444`, proof correction `e22404a8` and
+selection correction `1f2fb3f6`.
+
+Add one private typed NativeCommandRoot association policy: strict path-only
+by default and closure-selected repositories only for the observed query root.
+Keep full path epoch length/demand/value/Arc validation and existing
+selected-snapshot/materializer ownership. Retain no repository state in the
+query carrier. Preserve the accepted loading assertion, stable parents and all
+production semantics/caps.
+
+Require external nonempty request+validation acceptance, root-empty and strict
+root rejection proof, isolated corrected tests, default-parallel core, full
+query/loading/bzlmod, fmt/diff/accounting, cleanup and independent review. Stop
+any other root/file/caller/state/body change or M1 closure. After ACCEPT return
+only to a docs-only next-owner audit.
