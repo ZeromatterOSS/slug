@@ -17,11 +17,19 @@ use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::ConfigurationKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
+use slug_analysis_v2::ConfiguredNodeKey;
+use slug_analysis_v2::ConfiguredNodeKind;
+use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
+use slug_analysis_v2::key::RootStringSettingValue;
+use slug_analysis_v2::prepare_configured_node_analysis_observed;
 use slug_build_api_v2::ProviderId;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::LockfileMode;
+use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
@@ -33,17 +41,23 @@ use slug_events_v2::CaptureEvaluationEvents;
 use slug_events_v2::EvaluationEvent;
 use slug_events_v2::EventBatch;
 use slug_identity_v2::CanonicalLabel;
+use slug_loading_v2::RootPackageLoadKey;
+use slug_loading_v2::RootPackageLoadObservationKey;
 use slug_loading_v2::bzl_load_cycle_detector;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochError;
 use slug_workspace_v2::PathObservationEpochKey;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
 use slug_workspace_v2::PathObservationResult;
 use slug_workspace_v2::PathOperationResult;
+use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathObservationKey;
 use starlark_map::small_map::SmallMap;
 
 fn workspace() -> NormalizedAbsolutePath {
@@ -109,7 +123,8 @@ impl EpochBuilder {
 
     fn base(prefix: &str, parent_dependencies: &[&str], variant: i64) -> Self {
         let definitions = format!(
-            r#"MarkerInfo = provider(fields = {{"value": "ordered marker"}})
+            r#"print("BZL_LOADING")
+MarkerInfo = provider(fields = {{"value": "ordered marker"}})
 
 def _leaf_impl(ctx):
     print("LEAF_ANALYSIS")
@@ -133,10 +148,18 @@ parent = rule(implementation = _parent_impl, attrs = {{"deps": attr.label_list()
             "load(\"//rules:defs.bzl\", \"parent\")\n\
              parent(name = \"parent\", deps = [{dependencies}])\n"
         );
+        let parent_build = format!(
+            r#"print("BUILD_LOADING")
+{parent_build}"#
+        );
         let mut builder = Self::default();
         builder.directory("/", variant);
         builder.directory("/workspace", variant);
-        builder.file("/workspace/MODULE.bazel", "", variant);
+        builder.file(
+            "/workspace/MODULE.bazel",
+            r#"print("MODULE_LOADING")"#,
+            variant,
+        );
         builder.missing("/workspace/REPO.bazel");
         builder.missing("/workspace/.bazelignore");
         builder.package("rules", "", variant);
@@ -176,14 +199,27 @@ struct TrackedAnalysis {
     batch: Option<EventBatch>,
 }
 
+#[derive(Debug, Clone)]
+struct TrackedBatch(String, ActivationKind, EventBatch);
+
 #[derive(Default)]
 struct AnalysisTracker {
     activations: Mutex<Vec<TrackedAnalysis>>,
+    families: Mutex<Vec<String>>,
+    batches: Mutex<Vec<TrackedBatch>>,
 }
 
 impl AnalysisTracker {
     fn take(&self) -> Vec<TrackedAnalysis> {
         std::mem::take(&mut *self.activations.lock().unwrap())
+    }
+
+    fn take_families(&self) -> Vec<String> {
+        std::mem::take(&mut *self.families.lock().unwrap())
+    }
+
+    fn take_batches(&self) -> Vec<TrackedBatch> {
+        std::mem::take(&mut *self.batches.lock().unwrap())
     }
 }
 
@@ -201,10 +237,53 @@ impl ActivationTracker for AnalysisTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-        let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() else {
+        if let Some(batch) = activation
+            .evaluation_data()
+            .and_then(|data| data.downcast_ref::<EventBatch>())
+        {
+            self.batches.lock().unwrap().push(TrackedBatch(
+                key.to_string(),
+                activation.kind(),
+                batch.dupe(),
+            ));
+        }
+        let configured = if let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() {
+            self.families.lock().unwrap().push("analysis/legacy".into());
+            key.configured_target()
+        } else if let Some(key) = key.downcast_ref::<ConfiguredNodeAnalysisObservationKey>() {
+            self.families
+                .lock()
+                .unwrap()
+                .push("analysis/observed".into());
+            key.configured_target()
+        } else {
+            let family = if key.downcast_ref::<RootPackageLoadKey>().is_some() {
+                Some("package/legacy")
+            } else if key
+                .downcast_ref::<RootPackageLoadObservationKey>()
+                .is_some()
+            {
+                Some("package/observed")
+            } else if key.downcast_ref::<RootModuleLoadingAnchorKey>().is_some() {
+                Some("anchor/legacy")
+            } else if key
+                .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
+                .is_some()
+            {
+                Some("anchor/observed")
+            } else if key.downcast_ref::<ResolvedPathKey>().is_some() {
+                Some("resolved/legacy")
+            } else if key.downcast_ref::<ResolvedPathObservationKey>().is_some() {
+                Some("resolved/observed")
+            } else {
+                None
+            };
+            if let Some(family) = family {
+                self.families.lock().unwrap().push(family.into());
+            }
             return;
         };
-        let Some(configured_target) = key.configured_target() else {
+        let Some(configured_target) = configured else {
             return;
         };
         self.activations.lock().unwrap().push(TrackedAnalysis {
@@ -302,6 +381,61 @@ fn marker_value(
         .as_ref()
         .as_ref()
         .unwrap()
+        .providers()
+        .user(provider)
+        .unwrap()
+        .field("value")
+        .unwrap()
+        .to_owned()
+}
+
+async fn observed_key(
+    transaction: &mut DiceTransaction,
+    label: &str,
+) -> ConfiguredNodeAnalysisObservationKey {
+    observed_key_with_setting(transaction, label, None).await
+}
+
+async fn observed_key_with_setting(
+    transaction: &mut DiceTransaction,
+    label: &str,
+    explicit: Option<RootStringSettingValue>,
+) -> ConfiguredNodeAnalysisObservationKey {
+    let configured = configured(label);
+    match prepare_configured_node_analysis_observed(
+        transaction,
+        workspace(),
+        configured.label().clone(),
+        configured.configuration().clone(),
+        explicit,
+    )
+    .await
+    {
+        AnalysisPreparationOutcome::Need(_) => panic!("observed preparation returned Need"),
+        AnalysisPreparationOutcome::Complete(Err(error)) => {
+            panic!("observed preparation returned outer error: {error}")
+        }
+        AnalysisPreparationOutcome::Complete(Ok(Err(error))) => {
+            panic!("observed preparation returned semantic error: {error}")
+        }
+        AnalysisPreparationOutcome::Complete(Ok(Ok(key))) => key,
+    }
+}
+
+fn observed_result(
+    outcome: &<ConfiguredNodeAnalysisObservationKey as Key>::Value,
+) -> &Arc<ConfiguredNodeResult> {
+    let AnalysisPreparationOutcome::Complete(Ok(value)) = outcome else {
+        panic!("observed analysis did not complete semantically");
+    };
+    value.as_ref().as_ref().unwrap()
+}
+
+fn observed_marker_value(
+    outcome: &<ConfiguredNodeAnalysisObservationKey as Key>::Value,
+    provider: &ProviderId,
+) -> String {
+    observed_result(outcome)
         .providers()
         .user(provider)
         .unwrap()
@@ -449,4 +583,430 @@ async fn root_analysis_unions_needs_and_replays_build_bzl_dependency_lifecycle()
     let mut restored_transaction = transaction(&dice, restored_epoch.build(), tracker.dupe()).await;
     let restored = restored_transaction.compute(&key).await.unwrap();
     assert_eq!(marker_value(&restored, &provider), "v1-right,v1-left");
+}
+
+#[tokio::test]
+async fn observed_analysis_is_family_isolated_recursive_and_arc_stable() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base("observed-", &["//right:right", "//left:left"], 10);
+    epoch.add_leaf("left", 10);
+    epoch.add_leaf("right", 10);
+    let epoch = epoch.build();
+    let mut observed_transaction = transaction(&dice, epoch.dupe(), tracker.dupe()).await;
+    let key = observed_key(&mut observed_transaction, "@@//parent:parent").await;
+    assert_eq!(
+        key.node(),
+        &ConfiguredNodeKey::configured(configured("@@//parent:parent"))
+    );
+
+    let first = observed_transaction.compute(&key).await.unwrap();
+    assert!(ConfiguredNodeAnalysisObservationKey::validity(&first));
+    assert!(ConfiguredNodeAnalysisObservationKey::equality(
+        &first, &first
+    ));
+    let warm = observed_transaction.compute(&key).await.unwrap();
+    let (
+        AnalysisPreparationOutcome::Complete(Ok(first_carrier)),
+        AnalysisPreparationOutcome::Complete(Ok(warm_carrier)),
+    ) = (&first, &warm)
+    else {
+        panic!("observed analysis did not produce complete carriers")
+    };
+    assert!(Arc::ptr_eq(first_carrier, warm_carrier));
+    let provider = ProviderId::new("//rules:defs.bzl", "MarkerInfo").unwrap();
+    assert_eq!(
+        observed_marker_value(&first, &provider),
+        "observed-right,observed-left"
+    );
+    assert_eq!(
+        observed_result(&first)
+            .configured_dependencies()
+            .map(|key| key.label().to_string())
+            .collect::<Vec<_>>(),
+        ["@@//right:right", "@@//left:left"]
+    );
+
+    let events = tracker.take();
+    assert_eq!(
+        analysis_batch(&events, "@@//left:left").map(event_texts),
+        Some(vec!["LEAF_ANALYSIS"])
+    );
+    assert_eq!(
+        analysis_batch(&events, "@@//right:right").map(event_texts),
+        Some(vec!["LEAF_ANALYSIS"])
+    );
+    assert_eq!(
+        analysis_batch(&events, "@@//parent:parent").map(event_texts),
+        Some(vec!["PARENT_ANALYSIS"])
+    );
+    let batches = tracker.take_batches();
+    let batch_texts = batches
+        .iter()
+        .flat_map(|tracked| event_texts(&tracked.2))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        batch_texts,
+        [
+            "MODULE_LOADING",
+            "BZL_LOADING",
+            "BUILD_LOADING",
+            "LEAF_ANALYSIS",
+            "LEAF_ANALYSIS",
+            "PARENT_ANALYSIS",
+        ],
+        "{batches:#?}"
+    );
+    assert!(
+        batches
+            .iter()
+            .filter(|tracked| !tracked.2.events().is_empty())
+            .all(|tracked| tracked.1 == ActivationKind::Evaluated),
+        "{batches:#?}"
+    );
+    let families = tracker.take_families();
+    assert!(families.iter().any(|family| family == "package/observed"));
+    assert!(
+        families
+            .iter()
+            .filter(|family| family.as_str() == "analysis/observed")
+            .count()
+            >= 3
+    );
+    assert!(
+        families.iter().all(|family| !family.ends_with("/legacy")),
+        "{families:#?}"
+    );
+
+    let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let legacy_tracker = Arc::new(AnalysisTracker::default());
+    let mut legacy_transaction = transaction(&legacy_dice, epoch, legacy_tracker).await;
+    let legacy = legacy_transaction.compute(&parent_key()).await.unwrap();
+    let AnalysisPreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy parity analysis returned Need")
+    };
+    assert_eq!(
+        legacy.as_ref().as_ref().unwrap().as_ref(),
+        observed_result(&first).as_ref()
+    );
+}
+
+#[tokio::test]
+async fn observed_null_source_uses_only_observed_resolution() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base("source-", &[], 20);
+    epoch.package(
+        "source",
+        r#"load("//rules:defs.bzl", "parent")
+parent(name = "declares", deps = [":data.txt"])
+"#,
+        20,
+    );
+    epoch.file("/workspace/source/data.txt", b"payload", 20);
+    let mut transaction = transaction(&dice, epoch.build(), tracker.dupe()).await;
+    let label = CanonicalLabel::parse("@@//source:data.txt").unwrap();
+    let key =
+        ConfiguredNodeAnalysisObservationKey::new(workspace(), ConfiguredNodeKey::null(label))
+            .unwrap();
+    let outcome = transaction.compute(&key).await.unwrap();
+    assert_eq!(
+        observed_result(&outcome).kind(),
+        &ConfiguredNodeKind::SourceFile
+    );
+    let families = tracker.take_families();
+    assert!(families.iter().any(|family| family == "resolved/observed"));
+    assert!(families.iter().any(|family| family == "package/observed"));
+    assert!(
+        families.iter().all(|family| !family.ends_with("/legacy")),
+        "{families:#?}"
+    );
+}
+
+const OBSERVED_TOOLCHAIN_MODULE: &str = r#"module(name = "root")
+register_execution_platforms("//:platform")
+register_toolchains("//:toolchain")
+"#;
+const OBSERVED_TOOLCHAIN_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""})
+def _implementation(ctx):
+    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
+def _request(ctx):
+    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker)]
+implementation = rule(implementation = _implementation, attrs = {"marker": attr.string(mandatory = True)})
+request = rule(implementation = _request, toolchains = ["//:type"])
+"#;
+const OBSERVED_TOOLCHAIN_BUILD: &str = r#"load(":defs.bzl", "implementation", "request")
+constraint_setting(name = "setting")
+constraint_value(name = "linux", constraint_setting = ":setting")
+platform(name = "platform", constraint_values = [":linux"])
+toolchain_type(name = "type")
+implementation(name = "implementation", marker = "selected")
+toolchain(name = "toolchain", toolchain_type = ":type", toolchain = ":implementation", exec_compatible_with = [":linux"])
+request(name = "request")
+"#;
+
+#[tokio::test]
+async fn observed_toolchain_closure_keeps_anchor_packages_and_analysis_observed() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base("toolchain-", &[], 30);
+    epoch.file("/workspace/MODULE.bazel", OBSERVED_TOOLCHAIN_MODULE, 30);
+    epoch.file("/workspace/defs.bzl", OBSERVED_TOOLCHAIN_DEFS, 30);
+    epoch.file("/workspace/BUILD.bazel", OBSERVED_TOOLCHAIN_BUILD, 30);
+    let mut transaction = transaction(&dice, epoch.build(), tracker.dupe()).await;
+    let key = observed_key(&mut transaction, "@@//:request").await;
+    let outcome = transaction.compute(&key).await.unwrap();
+    let consumer = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+    assert_eq!(
+        observed_result(&outcome)
+            .providers()
+            .user(&consumer)
+            .unwrap()
+            .field("value"),
+        Some("selected")
+    );
+    let families = tracker.take_families();
+    assert!(families.iter().any(|family| family == "anchor/observed"));
+    assert!(families.iter().any(|family| family == "package/observed"));
+    assert!(
+        families
+            .iter()
+            .filter(|family| family.as_str() == "analysis/observed")
+            .count()
+            >= 2
+    );
+    assert!(
+        families.iter().all(|family| !family.ends_with("/legacy")),
+        "{families:#?}"
+    );
+}
+
+#[tokio::test]
+async fn observed_analysis_unions_needs_without_publishing_events() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let epoch = EpochBuilder::base("need-", &["//right:right", "//left:left"], 40).build();
+    let mut transaction = transaction(&dice, epoch, tracker.dupe()).await;
+    let key = observed_key(&mut transaction, "@@//parent:parent").await;
+    let outcome = transaction.compute(&key).await.unwrap();
+    let AnalysisPreparationOutcome::Need(needs) = &outcome else {
+        panic!("missing observed dependency packages did not produce Need")
+    };
+    let paths = needs
+        .path_observations()
+        .unwrap()
+        .demands()
+        .iter()
+        .map(|demand| demand.path().as_path())
+        .collect::<Vec<_>>();
+    assert!(paths.contains(&Path::new("/workspace/left")));
+    assert!(paths.contains(&Path::new("/workspace/right")));
+    assert!(!ConfiguredNodeAnalysisObservationKey::validity(&outcome));
+    assert!(!ConfiguredNodeAnalysisObservationKey::equality(
+        &outcome, &outcome
+    ));
+    assert!(analysis_batch(&tracker.take(), "@@//parent:parent").is_none());
+}
+
+#[tokio::test]
+async fn observed_outer_wins_need_and_semantic_while_semantic_error_publishes_once() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base(
+        "terminal-",
+        &["//need:leaf", "//semantic:missing", "//outer:leaf"],
+        41,
+    );
+    epoch.package("semantic", "", 41);
+    let transaction = transaction(&dice, epoch.build(), tracker.dupe()).await;
+    let outer = ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(
+        EpochBuilder::demand("/outer", PathObservationOperation::Lstat),
+    ));
+    let outer_value: <RootPackageLoadObservationKey as Key>::Value =
+        AnalysisPreparationOutcome::Complete(Err(outer.clone()));
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            RootPackageLoadObservationKey::new(
+                workspace(),
+                configured("@@//outer:leaf")
+                    .label()
+                    .package()
+                    .package()
+                    .clone(),
+            ),
+            outer_value,
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let key = observed_key(&mut transaction, "@@//parent:parent").await;
+    tracker.take_batches();
+    let outcome = transaction.compute(&key).await.unwrap();
+    assert!(matches!(
+        &outcome,
+        AnalysisPreparationOutcome::Complete(Err(error)) if error == &outer
+    ));
+    assert!(ConfiguredNodeAnalysisObservationKey::validity(&outcome));
+    assert!(ConfiguredNodeAnalysisObservationKey::equality(
+        &outcome, &outcome
+    ));
+    assert!(
+        tracker
+            .take_batches()
+            .iter()
+            .all(|tracked| { !tracked.0.starts_with("observed-configured-node-analysis:") })
+    );
+    let error_key =
+        ConfiguredNodeAnalysisObservationKey::new(workspace(), configured("@@//parent:missing"))
+            .unwrap();
+    let error = transaction.compute(&error_key).await.unwrap();
+    assert!(!ConfiguredNodeAnalysisObservationKey::validity(&error));
+    assert!(!ConfiguredNodeAnalysisObservationKey::equality(
+        &error, &error
+    ));
+    assert_eq!(
+        analysis_batch(&tracker.take(), "@@//parent:missing").map(event_texts),
+        Some(Vec::new())
+    );
+}
+
+#[tokio::test]
+async fn observed_alias_and_generated_edges_do_not_escape_the_family() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base("shape-", &[], 43);
+    epoch.file(
+        "/workspace/shape.bzl",
+        r#"def _producer(ctx): return [DefaultInfo()]
+producer = rule(implementation = _producer, attrs = {"out": attr.output()})
+"#,
+        43,
+    );
+    epoch.file(
+        "/workspace/BUILD.bazel",
+        r#"load(":shape.bzl", "producer")
+producer(name = "producer", out = "producer.out")
+alias(name = "alias", actual = ":producer")
+"#,
+        43,
+    );
+    let mut transaction = transaction(&dice, epoch.build(), tracker.dupe()).await;
+    let alias_key = observed_key(&mut transaction, "@@//:alias").await;
+    let alias = transaction.compute(&alias_key).await.unwrap();
+    assert_eq!(observed_result(&alias).kind(), &ConfiguredNodeKind::Alias);
+    let generated_key = observed_key(&mut transaction, "@@//:producer.out").await;
+    let generated = transaction.compute(&generated_key).await.unwrap();
+    assert_eq!(
+        observed_result(&generated).kind(),
+        &ConfiguredNodeKind::GeneratedFile
+    );
+    assert!(
+        tracker
+            .take_families()
+            .iter()
+            .all(|family| !family.ends_with("/legacy"))
+    );
+}
+
+#[tokio::test]
+async fn observed_cancellation_publishes_no_parent_and_recovers() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let mut epoch = EpochBuilder::base("cancel-", &["//left:left"], 44);
+    epoch.add_leaf("left", 44);
+    let epoch = epoch.build();
+    let mut cancelled = transaction(&dice, epoch.dupe(), tracker.dupe()).await;
+    let key = observed_key(&mut cancelled, "@@//parent:parent").await;
+    tracker.take_batches();
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    assert!(
+        tracker
+            .take_batches()
+            .iter()
+            .all(|tracked| !tracked.0.contains("@@//parent:parent"))
+    );
+    drop(cancelled);
+    let mut recovered = transaction(&dice, epoch, tracker).await;
+    assert!(
+        observed_result(&recovered.compute(&key).await.unwrap())
+            .providers()
+            .default_info()
+            .is_some()
+    );
+}
+
+const OBSERVED_SETTING_DEFS: &str = r#"ConsumerInfo = provider(fields = {"value": ""}); SettingInfo = provider(fields = {"value": ""})
+def _setting(ctx): return [SettingInfo(value = ctx.build_setting_value)]
+string_setting = rule(implementation = _setting, build_setting = config.string(flag = True))
+def _consumer(ctx): return [ConsumerInfo(value = ctx.attr._setting[SettingInfo].value)]
+consumer = rule(implementation = _consumer, attrs = {"_setting": attr.label(default = "//:setting")})
+"#;
+
+fn observed_setting_epoch(default: &str, variant: i64) -> PathObservationEpoch {
+    let mut epoch = EpochBuilder::base("setting-", &[], variant);
+    epoch.file("/workspace/defs.bzl", OBSERVED_SETTING_DEFS, variant);
+    epoch.file(
+        "/workspace/BUILD.bazel",
+        format!(
+            r#"load(":defs.bzl", "consumer", "string_setting")
+string_setting(name = "setting", build_setting_default = "{default}")
+consumer(name = "consumer")
+"#
+        ),
+        variant,
+    );
+    epoch.build()
+}
+
+#[tokio::test]
+async fn observed_root_string_setting_preserves_default_explicit_and_restore_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(AnalysisTracker::default());
+    let provider = ProviderId::new("//:defs.bzl", "ConsumerInfo").unwrap();
+
+    let default_epoch = observed_setting_epoch("default", 50);
+    let mut default_transaction = transaction(&dice, default_epoch.dupe(), tracker.dupe()).await;
+    let default_key = observed_key(&mut default_transaction, "@@//:consumer").await;
+    let default = default_transaction.compute(&default_key).await.unwrap();
+    assert_eq!(observed_marker_value(&default, &provider), "default");
+
+    let mut explicit_transaction = transaction(&dice, default_epoch, tracker.dupe()).await;
+    let explicit_key = observed_key_with_setting(
+        &mut explicit_transaction,
+        "@@//:consumer",
+        Some(RootStringSettingValue::new_for_label(
+            "@@//:setting",
+            "command",
+        )),
+    )
+    .await;
+    let explicit = explicit_transaction.compute(&explicit_key).await.unwrap();
+    assert_eq!(observed_marker_value(&explicit, &provider), "command");
+
+    let mut edited_transaction =
+        transaction(&dice, observed_setting_epoch("edited", 51), tracker.dupe()).await;
+    let edited_key = observed_key(&mut edited_transaction, "@@//:consumer").await;
+    let edited = edited_transaction.compute(&edited_key).await.unwrap();
+    assert_eq!(observed_marker_value(&edited, &provider), "edited");
+
+    let mut restored_transaction =
+        transaction(&dice, observed_setting_epoch("default", 52), tracker.dupe()).await;
+    let restored_key = observed_key(&mut restored_transaction, "@@//:consumer").await;
+    let restored = restored_transaction.compute(&restored_key).await.unwrap();
+    assert_eq!(restored_key, default_key);
+    assert_eq!(observed_marker_value(&restored, &provider), "default");
+    assert_eq!(observed_result(&restored), observed_result(&default));
+
+    let families = tracker.take_families();
+    assert!(families.iter().any(|family| family == "package/observed"));
+    assert!(
+        families.iter().all(|family| !family.ends_with("/legacy")),
+        "{families:#?}"
+    );
 }

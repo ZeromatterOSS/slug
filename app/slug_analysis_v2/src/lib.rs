@@ -20,7 +20,13 @@ pub use configured_target::ConfiguredEdgeKind;
 pub use dice::AnalysisError;
 pub use dice::AnalysisErrorKind;
 pub use dice::ConfiguredNodeAnalysisKey;
+#[doc(hidden)]
+pub use dice::ConfiguredNodeAnalysisObservationKey;
+#[doc(hidden)]
+pub use dice::ObservedConfiguredNodeAnalysisPreparationOutcome;
 pub use dice::prepare_configured_node_analysis;
+#[doc(hidden)]
+pub use dice::prepare_configured_node_analysis_observed;
 pub use key::ConfigurationChecksum;
 pub use key::ConfigurationKey;
 pub use key::ConfigurationKind;
