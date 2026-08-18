@@ -5251,3 +5251,71 @@ order, event ownership, retention, cancellation and lifecycle. Select exactly
 one docs-only natural-owner design, one uniquely smaller prerequisite design,
 or formal REPLAN. No implementation follows without independent design
 acceptance.
+
+### Post-package-load audit selects loading-query root (2026-08-18)
+
+The audit ACCEPTs `RootQueryCommandKey` as the uniquely smallest complete next
+publication owner. It is the sole native/public query terminal and its
+ephemeral environment aggregates root/external graphs, package provenance,
+recursive subtree expansion and BUILD companions. Private observed root/
+external graph and root-subtree siblings belong to this packet: none covers
+the whole query or publishes a command, and splitting them would create
+callerless partial carriers around the same environment.
+
+The earlier query design REPLANed only because external source/load keys had no
+complete epoch. Accepted route, source, recursive external-Bzl and repository-
+package-load carriers through `a9270586` now close that final lower Host edge.
+Anchor, root load, boundary, listing and resolution siblings were already
+accepted. No smaller prerequisite remains.
+
+Core external exported-source build is a separate deferred owner. It performs
+route -> package -> selected source and adds FileBytes, target-kind and
+certificate/revision concerns; its current branch explicitly returns no source
+certificate. Combining it with certificate-free query publication would add a
+second semantic/publication owner.
+
+### Loading-query observed-publication design resumed (2026-08-18)
+
+Run docs-only
+`WP-2A-m1-loading-query-observed-publication-design-resume` from scheduling
+base `9d17ca1b` and Rust base `a9270586`. Write only canonical/current/Stage 2/
+routing under 40/220/200/30 and 490 aggregate net-line caps. Stop Rust,
+fixtures/oracles, caller activation, public behavior changes and M1 closure.
+
+Freeze a doc-hidden structural observed root with one exact query Result Arc
+plus compact path epoch, private observed root/external graph and root-subtree
+siblings, shared Legacy/Observed drivers and a mode-aware ephemeral query
+environment. Keep direct/one-shot APIs legacy. Observed mode selects only the
+accepted anchor/route/load/boundary/listing/resolution families.
+
+Preserve anchor-first and actual evaluator callback order. Merge every
+Complete child epoch left-first before semantics; equal duplicates retain the
+first exact Arc and conflict/mismatch is typed outer. Sequential first Need/
+outer/semantic stops immediately; semantic error retains the reached prefix.
+Issued subtree joins scan their full input order and choose first outer/epoch
+error > combined compatible Need > first semantic > success. Reuse private
+Need and outer sentinel channels without exposing them as QueryError.
+
+Root/graph/subtree/environment siblings own no events. Semantic completion
+preserves exact child batches; Need/outer/cancel publishes none. Generic native
+selection validates the full epoch and the existing consuming terminal map
+preserves the public semantic Arc/event buffer. Query owns no revision or
+certificate. Retain no environment/arena/graph/traversal scratch beyond the
+semantic Result Arc plus compact epoch.
+
+Future Rust is exactly evaluator, loading_environment, graph and lib in
+`slug_query_v2`; new `tests/observed_loading_query.rs`; core runtime `dice.rs`;
+and new `runtime/tests/query_command_tests.rs`. Caps are +1,154 production,
++1,312 tests and +2,466 aggregate semantic lines, 19,515 combined physical.
+Relocate base `dice.rs` lines 7,318-8,036 exactly into the new nested include;
+all relocated bodies remain byte exact. Per-file physical caps are
+417/2,346/3,771/81/780/11,000/1,120.
+
+Require complete identity, exact Arc/epoch, every environment and subtree
+terminal/batch, evaluator-order, expression breadth, event/family isolation,
+cancellation, warm/edit/delete/recreate A-B-A, retained lifetime, cap, cleanup
+and dependent-suite proof. Exact public query behavior stays exact; private
+observation mechanics are Slug-native; one-shot workspace evaluation, external
+exported-source publication, multi-build aggregation, unsupported query breadth
+and exact identity bytes stay deferred. After independent design ACCEPT,
+schedule exactly one bounded implementation; otherwise REPLAN.
