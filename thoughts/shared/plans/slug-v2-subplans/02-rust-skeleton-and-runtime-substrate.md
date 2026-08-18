@@ -2904,3 +2904,33 @@ events and 496 aggregate net Rust lines. STOP on any other file, public API,
 broader activation, partial validation, behavior/event drift, another retained
 owner, direct Host read, Cargo/oracle write or cap excess. Acceptance schedules
 exactly one bounded singleton publication implementation.
+
+### Active singleton root-package-all publication implementation (2026-08-17)
+
+Run `WP-2A-m1-root-package-all-build-publication-implementation` from accepted
+build frontier `95002997` and frozen design `857ef363`. Write only core
+`runtime/dice.rs` and `runtime/events.rs`.
+
+Implement the private observed native root and optional observations hook.
+Preserve Need; map completed observed outer error to typed session failure; keep
+semantic error in the carrier. Construct the selected path epoch from shared
+Arcs, then validate the complete canonical demand/value/exact-Arc epoch plus
+empty repository selection immediately after preparation and before any
+revision finalization or snapshot commit. Every mismatch aborts without panic,
+snapshot or event.
+
+Use a private infallible consuming accepted-command projection to move the
+semantic Arc, preserve events and drop the carrier epoch. Activate observed
+only for constructor-admitted singleton root-repository `PackageAll`; every
+other identity stays legacy. Retain no state beyond the existing accepted
+compact path epoch and public semantic Arc/events; add no Host read, lock,
+task, cache, collection or event owner.
+
+Caps remain 150 production plus 300 test net/14,151 physical for DICE, 16
+production plus 30 test net/1,640 physical for events and 496 aggregate net
+Rust lines against `95002997`. Require exact-Arc/mismatch/terminal/abort/event/
+activation/lifecycle/retention proof, focused and broader validation, exact cap
+accounting, Buck2 retention scan, AI cleanup and independent implementation
+review. STOP on any other file, behavior or public API drift, broader
+activation, partial validation, direct Host read, Cargo/oracle write or cap
+excess. Acceptance returns only to a docs-only next-owner audit.
