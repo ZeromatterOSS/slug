@@ -4552,7 +4552,7 @@ pass. Exact include/package/lookup semantics and child events remain exact;
 the sibling/carrier/outer algebra is Slug-native; upper activation and identity
 bytes remain deferred.
 
-### Direct-local upper observation owner audit active (2026-08-18)
+### Direct-local upper observation owner audit accepted (2026-08-18)
 
 Run only `WP-2A-m1-direct-local-upper-observation-owner-audit` from
 `79248832`; write only canonical/current/Stage 2 docs. Rust, fixtures,
@@ -4576,3 +4576,48 @@ compact lifetimes, compatibility classes, discriminating proof, validation and
 independent review before implementation. STOP on Rust, mixed families,
 duplicate event ownership, retained scratch/state, upper activation, multiple
 successors or M1 closure.
+
+The audit accepts `DirectLocalModulePreparationKey` as the uniquely smallest
+complete owner. It already owns root validation, recursive BFS order,
+horizon selection, fragment reads/validation, first-cycle capability and the
+final closure. The fragment helper owns no reusable fact, and the accepted
+observed per-file source key removes any need for another fragment DICE key.
+`ModuleFileFunction.advanceHorizon` is the Bazel 9.2 owner analogue.
+
+### Direct-local preparation observation design active (2026-08-18)
+
+Run only `WP-2A-m1-direct-local-preparation-observation-design` from
+scheduling base `b7110fe5` and Rust base `79248832`; write only
+canonical/current/Stage 2 docs.
+
+Freeze one private observed preparation sibling/carrier and one mode-aware
+driver. Observed order is inspection, root validation, then for each BFS level
+the accepted shared horizon driver over the current request slice followed by
+unique observed fragment sources in first-occurrence order. Never compute the
+standalone horizon key for a recursive frontier. Legacy and Host preparation
+remain on their exact families.
+
+Merge Complete epochs left-first. Inspection/root-validation, horizon,
+SourceCompute prior-prefix, and source/Absent/validation merged-prefix cases
+remain distinct. Joined source batches use prefix-bounded outer/union,
+earlier-Need/full-Need-union, then first-semantic precedence; without a
+semantic, full-batch outer wins over Need. Later outcomes stay
+dependency-owned. Need/outer has no carrier; cycle and success retain the full
+epoch. Equality is complete-only by outer or semantic Result+epoch.
+
+Retain only the existing semantic root/fragment closure inside one Result Arc
+plus one compact epoch. Frontier, ancestry, outcomes, Need union and snapshots
+are compute-local. Preparation remains eventless; evaluation and all upper
+source/load/query owners remain dormant. Exact behavior, Slug-native carrier
+mechanics and deferred upper activation stay separately classified.
+
+Future Rust scope is exactly `source_preparation.rs` and
+`source_preparation_observation_tests.rs`, capped against `79248832` at
+430 production/13,600 physical, 550 tests/2,130 physical, 980 aggregate and
+15,730 combined. The large source owner is a cohesive exception; use bounded
+helpers and the existing separate proof file. Freeze the complete positional
+terminal, nested/cycle, exact Arc/epoch, family/event/nonactivation,
+cancellation/lifecycle, retention/cleanup and validation proof. STOP on Rust
+now, another file/export/caller, standalone-horizon recomputation, mixed
+families, event/state drift, upper activation, cap excess or M1 closure. After
+independent design ACCEPT, schedule exactly one implementation.
