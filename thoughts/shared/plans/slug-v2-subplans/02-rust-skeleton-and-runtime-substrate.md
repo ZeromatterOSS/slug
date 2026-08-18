@@ -3490,3 +3490,26 @@ test through the line before `accepted_native_snapshot`, into new
 the child begins `use super::*;`. Relocated bodies are byte-identical and
 excluded only from semantic growth. This split preserves parent fixtures and
 leaves the frozen 160/300/460 semantic and 12,435/1,200/13,635 physical caps.
+
+### Active observed cquery publication implementation (2026-08-18)
+
+Run `WP-2A-m1-cquery-observed-publication-implementation` from Rust base
+`941db0d0` and frozen design `895996d5`. Write only core
+`runtime/dice.rs` and new `runtime/tests/cquery_command_tests.rs`.
+
+Perform the exact 833-line nested-include test relocation first. Keep the sole
+`CqueryCommandRoot` and switch only direct-root preparation/analysis, joined
+deps analysis and rdeps seed-package validation to accepted observed families.
+Preserve full-batch first-outer > combined-Need > first-semantic > ordered
+success algebra, preflight order, public projection, child-only events,
+cancellation/no-publication and warm suppression.
+
+Retain no carrier/revision or new state; child epochs remain dependency-owned
+and the selected snapshot owns exact Result Arcs. Caps remain 160/300/460
+semantic and 12,435/1,200/13,635 physical lines against `941db0d0`. Require
+the frozen activation/terminal/event/lifecycle/configuration/recursive/public
+proof, complete core/analysis/loading validation, formatting/check/diff/archive
+gates, exact accounting, retention/cleanup scans and independent review. STOP
+on any other file, changed relocation, public drift, legacy family, duplicate
+owner, retained state, direct Host read, Cargo/oracle work or cap excess.
+Acceptance returns to one docs-only next-owner audit; do not close M1.
