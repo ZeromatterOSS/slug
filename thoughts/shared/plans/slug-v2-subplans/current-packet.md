@@ -1,80 +1,64 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-repository-package-load-observation-implementation`
+Packet: `WP-2A-m1-post-package-load-upper-owner-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Rust base: `93f43264`
-Accepted design: `a342a2c2`
-Result: implement and validate only the callerless observed repository-package
-load sibling.
+Accepted base: `a9270586`
+Result: audit only the first complete upper owner after observed repository
+package loading.
 
 ## Authority and caps
 
 Write exactly:
 
-- `app/slug_loading_v2/src/bzl_module.rs`: +360 production, <=6,955 physical;
-- `app/slug_loading_v2/src/lib.rs`: +4 export lines, <=86 physical;
-- `app/slug_loading_v2/src/host_package_load_tests.rs`: +560 tests,
-  <=3,438 physical.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`: <=40 net;
+- this manifest: <=180 net;
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`:
+  <=140 net;
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`: <=30 net.
 
-Aggregate semantic growth is <=924 and combined physical size <=10,479 against
-`93f43264`. Keep touched helpers below 200 lines; the two existing large files
-are accepted cohesive owner/proof exceptions.
+Aggregate docs growth is <=390 net lines against `a9270586`. Do not write
+Rust, Cargo/BUILD metadata, fixtures, oracles or generated artifacts. Do not
+activate a caller, change public behavior, or close M1.
 
-## Required implementation
+## Required audit
 
-Add doc-hidden public structural `RepositoryPackageLoadObservationKey` and
-`ObservedRepositoryPackageLoad` with read-only accessors and export only those
-two names through `lib.rs`. Its exact value is
-`SourcePreparationOutcome<Result<ObservedRepositoryPackageLoad,
-ObservedPathFrontierError>>`; the carrier retains exactly one local package
-Result Arc plus one compact epoch. Activate no caller.
+Start from the accepted doc-hidden `RepositoryPackageLoadObservationKey` and
+trace every immediate legacy package-load consumer before choosing an owner:
 
-Use one Legacy/Observed driver. Legacy selects only
-`RepositoryPackageSourceKey` and `ExternalBzlModuleEvalKey`; observed selects
-only their observed siblings. Preserve source -> UTF-8/parse -> complete label
-prevalidation -> direct children in AST order -> synchronous package attempt ->
-postvalidation. Move the exact driver Result Arc to legacy.
+1. `slug_query_v2/src/loading_environment.rs` external package evaluation;
+2. `slug_query_v2/src/graph.rs` external unconfigured package graph;
+3. `slug_core_v2/src/runtime/dice.rs` singleton exported-source build;
+4. only enough one-shot/public adapters to prove where selection and
+   publication are owned.
 
-Observed starts with source observations and merges every Complete child epoch
-left-first before semantic inspection. Equal duplicates keep the first Arc;
-conflict/operation mismatch is typed outer. Source DICE failure is semantic
-`SourceCompute` with empty prefix. Source semantic/encoding/parse/load-label
-keeps source; child DICE failure keeps prior; child semantic keeps merged;
-glob/evaluation/postvalidation/success keeps full reached epoch. Need/typed
-outer is immediate, carrierless, activates no later child, stores no parent
-batch and is not unioned.
+For each path, record structural key identity and family selection, exact
+semantic Result Arc and complete package epoch consumption, additional mutable
+children or source-certificate requirements, Need/typed-outer/semantic order,
+event ownership/replay, cancellation, retained lifetime and warm/A-B-A
+behavior. Determine whether one existing upper key is the uniquely smallest
+complete owner, whether a smaller shared prerequisite is required, or whether
+the boundaries require formal `REPLAN`. Do not presume that query and core can
+share a cutover: core's exported-source FileBytes/certificate edge and each
+query graph's retained semantic sidecars must be audited explicitly.
 
-Each sibling stores only its matching semantic-Complete local BUILD batch,
-including empty/error prefixes. Source remains eventless and recursive child
-batches precede the package. Need/outer/cancel stores none. Need is invalid and
-self-unequal; Complete outer equality is by outer value and carrier equality by
-semantic Result+epoch.
+Classify unchanged query/build values, errors, order and public events as
+exact; any private sibling/carrier/typed-outer association as Slug-native; and
+broader query functions, multi-package build aggregation, public publication,
+exact identity bytes and M1 closure as unsupported/deferred unless separately
+admitted.
 
-Retain only the existing LoadedPackage semantic graph in the local Result Arc
-plus compact epoch. Keep BUILD bytes/string/AST, resolved-load/loaded-module
-vectors, attempt/evaluator/prepared-map, event and union scratch compute-local.
-Add no child/source or other additional carrier Arc, collection/cache/interner/
-lock/task, Host read, revision, certificate or event owner.
+## Terminal
 
-## Proof and terminal
+End with exactly one independently reviewable result:
 
-Prove identity/hash/Display/accessors; exact legacy Arc/value/error/event parity;
-source and first/middle/last child Need/outer/semantic exact prefixes and later
-suppression; duplicate first Arc/conflict/mismatch; all BUILD parse/evaluation/
-postvalidation terminals; exact child-before-parent empty/error/success batches
-and warm suppression; both family directions/concurrent roots and zero upper
-activation; poll-drop recovery; BUILD and `.bzl` A-B-delete-recreate-A; exact
-bytes/manifest lifetime; retention/Allocative, cleanup and accounting.
+- schedule one docs-only design for the uniquely smallest complete owner;
+- schedule one docs-only design for a uniquely smaller prerequisite; or
+- record formal `REPLAN` with the conflicting ownership/effect boundary.
 
-Exact compatibility is BUILD/package semantics, load order, local events and
-legacy behavior. Sibling/carrier/outer/epoch/export seam is Slug-native. Query/
-core cutover, external glob support, exported-source certificate aggregation,
-public publication and exact identity bytes remain deferred.
-
-Run focused package-load proof, full loading, direct bzlmod/query dependents,
-fmt, diff-check and caps serially; require retention/cleanup and independent
-review. STOP on any other file/caller, upper activation, semantic/family/event/
-epoch drift, retained scratch, helper/cap excess or M1 closure. REPLAN if the
-complete carrier needs another owner/state. After ACCEPT commit and return only
-to a docs-only upper-owner audit.
+Before a design successor, freeze its natural owner, exact future Rust
+allowlist and measured per-file/aggregate semantic and physical caps, complete
+Arc/epoch/terminal/event/family/lifetime/lifecycle proof, compatibility classes,
+retention/cleanup obligations and STOP/REPLAN conditions. At most one successor
+may be scheduled. No implementation may follow without independent design
+acceptance.

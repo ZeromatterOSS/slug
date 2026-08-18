@@ -5210,3 +5210,44 @@ caller, upper activation or new state/event owner. Run the complete Arc/
 terminal/event/family/lifecycle proof, serial validation, cleanup and
 independent review. After ACCEPT return only to a docs-only upper-owner audit;
 do not close M1.
+
+### Repository-package-load observation accepted (2026-08-18)
+
+Accepted implementation `a9270586` from Rust base `93f43264` and frozen design
+`a342a2c2`. The doc-hidden repository-package-load sibling selects only the
+matching observed source and recursive external-Bzl families, preserves
+source -> parse/prevalidation -> AST-order children -> attempt/postvalidation,
+and moves the exact local package Result Arc. Every Complete child epoch is
+merged left-first before semantic inspection; Need/typed outer is immediate
+and carrierless. Each sibling alone owns its semantic-Complete local BUILD
+batch, while recursive children retain their earlier batch authority.
+
+Final accounting is +287 production in `bzl_module.rs`, +560 proof lines in
+`host_package_load_tests.rs`, and +4 exports in `lib.rs`, +851 aggregate, at
+6,882/3,438/86 and 10,406 combined physical lines. Focused observed proof is
+4/4; full loading is 138 unit plus 66 integration tests; direct bzlmod is 426
+unit plus all integrations; query is 53+56+11 = 120. Formatting and diff-check
+pass. Clippy stops only in unchanged dependency warnings and the archive check
+only on the inherited V1-ref/retained-authoring baseline.
+
+Retention remains exactly one local LoadedPackage Result Arc plus one compact
+epoch; source/child carriers, load vectors, AST/evaluator/event/union scratch
+stay compute-local. Cohesion, cleanup, memory and independent review ACCEPT;
+BUILD plus `.bzl` lifecycle, exact Arc/prefix/event proof and discriminating
+concurrent family dependency rows all pass.
+
+### Post-package-load upper-owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-post-package-load-upper-owner-audit` from accepted base
+`a9270586`. Write exactly canonical/current/Stage 2/routing docs within
+40/180/140/30 and 390 aggregate net-line caps. Stop Rust, caller/public
+activation, fixtures/oracles and M1 closure.
+
+Audit the immediate legacy package-load consumers in query loading environment,
+query graph and core singleton exported-source build, plus only enough adapters
+to locate their selection/publication owners. Inventory exact Result Arc and
+package epoch consumption, extra mutable/source-certificate edges, terminal
+order, event ownership, retention, cancellation and lifecycle. Select exactly
+one docs-only natural-owner design, one uniquely smaller prerequisite design,
+or formal REPLAN. No implementation follows without independent design
+acceptance.
