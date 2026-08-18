@@ -5413,3 +5413,27 @@ loading/bzlmod, exact Arc/epoch/event/family/lifecycle proof, fmt/diff/accountin
 cleanup and independent review. STOP every other file/body/caller or semantic
 change, cap excess and M1 closure. After ACCEPT schedule only a docs-only
 next-owner audit.
+
+### Loading-query repository-selection validation REPLAN (2026-08-18)
+
+The accepted stable-parent correction makes root query pass, but isolated
+external query still fails `ObservedTerminalMismatch::RepositoryRequests`.
+External query legitimately selects repository requests/validations from its
+exact activation closure, while the inherited singleton-build validator
+requires both sets empty. The path-only query carrier cannot and must not
+duplicate closure-selected repository state.
+
+Run docs-only
+`WP-2A-m1-loading-query-repository-selection-validation-correction-design`
+from scheduling base `71fad142`, retaining the eight-file candidate
+non-writable. Freeze one private typed NativeCommandRoot association policy:
+strict-empty by default, closure-selected repositories only for the observed
+query root. Keep full selected path epoch length/demand/value/Arc validation;
+`selected_snapshot` and materializer acceptance remain sole repository
+selection/validation owners.
+
+Keep the one-Result-Arc+epoch carrier, files and 1,154/1,328/2,482 plus 19,531
+caps unchanged. Prove external nonempty requests/validations, root-empty,
+strict-root rejection, exact Arcs, cancel/abort, warm/lifecycle/events/families.
+After design ACCEPT retry the same implementation; no lower prerequisite,
+caller/public change, retained collection or M1 closure is authorized.

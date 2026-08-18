@@ -1,84 +1,69 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-observed-publication-implementation-retry`
+Packet: `WP-2A-m1-loading-query-repository-selection-validation-correction-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
+Scheduling base: `71fad142`
 Rust base: `a9270586`
 Accepted query design: `44c1b444`
-Accepted correction design: `e22404a8`
-Result: finish and validate only the retained observed native loading-query publication candidate.
+Accepted proof correction: `e22404a8`
+Result: freeze only the native repository-selection association policy, then retry the retained query candidate.
 
-## Exact authority and caps
+## Docs authority and blocker
 
-Write exactly:
+Write exactly canonical/current/Stage/routing within 40/180/140/30 and 390
+aggregate net-line caps. The retained eight-file candidate is non-writable.
+Stop Rust, Cargo, fixtures/oracles, public changes and M1 closure.
 
-1. `app/slug_query_v2/src/evaluator.rs`: +170 production/+20 proof, <=417;
-2. `app/slug_query_v2/src/loading_environment.rs`: +360/+60, <=2,346;
-3. `app/slug_query_v2/src/graph.rs`: +520/+100, <=3,771;
-4. `app/slug_query_v2/src/lib.rs`: +4, <=81;
-5. new `app/slug_query_v2/tests/observed_loading_query.rs`: +760, <=780;
-6. `app/slug_core_v2/src/runtime/dice.rs`: +100/+12 glue, <=11,000 after
-   exact relocation of base lines 7,318-8,036;
-7. new `app/slug_core_v2/src/runtime/tests/query_command_tests.rs`: exact
-   719-line relocation plus <=372 proof, <=1,132; and
-8. `app/slug_loading_v2/src/host_package_load_tests.rs`: <=4 test lines and
-   <=3,442 solely for the frozen assertion replacement.
+The stable-parent root query passes, but isolated external query fails closed
+with `ObservedTerminalMismatch::RepositoryRequests`. External query correctly
+selects repository materialization requests/validations from its DICE closure;
+the inherited path-only validator rejects every nonempty repository selection.
+This is a production acceptance-boundary design miss, not a lower producer or
+test issue.
 
-Caps against `a9270586` are +1,154 production, +1,328 tests, +2,482 aggregate
-semantic and 19,531 combined physical. Existing large owner/proof files remain
-cohesive exceptions; touched helpers stay below 200 lines.
+## Frozen design
 
-## Frozen implementation
+Add one private typed `NativeCommandRoot` association policy with two cases:
 
-Preserve the doc-hidden structural observed query root, private observed root/
-external graph and subtree siblings, shared Legacy/Observed drivers and the
-mode-aware compute-local environment. Direct and one-shot APIs remain legacy;
-only the existing native public query constructor selects observed.
+1. strict path-only selection, the default for every existing root; and
+2. closure-selected repositories, overridden only by
+   `RootQueryCommandObservationKey`.
 
-Retain exactly the root query Result Arc plus compact epoch; private graph and
-subtree DICE values each retain one natural Result Arc plus epoch. All carriers
-are `Allocative` and `Dupe`. Environment, arena, resolved graph, traversal,
-listing, event and union scratch remain compute-local. Add no cache, interner,
-store, lock, task, Host read, revision, certificate or event owner.
+The default continues to reject nonempty repository requests and validations.
+The query policy permits only sidecars already selected after terminal compute
+from the exact DICE activation closure. `selected_snapshot` remains the sole
+owner that resolves selected repository epochs, adds validation paths, rejects
+conflicting requests and constructs exact validations. Existing materializer
+acceptance still consumes those exact selected requests/validations.
 
-Preserve anchor-first/evaluator order, matching observed child families and
-left-first union-before-semantic exact Arcs. Sequential Need/outer/semantic
-stops immediately; issued subtree batches scan fully and reduce first outer/
-epoch error > compatible Need union > first semantic > success. REPLAN rather
-than invent a QueryError if existing Needs cannot union.
+Regardless of policy, validate the entire observed versus selected path epoch
+by length, canonical demand, semantic value and `Arc::ptr_eq`. The policy may
+not skip or weaken path validation. Add no request/validation collection to
+`ObservedRootQueryCommand`, no new carrier field, key, cache, store, lock, task,
+Host read or event owner. The query carrier stays one Result Arc plus epoch.
 
-Root/graph/subtree/environment remain eventless. Child keys alone own batches;
-Need/outer/cancel publishes none. Existing native terminal validation compares
-the full selected epoch by value and Arc identity, and consuming projection
-preserves the exact public Result Arc and event buffer.
-
-## Exact correction
-
-In `host_package_load_tests.rs`, replace only the obsolete concatenated upper
-nonactivation block with the exact query-positive/core-negative assertion
-frozen in `e22404a8`; no loading production or other loading test changes.
-
-In the three named tests from `e22404a8`, replace only
-`tempfile::tempdir()` with a distinct fixed crate-target parent created before
-runtime plus `tempfile::tempdir_in`. These are the sole exceptions to exact
-relocated bytes. All other relocated bodies remain byte-identical to base.
+Future Rust remains exactly the accepted eight-file retry authority and all
+caps remain 1,154 production/1,328 tests/2,482 aggregate semantic and 19,531
+physical. The hook/enum belongs in core DICE; proof belongs in the relocated
+query proof and existing private strict-root tests. No new file or cap increase.
 
 ## Compatibility, proof and terminal
 
-Exact public query values/errors/order/events, loading proof truth and all
-legacy/direct APIs remain exact. Private observation/outer/selected association
-and stable test parents are Slug-native. One-shot workspace evaluation,
-external exported-source publication, multi-build aggregation, unsupported
-query breadth and exact identity bytes remain deferred.
+Exact external/root public query results, errors, events, materialization and
+all strict-root behavior remain exact. The typed private selection policy is
+Slug-native. Exported-source build, multi-build, one-shot query, unsupported
+breadth and exact identity bytes remain deferred.
 
-Run the three corrected query tests in isolation, then default-parallel full
-core, full query/loading/bzlmod, fmt, diff-check, exact relocation/accounting,
-retention/cleanup and independent review serially. Preserve all earlier proof:
-identity, prefixes, batch positions, exact Arcs, expression breadth, events,
-family isolation, cancellation, lifecycle and zero upper-build activation.
+Prove an external query with nonempty selected requests and validations accepts
+with exact path/result Arcs; root query keeps empty repository selection;
+strict observed roots still reject both RepositoryRequests and
+RepositoryValidations; cancellation/abort accepts none; warm/lifecycle/events/
+families remain exact. Retain the accepted stable-parent and loading assertion
+corrections.
 
-STOP on another file/caller, production semantic/order/family/event change,
-weakened proof, shared stable parent, any other relocated-body drift, retained
-scratch, cap excess or M1 closure. REPLAN if the bounded correction does not
-make default-parallel validation pass. After ACCEPT commit and return to one
-docs-only next-owner audit; do not close M1.
+After independent design ACCEPT schedule exactly the same
+`WP-2A-m1-loading-query-observed-publication-implementation-retry` with this
+additional authority. STOP any extra retained state, unrestricted boolean,
+weakened validation, other root opt-in, file/cap/caller/public change or M1
+closure. REPLAN if exact closure association cannot fit the private hook.
