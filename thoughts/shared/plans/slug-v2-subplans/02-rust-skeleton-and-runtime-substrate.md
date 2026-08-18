@@ -3461,3 +3461,32 @@ routing under 40/180/180/30 and 430 aggregate caps. STOP on Rust, public drift,
 another file/owner/family/event source, carrier/revision invention, retained
 state, query-crate work or cap excess. Acceptance schedules one implementation;
 do not close M1.
+
+The frozen cutover keeps the sole existing `CqueryCommandRoot` and switches
+only its direct-root preparation/analysis, joined deps analysis and rdeps seed
+package edges to the accepted observed families. It adds no mode field, sibling
+root or wrapper DICE key. Query preflight/evaluation, ordering, projection and
+public terminal construction remain shared and unchanged.
+
+Ordered direct roots and each joined deps frontier are fully inspected with
+first typed outer > combined Need > first semantic error > success precedence.
+Direct roots preserve request order; joined deps preserve `compute_join` input
+order. A preparation Need/outer/semantic error does not activate that root's
+analysis child. The one rdeps seed keeps outer > Need > semantic order.
+Incompatible Need union stays a typed native computation failure. Typed outer
+and cancellation publish no attempt events; completed semantic errors preserve
+successful-sibling sidecars and existing public error projection.
+
+No carrier or revision is introduced. Child epochs remain dependency-owned and
+the accepted selected snapshot retains their exact Result Arcs; the cquery
+terminal retains only its existing semantic Arc/targets/analyses and event
+buffer. Observed package/analysis keys remain the sole local event owners.
+
+Implementation first moves exact Rust-base DICE lines 9,210-10,042 (833 lines),
+from the `cquery_executables_deps_filters_complete_closure_and_induces_edges`
+test through the line before `accepted_native_snapshot`, into new
+`runtime/tests/cquery_command_tests.rs`. The parent inserts nested
+`mod cquery_command_tests { include!(\"tests/cquery_command_tests.rs\"); }`;
+the child begins `use super::*;`. Relocated bodies are byte-identical and
+excluded only from semantic growth. This split preserves parent fixtures and
+leaves the frozen 160/300/460 semantic and 12,435/1,200/13,635 physical caps.

@@ -78,6 +78,54 @@ aggregate net lines. Physical caps are 12,435 for `dice.rs`, 1,200 for the
 new test file and 13,635 combined. The design must freeze any line-identical
 test relocation and may lower these caps; it may not raise or add a Rust file.
 
+## Frozen implementation contract
+
+Keep the existing `CqueryCommandRoot` identity, public constructor and generic
+`NativeCommandRoot` publication path. Cquery has no legacy public sibling to
+preserve, so switch its semantic edges observed-only rather than adding a mode
+field or wrapper root:
+
+- direct roots use observed preparation then the observed configured-analysis
+  key;
+- every joined `deps()` frontier uses the observed configured-analysis key;
+- `rdeps()` seed validation uses the observed root-package key and projects
+  its semantic package result; and
+- query preflight/evaluation, root/literal ordering, target projection and
+  public terminal construction remain one unchanged path.
+
+For ordered direct roots, visit every root in request order. Record the first
+typed outer error, union all compatible Needs and retain semantic results/errors
+in root order. After the batch, return first outer as a typed native session
+failure; otherwise return combined Need; otherwise select the first semantic
+error in root order or continue with all successful analyses. A root whose
+preparation is nonsemantic does not compute its analysis child.
+
+For each joined deps frontier, preserve `compute_join` input order and inspect
+the complete batch. First typed outer wins; absent outer, combined Need wins;
+absent Need, first semantic error wins; otherwise append successful analyses in
+frontier order. The single rdeps seed keeps outer, then Need, then semantic
+polarity. Incompatible Need union remains typed native computation failure.
+Preflight request errors still occur before all semantic activation.
+
+Typed outer and cancellation abort the native attempt and publish no command
+or child event buffer. Completed semantic errors retain the same public
+cquery error/exit projection and successful-sibling child batches. Observed
+package/analysis keys are the only local event owners. Warm success replays no
+events. The terminal and accepted command keep only the existing semantic Arc,
+targets/analyses and event buffer; the selected snapshot alone retains the
+compact path epoch with exact child Result Arcs.
+
+Before semantic changes, move the exact contiguous Rust-base
+`app/slug_core_v2/src/runtime/dice.rs` lines 9,210 through 10,042, beginning
+at `cquery_executables_deps_filters_complete_closure_and_induces_edges` and
+ending immediately before `accepted_native_snapshot`, into
+`runtime/tests/cquery_command_tests.rs`. Replace them in the parent test
+module with
+`mod cquery_command_tests { include!(\"tests/cquery_command_tests.rs\"); }`.
+The new file begins `use super::*;`. The 833 relocated lines are
+byte-identical and excluded only from semantic-line growth, never physical
+accounting. Parent fixtures and every nonrelocated test remain unchanged.
+
 Require discriminating proof for zero legacy package/configured-analysis
 activation across direct roots, multi-root sets, deps and rdeps; exact public
 outputs/errors/events; cold child-before-result order and warm suppression;
