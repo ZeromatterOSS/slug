@@ -2989,3 +2989,67 @@ under 40/160/140/300 net documentation caps. STOP on Rust/Cargo/oracle writes,
 implementation, broader activation, another retained owner, direct Host read,
 public behavior/API drift or cap excess. Acceptance schedules one bounded
 design, one uniquely smaller prerequisite, or records `REPLAN`.
+
+### Root exported-source publication audit REPLAN (2026-08-18)
+
+The audit found that strict family isolation and constructor-time exported-file
+selection are jointly unsatisfiable. `BuildCommandRootObservationKey::new`
+must select a family from target syntax before DICE compute, while
+`PackageTargetKind::ExportedFile` is learned only after root-package loading
+and target lookup. A legacy package preclassifier followed by the observed
+root activates both package families for exported sources, duplicates event
+authority and introduces selected path dependencies whose exact Result Arcs
+are absent from the carrier. An observed preclassifier symmetrically activates
+the observed package family for rules and filegroups. An untracked or
+event-silent probe would bypass DICE publication or require a side certificate.
+
+The existing observed root therefore cannot remain the sole complete owner
+under the audit's strict activation contract. M1 still requires one
+daemon-owned observation/source-certificate/publication spine, so the bounded
+successor designs one neutral private singleton-root-`Single` owner rather than
+computing both existing root families. This is an internal Slug-native
+selection/association decision; existing public source, rule and filegroup
+results, outputs, errors and events remain exact. No Rust is accepted by this
+REPLAN.
+
+### Active neutral singleton-root-Single owner design (2026-08-18)
+
+Run docs-only `WP-2A-m1-root-single-neutral-owner-design` from scheduling base
+`0226d60a` and Rust base `31a8b1d3`. Freeze one private structural owner for
+constructor-admitted singleton root-repository `TargetPattern::Single`. It
+must compute one observed anchor and root package, perform target lookup/kind
+classification once, and continue directly to either exported-source
+revision/FileBytes publication or the existing rule/filegroup semantic path.
+It must never compute both legacy and observed build roots or both package
+families. Existing singleton root `PackageAll` remains on its observed owner;
+multi-target, external, recursive and cquery identities remain unchanged.
+
+The design must freeze the concrete key/terminal algebra, shared driver seam,
+single child/final event authority, Need/semantic/outer/cancellation order,
+and optional complete carrier validation only where the terminal owns every
+selected path Arc. Exported-source terminals retain one semantic Result Arc,
+one compact exact epoch and the existing exact FileBytes source certificate;
+rule/filegroup continuations may not retain a duplicate epoch, event batch or
+classification result. Preserve anchor -> package -> lookup/kind -> revision
+-> FileBytes order and exact first-Arc survival through revision retry.
+
+Classify unchanged public exported-source/rule/filegroup bytes and events as
+exact, and the internal singleton-Single family cutover plus carrier
+association as Slug-native. Broader analyzed/multi/external/cquery observation,
+repository/materializer work, native-Windows raw bytes and exact Bazel identity
+bytes remain deferred. Decide a bounded production/test split for the 14,148-
+line `runtime/dice.rs` owner before any growth, including whether a focused
+test sibling or cohesive command-owner module is the smaller seam. Name the
+future Rust allowlist, net/physical caps, focused/downstream/lifecycle proof,
+cleanup and residual risk. Carry the audit REPLAN's single routing-log row as
+a terminal closure artifact so the current three-file audit allowlist is not
+violated.
+
+Write only canonical/current/Stage 2 and, only at terminal closure, the
+orchestration routing log, under the active manifest caps. STOP on Rust, Cargo,
+BUILD, fixture, oracle or generated writes; public API/behavior drift; a parent
+that computes both root families; duplicate event/carrier retention; direct
+Host reads; repository/materializer work; or docs cap excess. `REPLAN` if no
+single owner can preserve exact exported-source revision publication and exact
+rule/filegroup public behavior without a side store, duplicate driver or
+unbounded split. Acceptance may schedule only one bounded implementation.

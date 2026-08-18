@@ -1,11 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-exported-source-publication-audit`
+Packet: `WP-2A-m1-root-single-neutral-owner-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Accepted predecessor: `31a8b1d3`
-Result: select the smallest complete owner for one root-repository exported
-source carrier and public publication, or record one bounded prerequisite.
+Scheduling base: `0226d60a`
+Rust base: `31a8b1d3`
+Result: freeze one neutral private singleton-root-`Single` owner that classifies
+target kind once and preserves exact public exported-source/rule/filegroup
+behavior without computing both legacy and observed root families.
 
 ## Authority
 
@@ -15,81 +17,114 @@ This packet is documentation-only. Write only:
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`; and
 - `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Against `31a8b1d3`, caps are 40 net canonical lines, 160 current-manifest
-lines, 140 Stage 2 lines and 300 aggregate documentation lines.
+Only at terminal closure, also write the one audit-REPLAN rollup row in:
 
-## Learned facts and evidence
+- `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-The accepted exact public source behavior and retained revision bridge are
-already pinned by `42f4a64b` and `f0849151`. Pinned Bazel 9.2
+Against `0226d60a`, caps are 40 net canonical lines, 200 current-manifest
+lines, 180 Stage 2 lines, 20 routing-log lines and 440 aggregate documentation
+lines.
+
+## REPLAN basis and evidence
+
+The predecessor audit proved that its strict constraints are jointly
+unsatisfiable. `BuildCommandRootObservationKey::new` must choose a DICE family
+from request syntax, but `PackageTargetKind::ExportedFile` is learned only
+after root-package loading and target lookup. A legacy package preclassifier
+followed by the observed root activates both package families for exported
+sources, duplicates child-event authority and adds selected path dependencies
+whose exact Result Arcs are absent from the carrier. An observed preclassifier
+does the symmetric wrong-family activation for rules/filegroups. An untracked
+probe loses DICE dependency/publication ownership or needs a forbidden side
+certificate.
+
+M1 nevertheless requires one daemon-owned observation/source-certificate/
+publication spine. The smallest coherent design subject is therefore one
+neutral private owner for constructor-admitted singleton root-repository
+`TargetPattern::Single`, not a parent that computes both existing root keys.
+The internal cutover may be Slug-native only after this packet freezes its
+event, carrier, memory and public-compatibility contract.
+
+Reuse exact public source behavior and revision evidence in `42f4a64b` and
+`f0849151`, the observed publication seam in `31a8b1d3`, pinned Bazel 9.2
 `TargetDefinitionContext`/`InputFile`, `ExportsFilesTest`,
-`BuildViewTest.testTopLevelInputFile`, `FileFunction` and `FileStateValue`
-establish declaration, top-level selection and source-file observation. Buck2
-DICE dependency recording, equality cutoff, transaction publication and
-cancellation remain governed by `docs/developers/dice.md`; no donor scheduler,
-side store or custom revision engine is admissible.
+`BuildViewTest.testTopLevelInputFile`, `FileFunction`/`FileStateValue`, and
+Buck2 DICE dependency/equality/transaction/cancellation rules. No new fixture
+or oracle is justified unless the design finds an observable gap.
 
-Live ownership is bounded: `BuildCommandRootKey` alone orders the loading
-anchor, root package, target lookup/kind, request revision, FileBytes demand,
-action closure and semantic terminal. `BuildCommandRootObservationKey` and the
-native/public acceptance seam accepted in `31a8b1d3` already retain and validate
-one semantic Result Arc plus one exact Arc-backed epoch. The sole-root exported
-source legacy path already retains its exact FileBytes source certificate and
-uses the revision finalizer; rules add configured analysis/actions, multiple
-targets add branch aggregation, external targets add repository/materializer
-selection, and cquery is a distinct result owner.
+## Required design decision
 
-## Required audit decision
+Freeze the exact private key and terminal algebra for one singleton-root-
+`Single` owner. It must:
 
-Determine whether the existing observed build sibling can admit exactly one
-root-repository `TargetPattern::Single` whose loaded target is
-`PackageTargetKind::ExportedFile`, using one shared legacy/observed driver and
-the existing revision/source-certificate/publication owners. Freeze:
+- be selected structurally by the sole public build constructor only after the
+  existing request validation admits exactly one root-repository `Single`;
+- compute one observed loading anchor and one observed root package, then do
+  target lookup/kind classification once;
+- continue directly to exported-source revision/FileBytes publication or the
+  existing rule/filegroup semantic continuation without computing either
+  existing build-root sibling or a second package family;
+- leave singleton root `PackageAll` on its accepted observed owner and leave
+  multi-target, external, recursive and cquery identities unchanged;
+- preserve anchor -> package -> lookup/kind -> revision -> FileBytes order,
+  first semantic/outer/Need precedence, cancellation and child/final events;
+- expose a complete carrier for validation only when the terminal owns every
+  selected path demand and exact Result Arc; no partial carrier is admissible;
+- preserve the exact FileBytes Arc in the source certificate and through every
+  retry/preflight/selection union, with complete validation before revision
+  finalization or snapshot commit; and
+- project the accepted terminal to the existing public result/event shape
+  without retaining classification scratch or a second semantic value.
 
-- anchor -> package -> lookup/kind -> revision -> FileBytes order;
-- exact carrier union and first-Arc identity through revision retry;
-- semantic error, typed outer error, Need, cancellation and event polarity;
-- complete carrier-versus-selected validation before each finalization/commit;
-- unchanged, changed, absent, error and A-B-A source-certificate behavior;
-- strict PackageAll/exported-source observed activation with every rule,
-  filegroup, multi-target, external and cquery identity still legacy; and
-- compact retention and a bounded test-module split if the 14k-line DICE owner
-  would otherwise grow further.
+Decide whether the terminal is an enum with an optional observed carrier or a
+single carrier algebra, and prove that rule analysis cannot accidentally
+publish a partial epoch. Freeze one child/final event authority for cold, warm,
+Need, semantic error, typed outer error, revision retry and cancellation.
+Name exact equality/validity behavior and demonstrate that no lock spans DICE.
 
-Select one bounded design successor, one uniquely smaller prerequisite, or
-`REPLAN`. Name the future Rust allowlist, production/test/physical caps,
-validation, cleanup and residual risk. Reuse accepted evidence; no new fixture
-or oracle is justified unless the audit finds an observable gap.
+The retained exported-source state is at most one semantic Result Arc, one
+compact exact epoch and the existing source certificate. Rule/filegroup
+terminals retain only their existing semantic public value/events; observed
+child epochs remain dependency-owned. Driver vectors, kind classification,
+unions, comparison and retry state are compute- or command-local. Add no cache,
+interner, collection, lock, task, Host read, graph, event store or certificate.
+
+The 14,148-line `runtime/dice.rs` owner is already beyond the complexity
+trigger and has three physical lines of prior packet headroom. Choose a bounded
+cohesive production/test split before authorizing growth: either a focused
+command-owner module with the minimum private seams, or a test sibling that
+materially lowers `dice.rs` while keeping private-owner tests discriminating.
+Do not authorize a nominal split that leaves the large owner growing. Freeze
+the future Rust allowlist, production/test/aggregate net and per-file physical
+caps, focused and direct-dependent validation, Buck2 retention scan, AI cleanup
+and independent implementation review.
 
 ## Compatibility and lifetimes
 
-Existing root exported-source result/output/event bytes remain exact.
-Carrier association, exact shared-Arc identity, revision retry and fail-closed
-outer handling remain Slug-native. Rule analysis/actions, multi-target,
+Existing public exported-source, rule and filegroup result/output/error/event
+bytes remain exact. The internal singleton-Single family cutover, carrier
+association, exact shared-Arc validation, revision retry and fail-closed outer
+handling are Slug-native. Broader analyzed observation, multi-target,
 external/repository/materializer, cquery, native-Windows raw bytes and exact
 Bazel identity bytes remain unsupported/deferred.
-
-The only admissible retained state is the existing public semantic Arc/events,
-accepted compact epoch and existing source certificate. Carrier/union/
-comparison/retry scratch is command- or compute-local; no cache, interner,
-collection, lock, task, Host read, graph or event owner may be added.
 
 ## STOP / REPLAN
 
 STOP on Rust, Cargo, BUILD, fixture, oracle or generated-artifact writes;
-implementation claims; broader activation; another retained owner; direct or
-reconstructed Host reads; public behavior/API drift; repository/materializer
-work; or docs cap excess. `REPLAN` if exact FileBytes Arcs cannot survive the
-revision-finalization cycle, the existing observed key cannot remain the
-natural complete owner, or safe implementation requires another semantic
-store, public API or cross-owner duplicate driver.
+implementation claims; public API/behavior drift; a parent that computes both
+root families; a second package family; partial carrier validation; duplicate
+event/carrier retention; direct or reconstructed Host reads; repository/
+materializer work; a nominal complexity split; routing-log omission at
+terminal closure; or docs cap excess. `REPLAN` if one neutral owner cannot
+preserve exact exported-source revision publication and exact public rule/
+filegroup behavior without a side store, duplicate driver, partial epoch or
+unbounded split.
 
 ## Immediate predecessor
 
-`31a8b1d3` accepted singleton root-package-all public publication: focused
-publication/retry/event tests and all loading tests pass; broad core retains
-only two named inherited failures; Clippy stops in unchanged
-`allocative_derive`; DICE is +150 production/+300 tests at 14,148 physical,
-events +7/+11 at 1,609, aggregate +468. Every command-retained path-epoch
-transform on the preflight/retry/selection path preserves equal shared result
-Arcs.
+`0226d60a` scheduled the exported-source owner audit from accepted Rust
+`31a8b1d3`. The audit's independent review returned `REPLAN`: target kind is
+unavailable at constructor family selection, and no neutral preclassifier can
+preserve strict family, event and exact-Arc isolation. The required routing-log
+row is intentionally carried into this immediate design's terminal closure
+because the audit's three-file allowlist forbade that fourth write.
