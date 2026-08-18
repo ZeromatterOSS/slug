@@ -5120,3 +5120,37 @@ terminal/cycle/event/family/lifecycle proof, serial validation, retention/
 cleanup and independent review. STOP/REPLAN on any contract or cap breach.
 After ACCEPT return only to the docs-only package-load/upper-owner audit; do not
 close M1.
+
+### External-Bzl observation implementation accepted (2026-08-18)
+
+Accepted `93f43264` from Rust base `ac7b8bdf` and design `b82496b6`. The
+private observed sibling selects only observed Host source and recursive
+external children, forwards exact left-first Result Arcs, completes cycles
+through matching observed sources, and retains one local semantic Result Arc
+plus compact epoch. The shared driver preserves exact legacy values, cycles and
+local `.bzl` batch ownership; Need/typed outer/cancellation publish none.
+
+Final accounting is `bzl_module.rs` +400 at 6,595 physical,
+`cycle_detector.rs` +42 at 640, proof +547 at 2,878, aggregate +989 at
+10,113. Focused observed proof is 5/5, full loading is 133 unit plus 66
+integration, bzlmod is 426 plus 193 and query is 120. Fmt/diff and caps pass;
+archive status remains at only the inherited missing-ref/record and retained
+authoring-doc baseline. Retention/cleanup and independent review ACCEPT the
+bounded helper split, compact carrier/cycle identity, exact lifecycle/event/
+family proof and absence of new retained state or Host reads.
+
+### Package-load observed-publication owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-package-load-observed-publication-owner-audit` from accepted
+base `93f43264`. Write only canonical/current/Stage/routing docs within
+40/180/220/30 and 470 aggregate net lines. Stop Rust, Cargo/BUILD, fixtures,
+oracles, generated artifacts, caller/public activation and M1 closure.
+
+Trace `RepositoryPackageLoadKey` from accepted observed package source through
+BUILD parse/load resolution, AST-order observed external-Bzl children, package
+evaluation and its local Complete BUILD batch, then inspect only enough upper
+consumers to locate the first complete owner. Inventory structural family,
+exact Result Arcs and epoch order, terminal precedence, events, lifetime and
+lifecycle. Select exactly one bounded package-load design, one uniquely smaller
+prerequisite, or formal REPLAN; freeze future files/caps/proof/STOP before one
+successor and do not implement in this packet.
