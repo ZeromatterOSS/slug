@@ -4852,3 +4852,58 @@ exactly one bounded docs-only design, one prerequisite design returning to this
 audit, or formal REPLAN. Freeze future files and measured caps only after the
 owner is proven; authorize implementation only after independent design
 ACCEPT.
+
+
+### Direct-local evaluation/upper-source audit accepted (2026-08-18)
+
+The audit from `efdfc6ed` selects a distinct observed sibling of
+`RepositoryPackageSourceKey` as the uniquely smallest complete next owner.
+The live key orders exactly direct-local support, external package lookup and
+the selected BUILD source. Accepted observed carriers exist for all three, so
+no lower mutable edge or prerequisite remains.
+
+Recursive `ExternalBzlModuleEvalKey` begins later, independently reads Host
+source, recursively evaluates children and owns its local `.bzl` Complete
+batch. `RepositoryPackageLoadKey` first consumes package source, then those
+recursive children and owns the BUILD batch. Absorbing either into source would
+mix independent semantic/event owners; selecting load would skip the smaller
+complete source owner. No REPLAN is required.
+
+### Repository-package source observation design active (2026-08-18)
+
+Run only `WP-2A-m1-repository-package-source-observation-design` from
+scheduling base `efdfc6ed` and Rust base `1815c019`; write only canonical/
+current/Stage 2 docs. Future Rust after independent ACCEPT is exactly
+`host_package.rs`, existing `host_package_observation_tests.rs`, and
+`lib.rs`, capped at 260/360/6 semantic lines, 626 aggregate, and
+5,050/750/405/6,205 physical lines. The large host-package owner is a cohesive
+exception; touched helpers stay below 200 lines.
+
+Freeze one doc-hidden public structural source sibling/carrier and one Legacy/
+Observed driver. Preserve support -> lookup -> selected BUILD-source order,
+matching-family isolation and exact legacy local Result Arc. Observed unions
+each Complete child epoch left-first before semantic inspection. Support
+semantic keeps support; LookupCompute keeps support; lookup semantic keeps
+support+lookup; SourceCompute keeps support+lookup; source semantic/Absent/
+success keeps support+lookup+source. Equal duplicates keep the first Arc;
+conflict/operation mismatch is typed outer. Need/outer at any stage has no
+carrier; existing DICE failures remain semantic. Equality/validity follows the
+frozen Need/outer/carrier algebra.
+
+The source parent stays eventless. Evaluation, routed REPO/policy/path and
+source children remain sole matching-family event owners; recursive external
+`.bzl`, package load, query/build and their batches remain dormant. Retain
+only one local source Result Arc, including selected bytes, plus the compact
+epoch; all child semantic Arcs, union/path/outcome scratch remain compute-local.
+Add no store/cache/collection/interner/lock/task/Host read/revision/certificate.
+
+Preserve exact support/lookup/source values/errors, BUILD marker precedence/
+bytes, legacy Arc behavior and child event text/order. Classify the structural
+sibling/carrier/outer/epoch as Slug-native; defer recursive `.bzl`, package
+load/query/build publication and identity bytes. Prove every prefix/position,
+exact epoch Arc/order, duplicate/conflict/mismatch, all terminal classes, event/
+family/nonactivation, warm/cancel/lifecycle/A-B-A, hidden export, retention and
+cleanup. STOP on Rust now, another file/caller, mixed family, epoch/event/state
+drift, upper activation, cap excess or M1 closure. After design ACCEPT schedule
+one implementation; after implementation ACCEPT return only to the docs-only
+upper-source audit.

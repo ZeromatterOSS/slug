@@ -1,12 +1,12 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-direct-local-evaluation-upper-source-owner-audit`
+Packet: `WP-2A-m1-repository-package-source-observation-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling/Rust base: `1815c019`
-Result: audit only the first complete owner above accepted observed direct-local
-evaluation; choose one bounded design, one uniquely smaller prerequisite, or
-formal REPLAN.
+Scheduling base: `efdfc6ed`
+Rust base: `1815c019`
+Result: design only the observed repository-package BUILD-source sibling;
+authorize no Rust or caller activation.
 
 ## Authority and caps
 
@@ -16,66 +16,100 @@ Write only:
 - `thoughts/shared/plans/slug-v2-subplans/current-packet.md`
 - `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
 
-Against `1815c019`: at most 40 canonical net lines and 80 physical lines;
-180 current-manifest net lines and 220 physical lines; 180 Stage 2 net lines
-and 5,000 physical lines; 400 aggregate net lines. This packet authorizes no
-Rust, Cargo/BUILD, fixture, oracle or generated-artifact write.
+Against `efdfc6ed`: at most 40 canonical net lines, 180 manifest net lines,
+180 Stage 2 net lines and 400 aggregate net lines. Future Rust, only after
+independent design ACCEPT, is exactly:
 
-## Required audit
+- `app/slug_bzlmod_v2/src/host_package.rs`: at most 260 production net lines
+  and 5,050 physical lines;
+- `app/slug_bzlmod_v2/src/host_package_observation_tests.rs`: at most 360 test
+  net lines and 750 physical lines;
+- `app/slug_bzlmod_v2/src/lib.rs`: at most 6 production net lines and 405
+  physical lines.
 
-Trace the accepted callerless observed support outcome through
-`RepositoryPackageSourceKey`, its package-lookup and selected BUILD-source
-children, recursive `ExternalBzlModuleEvalKey`, `RepositoryPackageLoadKey`,
-and the remaining loading-query/build consumers. For every candidate record:
+Future aggregate semantic growth is at most 626 lines and combined physical
+size at most 6,205 lines. Keep new/touched helpers below 200 lines; the existing
+host-package owner is a cohesive large-file exception.
 
-- the smallest DICE key or reusable driver that owns the complete semantic
-  terminal and every mutable path dependency;
-- matching legacy/observed family selection, exact shared Result-Arc and epoch
-  order, terminal prefixes, Need/typed-outer/semantic precedence, validity and
-  equality;
-- the sole owner and order of each Complete event batch, plus cancellation and
-  failed-attempt publication behavior;
-- retained semantic graphs/epochs versus compute-local AST, frontier, load,
-  event and outcome scratch;
-- cold/warm, create/edit/delete/recreate, A/B/A, family-nonactivation and public
-  retry consequences.
+## Required design
 
-Determine whether `RepositoryPackageSourceKey` can be the first complete
-observed owner using the accepted support, external-package lookup and selected
-source carriers; whether recursive external `.bzl` source/evaluation requires
-one uniquely smaller sibling frontier first; or whether the constraints require
-formal REPLAN. Do not select `RepositoryPackageLoadKey` merely because it is
-higher: it also owns recursive load evaluation and a BUILD event batch.
+Keep public `RepositoryPackageSourceKey` and its Value exact. Freeze one
+structurally distinct, doc-hidden public
+`RepositoryPackageSourceObservationKey` and one doc-hidden carrier containing
+only the local source Result Arc plus one compact `PathObservationEpoch`.
+Export only the key/carrier needed by the later loading-crate consumer; add no
+caller now.
 
-## Compatibility and terminal
+Use one Legacy/Observed source driver. Its exact sequential order is:
 
-Exact surfaces to preserve are admitted direct-local support/source values and
-errors, BUILD and `.bzl` bytes and Starlark semantics, load order, package
-values, and existing child event text/order. Slug-native candidates are
-structural sibling keys, compact path epochs, typed observed outer errors and
-retry association. Recursive external evaluation, package load, loading-query
-and build publication remain unsupported/deferred until an accepted design and
-implementation activate them.
+1. direct-local module support;
+2. external repository package lookup;
+3. the selected BUILD source, only after lookup selects a package marker.
 
-Terminate in exactly one of:
+Legacy selects only the existing legacy support, lookup and source children.
+Observed selects only the accepted observed counterparts. Neither sibling
+computes the other. Project the exact local source Result Arc to legacy.
 
-1. one docs-only bounded design for the smallest complete natural owner;
-2. one docs-only uniquely smaller prerequisite design that returns directly to
-   this audit after its implementation; or
-3. formal REPLAN with the concrete incompatible ownership constraints.
+Observed starts with the support epoch. Union each Complete lookup/source epoch
+left-first into the accumulated prefix before semantic inspection, using stable
+shared-Arc union. Equal duplicates keep the earliest support/lookup Result Arc;
+conflict or operation mismatch is a typed observed outer. Freeze these prefixes:
 
-Any selected design must freeze exact future Rust files and measured semantic/
-physical caps, full carrier and terminal algebra, event and lifetime authority,
-family isolation, discriminating proof, validation, Buck2 retention review, AI
-cleanup and independent review. Only after independent design ACCEPT may one
-implementation packet follow.
+- support evaluation/error/Unsupported: support only;
+- LookupCompute: support only;
+- invalid/deleted/ignored/no-build/lookup semantic: support then lookup;
+- SourceCompute: support then lookup;
+- source error/Absent/success: support then lookup then source.
+
+Need or typed outer at any child returns immediately with no carrier. Existing
+DICE compute failures retain their semantic ModuleEvaluation, LookupCompute or
+SourceCompute class and the prefixes above. This owner is sequential and adds
+no joined Need union. Need is invalid/self-unequal; Complete typed outer is
+valid/equal by outer value; Complete carrier is valid/equal by semantic
+Result+epoch.
+
+The source parent remains eventless on success, semantic error, Need, outer and
+cancellation. Evaluation, routed REPO/policy/path and source children remain
+the sole matching-family event owners. Do not activate recursive external
+`.bzl` evaluation or its batch, `RepositoryPackageLoadKey` or its BUILD
+batch, query, build or publication.
+
+Retain only the existing source semantic value, including its selected bytes
+Arc, in one local Result Arc plus the compact epoch. Support/lookup/source child
+semantic Arcs, selected-path temporaries, union state and outcome scratch remain
+compute-local. Add no collection/store/cache/interner, lock/task, direct Host
+read, revision/certificate or event owner.
+
+## Compatibility and proof
+
+Exact: support/lookup/source values and errors, BUILD.bazel-before-BUILD
+selection and bytes, legacy Result-Arc behavior, and existing child event
+text/order. Slug-native: sibling/carrier, typed outer and complete retry epoch.
+Deferred: recursive external `.bzl`, package load/query/build publication,
+broader identities and exact identity bytes.
+
+Prove distinct identity/Display and hidden export shape; exact legacy Arc/result
+parity and observed semantic parity; exact support->lookup->source membership/
+order and every Result Arc; stable duplicate first Arc, conflict and operation
+mismatch; every prefix and Need/outer position with validity/equality/no
+carrier; DICE-compute semantic polarity; all support/lookup/source terminal
+classes and BUILD marker precedence/fallback; exact selected bytes Arc;
+eventless parent and exact child ROOT/REPO/evaluation order with warm
+suppression; both family directions and zero external-Bzl/load/query/build
+activation; real poll-drop cancellation/recovery; create/edit/delete/recreate,
+BUILD.bazel<->BUILD and A/B/A; compact Allocative retention, Buck2/AI cleanup,
+focused/full bzlmod/loading/query and established core baselines, fmt/check/
+diff/accounting, Clippy/archive disposition and independent latest-diff review.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo/BUILD, fixtures/oracles, caller or public activation,
-identity-byte claims, mixed legacy/observed families, reconstructed or partial
-epochs, duplicate/moved events, retained frontier/AST/outcome scratch, new
-stores/locks/tasks/direct Host reads, unmeasured future caps, multiple
-successors or M1 closure. `REPLAN` if no bounded owner can retain the complete
-selected dependency epoch and existing event semantics without crossing an
-unaccepted family or adding a new ownership boundary.
+STOP on Rust now, every other future file, Cargo/BUILD/fixture/oracle write, a
+caller or public behavior change, recursive external-Bzl/load/query/build
+activation, mixed families, rebuilt/partial epoch, event ownership drift,
+retained child/scratch state, new I/O/store/lock/task, cap excess, multiple
+successors or M1 closure. `REPLAN` if a lower mutable edge lacks a complete
+observed carrier, exact legacy semantics require another owner/file, the later
+loading consumer cannot use the bounded hidden export, or the source parent must
+own an event. After independent design ACCEPT, schedule exactly one bounded
+implementation; after implementation ACCEPT, return to the docs-only upper-
+source audit for recursive external `.bzl` ownership.
