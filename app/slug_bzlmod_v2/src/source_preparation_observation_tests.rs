@@ -866,3 +866,276 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
         assert!(DirectLocalModuleFileObservationKey::equality(&value, &value));
     }
 }
+
+fn direct_local_inspection_key(apparent: &str) -> DirectLocalModuleInspectionKey {
+    DirectLocalModuleInspectionKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        ApparentRepoName::new(apparent).unwrap(),
+    )
+    .unwrap()
+}
+
+fn complete_observed_direct_local_inspection(
+    value: &<DirectLocalModuleInspectionObservationKey as Key>::Value,
+) -> &ObservedDirectLocalModuleInspection {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed direct-local inspection must complete")
+    };
+    observed
+}
+
+#[tokio::test]
+async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lifecycle() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let legacy_key = direct_local_inspection_key("dep");
+    let key = DirectLocalModuleInspectionObservationKey(legacy_key.clone());
+    assert_eq!(
+        key.to_string(),
+        "observed-direct-local-module-inspection:\"/workspace\":@dep"
+    );
+    let module = b"include(\"//p:a.MODULE.bazel\")\n";
+    let (mut cold, _) =
+        direct_local_file_transaction(&dice, "dep", Some(module), None, 31, Some(tracker.dupe()))
+            .await;
+    let cold_value = cold.compute(&key).await.unwrap();
+    assert!(DirectLocalModuleInspectionObservationKey::validity(
+        &cold_value
+    ));
+    let cold_observed = complete_observed_direct_local_inspection(&cold_value);
+    assert!(matches!(
+        cold_observed.result.as_ref(),
+        Ok(DirectLocalModuleInspection(_, Some(inspection)))
+            if inspection.includes.len() == 1
+                && inspection.includes[0].path.as_str() == "//p:a.MODULE.bazel"
+    ));
+
+    let child_value = cold
+        .compute(&DirectLocalModuleFileObservationKey(
+            direct_local_file_key("dep"),
+        ))
+        .await
+        .unwrap();
+    let child = complete_direct_local_file(&child_value);
+    assert_eq!(cold_observed.observations, child.observations);
+    for (demand, result) in cold_observed.observations.observations() {
+        assert!(Arc::ptr_eq(child.observations.get(demand).unwrap(), result));
+    }
+    let activations = tracker.take();
+    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    for expected in [
+        "observed-direct-local-module-inspection:",
+        "observed-direct-local-module-file:",
+        "observed-root-repository-route:",
+        "observed-host-repository-source-file:",
+    ] {
+        assert!(has(expected), "missing activation {expected}");
+    }
+    for forbidden in [
+        "direct-local-module-inspection:",
+        "direct-local-module-file:",
+        "direct-local-include-package-horizon:",
+        "direct-local-module-preparation:",
+        "direct-local-module-evaluation:",
+        "repository-package-source:",
+        "repository-package-load:",
+        "root-query",
+    ] {
+        assert!(!has(forbidden), "unexpected activation {forbidden}");
+    }
+    let owners = activations
+        .iter()
+        .filter(|entry| entry.kind == ActivationKind::Evaluated && !entry.event_free)
+        .collect::<Vec<_>>();
+    assert_eq!(owners.len(), 1);
+    assert!(owners[0]
+        .key
+        .starts_with("bzlmod-observed-host-root-module-file:"));
+
+    let warm = cold.compute(&key).await.unwrap();
+    assert!(DirectLocalModuleInspectionObservationKey::equality(
+        &cold_value,
+        &warm
+    ));
+    assert!(Arc::ptr_eq(
+        &cold_observed.result,
+        &complete_observed_direct_local_inspection(&warm).result
+    ));
+    assert!(tracker.take().iter().all(|entry| entry.event_free));
+    let legacy = cold.compute(&legacy_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy direct-local inspection must complete")
+    };
+    assert_eq!(legacy.as_ref(), cold_observed.result.as_ref());
+    assert!(!tracker
+        .take()
+        .iter()
+        .any(|entry| entry.key.contains("observed-")));
+
+    for (bytes, expected, variant) in [
+        (
+            Some(b"include(\"//q:b.MODULE.bazel\")\n".as_slice()),
+            Some("//q:b.MODULE.bazel"),
+            32,
+        ),
+        (None, None, 33),
+        (Some(module.as_slice()), Some("//p:a.MODULE.bazel"), 34),
+    ] {
+        let (mut transaction, _) =
+            direct_local_file_transaction(&dice, "dep", bytes, None, variant, None).await;
+        let value = transaction.compute(&key).await.unwrap();
+        let actual = match complete_observed_direct_local_inspection(&value).result.as_ref() {
+            Ok(DirectLocalModuleInspection(_, inspection)) => inspection
+                .as_ref()
+                .and_then(|inspection| inspection.includes.first())
+                .map(|request| request.path.as_str()),
+            Err(error) => panic!("unexpected inspection error: {error}"),
+        };
+        assert_eq!(actual, expected);
+    }
+}
+
+#[tokio::test]
+async fn observed_direct_local_inspection_covers_terminals_projection_and_cancellation() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = DirectLocalModuleInspectionObservationKey(direct_local_inspection_key("dep"));
+    let (route_need, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b""), None, 40, None).await;
+    let mut updater = route_need.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .unwrap();
+    let mut route_need = updater.commit().await;
+    let route_need = route_need.compute(&key).await.unwrap();
+    assert!(matches!(route_need, SourcePreparationOutcome::Need(_)));
+    assert!(!DirectLocalModuleInspectionObservationKey::validity(&route_need));
+    assert!(!DirectLocalModuleInspectionObservationKey::equality(
+        &route_need,
+        &route_need
+    ));
+
+    let (mut semantic_transaction, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b""), None, 41, None).await;
+    let missing = DirectLocalModuleInspectionObservationKey(direct_local_inspection_key("missing"));
+    let semantic_value = semantic_transaction.compute(&missing).await.unwrap();
+    let semantic = complete_observed_direct_local_inspection(&semantic_value);
+    assert!(matches!(
+        semantic.result.as_ref(),
+        Err(DirectLocalModuleInspectionError::Input(_))
+    ));
+    assert!(!semantic.observations.observations().is_empty());
+    let semantic_child = semantic_transaction
+        .compute(&DirectLocalModuleFileObservationKey(
+            direct_local_file_key("missing"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        semantic.observations,
+        complete_direct_local_file(&semantic_child).observations
+    );
+
+    let (mut invalid, _) = direct_local_file_transaction(
+        &dice,
+        "dep",
+        Some(b"include(\n"),
+        None,
+        42,
+        None,
+    )
+    .await;
+    let invalid_value = invalid.compute(&key).await.unwrap();
+    let invalid_observed = complete_observed_direct_local_inspection(&invalid_value);
+    assert!(matches!(
+        invalid_observed.result.as_ref(),
+        Err(DirectLocalModuleInspectionError::Inspection(_, _))
+    ));
+    let invalid_child = invalid
+        .compute(&DirectLocalModuleFileObservationKey(
+            direct_local_file_key("dep"),
+        ))
+        .await
+        .unwrap();
+    assert_eq!(
+        invalid_observed.observations,
+        complete_direct_local_file(&invalid_child).observations
+    );
+
+    let semantic_arc = Arc::new(Err(DirectLocalModuleInspectionError::InputCompute(
+        "held".into(),
+    )));
+    let carrier = SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalModuleInspection {
+        result: semantic_arc.dupe(),
+        observations: PathObservationEpoch::empty(),
+    }));
+    assert!(complete_observed_direct_local_inspection(&carrier)
+        .observations
+        .observations()
+        .is_empty());
+    let SourcePreparationOutcome::Complete(projected) =
+        project_legacy_direct_local_inspection(carrier)
+    else {
+        panic!("legacy projection must complete")
+    };
+    assert!(Arc::ptr_eq(&semantic_arc, &projected));
+
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand,
+            result_operation: PathObservationOperation::Lstat,
+        },
+    );
+    let ControlFlow::Break(outer_value) = direct_local_inspection_observed_child(
+        SourcePreparationOutcome::Complete(Err(outer.dupe())),
+    ) else {
+        panic!("file typed outer must suppress inspection")
+    };
+    assert!(matches!(&outer_value, SourcePreparationOutcome::Complete(Err(error)) if error == &outer));
+    assert!(DirectLocalModuleInspectionObservationKey::validity(
+        &outer_value
+    ));
+    assert!(DirectLocalModuleInspectionObservationKey::equality(
+        &outer_value,
+        &outer_value
+    ));
+
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut cancelled, _) = direct_local_file_transaction(
+        &dice,
+        "dep",
+        Some(b"include(\"//p:a.MODULE.bazel\")\n"),
+        None,
+        43,
+        Some(tracker.dupe()),
+    )
+    .await;
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(tracker.take().is_empty());
+    let (mut recovered, _) = direct_local_file_transaction(
+        &dice,
+        "dep",
+        Some(b"include(\"//p:a.MODULE.bazel\")\n"),
+        None,
+        43,
+        Some(tracker.dupe()),
+    )
+    .await;
+    assert!(matches!(
+        complete_observed_direct_local_inspection(&recovered.compute(&key).await.unwrap())
+            .result
+            .as_ref(),
+        Ok(DirectLocalModuleInspection(_, Some(_)))
+    ));
+}

@@ -1307,6 +1307,10 @@ impl Key for DirectLocalModuleFileObservationKey {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 struct DirectLocalModuleInspectionKey(NormalizedAbsolutePath, ApparentRepoName);
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+struct DirectLocalModuleInspectionObservationKey(DirectLocalModuleInspectionKey);
+
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
 struct DirectLocalModuleInspection(DirectLocalModuleFile, Option<NonrootModuleFileInspection>);
 
@@ -1316,6 +1320,16 @@ enum DirectLocalModuleInspectionError {
     Input(DirectLocalModuleFileError),
     Inspection(NormalizedAbsolutePath, Arc<str>),
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedDirectLocalModuleInspection {
+    result: Arc<Result<DirectLocalModuleInspection, DirectLocalModuleInspectionError>>,
+    observations: PathObservationEpoch,
+}
+
+type DirectLocalModuleInspectionDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedDirectLocalModuleInspection, ObservedPathFrontierError>,
+>;
 
 impl fmt::Display for DirectLocalModuleInspectionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -1339,64 +1353,159 @@ impl fmt::Display for DirectLocalModuleInspectionKey {
     }
 }
 
+impl fmt::Display for DirectLocalModuleInspectionObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+fn direct_local_inspection_complete(
+    result: Result<DirectLocalModuleInspection, DirectLocalModuleInspectionError>,
+    observations: PathObservationEpoch,
+) -> DirectLocalModuleInspectionDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedDirectLocalModuleInspection {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn direct_local_inspection_observed_child(
+    outcome: DirectLocalModuleFileDriverOutcome,
+) -> ControlFlow<DirectLocalModuleInspectionDriverOutcome, ObservedDirectLocalModuleFile> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(result) => result.map_or_else(
+            |error| ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))),
+            ControlFlow::Continue,
+        ),
+    }
+}
+
+async fn drive_direct_local_module_inspection(
+    ctx: &mut DiceComputations<'_>,
+    key: &DirectLocalModuleInspectionKey,
+    mode: HostRepositoryObservationMode,
+) -> DirectLocalModuleInspectionDriverOutcome {
+    let input_key = DirectLocalModuleFileKey::new(key.0.dupe(), key.1.clone())
+        .expect("direct inspection key rejects root names");
+    let (input, observations) = match mode {
+        HostRepositoryObservationMode::Legacy => match ctx.compute(&input_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return SourcePreparationOutcome::Need(need);
+            }
+            Ok(SourcePreparationOutcome::Complete(input)) => {
+                (input.as_ref().clone(), PathObservationEpoch::empty())
+            }
+            Err(error) => {
+                return direct_local_inspection_complete(
+                    Err(DirectLocalModuleInspectionError::InputCompute(
+                        error.to_string().into(),
+                    )),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        },
+        HostRepositoryObservationMode::Observed => {
+            let outcome = ctx
+                .compute(&DirectLocalModuleFileObservationKey(input_key))
+                .await;
+            let observed = match outcome {
+                Err(error) => {
+                    return direct_local_inspection_complete(
+                        Err(DirectLocalModuleInspectionError::InputCompute(
+                            error.to_string().into(),
+                        )),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+                Ok(outcome) => match direct_local_inspection_observed_child(outcome) {
+                    ControlFlow::Break(outcome) => return outcome,
+                    ControlFlow::Continue(observed) => observed,
+                },
+            };
+            (observed.result.as_ref().clone(), observed.observations)
+        }
+    };
+    let input = match input {
+        Ok(input) => input,
+        Err(error) => {
+            return direct_local_inspection_complete(
+                Err(DirectLocalModuleInspectionError::Input(error)),
+                observations,
+            );
+        }
+    };
+    let inspection = match &input.1 {
+        HostRepositorySourceFileValue::Absent => None,
+        HostRepositorySourceFileValue::Present {
+            bytes,
+            logical_path,
+        } => match crate::inspect_nonroot_module_file(
+            crate::LogicalModuleFileId::new(logical_path.as_path().display().to_string()),
+            bytes,
+        ) {
+            Ok(inspection) => Some(inspection),
+            Err(error) => {
+                return direct_local_inspection_complete(
+                    Err(DirectLocalModuleInspectionError::Inspection(
+                        logical_path.dupe(),
+                        Arc::from(error.to_string()),
+                    )),
+                    observations,
+                );
+            }
+        },
+    };
+    direct_local_inspection_complete(
+        Ok(DirectLocalModuleInspection(input, inspection)),
+        observations,
+    )
+}
+
+fn project_legacy_direct_local_inspection(
+    outcome: DirectLocalModuleInspectionDriverOutcome,
+) -> <DirectLocalModuleInspectionKey as Key>::Value {
+    outcome.map(|observed| {
+        observed
+            .expect("legacy direct-local inspection cannot produce an observed outer error")
+            .result
+    })
+}
+
 #[async_trait]
 impl Key for DirectLocalModuleInspectionKey {
     type Value = SourcePreparationOutcome<
         Arc<Result<DirectLocalModuleInspection, DirectLocalModuleInspectionError>>,
     >;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let input = match ctx
-            .compute(
-                &DirectLocalModuleFileKey::new(self.0.dupe(), self.1.clone())
-                    .expect("direct inspection key rejects root names"),
-            )
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(input)) => input,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    DirectLocalModuleInspectionError::InputCompute(Arc::from(error.to_string())),
-                )));
-            }
-        };
-        let input = match input.as_ref() {
-            Ok(input) => input.clone(),
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    DirectLocalModuleInspectionError::Input(error.clone()),
-                )));
-            }
-        };
-        let inspection = match &input.1 {
-            HostRepositorySourceFileValue::Absent => None,
-            HostRepositorySourceFileValue::Present {
-                bytes,
-                logical_path,
-            } => match crate::inspect_nonroot_module_file(
-                crate::LogicalModuleFileId::new(logical_path.as_path().display().to_string()),
-                bytes,
-            ) {
-                Ok(inspection) => Some(inspection),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        DirectLocalModuleInspectionError::Inspection(
-                            logical_path.dupe(),
-                            Arc::from(error.to_string()),
-                        ),
-                    )));
-                }
-            },
-        };
-        SourcePreparationOutcome::Complete(Arc::new(Ok(DirectLocalModuleInspection(
-            input, inspection,
-        ))))
+        project_legacy_direct_local_inspection(
+            drive_direct_local_module_inspection(ctx, self, HostRepositoryObservationMode::Legacy)
+                .await,
+        )
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x.complete_eq(y)
     }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for DirectLocalModuleInspectionObservationKey {
+    type Value = DirectLocalModuleInspectionDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_direct_local_module_inspection(ctx, &self.0, HostRepositoryObservationMode::Observed)
+            .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
