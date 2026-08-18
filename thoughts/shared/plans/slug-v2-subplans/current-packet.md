@@ -1,104 +1,104 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-root-package-all-build-frontier-implementation`
+Packet: `WP-2A-m1-root-package-all-build-publication-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Accepted design: `5eb036c2`
-Result: implement the private singleton root-package-all observed build sibling.
+Accepted implementation: `95002997`
+Result: freeze the bounded native publication consumer of the observed
+singleton root-package-all build carrier.
 
-## Frozen scope
+## Audit scope
 
-Implement private `BuildCommandRootObservationKey(BuildCommandRootKey)` only
-for exactly one root-repository `TargetPattern::PackageAll`; its constructor
-rejects every other identity and its `Display` is distinct from the legacy key.
-`ObservedBuildCommandRoot` retains exactly one
-`Arc<Result<BuildCommandEvaluation, BuildCommandError>>` plus one Arc-backed
-`PathObservationEpoch`, derives `Allocative`, and uses complete-only equality/
-validity. The key Value is exactly `SourcePreparationOutcome<Result<
-ObservedBuildCommandRoot, ObservedPathFrontierError>>`.
+Audit only the private `NativeCommandRoot` boundary, generic native
+attempt/terminal-selection owner, sole production
+`WorkspaceRuntime::build_command_with_bzlmod_inputs` constructor/caller, and
+the accepted-command event-preserving projection seam. Confirm that this is
+the uniquely smallest complete owner above `BuildCommandRootKey`, or record one
+smaller prerequisite/`REPLAN`.
 
-Expose the accepted `RootPackageLoadObservationKey` and
-`ObservedRootPackageLoad` only through the minimum doc-hidden loading API needed
-by core. Add no public/native command caller. Cquery, analyzed/exported/
-multi-target/external build paths and every repository/materializer path remain
-unchanged.
+The candidate slice is structurally exactly one root-repository
+`TargetPattern::PackageAll` admitted by the existing observed-key constructor.
+Empty, Starlark, exported, multi-target, external and cquery identities stay
+legacy and unsupported/deferred for this frontier.
 
-One shared narrow Legacy/Observed singleton-package-all driver selects matching
-root-module anchor and root-package families. Legacy enters the helper only for
-the same singleton structural identity; every other legacy path stays on the
-existing driver. Neither sibling computes the other.
+## Required design decisions
 
-## Order and terminals
+Freeze how the observed carrier remains live through native terminal closure
+selection and acceptance while the public return type remains the existing
+semantic `AcceptedCommand<Arc<Result<BuildCommandEvaluation,
+BuildCommandError>>>`. Decide the minimum private, infallible consuming
+projection that preserves the accepted event buffer.
 
-Observed order is root-module anchor then root package. Union each completed
-epoch before semantic inspection. Equal duplicate anchor observations retain
-the first exact Arc.
+Freeze carrier-versus-selected-snapshot validation immediately after terminal
+selection/preparation and before any selected snapshot commit, request-revision
+finalization or irreversible publication. The proof must cover the complete
+selected path epoch, canonical demand order, semantic values and exact result
+Arcs, plus the absence of repository requests/validation scopes. Missing,
+extra, unequal or pointer-distinct observations must fail closed without
+publishing a snapshot or event.
 
-Anchor semantic error retains the anchor epoch. Package semantic error retains
-anchor plus its complete decisive package prefix. Need and typed child/union
-outer error return no carrier or event, and cancellation publishes nothing.
-Success returns the unchanged loaded-only evaluation with an empty action
-closure and the full epoch.
+Decide whether selected snapshot construction can preserve the already shared
+observation Arcs through `PathObservationEpoch::from_shared`; do not authorize
+reconstructed Host reads or another observation store. Anchor-then-package
+execution order remains a separate accepted driver invariant from canonical
+epoch demand order.
 
-Anchor and package events remain child-owned; the build sibling stores no event
-data. Child values, loaded-only target construction and union scratch are
-compute-local.
+Freeze Need retry, typed observed outer error, semantic error, cancellation,
+selection/injection/materializer failure, event replay and restoration
+polarity. The observed singleton has no request-revision/source-certificate,
+empty-root or unavailable-root relaxation. All non-admitted callers must keep
+the identical legacy driver.
 
-## Required proof
+## Retention and proof
 
-Add discriminating tests for semantic parity/output, exact anchor-then-package
-Arcs and duplicate first-Arc, semantic/Need/outer/event polarity, strict family
-and public-caller isolation, complete-only equality/validity, warm/edit/delete/
-recreate/A-B-A, cancellation recovery, and unchanged empty/Starlark/exported/
-multi/external/cquery legacy paths.
+The public accepted value may retain only its existing semantic Result Arc and
+event buffer; the accepted native snapshot may retain only its existing compact
+Arc-backed path epoch. The observed carrier is attempt/acceptance-local and its
+epoch drops after successful consuming projection. Add no lock, task, cache,
+interner, collection, graph, event owner or Host read.
 
-Reuse accepted lifecycle/event evidence and pinned Bazel package-pattern
-behavior. No fixture or oracle is authorized.
+Require discriminating successor proof for public semantic/output parity;
+carrier/selected exact-Arc equality; pointer-distinct, missing, extra and value
+mismatches; Need/outer/error/cancellation/failure aborts; child-event order and
+warm replay; strict observed singleton and non-singleton legacy activation;
+warm/edit/delete/recreate/A-B-A; and post-return retained-state shape. Reuse the
+accepted package-pattern evidence; no fixture or oracle is authorized.
 
 ## Authority and caps
 
-Write only:
+This packet is docs-only. Write only:
 
-- `app/slug_loading_v2/src/bzl_module.rs`;
-- `app/slug_loading_v2/src/lib.rs`; and
-- `app/slug_core_v2/src/runtime/dice.rs`.
+- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+- this manifest; and
+- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
 
-Against `daf5eef9`, formatted caps are 24 net/6,214 physical for Bzl module,
-4/82 for loading lib, 260 production plus 420 test net/13,730 physical for core
-dice, and 708 aggregate net Rust lines. No cap-only correction is authorized.
-Completion-only scheduling may write canonical/current/Stage 2 under 180
-aggregate net lines.
-
-Retained state must remain one semantic Result Arc plus the existing Arc-backed
-epoch, with `Allocative` and cheap-clone signaling. Add no standard retained
-collection, interner, cache or hash surface. Require focused/full core and
-loading validation, formatting, inherited Clippy/archive disposition, exact
-scope/cap/artifact scans, `git diff --check`, Buck2-utility retention scan and
-independent ownership/cleanup review.
+Against `95002997`, caps are 40 canonical, 200 manifest, 120 Stage 2 and 300
+aggregate net lines. Require source/ownership audit, exact compatibility
+classification, bounded successor allowlist/caps, `git diff --check` and
+independent reserved-design review.
 
 ## Compatibility boundary
 
-Existing singleton root package-all package, output and child-event behavior
-remains exact. Carrier association, stable first-Arc union and typed outer
-errors are Slug-native. Every other build/cquery frontier, caller activation,
-repository materialization, native-Windows raw-byte ordering and exact Bazel
-identity bytes remain unsupported/deferred.
+Existing singleton package/output/event behavior remains exact. Carrier versus
+selected-snapshot association, exact shared-Arc validation and fail-closed
+outer errors are Slug-native. Analyzed/exported/multi-target/external/cquery
+publication, repository/materializer breadth, native-Windows raw-byte ordering
+and exact Bazel identity bytes remain unsupported/deferred.
 
 ## STOP / REPLAN
 
-STOP on any other file; Cargo, fixture or oracle writes; caller/public
-activation; analyzed/exported/multi/external/cquery composition; partial
-frontiers; direct/reconstructed Host reads; changed legacy output, events,
-dependency/error order or semantics; duplicated full build driver; another
-retained collection/cache/graph/store/lock/task; missing `Allocative`; or cap
-excess.
+STOP on Rust, Cargo, fixture or oracle writes; any public/caller activation;
+partial epoch validation; changed terminal, output, event, retry, selection,
+publication or restoration behavior; direct/reconstructed Host reads; another
+retained structure/owner; repository/materializer breadth; or cap excess.
 
-`REPLAN` if singleton package-all has an unobserved input, the narrow shared
-driver changes other legacy branches, the loading seam cannot remain sealed,
-child event ownership changes, or proof needs another file/key/seam/oracle.
+`REPLAN` if the observed carrier cannot be compared before irreversible
+acceptance, event-preserving projection needs a public API, selected snapshot
+identity cannot preserve the exact Arcs, the singleton path selects repository
+demands, or generic native-driver changes cannot remain bounded.
 
 ## Immediate successor
 
-On acceptance return only to docs-only next-owner design using `5eb036c2` plus
-the implementation commit. Do not combine caller/public cutover or another
-build/cquery/repository frontier.
+On independent acceptance schedule exactly one bounded singleton publication
+implementation using `95002997` plus the design commit. Do not combine another
+build/cquery/repository frontier or milestone close.

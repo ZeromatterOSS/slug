@@ -2804,3 +2804,51 @@ independent ownership/cleanup review. STOP on any other file or frontier,
 caller activation, behavior/event drift, direct Host read, another retained
 structure, Cargo/oracle write or cap excess. Acceptance returns only to a
 docs-only next-owner design.
+
+### Accepted singleton root-package-all build frontier (2026-08-17)
+
+Commit `95002997` accepts the private `BuildCommandRootObservationKey` and its
+shared narrow Legacy/Observed singleton root-repository `PackageAll` driver.
+The observed sibling selects only the matching anchor and root-package
+families, unions their epochs before semantic inspection, and retains one
+semantic Result Arc plus one Arc-backed epoch. Every public/native caller and
+every other build/cquery shape remains legacy.
+
+Semantic anchor and package errors retain their decisive prefix. Need, typed
+outer error and cancellation publish no carrier or parent event; child events
+remain child-owned. Stable union preserves the first exact Arc. Scratch child
+values, loaded-only target construction and union state remain compute-local.
+
+All four discriminating observed-build tests, eight broader build-root tests,
+and all 194 loading tests pass; direct core/loading checks, formatting, scope,
+caps and diff hygiene pass. The full core run's two failures are unchanged
+external-query/runtime-observation baselines outside this packet. Strict
+Clippy and archive checks retain only their inherited stops. Independent
+ownership/retention/cleanup review accepted.
+
+Against `daf5eef9`, loading Bzl module is +5 at 6,195 physical, loading lib is
++4 at 82, and core DICE is +260 production/+388 tests at 13,698; aggregate net
+Rust growth is +657. Existing singleton package/output/event behavior remains
+exact; carrier association, stable Arc union and typed outer errors are
+Slug-native.
+
+### Resumed singleton root-package-all publication design (2026-08-17)
+
+Run docs-only `WP-2A-m1-root-package-all-build-publication-design` from
+accepted implementation `95002997`. Audit the private `NativeCommandRoot`,
+generic native attempt/selection owner, sole public build constructor and
+accepted-command event-preserving projection seam. Select the uniquely
+smallest complete owner that can consume the observed build carrier without
+erasing its epoch or changing the public terminal.
+
+Freeze exact carrier-versus-selected-snapshot validation, Need/outer/error and
+abort polarity, event ownership, family/caller activation, accepted snapshot
+Arc retention, public output parity, lifecycle and failure recovery. Record a
+smaller prerequisite or `REPLAN` if no bounded cutover exists. This packet is
+design-only; Rust, Cargo, fixtures and oracles remain unchanged.
+
+Write only canonical/current/Stage 2 within 40/200/120 per-file and 300
+aggregate net lines. STOP on implementation, caller activation, partial epoch
+validation, public behavior drift, another retained structure, direct Host
+read, repository/materializer breadth or cap excess. Acceptance schedules
+exactly one bounded implementation successor or records the blocking `REPLAN`.
