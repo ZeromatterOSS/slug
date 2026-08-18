@@ -3491,7 +3491,7 @@ the child begins `use super::*;`. Relocated bodies are byte-identical and
 excluded only from semantic growth. This split preserves parent fixtures and
 leaves the frozen 160/300/460 semantic and 12,435/1,200/13,635 physical caps.
 
-### Active observed cquery publication implementation (2026-08-18)
+### Observed cquery publication implementation REPLAN (2026-08-18)
 
 Run `WP-2A-m1-cquery-observed-publication-implementation` from Rust base
 `941db0d0` and frozen design `895996d5`. Write only core
@@ -3512,4 +3512,46 @@ proof, complete core/analysis/loading validation, formatting/check/diff/archive
 gates, exact accounting, retention/cleanup scans and independent review. STOP
 on any other file, changed relocation, public drift, legacy family, duplicate
 owner, retained state, direct Host read, Cargo/oracle work or cap excess.
-Acceptance returns to one docs-only next-owner audit; do not close M1.
+Acceptance would return to one docs-only next-owner audit; do not close M1.
+
+The retained two-file candidate compiles, formats and passes 15 of 16 focused
+cquery tests in the default parallel batch. The only failure is
+`cquery_restores_structural_configuration_and_display_projection`: its restored
+attempt observes events only when run beside sibling tests, while the same test
+passes alone. The frozen relocation remains byte-identical to Rust-base lines
+9,210-10,042.
+
+The failure is a test-harness isolation artifact. Multiple parallel tests
+create sibling workspaces directly under `/tmp`; after this lifecycle test
+constructs its observed runtime, a sibling directory creation mutates the
+already-observed ancestor and correctly triggers replay. The production
+configured-analysis/package-family cutover, terminal algebra and event owner
+are not implicated. Because `895996d5` forbids any relocated-body change, the
+implementation stops unaccepted and formally replans before the test fix.
+
+### Active cquery parallel-workspace isolation correction design (2026-08-18)
+
+Run docs-only
+`WP-2A-m1-cquery-parallel-workspace-isolation-correction-design` from
+scheduling base `7280b9c2`, Rust base `941db0d0` and frozen semantic design
+`895996d5`. Retain the unaccepted two-file Rust candidate in place without
+modifying it in this packet.
+
+Freeze one exception only in
+`cquery_restores_structural_configuration_and_display_projection`: create a
+test-exclusive parent beneath the crate target tree before runtime
+construction, then use `tempfile::tempdir_in` beneath that pre-existing stable
+parent. Preserve every assertion and every other relocated body byte-for-byte.
+Charge the exception as test semantic growth while keeping the original
+160/300/460 semantic and 12,435/1,200/13,635 physical caps. The cfg(test)
+activation audit may remain with test accounting; the existing nonrelocated
+root-count test body stays unchanged.
+
+The successor resumes the same cquery implementation, runs the lifecycle test
+alone and the 16-test cquery batch at default parallelism, then completes all
+frozen proof, broader validation, accounting, retention/cleanup and independent
+review. Write only canonical/current/Stage 2/routing docs under
+40/140/100/30 and 310 aggregate caps. STOP on Rust, another test exception,
+assertion weakening, production design or cap change, extra files, Cargo/
+fixture/oracle writes or M1 close. `REPLAN` if the isolated parent does not
+remove the parallel replay or another relocated body must change.
