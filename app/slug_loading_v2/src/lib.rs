@@ -45,9 +45,13 @@ pub use bzl_module::BzlModuleEvaluator;
 pub use bzl_module::BzlModuleIdentity;
 pub use bzl_module::EvaluatedBzlModule;
 #[doc(hidden)]
+pub use bzl_module::ObservedRepositoryPackageLoad;
+#[doc(hidden)]
 pub use bzl_module::ObservedRootPackageLoad;
 pub use bzl_module::RepositoryPackageLoadError;
 pub use bzl_module::RepositoryPackageLoadKey;
+#[doc(hidden)]
+pub use bzl_module::RepositoryPackageLoadObservationKey;
 pub use bzl_module::RootPackageLoadError;
 pub use bzl_module::RootPackageLoadKey;
 #[doc(hidden)]

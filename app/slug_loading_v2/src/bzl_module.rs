@@ -43,8 +43,10 @@ use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequests;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsError;
 use slug_bzlmod_v2::HostSelectedExtensionEvaluationInputRequestsKey;
 use slug_bzlmod_v2::LogicalSpan;
+use slug_bzlmod_v2::RepositoryPackageSource;
 use slug_bzlmod_v2::RepositoryPackageSourceError;
 use slug_bzlmod_v2::RepositoryPackageSourceKey;
+use slug_bzlmod_v2::RepositoryPackageSourceObservationKey;
 use slug_bzlmod_v2::RepositorySourceFileError;
 use slug_bzlmod_v2::RootModuleGraphKey;
 use slug_bzlmod_v2::RootModuleLoadingAnchorError;
@@ -1823,6 +1825,39 @@ impl std::error::Error for RepositoryPackageLoadError {
 pub struct RepositoryPackageLoadKey {
     route: RootRepositoryRoute,
     package: PackagePath,
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub struct RepositoryPackageLoadObservationKey(RepositoryPackageLoadKey);
+
+impl RepositoryPackageLoadObservationKey {
+    pub fn new(route: RootRepositoryRoute, package: PackagePath) -> Self {
+        Self(RepositoryPackageLoadKey::new(route, package))
+    }
+}
+
+impl fmt::Display for RepositoryPackageLoadObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct ObservedRepositoryPackageLoad {
+    result: Arc<Result<LoadedPackage, RepositoryPackageLoadError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRepositoryPackageLoad {
+    pub fn result(&self) -> &Arc<Result<LoadedPackage, RepositoryPackageLoadError>> {
+        &self.result
+    }
+
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
 }
 
 impl RepositoryPackageLoadKey {
@@ -3756,12 +3791,6 @@ impl Key for RootPackageLoadObservationKey {
     }
 }
 
-fn repository_package_complete(
-    result: Result<LoadedPackage, RepositoryPackageLoadError>,
-) -> SourcePreparationOutcome<Arc<Result<LoadedPackage, RepositoryPackageLoadError>>> {
-    SourcePreparationOutcome::Complete(Arc::new(result))
-}
-
 fn loaded_external_target_kind(kind: &PackageTargetKind) -> Option<&'static str> {
     match kind {
         PackageTargetKind::ExportedFile | PackageTargetKind::Filegroup { .. } => None,
@@ -3836,62 +3865,245 @@ fn loaded_external_starlark_rule_reason(
         .map(|reason| (target.name.as_str(), reason))
 }
 
-#[async_trait]
-impl Key for RepositoryPackageLoadKey {
-    type Value = SourcePreparationOutcome<Arc<Result<LoadedPackage, RepositoryPackageLoadError>>>;
+#[derive(Clone, Copy)]
+enum RepositoryPackageLoadMode {
+    Legacy,
+    Observed,
+}
 
-    async fn compute(
-        &self,
-        ctx: &mut DiceComputations,
-        _cancellations: &CancellationContext,
-    ) -> Self::Value {
-        let capture_events = ctx
-            .per_transaction_data()
-            .data
-            .get::<CaptureEvaluationEvents>()
-            .is_ok();
-        let mut event_batch = None;
-        let value = async {
-            let package =
-                PackageIdentifier::new(self.route.canonical_repo().clone(), self.package.clone());
-            let source_key = RepositoryPackageSourceKey::new(self.route.clone(), package)
+type RepositoryPackageLoadCarrier = Arc<Result<LoadedPackage, RepositoryPackageLoadError>>;
+type RepositoryPackageLoadDriverOutcome = SourcePreparationOutcome<
+    Result<(RepositoryPackageLoadCarrier, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+fn repository_package_driver_complete(
+    result: Result<LoadedPackage, RepositoryPackageLoadError>,
+    observations: PathObservationEpoch,
+) -> RepositoryPackageLoadDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn finish_repository_package_observed_child<T>(
+    outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
+) -> ControlFlow<RepositoryPackageLoadDriverOutcome, T> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => ControlFlow::Continue(value),
+    }
+}
+
+fn merge_repository_package_observations(
+    current: &PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    union_host_observations(current, incoming)
+}
+
+async fn compute_repository_package_source(
+    ctx: &mut DiceComputations<'_>,
+    key: &RepositoryPackageLoadKey,
+    mode: RepositoryPackageLoadMode,
+) -> ControlFlow<RepositoryPackageLoadDriverOutcome, (RepositoryPackageSource, PathObservationEpoch)>
+{
+    let package = PackageIdentifier::new(key.route.canonical_repo().clone(), key.package.clone());
+    let mut observations = PathObservationEpoch::empty();
+    let result = match mode {
+        RepositoryPackageLoadMode::Legacy => {
+            let source = RepositoryPackageSourceKey::new(key.route.clone(), package)
                 .expect("repository package load route and package agree");
-            let source = match ctx.compute(&source_key).await {
+            match ctx.compute(&source).await {
                 Ok(SourcePreparationOutcome::Need(need)) => {
-                    return SourcePreparationOutcome::Need(need);
+                    return ControlFlow::Break(SourcePreparationOutcome::Need(need));
                 }
-                Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                    Ok(source) => source.dupe(),
-                    Err(error) => {
-                        return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                            RepositoryPackageLoadErrorInner::Source {
-                                error: error.clone(),
+                Ok(SourcePreparationOutcome::Complete(value)) => value.dupe(),
+                Err(error) => {
+                    return ControlFlow::Break(repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::SourceCompute {
+                                canonical_repo: CompactString::new(
+                                    key.route.canonical_repo().as_str(),
+                                ),
+                                package: key.package.clone(),
+                                message: Arc::from(error.to_string()),
                             },
-                        )));
+                        )),
+                        observations,
+                    ));
+                }
+            }
+        }
+        RepositoryPackageLoadMode::Observed => {
+            let source = RepositoryPackageSourceObservationKey::new(key.route.clone(), package)
+                .expect("repository package load route and package agree");
+            match ctx.compute(&source).await {
+                Ok(outcome) => match finish_repository_package_observed_child(outcome) {
+                    ControlFlow::Continue(value) => {
+                        observations = value.observations().dupe();
+                        value.result().dupe()
                     }
+                    ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
                 },
                 Err(error) => {
-                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::SourceCompute {
-                            canonical_repo: CompactString::new(
-                                self.route.canonical_repo().as_str(),
-                            ),
-                            package: self.package.clone(),
-                            message: Arc::from(error.to_string()),
-                        },
-                    )));
+                    return ControlFlow::Break(repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::SourceCompute {
+                                canonical_repo: CompactString::new(
+                                    key.route.canonical_repo().as_str(),
+                                ),
+                                package: key.package.clone(),
+                                message: Arc::from(error.to_string()),
+                            },
+                        )),
+                        observations,
+                    ));
                 }
-            };
+            }
+        }
+    };
+    match result.as_ref() {
+        Ok(source) => ControlFlow::Continue((source.dupe(), observations)),
+        Err(error) => ControlFlow::Break(repository_package_driver_complete(
+            Err(RepositoryPackageLoadError::new(
+                RepositoryPackageLoadErrorInner::Source {
+                    error: error.clone(),
+                },
+            )),
+            observations,
+        )),
+    }
+}
+
+async fn compute_repository_package_children(
+    ctx: &mut DiceComputations<'_>,
+    key: &RepositoryPackageLoadKey,
+    mode: RepositoryPackageLoadMode,
+    resolved_loads: Vec<(String, RepositoryBzlLabel)>,
+    build_origin: &Arc<str>,
+    mut observations: PathObservationEpoch,
+) -> ControlFlow<
+    RepositoryPackageLoadDriverOutcome,
+    (Vec<(String, FrozenBzlModule)>, PathObservationEpoch),
+> {
+    let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
+    for (raw_load, label) in resolved_loads {
+        let canonical_label = label.canonical_label(&key.route);
+        let child_result = match mode {
+            RepositoryPackageLoadMode::Legacy => {
+                let child = ExternalBzlModuleEvalKey::new(key.route.clone(), label);
+                match ctx.compute(&child).await {
+                    Ok(SourcePreparationOutcome::Need(need)) => {
+                        return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+                    }
+                    Ok(SourcePreparationOutcome::Complete(value)) => value,
+                    Err(error) => {
+                        return ControlFlow::Break(repository_package_driver_complete(
+                            Err(RepositoryPackageLoadError::new(
+                                RepositoryPackageLoadErrorInner::Bzl {
+                                    origin: build_origin.dupe(),
+                                    raw_load: Arc::from(raw_load.as_str()),
+                                    canonical_label: canonical_label.clone(),
+                                    error: Arc::new(ExternalBzlModuleError::SourceCompute {
+                                        label: canonical_label,
+                                        message: Arc::from(error.to_string()),
+                                    }),
+                                },
+                            )),
+                            observations,
+                        ));
+                    }
+                }
+            }
+            RepositoryPackageLoadMode::Observed => {
+                let child = ExternalBzlModuleObservationKey::new(key.route.clone(), label);
+                match ctx.compute(&child).await {
+                    Ok(outcome) => match finish_repository_package_observed_child(outcome) {
+                        ControlFlow::Continue(value) => {
+                            observations = match merge_repository_package_observations(
+                                &observations,
+                                value.observations(),
+                            ) {
+                                Ok(observations) => observations,
+                                Err(error) => {
+                                    return ControlFlow::Break(SourcePreparationOutcome::Complete(
+                                        Err(error),
+                                    ));
+                                }
+                            };
+                            value.result().dupe()
+                        }
+                        ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                    },
+                    Err(error) => {
+                        return ControlFlow::Break(repository_package_driver_complete(
+                            Err(RepositoryPackageLoadError::new(
+                                RepositoryPackageLoadErrorInner::Bzl {
+                                    origin: build_origin.dupe(),
+                                    raw_load: Arc::from(raw_load.as_str()),
+                                    canonical_label: canonical_label.clone(),
+                                    error: Arc::new(ExternalBzlModuleError::SourceCompute {
+                                        label: canonical_label,
+                                        message: Arc::from(error.to_string()),
+                                    }),
+                                },
+                            )),
+                            observations,
+                        ));
+                    }
+                }
+            }
+        };
+        match child_result.as_ref() {
+            Ok(module) => loaded_modules.push((raw_load, module.clone())),
+            Err(error) => {
+                return ControlFlow::Break(repository_package_driver_complete(
+                    Err(RepositoryPackageLoadError::new(
+                        RepositoryPackageLoadErrorInner::Bzl {
+                            origin: build_origin.dupe(),
+                            raw_load: Arc::from(raw_load.as_str()),
+                            canonical_label,
+                            error: Arc::new(error.clone()),
+                        },
+                    )),
+                    observations,
+                ));
+            }
+        }
+    }
+    ControlFlow::Continue((loaded_modules, observations))
+}
+
+impl RepositoryPackageLoadKey {
+    async fn compute_mode(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: RepositoryPackageLoadMode,
+        capture_events: bool,
+        event_batch: &mut Option<EventBatch>,
+    ) -> RepositoryPackageLoadDriverOutcome {
+        async {
+            let (source, observations) =
+                match compute_repository_package_source(ctx, self, mode).await {
+                    ControlFlow::Continue(value) => value,
+                    ControlFlow::Break(value) => return value,
+                };
             let relative_build_file =
                 PathBuf::from(self.package.as_str()).join(source.build_file_name());
             let source = match std::str::from_utf8(source.bytes().as_ref()) {
                 Ok(source) => Arc::new(source.to_owned()),
                 Err(_) => {
-                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::Encoding {
-                            path: relative_build_file,
-                        },
-                    )));
+                    return repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::Encoding {
+                                path: relative_build_file,
+                            },
+                        )),
+                        observations,
+                    );
                 }
             };
             let canonical_repo = CompactString::new(self.route.canonical_repo().as_str());
@@ -3912,13 +4124,16 @@ impl Key for RepositoryPackageLoadKey {
             ) {
                 Ok(ast) => ast,
                 Err(error) => {
-                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::Parse {
-                            canonical_repo,
-                            package: self.package.clone(),
-                            message: Arc::from(error.to_string()),
-                        },
-                    )));
+                    return repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::Parse {
+                                canonical_repo,
+                                package: self.package.clone(),
+                                message: Arc::from(error.to_string()),
+                            },
+                        )),
+                        observations,
+                    );
                 }
             };
             let loads = ast
@@ -3936,13 +4151,16 @@ impl Key for RepositoryPackageLoadKey {
             {
                 Ok(loads) => loads,
                 Err(error) => {
-                    return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::LoadLabel {
-                            canonical_repo,
-                            package: self.package.clone(),
-                            error,
-                        },
-                    )));
+                    return repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::LoadLabel {
+                                canonical_repo,
+                                package: self.package.clone(),
+                                error,
+                            },
+                        )),
+                        observations,
+                    );
                 }
             };
             let build_basename = relative_build_file
@@ -3953,48 +4171,19 @@ impl Key for RepositoryPackageLoadKey {
                 "@@{canonical_repo}//{}/{}",
                 self.package, build_basename
             ));
-            let mut loaded_modules = Vec::with_capacity(resolved_loads.len());
-            for (raw_load, label) in resolved_loads {
-                let child = ExternalBzlModuleEvalKey::new(self.route.clone(), label);
-                let canonical_label = child.canonical_label();
-                let child_value = match ctx.compute(&child).await {
-                    Ok(value) => value,
-                    Err(error) => {
-                        return repository_package_complete(Err(RepositoryPackageLoadError::new(
-                            RepositoryPackageLoadErrorInner::Bzl {
-                                origin: build_origin.clone(),
-                                raw_load: Arc::from(raw_load.as_str()),
-                                canonical_label: canonical_label.clone(),
-                                error: Arc::new(ExternalBzlModuleError::SourceCompute {
-                                    label: canonical_label,
-                                    message: Arc::from(error.to_string()),
-                                }),
-                            },
-                        )));
-                    }
-                };
-                let module = match child_value {
-                    SourcePreparationOutcome::Need(need) => {
-                        return SourcePreparationOutcome::Need(need);
-                    }
-                    SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                        Ok(module) => module.clone(),
-                        Err(error) => {
-                            return repository_package_complete(Err(
-                                RepositoryPackageLoadError::new(
-                                    RepositoryPackageLoadErrorInner::Bzl {
-                                        origin: build_origin.clone(),
-                                        raw_load: Arc::from(raw_load.as_str()),
-                                        canonical_label,
-                                        error: Arc::new(error.clone()),
-                                    },
-                                ),
-                            ));
-                        }
-                    },
-                };
-                loaded_modules.push((raw_load, module));
-            }
+            let (loaded_modules, observations) = match compute_repository_package_children(
+                ctx,
+                self,
+                mode,
+                resolved_loads,
+                &build_origin,
+                observations,
+            )
+            .await
+            {
+                ControlFlow::Continue(value) => value,
+                ControlFlow::Break(value) => return value,
+            };
             let input = HostPackageAttemptInput {
                 workspace: self.route.workspace().dupe(),
                 logical_package_root: self.route.workspace().dupe(),
@@ -4010,16 +4199,19 @@ impl Key for RepositoryPackageLoadKey {
                 HostPackageAttemptStep::Pending {
                     event_batch: batch, ..
                 } => {
-                    event_batch = Some(batch);
-                    repository_package_complete(Err(RepositoryPackageLoadError::new(
-                        RepositoryPackageLoadErrorInner::GlobUnsupported {
-                            canonical_repo,
-                            package: self.package.clone(),
-                        },
-                    )))
+                    *event_batch = Some(batch);
+                    repository_package_driver_complete(
+                        Err(RepositoryPackageLoadError::new(
+                            RepositoryPackageLoadErrorInner::GlobUnsupported {
+                                canonical_repo,
+                                package: self.package.clone(),
+                            },
+                        )),
+                        observations,
+                    )
                 }
                 HostPackageAttemptStep::Terminal(terminal) => {
-                    event_batch = Some(terminal.event_batch);
+                    *event_batch = Some(terminal.event_batch);
                     let result = terminal.result.map_err(|error| {
                         RepositoryPackageLoadError::new(RepositoryPackageLoadErrorInner::Attempt(
                             error,
@@ -4065,16 +4257,111 @@ impl Key for RepositoryPackageLoadKey {
                         }
                         Ok(loaded)
                     });
-                    repository_package_complete(result)
+                    repository_package_driver_complete(result, observations)
                 }
             }
         }
-        .await;
-        if capture_events && value.is_complete() {
+        .await
+    }
+}
+
+fn project_legacy_repository_package_load(
+    value: RepositoryPackageLoadDriverOutcome,
+) -> SourcePreparationOutcome<RepositoryPackageLoadCarrier> {
+    match value {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            debug_assert!(observations.observations().is_empty());
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            panic!("legacy repository package load produced frontier error: {error}")
+        }
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryPackageLoadKey {
+    type Value = SourcePreparationOutcome<RepositoryPackageLoadCarrier>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = self
+            .compute_mode(
+                ctx,
+                RepositoryPackageLoadMode::Legacy,
+                capture_events,
+                &mut event_batch,
+            )
+            .await;
+        if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
             ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
                 .expect("RepositoryPackageLoadKey stores one local Complete event batch");
         }
-        value
+        project_legacy_repository_package_load(value)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryPackageLoadObservationKey {
+    type Value =
+        SourcePreparationOutcome<Result<ObservedRepositoryPackageLoad, ObservedPathFrontierError>>;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        let capture_events = ctx
+            .per_transaction_data()
+            .data
+            .get::<CaptureEvaluationEvents>()
+            .is_ok();
+        let mut event_batch = None;
+        let value = self
+            .0
+            .compute_mode(
+                ctx,
+                RepositoryPackageLoadMode::Observed,
+                capture_events,
+                &mut event_batch,
+            )
+            .await;
+        if capture_events && matches!(value, SourcePreparationOutcome::Complete(Ok(_))) {
+            ctx.store_evaluation_data(event_batch.unwrap_or_else(EventBatch::empty))
+                .expect(
+                    "RepositoryPackageLoadObservationKey stores one local Complete event batch",
+                );
+        }
+        match value {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedRepositoryPackageLoad {
+                    result,
+                    observations,
+                }))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
