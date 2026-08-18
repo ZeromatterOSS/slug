@@ -1,12 +1,11 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-host-glob-frontier-design`
+Packet: `WP-2A-m1-host-glob-frontier-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Accepted predecessors: `b9fda97d`, `f5a9b249`, `bd4fb8db`, `dc696b2d`,
-`dc6f6e02`
-Result: freeze one complete callerless observed sibling at the natural
-`HostGlobTraversalKey` owner. No smaller prerequisite remains.
+Accepted design: `c271b07c`
+Result: implement exactly the frozen callerless observed sibling at the natural
+`HostGlobTraversalKey` owner.
 
 ## Design task
 
@@ -76,7 +75,7 @@ specific unproved parity gap.
 
 ## Authority and validation
 
-This design packet is docs-only. Candidate implementation may write only:
+Write only:
 
 - `app/slug_loading_v2/src/host_glob/mod.rs` for a zero-net helper rename;
 - `app/slug_loading_v2/src/host_glob/traversal.rs`; and
@@ -85,15 +84,8 @@ This design packet is docs-only. Candidate implementation may write only:
 Against `dc6f6e02`, implementation caps are zero net/1,000 physical for
 `mod.rs`, 350 production/880 physical for traversal, 470 tests/1,293 physical
 for traversal tests, and 820 aggregate net Rust lines. No correction is
-authorized. Design-time writes remain only:
-
-- `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
-- this manifest; and
-- `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`.
-
-Caps are 40 canonical, 320 manifest, 280 Stage 2 and 640 aggregate net lines.
-Require plan consistency, reference verification, `git diff --check`, exact
-ledger accounting and independent design review before commit.
+authorized. Completion-only scheduling may write canonical, this manifest and
+Stage 2 under 180 aggregate net lines.
 
 ## Compatibility boundary
 
@@ -105,10 +97,11 @@ identity bytes remain unsupported/deferred.
 
 ## STOP / REPLAN
 
-STOP on Rust, Cargo, fixture or oracle writes; BUILD/package-load activation;
-public/core/repository/materializer work; direct, reconstructed or historical
-Host reads; parent events; another carrier/container/cache/graph/store/lock;
-retained work collections; behavior widening; or ledger excess.
+STOP on any other file; Cargo, fixture or oracle writes; BUILD/package-load or
+adapter activation; public/core/repository/materializer work; direct,
+reconstructed or historical Host reads; parent events; another carrier/
+container/cache/graph/store/lock; retained work collections; changed traversal
+order/ranking/stops/polarity; or cap excess.
 
 `REPLAN` if a shared driver changes legacy behavior, a decisive child epoch
 cannot remain complete, prefix terminals cannot be proved, family isolation
@@ -116,5 +109,6 @@ requires duplication, or proof needs another file/key/seam/oracle.
 
 ## Immediate successor
 
-On acceptance schedule only
-`WP-2A-m1-host-glob-frontier-implementation` from the design commit.
+On acceptance return only to docs-only `WP-2A-m1-host-glob-frontier-design`
+using `c271b07c` plus the implementation commit. Do not combine adapter,
+BUILD/package-load or higher-caller activation.

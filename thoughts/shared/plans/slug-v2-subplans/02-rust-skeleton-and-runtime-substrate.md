@@ -2555,3 +2555,23 @@ decisive-prefix aggregation and outer precedence are Slug-native. Adapter,
 BUILD/package-load, core/public, repository/materializer and native-Windows
 work remain deferred. Acceptance schedules only the bounded traversal
 implementation.
+
+### Active Host-glob traversal frontier implementation (2026-08-17)
+
+Run `WP-2A-m1-host-glob-frontier-implementation` from accepted design
+`c271b07c`. Implement only the private observed traversal sibling and one
+shared mode-aware driver in `host_glob/{mod.rs,traversal.rs,
+traversal_tests.rs}` under the frozen zero/350/470/820 net and
+1,000/880/1,293 physical caps.
+
+Preserve exact breadth-first traversal and legacy family behavior. Aggregate
+observed segment then boundary epochs incrementally at exact child rank; outer
+is prefix-bounded by the first semantic terminal and otherwise wins over Need.
+Need, outer error and cancellation publish no carrier/event.
+
+Require the frozen parity, exact-Arc/order/prefix, mixed-terminal, boundary
+stop, lifecycle, cancellation, event, family, validation, accounting and
+independent cleanup proof. STOP on any other file, adapter or caller activation,
+behavior change, another retained structure, direct Host read, fixture/oracle
+write or cap excess. Acceptance returns only to docs-only Host-glob frontier
+design.
