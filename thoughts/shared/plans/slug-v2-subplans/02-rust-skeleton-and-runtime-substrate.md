@@ -5977,3 +5977,29 @@ order, rollback, public source lifecycle and the unchanged server lifecycle.
 Preserve every original external owner/certificate/event/family/compatibility
 contract and schedule only one implementation retry after independent design
 ACCEPT. After implementation ACCEPT return only to a docs-only M1 owner audit.
+
+### External singleton observed-build implementation retry 2 active (2026-08-18)
+
+Run only `WP-2A-m1-external-singleton-observed-build-implementation-retry-2`
+from Rust base `a4dd40d6`, external design `1a217e2a`, loading correction
+`ce110d9a` and event design `5dabd4bf`. Authority is exactly DICE
++300/11,300, build proof +400/3,400, the sole line-neutral loading assertion at
+3,439, and events +80 production/+100 tests/1,950. Aggregate is <=880 semantic
+and <=20,089 physical.
+
+Preserve the complete external matching-family owner, order/prefix/certificate,
+repository, child-event, memory and compatibility contract. Add only the
+private command-local tombstone-capable provisional event slice. Carry it from
+revision retries through later Needs for the same root; final Known Some/None
+overrides, NoTransition uses carry then true prior, and final-only nodes append.
+Emit the final effective delta against true prior and accept its Some-only epoch
+only after materializer acceptance. Failure drops carry and changes no accepted
+state.
+
+Require exact reducer/removal/reappearance/order/Need/rollback proof, public
+source churn without package replay, the unchanged server lifecycle, focused
+build, loading 138/138, full bzlmod, documented core/query/server baselines,
+fmt/diff, exact caps, cleanup/retention and independent review. STOP every other
+file or loading byte, child filtering, equality weakening, accepted-state or
+owner expansion, behavior drift, cap excess and M1 closure. After ACCEPT return
+only to one docs-only remaining M1 owner audit.
