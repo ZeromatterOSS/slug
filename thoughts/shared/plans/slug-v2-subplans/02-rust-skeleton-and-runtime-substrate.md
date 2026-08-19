@@ -6133,3 +6133,33 @@ same four files and unchanged corrected caps: DICE +340/11,350, build proof
 aggregate <=1,040 semantic and <=20,289 physical. Preserve every external
 owner/certificate/repository/family/event and legacy contract; remove temporary
 trace logging. After implementation ACCEPT return only to a docs-only M1 audit.
+
+### External singleton observed-build implementation retry 4 active (2026-08-18)
+
+Run only
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-4` from Rust
+base `a4dd40d6`, external design `1a217e2a`, loading correction
+`ce110d9a`, revision-event design `5dabd4bf`, and accepted current-closure
+correction `56ed9923`.
+
+Authority remains exactly DICE +340/11,350, build proof +440/3,450, the one
+line-neutral loading assertion at 3,439, and events +100 production/+160
+tests/2,050; aggregate <=1,040 semantic and <=20,289 physical.
+
+Preserve every external owner/order/prefix/certificate/repository/family/event,
+legacy infrastructure, compact retention and compatibility contract. On the
+first revision retry with matching ordered roots, reconcile in current closure
+order: prior+Some uses current, prior+KnownNone/NoTransition carries prior,
+absent prior drops and new Some contributes. Root mismatch remains ordinary.
+Semantic-Complete child owners must store Some including empty; Need/outer
+cannot accept. Preserve later final overrides, tombstones, Needs, retry order,
+true-prior delta and atomic accepted replacement. Remove temporary trace logs.
+
+Require mixed current-order/root mismatch/reorder and simultaneous child
+removal/source-change proof, every later retry/failure case, accepted package
+membership across source churn, changed child replay, root switch, unchanged
+server lifecycle, focused/full validation, exact caps, cleanup/retention and
+independent review. STOP every other file/loading byte, child filtering,
+equality weakening, absent-node carry, producer-invariant failure, retained
+closure/map, behavior drift, cap excess and M1 closure. After ACCEPT return only
+to one docs-only M1 owner audit.
