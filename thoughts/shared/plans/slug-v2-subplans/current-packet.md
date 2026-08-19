@@ -1,18 +1,28 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-repository-materialization-request-observation-implementation`
+Packet: `WP-6-7A-repository-materialization-request-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling base: `ba04cde7`
 Rust base: `3d174006`
-Accepted design and scheduling base: `e606e1b2`
+Accepted semantic design: `e606e1b2`
 
-## Exact Rust authority and caps
+## Exact docs authority and measured correction
 
-Write only `app/slug_bzlmod_v2/src/source_preparation.rs` from the
-13,747-line `3d174006` baseline: <=180 production, <=320 tests, <=500
-aggregate semantic and <=14,300 physical lines. The file is a cohesive
-large-owner exception and every touched helper remains below 200 lines. Every
-other file is read-only.
+During this design write only the canonical plan, this manifest, Stage 6 and
+the routing log, with <=40/180/140/30 net lines respectively and <=390
+aggregate. The retained dirty
+`app/slug_bzlmod_v2/src/source_preparation.rs` candidate is non-writable; every
+other Rust, Cargo, BUILD, fixture, oracle and public file is read-only.
+
+Against the 13,747-line `3d174006` baseline, the retained candidate is +161
+production/+319 tests/+480 aggregate at 14,227 physical lines. It fits the
+original production and aggregate caps but leaves one test line, which cannot
+hold the missing observed terminal and lifecycle matrix. The future retry keeps
+the exact one-file authority and <=180 production, raises only tests to <=480
+and aggregate to <=660, and raises the physical ceiling to <=14,480. This is a
+measured +160 semantic/+180 formatted proof allowance over the prior test cap,
+with 161 test-net/253 physical lines beyond the live candidate.
 
 ## Frozen owner and implementation contract
 
@@ -52,6 +62,16 @@ Do not activate materialization result injection, repository source,
 preparation/closure, discovery, selected graph, extension, analysis or any
 caller.
 
+The correction may only restructure or add proof. Production semantics,
+identity, driver order, Result-Arc projection, event ownership, retained state
+and the <=180 production cap are frozen. Required additions must drive the live
+observed owner, or a pure reducer used directly by it, through empty
+invalid-workspace/effective-compute prefixes and full missing, unsupported,
+canonical, request-kind/spec and success prefixes. They must discriminate
+root-local, command-absolute and HTTP/Git immutable projections; malformed
+request kinds; command/request-kind A-B-A with held Result and epoch Arcs; and
+later-child suppression. Existing proof remains required.
+
 ## Required proof and compatibility
 
 Discriminate distinct key identity/Display and private access; exact legacy
@@ -82,10 +102,15 @@ formatting, diff-check, exact accounting and AI-cleanup/Buck2 retention review.
 
 ## STOP and successor
 
-STOP on any second file/key/caller/export, downstream activation, semantic or
-error drift, event/family change, retained child carrier or scratch collection,
-direct Host read, new state, cap excess or milestone closure. REPLAN rather
-than weaken exact request behavior or fabricate proof.
+STOP Rust during this design. STOP on any second Rust file/key/caller/export,
+downstream activation, semantic or error drift, event/family change, retained
+child carrier or scratch collection, direct Host read, new state, cap excess
+or milestone closure. REPLAN rather than weaken exact request behavior,
+discard an existing discriminator or fabricate proof.
 
-After independent implementation ACCEPT, schedule only the docs-only
-`WP-6-7A-selected-module-graph-observation-frontier-design`.
+After independent design ACCEPT, schedule exactly
+`WP-6-7A-repository-materialization-request-observation-implementation-retry`
+with the corrected one-file caps. After independent implementation ACCEPT,
+schedule only the docs-only
+`WP-6-7A-selected-module-graph-observation-frontier-design`. Exactly one
+immediate successor is authorized.

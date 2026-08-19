@@ -8089,3 +8089,40 @@ complete identity, Arc, prefix, family, event, lifecycle, retention,
 compatibility and STOP contract. No materialization/source/closure/preparation/
 discovery/selected-graph caller is activated. After independent ACCEPT, return
 only to the docs-only selected-module-graph observation-frontier design.
+
+### Materialization-request observation proof-cap REPLAN (2026-08-19)
+
+The retained one-file candidate implements the accepted private request owner
+without a semantic, ownership, event or retention defect. Against
+`3d174006`, it measures +161 production/+319 tests/+480 aggregate at 14,227
+physical lines and passes focused 2/2, full bzlmod 431/431 and loading 138/138.
+The parent selects only the matching effective-override family, accepts the
+complete child epoch before semantic inspection, moves the exact legacy Result
+Arc, remains eventless and retains only one request Result Arc plus the compact
+epoch.
+
+Independent proof review found that the single remaining test line cannot
+discriminate the frozen empty invalid-workspace/effective-compute prefixes,
+full missing/unsupported/canonical/request-kind/spec terminals,
+command-absolute and HTTP/Git immutable behavior, or command/request-kind
+A-B-A with held Result and epoch Arcs. Existing legacy request-kind tests do
+not prove the observed parent's prefix or retained-Arc behavior. Compaction
+cannot add that matrix without removing the accepted live dependency-row,
+family, event, warm, cancellation, Need/outer, legacy-Arc and root-local
+lifecycle proof.
+
+Run only
+`WP-6-7A-repository-materialization-request-observation-proof-cap-correction-design`,
+docs-only, from scheduling base `ba04cde7`, Rust base `3d174006` and
+semantic design `e606e1b2`. Retain `source_preparation.rs` non-writable.
+Keep production <=180; raise tests only to <=480, aggregate to <=660 and
+physical to <=14,480 from the 13,747-line base. The added room may fund only
+proof restructuring and the missing observed terminal/lifecycle matrix.
+
+STOP every Rust/Cargo/BUILD/fixture/oracle/public write, semantic or event
+change, new key/caller/state, later-owner activation, proof deletion, cap
+excess and milestone closure. After independent correction ACCEPT, schedule
+exactly the same one-file implementation retry. After its independent ACCEPT,
+return only to
+`WP-6-7A-selected-module-graph-observation-frontier-design`, docs-only.
+Exactly one immediate successor is authorized.
