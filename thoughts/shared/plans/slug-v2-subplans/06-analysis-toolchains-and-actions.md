@@ -7826,3 +7826,22 @@ lines. STOP any third Rust file, selected-graph/registry/extension/package or
 analysis activation, direct Host read, duplicate collection/state/event owner,
 or parity drift. After design and implementation ACCEPT, schedule only the
 docs-only selected-module-graph observation-frontier design.
+
+### Root MODULE-files observation design accepted (2026-08-19)
+
+Design `335cfa45` freezes `RootModuleFilesKey` as the first complete aggregate
+owner. The implementation may edit only `host_module.rs` and `module_eval.rs`.
+It must move the already-evaluated extension-usage Arc into the private root
+child value, add the private observed RootModuleFiles sibling/carrier, preserve
+legacy evaluation -> visible-lockfile order, and make the observed lockfile
+projection mode-first with no file activation in Off mode. Complete epochs are
+merged root then lockfile left-first before semantic inspection; Need/typed
+outer is immediate and carrierless; the parent remains eventless.
+
+Caps are host-module +80 production/+120 tests/4,740 physical, module-eval
++180 production/+220 tests/5,850 physical, <=600 aggregate semantic and
+<=10,590 combined physical. Retain only one local RootModuleFiles Result Arc
+plus compact epoch; no third file, selected graph/registry/extension/package or
+analysis activation, direct Host read, extra collection/state/event owner, or
+cap excess. After ACCEPT, schedule only the docs-only selected-module-graph
+observation-frontier design.
