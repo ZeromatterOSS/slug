@@ -6288,3 +6288,62 @@ lifecycle/rollback behavior, focused/full validation, exact caps, cleanup and
 independent review. STOP every other file/loading byte, validation weakening,
 stale preference, behavior drift, cap excess and M1 closure. After ACCEPT
 return only to one docs-only M1 audit.
+
+### External singleton observed-build publication accepted (2026-08-18)
+
+Accepted implementation `3f1d4dd4` completes the observed nonroot-singleton
+build owner from Rust base `a4dd40d6` and design/correction authorities
+`1a217e2a`, `ce110d9a`, `5dabd4bf`, `0b4b5210` and `503af0a9`.
+
+Every syntactic nonroot Single enters the distinct observed root and is
+classified after observed repository package loading. Exported files retain
+the exact source-child certificate and full terminal epoch; wrong-kind rules
+and filegroups stop after classification. Terminal-first stable epoch
+association installs missing demands, preserves terminal Arcs for equal
+duplicates, retains unrelated command Arcs and fails closed on conflict before
+selection or publication. Selected-demand membership, repository validation
+and full value/Arc validation remain exact.
+
+Only certificate-bearing external terminals select matching-root
+SourceCertifiedCurrentClosure event reconciliation. Strict roots keep ordinary
+KnownNone removal. Current Some, carried KnownNone/NoTransition, absence,
+tombstones, multiple retries and changed/empty/new current-order batches are
+discriminated while child keys remain sole batch owners. Path, repository and
+event snapshots replace only after materializer acceptance.
+
+The exact four-file diff is core `runtime/{dice,events}.rs`,
+`runtime/tests/build_command_tests.rs` and loading
+`host_package_load_tests.rs`. Final accounting is +349 DICE at 11,264 physical,
+events +96 production/+137 tests at 2,003, build proof +439 at 3,389 and loading
+line-neutral at 3,439; aggregate +1,021/20,095.
+
+Validation passes build-command 35/35, event 16/16, loading 138/138, query
+56+1+11, bzlmod 426 plus its integration suites, and the retained server
+external/root lifecycle. Full core retains only the recorded stale visibility
+and PathObservationEpoch injection baselines. Formatting, diff, Buck2
+retention, AI cleanup and two independent reviews returned ACCEPT.
+
+Compatibility is exact for public build values/errors/order/repositories and
+child events plus every legacy/direct owner. Private observed terminal,
+certificate, repository and event association is Slug-native. Multi-build,
+one-shot migration, broader actions/external globs and exact identity bytes
+remain deferred. M1 is partial.
+
+### Post-external-singleton remaining-owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-post-external-singleton-remaining-owner-audit` from accepted
+base `3f1d4dd4`. This is a four-document read-only source audit; write only
+canonical/current/Stage/routing within 40/180/160/30 net and 430 aggregate.
+
+Rank multi-build aggregation against the one-shot workspace adapters and any
+uniquely smaller prerequisite. Trace structural Result ownership, mixed
+loading/analysis/exported-source branch algebra, complete path and aggregate
+certificate construction, revision eligibility, repository/event acceptance,
+cancellation/rollback, retained versus scratch lifetime, family isolation and
+exact lifecycle proof. Measure a future Rust allowlist and caps only after the
+owner is complete.
+
+End with exactly one independently reviewed docs-only owner design, one
+uniquely smaller prerequisite design or formal REPLAN. STOP Rust, Cargo, BUILD,
+fixtures/oracles, public activation, adjacent breadth, cap excess and M1
+closure.
