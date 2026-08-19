@@ -6416,3 +6416,39 @@ one-shot cutover, broader globs/actions and exact identity bytes.
 STOP Rust, any third file/owner, admission/public/event drift, retained branch
 state, cap excess or M1 closure. After independent design ACCEPT schedule only
 `WP-2A-m1-multi-build-observed-publication-implementation`; otherwise REPLAN.
+
+### Multi-build observed-publication implementation active (2026-08-18)
+
+Run only `WP-2A-m1-multi-build-observed-publication-implementation` from
+accepted Rust base `3f1d4dd4` and design authority `a2d440cb`.
+
+Write exactly core `runtime/dice.rs` within <=380 production/+40 colocated
+tests and 11,700 physical, plus `runtime/tests/build_command_tests.rs` within
+<=500 tests and 3,900 physical; aggregate <=920/15,600. No third file.
+
+Preserve the accepted root-only multi admission, mode-aware aggregate driver,
+full-batch outer > compatible Need union > first semantic ordering, local
+anchor/package/source epoch, request-ordered aggregate certificate and
+revision-before-source contract. Implement only the multi private
+SelectedDependencySuperset policy: terminal demands must be exact selected
+Arcs, terminal-only demands and repository sidecars fail, while dependency
+closure remainder stays selected-owned. Every other observed root retains exact
+full-epoch validation.
+
+The root remains eventless. Certificate-bearing multi terminals use the
+accepted source-certified event policy only with the Some(including empty)
+producer proof; no-certificate multi stays Strict. Preserve terminal-first Arc
+association, exact selected snapshot, rollback/atomicity, compact Result plus
+shared epochs, every singleton/legacy/direct/one-shot behavior and all
+compatibility classes.
+
+Complete the discriminating identity, branch-position, Need/outer/semantic,
+epoch/certificate, mixed source+rule closure remainder, event/family,
+cancellation/retry/rollback, multi-source/BUILD lifecycle and lifetime proof.
+Run focused and broad validation, exact accounting, Buck2 retention, AI cleanup
+and independent implementation review.
+
+STOP every other file/owner, widened external/recursive admission, public or
+one-shot drift, child event ownership change, retained branch state,
+incompatible-Need coercion, cap excess, partial validation or M1 closure. After
+ACCEPT return only to one docs-only next-owner audit.

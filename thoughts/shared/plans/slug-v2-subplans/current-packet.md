@@ -1,25 +1,25 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-multi-build-observed-publication-design`
+Packet: `WP-2A-m1-multi-build-observed-publication-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `abb951de`
+Scheduling and accepted design base: `a2d440cb`
 Accepted Rust base: `3f1d4dd4`
-Result: freeze one bounded observed-publication sibling for already-admitted
-root-only multi-target native builds; authorize no Rust yet.
+Result: implement the accepted bounded observed-publication sibling for
+already-admitted root-only multi-target native builds.
 
-## Exact docs-only authority and caps
+## Exact Rust authority and caps
 
 Write exactly:
 
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
-2. this manifest,
-3. `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`, and
-4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
+1. `app/slug_core_v2/src/runtime/dice.rs`: <=380 production plus <=40
+   colocated-test net; <=11,700 physical lines.
+2. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=500 test
+   net; <=3,900 physical lines.
 
-Caps against `abb951de`: canonical <=40 net, this manifest <=220, Stage 2
-<=180, routing <=30 and aggregate <=470. Rust, Cargo, BUILD, fixtures, oracles,
-generated evidence and public/caller activation are forbidden.
+Aggregate semantic <=920 and combined physical <=15,600 from the accepted
+11,264/3,389 baselines. Every other Rust file, Cargo, BUILD, fixture, oracle,
+generated artifact and caller/public surface is forbidden.
 
 ## Accepted owner decision
 
@@ -163,7 +163,7 @@ Unsupported/deferred: mixed or multi external build, recursive build patterns,
 one-shot migration, broader actions/external globs and exact Bazel identity
 bytes.
 
-Future implementation proof must discriminate:
+Implementation proof must discriminate:
 
 - identity/Display/equality/validity and routing for empty, singleton, root
   multi, mixed/external and direct legacy requests;
@@ -190,25 +190,18 @@ Future implementation proof must discriminate:
   and broad validation, retention/cleanup and independent implementation
   review.
 
-## Future Rust envelope and terminal
+## Implementation terminal
 
-After independent design ACCEPT, one implementation may write exactly:
-
-1. `app/slug_core_v2/src/runtime/dice.rs`: <=380 production plus <=40
-   colocated-test net; <=11,700 physical lines.
-2. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=500 test
-   net; <=3,900 physical lines.
-
-Aggregate semantic <=920 and combined physical <=15,600 from the accepted
-11,264/3,389 baselines. The existing files are cohesive owner/proof exceptions;
-do not add a third Rust file.
+The existing two files are cohesive owner/proof exceptions; do not add a third
+Rust file. Run focused multi-build, build-command and native acceptance tests,
+then full core/loading/analysis/query coverage, formatting and diff checks.
+Record inherited baselines without weakening them. Finish with Buck2 retention,
+AI cleanup and an independent implementation review.
 
 STOP/REPLAN on another owner/file, widened external/recursive admission,
 legacy/public/one-shot drift, incomplete epoch or certificate, incompatible
 Need coercion, changed child event authority, retained branch state, cap excess,
 partial validation or M1 closure.
 
-End this design with exactly one independently reviewed decision: ACCEPT and
-schedule only `WP-2A-m1-multi-build-observed-publication-implementation`, or
-REPLAN. After accepted implementation return only to one docs-only M1
-next-owner audit; do not close M1.
+End with exactly one independently reviewed decision: ACCEPT and return only
+to one docs-only M1 next-owner audit, or REPLAN. Do not close M1.
