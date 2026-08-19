@@ -8233,3 +8233,80 @@ request/result A-B-A and zero later activation. STOP every second file/key/
 caller/export, semantic/event/family/state drift, direct Host read, cap excess
 or milestone closure. After independent implementation ACCEPT, schedule only
 the docs-only selected-module-graph observation-frontier design.
+
+### Repository-materialization observation implementation accepted (2026-08-19)
+
+Implementation `ae8aa35e` completes the private materialization owner from
+Rust base `cc847c98` and design `b2fd01e7`. Its matching-family driver preserves
+request-then-neutral-result order, accepts the request epoch before semantics,
+forwards it unchanged through every completed result terminal, keeps Need/outer
+carrierless, remains eventless and retains only one local Result Arc plus the
+compact epoch.
+
+Final one-file accounting is +168 production/+393 tests/+561 aggregate at
+14,940 physical lines. Focused 3/3, full bzlmod 436/436, loading 138/138 and
+query 121/121 pass. Core remains 245/246 only on the inherited stale visibility
+wording assertion. Formatting, diff, Clippy/archive disposition, cleanup,
+retention and independent review pass.
+
+### Selected-module-graph frontier repository-source REPLAN (2026-08-19)
+
+Do not freeze the selected graph sibling yet. Nonregistry module-source
+preparation, closure roots/fragments, package preflight, REPO projection and
+repository-ignore handling all reuse `RepositorySourceFileKey`. It is the first
+complete carrierless owner after accepted materialization: relative-path
+validation -> materialization -> resolved path -> FileBytes. The route-based
+Host source observation sibling cannot substitute without reconstructing route
+identity, and a detached path sibling would have no independent consumer.
+
+Registry preparation separately crosses `RegistryFileKey` and patch-path
+resolution. It remains a later frontier. Run only
+`WP-6-7A-repository-source-file-observation-design`, docs-only, from
+scheduling/Rust base `ae8aa35e`.
+
+Freeze a crate-private structural sibling and a `Dupe`/`Allocative` carrier
+containing exactly one local repository-source Result Arc plus the cumulative
+epoch. A shared Legacy/Observed driver selects only the matching materialization
+and resolution families, followed by neutral FileBytes. It preserves exact
+legacy values/errors and nested bytes Arcs; neither sibling computes the other.
+
+Invalid relative path and materialization-compute errors are empty-prefix.
+Materialization semantic error retains its epoch. Invalid materialized path and
+resolution compute error retain the materialization prefix; resolution
+semantic/Absent/WrongKind retains the merged prefix. File compute retains the
+resolved prefix; completed Present/Missing/Error retains the full prefix. Merge
+the materialization prefix left-first with the resolution epoch, then append
+FileBytes before semantic inspection. Preserve the earliest equal Arc and
+return typed outer on conflict/mismatch. Need/outer is immediate and
+carrierless; this sequential owner performs no Need union.
+
+Parent, resolution and FileBytes owners remain eventless. Existing request/root
+children keep their events. Retain no child carrier, path scratch, collection,
+cache/store/interner/lock/task, direct Host read, revision, certificate or event
+state. Do not activate preflight/REPO/ignore/preparation/closure/discovery/
+selected-graph/registry callers.
+
+Future implementation authority after independent design ACCEPT is exactly
+`source_preparation.rs` from 14,940 physical lines (<=300 production, <=30
+colocated proof, <=15,320 physical) and
+`source_preparation_observation_tests.rs` from 2,470 lines (<=500 tests,
+<=3,020 physical). Aggregate semantic growth is <=830 and combined physical
+size <=18,340; helpers stay below 200 lines.
+
+Proof must discriminate every materialization/resolution/FileBytes terminal
+and prefix, first-Arc/conflict/mismatch algebra, exact local/immutable bytes and
+epoch Arcs, family rows, parent silence/warm behavior, cancellation/recovery,
+local+immutable lifecycle/restoration and zero upper activation.
+
+Exact behavior is current path/materialization/source values, errors, order,
+bytes and legacy semantics. The sibling, Result Arc, epoch and typed outer are
+Slug-native. Registry/preparation/closure/discovery/selected graph, extensions,
+generated repositories, rules_rust analysis/actions, M8/M7B and exact identity
+bytes remain deferred.
+
+STOP Rust during design and stop a third future file, caller/export, upper or
+registry activation, direct Host read, event/family/error/order drift, retained
+state, cap excess and milestone closure. After independent design ACCEPT,
+schedule only `WP-6-7A-repository-source-file-observation-implementation`;
+after implementation ACCEPT return only to the docs-only selected-graph
+frontier design.
