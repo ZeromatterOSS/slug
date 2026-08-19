@@ -6224,3 +6224,39 @@ caps, cleanup and independent review. STOP every other file/loading byte,
 global semantics change, child filtering, equality weakening, retained
 policy/closure/map, behavior drift, cap excess and M1 closure. After ACCEPT
 return only to one docs-only M1 audit.
+
+### Observed terminal epoch-association REPLAN (2026-08-18)
+
+Retry 5 fixes direct external source event suppression, but the unchanged
+server lifecycle exposes a separate exact-Arc failure after external -> root
+PackageAll -> external wrong-kind. The reused observed package carrier retains
+the prior Host route-directory Lstat Arc; the new command epoch holds an equal
+fresh Arc, so unconditional terminal pointer validation correctly rejects it.
+
+Run only `WP-2A-m1-observed-terminal-epoch-association-correction-design` from
+`95148642`. Write canonical/current/Stage/routing under 40/220/180/30 and 470
+aggregate docs net. Retain but do not write the four-file Rust candidate.
+
+Freeze native terminal acceptance as the owner. Before sealing/selection,
+rebuild the command epoch from terminal entries first and command entries
+second through stable shared-Arc construction. Terminal-only installs, equal
+duplicates preserve the terminal Arc, unrelated command Arcs survive and
+conflicting values fail closed. Selected closure demands still exclusively
+control membership; repository validation and full length/demand/value/pointer
+validation remain unchanged. Need/outer and terminal-less roots do not merge.
+
+The correction is command-local and adds no Host read, store, retained
+collection, cache/interner/lock/task, child carrier or event owner. Every
+failure preserves prior path/repository/event state. Preserve the accepted
+external certificate and source-certified event policy without weakening DICE
+reuse or child ownership.
+
+After independent design ACCEPT schedule only retry 6 in the same four files:
+DICE <=380/11,400, build proof <=440/3,450, loading line-neutral at 3,439 and
+events <=100 production +160 tests/2,050; aggregate <=1,080 semantic/20,339
+physical. Prove terminal-only/equal/unrelated/conflict cases, strict membership,
+external -> root -> external wrong-kind/success, observed query/build root
+switches, rollback, cancellation and event parity. STOP every other write,
+validation/membership weakening, stale-value preference, behavior drift, cap
+excess and M1 closure. After implementation ACCEPT return only to a docs-only
+M1 audit.
