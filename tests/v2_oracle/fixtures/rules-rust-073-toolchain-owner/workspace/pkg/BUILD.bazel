@@ -1,0 +1,15 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+
+rust_library(
+    name = "support",
+    srcs = ["lib.rs"],
+    crate_name = "support",
+)
+
+rust_binary(
+    name = "probe",
+    srcs = ["main.rs"],
+    crate_name = "probe",
+    data = ["data.txt"],
+    deps = [":support"],
+)

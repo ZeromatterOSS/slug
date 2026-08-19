@@ -1,0 +1,155 @@
+[fixture]
+name = "rules-rust-073-toolchain-owner"
+description = "Bazel 9.2/rules_rust 0.73 extension-generated toolchain mapping, provider projection, and configured Rust action ownership."
+comparison = "message_shape"
+daemon = true
+startup_argv = ["--ignore_all_rc_files"]
+oracle_notes = "Analysis-only M7A evidence. Canonical generated-repository labels, CrateInfo fields, selected platform, action order, and opaque ActionKey equality/restoration are exact; configuration and ActionKey bytes are not claimed."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/RegisteredToolchainsFunction.java#getBzlmodToolchains",
+  "src/main/java/com/google/devtools/build/lib/skyframe/TargetPatternUtil.java#expandTargetPatterns",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/SingleToolchainResolutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/ToolchainResolutionFunction.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/ResolvedToolchainContext.java",
+  "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java",
+  "rules_rust 0.73.0 rust/extensions.bzl",
+  "rules_rust 0.73.0 rust/private/repositories.bzl",
+  "rules_rust 0.73.0 rust/private/toolchain.bzl",
+  "rules_rust 0.73.0 rust/private/rust.bzl",
+  "rules_rust 0.73.0 rust/private/utils.bzl",
+]
+translation_notes = "The root module extension creates the rust_toolchains hub and tools repositories. Bazel parses the apparent registration pattern in the root mapping, expands only toolchain rules, configures them, selects the Rust toolchain for the host execution platform, loads its provider into the rust rule, and assigns that platform to Rustc/runfiles actions. Slug's future DICE owner and structural bytes remain Slug-native."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture rules-rust-073-toolchain-owner --tool bazel --bazel bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture rules-rust-073-toolchain-owner --tool bazel --bazel bazel"
+
+[[commands]]
+name = "expanded_generated_toolchain_rules"
+argv = ["query", "kind(toolchain, @rust_toolchains//:all)", "--output=label", "--order_output=full", "--noshow_progress", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+[[commands]]
+name = "selected_registration_canonical_mapping"
+argv = ["query", "labels(toolchain, @rust_toolchains//:rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly)", "--output=label", "--order_output=full", "--noshow_progress", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+[[commands]]
+name = "direct_configured_edges"
+argv = ["cquery", "deps(//pkg:probe, 1)", "--output=label", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+[[commands]]
+name = "crate_info_edition_2024"
+argv = ["cquery", "//pkg:probe", "--output=starlark", "--starlark:file=cquery_format.bzl", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+[[commands]]
+name = "rust_actions_edition_2024"
+argv = ["aquery", "mnemonic(\"(Rustc|SymlinkTree|RunfilesTree)\", //pkg:probe)", "--output=text", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "message_shape"
+stdout_patterns = ['''(?s)\A(?=[\s\S]*external/rules_rust\+/util/process_wrapper/process_wrapper)(?=[\s\S]*external/rules_rust\+\+rust\+rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools/rust_toolchain/bin/rustc)(?=[\s\S]*'--edition=2024')action 'Compiling Rust bin probe \(1 file\)'
+  Mnemonic: Rustc
+  Target: //pkg:probe
+  Configuration: [^\n]+
+  Execution platform: @platforms//host:host
+  ActionKey: [0-9a-f]{64}
+(?:(?!\naction |\nrunfiles for ).)*\naction 'Creating runfiles tree [^\n]+'
+  Mnemonic: SymlinkTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\nrunfiles for //pkg:probe
+  Mnemonic: RunfilesTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\Z''']
+
+[[commands]]
+name = "warm_crate_info_edition_2024"
+argv = ["cquery", "//pkg:probe", "--output=starlark", "--starlark:file=cquery_format.bzl", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+[[commands]]
+name = "warm_rust_actions_edition_2024"
+argv = ["aquery", "mnemonic(\"(Rustc|SymlinkTree|RunfilesTree)\", //pkg:probe)", "--output=text", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "message_shape"
+stdout_patterns = ['''(?s)\A(?=[\s\S]*external/rules_rust\+/util/process_wrapper/process_wrapper)(?=[\s\S]*external/rules_rust\+\+rust\+rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools/rust_toolchain/bin/rustc)(?=[\s\S]*'--edition=2024')action 'Compiling Rust bin probe \(1 file\)'
+  Mnemonic: Rustc
+  Target: //pkg:probe
+  Configuration: [^\n]+
+  Execution platform: @platforms//host:host
+  ActionKey: [0-9a-f]{64}
+(?:(?!\naction |\nrunfiles for ).)*\naction 'Creating runfiles tree [^\n]+'
+  Mnemonic: SymlinkTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\nrunfiles for //pkg:probe
+  Mnemonic: RunfilesTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\Z''']
+
+[[commands]]
+name = "crate_info_edition_2021"
+argv = ["cquery", "//pkg:probe", "--output=starlark", "--starlark:file=cquery_format.bzl", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'edition = "2024"'
+  replace = 'edition = "2021"'
+
+[[commands]]
+name = "rust_actions_edition_2021"
+argv = ["aquery", "mnemonic(\"(Rustc|SymlinkTree|RunfilesTree)\", //pkg:probe)", "--output=text", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "message_shape"
+stdout_patterns = ['''(?s)\A(?=[\s\S]*external/rules_rust\+/util/process_wrapper/process_wrapper)(?=[\s\S]*external/rules_rust\+\+rust\+rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools/rust_toolchain/bin/rustc)(?=[\s\S]*'--edition=2021')action 'Compiling Rust bin probe \(1 file\)'
+  Mnemonic: Rustc
+  Target: //pkg:probe
+  Configuration: [^\n]+
+  Execution platform: @platforms//host:host
+  ActionKey: [0-9a-f]{64}
+(?:(?!\naction |\nrunfiles for ).)*\naction 'Creating runfiles tree [^\n]+'
+  Mnemonic: SymlinkTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\nrunfiles for //pkg:probe
+  Mnemonic: RunfilesTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\Z''']
+
+[[commands]]
+name = "crate_info_restored_edition_2024"
+argv = ["cquery", "//pkg:probe", "--output=starlark", "--starlark:file=cquery_format.bzl", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "exact"
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = 'edition = "2021"'
+  replace = 'edition = "2024"'
+
+[[commands]]
+name = "rust_actions_restored_edition_2024"
+argv = ["aquery", "mnemonic(\"(Rustc|SymlinkTree|RunfilesTree)\", //pkg:probe)", "--output=text", "--noshow_progress", "--@rules_rust//rust/toolchain/channel=nightly", "--lockfile_mode=off"]
+expected_exit = 0
+compare = "message_shape"
+stdout_patterns = ['''(?s)\A(?=[\s\S]*external/rules_rust\+/util/process_wrapper/process_wrapper)(?=[\s\S]*external/rules_rust\+\+rust\+rust_linux_x86_64__x86_64-unknown-linux-gnu__nightly_tools/rust_toolchain/bin/rustc)(?=[\s\S]*'--edition=2024')action 'Compiling Rust bin probe \(1 file\)'
+  Mnemonic: Rustc
+  Target: //pkg:probe
+  Configuration: [^\n]+
+  Execution platform: @platforms//host:host
+  ActionKey: [0-9a-f]{64}
+(?:(?!\naction |\nrunfiles for ).)*\naction 'Creating runfiles tree [^\n]+'
+  Mnemonic: SymlinkTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\nrunfiles for //pkg:probe
+  Mnemonic: RunfilesTree
+  Target: //pkg:probe
+(?:(?!\naction |\nrunfiles for ).)*\Z''']
