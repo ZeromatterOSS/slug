@@ -1,154 +1,108 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repo-file-observation-design`
+Packet: `WP-6-7A-host-nonregistry-repo-file-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: `12f68983`
-Accepted repository-source design/correction: `9040e168` / `edc533ff`
+Rust base: `12f68983`
+Accepted design: `3c598dd5`
 
-## Formal frontier REPLAN evidence
+## Exact Rust authority and caps
 
-`12f68983` accepts the repository-source observation owner at +297 production,
-+30 colocated proof and +700 external proof lines, +1,027 semantic aggregate,
-and 15,267/3,170/18,437 physical lines. Focused proof passes 3/3, full
-`slug_bzlmod_v2` passes 439+193, loading passes 204, query passes 121, and the
-inherited core baseline remains 245/246 only on the stale generic visibility
-wording assertion. Formatting, diff-check, compact-retention cleanup and
-independent final review pass.
+Write only `app/slug_bzlmod_v2/src/repo_file.rs`, baseline 2,679 physical
+lines. Production growth is <=180, test growth is <=320, aggregate semantic
+growth is <=500 and final physical size is <=3,200. Every new or touched helper
+stays below 200 lines. Every other Rust, Cargo, BUILD, fixture, oracle and docs
+file is read-only during implementation.
 
-The selected graph is still not an implementable observation owner.
-`HostSelectedModuleGraphKey` joins legacy `HostDiscoveredModuleKey` values.
-Its nonregistry branch reaches `HostNonregistryModuleClosureKey`, whose Host
-include horizon is legacy-only and computes
-`HostNonregistryPackagePreflightKey`. Preflight computes the carrierless
-`HostNonregistryRepositoryIgnoreKey`; ignore computes the carrierless,
-event-owning `HostNonregistryRepoFileKey` before the legacy `.bazelignore`
-source. Observing closure, discovery or selected graph now would bypass,
-duplicate or relocate that exact REPO event owner.
+## Frozen owner and driver
 
-`HostNonregistryRepoFileKey` is the uniquely smallest complete next producer.
-It owns only repository `REPO.bazel` source -> neutral root REPO semantics ->
-pure evaluation and its one local REPO batch. Its source edge now has the
-accepted observed sibling. Registry `RegistryFileKey`, registry preparation
-and patch observations remain a separate later frontier.
-
-## Exact docs authority
-
-This design may write only:
-
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, <=40 net lines.
-2. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`, <=220 net lines.
-3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
-   <=180 net lines.
-4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`, <=30 net
-   lines.
-
-Aggregate docs growth is <=470 net lines. Rust, Cargo, BUILD files, fixtures and
-oracles are read-only during design.
-
-## Frozen natural owner and future authority
-
-Add a private structural
+Add private structural
 `HostNonregistryRepoFileObservationKey(HostNonregistryRepoFileKey)` and private
-`ObservedHostNonregistryRepoFile`. The carrier contains exactly one local
+`ObservedHostNonregistryRepoFile`. Its carrier contains exactly one local
 `Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>` plus one compact
-`PathObservationEpoch`; it is `Dupe` and `Allocative`, with borrowed
-result/epoch accessors. Do not export the key or carrier.
+`PathObservationEpoch`; derive `Dupe` and `Allocative` and expose only
+borrowed result/epoch accessors. Add no export or caller.
 
-Use one Legacy/Observed driver in `repo_file.rs`. Legacy selects only
-`RepositorySourceFileKey`; observed selects only the accepted
-`RepositorySourceFileObservationKey`. Both then select the same neutral
-`RootRepoFileSemanticsProjectionKey` only after a Present source and perform
-the same pure REPO evaluation. Neither key computes its sibling. The legacy key
-moves the driver's exact local semantic Result Arc unchanged.
+Use one Legacy/Observed driver. Legacy selects only
+`RepositorySourceFileKey`; observed selects only
+`RepositorySourceFileObservationKey`. Only a Present source continues to the
+same neutral `RootRepoFileSemanticsProjectionKey` and pure REPO evaluation.
+Neither sibling computes the other. Move the driver's exact local semantic
+Result Arc into the legacy value.
 
-Future Rust authority is exactly
-`app/slug_bzlmod_v2/src/repo_file.rs`, baseline 2,679 physical lines:
-<=180 production, <=320 tests, <=500 aggregate semantic and <=3,200 physical.
-Every new or touched helper stays below 200 lines; the existing file is the sole
-cohesive owner/proof exception.
+## Exact order and terminal algebra
 
-## Order and terminal algebra
+Preserve repository source first -> neutral semantics only for Present -> pure
+evaluation. Preserve current DICE-invariant behavior and all legacy terminal
+classes.
 
-The exact order is repository source first; only Present continues to neutral
-REPO semantics; evaluation is last. Preserve the current DICE-invariant
-treatment and exact legacy terminal polarity.
-
-Observed Need or typed outer from the source returns immediately, carrierless,
-without semantics or parent batch. Accept and retain the complete source epoch
-before inspecting its semantic Result. Source Absent and source semantic error
-retain that epoch and store the existing empty local REPO batch. A semantics
-projection failure retains the same epoch and empty batch. REPO parse/evaluation
-error and success retain that epoch and store exactly the existing local event
-batch, including an empty batch as a semantic Complete batch rather than no
-batch. No epoch union or Need union is needed at this single-observed-child
-owner.
+Observed source Need or typed outer returns immediately, carrierless, before
+semantics and without parent batch. Accept the complete source epoch before
+semantic inspection. Source Absent and source semantic error retain that epoch
+and store the existing empty local batch. Neutral policy failure retains the
+same epoch and empty batch. REPO parse/evaluation error and success retain the
+same epoch and exact existing local batch, including semantic Complete with an
+empty batch. This single observed child has no epoch union and no Need union.
 
 Need is invalid/self-unequal. Complete typed outer is valid/equal by outer
 value. Complete carrier is valid/equal by semantic Result plus epoch.
 
 ## Events, families and retention
 
-Each Legacy/Observed sibling remains sole owner of its matching local REPO batch.
-The repository-source child is eventless. Need, typed outer and cancellation
-store no parent batch; warm reuse is silent. Preserve exact event text, prefix,
-empty-batch behavior and child-before-parent order.
+Each Legacy/Observed sibling is sole owner of its matching local REPO batch.
+Repository source remains eventless. Need/outer/cancel stores none; warm reuse is
+silent. Preserve exact event text, prefix, empty-batch behavior and
+child-before-parent order.
 
-Legacy dependencies contain only legacy repository source plus the neutral
-semantics projection when Present. Observed dependencies contain only observed
-repository source plus the same neutral projection when Present. Activate no
-repository-ignore, package-preflight, closure, discovery, selected graph,
-registry, extension or public caller.
+Legacy direct dependencies are legacy source plus neutral semantics when
+Present. Observed direct dependencies are observed source plus the same neutral
+semantics when Present. Activate no repository-ignore, package-preflight,
+closure, discovery, selected graph, registry, extension or public caller.
 
-Retain only the local semantic Result Arc plus source epoch. Source child
-carrier, source bytes, logical path, reporter, evaluator and event scratch are
-dependency-owned or compute-local. Add no second carrier Arc, collection,
-cache, store, interner, lock, task, direct Host read, revision, certificate or
-new event state.
+Retain only the local semantic Result Arc plus source epoch. Source carrier and
+bytes, logical path, reporter/evaluator and event scratch are dependency-owned
+or compute-local. Add no second carrier Arc, collection, cache, store, interner,
+lock, task, direct Host read, revision, certificate or new event state.
 
-## Required discriminating proof
+## Required proof
 
-Prove:
+Discriminate:
 
-- distinct identity/hash/Display, `Dupe`/`Allocative`, accessors and
-  Complete/Need/outer validity/equality;
+- key/carrier identity, hash, Display, accessors, Dupe/Allocative and
+  Complete/Need/outer equality/validity;
 - real source Need, typed outer, Absent, Present and semantic error with exact
-  source epoch or carrierlessness and semantics nonactivation;
-- neutral policy failure plus REPO parse/evaluation success and error with exact
-  prefixes and exact legacy semantic parity/Result Arc projection;
-- exact epoch iteration and per-demand `Arc::ptr_eq`, held carrier lifetime,
-  and source conflict/operation-mismatch outer propagation;
-- exact observed and legacy dependency rows and reverse-family isolation;
-- source-child event silence, exact parent empty/nonempty/error batches, warm
-  suppression and no batch on Need/outer/cancel;
-- genuine poll-drop cancellation and identical-request same-DICE recovery;
-- local and immutable A -> B -> absent -> directory -> A restoration while
-  retaining the original semantic Result and epoch Arcs; and
+  epoch/carrier polarity and later-child suppression;
+- neutral policy failure and REPO parse/evaluation success/error with exact
+  prefixes and legacy Result-Arc/value/event parity;
+- exact epoch iteration and per-demand Arc identity, held lifetime, and source
+  conflict/operation-mismatch outer propagation;
+- exact observed/legacy dependency rows and reverse-family isolation;
+- source child silence, parent empty/nonempty/error batches, warm suppression
+  and no batch on Need/outer/cancel;
+- real poll-drop and identical-request same-DICE recovery;
+- local and immutable A -> B -> absent -> directory -> A restoration with held
+  semantic Result and epoch Arcs; and
 - zero ignore/preflight/closure/discovery/selected-graph/registry/extension/public
   activation.
 
 Run focused REPO proof, full bzlmod, affected loading/query/core baselines, fmt,
-diff-check, exact accounting and AI-cleanup/Buck2 retention review. Reuse
-accepted evidence; no fixture or Bazel oracle is authorized.
+diff-check, exact cap accounting and AI-cleanup/Buck2 retention review. Reuse
+accepted evidence; add no fixture or Bazel oracle.
 
 ## Compatibility
 
-Exact: existing nonregistry REPO source order, UTF-8 policy, values/errors,
-diagnostics, event text/batches and every legacy result. Slug-native: the private
-sibling/carrier, compact source epoch and typed outer. Unsupported/deferred:
-nonregistry ignore/preflight/closure/discovery/selected graph; registry
-file/preparation/patch observations; generated extension repositories,
-rules_rust actions, M8/M7B and exact identity bytes.
+Exact: existing nonregistry REPO source order, UTF-8 policy, result/error/
+diagnostic/event behavior and every legacy result. Slug-native: private sibling,
+Result-Arc+epoch carrier and typed outer. Unsupported/deferred: observed ignore,
+preflight, closure, discovery/selected graph; registry file/preparation/patches;
+extensions, rules_rust actions, M8/M7B and exact identity bytes.
 
 ## STOP and sole successor
 
-STOP on Rust during design, another file/owner, caller/export, event ownership or
-text drift, retained scratch/state, direct Host read, upper/registry activation,
-cap excess, M7A closure, M8/M7B/M9 or more than one successor. REPLAN rather than
-change source-first ordering, invent a lower producer or merge the REPO event
-owner upward.
+STOP on a second file/key/caller/export, source-order or event drift, retained
+scratch/state, direct Host read, upper/registry activation, proof weakness, cap
+excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN rather than move the
+REPO batch upward or invent another producer.
 
-After independent design ACCEPT schedule exactly one bounded
-`WP-6-7A-host-nonregistry-repo-file-observation-implementation`. After its
-independent ACCEPT schedule only the docs-only
+After independent implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.

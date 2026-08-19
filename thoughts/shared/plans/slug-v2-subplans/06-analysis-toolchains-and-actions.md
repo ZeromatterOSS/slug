@@ -8507,3 +8507,25 @@ or text, retained scratch/state, direct Host read, upper/registry activation,
 cap excess and milestone closure. After independent design ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repo-file-observation-implementation`; after its
 ACCEPT design only the nonregistry repository-ignore observed owner.
+### Host nonregistry REPO-file design accepted (2026-08-19)
+
+Design `3c598dd5` accepts the uniquely smallest event-owning prerequisite from
+Rust base `12f68983`. Schedule only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation`.
+
+Implementation authority is exactly `app/slug_bzlmod_v2/src/repo_file.rs`,
+baseline 2,679, with <=180 production, <=320 tests, <=500 aggregate semantic and
+<=3,200 physical. Helpers stay below 200 lines.
+
+Keep the private sibling/carrier, matching Legacy/Observed source family,
+source-first Present-only semantics continuation, accepted source epoch,
+carrierless Need/outer, exact semantic Complete local batch, Result-Arc
+projection, compact retention and complete proof contract frozen by
+`3c598dd5`. Preserve DICE-invariant behavior, exact legacy REPO semantics,
+event text/order, empty batches and family isolation.
+
+STOP a second file/key/caller/export, changed event ownership/text, retained
+scratch/state, direct Host read, ignore/preflight/closure/discovery/selected
+graph/registry/extension activation, cap excess and milestone closure. After
+independent implementation ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
