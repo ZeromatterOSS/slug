@@ -95,8 +95,10 @@ use crate::module_eval::DirectNonregistryEvaluationError;
 use crate::module_eval::DirectNonregistryIncludeFile;
 use crate::module_eval::HostEffectiveModuleOverride;
 use crate::module_eval::HostEffectiveModuleOverrideKey;
+use crate::module_eval::HostEffectiveModuleOverrideObservationKey;
 use crate::module_eval::NonrootIncludeRequest;
 use crate::module_eval::NonrootModuleFileInspection;
+use crate::module_eval::ObservedHostEffectiveModuleOverride;
 use crate::module_eval::evaluate_direct_nonregistry_module_closure_with_events;
 use crate::module_eval::parse_nonroot_include;
 use crate::module_eval::parse_root_include;
@@ -3867,84 +3869,222 @@ struct RepositoryMaterializationRequestKey {
     module_name: CompactString,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RepositoryMaterializationRequestObservationKey(RepositoryMaterializationRequestKey);
+
+impl RepositoryMaterializationRequestObservationKey {
+    fn new(workspace: PathBuf, module_name: CompactString) -> Self {
+        Self(RepositoryMaterializationRequestKey {
+            workspace,
+            module_name,
+        })
+    }
+}
+
 impl fmt::Display for RepositoryMaterializationRequestKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "repository-materialization-request:{}", self.module_name)
     }
 }
 
+impl fmt::Display for RepositoryMaterializationRequestObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type MaterializationRequestResult =
+    Arc<Result<RepositoryMaterializationRequest, RepositoryMaterializationError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedRepositoryMaterializationRequest {
+    result: MaterializationRequestResult,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRepositoryMaterializationRequest {
+    fn result(&self) -> &MaterializationRequestResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type MaterializationRequestDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedRepositoryMaterializationRequest, ObservedPathFrontierError>,
+>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MaterializationRequestMode {
+    Legacy,
+    Observed,
+}
+
+fn materialization_request_complete(
+    result: Result<RepositoryMaterializationRequest, RepositoryMaterializationError>,
+    observations: PathObservationEpoch,
+) -> MaterializationRequestDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedRepositoryMaterializationRequest {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn materialization_effective_compute_error(
+    error: impl fmt::Display,
+) -> MaterializationRequestDriverOutcome {
+    materialization_request_complete(
+        Err(RepositoryMaterializationError::RootModuleFiles(
+            error.to_string().into(),
+        )),
+        PathObservationEpoch::empty(),
+    )
+}
+fn finish_observed_materialization_effective(
+    outcome: SourcePreparationOutcome<
+        Result<ObservedHostEffectiveModuleOverride, ObservedPathFrontierError>,
+    >,
+) -> ControlFlow<
+    MaterializationRequestDriverOutcome,
+    (HostEffectiveModuleOverride, PathObservationEpoch),
+> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            let observations = observed.observations().dupe();
+            match observed.result().as_ref() {
+                Ok(effective) => ControlFlow::Continue((effective.clone(), observations)),
+                Err(error) => ControlFlow::Break(materialization_request_complete(
+                    Err(RepositoryMaterializationError::RootModuleFiles(
+                        error.to_string().into(),
+                    )),
+                    observations,
+                )),
+            }
+        }
+    }
+}
+
+fn project_materialization_request(
+    workspace: NormalizedAbsolutePath,
+    module_name: &CompactString,
+    effective: &HostEffectiveModuleOverride,
+) -> Result<RepositoryMaterializationRequest, RepositoryMaterializationError> {
+    let repo_spec = match effective.override_() {
+        Some(RootModuleOverride::NonRegistry(repo_spec)) => repo_spec.clone(),
+        Some(_) => {
+            return Err(RepositoryMaterializationError::UnsupportedOverride(
+                format!("module {module_name} does not have a non-registry override").into(),
+            ));
+        }
+        None => {
+            return Err(RepositoryMaterializationError::MissingOverride(
+                module_name.clone(),
+            ));
+        }
+    };
+    let canonical_repo = CanonicalRepoName::new(format!("{module_name}+")).map_err(|error| {
+        RepositoryMaterializationError::InvalidCanonicalRepository(error.into())
+    })?;
+    let kind = request_kind(&workspace, &repo_spec, local_path_policy(effective))?;
+    Ok(RepositoryMaterializationRequest {
+        id: RepositoryMaterializationRequestId {
+            workspace,
+            canonical_repo,
+        },
+        repo_spec,
+        kind,
+    })
+}
+
+async fn drive_repository_materialization_request(
+    ctx: &mut DiceComputations<'_>,
+    key: &RepositoryMaterializationRequestKey,
+    mode: MaterializationRequestMode,
+) -> MaterializationRequestDriverOutcome {
+    let workspace = match NormalizedAbsolutePath::new(key.workspace.clone()) {
+        Ok(workspace) => workspace,
+        Err(error) => {
+            return materialization_request_complete(
+                Err(RepositoryMaterializationError::InvalidWorkspace(
+                    error.to_string().into(),
+                )),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    let (effective, observations) = match mode {
+        MaterializationRequestMode::Legacy => {
+            let effective = match ctx
+                .compute(&HostEffectiveModuleOverrideKey::new(
+                    workspace.dupe(),
+                    key.module_name.clone(),
+                ))
+                .await
+            {
+                Ok(effective) => effective,
+                Err(error) => return materialization_effective_compute_error(error),
+            };
+            match effective.as_ref() {
+                Ok(effective) => (effective.clone(), PathObservationEpoch::empty()),
+                Err(error) => {
+                    return materialization_request_complete(
+                        Err(RepositoryMaterializationError::RootModuleFiles(
+                            error.to_string().into(),
+                        )),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+            }
+        }
+        MaterializationRequestMode::Observed => {
+            let effective = match ctx
+                .compute(&HostEffectiveModuleOverrideObservationKey::new(
+                    workspace.dupe(),
+                    key.module_name.clone(),
+                ))
+                .await
+            {
+                Ok(effective) => effective,
+                Err(error) => return materialization_effective_compute_error(error),
+            };
+            match finish_observed_materialization_effective(effective) {
+                ControlFlow::Continue(effective) => effective,
+                ControlFlow::Break(outcome) => return outcome,
+            }
+        }
+    };
+    materialization_request_complete(
+        project_materialization_request(workspace, &key.module_name, &effective),
+        observations,
+    )
+}
+
+fn project_legacy_materialization_request(
+    outcome: MaterializationRequestDriverOutcome,
+) -> MaterializationRequestResult {
+    match outcome {
+        SourcePreparationOutcome::Complete(Ok(observed)) => observed.result,
+        _ => panic!("legacy materialization request invariant failed"),
+    }
+}
+
 #[async_trait]
 impl Key for RepositoryMaterializationRequestKey {
-    type Value = Arc<Result<RepositoryMaterializationRequest, RepositoryMaterializationError>>;
+    type Value = MaterializationRequestResult;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let workspace = match NormalizedAbsolutePath::new(self.workspace.clone()) {
-            Ok(workspace) => workspace,
-            Err(error) => {
-                return Arc::new(Err(RepositoryMaterializationError::InvalidWorkspace(
-                    error.to_string().into(),
-                )));
-            }
-        };
-        let effective = match ctx
-            .compute(&HostEffectiveModuleOverrideKey::new(
-                workspace.dupe(),
-                self.module_name.clone(),
-            ))
-            .await
-        {
-            Ok(effective) => effective,
-            Err(error) => {
-                return Arc::new(Err(RepositoryMaterializationError::RootModuleFiles(
-                    error.to_string().into(),
-                )));
-            }
-        };
-        let effective = match effective.as_ref() {
-            Ok(effective) => effective,
-            Err(error) => {
-                return Arc::new(Err(RepositoryMaterializationError::RootModuleFiles(
-                    error.to_string().into(),
-                )));
-            }
-        };
-        let repo_spec = match effective.override_() {
-            Some(RootModuleOverride::NonRegistry(repo_spec)) => repo_spec.clone(),
-            Some(_) => {
-                return Arc::new(Err(RepositoryMaterializationError::UnsupportedOverride(
-                    format!(
-                        "module {} does not have a non-registry override",
-                        self.module_name
-                    )
-                    .into(),
-                )));
-            }
-            None => {
-                return Arc::new(Err(RepositoryMaterializationError::MissingOverride(
-                    self.module_name.clone(),
-                )));
-            }
-        };
-        let canonical_repo = match CanonicalRepoName::new(format!("{}+", self.module_name)) {
-            Ok(repo) => repo,
-            Err(error) => {
-                return Arc::new(Err(
-                    RepositoryMaterializationError::InvalidCanonicalRepository(error.into()),
-                ));
-            }
-        };
-        let kind = match request_kind(&workspace, &repo_spec, local_path_policy(effective)) {
-            Ok(kind) => kind,
-            Err(error) => return Arc::new(Err(error)),
-        };
-        Arc::new(Ok(RepositoryMaterializationRequest {
-            id: RepositoryMaterializationRequestId {
-                workspace,
-                canonical_repo,
-            },
-            repo_spec,
-            kind,
-        }))
+        project_legacy_materialization_request(
+            drive_repository_materialization_request(ctx, self, MaterializationRequestMode::Legacy)
+                .await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3952,6 +4092,23 @@ impl Key for RepositoryMaterializationRequestKey {
     }
 }
 
+#[async_trait]
+impl Key for RepositoryMaterializationRequestObservationKey {
+    type Value = MaterializationRequestDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_repository_materialization_request(ctx, &self.0, MaterializationRequestMode::Observed)
+            .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 fn request_kind(
     workspace: &NormalizedAbsolutePath,
     repo_spec: &RepoSpec,
@@ -12033,14 +12190,13 @@ mod tests {
                 .any(|(kind, _)| *kind == ActivationKind::Reused)
         );
     }
-    async fn compute_host_effective(
-        dice: &Arc<Dice>,
+    fn inject_host_effective_inputs(
+        updater: &mut dice::DiceTransactionUpdater,
         root_source: &str,
-        module_name: &str,
+        mode: crate::LockfileMode,
         override_values: &[&str],
-    ) -> <HostEffectiveModuleOverrideKey as Key>::Value {
+    ) {
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
-        let mut updater = dice.updater();
         updater
             .changed_to(vec![(
                 slug_workspace_v2::WorkspaceSnapshotKey {
@@ -12070,7 +12226,7 @@ mod tests {
             )])
             .unwrap();
         inject_root_module_request_inputs(
-            &mut updater,
+            updater,
             workspace.as_path(),
             crate::BzlmodCommandPolicyKey::from_flags_with_module_overrides(
                 None,
@@ -12080,9 +12236,25 @@ mod tests {
             )
             .unwrap(),
             crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
-            crate::LockfileMode::Update,
+            mode,
         )
         .unwrap();
+    }
+
+    async fn compute_host_effective(
+        dice: &Arc<Dice>,
+        root_source: &str,
+        module_name: &str,
+        override_values: &[&str],
+    ) -> <HostEffectiveModuleOverrideKey as Key>::Value {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut updater = dice.updater();
+        inject_host_effective_inputs(
+            &mut updater,
+            root_source,
+            crate::LockfileMode::Update,
+            override_values,
+        );
         updater
             .commit()
             .await
@@ -13739,7 +13911,467 @@ mod tests {
             &outer, &outer
         ));
     }
+    #[derive(Default)]
+    struct MaterializationRequestTracker {
+        rows: Mutex<Vec<(String, Vec<String>)>>,
+        rich: Mutex<Vec<(String, ActivationKind, bool)>>,
+    }
+    impl ActivationTracker for MaterializationRequestTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+            let name = key.to_string();
+            if name.starts_with("repository-materialization-request:")
+                || name.starts_with("observed-repository-materialization-request:")
+            {
+                self.rows
+                    .lock()
+                    .unwrap()
+                    .push((name, deps.map(ToString::to_string).collect()));
+            }
+        }
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            self.rich.lock().unwrap().push((
+                key.to_string(),
+                activation.kind(),
+                activation.evaluation_data().is_some(),
+            ));
+        }
+    }
+    fn materialization_request_epoch(source: &str, variant: i64) -> PathObservationEpoch {
+        horizon_epoch(
+            source,
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            None,
+            None,
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            variant,
+        )
+    }
 
+    fn inject_materialization_request_inputs(
+        updater: &mut dice::DiceTransactionUpdater,
+        source: &str,
+        variant: i64,
+        overrides: &[&str],
+        observe: bool,
+    ) -> PathObservationEpoch {
+        let epoch = materialization_request_epoch(source, variant);
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                if observe {
+                    epoch.dupe()
+                } else {
+                    PathObservationEpoch::empty()
+                },
+            )])
+            .unwrap();
+        inject_host_effective_inputs(updater, source, crate::LockfileMode::Off, overrides);
+        inject_root_package_policy_inputs(
+            updater,
+            RootPackagePolicyInputs::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [NormalizedAbsolutePath::new("/workspace").unwrap()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        epoch
+    }
+    async fn materialization_request_case(
+        dice: &Arc<Dice>,
+        source: &str,
+        variant: i64,
+        overrides: &[&str],
+        observe: bool,
+    ) -> (
+        MaterializationRequestDriverOutcome,
+        MaterializationRequestResult,
+        PathObservationEpoch,
+        Vec<(String, ActivationKind, bool)>,
+        Vec<(String, Vec<String>)>,
+    ) {
+        let tracker = Arc::new(MaterializationRequestTracker::default());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        let epoch = inject_materialization_request_inputs(
+            &mut updater,
+            source,
+            variant,
+            overrides,
+            observe,
+        );
+        let mut transaction = updater.commit().await;
+        let observed = transaction
+            .compute(&RepositoryMaterializationRequestObservationKey::new(
+                PathBuf::from("/workspace"),
+                "dep".into(),
+            ))
+            .await
+            .unwrap();
+        let trace = std::mem::take(&mut *tracker.rich.lock().unwrap());
+        let legacy = transaction
+            .compute(&RepositoryMaterializationRequestKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+            })
+            .await
+            .unwrap();
+        let rows = tracker.rows.lock().unwrap().clone();
+        (observed, legacy, epoch, trace, rows)
+    }
+    #[test]
+    fn observed_materialization_request_reducer_and_projection_are_exact() {
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let shared = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), shared.dupe())]).unwrap();
+        let child = ObservedHostEffectiveModuleOverride::new(
+            Arc::new(Ok(HostEffectiveModuleOverride::None)),
+            epoch.dupe(),
+        );
+        let ControlFlow::Continue((_, forwarded)) = finish_observed_materialization_effective(
+            SourcePreparationOutcome::Complete(Ok(child)),
+        ) else {
+            panic!("success must continue")
+        };
+        assert!(Arc::ptr_eq(
+            forwarded.observations().get(&demand).unwrap(),
+            &shared
+        ));
+        let semantic = Arc::new(Err(
+            crate::module_eval::HostEffectiveModuleOverrideError::CommandPolicy("policy".into()),
+        ));
+        let ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(error))) =
+            finish_observed_materialization_effective(SourcePreparationOutcome::Complete(Ok(
+                ObservedHostEffectiveModuleOverride::new(semantic, epoch.dupe()),
+            )))
+        else {
+            panic!("semantic error must retain a carrier")
+        };
+        assert_eq!(error.observations(), &epoch);
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(demand.dupe()),
+        ));
+        let ControlFlow::Break(need) = finish_observed_materialization_effective(need) else {
+            panic!("Need must stop")
+        };
+        assert!(
+            !RepositoryMaterializationRequestObservationKey::validity(&need)
+                && !RepositoryMaterializationRequestObservationKey::equality(&need, &need)
+        );
+        let outer = SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+            slug_workspace_v2::PathObservationEpochError::DuplicateDemand(demand),
+        )));
+        let ControlFlow::Break(outer) = finish_observed_materialization_effective(outer) else {
+            panic!("outer must stop")
+        };
+        assert!(
+            RepositoryMaterializationRequestObservationKey::validity(&outer)
+                && RepositoryMaterializationRequestObservationKey::equality(&outer, &outer)
+        );
+        let held = Arc::new(Err(RepositoryMaterializationError::MissingOverride(
+            "dep".into(),
+        )));
+        let legacy = project_legacy_materialization_request(SourcePreparationOutcome::Complete(
+            Ok(ObservedRepositoryMaterializationRequest {
+                result: held.dupe(),
+                observations: epoch,
+            }),
+        ));
+        assert!(Arc::ptr_eq(&held, &legacy));
+    }
+
+    #[tokio::test]
+    async fn observed_materialization_request_lifecycle_families_events_and_cancellation() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let a_source = "module(name='root')\nprint('root-a')\nlocal_path_override(module_name='dep', path='dep-a')\n";
+        let b_source = "module(name='root')\nlocal_path_override(module_name='dep',path='b')\n";
+        let (a, legacy, injected, cold, rows) =
+            materialization_request_case(&dice, a_source, 1, &[], true).await;
+        let key = RepositoryMaterializationRequestObservationKey::new(
+            PathBuf::from("/workspace"),
+            "dep".into(),
+        );
+        assert!(key.to_string().starts_with("observed-repository-"));
+        let SourcePreparationOutcome::Complete(Ok(a_value)) = &a else {
+            panic!("request must complete: {a:?}")
+        };
+        assert_eq!(a_value.result().as_ref(), legacy.as_ref());
+        assert!(
+            a_value
+                .observations()
+                .observations()
+                .iter()
+                .all(|(demand, result)| Arc::ptr_eq(
+                    result,
+                    injected.observations().get(demand).unwrap()
+                ))
+        );
+        assert!(
+            cold.iter()
+                .any(|(name, _, event)| name == &key.to_string() && !event)
+        );
+        assert!(
+            cold.iter()
+                .any(|(name, _, event)| name.contains("root-module") && *event)
+        );
+        assert!(rows.iter().any(|(name, deps)| name == &key.to_string()
+            && deps == &["observed-host-effective-module-override:\"/workspace\":dep"]));
+        assert!(rows.iter().any(
+            |(name, deps)| name == "repository-materialization-request:dep"
+                && deps == &["host-effective-module-override:\"/workspace\":dep"]
+        ));
+        assert!(!cold.iter().any(|(name, _, _)| {
+            [
+                "repository-materialization:",
+                "host-repository-source-file:",
+                "host-nonregistry-module",
+                "host-discovered-module:",
+                "root-module-graph:",
+            ]
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+        }));
+
+        let (warm, _, _, reuse, _) =
+            materialization_request_case(&dice, a_source, 1, &[], true).await;
+        assert!(RepositoryMaterializationRequestObservationKey::equality(
+            &a, &warm
+        ));
+        assert!(
+            reuse
+                .iter()
+                .any(|(name, kind, event)| name == &key.to_string()
+                    && *kind == ActivationKind::Reused
+                    && !event)
+        );
+        let (b, _, _, _, _) = materialization_request_case(&dice, b_source, 2, &[], true).await;
+        let (restored, _, _, _, _) =
+            materialization_request_case(&dice, a_source, 1, &[], true).await;
+        assert!(!RepositoryMaterializationRequestObservationKey::equality(
+            &a, &b
+        ));
+        assert!(RepositoryMaterializationRequestObservationKey::equality(
+            &a, &restored
+        ));
+        assert!(matches!(a_value.result().as_ref(), Ok(request)
+            if matches!(&request.kind, RepositoryMaterializationKind::Local { logical_root }
+                if logical_root.as_path() == Path::new("/workspace/dep-a"))));
+
+        let (need, _, _, trace, rows) =
+            materialization_request_case(&dice, a_source, 3, &[], false).await;
+        assert!(
+            !RepositoryMaterializationRequestObservationKey::validity(&need)
+                && !RepositoryMaterializationRequestObservationKey::equality(&need, &need)
+        );
+        assert!(rows.iter().any(|(name, deps)| name.starts_with("observed-")
+            && deps == &["observed-host-effective-module-override:\"/workspace\":dep"]));
+        assert!(!trace.iter().any(
+            |(name, _, _)| name.starts_with("repository-materialization:")
+                || name.starts_with("host-repository-source-file:")
+        ));
+
+        let tracker = Arc::new(MaterializationRequestTracker::default());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        inject_materialization_request_inputs(&mut updater, b_source, 4, &[], true);
+        let mut cancelled = updater.commit().await;
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|cx| {
+            assert!(std::future::Future::poll(future.as_mut(), cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(cancelled);
+        assert!(tracker.rich.lock().unwrap().is_empty());
+        let (recovered, _, _, _, _) =
+            materialization_request_case(&dice, b_source, 4, &[], true).await;
+        assert!(RepositoryMaterializationRequestObservationKey::validity(
+            &recovered
+        ));
+    }
+    fn observed_materialization_value(
+        outcome: &MaterializationRequestDriverOutcome,
+    ) -> &ObservedRepositoryMaterializationRequest {
+        match outcome {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            _ => panic!("observed materialization request did not complete"),
+        }
+    }
+    #[tokio::test]
+    async fn observed_materialization_request_terminal_prefix_matrix_is_exact() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut transaction = dice.updater().commit().await;
+        let invalid = transaction
+            .compute(&RepositoryMaterializationRequestObservationKey::new(
+                PathBuf::from("relative"),
+                "dep".into(),
+            ))
+            .await
+            .unwrap();
+        let invalid = observed_materialization_value(&invalid);
+        assert!(matches!(
+            invalid.result().as_ref(),
+            Err(RepositoryMaterializationError::InvalidWorkspace(_))
+        ));
+        assert!(invalid.observations().observations().is_empty());
+        let compute = materialization_effective_compute_error("effective compute");
+        assert!(
+            observed_materialization_value(&compute)
+                .observations()
+                .observations()
+                .is_empty()
+        );
+        let cases = [
+            "module(name='root')\n",
+            "module(name='root')\nsingle_version_override(module_name='dep',version='1.0')\n",
+            "module(name='root')\nlocal_path_override(module_name='dep',path='../dep')\n",
+            "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n",
+            "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n",
+            "module(name='root')\ngit_override(module_name='dep',remote='https://example.invalid/r.git',commit='deadbeef')\n",
+        ];
+        for (index, source) in cases.into_iter().enumerate() {
+            let (observed, legacy, injected, _, _) =
+                materialization_request_case(&dice, source, 20 + index as i64, &[], true).await;
+            let value = observed_materialization_value(&observed);
+            assert_eq!(value.result().as_ref(), legacy.as_ref());
+            assert_eq!(value.observations().observations().len(), 4);
+            assert!(value.observations().observations().iter().all(
+                |(demand, result)| Arc::ptr_eq(
+                    result,
+                    injected.observations().get(demand).unwrap()
+                )
+            ));
+            match (index, value.result().as_ref()) {
+                (0, Err(RepositoryMaterializationError::MissingOverride(name)))
+                    if name == "dep" => {}
+                (1, Err(RepositoryMaterializationError::UnsupportedOverride(_))) => {}
+                (2, Err(RepositoryMaterializationError::Spec(message)))
+                    if message.contains("workspace-relative") => {}
+                (
+                    3,
+                    Ok(RepositoryMaterializationRequest {
+                        kind: RepositoryMaterializationKind::Local { logical_root },
+                        ..
+                    }),
+                ) if logical_root.as_path() == Path::new("/workspace/dep") => {}
+                (
+                    4 | 5,
+                    Ok(RepositoryMaterializationRequest {
+                        kind: RepositoryMaterializationKind::Immutable,
+                        ..
+                    }),
+                ) => {}
+                other => panic!("unexpected observed request terminal: {other:?}"),
+            }
+        }
+        let epoch = materialization_request_epoch("canonical", 40);
+        let effective = HostEffectiveModuleOverride::Root {
+            override_: RootModuleOverride::NonRegistry(local_route().repo_spec().clone()),
+        };
+        let canonical = materialization_request_complete(
+            project_materialization_request(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                &"bad/name".into(),
+                &effective,
+            ),
+            epoch.dupe(),
+        );
+        let canonical = observed_materialization_value(&canonical);
+        assert!(matches!(
+            canonical.result().as_ref(),
+            Err(RepositoryMaterializationError::InvalidCanonicalRepository(
+                _
+            ))
+        ));
+        assert_eq!(canonical.observations(), &epoch);
+    }
+    #[tokio::test]
+    async fn observed_materialization_request_command_and_kind_restore_exactly() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let root = "module(name='root')\n";
+        let (command_a, _, _, _, _) =
+            materialization_request_case(&dice, root, 60, &["dep=/workspace/dep-a"], true).await;
+        let held = observed_materialization_value(&command_a);
+        let held_result = held.result().dupe();
+        let (held_demand, held_observation) = held
+            .observations()
+            .observations()
+            .iter()
+            .next()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .unwrap();
+        let (command_b, _, _, _, _) =
+            materialization_request_case(&dice, root, 61, &["dep=/workspace/dep-b"], true).await;
+        let (command_restored, _, _, _, _) =
+            materialization_request_case(&dice, root, 60, &["dep=/workspace/dep-a"], true).await;
+        assert!(!RepositoryMaterializationRequestObservationKey::equality(
+            &command_a, &command_b
+        ));
+        assert!(RepositoryMaterializationRequestObservationKey::equality(
+            &command_a,
+            &command_restored
+        ));
+        assert!(matches!(held_result.as_ref(), Ok(request)
+            if matches!(&request.kind, RepositoryMaterializationKind::Local { logical_root }
+                if logical_root.as_path() == Path::new("/workspace/dep-a"))));
+        assert!(Arc::ptr_eq(
+            held.observations()
+                .observations()
+                .get(&held_demand)
+                .unwrap(),
+            &held_observation
+        ));
+        let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
+        let git = "module(name='root')\ngit_override(module_name='dep',remote='https://example.invalid/r.git',commit='deadbeef')\n";
+        let (kind_a, _, _, _, _) =
+            materialization_request_case(&dice, archive, 70, &[], true).await;
+        let held_kind = observed_materialization_value(&kind_a).result().dupe();
+        let (kind_b, _, _, _, _) = materialization_request_case(&dice, git, 71, &[], true).await;
+        let (kind_restored, _, _, _, _) =
+            materialization_request_case(&dice, archive, 70, &[], true).await;
+        assert!(!RepositoryMaterializationRequestObservationKey::equality(
+            &kind_a, &kind_b
+        ));
+        assert!(RepositoryMaterializationRequestObservationKey::equality(
+            &kind_a,
+            &kind_restored
+        ));
+        assert!(matches!(held_kind.as_ref(), Ok(request)
+            if request.repo_spec.rule_id.rule_name == "http_archive"
+                && request.kind == RepositoryMaterializationKind::Immutable));
+    }
     mod observation_tests {
         use super::*;
         include!("source_preparation_observation_tests.rs");
