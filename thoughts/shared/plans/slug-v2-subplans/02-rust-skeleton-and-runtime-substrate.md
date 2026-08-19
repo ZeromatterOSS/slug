@@ -5826,3 +5826,43 @@ scratch, direct Host read, behavior/family/order drift, cap excess or inability
 to carry the exact source child epoch without terminal-side collections.
 After design ACCEPT schedule exactly one bounded implementation; after
 implementation ACCEPT return to one docs-only remaining M1 owner audit.
+
+
+### External singleton observed-build implementation active (2026-08-18)
+
+Run only `WP-2A-m1-external-singleton-observed-build-implementation` from
+Rust base `a4dd40d6` and accepted design `1a217e2a`. Authority is exactly
+`runtime/dice.rs` (+260 production, <=11,220 physical) and
+`runtime/tests/build_command_tests.rs` (+360 tests, <=3,350 physical), <=620
+semantic and <=14,570 combined. No relocation or third Rust file.
+
+Keep the structural observed root and admit every syntactic nonroot Single;
+classify wrong-kind external targets after observed package load while root
+Single and multi-target routes remain unchanged. One mode-aware external branch
+selects only matching legacy/observed route, package and source families.
+Observed order is anchor -> route -> package -> target kind -> request revision
+-> source. Union completed epochs left-first before semantics; Need/outer is
+immediate and carrierless. Preserve every frozen empty/partial/full prefix and
+exact diagnostic/value behavior.
+
+Post-source terminals retain the exact source-child epoch certificate; earlier
+terminals retain none. Only the external observed identity initializes revision
+and opts into closure-selected repository sidecars; PackageAll stays strict.
+Keep unconditional full path value/Arc validation, active-materializer
+certificate refresh, atomic path/repository/event rollback and child-only event
+ownership. Retain only the local Result Arc, full epoch and shared certificate
+epoch; add no key/collection/cache/store/interner/lock/task/Host read/event
+owner.
+
+Prove identity/routing, shared-driver parity, every prefix/Arc/certificate,
+repository selection, exact cold/warm/no-replay events, both family directions,
+Host+Materialization lifecycle, failure/cancellation rollback and retained
+lifetimes. Preserve exact public external/root/multi behavior; internal
+observed association is Slug-native; multi-build, one-shot, broader actions,
+external globs and identity bytes remain deferred.
+
+STOP every other file, new key/state/event owner, lower/public change, partial
+validation, strict-root relaxation, retained scratch, behavior drift, cap
+excess or broader activation. REPLAN on an incomplete source certificate,
+terminal-retained repository sidecar or unbounded owner. After ACCEPT return
+only to one docs-only remaining M1 owner audit.
