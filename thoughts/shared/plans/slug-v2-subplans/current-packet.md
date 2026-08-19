@@ -1,25 +1,24 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-effective-module-override-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-effective-module-override-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `c2a18a94`
 Rust base: `a3efa1b7`
 Accepted semantic design: `c2d1f893`
-Retained Rust candidate: `app/slug_bzlmod_v2/src/module_eval.rs` at the scheduling-base worktree; non-writable during this design.
+Accepted proof-cap correction: `5ebc274a`
 
-## Exact docs authority and measured stop
+## Exact Rust authority and corrected caps
 
-Write only:
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` (<=40 net);
-2. this manifest (<=180 net);
-3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md` (<=140 net);
-4. `.codex/skills/slug-agent-orchestration/references/routing-log.md` (<=30 net).
-Aggregate docs net <=390. Do not edit Rust, Cargo/BUILD metadata, fixtures, oracles or any other file.
+Write only `app/slug_bzlmod_v2/src/module_eval.rs`, from the 6,052-line
+`a3efa1b7` baseline: <=200 production, <=320 tests, <=520 aggregate semantic
+and <=6,700 physical lines. The file is a cohesive large-owner exception and
+every touched helper remains <200 lines. Every other file is read-only.
 
-The retained one-file candidate proves the accepted owner and compiles, but the frozen cap/proof matrix cannot both be satisfied. Against `a3efa1b7`, `module_eval.rs` is currently +170 production/+236 tests/+406 aggregate and 6,458 physical lines. The original +160 production/+240 tests/+400 aggregate cap leaves no room for the smallest production-used root-outcome reducer and only four test lines for the missing dependency-row, cancellation, event and lifecycle discriminators. Forcing the proof under the old cap would either fabricate outcomes outside the live reducer or overcompress the owner.
+The retained one-file candidate is currently +170 production/+236 tests/+406
+aggregate at 6,458 physical lines. Use the corrected room only for the frozen
+proof and small pure seams used by the live driver.
 
-## Frozen correction
+## Frozen owner and correction
 
 Do not change the accepted owner, value, order, errors, events or retention. The retry remains exactly `app/slug_bzlmod_v2/src/module_eval.rs`, but correct its caps to <=200 production, <=320 tests, <=520 aggregate semantic lines and <=6,700 physical lines from the 6,052-line `a3efa1b7` baseline. This leaves 30 production, 84 test, 114 aggregate and 242 physical lines over the current candidate. It may fund only the frozen proof and small pure seams used by the live driver. Every touched helper remains <200 lines.
 
@@ -30,6 +29,7 @@ The retry may retain one production-used pure root-outcome reducer and one pure 
 ## Required correction proof
 
 Replace or compact the existing proof so it discriminates:
+
 - the crate-private carrier constructor/accessors, distinct identity/hash/Display and complete-only equality;
 - real parent dependency rows: observed root Need has only the observed root-files direct edge and no parent command-policy/later edge, even though the root-MODULE child legitimately reads command policy for ignore-dev;
 - the production-used reducer at root Need, typed outer and semantic positions, with exact prefixes, validity/equality and no carrier;
@@ -41,8 +41,14 @@ Replace or compact the existing proof so it discriminates:
 
 Retain exact values/errors/order/normalized command paths and legacy behavior. The sibling/carrier/epoch/typed outer association remains Slug-native. Selected graph, discovery, preparation, registry/nonregistry closure, extensions, generated repositories, external rules_rust actions, M8/M7B and identity bytes remain deferred.
 
-## STOP and successor
+## STOP, validation and successor
 
-STOP on Rust during this design, another file/key/caller/export, semantic or event change, retained child carrier/collection, direct Host read, cache/store/interner/lock/task, selected-graph or later-owner activation, cap excess or milestone closure. REPLAN again if the correction cannot fit.
+Run focused owner tests, full bzlmod, affected accepted loading/query/core
+baselines, fmt, diff-check, exact cap accounting and AI-cleanup/Buck2 retention
+review.
 
-After independent design ACCEPT, schedule exactly `WP-6-7A-effective-module-override-observation-implementation-retry` with the one-file corrected authority. After that implementation ACCEPT, schedule only `WP-6-7A-selected-module-graph-observation-frontier-design`.
+STOP on another file/key/caller/export, semantic or event change, retained child
+carrier/collection, direct Host read, cache/store/interner/lock/task,
+selected-graph or later-owner activation, cap excess or milestone closure.
+REPLAN again if the proof cannot fit. After independent implementation ACCEPT,
+schedule only `WP-6-7A-selected-module-graph-observation-frontier-design`.

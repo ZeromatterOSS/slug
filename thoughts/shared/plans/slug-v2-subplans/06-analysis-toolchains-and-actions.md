@@ -7990,3 +7990,16 @@ Independent proof review found that the four remaining test lines cannot discrim
 Run only `WP-6-7A-effective-module-override-observation-proof-cap-correction-design`, docs-only. Retain `module_eval.rs` non-writable. Keep the same one-file retry and raise only its limits to +200 production/+320 tests/+520 aggregate and 6,700 physical lines. The increase may fund only the existing live reducer, legacy Arc projection seam and missing discriminators; it authorizes no semantic/event/retention change, caller or later owner.
 
 STOP Rust, every other file/key/caller/export, direct Host read, new retained state, selected graph/discovery/preparation/repository activation and milestone closure. After independent correction ACCEPT, resume exactly one bounded implementation retry; after its ACCEPT, return only to the selected-module-graph frontier design.
+
+### Effective-module-override implementation retry scheduled (2026-08-19)
+
+Correction `5ebc274a` accepts the measured proof-cap increase without changing
+the owner, semantics, event authority or retention contract. Run only
+`WP-6-7A-effective-module-override-observation-implementation-retry` from Rust
+base `a3efa1b7`, semantic design `c2d1f893` and correction `5ebc274a`.
+Authority remains exactly `module_eval.rs`: <=200 production, <=320 tests,
+<=520 aggregate semantic and <=6,700 physical lines. The added room may fund
+only the production-used pure root reducer, exact legacy projection seam and
+the frozen dependency-row, prefix, Arc, event, cancellation and lifecycle
+proof. Preserve every original STOP boundary. After independent Rust ACCEPT,
+schedule only the docs-only selected-module-graph frontier design.
