@@ -8069,3 +8069,23 @@ other Rust file, caller/export, materialization/source/closure/preparation/
 discovery/selected-graph activation, direct Host read, retained collection or
 state, event drift and milestone closure. After implementation ACCEPT, return
 only to the docs-only selected-module-graph observation-frontier design.
+
+### Materialization-request observation design accepted (2026-08-19)
+
+Design `e606e1b2` freezes one private request sibling/carrier in
+`source_preparation.rs` from Rust base `3d174006`. A shared Legacy/Observed
+driver selects only the matching effective-override family and reuses one pure
+workspace/override/canonical-repository/request-kind projection. Invalid
+workspace and effective compute failure are empty-prefix; completed effective
+semantic and all request terminals retain the unchanged child epoch; Need and
+typed outer are carrierless. The parent is eventless and retains one local
+request Result Arc plus compact epoch.
+
+Run only
+`WP-6-7A-repository-materialization-request-observation-implementation`.
+Authority is exactly `source_preparation.rs`: <=180 production, <=320 tests,
+<=500 aggregate semantic and <=14,300 physical lines from 13,747. Preserve the
+complete identity, Arc, prefix, family, event, lifecycle, retention,
+compatibility and STOP contract. No materialization/source/closure/preparation/
+discovery/selected-graph caller is activated. After independent ACCEPT, return
+only to the docs-only selected-module-graph observation-frontier design.
