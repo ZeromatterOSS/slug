@@ -7896,3 +7896,65 @@ projections and stable Slug-native Host-only path/source-kind messages; prove
 both with real terminal comparisons. No third file/caller/owner, direct Host
 read, selected-graph/extension/package/analysis activation or milestone close.
 After ACCEPT, design only the selected-module-graph observation frontier.
+
+### Root MODULE-files observation implementation accepted (2026-08-19)
+
+Implementation `a3efa1b7` completes the first aggregate root prefix. The private
+matching-family driver retains the already-evaluated extension-usage Arc, reads
+the visible lockfile mode-first through the observed Host FileBytes owner, and
+associates root then lockfile exact Arcs before semantic inspection. Equivalent
+legacy errors remain exact; Host-only terminals have stable explicit messages.
+The parent is eventless and retains only one local Result Arc plus compact
+epoch.
+
+Final accounting against `335cfa45` is +76 production/+119 tests in
+`host_module.rs`, +303 production/+298 tests in `module_eval.rs`, +796
+aggregate semantic lines and 10,778 physical lines. Focused 2/2 and full bzlmod
+428/428 pass. Loading 138/138 and query 53/53 remain green; core retains only
+the accepted inherited visibility-wording baseline. Formatting, diff hygiene,
+archive disposition, retention/cleanup and independent terminal review pass.
+
+### Selected-graph frontier first-child REPLAN (2026-08-19)
+
+Do not freeze the selected graph sibling yet. `HostSelectedModuleGraphKey`
+starts from the now-complete `RootModuleFilesKey` but repeatedly computes
+carrierless `HostEffectiveModuleOverrideKey` before every discovered-module
+horizon. That same effective-override owner is the first shared child of module
+source preparation, nonregistry preflight and selected repository-definition
+projection. Bypassing it would duplicate command/root override precedence and
+lose the accepted root epoch.
+
+`HostDiscoveredModuleKey` also still crosses carrierless registry preparation
+and nonregistry closure branches. Those remain later frontier work; folding
+them into this first child would widen ownership and event/lifetime proof before
+the shared root prefix is reusable.
+
+Run only `WP-6-7A-effective-module-override-observation-design`, docs-only.
+Freeze one private structural observed sibling/carrier in `module_eval.rs`
+with one local effective-override Result Arc plus the unchanged root-files
+epoch. One Legacy/Observed driver must select only the matching root-files key,
+then compute the shared command policy and run the existing pure precedence
+projection. Root Need/typed outer is immediate and carrierless; root compute
+failure has empty prefix; root semantic, policy compute failure and every
+command/root/None terminal retain the root prefix. The parent remains eventless
+and retains no child carrier or collection.
+
+Future implementation authority after design ACCEPT is exactly
+`module_eval.rs` from the 6,052-line `a3efa1b7` baseline: <=160 production,
+<=240 tests, <=400 aggregate semantic and <=6,500 physical lines. Keep every
+helper below 200 lines. Prove exact legacy Arc/value/error parity, exact epoch
+Arc identity, all terminal prefixes, both family directions, later-owner
+nonactivation, eventlessness, warm/cancellation recovery and override A/B/A.
+
+Exact behavior is effective override values/errors/order, normalized command
+paths and legacy Results. The sibling/carrier/epoch/typed outer association is
+Slug-native. Selected graph/discovered registry/nonregistry modules, extension
+evaluation/instantiation, generated repository loading, external rules_rust
+analysis/actions, M8/M7B and identity bytes remain deferred.
+
+STOP Rust during design and stop every other file/caller/export, selected graph
+or discovered/preparation/repository activation, direct Host read, extra state,
+family/order/error/event/retention drift, cap excess or milestone closure.
+After design ACCEPT schedule only the bounded effective-override implementation;
+after implementation ACCEPT return only to the selected-module-graph frontier
+design.
