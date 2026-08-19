@@ -8,21 +8,38 @@ struct HostSourceActivation {
 #[derive(Debug, Default)]
 struct HostSourceFamilyTracker {
     activations: Mutex<Vec<HostSourceActivation>>,
+    rows: Mutex<Vec<(String, Vec<String>)>>,
 }
 
 impl HostSourceFamilyTracker {
     fn take(&self) -> Vec<HostSourceActivation> {
         std::mem::take(&mut *self.activations.lock().unwrap())
     }
+
+    fn take_rows(&self) -> Vec<(String, Vec<String>)> {
+        std::mem::take(&mut *self.rows.lock().unwrap())
+    }
+}
+
+fn assert_repository_source_eventless(activations: &[HostSourceActivation]) {
+    assert!(activations.iter().filter(|entry| {
+        entry.key.contains("repository-source-file:")
+            || entry.key.contains("resolved-path:")
+            || entry.key.starts_with("path-observation:")
+    }).all(|entry| entry.batch.is_none()));
 }
 
 impl ActivationTracker for HostSourceFamilyTracker {
     fn key_activated(
         &self,
-        _: &DynKey,
-        _: &mut dyn Iterator<Item = &DynKey>,
+        key: &DynKey,
+        deps: &mut dyn Iterator<Item = &DynKey>,
         _: ActivationData,
     ) {
+        self.rows
+            .lock()
+            .unwrap()
+            .push((key.to_string(), deps.map(ToString::to_string).collect()));
     }
 
     fn tracks_rich_activations(&self) -> bool {
@@ -77,9 +94,14 @@ fn complete_observed_source(
 
 fn assert_exact_epoch(expected: &PathObservationEpoch, actual: &PathObservationEpoch) {
     assert_eq!(actual.observations().len(), expected.observations().len());
-    for (demand, result) in expected.observations() {
+    for ((demand, result), (actual_demand, actual_result)) in expected
+        .observations()
+        .iter()
+        .zip(actual.observations())
+    {
+        assert_eq!(actual_demand, demand, "epoch iteration order changed");
         assert!(
-            Arc::ptr_eq(actual.get(demand).unwrap(), result),
+            Arc::ptr_eq(actual_result, result),
             "result Arc changed for {demand:?}"
         );
     }
@@ -505,6 +527,684 @@ async fn observed_host_source_cancellation_publishes_nothing_and_recovers_aba() 
     );
 }
 
+
+fn complete_repository_source(
+    value: &<RepositorySourceFileObservationKey as Key>::Value,
+) -> &ObservedRepositorySourceFileValue {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed repository source must complete: {value:?}");
+    };
+    observed
+}
+
+fn repository_source_key(path: &str) -> RepositorySourceFileKey {
+    RepositorySourceFileKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        repo_relative_path: PathBuf::from(path),
+    }
+}
+fn extend_repository_source_epoch(
+    prefix: &PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> PathObservationEpoch {
+    PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                incoming
+                    .observations()
+                    .iter()
+                    .filter(|(demand, _)| prefix.observations().get(*demand).is_none())
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .unwrap()
+}
+async fn repository_source_transaction(
+    dice: &Arc<Dice>,
+    source: &str,
+    variant: i64,
+    result: RepositoryMaterializationResult,
+    source_epoch: PathObservationEpoch,
+    tracker: Arc<HostSourceFamilyTracker>,
+) -> (dice::DiceTransaction, PathObservationEpoch) {
+    let mut data = UserComputationData {
+        activation_tracker: Some(tracker.dupe()),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(data);
+    inject_materialization_request_inputs(&mut updater, source, variant, &[], true);
+    let mut transaction = updater.commit().await;
+    let request = transaction
+        .compute(&RepositoryMaterializationRequestObservationKey::new(
+            PathBuf::from("/workspace"),
+            "dep".into(),
+        ))
+        .await
+        .unwrap();
+    let request = observed_materialization_value(&request);
+    let prefix = request.observations().dupe();
+    let request = request.result().as_ref().as_ref().unwrap().clone();
+    let epoch = extend_repository_source_epoch(&prefix, &source_epoch);
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch.dupe())])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                [RepositoryMaterializationEpochEntry {
+                    request: Arc::new(request),
+                    result,
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let materialization = transaction.compute(&RepositoryMaterializationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+    )).await.unwrap();
+    let epoch = extend_repository_source_epoch(
+        observed_repository_materialization(&materialization).observations(),
+        &source_epoch,
+    );
+    (transaction, epoch)
+}
+async fn repository_source_case(
+    dice: &Arc<Dice>,
+    source: &str,
+    variant: i64,
+    result: RepositoryMaterializationResult,
+    source_epoch: PathObservationEpoch,
+) -> (
+    <RepositorySourceFileObservationKey as Key>::Value,
+    <RepositorySourceFileObservationKey as Key>::Value,
+    <RepositorySourceFileKey as Key>::Value,
+    PathObservationEpoch,
+    Vec<Vec<HostSourceActivation>>,
+    Vec<(String, Vec<String>)>,
+) {
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut transaction, epoch) = repository_source_transaction(
+        dice,
+        source,
+        variant,
+        result,
+        source_epoch,
+        tracker.dupe(),
+    )
+    .await;
+    let child = tracker.take();
+    tracker.take_rows();
+    let observed_key = RepositorySourceFileObservationKey(repository_source_key("file"));
+    let cold = transaction.compute(&observed_key).await.unwrap();
+    let cold_activations = tracker.take();
+    let mut rows = tracker.take_rows();
+    let warm = transaction.compute(&observed_key).await.unwrap();
+    let warm_activations = tracker.take();
+    rows.extend(tracker.take_rows());
+    let legacy = transaction
+        .compute(&repository_source_key("file"))
+        .await
+        .unwrap();
+    let legacy_activations = tracker.take();
+    rows.extend(tracker.take_rows());
+    if let SourcePreparationOutcome::Complete(Ok(observed)) = &cold {
+        assert_selected_epoch(&mut transaction, &epoch, observed.observations()).await;
+    }
+    (
+        cold,
+        warm,
+        legacy,
+        epoch,
+        vec![child, cold_activations, warm_activations, legacy_activations],
+        rows,
+    )
+}
+#[tokio::test]
+async fn observed_repository_source_projection_and_algebra_are_exact() {
+    let key = RepositorySourceFileObservationKey(repository_source_key("file"));
+    assert_eq!(key.to_string(), "observed-repository-source-file:dep:file");
+    let other = RepositorySourceFileObservationKey(repository_source_key("other"));
+    assert_ne!(key, other);
+    assert_ne!(test_hash(&key), test_hash(&other));
+    let mut tx = Dice::builder().build(DetectCycles::Enabled).updater().commit().await;
+    let invalid = tx.compute(&RepositorySourceFileObservationKey(repository_source_key("../file"))).await.unwrap();
+    let invalid = complete_repository_source(&invalid);
+    assert!(matches!(invalid.result().as_ref(),
+        Err(RepositorySourceFileError::InvalidRepoRelativePath { .. })));
+    assert!(invalid.observations().observations().is_empty());
+    let bytes = Arc::<[u8]>::from(b"bytes".as_slice());
+    let carrier = repository_source_file_complete(
+        Ok(RepositorySourceFileValue::Present(bytes.dupe())),
+        PathObservationEpoch::empty(),
+    );
+    let held = complete_repository_source(&carrier).result().dupe();
+    assert!(matches!(project_legacy_repository_source_file(carrier),
+        SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(found)))
+            if Arc::ptr_eq(&bytes, &found)));
+    assert!(matches!(held.as_ref(), Ok(RepositorySourceFileValue::Present(found))
+        if Arc::ptr_eq(&bytes, found)));
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/dep/file").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let first = Arc::new(PathObservationResult::FileBytes(
+        PathOperationResult::Present(Arc::from(b"same".as_slice())),
+    ));
+    let prefix = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+    let equal = PathObservationEpoch::from_shared([(
+        demand.dupe(),
+        Arc::new(first.as_ref().clone()),
+    )])
+    .unwrap();
+    assert!(Arc::ptr_eq(
+        merge_path_observations(&prefix, &equal)
+            .unwrap()
+            .get(&demand)
+            .unwrap(),
+        &first
+    ));
+    let conflict = PathObservationEpoch::from_shared([(
+        demand.dupe(),
+        Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(b"changed".as_slice())),
+        )),
+    )])
+    .unwrap();
+    assert!(matches!(
+        merge_path_observations(&prefix, &conflict),
+        Err(ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::ConflictingDemand(_)
+        ))
+    ));
+    assert!(matches!(
+        append_host_repository_source_observation(
+            &prefix,
+            demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        ),
+        Err(ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. }
+        ))
+    ));
+    let path = Arc::new(PathBuf::from("file"));
+    let materialization = repository_source_materialization_compute_error(
+        path.dupe(), "materialization".into(),
+    );
+    let materialization = complete_repository_source(&materialization);
+    assert!(matches!(materialization.result().as_ref(),
+        Err(RepositorySourceFileError::MaterializationCompute { message, .. })
+            if message.as_ref() == "materialization"));
+    assert!(materialization.observations().observations().is_empty());
+    let resolution =
+        repository_source_resolution_compute_error(path.dupe(), "resolution".into(), prefix.dupe());
+    let resolution = complete_repository_source(&resolution);
+    assert!(matches!(resolution.result().as_ref(), Err(RepositorySourceFileError::ResolutionCompute { message, .. }) if message.as_ref() == "resolution"));
+    assert_exact_epoch(&prefix, resolution.observations());
+    let SourcePreparationOutcome::Complete(Ok((Err(RepositorySourceFileError::FileCompute { message, .. }), file_prefix))) =
+        host_repository_source_file_compute_error(path.dupe(), "file".into(), &prefix)
+    else {
+        panic!("FileBytes compute failure must retain its prior prefix")
+    };
+    assert_exact_epoch(&prefix, &file_prefix);
+    assert_eq!(message.as_ref(), "file");
+    let semantic = finish_observed_repository_source_materialization(
+        SourcePreparationOutcome::Complete(Ok(ObservedRepositoryMaterialization {
+            result: Arc::new(Err(RepositoryMaterializationError::Spec("spec".into()))),
+            observations: prefix.dupe(),
+        })),
+        path.dupe(),
+    );
+    let ControlFlow::Break(semantic) = semantic else {
+        panic!("materialization semantic must stop")
+    };
+    assert_exact_epoch(&prefix, complete_repository_source(&semantic).observations());
+    let need = NeedPathObservations::singleton(demand.dupe());
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand,
+            result_operation: PathObservationOperation::Lstat,
+        },
+    );
+    for value in [
+        finish_observed_repository_source_materialization(
+            SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need.dupe())),
+            path.dupe(),
+        )
+        .break_value()
+        .unwrap(),
+        finish_observed_repository_source_resolution(
+            PathOutcome::Need(need),
+            &prefix,
+            path.dupe(),
+        )
+        .break_value()
+        .unwrap(),
+        finish_observed_repository_source_materialization(
+            SourcePreparationOutcome::Complete(Err(outer.dupe())),
+            path.dupe(),
+        )
+        .break_value()
+        .unwrap(),
+        finish_observed_repository_source_resolution(
+            PathOutcome::Complete(Err(outer)),
+            &prefix,
+            path,
+        )
+        .break_value()
+        .unwrap(),
+    ] {
+        assert_eq!(RepositorySourceFileObservationKey::validity(&value), value.is_complete());
+        assert_eq!(
+            RepositorySourceFileObservationKey::equality(&value, &value),
+            value.is_complete()
+        );
+    }
+}
+#[tokio::test]
+async fn observed_repository_source_prefixes_families_and_events_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let local = "module(name='root')\nprint('root-source')\nlocal_path_override(module_name='dep',path='dep')\n";
+    let local_success =
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local);
+    let present_epoch = host_path_epoch(
+        PathObservationNamespace::Host,
+        "/workspace/dep/file",
+        Some(PathNodeKind::RegularFile),
+        Some(b"local-a"),
+    );
+    let (cold, warm, legacy, expected, phases, rows) = repository_source_case(
+        &dice,
+        local,
+        301,
+        local_success.clone(),
+        present_epoch,
+    )
+    .await;
+    let observed = complete_repository_source(&cold);
+    assert!(RepositorySourceFileObservationKey::equality(&cold, &warm));
+    assert!(Arc::ptr_eq(
+        observed.result(),
+        complete_repository_source(&warm).result()
+    ));
+    assert_exact_epoch(&expected, observed.observations());
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy source must complete");
+    };
+    assert_eq!(observed.result().as_ref(), &legacy);
+    let (
+        Ok(RepositorySourceFileValue::Present(observed_bytes)),
+        Ok(RepositorySourceFileValue::Present(legacy_bytes)),
+    ) = (observed.result().as_ref(), &legacy)
+    else {
+        panic!("both source families must retain bytes");
+    };
+    assert!(Arc::ptr_eq(observed_bytes, legacy_bytes));
+    for (root, expected) in [
+        (
+            "observed-repository-source-file:dep:file",
+            [
+                "observed-repository-materialization:dep",
+                "observed-resolved-path:Host:\"/workspace/dep/file\"",
+                "path-observation:Host:\"/workspace/dep/file\":FileBytes",
+            ],
+        ),
+        (
+            "repository-source-file:dep:file",
+            [
+                "repository-materialization:dep",
+                "resolved-path:Host:\"/workspace/dep/file\"",
+                "path-observation:Host:\"/workspace/dep/file\":FileBytes",
+            ],
+        ),
+    ] {
+        let deps = &rows.iter().find(|(name, _)| name == root).unwrap().1;
+        assert_eq!(deps, &expected.map(str::to_owned));
+    }
+    assert!(phases[0].iter().any(|entry| {
+        entry.key.contains("root-module-file:")
+            && entry.batch.as_ref().is_some_and(|batch| !batch.events().is_empty())
+    }));
+    assert_repository_source_eventless(&phases[1]);
+    assert!(phases[2]
+        .iter()
+        .all(|entry| entry.kind == ActivationKind::Reused && entry.batch.is_none()));
+    let upper = [
+        "host-nonregistry-package-preflight:",
+        "host-nonregistry-repo-file:",
+        "host-nonregistry-repository-ignore:",
+        "module-source-preparation:",
+        "direct-local-module-preparation:",
+        "observed-direct-local-module-preparation:",
+        "host-nonregistry-module-closure:",
+        "host-discovered-module:",
+        "host-selected-module-graph:",
+        "registry-file:",
+    ];
+    assert!(!phases
+        .iter()
+        .flatten()
+        .any(|entry| upper.iter().any(|p| entry.key.starts_with(p))));
+    let path = |kind| {
+        host_path_epoch(
+            PathObservationNamespace::Host,
+            "/workspace/dep/file",
+            kind,
+            None,
+        )
+    };
+    let regular = path(Some(PathNodeKind::RegularFile));
+    let bytes = |result| {
+        source_epoch(
+            regular.dupe(),
+            PathObservationNamespace::Host,
+            "/workspace/dep/file",
+            PathObservationResult::FileBytes(result),
+        )
+    };
+    let resolution_error = repository_source_readlink_error_epoch();
+    let cases = [
+        (path(None), "absent"),
+        (resolution_error, "resolution"),
+        (path(Some(PathNodeKind::Directory)), "wrong"),
+        (bytes(PathOperationResult::Missing), "missing"),
+        (
+            bytes(PathOperationResult::Error(PathObservationError::NotALink)),
+            "error",
+        ),
+    ];
+    for (index, (tail, expected_kind)) in cases.into_iter().enumerate() {
+        let case_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let (value, _, _, epoch, _, _) = repository_source_case(
+            &case_dice,
+            local,
+            310 + index as i64,
+            local_success.clone(),
+            tail,
+        )
+        .await;
+        let value = complete_repository_source(&value);
+        assert_exact_epoch(&epoch, value.observations());
+        assert!(match (expected_kind, value.result().as_ref()) {
+            ("absent", Ok(RepositorySourceFileValue::Absent)) => true,
+            (
+                "wrong",
+                Err(RepositorySourceFileError::WrongKind {
+                    actual: PathNodeKind::Directory,
+                    ..
+                }),
+            ) => true,
+            ("resolution", Err(RepositorySourceFileError::Observation {
+                operation: PathObservationOperation::ReadLink,
+                ..
+            })) => true,
+            ("missing", Err(RepositorySourceFileError::InconsistentState { .. })) => true,
+            ("error", Err(RepositorySourceFileError::Observation { .. })) => true,
+            _ => false,
+        });
+    }
+
+    let spec_case = repository_source_case(
+        &dice,
+        local,
+        320,
+        RepositoryMaterializationResult::SpecError("spec".into()),
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let spec = complete_repository_source(&spec_case.0);
+    assert!(matches!(
+        spec.result().as_ref(),
+        Err(RepositorySourceFileError::Materialization { .. })
+    ));
+    assert_exact_epoch(&spec_case.3, spec.observations());
+    let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
+    let instance = PathObservationInstanceId::new(321);
+    let namespace = PathObservationNamespace::Materialization(instance);
+    let immutable = RepositoryMaterializationResult::Success(
+        RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("sha256-immutable"),
+            generation_root: PathBuf::from("/immutable/321"),
+            observation_instance: instance,
+        },
+    );
+    let immutable_tail = host_path_epoch(
+        namespace,
+        "/immutable/321/file",
+        Some(PathNodeKind::SpecialFile),
+        Some(b"immutable"),
+    );
+    let (immutable_value, _, _, immutable_epoch, _, _) =
+        repository_source_case(&dice, archive, 321, immutable, immutable_tail).await;
+    let immutable_value = complete_repository_source(&immutable_value);
+    assert_exact_epoch(&immutable_epoch, immutable_value.observations());
+    assert!(matches!(
+        immutable_value.result().as_ref(),
+        Ok(RepositorySourceFileValue::Present(bytes))
+            if bytes.as_ref() == b"immutable"
+    ));
+}
+
+#[tokio::test]
+async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let local =
+        "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n";
+    let key = RepositorySourceFileObservationKey(repository_source_key("file"));
+
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let mut data = UserComputationData {
+        activation_tracker: Some(tracker.dupe()),
+        ..Default::default()
+    };
+    data.data.set(CaptureEvaluationEvents);
+    let mut updater = dice.updater_with_data(data);
+    inject_materialization_request_inputs(&mut updater, local, 401, &[], false);
+    let mut transaction = updater.commit().await;
+    let materialization_need = transaction.compute(&key).await.unwrap();
+    assert!(matches!(materialization_need, SourcePreparationOutcome::Need(_)));
+    let deps = &tracker.take_rows().into_iter()
+        .find(|(name, _)| name == &key.to_string()).unwrap().1;
+    assert!(deps.iter().any(|dep| dep.starts_with("observed-repository-materialization:")));
+    assert!(!deps.iter().any(|dep| dep.starts_with("observed-resolved-path:")));
+
+    assert_repository_source_eventless(&tracker.take());
+    let result =
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local);
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut resolution_need, _) = repository_source_transaction(
+        &dice,
+        local,
+        402,
+        result.clone(),
+        PathObservationEpoch::empty(),
+        tracker.dupe(),
+    )
+    .await;
+    assert!(matches!(
+        resolution_need.compute(&key).await.unwrap(),
+        SourcePreparationOutcome::Need(_)
+    ));
+    let deps = &tracker.take_rows().into_iter()
+        .find(|(name, _)| name == &key.to_string()).unwrap().1;
+    assert!(deps.iter().any(|dep| dep.starts_with("observed-resolved-path:")));
+    assert!(!deps.iter().any(|dep| dep.contains("FileBytes")));
+
+    assert_repository_source_eventless(&tracker.take());
+    let lstat_only = host_path_epoch(
+        PathObservationNamespace::Host,
+        "/workspace/dep/file",
+        Some(PathNodeKind::RegularFile),
+        None,
+    );
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut file_need, _) =
+        repository_source_transaction(&dice, local, 403, result.clone(), lstat_only, tracker.dupe())
+            .await;
+    assert!(matches!(
+        file_need.compute(&key).await.unwrap(),
+        SourcePreparationOutcome::Need(_)
+    ));
+    assert_repository_source_eventless(&tracker.take());
+
+    let full = host_path_epoch(
+        PathObservationNamespace::Host,
+        "/workspace/dep/file",
+        Some(PathNodeKind::RegularFile),
+        Some(b"a"),
+    );
+    let tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut cancelled, _) = repository_source_transaction(
+        &dice,
+        local,
+        404,
+        result.clone(),
+        full,
+        tracker.dupe(),
+    )
+    .await;
+    tracker.take();
+    tracker.take_rows();
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(tracker.take().is_empty());
+
+    let recovery_tracker = Arc::new(HostSourceFamilyTracker::default());
+    let (mut recovered, _) = repository_source_transaction(
+        &dice,
+        local,
+        404,
+        result.clone(),
+        host_path_epoch(
+            PathObservationNamespace::Host,
+            "/workspace/dep/file",
+            Some(PathNodeKind::RegularFile),
+            Some(b"a"),
+        ),
+        recovery_tracker.dupe(),
+    )
+    .await;
+    recovery_tracker.take();
+    let recovered = recovered.compute(&key).await.unwrap();
+    assert!(RepositorySourceFileObservationKey::validity(&recovered));
+    assert!(recovery_tracker.take().iter().all(|entry| {
+        entry.key != key.to_string() || entry.batch.is_none()
+    }));
+
+    let epoch_for = |kind, bytes| {
+        host_path_epoch(
+            PathObservationNamespace::Host,
+            "/workspace/dep/file",
+            kind,
+            bytes,
+        )
+    };
+    let lifecycle = [
+        (Some(PathNodeKind::RegularFile), Some(b"a".as_slice())),
+        (Some(PathNodeKind::RegularFile), Some(b"b".as_slice())),
+        (None, None),
+        (Some(PathNodeKind::Directory), None),
+        (Some(PathNodeKind::RegularFile), Some(b"a".as_slice())),
+    ];
+    let mut local_values = Vec::new();
+    for (kind, bytes) in lifecycle {
+        let case = repository_source_case(
+            &dice, local, 405, result.clone(), epoch_for(kind, bytes),
+        ).await;
+        local_values.push((case.0, case.3));
+    }
+    let a_value = complete_repository_source(&local_values[0].0);
+    let held_result = a_value.result().dupe();
+    let held_epoch = a_value.observations().dupe();
+    assert!(local_values[1..4].iter().all(|value| {
+        !RepositorySourceFileObservationKey::equality(&local_values[0].0, &value.0)
+    }));
+    let (restored_value, _) = local_values.pop().unwrap();
+    assert!(RepositorySourceFileObservationKey::equality(
+        &local_values[0].0, &restored_value
+    ));
+    let restored = complete_repository_source(&restored_value);
+    assert_eq!(held_result.as_ref(), restored.result().as_ref());
+    assert_eq!(held_epoch, *restored.observations());
+
+    let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
+    let instance = PathObservationInstanceId::new(406);
+    let invalid_root = repository_source_case(
+        &dice,
+        archive,
+        407,
+        RepositoryMaterializationResult::Success(
+            RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from("sha256-invalid-root"),
+                generation_root: PathBuf::from("relative"),
+                observation_instance: instance,
+            },
+        ),
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let invalid = complete_repository_source(&invalid_root.0);
+    assert!(matches!(
+        invalid.result().as_ref(),
+        Err(RepositorySourceFileError::InvalidMaterializedPath { .. })
+    ));
+    assert_exact_epoch(&invalid_root.3, invalid.observations());
+
+    let immutable = RepositoryMaterializationResult::Success(
+        RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("sha256-lifecycle"),
+            generation_root: PathBuf::from("/immutable/406"),
+            observation_instance: instance,
+        },
+    );
+    let mut values = Vec::new();
+    for (kind, bytes) in lifecycle {
+        let case = repository_source_case(
+            &dice,
+            archive,
+            406,
+            immutable.clone(),
+            host_path_epoch(
+                PathObservationNamespace::Materialization(instance),
+                "/immutable/406/file",
+                kind,
+                bytes,
+            ),
+        )
+        .await;
+        values.push((case.0, case.3));
+    }
+    let immutable_a = complete_repository_source(&values[0].0);
+    let held_immutable_result = immutable_a.result().dupe();
+    let held_immutable_epoch = immutable_a.observations().dupe();
+    assert!(values[1..4].iter().all(|value| {
+        !RepositorySourceFileObservationKey::equality(&values[0].0, &value.0)
+    }));
+    let (restored_value, _) = values.pop().unwrap();
+    assert!(RepositorySourceFileObservationKey::equality(&values[0].0, &restored_value));
+    let immutable_restored = complete_repository_source(&restored_value);
+    assert_eq!(held_immutable_result.as_ref(), immutable_restored.result().as_ref());
+    assert_eq!(held_immutable_epoch, *immutable_restored.observations());
+}
+
 fn direct_local_file_key(apparent: &str) -> DirectLocalModuleFileKey {
     DirectLocalModuleFileKey::new(
         NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -818,7 +1518,7 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
     let equal = Arc::new(first.as_ref().clone());
     let left = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
     let right = PathObservationEpoch::from_shared([(demand.dupe(), equal)]).unwrap();
-    let merged = merge_direct_local_observations(&left, &right).unwrap();
+    let merged = merge_path_observations(&left, &right).unwrap();
     assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
     let conflict = PathObservationEpoch::from_shared([(
         demand.dupe(),
@@ -828,7 +1528,7 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
     )])
     .unwrap();
     assert!(matches!(
-        merge_direct_local_observations(&left, &conflict),
+        merge_path_observations(&left, &conflict),
         Err(ObservedPathFrontierError::Epoch(
             slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
         )) if found == demand
@@ -1457,7 +2157,7 @@ async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle
         let SourcePreparationOutcome::Complete(Ok(lookup)) = lookup else {
             panic!("observed package lookup must complete")
         };
-        expected = merge_direct_local_observations(&expected, lookup.observations()).unwrap();
+        expected = merge_path_observations(&expected, lookup.observations()).unwrap();
     }
     assert_exact_epoch(&expected, &observed.observations);
     let activations = tracker.take();
@@ -1683,7 +2383,7 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
         let SourcePreparationOutcome::Complete(Ok(lookup)) = lookup else {
             panic!("observed package lookup must complete")
         };
-        expected = merge_direct_local_observations(&expected, lookup.observations()).unwrap();
+        expected = merge_path_observations(&expected, lookup.observations()).unwrap();
         let source = cold
             .compute(&HostRepositorySourceFileObservationKey::new(
                 local_route(),
@@ -1691,7 +2391,7 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
             ))
             .await
             .unwrap();
-        expected = merge_direct_local_observations(
+        expected = merge_path_observations(
             &expected,
             complete_observed_source(&source).observations(),
         )
