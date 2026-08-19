@@ -6003,3 +6003,54 @@ fmt/diff, exact caps, cleanup/retention and independent review. STOP every other
 file or loading byte, child filtering, equality weakening, accepted-state or
 owner expansion, behavior drift, cap excess and M1 closure. After ACCEPT return
 only to one docs-only remaining M1 owner audit.
+
+### External singleton accepted-root event association REPLAN (2026-08-18)
+
+The first retry-2 event carry compiles but does not close the exact server
+regression. Test-only accepted-epoch inspection proves the cold package BUILD
+event node is already absent after an event-silent source edit. The
+pre-revision root is equality-reused, so its selected closure omits the hidden
+package descendant and the provisional carry never sees it.
+
+Independent review rejects both in-authority shortcuts. Filtering the child,
+weakening path/key equality, or retaining every prior event across any revision
+retry breaks accepted ownership/removal semantics. Ordered accepted root IDs
+are the uniquely smallest durable association, but equality alone is
+insufficient when the same root is reevaluated with a changed BUILD or
+`.bzl` dependency graph.
+
+Run only
+`WP-2A-m1-external-singleton-event-root-association-correction-design` from
+scheduling base `d63e1718`. Write only canonical/current/Stage/routing under
+40/220/180/30 and 470 aggregate docs net. Retain but do not write the dirty
+four-file Rust candidate. STOP Cargo, BUILD, fixtures, oracles, server tests,
+implementation, callers, exports and public behavior.
+
+Freeze one compact ordered `Arc<[DiceNodeId]>` of accepted closure roots
+beside the existing Some-only accepted event entries. Capture ordered roots in
+selected state and the command-local provisional tombstone state. Normal
+commands still drop absent nodes. On the first source-certificate revision
+retry, seed hidden prior entries only if ordered roots exactly match the prior
+accepted roots and every current root transition is `NoTransition`/reused.
+Any root/order/length mismatch, unavailable root, or root Known(Some/None)
+uses ordinary closure reconciliation. Final Known transitions, tombstones,
+NoTransition fallback, retry/final ordering, revision->Need persistence,
+multiple retries, true-prior delta emission and atomic post-materializer
+replacement remain as frozen in `5dabd4bf`.
+
+Retain only compact Dupe/Allocative root and entry slices; merge maps/Vecs stay
+compute-local. Add no retained closure/dependency graph/map, cache, interner,
+lock, task, Host read, child carrier or event owner. Prove reuse-only seeding,
+same-root evaluated nonseeding, different/reordered-root nonseeding,
+simultaneous BUILD or `.bzl` plus source change, all final transition and
+tombstone cases, revision->Need, multiple retries and atomic failures. The
+unchanged public and server lifecycles must distinguish equal suppression,
+changed replay, removed owners and external->root switching.
+
+After independent design ACCEPT, schedule exactly
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-3` with the
+same four Rust files under DICE +340/11,350, build proof +440/3,450, loading
+zero/3,439, and events +100 production/+160 tests/2,050; aggregate <=1,040
+semantic and <=20,289 physical against `a4dd40d6`. Preserve every external
+owner/certificate/repository/family/event and legacy contract. After
+implementation ACCEPT return only to a docs-only M1 owner audit.
