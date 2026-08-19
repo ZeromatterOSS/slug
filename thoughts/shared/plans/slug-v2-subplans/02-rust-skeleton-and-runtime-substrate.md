@@ -6197,3 +6197,30 @@ forced actual retry, all failures, root switch and server lifecycle.
 After independent ACCEPT schedule only retry 5 in the same four files and
 unchanged 1,040 semantic/20,289 physical caps. Remove temporary logs; preserve
 every external owner/certificate/repository/family/event/legacy contract.
+
+### External singleton observed-build implementation retry 5 active (2026-08-18)
+
+Run only
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-5` from Rust
+base `a4dd40d6` with authorities `1a217e2a`, `ce110d9a`, `5dabd4bf`
+and source-certified policy `0b4b5210`.
+
+Authority remains the exact four Rust files under DICE +340/11,350, build proof
++440/3,450, loading zero/3,439, events +100 production/+160 tests/2,050,
+aggregate <=1,040 semantic and <=20,289 physical.
+
+Preserve every external owner/order/prefix/certificate/repository/family/event
+and legacy contract. Default Strict event reconciliation everywhere; only an
+observed external terminal retaining a certificate selects matching-root
+SourceCertifiedCurrentClosure for direct acceptance and actual retries. Apply
+current Some/present-prior KnownNone-or-reuse/absent/new semantics in current
+closure order; preserve Needs/retries/tombstones/atomicity and compact
+retention. Remove temporary traces.
+
+Prove strict removal, terminal opt-in/invariant, direct source edit without
+RevisionRetry, forced actual retry, mixed current-order/removal/change cases,
+source and child lifecycle, root switch, server lifecycle, broad validation,
+caps, cleanup and independent review. STOP every other file/loading byte,
+global semantics change, child filtering, equality weakening, retained
+policy/closure/map, behavior drift, cap excess and M1 closure. After ACCEPT
+return only to one docs-only M1 audit.
