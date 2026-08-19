@@ -8003,3 +8003,16 @@ only the production-used pure root reducer, exact legacy projection seam and
 the frozen dependency-row, prefix, Arc, event, cancellation and lifecycle
 proof. Preserve every original STOP boundary. After independent Rust ACCEPT,
 schedule only the docs-only selected-module-graph frontier design.
+
+### Effective-module-override second proof-cap REPLAN (2026-08-19)
+
+The honest corrected proof passes focused 2/2 and preserves the accepted
+effective-override semantics, but measures +175 production/+390 tests/+565
+aggregate at 6,617 physical lines versus the +200/+320/+520/6,700 limits.
+Independent review found no bounded 70-line test reduction without weakening
+the live dependency-row, cancellation, event, exact-Arc and lifecycle proof.
+
+Run only `WP-6-7A-effective-module-override-observation-proof-cap-correction-2-design`,
+docs-only. Retain `module_eval.rs` non-writable; keep production <=200 and
+raise only tests to <=420, aggregate to <=620 and physical to <=6,750. After
+independent ACCEPT, retry the same one-file implementation, then return only to

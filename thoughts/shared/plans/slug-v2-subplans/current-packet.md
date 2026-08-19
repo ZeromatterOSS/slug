@@ -1,54 +1,69 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-effective-module-override-observation-implementation-retry`
+Packet: `WP-6-7A-effective-module-override-observation-proof-cap-correction-2-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling base: `d17e5249`
 Rust base: `a3efa1b7`
 Accepted semantic design: `c2d1f893`
-Accepted proof-cap correction: `5ebc274a`
+Accepted first proof-cap correction: `5ebc274a`
+Retained Rust candidate: `app/slug_bzlmod_v2/src/module_eval.rs` at the scheduling-base worktree; non-writable during this design.
 
-## Exact Rust authority and corrected caps
+## Exact docs authority and measured stop
 
-Write only `app/slug_bzlmod_v2/src/module_eval.rs`, from the 6,052-line
-`a3efa1b7` baseline: <=200 production, <=320 tests, <=520 aggregate semantic
-and <=6,700 physical lines. The file is a cohesive large-owner exception and
-every touched helper remains <200 lines. Every other file is read-only.
+Write only:
 
-The retained one-file candidate is currently +170 production/+236 tests/+406
-aggregate at 6,458 physical lines. Use the corrected room only for the frozen
-proof and small pure seams used by the live driver.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md` (<=40 net);
+2. this manifest (<=180 net);
+3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md` (<=140 net);
+4. `.codex/skills/slug-agent-orchestration/references/routing-log.md` (<=30 net).
 
-## Frozen owner and correction
+Aggregate docs net <=390. Do not edit Rust, Cargo/BUILD metadata, fixtures,
+oracles or any other file.
 
-Do not change the accepted owner, value, order, errors, events or retention. The retry remains exactly `app/slug_bzlmod_v2/src/module_eval.rs`, but correct its caps to <=200 production, <=320 tests, <=520 aggregate semantic lines and <=6,700 physical lines from the 6,052-line `a3efa1b7` baseline. This leaves 30 production, 84 test, 114 aggregate and 242 physical lines over the current candidate. It may fund only the frozen proof and small pure seams used by the live driver. Every touched helper remains <200 lines.
+The retained one-file candidate preserves the accepted owner and passes the
+focused 2/2 proof. Against `a3efa1b7`, it is +175 production/+390 tests/+565
+aggregate at 6,617 physical lines. Production and physical caps pass, but the
+honest parent dependency-row, live reducer, exact Arc, cold child-event,
+poll-drop recovery and two-axis lifecycle proof exceeds the corrected test cap
+by 70 and aggregate cap by 45. Independent review confirms that removing those
+lines would weaken the DICE/cancellation/event proof rather than remove
+accidental duplication.
 
-Preserve the crate-private structural observed key and crate-private carrier constructor/borrowed accessors. Preserve one Legacy/Observed driver: legacy selects only `RootModuleFilesKey`; observed selects only `RootModuleFilesObservationKey`; both then compute the same `RootModuleCommandPolicyKey` and one pure root-name/command/root/None projection. The legacy wrapper moves the driver's exact Result Arc. Observed forwards the exact root epoch unchanged before semantic inspection. Need and typed outer remain carrierless; root compute failure is empty-prefix, root semantic and every later terminal retain the root prefix. The parent remains eventless and retains only one local Result Arc plus compact epoch.
+## Frozen correction
 
-The retry may retain one production-used pure root-outcome reducer and one pure legacy projection seam. They may only expose the existing terminal algebra for discriminating tests; add no key, hook, injected state, semantic branch, event or retained value.
+Do not change the accepted key, carrier, driver, order, terminal algebra,
+values, errors, event authority or compact retention. Keep production <=200.
+Raise only the test cap to <=420, aggregate semantic cap to <=620, and physical
+ceiling to <=6,750 from the 6,052-line `a3efa1b7` baseline. This leaves 25
+production, 30 test, 55 aggregate and 133 physical lines over the measured
+candidate. Every touched helper remains <200 lines.
 
-## Required correction proof
+The same retry remains exactly `app/slug_bzlmod_v2/src/module_eval.rs`. The
+extra room may fund only the already frozen production-used pure reducer,
+legacy projection seam, real dependency-row/event/cancellation fixtures and
+discriminating root/command lifecycle assertions. Add no key, hook, semantic
+branch, caller, event owner, retained value or state.
 
-Replace or compact the existing proof so it discriminates:
+Preserve the full accepted proof contract: crate-private constructor/accessors
+and distinct identity; matching Legacy/Observed root-files selection; exact
+Result and epoch Arc projection; root Need/outer/semantic and command-policy
+prefixes; parent-only dependency rows and later suppression; root-name, None,
+root and command parity; root plus command A-B-A; child-owned cold events,
+eventless parent, warm silence, real poll-drop/same-DICE recovery; both family
+directions and zero selected-graph/discovery/preparation/repository-definition
+activation. Compatibility remains exact for existing values/errors/order and
+legacy behavior, Slug-native for the sibling/carrier/typed outer/epoch, and
+unsupported/deferred for every later M7A/M8/M7B or identity surface.
 
-- the crate-private carrier constructor/accessors, distinct identity/hash/Display and complete-only equality;
-- real parent dependency rows: observed root Need has only the observed root-files direct edge and no parent command-policy/later edge, even though the root-MODULE child legitimately reads command policy for ignore-dev;
-- the production-used reducer at root Need, typed outer and semantic positions, with exact prefixes, validity/equality and no carrier;
-- the command-policy compute-error projector with the exact root prefix;
-- `Arc::ptr_eq` for the Result Arc moved through the live legacy projection and every held root-epoch demand Arc;
-- root-name rejection, None, root override and command override parity, with root and command create/change/remove/A-B-A restoration;
-- cold child-owned event parity, parent eventlessness, warm suppression, a genuinely polled-and-dropped parent compute, no publication, and successful same-DICE recovery;
-- both family directions and zero selected-graph/discovered/preparation/repository-definition activation.
+## STOP and successor
 
-Retain exact values/errors/order/normalized command paths and legacy behavior. The sibling/carrier/epoch/typed outer association remains Slug-native. Selected graph, discovery, preparation, registry/nonregistry closure, extensions, generated repositories, external rules_rust actions, M8/M7B and identity bytes remain deferred.
+STOP on Rust during this design, every other file/key/caller/export, semantic or
+event change, retained child carrier/collection, direct Host read,
+cache/store/interner/lock/task, later-owner activation, cap excess or milestone
+closure. REPLAN again if the measured proof cannot fit.
 
-## STOP, validation and successor
-
-Run focused owner tests, full bzlmod, affected accepted loading/query/core
-baselines, fmt, diff-check, exact cap accounting and AI-cleanup/Buck2 retention
-review.
-
-STOP on another file/key/caller/export, semantic or event change, retained child
-carrier/collection, direct Host read, cache/store/interner/lock/task,
-selected-graph or later-owner activation, cap excess or milestone closure.
-REPLAN again if the proof cannot fit. After independent implementation ACCEPT,
+After independent design ACCEPT, schedule exactly
+`WP-6-7A-effective-module-override-observation-implementation-retry-2` with the
+same one-file authority and corrected caps. After that implementation ACCEPT,
 schedule only `WP-6-7A-selected-module-graph-observation-frontier-design`.
