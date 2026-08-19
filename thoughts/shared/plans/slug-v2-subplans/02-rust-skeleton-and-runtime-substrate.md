@@ -6054,3 +6054,39 @@ zero/3,439, and events +100 production/+160 tests/2,050; aggregate <=1,040
 semantic and <=20,289 physical against `a4dd40d6`. Preserve every external
 owner/certificate/repository/family/event and legacy contract. After
 implementation ACCEPT return only to a docs-only M1 owner audit.
+
+### External singleton observed-build implementation retry 3 active (2026-08-18)
+
+Run only
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-3` from Rust
+base `a4dd40d6`, external design `1a217e2a`, loading correction
+`ce110d9a`, revision-event design `5dabd4bf`, and accepted root-association
+correction `340159c0`.
+
+Authority is exactly DICE +340/11,350, build proof +440/3,450, the sole
+line-neutral loading assertion at 3,439, and events +100 production/+160
+tests/2,050; aggregate <=1,040 semantic and <=20,289 physical.
+
+Preserve the full matching-family external owner, order/prefix/certificate,
+repository, child-event, legacy infrastructure, memory and compatibility
+contract. Add compact ordered accepted roots and selected/provisional roots.
+Seed missing prior entries on the first revision retry only when exact ordered
+roots match and every current root transition is NoTransition/reused. Normal
+commands and evaluated/mismatched roots retain ordinary removal semantics.
+Preserve carry through later Needs; final Known Some/None overrides,
+NoTransition uses carry then true prior, retry/final order remains stable, and
+accepted roots/Some-only entries replace atomically only after materializer
+acceptance.
+
+Require reuse-only/evaluated/different/reordered root proof, simultaneous
+BUILD or `.bzl` plus source change, every transition/tombstone/multiple-retry/
+Need/failure case, public source churn without equal package replay, changed
+child replay, external->root suppression, and the unchanged server lifecycle.
+Run focused event/build, 33/33 build, loading 138/138, full bzlmod, documented
+core/query/server baselines, fmt/diff, exact caps, retention/cleanup and
+independent review.
+
+STOP every other file/loading byte, child filtering, equality weakening,
+seeding evaluated/mismatched roots, retained closure/map, behavior/family/order
+drift, cap excess, broader activation and M1 closure. After ACCEPT return only
+to one docs-only remaining M1 owner audit.
