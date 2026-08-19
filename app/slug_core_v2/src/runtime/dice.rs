@@ -1013,6 +1013,13 @@ type SyntheticCommandResult = DrivenCommand<Result<SyntheticCommandValue, Synthe
 enum ObservedSelectionAssociation {
     StrictPathOnly,
     ClosureRepositories,
+    SelectedDependencySuperset,
+}
+
+#[derive(Clone, Copy)]
+enum TerminalDemandAssociation {
+    ClosureOnly,
+    TransientTerminalLocal,
 }
 
 #[async_trait]
@@ -1036,6 +1043,10 @@ trait NativeCommandRoot: Clone {
 
     fn observed_selection_association(&self) -> ObservedSelectionAssociation {
         ObservedSelectionAssociation::StrictPathOnly
+    }
+
+    fn terminal_demand_association(&self, _terminal: &Self::Terminal) -> TerminalDemandAssociation {
+        TerminalDemandAssociation::ClosureOnly
     }
 
     fn event_reconciliation_policy(&self, _terminal: &Self::Terminal) -> EventReconciliationPolicy {
@@ -1475,7 +1486,7 @@ impl NativeCommandRoot for BuildCommandRootObservationKey {
     type Terminal = ObservedBuildCommandRoot;
 
     fn initializes_request_revision(&self) -> bool {
-        self.0.singleton_external_single().is_some()
+        self.0.singleton_external_single().is_some() || self.0.observed_multi_root()
     }
 
     fn source_certificate<'a>(
@@ -1492,17 +1503,46 @@ impl NativeCommandRoot for BuildCommandRootObservationKey {
     fn observed_selection_association(&self) -> ObservedSelectionAssociation {
         if self.0.singleton_external_single().is_some() {
             ObservedSelectionAssociation::ClosureRepositories
+        } else if self.0.observed_multi_root() {
+            ObservedSelectionAssociation::SelectedDependencySuperset
         } else {
             ObservedSelectionAssociation::StrictPathOnly
         }
     }
 
+    fn terminal_demand_association(&self, terminal: &Self::Terminal) -> TerminalDemandAssociation {
+        if self.0.observed_multi_root()
+            && matches!(
+                terminal.result.as_ref(),
+                Err(BuildCommandError {
+                    kind: BuildCommandErrorKind::Analysis(_)
+                })
+            )
+        {
+            TerminalDemandAssociation::TransientTerminalLocal
+        } else {
+            TerminalDemandAssociation::ClosureOnly
+        }
+    }
+
     fn event_reconciliation_policy(&self, terminal: &Self::Terminal) -> EventReconciliationPolicy {
-        if self.0.singleton_external_single().is_some() && terminal.source_certificate().is_some() {
+        if (self.0.singleton_external_single().is_some() || self.0.observed_multi_root())
+            && terminal.source_certificate().is_some()
+        {
             EventReconciliationPolicy::SourceCertifiedCurrentClosure
         } else {
             EventReconciliationPolicy::Strict
         }
+    }
+
+    fn allows_unavailable_terminal_roots(&self, terminal: &Self::Terminal) -> bool {
+        self.0.observed_multi_root()
+            && matches!(
+                terminal.result.as_ref(),
+                Err(BuildCommandError {
+                    kind: BuildCommandErrorKind::Analysis(_)
+                })
+            )
     }
 
     async fn compute(
@@ -2297,6 +2337,7 @@ struct SingletonRootSingleBuildCommandKey(BuildCommandRootKey);
 struct ObservedBuildCommandRoot {
     result: Arc<Result<BuildCommandEvaluation, BuildCommandError>>,
     observations: PathObservationEpoch,
+    aggregate_source_certificate: Option<SourceCertificate>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Allocative, Dupe)]
@@ -2318,10 +2359,12 @@ impl ObservedBuildCommandRoot {
     }
 
     fn source_certificate(&self) -> Option<&SourceCertificate> {
-        match self.result.as_ref() {
-            Ok(evaluation) => evaluation.source_certificate(),
-            Err(error) => error.source_certificate(),
-        }
+        self.aggregate_source_certificate
+            .as_ref()
+            .or_else(|| match self.result.as_ref() {
+                Ok(evaluation) => evaluation.source_certificate(),
+                Err(error) => error.source_certificate(),
+            })
     }
 }
 
@@ -2876,6 +2919,15 @@ type ExternalBuildBranchOutcome = ObservedBuildOutcome<(
 )>;
 type ExternalBuildBranchResult = Result<ExternalBuildBranchOutcome, Arc<str>>;
 
+#[derive(Clone)]
+struct ObservedMultiBuildBranch {
+    result: Result<BuildRequestedTarget, BuildCommandError>,
+    observations: PathObservationEpoch,
+    source_certificate: Option<SourceCertificate>,
+}
+
+type ObservedMultiBuildBranchOutcome = ObservedBuildOutcome<ObservedMultiBuildBranch>;
+
 fn external_build_complete(
     result: Result<BuildRequestedTarget, BuildCommandError>,
     observations: PathObservationEpoch,
@@ -2994,13 +3046,19 @@ impl BuildCommandRootKey {
             _ => None,
         }
     }
+
+    fn observed_multi_root(&self) -> bool {
+        self.targets.len() > 1
+    }
 }
 
 #[allow(dead_code)]
 impl BuildCommandRootObservationKey {
     fn new(key: BuildCommandRootKey) -> Option<Self> {
-        (key.singleton_root_package_all().is_some() || key.singleton_external_single().is_some())
-            .then_some(Self(key))
+        (key.singleton_root_package_all().is_some()
+            || key.singleton_external_single().is_some()
+            || key.observed_multi_root())
+        .then_some(Self(key))
     }
 }
 
@@ -3492,6 +3550,19 @@ impl BuildCommandError {
             | BuildCommandErrorKind::RepositorySource(_, source_certificate)
             | BuildCommandErrorKind::SourceMissing(_, source_certificate) => {
                 source_certificate.as_deref()
+            }
+            _ => None,
+        }
+    }
+
+    fn take_source_certificate(&mut self) -> Option<SourceCertificate> {
+        match &mut self.kind {
+            BuildCommandErrorKind::RootSource {
+                source_certificate, ..
+            }
+            | BuildCommandErrorKind::RepositorySource(_, source_certificate)
+            | BuildCommandErrorKind::SourceMissing(_, source_certificate) => {
+                source_certificate.take().map(|certificate| *certificate)
             }
             _ => None,
         }
@@ -4124,7 +4195,8 @@ async fn compute_loaded_build_branch(
     package_value: LoadedPackage,
     analysis_mode: BuildAnalysisMode,
 ) -> BuildBranchResult {
-    let revision_eligible = key.initializes_request_revision();
+    let revision_eligible = key.initializes_request_revision()
+        || matches!(analysis_mode, BuildAnalysisMode::Observed) && key.observed_multi_root();
     let (analysis, completion, source_certificate) = match parsed {
         TargetPattern::PackageAll { .. } => (None, BuildTargetCompletion::LoadedOnly, None),
         TargetPattern::Single(label) => {
@@ -4298,6 +4370,181 @@ async fn compute_loaded_build_branch(
         completion,
         source_certificate,
     }))
+}
+
+fn observed_multi_branch_complete(
+    mut result: Result<BuildRequestedTarget, BuildCommandError>,
+    mut observations: PathObservationEpoch,
+) -> ObservedMultiBuildBranchOutcome {
+    let source_certificate = match &mut result {
+        Ok(target) => target.source_certificate.take(),
+        Err(error) => error.take_source_certificate(),
+    };
+    if let Some(certificate) = &source_certificate {
+        observations = match union_build_observations(&observations, certificate.observations()) {
+            Ok(observations) => observations,
+            Err(error) => return PreparationOutcome::Complete(Err(error)),
+        };
+    }
+    PreparationOutcome::Complete(Ok(ObservedMultiBuildBranch {
+        result,
+        observations,
+        source_certificate,
+    }))
+}
+
+async fn compute_observed_multi_build_branch(
+    ctx: &mut DiceComputations<'_>,
+    key: &BuildCommandRootKey,
+    pattern: Arc<str>,
+) -> ObservedMultiBuildBranchOutcome {
+    let parsed = TargetPattern::parse(&pattern)
+        .expect("BuildCommandRootKey stores validated canonical target patterns");
+    let package = match &parsed {
+        TargetPattern::Single(label) => label.package().clone(),
+        TargetPattern::PackageAll { package, .. } => package.clone(),
+        TargetPattern::Recursive { .. } => {
+            unreachable!("BuildCommandRootKey rejects recursive patterns")
+        }
+    };
+    let observed = match ctx
+        .compute(&RootPackageLoadObservationKey::new(
+            key.workspace.dupe(),
+            package.clone(),
+        ))
+        .await
+    {
+        Err(error) => {
+            return observed_multi_branch_complete(
+                Err(BuildCommandError::infrastructure(error)),
+                PathObservationEpoch::empty(),
+            );
+        }
+        Ok(PreparationOutcome::Need(need)) => return PreparationOutcome::Need(need),
+        Ok(PreparationOutcome::Complete(Err(error))) => {
+            return PreparationOutcome::Complete(Err(error));
+        }
+        Ok(PreparationOutcome::Complete(Ok(observed))) => observed,
+    };
+    let observations = observed.observations().dupe();
+    let package_value = match observed.result().as_ref() {
+        Ok(package) => package.clone(),
+        Err(error) => {
+            return observed_multi_branch_complete(
+                Err(BuildCommandError::new(BuildCommandErrorKind::Package(
+                    error.clone(),
+                ))),
+                observations,
+            );
+        }
+    };
+    match compute_loaded_build_branch(
+        ctx,
+        key,
+        pattern,
+        parsed,
+        package,
+        package_value,
+        BuildAnalysisMode::Observed,
+    )
+    .await
+    {
+        BuildBranchResult::Infrastructure(error) => observed_multi_branch_complete(
+            Err(BuildCommandError::infrastructure(error)),
+            observations,
+        ),
+        BuildBranchResult::ObservedOuter(error) => PreparationOutcome::Complete(Err(error)),
+        BuildBranchResult::Outcome(PreparationOutcome::Need(need)) => {
+            PreparationOutcome::Need(need)
+        }
+        BuildBranchResult::Outcome(PreparationOutcome::Complete(result)) => {
+            observed_multi_branch_complete(result, observations)
+        }
+    }
+}
+
+type ObservedMultiBuildBranchesOutcome = ObservedBuildOutcome<(
+    Result<Arc<[BuildRequestedTarget]>, BuildCommandError>,
+    PathObservationEpoch,
+    Option<SourceCertificate>,
+)>;
+
+fn finish_observed_multi_build_branches(
+    mut observations: PathObservationEpoch,
+    branches: Vec<ObservedMultiBuildBranchOutcome>,
+) -> ObservedMultiBuildBranchesOutcome {
+    let mut needs: Option<slug_bzlmod_v2::SourcePreparationNeeds> = None;
+    let mut need_error = None;
+    let mut first_outer = None;
+    let mut first_semantic = None;
+    let mut targets = Vec::with_capacity(branches.len());
+    let mut certificate_observations: Option<PathObservationEpoch> = None;
+    for branch in branches {
+        match branch {
+            PreparationOutcome::Need(need) => {
+                needs = Some(match needs {
+                    Some(current) => match current.try_union(&need) {
+                        Ok(combined) => combined,
+                        Err(error) => {
+                            need_error.get_or_insert_with(|| {
+                                BuildCommandError::infrastructure(format!("{error:?}"))
+                            });
+                            current
+                        }
+                    },
+                    None => need,
+                });
+            }
+            PreparationOutcome::Complete(Err(error)) => {
+                if first_outer.is_none() {
+                    first_outer = Some(error);
+                }
+            }
+            PreparationOutcome::Complete(Ok(branch)) => {
+                match union_build_observations(&observations, &branch.observations) {
+                    Ok(merged) => observations = merged,
+                    Err(error) if first_outer.is_none() => first_outer = Some(error),
+                    Err(_) => {}
+                }
+                if let Some(certificate) = branch.source_certificate {
+                    certificate_observations = match certificate_observations {
+                        Some(current) => {
+                            match union_build_observations(&current, certificate.observations()) {
+                                Ok(merged) => Some(merged),
+                                Err(error) if first_outer.is_none() => {
+                                    first_outer = Some(error);
+                                    Some(current)
+                                }
+                                Err(_) => Some(current),
+                            }
+                        }
+                        None => Some(certificate.observations().dupe()),
+                    };
+                }
+                match branch.result {
+                    Ok(target) => targets.push(target),
+                    Err(error) if first_semantic.is_none() => first_semantic = Some(error),
+                    Err(_) => {}
+                }
+            }
+        }
+    }
+    if let Some(error) = first_outer {
+        return PreparationOutcome::Complete(Err(error));
+    }
+    let source_certificate = certificate_observations.map(|observations| {
+        SourceCertificate::from_epoch(observations)
+            .expect("completed source branches produce a nonempty certificate")
+    });
+    if let Some(error) = need_error {
+        PreparationOutcome::Complete(Ok((Err(error), observations, source_certificate)))
+    } else if let Some(need) = needs {
+        PreparationOutcome::Need(need)
+    } else if let Some(error) = first_semantic {
+        PreparationOutcome::Complete(Ok((Err(error), observations, source_certificate)))
+    } else {
+        PreparationOutcome::Complete(Ok((Ok(targets.into()), observations, source_certificate)))
+    }
 }
 
 macro_rules! compute_external_build_child {
@@ -4795,6 +5042,7 @@ async fn compute_external_single_observed(
                 action_closure: Arc::from([]),
             })),
             observations,
+            aggregate_source_certificate: None,
         })
     })
 }
@@ -4803,10 +5051,115 @@ fn observed_build_root_complete(
     result: Result<BuildCommandEvaluation, BuildCommandError>,
     observations: PathObservationEpoch,
 ) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
+    observed_build_root_complete_with_certificate(result, observations, None)
+}
+
+fn observed_build_root_complete_with_certificate(
+    result: Result<BuildCommandEvaluation, BuildCommandError>,
+    observations: PathObservationEpoch,
+    aggregate_source_certificate: Option<SourceCertificate>,
+) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
     slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(ObservedBuildCommandRoot {
         result: Arc::new(result),
         observations,
+        aggregate_source_certificate,
     }))
+}
+
+async fn compute_observed_multi_build_root(
+    key: &BuildCommandRootKey,
+    ctx: &mut DiceComputations<'_>,
+) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
+    let anchor_outcome =
+        match compute_build_anchor_input(ctx, key.workspace.dupe(), BuildAnalysisMode::Observed)
+            .await
+        {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                return observed_build_root_complete(
+                    Err(BuildCommandError::infrastructure(error)),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        };
+    let (anchor, anchor_observations) = match anchor_outcome {
+        PreparationOutcome::Need(need) => return PreparationOutcome::Need(need),
+        PreparationOutcome::Complete(Err(error)) => {
+            return PreparationOutcome::Complete(Err(error));
+        }
+        PreparationOutcome::Complete(Ok(value)) => value,
+    };
+    let anchor = match anchor {
+        Ok(anchor) => anchor,
+        Err(error) => {
+            return observed_build_root_complete(
+                Err(BuildCommandError::new(BuildCommandErrorKind::RootAnchor(
+                    error,
+                ))),
+                anchor_observations,
+            );
+        }
+    };
+    let branches = ctx
+        .compute_join(key.targets.iter().cloned(), |ctx, pattern| {
+            Box::pin(compute_observed_multi_build_branch(ctx, key, pattern))
+        })
+        .await;
+    let (targets, observations, aggregate_source_certificate) =
+        match finish_observed_multi_build_branches(anchor_observations, branches) {
+            PreparationOutcome::Need(need) => return PreparationOutcome::Need(need),
+            PreparationOutcome::Complete(Err(error)) => {
+                return PreparationOutcome::Complete(Err(error));
+            }
+            PreparationOutcome::Complete(Ok(value)) => value,
+        };
+    let targets = match targets {
+        Ok(targets) => targets,
+        Err(error) => {
+            return observed_build_root_complete_with_certificate(
+                Err(error),
+                observations,
+                aggregate_source_certificate,
+            );
+        }
+    };
+    let action_closure = match compute_build_action_closure(
+        ctx,
+        &key.workspace,
+        &targets,
+        BuildAnalysisMode::Observed,
+    )
+    .await
+    {
+        Err(BuildActionClosureFailure::Infrastructure(error)) => {
+            return observed_build_root_complete_with_certificate(
+                Err(BuildCommandError::infrastructure(error)),
+                observations,
+                aggregate_source_certificate,
+            );
+        }
+        Err(BuildActionClosureFailure::ObservedOuter(error)) => {
+            return PreparationOutcome::Complete(Err(error));
+        }
+        Ok(PreparationOutcome::Need(need)) => return PreparationOutcome::Need(need),
+        Ok(PreparationOutcome::Complete(Err(error))) => {
+            return observed_build_root_complete_with_certificate(
+                Err(error),
+                observations,
+                aggregate_source_certificate,
+            );
+        }
+        Ok(PreparationOutcome::Complete(Ok(closure))) => closure,
+    };
+    observed_build_root_complete_with_certificate(
+        Ok(BuildCommandEvaluation {
+            anchor,
+            targets,
+            action_closure,
+        }),
+        observations,
+        aggregate_source_certificate,
+    )
 }
 
 #[async_trait]
@@ -4823,12 +5176,16 @@ impl Key for BuildCommandRootObservationKey {
         if let Some(label) = self.0.singleton_external_single() {
             return compute_external_single_observed(&self.0, &label, ctx).await;
         }
+        if self.0.observed_multi_root() {
+            return compute_observed_multi_build_root(&self.0, ctx).await;
+        }
         compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed)
             .await
             .map(|value| {
                 value.map(|(result, observations)| ObservedBuildCommandRoot {
                     result,
                     observations,
+                    aggregate_source_certificate: None,
                 })
             })
     }
@@ -5211,6 +5568,16 @@ impl WorkspaceRuntime {
                         let terminal = terminal.clone();
                         let source_certificate =
                             attempt_root.source_certificate(&terminal).cloned();
+                        let terminal_demands = matches!(
+                            attempt_root.terminal_demand_association(&terminal),
+                            TerminalDemandAssociation::TransientTerminalLocal
+                        )
+                        .then(|| {
+                            attempt_root
+                                .observations(&terminal)
+                                .expect("terminal-local demand association requires an epoch")
+                                .dupe()
+                        });
                         let event_reconciliation_policy =
                             attempt_root.event_reconciliation_policy(&terminal);
                         if let Some(observations) = attempt_root.observations(&terminal) {
@@ -5231,6 +5598,7 @@ impl WorkspaceRuntime {
                                 &transaction,
                                 revision_events.as_ref(),
                                 event_reconciliation_policy,
+                                terminal_demands.as_ref(),
                             )
                             .await
                         {
@@ -6525,7 +6893,10 @@ fn validate_observed_terminal_with_association(
     selected: &AcceptedNativeDemandSnapshot,
     association: ObservedSelectionAssociation,
 ) -> Result<(), NativeDemandSessionError> {
-    if matches!(association, ObservedSelectionAssociation::StrictPathOnly) {
+    if !matches!(
+        association,
+        ObservedSelectionAssociation::ClosureRepositories
+    ) {
         if !selected.selected.repository_requests().is_empty() {
             return Err(NativeDemandSessionError::ObservedTerminal(
                 ObservedTerminalMismatch::RepositoryRequests,
@@ -6539,6 +6910,29 @@ fn validate_observed_terminal_with_association(
     }
     let observed = observed.observations();
     let selected = selected.path_observations.observations();
+    if matches!(
+        association,
+        ObservedSelectionAssociation::SelectedDependencySuperset
+    ) {
+        for (observed_demand, observed_result) in observed {
+            let Some(selected_result) = selected.get(observed_demand) else {
+                return Err(NativeDemandSessionError::ObservedTerminal(
+                    ObservedTerminalMismatch::Demand,
+                ));
+            };
+            if observed_result.as_ref() != selected_result.as_ref() {
+                return Err(NativeDemandSessionError::ObservedTerminal(
+                    ObservedTerminalMismatch::Value,
+                ));
+            }
+            if !Arc::ptr_eq(observed_result, selected_result) {
+                return Err(NativeDemandSessionError::ObservedTerminal(
+                    ObservedTerminalMismatch::ResultArc,
+                ));
+            }
+        }
+        return Ok(());
+    }
     if observed.len() != selected.len() {
         return Err(NativeDemandSessionError::ObservedTerminal(
             ObservedTerminalMismatch::Length,
@@ -6789,6 +7183,7 @@ impl<'a> NativeDemandAbortGuard<'a> {
             terminal_authority,
             None,
             EventReconciliationPolicy::Strict,
+            None,
         )
         .await
     }
@@ -6799,11 +7194,18 @@ impl<'a> NativeDemandAbortGuard<'a> {
         terminal_authority: &dice::DiceTransaction,
         revision_events: Option<&ProvisionalEventEpoch>,
         event_reconciliation_policy: EventReconciliationPolicy,
+        terminal_demands: Option<&PathObservationEpoch>,
     ) -> Result<NativeDemandPreparedAcceptance, NativeDemandSessionError> {
         if !Arc::ptr_eq(&self.command().effects, &selected.effects) {
             return Err(NativeDemandSessionError::ForeignEffects);
         }
         let (events, demands, terminal_token) = selected.sidecars.into_parts();
+        let demands = match terminal_demands {
+            Some(observations) => {
+                demands.with_additional_unscoped_paths(observations.observations().keys().cloned())
+            }
+            None => demands,
+        };
         let (mut snapshot, validation) = self.command().selected_snapshot(demands)?;
         let (events, accepted_events, provisional_events) = events.reconcile_revision(
             &self.command().prior.events,

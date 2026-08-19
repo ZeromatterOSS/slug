@@ -2326,16 +2326,28 @@ probe = rule(implementation = _impl)
         for targets in [
             vec![],
             vec![TargetPattern::parse("//pkg:t").unwrap()],
-            vec![
-                TargetPattern::parse("//pkg:all").unwrap(),
-                TargetPattern::parse("//other:all").unwrap(),
-            ],
         ] {
             let legacy =
                 BuildCommandRootKey::new(workspace.clone(), &targets, configuration.clone())
                     .unwrap();
             assert!(BuildCommandRootObservationKey::new(legacy).is_none());
         }
+        let multi = BuildCommandRootKey::new(
+            workspace.clone(),
+            &[
+                TargetPattern::parse("//pkg:all").unwrap(),
+                TargetPattern::parse("//other:all").unwrap(),
+            ],
+            configuration.clone(),
+        )
+        .unwrap();
+        let observed_multi = BuildCommandRootObservationKey::new(multi.clone()).unwrap();
+        assert_eq!(observed_multi.0, multi);
+        assert!(observed_multi.initializes_request_revision());
+        assert!(matches!(
+            observed_multi.observed_selection_association(),
+            ObservedSelectionAssociation::SelectedDependencySuperset
+        ));
         let external = BuildCommandRootKey::new(
             workspace,
             &[TargetPattern::parse("@repo//pkg:t").unwrap()],
@@ -2378,6 +2390,478 @@ probe = rule(implementation = _impl)
         )])
         .unwrap();
         assert!(union_build_observations(&merged, &conflicting).is_err());
+    }
+
+    #[test]
+    fn observed_multi_reducer_and_selected_superset_preserve_total_order_and_arcs() {
+        let first = BuildRootEpoch::demand("/first", PathObservationOperation::FileBytes);
+        let second = BuildRootEpoch::demand("/second", PathObservationOperation::FileBytes);
+        let first_result = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(&b"first"[..])),
+        ));
+        let second_result = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(&b"second"[..])),
+        ));
+        let certified_error =
+            |demand: PathObservationDemand, result: Arc<PathObservationResult>| {
+            observed_multi_branch_complete(
+                Err(BuildCommandError::new(BuildCommandErrorKind::RootSource {
+                    observation: result.as_ref().clone(),
+                    source_certificate: Some(Box::new(SourceCertificate::new(demand, result))),
+                })),
+                PathObservationEpoch::empty(),
+            )
+        };
+        let branches = vec![
+            certified_error(first.dupe(), first_result.dupe()),
+            certified_error(second.dupe(), second_result.dupe()),
+        ];
+        let PreparationOutcome::Complete(Ok((Err(selected), epoch, Some(certificate)))) =
+            finish_observed_multi_build_branches(PathObservationEpoch::empty(), branches)
+        else {
+            panic!("two Complete semantic branches did not retain a certificate");
+        };
+        assert!(matches!(
+            selected.kind,
+            BuildCommandErrorKind::RootSource { ref observation, .. }
+                if observation == first_result.as_ref()
+        ));
+        for (demand, result) in [
+            (&first, &first_result),
+            (&second, &second_result),
+        ] {
+            assert!(Arc::ptr_eq(epoch.get(demand).unwrap(), result));
+            assert!(Arc::ptr_eq(
+                certificate.observations().get(demand).unwrap(),
+                result
+            ));
+        }
+
+        let need = build_test_need("/workspace/need");
+        assert!(matches!(
+            finish_observed_multi_build_branches(
+                PathObservationEpoch::empty(),
+                vec![
+                    certified_error(first.dupe(), first_result.dupe()),
+                    PreparationOutcome::Need(need),
+                ],
+            ),
+            PreparationOutcome::Need(_)
+        ));
+        let conflicting = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Missing,
+        ));
+        assert!(matches!(
+            finish_observed_multi_build_branches(
+                PathObservationEpoch::from_shared([(
+                    first.dupe(),
+                    first_result.dupe(),
+                )])
+                .unwrap(),
+                vec![
+                    PreparationOutcome::Need(build_test_need("/workspace/need")),
+                    certified_error(first.dupe(), conflicting),
+                ],
+            ),
+            PreparationOutcome::Complete(Err(_))
+        ));
+        let incompatible_a = slug_bzlmod_v2::SourcePreparationNeeds::root_module_bootstrap(
+            slug_bzlmod_v2::RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+        );
+        let incompatible_b = slug_bzlmod_v2::SourcePreparationNeeds::root_module_bootstrap(
+            slug_bzlmod_v2::RootModuleBootstrapRequest {
+                workspace: NormalizedAbsolutePath::new("/other").unwrap(),
+            },
+        );
+        assert!(matches!(
+            finish_observed_multi_build_branches(
+                PathObservationEpoch::empty(),
+                vec![
+                    PreparationOutcome::Need(incompatible_a),
+                    PreparationOutcome::Need(incompatible_b),
+                ],
+            ),
+            PreparationOutcome::Complete(Ok((Err(BuildCommandError {
+                kind: BuildCommandErrorKind::Infrastructure(_),
+            }), _, None)))
+        ));
+
+        let workspace = tempfile::tempdir().unwrap();
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let mut snapshot = accepted_native_snapshot(&runtime);
+        snapshot.path_observations = PathObservationEpoch::from_shared([
+            (first.dupe(), first_result.dupe()),
+            (second.dupe(), second_result.dupe()),
+        ])
+        .unwrap();
+        snapshot.selected =
+            SelectedWorkspaceDemands::for_test([], [first.dupe(), second.dupe()]);
+        let terminal =
+            PathObservationEpoch::from_shared([(first.dupe(), first_result.dupe())]).unwrap();
+        validate_observed_terminal_with_association(
+            &terminal,
+            &snapshot,
+            ObservedSelectionAssociation::SelectedDependencySuperset,
+        )
+        .unwrap();
+        let fresh = PathObservationEpoch::new([(
+            first.dupe(),
+            first_result.as_ref().clone(),
+        )])
+        .unwrap();
+        assert!(matches!(
+            validate_observed_terminal_with_association(
+                &fresh,
+                &snapshot,
+                ObservedSelectionAssociation::SelectedDependencySuperset,
+            ),
+            Err(NativeDemandSessionError::ObservedTerminal(
+                ObservedTerminalMismatch::ResultArc
+            ))
+        ));
+        let request = local_native_request(
+            &NormalizedAbsolutePath::new(workspace.path().canonicalize().unwrap()).unwrap(),
+            "dep+",
+            ".",
+        );
+        snapshot.selected = SelectedWorkspaceDemands::for_test([request], [first.dupe()]);
+        assert!(matches!(
+            validate_observed_terminal_with_association(
+                &terminal,
+                &snapshot,
+                ObservedSelectionAssociation::SelectedDependencySuperset,
+            ),
+            Err(NativeDemandSessionError::ObservedTerminal(
+                ObservedTerminalMismatch::RepositoryRequests
+            ))
+        ));
+        snapshot.selected =
+            SelectedWorkspaceDemands::for_test([], [first.dupe(), second.dupe()]);
+        let extra = BuildRootEpoch::demand("/extra", PathObservationOperation::Lstat);
+        assert!(matches!(
+            validate_observed_terminal_with_association(
+                &PathObservationEpoch::new([
+                    (first, first_result.as_ref().clone()),
+                    (
+                        extra,
+                        PathObservationResult::Lstat(PathOperationResult::Missing),
+                    ),
+                ])
+                .unwrap(),
+                &snapshot,
+                ObservedSelectionAssociation::SelectedDependencySuperset,
+            ),
+            Err(NativeDemandSessionError::ObservedTerminal(
+                ObservedTerminalMismatch::Demand
+            ))
+        ));
+    }
+
+    #[test]
+    fn public_multi_build_aggregates_sources_and_accepts_analysis_dependency_superset() {
+        let stable_parent_root = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/debug/incremental/slug-public-observed-multi");
+        fs::create_dir_all(&stable_parent_root).unwrap();
+        let stable_parent = tempfile::tempdir_in(stable_parent_root).unwrap();
+        let workspace = tempfile::tempdir_in(stable_parent.path()).unwrap();
+        fs::write(
+            workspace.path().join("MODULE.bazel"),
+            "print('MODULE')\nmodule(name = 'multi')\n",
+        )
+        .unwrap();
+        let good_defs = "print('BZL')\ndef _leaf(ctx):\n    print('LEAF_ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nleaf = rule(implementation = _leaf)\ndef _impl(ctx):\n    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]\nprobe = rule(implementation = _impl, attrs = {'dep': attr.label()})\n";
+        fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
+        fs::write(
+            workspace.path().join("BUILD.bazel"),
+            "print('BUILD')\nload('//:defs.bzl', 'probe')\nexports_files(['one.txt', 'two.txt'])\nprobe(name = 'rule', dep = '//dep:leaf')\n",
+        )
+        .unwrap();
+        fs::create_dir(workspace.path().join("dep")).unwrap();
+        fs::write(
+            workspace.path().join("dep/BUILD.bazel"),
+            "load('//:defs.bzl', 'leaf')\nleaf(name = 'leaf')\n",
+        )
+        .unwrap();
+        fs::write(workspace.path().join("one.txt"), b"one").unwrap();
+        fs::write(workspace.path().join("two.txt"), b"two").unwrap();
+        let audit = Arc::new(ExternalQueryActivationAudit::default());
+        let runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(audit.dupe());
+        let targets = [
+            TargetPattern::parse("//:one.txt").unwrap(),
+            TargetPattern::parse("//:rule").unwrap(),
+            TargetPattern::parse("//:two.txt").unwrap(),
+        ];
+        let run = || {
+            runtime.build_command_with_bzlmod_inputs(
+                &targets,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+        };
+        let checkpoint = audit.checkpoint();
+        let cold = run().unwrap();
+        assert_eq!(
+            accepted_output_text(&cold),
+            ["MODULE", "BZL", "BUILD", "LEAF_ANALYSIS", "ANALYSIS"]
+        );
+        let public = cold.terminal_for_test().as_ref().as_ref().unwrap();
+        assert_eq!(
+            public
+                .targets
+                .iter()
+                .map(|target| target.pattern.as_ref())
+                .collect::<Vec<_>>(),
+            ["//:one.txt", "//:rule", "//:two.txt"]
+        );
+        assert!(public.targets[0].source_certificate.is_none());
+        assert!(public.targets[1].analysis.is_some());
+        assert!(public.targets[2].source_certificate.is_none());
+        let snapshot = accepted_native_snapshot(&runtime);
+        assert!(snapshot.selected.repository_requests().is_empty());
+        assert!(snapshot.selected.repository_validations().is_empty());
+
+        let host = runtime.process_host.default_configuration_inputs().unwrap();
+        let root = BuildCommandRootKey::new(
+            NormalizedAbsolutePath::new(runtime.workspace.clone()).unwrap(),
+            &targets,
+            ConfigurationKey::from_slug(SlugConfiguration::default_target(&host).unwrap()),
+        )
+        .unwrap();
+        let observed_key = BuildCommandRootObservationKey::new(root.clone()).unwrap();
+        let tracker = Arc::new(ObservedBuildTracker::default());
+        let observed = runtime.runtime.block_on(compute_observed_build_with_epoch(
+            &runtime,
+            &observed_key,
+            snapshot.path_observations.dupe(),
+            tracker.dupe(),
+        ));
+        let observed = complete_observed_build(&observed);
+        assert_eq!(observed.result().as_ref().as_ref().unwrap(), public);
+        assert!(observed.observations().observations().len()
+            < snapshot.path_observations.observations().len());
+        validate_observed_terminal_with_association(
+            observed.observations(),
+            &snapshot,
+            ObservedSelectionAssociation::SelectedDependencySuperset,
+        )
+        .unwrap();
+        assert!(matches!(
+            observed_key.terminal_demand_association(observed),
+            TerminalDemandAssociation::ClosureOnly
+        ));
+        let certificate = observed.source_certificate().unwrap();
+        for source in ["one.txt", "two.txt"] {
+            assert!(certificate.observations().observations().iter().any(
+                |(demand, result)| demand.path().as_path().ends_with(source)
+                    && Arc::ptr_eq(result, snapshot.path_observations.get(demand).unwrap())
+            ));
+        }
+        assert!(certificate.observations().observations().iter().all(
+            |(demand, result)| Arc::ptr_eq(
+                result,
+                observed.observations().get(demand).unwrap()
+            )
+        ));
+        let dependencies = tracker.take_root_dependencies().pop().unwrap();
+        let revision = dependencies
+            .iter()
+            .position(|dependency| dependency.starts_with("root-host-request-revision:"))
+            .unwrap();
+        assert!(dependencies
+            .iter()
+            .enumerate()
+            .filter(|(_, dependency)| {
+                dependency.starts_with("observed-host-repository-source-file:")
+            })
+            .all(|(position, _)| revision < position));
+        let (observed_roots, neutral_roots, legacy_roots) = audit.exact_build_root_counts();
+        assert!(observed_roots > 0);
+        assert_eq!((neutral_roots, legacy_roots), (0, 0));
+        audit.assert_phase_clean(checkpoint, 0);
+        assert!(accepted_output_text(&run().unwrap()).is_empty());
+
+        fs::write(workspace.path().join("one.txt"), b"ONE").unwrap();
+        assert!(accepted_output_text(&run().unwrap()).is_empty());
+        let edited_snapshot = accepted_native_snapshot(&runtime);
+        let edited_outcome = runtime.runtime.block_on(compute_observed_build_with_epoch(
+            &runtime,
+            &observed_key,
+            edited_snapshot.path_observations.dupe(),
+            Arc::new(ObservedBuildTracker::default()),
+        ));
+        let edited = complete_observed_build(&edited_outcome);
+        assert!(edited
+            .source_certificate()
+            .unwrap()
+            .observations()
+            .observations()
+            .iter()
+            .any(|(demand, result)| {
+                demand.path().as_path().ends_with("one.txt")
+                    && matches!(
+                        result.as_ref(),
+                        PathObservationResult::FileBytes(PathOperationResult::Present(bytes))
+                            if bytes.as_ref() == b"ONE"
+                    )
+                    && Arc::ptr_eq(result, edited_snapshot.path_observations.get(demand).unwrap())
+            }));
+        fs::write(workspace.path().join("one.txt"), b"one").unwrap();
+        assert!(accepted_output_text(&run().unwrap()).is_empty());
+
+        let broken_defs = good_defs.replace(
+            "    print('ANALYSIS')\n    return [DefaultInfo(files = depset([]))]",
+            "    fail('BROKEN_ANALYSIS')",
+        );
+        fs::write(workspace.path().join("defs.bzl"), broken_defs).unwrap();
+        let failure_audit = Arc::new(ExternalQueryActivationAudit::default());
+        let failure_runtime = test_runtime(workspace.path())
+            .unwrap()
+            .with_activation_audit(failure_audit.dupe());
+        let failure_run = || {
+            failure_runtime.build_command_with_bzlmod_inputs(
+                &targets,
+                BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+                BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+                LockfileMode::Update,
+                &[],
+                None,
+            )
+        };
+        let failed = failure_run().unwrap();
+        let failed_text = accepted_output_text(&failed);
+        assert!(failed_text.is_empty());
+        let failed_terminal = failed.terminal_for_test();
+        let failed_error = failed_terminal.as_ref().as_ref().unwrap_err();
+        assert!(matches!(
+            &failed_error.kind,
+            BuildCommandErrorKind::Analysis(_)
+        ));
+        let failed_snapshot = accepted_native_snapshot(&failure_runtime);
+        assert!(failed_snapshot.selected.repository_requests().is_empty());
+        assert!(failed_snapshot.selected.repository_validations().is_empty());
+        let (observed_roots, neutral_roots, legacy_roots) =
+            failure_audit.exact_build_root_counts();
+        assert!(observed_roots > 0);
+        assert_eq!((neutral_roots, legacy_roots), (0, 0));
+        let token = failure_runtime.repository_materializer.begin().unwrap();
+        failure_runtime
+            .repository_materializer
+            .preflight_native(token, std::iter::empty())
+            .unwrap();
+        let mut compute_epoch = failed_snapshot.path_observations.dupe();
+        let failed_observed = loop {
+            let outcome = failure_runtime.runtime.block_on(compute_observed_build_with_epoch(
+                &failure_runtime,
+                &observed_key,
+                compute_epoch.dupe(),
+                Arc::new(ObservedBuildTracker::default()),
+            ));
+            let PreparationOutcome::Need(needs) = outcome else {
+                break outcome;
+            };
+            let demands = needs.path_observations().unwrap().demands().iter().cloned();
+            let additional = failure_runtime
+                .repository_materializer
+                .observe_native(token, demands)
+                .unwrap();
+            compute_epoch = union_build_observations(&compute_epoch, &additional).unwrap();
+        };
+        failure_runtime
+            .repository_materializer
+            .accept(token, &[], Vec::new())
+            .unwrap();
+        let failed_observed = complete_observed_build(&failed_observed);
+        assert!(matches!(
+            failed_observed.result().as_ref(),
+            Err(BuildCommandError {
+                kind: BuildCommandErrorKind::Analysis(_)
+            })
+        ));
+        assert!(matches!(
+            observed_key.terminal_demand_association(failed_observed),
+            TerminalDemandAssociation::TransientTerminalLocal
+        ));
+        validate_observed_terminal_with_association(
+            failed_observed.observations(),
+            &failed_snapshot,
+            ObservedSelectionAssociation::SelectedDependencySuperset,
+        )
+        .unwrap();
+        assert!(failed_observed
+            .observations()
+            .observations()
+            .iter()
+            .all(|(demand, result)| Arc::ptr_eq(
+                result,
+                failed_snapshot.path_observations.get(demand).unwrap()
+            )));
+        assert!(failed_observed
+            .source_certificate()
+            .unwrap()
+            .observations()
+            .observations()
+            .iter()
+            .all(|(demand, result)| Arc::ptr_eq(
+                result,
+                failed_snapshot.path_observations.get(demand).unwrap()
+            )));
+
+        let legacy_failed = failure_runtime
+            .drive_command(
+                NativeDemandRequestInputBundle::normalized_initial(),
+                root.clone(),
+            )
+            .unwrap();
+        assert_eq!(accepted_output_text(&legacy_failed.accepted), failed_text);
+        assert_eq!(
+            legacy_failed
+                .accepted
+                .terminal_for_test()
+                .as_ref()
+                .as_ref()
+                .unwrap_err()
+                .to_string(),
+            failed_error.to_string()
+        );
+        assert!(failure_audit.exact_build_root_counts().2 > 0);
+
+        fs::write(workspace.path().join("defs.bzl"), good_defs).unwrap();
+        let recovered = failure_run().unwrap();
+        assert!(recovered.terminal_for_test().as_ref().is_ok());
+
+        let before_legacy = audit.exact_build_root_counts();
+        let legacy = runtime.runtime.block_on(async {
+            let updater = runtime
+                .dice
+                .updater_with_data(runtime.user_computation_data(None).unwrap());
+            let mut transaction = updater.existing_state().await;
+            transaction.compute(&root).await.unwrap()
+        });
+        let PreparationOutcome::Complete(legacy) = legacy else {
+            panic!("legacy multi root returned Need");
+        };
+        let legacy = legacy.as_ref().as_ref().unwrap();
+        let observed = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(legacy.anchor, observed.anchor);
+        assert_eq!(legacy.targets.len(), observed.targets.len());
+        for (legacy, observed) in legacy.targets.iter().zip(observed.targets.iter()) {
+            assert_eq!(legacy.pattern, observed.pattern);
+            assert_eq!(legacy.package, observed.package);
+            assert_eq!(legacy.completion, observed.completion);
+        }
+        assert_eq!(legacy.analyzed_target_count(), observed.analyzed_target_count());
+        assert_eq!(legacy.declared_action_count(), observed.declared_action_count());
+        let after_legacy = audit.exact_build_root_counts();
+        assert_eq!(after_legacy.0, before_legacy.0);
+        assert_eq!(after_legacy.1, before_legacy.1);
+        assert!(after_legacy.2 > before_legacy.2);
     }
 
     #[tokio::test]

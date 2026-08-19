@@ -192,6 +192,18 @@ impl SelectedWorkspaceDemands {
         }
     }
 
+    pub(super) fn with_additional_unscoped_paths(
+        mut self,
+        paths: impl IntoIterator<Item = PathObservationDemand>,
+    ) -> Self {
+        let mut unscoped_paths = self.unscoped_paths.to_vec();
+        unscoped_paths.extend(paths);
+        unscoped_paths.sort_unstable();
+        unscoped_paths.dedup();
+        self.unscoped_paths = unscoped_paths.into();
+        self
+    }
+
     #[cfg(test)]
     pub(super) fn for_test(
         repository_requests: impl Into<Arc<[Arc<RepositoryMaterializationRequest>]>>,
