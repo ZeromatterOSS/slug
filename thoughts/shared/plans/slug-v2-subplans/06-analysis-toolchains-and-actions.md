@@ -7742,3 +7742,59 @@ cache, run/test, sysroot-closure or exact ActionKey bytes. Generate once, shut
 down Bazel, replay from no server, and REPLAN if exact bounded output cannot be
 anchored. After evidence ACCEPT, design only
 `WP-6-7A-external-rules-rust-toolchain-owner-design`.
+
+### rules_rust 0.73 toolchain/action-owner evidence accepted (2026-08-19)
+
+Evidence commit `b7390392` adds exactly the isolated eight-file Bazel 9.2 /
+rules_rust 0.73 fixture. It pins 78 generated registration labels, the selected
+canonical nightly tools implementation, 25 configured edges, exact CrateInfo
+owner/type/edition/root/output/dependency projection, and the restricted
+Rustc/SymlinkTree/RunfilesTree owner relationship. Edition 2024 -> 2021 ->
+2024 changes and restores the provider projection and opaque Rustc ActionKey.
+
+Fresh generation and no-server no-update replay pass. Authored content is 228
+physical lines; generated oracle is 430 lines and 196,649 bytes; aggregate is
+658 lines. The fixture contains no home path, stale-server diagnostic or
+credential pattern. It claims exact generated mapping/provider/action
+relationships but not opaque identity bytes, execution, cache, REAPI, run/test
+or full sysroot breadth.
+
+### External rules_rust owner formal REPLAN (2026-08-19)
+
+Do not freeze the analysis owner yet. Live root apparent repository mapping
+still crosses carrierless selected extension/module graph owners, and the
+accepted observed package loader starts only from direct-local/builtin root
+routes. Extension-generated `@rust_toolchains` and canonical
+`@@rules_rust++rust+rust_toolchains` therefore have no complete reusable
+mapping -> definition -> route/source -> package epoch. Private core apparent-
+route keys cannot be called from lower analysis/loading without dependency
+inversion; a mapping-only sibling would leave the same route/package gap.
+
+Run only `WP-6-7A-root-generated-repository-observation-frontier-design`,
+docs-only. Freeze the minimal matching-family bzlmod/loading sibling set that
+carries the generated apparent mapping through canonical repository definition,
+route/source and generated BUILD package loading. Each sibling may retain only
+one natural Result Arc plus one compact epoch; parents retain no child carrier,
+map/frontier/event scratch, cache, store, interner, lock or task. Union Complete
+epochs left-first before semantic inspection, preserve exact first Arcs, and
+freeze outer > compatible Need > semantic ordering with explicit REPLAN for
+incompatible Need kinds.
+
+The design audit must also trace the carrierless prepared-input, pure-extension
+invocation/event and repository-instantiation owners in `bzl_module.rs`,
+`module_extension.rs` and `module_extension_repository_instantiation.rs`; the
+validation key already computes them and cannot bypass them without duplicating
+evaluation/event semantics. The ten existing candidate files total 26,768
+physical lines. Freeze the exact necessary subset and measured per-file caps,
+or REPLAN if another owner/file is required. The provisional whole-candidate
+envelope is +1,200 production, +900 tests, +2,100 aggregate and <=29,200
+combined physical lines; it is not implementation authority.
+
+Prove the accepted rules_rust mapping and selected tools implementation, exact
+legacy parity, every Need/outer/semantic prefix, joined full-batch order, exact
+epoch Result-Arc identity, both family directions, child-only events/warm
+suppression, cancellation/recovery and root/registry/extension A/B/A. STOP Rust,
+analysis/toolchain/action activation, core ownership inversion, a partial
+mapping carrier, duplicate retained state, Stage 10 and M7A/M8/M7B/M9 closure.
+After design and implementation ACCEPT, return directly to the docs-only
+`WP-6-7A-external-rules-rust-toolchain-owner-design`.
