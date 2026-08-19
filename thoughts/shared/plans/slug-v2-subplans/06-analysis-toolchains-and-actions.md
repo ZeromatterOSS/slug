@@ -7563,3 +7563,59 @@ Run next only
 `WP-6-7A-immutable-configured-action-owner-context-design`, docs-only. Freeze
 one analysis-owned configured-action row from the accepted evidence before any
 Rust implementation or public named-group activation.
+
+### Immutable configured-action owner-context design accepted (2026-08-19)
+
+The natural owner is analysis finalization, not lower `ActionSpec`, a DICE key
+or a later command projection. `CtxActions` continues to register intrinsic
+specs in declaration order. The mode-aware toolchain preparation already owns
+platform/toolchain selection and the native package facts; it will additionally
+compute the selected Platform analysis through the matching family and prepare
+one compact action context before Starlark evaluation. The evaluator moves its
+validated specs through a pure finalizer before returning `ConfiguredNodeResult`.
+Platform analysis occurs immediately after raw package selection and before
+selected toolchain-implementation analysis; any Platform terminal suppresses
+both the implementation and rule children.
+
+Replace the retained raw spec slice with one configured-action slice. Each row
+owns one intrinsic spec and shares an `Arc<ConfiguredActionOwnerContext>` for
+its owner/group. The context structurally retains configured owner, explicit
+default/named group, selected exec-configured platform, normalized merged
+properties, ordered constraint value/setting keys, exact toolchain selection
+plus selected `ToolchainInfo` marker/provider projection, and explicit absent
+aspect provenance. Preparation, Starlark and final rows share that compact
+context; no full selected implementation/provider Result Arc is retained. The
+admitted production path supplies
+one default context; named contexts and platform/target/group merge precedence
+are private representation/finalizer proof only. Public `rule(exec_groups=...)`,
+action `exec_group=`, target/group property ingestion and applied aspects remain
+unsupported.
+
+Selected Platform analysis provides the exact property Arc and ordered value
+edges; already loaded native packages provide each setting identity. The
+prepared Platform result, registry and lookup scratch are compute-local. The
+existing `ToolchainTopology` remains its independent analysis/edge fact, but no
+action consumer reads it and no second candidate/topology collection is added.
+Same-group actions share one context Arc; there is no retained context map,
+platform result Arc or second action graph.
+
+Core's resolved FileWrite view becomes a direct borrow of this row. Remove its
+projection-time platform/constraint closure lookup and temporary constraint
+vector. Semantic identity, text aquery and unchanged `FileWriteReapiPlan` read
+the identical retained group/platform/property/constraint data. Dependency
+platform/toolchain/constraint nodes remain exactly once in the recursive action
+closure through the accepted configured edges; public FileWrite bytes/order and
+REAPI wire semantics do not change. Named-group identity is structurally tagged
+but remains nonactivated by Starlark, commands, aquery, REAPI and execution.
+
+Run next only
+`WP-6-7A-immutable-configured-action-owner-context-implementation`. Exact Rust
+authority is the four analysis production files and two existing analysis proof
+files; core `runtime/{dice.rs,file_write_identity.rs,mod.rs}` and its build proof;
+and the existing REAPI proof only. Caps are 788 production, 860 test, 1,648
+aggregate and 25,835 combined physical lines. Prove declaration order and
+same-context pointer sharing; default/named distinct contexts; configuration,
+platform, property and toolchain marker/provider A/B/A; Platform-before-
+implementation suppression; failure-before-retention and diagnostic
+precedence; matching-family selected-Platform Need/outer/error; removal of
+projection reconstruction; identical identity/aquery/REAPI consumption; exact

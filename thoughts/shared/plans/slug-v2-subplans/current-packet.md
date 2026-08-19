@@ -1,112 +1,194 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-immutable-configured-action-owner-context-design`
+Packet: `WP-6-7A-immutable-configured-action-owner-context-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and evidence base: `9ab2fa4a`
+Scheduling/evidence/design base: `8eecf172`
 Accepted Rust base: `51127df8`
-Result: freeze the smallest immutable analysis-owned configured-action row and
-one bounded implementation packet.
+Result: implement the first immutable analysis-owned configured-action row and
+migrate the accepted FileWrite semantic consumers to it without public breadth.
 
-## Exact docs-only authority and caps
+## Exact authority and caps
 
 Write exactly:
 
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
-2. this manifest, and
-3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`.
+1. `app/slug_analysis_v2/src/result.rs`: <=240 production net, <=670 physical;
+2. `app/slug_analysis_v2/src/dice.rs`: <=260 production, <=3,000 physical;
+3. `app/slug_analysis_v2/src/starlark_rule.rs`: <=80 production, <=680 physical;
+4. `app/slug_analysis_v2/src/lib.rs`: <=12 production, <=75 physical;
+5. `app/slug_analysis_v2/tests/configured_target.rs`: <=300 test, <=850 physical;
+6. `app/slug_analysis_v2/tests/starlark_rule.rs`: <=220 test, <=3,500 physical;
+7. `app/slug_core_v2/src/runtime/dice.rs`: <=140 production, <=11,850 physical;
+8. `app/slug_core_v2/src/runtime/file_write_identity.rs`: <=50 production,
+   <=300 physical;
+9. `app/slug_core_v2/src/runtime/mod.rs`: <=6 production, <=260 physical;
+10. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=240 test,
+    <=4,150 physical; and
+11. `app/slug_reapi_v2/tests/reapi.rs`: <=100 test, <=500 physical.
 
-Caps against `9ab2fa4a`: canonical <=40 net, this manifest <=220, Stage 6
-<=240 and aggregate <=500. Stage 1/7/8/10, the accepted fixture and live Rust
-are read-only. Rust, Cargo, BUILD, fixture/oracle, generated evidence and
-public/caller changes are forbidden.
+Production semantic cap <=788, test cap <=860, aggregate <=1,648 and combined
+physical <=25,835. `dice.rs`, the existing Starlark-rule proof and the core
+build proof are cohesive owner/proof exceptions; every touched/new helper must
+remain below 200 lines. No twelfth file.
 
-## Accepted just-in-time evidence
+## Frozen owner and representation
 
-The Bazel 9.2 `exec-groups-action-platform` oracle is generated and cleanly
-replays six rows for two actions of one configured owner. The default action
-omits Starlark's `exec_group` argument and stays on `default_platform`; the
-named `compile` action stays on `compile_a` cold/warm. Editing only a property
-on that same platform changes only the compile action's opaque ActionKey and
-restoration recovers its prior token. Reordering compatible compile platforms
-moves only that action to `compile_b`; restoring order returns its platform and
-opaque token. Exact ActionKey bytes remain M9.
+Preserve `slug_build_api_v2::ActionSpec` as intrinsic action material. In
+`slug_analysis_v2`, add immutable `Allocative`, cloneable/equatable configured
+action types with this structural content:
 
-The evidence pins `RuleContext#getActionOwner(execGroup)`: Bazel derives the
-per-group owner from configuration, aspect descriptors, merged exec properties
-and selected execution platform. This fixture admits explicit absent aspect
-provenance; applied aspects remain unsupported.
+- `ConfiguredActionExecGroup` is explicit `Default` or a compact named group;
+- `ConfiguredActionAspectProvenance` has only the explicit `Absent` state in
+  this packet; no applied-aspect value may be guessed;
+- `ConfiguredActionPlatformConstraint` retains the configured constraint-value
+  and setting keys in platform declaration order;
+- one compact admitted toolchain context retains the exact `ToolchainSelection`
+  plus the selected `ToolchainInfo` marker/provider projection, never its full
+  analysis/provider Result Arc; and
+- one shared `ConfiguredActionOwnerContext` retains the configured target
+  owner, group, selected exec-configured platform, normalized merged execution
+  properties, complete ordered constraints, that compact toolchain context,
+  and absent aspect provenance; and
+- each `ConfiguredAction` owns one intrinsic `ActionSpec` plus an `Arc` to its
+  matching immutable context. Actions of the same owner/group share that Arc.
 
-## Design authority
+Replace `ConfiguredNodeResult.actions: Arc<[ActionSpec]>` with exactly one
+`Arc<[ConfiguredAction]>`; do not retain the old slice. The evaluation-time
+`Vec<ActionSpec>` must be moved into configured rows. Retain no context lookup
+map after finalization and no platform/toolchain `ConfiguredNodeResult` Arc.
+The existing `ToolchainTopology` remains only as the already accepted
+rule/native analysis fact and candidate-edge witness; action consumers must not
+read it, and this packet adds no second topology/candidate collection.
 
-Freeze one analysis-owned immutable configured-action representation. Preserve
-build-API `ActionSpec` as intrinsic action material; do not add configured
-analysis types to the lower crate and do not create a DICE key. The retained
-row (or authenticated compact projections with identical lifetime) must own:
+Configured owner identity already includes the complete structural Slug
+configuration. The selected platform and all constraint keys must carry the
+same structural exec configuration. The toolchain selection's execution
+platform must equal the context platform; its declaration/type/implementation
+remain structurally retained. Equality and invalidation include every field.
 
-- configured target owner and complete structural configuration identity;
-- explicit default or named exec-group identity;
-- the group-selected execution platform;
-- deterministic merged platform/target/group exec properties;
-- the selected group toolchain context required by the action; and
-- explicit absent aspect provenance now, with a fail-closed extension point
-  for later applied-aspect evidence.
+Merge execution properties deterministically in platform, target, then group
+override order into one sorted unique compact slice. The admitted production
+surface supplies platform properties and empty target/group overlays; preserve
+the platform fact's exact inner Arc when both overlays are empty. The helper
+and pure tests freeze later target/group precedence, but loading/public
+target/group-property admission remains deferred. Per-action properties remain
+intrinsic `ActionSpec` data and are not silently folded into owner context.
 
-Decide the exact construction seam. Current Starlark evaluation registers
-intrinsic specs through `CtxActions`; `finish_analysis` separately has the
-configured key, prepared toolchain selection, candidate platforms and computed
-platform facts. The design must bind every accepted action to a precomputed
-matching group context before the `ConfiguredNodeResult` becomes immutable.
-It may finalize the registry into configured rows at that boundary, but later
-`configured_file_write_actions`, aquery or REAPI may not infer platform,
-properties or toolchains from the owner's current topology.
+## Creation seam and failure order
 
-The default group is data, not `None`. Named-group lookup must fail on unknown,
-missing or mismatched contexts before retaining a result. Two actions of one
-owner may bind different groups/platforms/properties. A `cfg = "exec"` tool or
-dependency must use the selected group's exec configuration. Preserve Bazel's
-output-conflict and action-construction error precedence.
+Extend the existing mode-aware root toolchain preparation; add no DICE key.
+After raw package-based platform/toolchain selection, but before computing the
+selected toolchain implementation, compute selected Platform analysis through
+the matching legacy/observed family. Validate its exact configured key,
+Platform kind, diagnostics, normalized `PlatformSemanticFact`, and ordered
+constraint edges. Build the constraint setting keys from the already loaded,
+DICE-owned native toolchain packages and the selected platform's exec
+configuration. Forward the exact properties Arc; drop the selected Platform
+result after the context is built. A Platform Need/typed outer/semantic error
+suppresses both selected-implementation analysis and rule evaluation.
 
-Replace, rather than duplicate, the current retained action slice where
-possible. Inventory exact clone/allocation cost, `Allocative`, equality and
-invalidation inputs. Retain no second action collection, topology snapshot,
-resolver map, registry, evaluator, lock, cache, interner or task after analysis.
-No lock may span DICE. Use the Buck2 utility-reuse review for any new retained
-collection/string representation.
+Only after Platform success compute and validate the selected toolchain
+implementation as today. Project its exact `ToolchainInfo` marker together
+with the selected labels/platform into the compact toolchain context.
+`PreparedToolchain` and Starlark `ctx.toolchains` must borrow/share that compact
+context; move the same context Arc into configured action rows after evaluation
+rather than cloning a second marker or retaining the provider/result Arc.
 
-Freeze how `ConfiguredNodeResult`, recursive build action closure,
-FileWrite semantic identity, text aquery and `FileWriteReapiPlan` consume the
-same row without re-resolution. Exact public FileWrite values/order and REAPI
-wire semantics remain unchanged; named-group exposure is proof/internal until
-a later separately admitted command/action packet.
+Pass one compute-local prepared default-group context into
+`evaluate_loaded_rule`. Starlark still registers intrinsic actions in
+declaration order through `CtxActions`. After provider and action-registry
+validation succeeds, but before constructing `ConfiguredNodeResult`, move each
+spec through one pure finalizer:
 
-## Proof and future packet
+1. `None` group means explicit `Default`; a string means that exact named key;
+2. select exactly one matching context and reject missing/duplicate contexts;
+3. validate owner, exec configuration, platform/toolchain agreement, sorted
+   properties/constraints and explicit aspect state; then
+4. produce rows in original registration order, sharing contexts by Arc.
 
-The design must name exact Rust files, measured baselines, semantic/physical
-caps and cohesive helper limits. Required discriminators include:
+Production passes exactly one default context. Named contexts are a private
+representation/finalizer proof only: Starlark `rule(exec_groups=...)` and
+action `exec_group=` remain unactivated. Unknown/named groups therefore fail
+before result retention. Existing action registration/output-conflict,
+provider, executable-rule and Starlark evaluation errors retain their current
+precedence because finalization occurs after those checks. Need/typed observed
+outer from selected-platform analysis propagates before rule evaluation and
+retains no partial result or context.
 
-- default and named actions of one owner retain distinct group/platform/
-  property/toolchain rows in declaration order;
-- C0/C1/C0, platform A/B/A, property A/B/A and toolchain registration/provider
-  edits invalidate and restore structural equality;
-- unknown/missing/mismatched group contexts and ambiguous platforms fail
-  before result retention with unchanged diagnostic precedence;
-- exact configured-owner/action Arc and clone behavior; no projection-time
-  topology reconstruction;
-- aquery identity/text and REAPI derive from the identical retained row and
-  preserve the accepted FileWrite public output;
-- recursive action closure has one owner row per action with deterministic
-  order and no duplicated collection;
-- `Allocative`/retention cleanup and zero new Host read/cache/interner/lock/task;
-  and
-- applied aspects, broader action kinds and public named-group behavior remain
-  nonactivated.
+## Consumer and memory contract
 
-Classify exact Bazel semantics, Slug-native representation/identity and every
-unsupported surface. End with one implementation packet or formal REPLAN.
+`ConfiguredActionView` becomes a borrowed view of the retained row. Its owner,
+group, platform, properties, constraints, toolchain and aspect accessors must
+read only the row/context. `configured_file_write_actions` retains the existing
+FileWrite shape checks but performs no topology/platform reconstruction.
 
-STOP Rust/Cargo, fixture/oracle changes, a new DICE owner, dependency inversion,
-projection-time reconstruction, duplicate retained graphs, guessed aspect
-semantics, public named-group/action activation, rules_rust breadth, execution
-backend changes, M8, M7B, M9, JVM production code, cap excess or multiple
-successors.
+In core, reduce `ResolvedFileWriteSemanticView` to the borrowed configured
+action row. Remove `unique_closure_node` platform/constraint resolution and its
+temporary constraint vector. FileWrite semantic identity encodes the same
+configured owner/output/Write material/group/platform/properties/constraint
+grammar from the retained row; add a tagged named-group representation without
+activating it publicly. Text aquery continues to reject named/non-FileWrite
+surfaces and preserves its exact accepted bytes. `FileWriteReapiPlan` already
+consumes the resolved view and must read the identical retained properties;
+production REAPI code does not change.
+
+The recursive action closure keeps its existing dependency-owned platform,
+constraint and toolchain nodes/order through existing configured edges. It
+retains one configured action slice per analysis result, not a second action or
+resolved-platform graph. Registry/evaluator/prepared context maps, selected
+Platform result, merge scratch and consumer iteration state stay compute-local.
+Add no cache, interner, store, lock, task, direct Host read or DICE state. No
+lock may span DICE.
+
+## Required discriminating proof
+
+- default and named rows for one owner retain distinct group/platform/property/
+  toolchain contexts in declaration order; same-group rows are `Arc::ptr_eq`;
+- C0/C1/C0, platform A/B/A, property A/B/A, toolchain registration/provider
+  A/B/A and restored values change then restore structural equality;
+- the production default row preserves the selected Platform fact's exact
+  property Arc, ordered constraint keys, selected `ToolchainInfo` marker and
+  configured owner/action clone behavior without a provider/result Arc;
+- missing/default/named/duplicate/mismatched owner, platform configuration,
+  toolchain platform, constraint configuration and unsorted property contexts
+  fail before result retention; output-conflict and Starlark/provider errors
+  keep their existing precedence;
+- selected Platform Need/typed outer/semantic error prevents evaluation and
+  selected-implementation activation and leaves no configured row;
+  legacy/observed analysis families stay isolated;
+- a real configured FileWrite result no longer needs platform/constraint nodes
+  to reconstruct its semantic view, while the recursive closure still contains
+  those dependency nodes exactly once and in deterministic order;
+- semantic identity/text aquery and REAPI use one borrowed retained row,
+  preserve exact accepted public FileWrite output/identity/REAPI wire behavior,
+  and respond to property/platform/configuration restoration;
+- named-group types/finalizer paths are private proof only: zero Starlark,
+  command, aquery, REAPI or execution named-group activation;
+- `Allocative` and clone/Arc accounting prove one row slice plus shared compact
+  contexts, no retained context map/topology duplicate/result Arc/scratch; and
+- focused analysis/core/REAPI tests, full affected crates, fmt, diff-check and
+  AI-cleanup/Buck2 retention review pass. Record inherited baselines exactly.
+
+## Compatibility and terminal
+
+Exact Bazel 9.2 for the admitted surface: existing default FileWrite values,
+action declaration/closure order, configured owner/configuration, selected
+platform/toolchain/property semantics, diagnostics, text aquery and REAPI wire
+behavior; the accepted oracle's default/named platform/property relationships
+remain the evidence boundary.
+
+Slug-native: immutable configured-action/context types, compact Arc sharing,
+explicit group/aspect enums, structural identity bytes, and the private named
+finalizer proof.
+
+Unsupported/deferred: public `rule(exec_groups=...)`, action `exec_group=`,
+target/group property ingestion, applied-aspect actions, `cfg = "exec"` tools
+outside the selected-context invariant, broader action kinds/rules_rust,
+execution backend breadth, and exact Bazel configuration/ActionKey bytes.
+
+On ACCEPT schedule exactly one docs-only M7A next-owner audit. STOP on any
+twelfth file, lower build-API configured type, new DICE owner, raw-action slice
+retention, consumer topology reconstruction, second retained graph/map,
+property/input invention, diagnostic drift, public named-group activation,
+Rust/Java delegation, cap excess, partial proof or M7A/M8/M7B/M9 closure.
+REPLAN instead of widening any frozen boundary.
