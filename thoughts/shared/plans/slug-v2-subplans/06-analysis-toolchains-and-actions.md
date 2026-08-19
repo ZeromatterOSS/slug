@@ -8030,3 +8030,42 @@ the complete root/command, dependency-row, reducer, Arc, event, cancellation,
 family and lifecycle proof with no semantic/event/retention change. After
 independent Rust ACCEPT, schedule only the docs-only selected-module-graph
 frontier design, `WP-6-7A-selected-module-graph-observation-frontier-design`.
+
+### Effective-module-override observation implementation accepted (2026-08-19)
+
+Implementation `3d174006` completes the first shared consumer of the accepted
+root MODULE-files epoch. Its private matching-family key forwards the exact
+root epoch, preserves command-policy precedence and exact legacy Result Arc
+projection, remains eventless and retains one local Result Arc plus compact
+epoch. Final accounting is +175 production/+420 tests/+595 aggregate at 6,647
+physical lines. Focused and full affected validation, the inherited core
+visibility-wording baseline, formatting, cleanup/retention and independent
+review pass.
+
+### Selected-module-graph frontier materialization-request REPLAN (2026-08-19)
+
+Do not freeze the selected graph sibling yet. Registry discovery uses
+`ModuleSourcePreparationKey`, while the nonregistry closure/source path
+crosses `RepositoryMaterializationKey` and its carrierless
+`RepositoryMaterializationRequestKey`. A complete observed preparation
+sibling must preserve its existing nonregistry branch, which would otherwise
+duplicate or bypass that request projection. The request key is therefore the
+smallest reusable owner of normalized workspace, effective override, canonical
+repository and local/immutable request-kind semantics. The builtin discovery
+branch adds no Host path epoch.
+
+Run only `WP-6-7A-repository-materialization-request-observation-design`,
+docs-only. Freeze one private request sibling/carrier and a matching
+Legacy/Observed driver in `source_preparation.rs`. Invalid workspace and
+effective compute failure have empty prefixes; effective Need/outer is
+carrierless; completed effective semantic and every request projection terminal
+retain the exact effective prefix. The parent is eventless and retains one
+local request Result Arc plus compact epoch.
+
+Future implementation authority after independent design ACCEPT is exactly
+`source_preparation.rs` from 13,747 physical lines, with <=180 production,
+<=320 tests, <=500 aggregate semantic and <=14,300 physical lines. STOP every
+other Rust file, caller/export, materialization/source/closure/preparation/
+discovery/selected-graph activation, direct Host read, retained collection or
+state, event drift and milestone closure. After implementation ACCEPT, return
+only to the docs-only selected-module-graph observation-frontier design.
