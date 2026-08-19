@@ -45,6 +45,7 @@ use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::repo_file::HostNonregistryRepoFileKey;
+use crate::repo_file::HostNonregistryRepoFileObservationKey;
 use crate::repo_file::HostRepoFileError;
 use crate::repo_file::HostRepoFileKey;
 use crate::repo_file::HostRepoFileObservationKey;
@@ -56,6 +57,7 @@ use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::RepositorySourceFileKey;
+use crate::source_preparation::RepositorySourceFileObservationKey;
 use crate::source_preparation::RepositorySourceFileValue;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
@@ -1181,76 +1183,253 @@ impl fmt::Display for HostNonregistryRepositoryIgnoreKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryRepositoryIgnoreObservationKey(
+    pub(crate) HostNonregistryRepositoryIgnoreKey,
+);
+impl fmt::Display for HostNonregistryRepositoryIgnoreObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostNonregistryRepositoryIgnore {
+    result: Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>,
+    observations: PathObservationEpoch,
+}
+impl ObservedHostNonregistryRepositoryIgnore {
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+#[derive(Clone, Copy)]
+enum HostNonregistryRepositoryIgnoreMode {
+    Legacy,
+    Observed,
+}
+type HostNonregistryRepositoryIgnoreProjection = (
+    Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>,
+    PathObservationEpoch,
+);
+type HostNonregistryRepositoryIgnoreDriverOutcome = SourcePreparationOutcome<
+    Result<HostNonregistryRepositoryIgnoreProjection, ObservedPathFrontierError>,
+>;
+fn nonregistry_ignore_complete(
+    result: Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>,
+    observations: PathObservationEpoch,
+) -> HostNonregistryRepositoryIgnoreDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+fn finish_observed_nonregistry_ignore_complete<T>(
+    result: Result<T, ObservedPathFrontierError>,
+) -> Result<T, HostNonregistryRepositoryIgnoreDriverOutcome> {
+    result.map_err(|error| SourcePreparationOutcome::Complete(Err(error)))
+}
+fn project_nonregistry_ignore_legacy(
+    outcome: HostNonregistryRepositoryIgnoreDriverOutcome,
+) -> <HostNonregistryRepositoryIgnoreKey as Key>::Value {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy nonregistry ignore cannot produce an observed outer error")
+        }
+    }
+}
+
+async fn drive_host_nonregistry_repository_ignore(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryRepositoryIgnoreKey,
+    mode: HostNonregistryRepositoryIgnoreMode,
+) -> HostNonregistryRepositoryIgnoreDriverOutcome {
+    let repo_key = HostNonregistryRepoFileKey::new(key.workspace.dupe(), key.module.clone());
+    let (repo, mut observations) = match mode {
+        HostNonregistryRepositoryIgnoreMode::Legacy => {
+            match dice_invariant(ctx.compute(&repo_key).await) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(repo) => (repo, PathObservationEpoch::empty()),
+            }
+        }
+        HostNonregistryRepositoryIgnoreMode::Observed => {
+            match dice_invariant(
+                ctx.compute(&HostNonregistryRepoFileObservationKey(repo_key))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    match finish_observed_nonregistry_ignore_complete(result) {
+                        Ok(repo) => (repo.result().dupe(), repo.observations().dupe()),
+                        Err(outcome) => return outcome,
+                    }
+                }
+            }
+        }
+    };
+    let repo = match repo.as_ref() {
+        Ok(repo) => repo.dupe(),
+        Err(error) => {
+            return nonregistry_ignore_complete(
+                Err(HostRepositoryIgnoreError::NonregistryRepoFile(
+                    error.clone(),
+                )),
+                observations,
+            );
+        }
+    };
+    let source_key = RepositorySourceFileKey {
+        workspace: key.workspace.as_path().to_owned(),
+        module_name: key.module.name.clone(),
+        repo_relative_path: ".bazelignore".into(),
+    };
+    let (source, source_observations) = match mode {
+        HostNonregistryRepositoryIgnoreMode::Legacy => {
+            match dice_invariant(ctx.compute(&source_key).await) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(source) => {
+                    let source = source.as_ref().map(Dupe::dupe).map_err(Dupe::dupe);
+                    (source, PathObservationEpoch::empty())
+                }
+            }
+        }
+        HostNonregistryRepositoryIgnoreMode::Observed => {
+            match dice_invariant(
+                ctx.compute(&RepositorySourceFileObservationKey(source_key))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                SourcePreparationOutcome::Complete(result) => {
+                    match finish_observed_nonregistry_ignore_complete(result) {
+                        Ok(source) => (
+                            source.result().as_ref().clone(),
+                            source.observations().dupe(),
+                        ),
+                        Err(outcome) => return outcome,
+                    }
+                }
+            }
+        }
+    };
+    observations = match union_observations(&observations, &source_observations) {
+        Ok(observations) => observations,
+        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+    };
+    let source = match source {
+        Ok(RepositorySourceFileValue::Absent) => None,
+        Ok(RepositorySourceFileValue::Present(bytes)) => {
+            let logical_path = NormalizedAbsolutePath::new(
+                key.workspace
+                    .as_path()
+                    .join(".slug-nonregistry")
+                    .join(key.module.name.as_str())
+                    .join(".bazelignore"),
+            )
+            .expect("joining a normalized workspace remains absolute");
+            Some((bytes, logical_path))
+        }
+        Err(RepositorySourceFileError::WrongKind {
+            actual: PathNodeKind::Directory,
+            ..
+        }) => None,
+        Err(error) => {
+            return nonregistry_ignore_complete(
+                Err(HostRepositoryIgnoreError::RepositorySource(error)),
+                observations,
+            );
+        }
+    };
+    let mut prefixes = Vec::new();
+    if let Some((bytes, logical_path)) = source {
+        let parsed = match parse_ignore_file_observed(ctx, &logical_path, &bytes).await {
+            PathOutcome::Need(need) => {
+                return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
+            }
+            PathOutcome::Complete(result) => {
+                match finish_observed_nonregistry_ignore_complete(result) {
+                    Ok(parsed) => parsed,
+                    Err(outcome) => return outcome,
+                }
+            }
+        };
+        observations = match union_observations(&observations, &parsed.observations) {
+            Ok(observations) => observations,
+            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        };
+        match parsed.result {
+            Ok(parsed) => prefixes = parsed,
+            Err(error) => return nonregistry_ignore_complete(Err(error), observations),
+        }
+    }
+    nonregistry_ignore_complete(
+        Ok(RepositoryIgnoreMatcher::new(
+            prefixes,
+            repo.ignored_directories().iter().cloned(),
+        )),
+        observations,
+    )
+}
+
 #[async_trait]
 impl Key for HostNonregistryRepositoryIgnoreKey {
     type Value =
         SourcePreparationOutcome<Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let repo = match dice_invariant(
-            ctx.compute(&HostNonregistryRepoFileKey::new(
-                self.workspace.dupe(),
-                self.module.clone(),
-            ))
+        project_nonregistry_ignore_legacy(
+            drive_host_nonregistry_repository_ignore(
+                ctx,
+                self,
+                HostNonregistryRepositoryIgnoreMode::Legacy,
+            )
             .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.dupe(),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostRepositoryIgnoreError::NonregistryRepoFile(error.clone()),
-                    )));
-                }
-            },
-        };
-        let source = match dice_invariant(
-            ctx.compute(&RepositorySourceFileKey {
-                workspace: self.workspace.as_path().to_owned(),
-                module_name: self.module.name.clone(),
-                repo_relative_path: ".bazelignore".into(),
-            })
-            .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent)) => None,
-            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes))) => {
-                let path = NormalizedAbsolutePath::new(
-                    self.workspace
-                        .as_path()
-                        .join(".slug-nonregistry")
-                        .join(self.module.name.as_str())
-                        .join(".bazelignore"),
-                )
-                .expect("joining a normalized workspace remains absolute");
-                Some((bytes, path))
-            }
-            SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
-                actual: PathNodeKind::Directory,
-                ..
-            })) => None,
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostRepositoryIgnoreError::RepositorySource(error),
-                )));
-            }
-        };
-        let mut prefixes = Vec::new();
-        if let Some((bytes, logical_path)) = source {
-            match parse_ignore_file(ctx, &logical_path, &bytes).await {
-                PathOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
-                }
-                PathOutcome::Complete(Err(error)) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
-                }
-                PathOutcome::Complete(Ok(values)) => prefixes = values,
-            }
-        }
-        SourcePreparationOutcome::Complete(Arc::new(Ok(RepositoryIgnoreMatcher::new(
-            prefixes,
-            repo.ignored_directories().iter().cloned(),
-        ))))
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostNonregistryRepositoryIgnoreObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostNonregistryRepositoryIgnore, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_nonregistry_repository_ignore(
+            ctx,
+            &self.0,
+            HostNonregistryRepositoryIgnoreMode::Observed,
+        )
+        .await
+        .map(|outcome| {
+            outcome.map(
+                |(result, observations)| ObservedHostNonregistryRepositoryIgnore {
+                    result,
+                    observations,
+                },
+            )
+        })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1768,6 +1947,8 @@ mod tests {
     #[cfg(unix)]
     use crate::host_file::HostFileBytesKey;
     #[cfg(unix)]
+    use crate::inject_root_module_request_inputs;
+    #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
     #[cfg(unix)]
     use crate::repo_file::HostRepoFileKey;
@@ -1777,6 +1958,16 @@ mod tests {
     use crate::repo_file::tests::routed_policy_route;
     #[cfg(unix)]
     use crate::repo_file::tests::routed_policy_transaction;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationEpochEntry;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResult;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResultEpoch;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationResultEpochKey;
+    #[cfg(unix)]
+    use crate::source_preparation::RepositoryMaterializationSuccess;
 
     fn path(value: &str) -> PackagePath {
         PackagePath::parse(value).unwrap()
@@ -2897,6 +3088,7 @@ mod tests {
     #[derive(Default)]
     struct RoutedPolicyTracker {
         activations: Mutex<Vec<(String, Option<EventBatch>)>>,
+        rows: Mutex<Vec<(String, Vec<String>)>>,
     }
 
     #[cfg(unix)]
@@ -2904,16 +3096,53 @@ mod tests {
         fn take(&self) -> Vec<(String, Option<EventBatch>)> {
             std::mem::take(&mut *self.activations.lock().unwrap())
         }
+
+        fn take_rows(&self) -> Vec<(String, Vec<String>)> {
+            std::mem::take(&mut *self.rows.lock().unwrap())
+        }
+        fn clear(&self) {
+            self.take();
+            self.take_rows();
+        }
+    }
+    #[cfg(unix)]
+    const OBS_DEPS: &[&str] = &[
+        "observed-host-nonregistry-repo-file:dep@1",
+        "observed-repository-source-file:dep:.bazelignore",
+    ];
+    #[cfg(unix)]
+    const LEG_DEPS: &[&str] = &[
+        "host-nonregistry-repo-file:dep@1",
+        "repository-source-file:dep:.bazelignore",
+    ];
+    #[cfg(unix)]
+    fn assert_row(tracker: &RoutedPolicyTracker, key: impl ToString, deps: &[&str]) {
+        assert_eq!(
+            tracker.take_rows(),
+            [(
+                key.to_string(),
+                deps.iter().map(|dep| (*dep).to_owned()).collect()
+            )]
+        );
     }
 
     #[cfg(unix)]
     impl ActivationTracker for RoutedPolicyTracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            let name = key.to_string();
+            if name.starts_with("observed-host-nonregistry-repository-ignore:")
+                || name.starts_with("host-nonregistry-repository-ignore:")
+            {
+                self.rows
+                    .lock()
+                    .unwrap()
+                    .push((name, deps.map(ToString::to_string).collect()));
+            }
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -3195,19 +3424,22 @@ mod tests {
         let right = PathObservationEpoch::from_shared([(demand.dupe(), equal)]).unwrap();
         let union = super::union_observations(&left, &right).unwrap();
         assert!(Arc::ptr_eq(union.get(&demand).unwrap(), &first));
+        let stat = PathLstat::new(PathNodeKind::RegularFile, 1, 1, 1, 1, 0o644);
         let changed = PathObservationEpoch::new([(
             demand.dupe(),
-            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
-                PathNodeKind::RegularFile,
-                1,
-                1,
-                1,
-                1,
-                0o644,
-            ))),
+            PathObservationResult::Lstat(PathOperationResult::Present(stat)),
         )])
         .unwrap();
         assert!(super::union_observations(&left, &changed).is_err());
+        assert!(matches!(
+            PathObservationEpoch::from_shared([(
+                demand.dupe(),
+                Arc::new(PathObservationResult::FileBytes(
+                    PathOperationResult::Missing
+                )),
+            )]),
+            Err(slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. })
+        ));
         let outer = SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
             slug_workspace_v2::PathObservationEpochError::ConflictingDemand(demand),
         )));
@@ -3293,5 +3525,667 @@ mod tests {
                 slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. }
             ))
         ));
+    }
+    #[cfg(unix)]
+    fn nonregistry_ignore_epoch(
+        root: &str,
+        files: [Option<(&[u8], PathNodeKind)>; 2],
+        namespace: PathObservationNamespace,
+        source_root: &str,
+        variant: i64,
+    ) -> PathObservationEpoch {
+        let lstat = |kind| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, variant, variant, variant, variant, 0o755,
+            )))
+        };
+        let demand = |namespace, path: &str, operation| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let mut entries = starlark_map::small_map::SmallMap::new();
+        for path in ["/", "/workspace"] {
+            entries.insert(
+                demand(
+                    PathObservationNamespace::Host,
+                    path,
+                    PathObservationOperation::Lstat,
+                ),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        let module = "/workspace/MODULE.bazel";
+        entries.insert(
+            demand(
+                PathObservationNamespace::Host,
+                module,
+                PathObservationOperation::Lstat,
+            ),
+            lstat(PathNodeKind::RegularFile),
+        );
+        entries.insert(
+            demand(
+                PathObservationNamespace::Host,
+                module,
+                PathObservationOperation::FileBytes,
+            ),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                root.as_bytes(),
+            ))),
+        );
+        for (name, source) in ["REPO.bazel", ".bazelignore"].into_iter().zip(files) {
+            let path = format!("{source_root}/{name}");
+            for ancestor in std::path::Path::new(&path).ancestors().skip(1) {
+                entries.insert(
+                    demand(
+                        namespace,
+                        ancestor.to_str().unwrap(),
+                        PathObservationOperation::Lstat,
+                    ),
+                    lstat(PathNodeKind::Directory),
+                );
+            }
+            entries.insert(
+                demand(namespace, &path, PathObservationOperation::Lstat),
+                source.map_or(
+                    PathObservationResult::Lstat(PathOperationResult::Missing),
+                    |(_, kind)| lstat(kind),
+                ),
+            );
+            if let Some((bytes, PathNodeKind::RegularFile)) = source {
+                entries.insert(
+                    demand(namespace, &path, PathObservationOperation::FileBytes),
+                    PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                        bytes,
+                    ))),
+                );
+            }
+        }
+        PathObservationEpoch::new(entries).unwrap()
+    }
+
+    #[cfg(unix)]
+    fn without_ignore_bytes(epoch: &PathObservationEpoch) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(epoch.observations().iter().filter_map(
+            |(demand, result)| {
+                (!(demand.path().as_path().ends_with(".bazelignore")
+                    && demand.operation() == PathObservationOperation::FileBytes))
+                    .then(|| (demand.dupe(), result.dupe()))
+            },
+        ))
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn ignore_read_error(epoch: &PathObservationEpoch) -> PathObservationEpoch {
+        PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
+            let result = if demand.path().as_path().ends_with(".bazelignore")
+                && demand.operation() == PathObservationOperation::FileBytes
+            {
+                Arc::new(PathObservationResult::FileBytes(
+                    PathOperationResult::Error(slug_workspace_v2::PathObservationError::Io {
+                        kind: slug_workspace_v2::PathIoErrorKind::PermissionDenied,
+                        raw_os_error: None,
+                    }),
+                ))
+            } else {
+                result.dupe()
+            };
+            (demand.dupe(), result)
+        }))
+        .unwrap()
+    }
+
+    #[cfg(unix)]
+    fn nonregistry_ignore_key() -> super::HostNonregistryRepositoryIgnoreKey {
+        super::HostNonregistryRepositoryIgnoreKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            crate::NonrootModuleKey::new("dep", "1"),
+        )
+    }
+
+    #[cfg(unix)]
+    async fn nonregistry_ignore_transaction(
+        dice: &Arc<Dice>,
+        tracker: Arc<RoutedPolicyTracker>,
+        root: &str,
+        epoch: PathObservationEpoch,
+        result: Option<RepositoryMaterializationResult>,
+    ) -> dice::DiceTransaction {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(root.to_owned())),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Off,
+        )
+        .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                workspace.dupe(),
+                [workspace.dupe()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+            )])
+            .unwrap();
+        let mut tx = updater.commit().await;
+        let pending = tx
+            .compute(&super::HostNonregistryRepositoryIgnoreObservationKey(
+                nonregistry_ignore_key(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Need(need) = pending else {
+            panic!("missing materialization result must remain a parent Need");
+        };
+        let request = need
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap()
+            .dupe();
+        let mut updater = tx.into_updater();
+        let Some(result) = result else {
+            return updater.commit().await;
+        };
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace,
+                    [RepositoryMaterializationEpochEntry { request, result }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[cfg(unix)]
+    async fn nonregistry_ignore_child_epoch(
+        tx: &mut dice::DiceTransaction,
+        include_source: bool,
+    ) -> PathObservationEpoch {
+        let repo_key = crate::repo_file::HostNonregistryRepoFileObservationKey(
+            crate::repo_file::HostNonregistryRepoFileKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                crate::NonrootModuleKey::new("dep", "1"),
+            ),
+        );
+        let SourcePreparationOutcome::Complete(Ok(repo)) = tx.compute(&repo_key).await.unwrap()
+        else {
+            panic!("observed REPO child must complete");
+        };
+        if !include_source {
+            return repo.observations().dupe();
+        }
+        let source_key =
+            super::RepositorySourceFileObservationKey(super::RepositorySourceFileKey {
+                workspace: "/workspace".into(),
+                module_name: "dep".into(),
+                repo_relative_path: ".bazelignore".into(),
+            });
+        let source_outcome = tx.compute(&source_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(source)) = source_outcome else {
+            panic!("observed source child must complete: {source_outcome:?}");
+        };
+        super::union_observations(repo.observations(), source.observations()).unwrap()
+    }
+
+    #[cfg(unix)]
+    fn assert_nonregistry_ignore_epoch(
+        expected: &PathObservationEpoch,
+        actual: &PathObservationEpoch,
+    ) {
+        assert_eq!(expected.observations().len(), actual.observations().len());
+        for ((expected_demand, expected_result), (actual_demand, actual_result)) in
+            expected.observations().iter().zip(actual.observations())
+        {
+            assert_eq!(expected_demand, actual_demand);
+            assert!(Arc::ptr_eq(expected_result, actual_result));
+        }
+    }
+
+    #[cfg(unix)]
+    fn observed_nonregistry_ignore(
+        value: &<super::HostNonregistryRepositoryIgnoreObservationKey as Key>::Value,
+    ) -> &super::ObservedHostNonregistryRepositoryIgnore {
+        match value {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            _ => panic!("observed nonregistry ignore did not complete: {value:?}"),
+        }
+    }
+
+    #[cfg(unix)]
+    async fn ignore_lifecycle(
+        root: &str,
+        namespace: PathObservationNamespace,
+        source_root: &str,
+        result: RepositoryMaterializationResult,
+        change_repo: bool,
+    ) {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(RoutedPolicyTracker::default());
+        let key = super::HostNonregistryRepositoryIgnoreObservationKey(nonregistry_ignore_key());
+        let ignore_states = [
+            Some((b"a\n".as_slice(), PathNodeKind::RegularFile)),
+            Some((b"b\n".as_slice(), PathNodeKind::RegularFile)),
+            None,
+            Some((b"".as_slice(), PathNodeKind::Directory)),
+            Some((b"a\n".as_slice(), PathNodeKind::RegularFile)),
+        ];
+        let repo_states = [
+            Some((b"print('A')\n".as_slice(), PathNodeKind::RegularFile)),
+            Some((b"print('B')\n".as_slice(), PathNodeKind::RegularFile)),
+            None,
+            Some((b"".as_slice(), PathNodeKind::Directory)),
+            Some((b"print('A')\n".as_slice(), PathNodeKind::RegularFile)),
+        ];
+        let (mut values, mut held) = (Vec::new(), None);
+        for index in 0..5 {
+            let epoch = nonregistry_ignore_epoch(
+                root,
+                if change_repo {
+                    [
+                        repo_states[index],
+                        Some((b"ignored\n".as_slice(), PathNodeKind::RegularFile)),
+                    ]
+                } else {
+                    [
+                        Some((
+                            b"ignore_directories(['repo/**'])\n".as_slice(),
+                            PathNodeKind::RegularFile,
+                        )),
+                        ignore_states[index],
+                    ]
+                },
+                namespace,
+                source_root,
+                [70, 71, 72, 73, 70][index],
+            );
+            let mut tx = nonregistry_ignore_transaction(
+                &dice,
+                tracker.dupe(),
+                root,
+                epoch.dupe(),
+                Some(result.clone()),
+            )
+            .await;
+            tracker.clear();
+            let expected =
+                nonregistry_ignore_child_epoch(&mut tx, !(change_repo && index == 3)).await;
+            let value = tx.compute(&key).await.unwrap();
+            let observed = observed_nonregistry_ignore(&value);
+            assert_nonregistry_ignore_epoch(&expected, observed.observations());
+            held.get_or_insert_with(|| (observed.result().dupe(), observed.observations().dupe()));
+            tracker.clear();
+            values.push(value);
+        }
+        assert!(
+            super::HostNonregistryRepositoryIgnoreObservationKey::equality(&values[0], &values[4])
+                && !super::HostNonregistryRepositoryIgnoreObservationKey::equality(
+                    &values[0], &values[1]
+                )
+        );
+        let first = observed_nonregistry_ignore(&values[0]);
+        let restored = observed_nonregistry_ignore(&values[4]);
+        assert_eq!(first.result().as_ref(), restored.result().as_ref());
+        let (held_result, held_epoch) = held.unwrap();
+        assert!(Arc::ptr_eq(first.result(), &held_result));
+        assert_eq!(held_result.as_ref(), restored.result().as_ref());
+        assert_eq!(first.observations(), &held_epoch);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn nonregistry_ignore_terminal_prefixes_and_outer_are_exact() {
+        const LOCAL: &str =
+            "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n";
+        let key = super::HostNonregistryRepositoryIgnoreObservationKey(nonregistry_ignore_key());
+        let local =
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local);
+        let valid = nonregistry_ignore_epoch(
+            LOCAL,
+            [
+                Some((
+                    b"ignore_directories(['repo/**'])\n".as_slice(),
+                    PathNodeKind::RegularFile,
+                )),
+                Some((b"ignored\n".as_slice(), PathNodeKind::RegularFile)),
+            ],
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            80,
+        );
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(RoutedPolicyTracker::default());
+        let mut tx = nonregistry_ignore_transaction(
+            &dice,
+            tracker.dupe(),
+            LOCAL,
+            without_ignore_bytes(&valid),
+            Some(local.clone()),
+        )
+        .await;
+        tracker.clear();
+        let need = tx.compute(&key).await.unwrap();
+        assert!(
+            matches!(need, SourcePreparationOutcome::Need(_))
+                && !super::HostNonregistryRepositoryIgnoreObservationKey::validity(&need)
+                && !super::HostNonregistryRepositoryIgnoreObservationKey::equality(&need, &need)
+        );
+        assert_row(&tracker, &key, OBS_DEPS);
+        assert!(tracker.take().iter().all(|(name, batch)| {
+            !(name.starts_with("observed-repository-source-file:")
+                || name.starts_with("observed-host-nonregistry-repository-ignore:"))
+                || batch.is_none()
+        }));
+
+        let cases = [
+            (
+                [
+                    Some((b"fail('repo')\n".as_slice(), PathNodeKind::RegularFile)),
+                    Some((b"ignored\n".as_slice(), PathNodeKind::RegularFile)),
+                ],
+                false,
+            ),
+            (
+                [
+                    Some((
+                        b"ignore_directories(['repo/**'])\n".as_slice(),
+                        PathNodeKind::RegularFile,
+                    )),
+                    Some((b"".as_slice(), PathNodeKind::RegularFile)),
+                ],
+                true,
+            ),
+            (
+                [
+                    Some((
+                        b"ignore_directories(['repo/**'])\n".as_slice(),
+                        PathNodeKind::RegularFile,
+                    )),
+                    Some((b"/absolute\n".as_slice(), PathNodeKind::RegularFile)),
+                ],
+                true,
+            ),
+        ];
+        for (index, (files, include_source)) in cases.into_iter().enumerate() {
+            let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+            let tracker = Arc::new(RoutedPolicyTracker::default());
+            let epoch = nonregistry_ignore_epoch(
+                LOCAL,
+                files,
+                PathObservationNamespace::Host,
+                "/workspace/dep",
+                81 + index as i64,
+            );
+            let epoch = if index == 1 {
+                ignore_read_error(&epoch)
+            } else {
+                epoch
+            };
+            let mut tx = nonregistry_ignore_transaction(
+                &dice,
+                tracker.dupe(),
+                LOCAL,
+                epoch,
+                Some(local.clone()),
+            )
+            .await;
+            tracker.clear();
+            let expected = nonregistry_ignore_child_epoch(&mut tx, include_source).await;
+            tracker.clear();
+            let value = tx.compute(&key).await.unwrap();
+            let observed = observed_nonregistry_ignore(&value);
+            assert_nonregistry_ignore_epoch(&expected, observed.observations());
+            let error = observed.result().as_ref().as_ref().unwrap_err();
+            assert!(
+                [
+                    matches!(
+                        error,
+                        super::HostRepositoryIgnoreError::NonregistryRepoFile(_)
+                    ),
+                    matches!(
+                        error,
+                        super::HostRepositoryIgnoreError::RepositorySource(
+                            super::RepositorySourceFileError::Observation { .. }
+                        )
+                    ),
+                    matches!(
+                        error,
+                        super::HostRepositoryIgnoreError::InvalidAbsolute { .. }
+                    ),
+                ][index]
+            );
+            let exact = [
+                "error evaluating REPO.bazel file at \"/workspace/.slug-nonregistry/dep/REPO.bazel\": Traceback (most recent call last):\n  * /workspace/.slug-nonregistry/dep/REPO.bazel:1, in <module>\n      fail('repo')\nerror: fail: repo\n --> /workspace/.slug-nonregistry/dep/REPO.bazel:1:1\n  |\n1 | fail('repo')\n  | ^^^^^^^^^^^^\n  |\n",
+                "failed to read routed .bazelignore: Observation { repo_relative_path: \".bazelignore\", operation: FileBytes, error: Io { kind: PermissionDenied, raw_os_error: None } }",
+                "Invalid path in /workspace/.slug-nonregistry/dep/.bazelignore: '/absolute': cannot be an absolute path",
+            ][index];
+            assert_eq!(error.to_string(), exact);
+            let mut expected_deps = vec![
+                "observed-host-nonregistry-repo-file:dep@1".to_owned(),
+                "observed-repository-source-file:dep:.bazelignore".to_owned(),
+            ];
+            expected_deps.truncate(1 + usize::from(include_source));
+            assert_eq!(tracker.take_rows(), [(key.to_string(), expected_deps)]);
+            assert!(tracker.take().iter().all(|(name, batch)| {
+                !(name.starts_with("observed-repository-source-file:")
+                    || name.starts_with("observed-host-nonregistry-repository-ignore:"))
+                    || batch.is_none()
+            }));
+            let SourcePreparationOutcome::Complete(legacy) =
+                tx.compute(&nonregistry_ignore_key()).await.unwrap()
+            else {
+                panic!("legacy terminal must complete");
+            };
+            assert_eq!(legacy.as_ref(), observed.result().as_ref());
+        }
+
+        let mismatch = ObservedPathFrontierError::from(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand: PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    logical_path(),
+                    PathObservationOperation::Lstat,
+                ),
+                result_operation: PathObservationOperation::FileBytes,
+            },
+        );
+        let projected =
+            super::finish_observed_nonregistry_ignore_complete::<()>(Err(mismatch.dupe()))
+                .unwrap_err();
+        assert!(matches!(
+            projected,
+            SourcePreparationOutcome::Complete(Err(_))
+        ));
+        let outer = SourcePreparationOutcome::Complete(Err(mismatch));
+        assert!(
+            super::HostNonregistryRepositoryIgnoreObservationKey::validity(&outer)
+                && super::HostNonregistryRepositoryIgnoreObservationKey::equality(&outer, &outer)
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn nonregistry_ignore_stops_events_families_and_lifecycles_are_exact() {
+        const LOCAL: &str =
+            "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n";
+        let epoch = nonregistry_ignore_epoch(
+            LOCAL,
+            [
+                Some((b"print('REPO')\n".as_slice(), PathNodeKind::RegularFile)),
+                Some((b"ignored\n".as_slice(), PathNodeKind::RegularFile)),
+            ],
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            60,
+        );
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(RoutedPolicyTracker::default());
+        let mut need_tx =
+            nonregistry_ignore_transaction(&dice, tracker.dupe(), LOCAL, epoch.dupe(), None).await;
+        tracker.clear();
+        let key = super::HostNonregistryRepositoryIgnoreObservationKey(nonregistry_ignore_key());
+        assert_eq!(
+            key.to_string(),
+            "observed-host-nonregistry-repository-ignore:dep@1"
+        );
+        let mut identities = std::collections::HashSet::from([key.clone()]);
+        assert!(!identities.insert(key.clone()));
+        let mut cancelled = Box::pin(need_tx.compute(&key));
+        std::future::poll_fn(|cx| {
+            assert!(std::future::Future::poll(cancelled.as_mut(), cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(cancelled);
+        let need = need_tx.compute(&key).await.unwrap();
+        assert!(
+            !super::HostNonregistryRepositoryIgnoreObservationKey::validity(&need)
+                && !super::HostNonregistryRepositoryIgnoreObservationKey::equality(&need, &need)
+        );
+        assert_row(&tracker, &key, &OBS_DEPS[..1]);
+        assert!(tracker.take().iter().all(|(name, batch)| {
+            !name.starts_with("observed-host-nonregistry-repository-ignore:") || batch.is_none()
+        }));
+
+        let mut tx = nonregistry_ignore_transaction(
+            &dice,
+            tracker.dupe(),
+            LOCAL,
+            epoch.dupe(),
+            Some(RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Local,
+            )),
+        )
+        .await;
+        tracker.clear();
+        let expected = nonregistry_ignore_child_epoch(&mut tx, true).await;
+        let value = tx.compute(&key).await.unwrap();
+        let observed = observed_nonregistry_ignore(&value);
+        assert_nonregistry_ignore_epoch(&expected, observed.observations());
+        assert_row(&tracker, &key, OBS_DEPS);
+        let cold = tracker.take();
+        let observed_batches = cold
+            .iter()
+            .filter(|(name, _)| name.starts_with("observed-host-nonregistry-repo-file:"))
+            .filter_map(|(_, batch)| batch.as_ref())
+            .collect::<Vec<_>>();
+        assert!(matches!(
+            observed_batches.as_slice(),
+            [batch]
+                if matches!(batch.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "REPO")
+        ));
+        assert!(cold.iter().all(|(name, batch)| {
+            !(name.starts_with("observed-repository-source-file:")
+                || name.starts_with("observed-host-nonregistry-repository-ignore:"))
+                || batch.is_none()
+        }));
+        assert!(cold.iter().all(|(name, _)| {
+            [
+                "host-nonregistry-package-preflight:",
+                "host-nonregistry-module-closure:",
+                "module-source-preparation:",
+                "host-discovered-module:",
+                "host-selected-module-graph:",
+                "registry-file:",
+                "host-selected-extension-",
+            ]
+            .iter()
+            .all(|upper| !name.contains(upper))
+        }));
+        let warm = tx.compute(&key).await.unwrap();
+        assert!(Arc::ptr_eq(
+            observed_nonregistry_ignore(&warm).result(),
+            observed.result()
+        ));
+        assert!(tracker.take().iter().all(|(_, batch)| batch.is_none()));
+        assert!(tracker.take_rows().is_empty());
+        let legacy_key = nonregistry_ignore_key();
+        let SourcePreparationOutcome::Complete(legacy) = tx.compute(&legacy_key).await.unwrap()
+        else {
+            panic!("legacy ignore must complete");
+        };
+        assert_eq!(legacy.as_ref(), observed.result().as_ref());
+        assert_row(&tracker, &legacy_key, LEG_DEPS);
+        let legacy_events = tracker.take();
+        let legacy_batches = legacy_events
+            .iter()
+            .filter(|(name, _)| name.starts_with("host-nonregistry-repo-file:"))
+            .filter_map(|(_, batch)| batch.as_ref())
+            .collect::<Vec<_>>();
+        assert_eq!(legacy_batches, observed_batches);
+
+        let local =
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local);
+        for change_repo in [false, true] {
+            ignore_lifecycle(
+                LOCAL,
+                PathObservationNamespace::Host,
+                "/workspace/dep",
+                local.clone(),
+                change_repo,
+            )
+            .await;
+        }
+        let instance = slug_workspace_v2::PathObservationInstanceId::new(9);
+        let immutable =
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from("sha256-x"),
+                generation_root: "/immutable/9".into(),
+                observation_instance: instance,
+            });
+        for change_repo in [false, true] {
+            ignore_lifecycle(
+                "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n",
+                PathObservationNamespace::Materialization(instance),
+                "/immutable/9",
+                immutable.clone(),
+                change_repo,
+            )
+            .await;
+        }
     }
 }
