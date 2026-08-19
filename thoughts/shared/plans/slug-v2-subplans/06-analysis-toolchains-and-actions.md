@@ -7682,3 +7682,34 @@ semantic and 25,895 physical. Split the root-toolchain owner into Platform,
 implementation and orchestration helpers below 200 lines. Preserve every other
 owner/order/memory/identity/aquery/REAPI/proof boundary and schedule only a
 docs-only M7A next-owner audit after ACCEPT.
+
+### Immutable configured-action owner context accepted (2026-08-19)
+
+Implementation `cb5073e0` completes the corrected owner. Analysis now retains
+one configured-action slice and one shared compact context per group, with
+explicit `SelectedToolchain`, `SelectedPlatformOnly` and `UnresolvedDefault`
+states. Selected Platform analysis uses the matching key family before any
+selected implementation or rule evaluation. FileWrite identity, text aquery
+and REAPI consume the retained row without topology reconstruction. Intrinsic
+zero-toolchain actions remain ordered and exact; sole-candidate actions remain
+projectable; unresolved actions retain no fabricated platform or toolchain.
+
+Accounting against `51127df8` is +397 production, +538 test, +935 aggregate
+semantic and 24,807 physical lines across the exact eleven files. Full analysis
+passes 4+11+10+21+4 tests. Focused core/REAPI, workspace check, fmt, diff-check,
+cap accounting and independent ownership/retention/cleanup review pass; only
+the already recorded inherited core baselines remain.
+
+Run only `WP-6-7A-post-owner-context-bootstrap-closure-owner-audit`, docs-only.
+Trace the exact remaining Stage 10 bootstrap closure across repository sources,
+rules_rust/provider/toolchain semantics, action kinds/Args/paramfiles/tools/
+runfiles/input trees, normalized aquery and REAPI execution/cache/
+materialization. Rank natural owners and accepted evidence without assuming
+that one umbrella owner or implementation is next.
+
+Return exactly one bounded owner design, one uniquely smaller just-in-time
+Bazel 9.2 evidence prerequisite, or formal REPLAN. Write authority is only the
+canonical plan, current manifest, this Stage 6 plan and the routing log. Rust,
+tests, fixtures, oracle generation, Cargo/BUILD, public named groups, applied
+aspects, bootstrap-only paths, M7A closure, M8, M7B and M9 are stopped. Preserve
+M7A -> M8 -> M7B and require an independently accepted design before code.
