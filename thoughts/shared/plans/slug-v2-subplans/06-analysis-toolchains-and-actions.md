@@ -9001,3 +9001,30 @@ or milestone closure. After design ACCEPT schedule only
 `WP-6-7A-host-nonregistry-package-preflight-observation-implementation`; after
 implementation ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
+
+### Host nonregistry package-preflight observation design accepted (2026-08-19)
+
+Design `0c5a1366` accepts the private stage-aware observed owner from Rust base
+`754e7619`. Run only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation`.
+
+Exact authority is `source_preparation.rs` at <=320 production/15,650 physical
+and `source_preparation_observation_tests.rs` at <=720 proof/3,950 physical,
+<=1,040 semantic/19,600 physical aggregate; helpers remain below 200 lines.
+
+Preserve the exact effective -> invalid-name -> neutral deleted-policy -> ignore
+-> BUILD.bazel -> BUILD driver, matching families and left-first Complete epoch
+merges before semantics. The named stage-aware outer keeps effective/policy/
+ignore/marker compute failures and effective/ignore/marker child frontier
+failures carrierless. Semantic policy errors keep the effective prefix; Need
+exists only at effective/ignore/markers and no Need union is allowed.
+
+The parent remains eventless, ROOT/REPO children remain sole batch owners, and
+retained state is only the local semantic Result Arc plus cumulative epoch.
+Prove exact terminal positions/prefixes/Arcs, marker preference, family rows,
+events/warm/cancellation, local+immutable lifecycles and upper nonactivation.
+
+STOP a third file/caller/export, semantic/order/event/family drift, retained
+state growth, upper/registry activation, cap excess and milestone closure.
+After implementation ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-design`.

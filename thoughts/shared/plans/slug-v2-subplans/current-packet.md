@@ -1,23 +1,21 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-design`
+Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: `754e7619`
+Scheduling base and accepted design: `0c5a1366`
+Rust base: `754e7619`
 
 ## Objective and exact authority
 
-Freeze the uniquely smallest complete owner after accepted repository-ignore:
-a private observed sibling of `HostNonregistryPackagePreflightKey`. This
-docs-only packet changes exactly the canonical plan, this manifest, Stage 6 and
-the routing log at <=40/<=220/<=180/<=30 net lines and <=470 aggregate.
+Implement the independently accepted private package-preflight observation
+owner without activating its horizon consumer.
 
-Rust, Cargo, BUILD, fixtures, oracles, callers and public files are read-only.
-After independent design ACCEPT, future implementation authority is exactly
-`app/slug_bzlmod_v2/src/source_preparation.rs` (15,267-line baseline,
-<=320 production and <=15,650 physical) and
-`source_preparation_observation_tests.rs` (3,170-line baseline, <=720 proof
-and <=3,950 physical), <=1,040 semantic and <=19,600 physical aggregate.
+Write exactly `app/slug_bzlmod_v2/src/source_preparation.rs` from the 15,267-line
+`754e7619` baseline at <=320 production and <=15,650 physical, plus
+`source_preparation_observation_tests.rs` from 3,170 lines at <=720 proof and
+<=3,950 physical. Aggregate is <=1,040 semantic and <=19,600 physical.
+Every other Rust/Cargo/BUILD/fixture/oracle/caller/public file is read-only.
 Touched helpers remain below 200 lines.
 
 ## Frozen production contract
@@ -97,12 +95,10 @@ Slug-native: private sibling, Result-Arc+epoch carrier and typed outer.
 Unsupported/deferred: horizon/closure/discovery/selected graph, registry
 preparation/patches, extension repositories, M8/M7B and identity bytes.
 
-STOP Rust writes during design. STOP a caller/export/third file, legacy/order/
-event/family drift, semantic compute-error invention, direct Host read, extra
-retained state, upper/registry activation, cap excess or milestone closure.
-REPLAN if the exact owner cannot fit.
+STOP a caller/export/third file, legacy/order/event/family drift, semantic
+compute-error invention, direct Host read, extra retained state, upper/registry
+activation, cap excess or milestone closure. REPLAN if the exact owner cannot
+fit.
 
-After independent design ACCEPT schedule only
-`WP-6-7A-host-nonregistry-package-preflight-observation-implementation`; after
-independent implementation ACCEPT schedule only the docs-only
+After independent implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
