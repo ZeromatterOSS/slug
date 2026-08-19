@@ -8792,3 +8792,38 @@ ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-implementation`;
 after independent implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-package-preflight-observation-design`.
+### Host nonregistry repository-ignore observation design accepted (2026-08-19)
+
+Design `9c0a5473` accepts the private observed ignore owner from Rust base
+`b08b7f2e`. Run only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-implementation`.
+
+Exact Rust authority is only
+`app/slug_bzlmod_v2/src/repository_ignore.rs` from its 3,297-line baseline:
+<=180 production, <=400 proof, <=580 aggregate semantic and <=3,900 physical;
+touched helpers remain below 200 lines.
+
+Preserve the private one-Result-Arc+compact-epoch carrier and one shared
+Legacy/Observed driver. Exact order is REPO -> repository source -> parser.
+Accept each Complete epoch before semantic inspection, merge the accumulated
+earlier prefix left-first with each later source/parser epoch, preserve the
+earliest duplicate Arc, and return Need/typed outer carrierless without later
+activation. This sequential owner has no Need union.
+
+Legacy selects only legacy REPO/source families; observed selects only their
+accepted observed siblings. Both modes retain the same neutral Windows
+long-path parser dependency when reached. The ignore parent remains eventless,
+its matching REPO child remains sole local batch owner, and retained state is
+only the local matcher Result Arc plus cumulative epoch.
+
+Proof exact terminal prefixes, ordered shared Arcs, conflict/mismatch,
+family rows, child event ownership/warm/cancellation, local+immutable lifecycle
+and upper nonactivation. Exact ignore grammar/platform behavior, values/errors
+and legacy events remain unchanged; the sibling/carrier/typed outer is
+Slug-native. Preflight/closure/discovery/selected graph, registry preparation,
+extensions, M8/M7B and identity bytes remain deferred.
+
+STOP a second file/key/caller/export, parser/legacy/event drift, extra retained
+state, direct Host read, upper/registry activation, cap excess and milestone
+closure. After independent implementation ACCEPT schedule only
+`WP-6-7A-host-nonregistry-package-preflight-observation-design`.
