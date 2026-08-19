@@ -63,6 +63,7 @@ use slug_analysis_v2::prepare_configured_node_analysis_observed;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
 use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
 use slug_bzlmod_v2::HostRepositorySourceFileKey;
+use slug_bzlmod_v2::HostRepositorySourceFileObservationKey;
 use slug_bzlmod_v2::HostRepositorySourceFileValue;
 use slug_bzlmod_v2::LockfileMode;
 use slug_bzlmod_v2::RegistryRequestGeneration;
@@ -88,6 +89,8 @@ use slug_bzlmod_v2::RootModuleRegistryUrlsKey;
 use slug_bzlmod_v2::RootPackagePolicyInputs;
 use slug_bzlmod_v2::RootRepositoryRouteError;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
+use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
+use slug_bzlmod_v2::SourcePreparationOutcome as PreparationOutcome;
 use slug_bzlmod_v2::inject_registry_request_inputs;
 use slug_bzlmod_v2::inject_root_module_request_inputs;
 use slug_bzlmod_v2::inject_root_package_policy_inputs;
@@ -106,6 +109,7 @@ use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::ObservedRootPackageLoad;
 use slug_loading_v2::RepositoryPackageLoadError;
 use slug_loading_v2::RepositoryPackageLoadKey;
+use slug_loading_v2::RepositoryPackageLoadObservationKey;
 use slug_loading_v2::RootPackageLoadError;
 use slug_loading_v2::RootPackageLoadKey;
 use slug_loading_v2::RootPackageLoadObservationKey;
@@ -163,6 +167,8 @@ use super::events::AcceptedEventEpoch;
 use super::events::AttemptEffectTracker;
 use super::events::CommandEffectError;
 use super::events::CommandEffectOwner;
+use super::events::EventReconciliationPolicy;
+use super::events::ProvisionalEventEpoch;
 use super::events::SealedCommandAttempt;
 use super::events::SelectedCommandSidecars;
 use super::events::SelectedTerminalToken;
@@ -513,6 +519,9 @@ impl ExternalQueryActivationAudit {
             || key
                 .downcast_ref::<slug_loading_v2::keys::WorkspaceDirectoryKey>()
                 .is_some()
+            || key.downcast_ref::<RootRepositoryRouteKey>().is_some()
+            || key.downcast_ref::<RepositoryPackageLoadKey>().is_some()
+            || key.downcast_ref::<HostRepositorySourceFileKey>().is_some()
             || key.downcast_ref::<WorkspaceSnapshotKey>().is_some()
             || key.downcast_ref::<WorkspaceRawSnapshotKey>().is_some()
             || key.downcast_ref::<WorkspaceFileKey>().is_some()
@@ -878,6 +887,7 @@ struct NativeDemandTerminalSelection {
 #[allow(dead_code)]
 struct NativeDemandPreparedAcceptance {
     events: super::events::SelectedEventBatches,
+    provisional_events: ProvisionalEventEpoch,
     snapshot: AcceptedNativeDemandSnapshot,
     validation: Vec<super::repository_io::RepositoryValidation>,
     selected_updater: Option<DiceTransactionUpdater>,
@@ -990,7 +1000,10 @@ const MAX_NATIVE_REVISION_RETRIES: usize = 8;
 #[allow(dead_code)]
 enum CommandAttemptResult<T> {
     Retry(slug_bzlmod_v2::SourcePreparationNeeds),
-    RevisionRetry(Option<Box<PathObservationEpoch>>),
+    RevisionRetry {
+        epoch: Option<Box<PathObservationEpoch>>,
+        events: ProvisionalEventEpoch,
+    },
     Terminal(T, NativeDemandPreparedAcceptance, usize),
 }
 
@@ -1023,6 +1036,10 @@ trait NativeCommandRoot: Clone {
 
     fn observed_selection_association(&self) -> ObservedSelectionAssociation {
         ObservedSelectionAssociation::StrictPathOnly
+    }
+
+    fn event_reconciliation_policy(&self, _terminal: &Self::Terminal) -> EventReconciliationPolicy {
+        EventReconciliationPolicy::Strict
     }
 
     fn allows_empty_terminal(&self) -> bool {
@@ -1457,8 +1474,35 @@ impl NativeCommandRoot for BuildCommandRootKey {
 impl NativeCommandRoot for BuildCommandRootObservationKey {
     type Terminal = ObservedBuildCommandRoot;
 
+    fn initializes_request_revision(&self) -> bool {
+        self.0.singleton_external_single().is_some()
+    }
+
+    fn source_certificate<'a>(
+        &self,
+        terminal: &'a Self::Terminal,
+    ) -> Option<&'a SourceCertificate> {
+        terminal.source_certificate()
+    }
+
     fn observations<'a>(&self, terminal: &'a Self::Terminal) -> Option<&'a PathObservationEpoch> {
         Some(terminal.observations())
+    }
+
+    fn observed_selection_association(&self) -> ObservedSelectionAssociation {
+        if self.0.singleton_external_single().is_some() {
+            ObservedSelectionAssociation::ClosureRepositories
+        } else {
+            ObservedSelectionAssociation::StrictPathOnly
+        }
+    }
+
+    fn event_reconciliation_policy(&self, terminal: &Self::Terminal) -> EventReconciliationPolicy {
+        if self.0.singleton_external_single().is_some() && terminal.source_certificate().is_some() {
+            EventReconciliationPolicy::SourceCertifiedCurrentClosure
+        } else {
+            EventReconciliationPolicy::Strict
+        }
     }
 
     async fn compute(
@@ -2272,6 +2316,13 @@ impl ObservedBuildCommandRoot {
     fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
+
+    fn source_certificate(&self) -> Option<&SourceCertificate> {
+        match self.result.as_ref() {
+            Ok(evaluation) => evaluation.source_certificate(),
+            Err(error) => error.source_certificate(),
+        }
+    }
 }
 
 impl SingletonRootSingleBuildCommandTerminal {
@@ -2778,8 +2829,8 @@ enum BuildCommandErrorKind {
     Package(RootPackageLoadError),
     RepositoryRoute(RootRepositoryRouteError),
     RepositoryPackage(RepositoryPackageLoadError),
-    RepositorySource(RepositorySourceFileError),
-    SourceMissing(CanonicalLabel),
+    RepositorySource(RepositorySourceFileError, Option<Box<SourceCertificate>>),
+    SourceMissing(CanonicalLabel, Option<Box<SourceCertificate>>),
     RootSource {
         observation: PathObservationResult,
         source_certificate: Option<Box<SourceCertificate>>,
@@ -2814,21 +2865,45 @@ type BuildActionFrontierOutcome =
     slug_bzlmod_v2::SourcePreparationOutcome<Result<Vec<Arc<ConfiguredNodeResult>>, AnalysisError>>;
 
 enum BuildBranchResult {
-    Outcome(
-        slug_bzlmod_v2::SourcePreparationOutcome<Result<BuildRequestedTarget, BuildCommandError>>,
-    ),
+    Outcome(PreparationOutcome<Result<BuildRequestedTarget, BuildCommandError>>),
     Infrastructure(Arc<str>),
     ObservedOuter(ObservedPathFrontierError),
 }
 
+type ExternalBuildBranchOutcome = ObservedBuildOutcome<(
+    Result<BuildRequestedTarget, BuildCommandError>,
+    PathObservationEpoch,
+)>;
+type ExternalBuildBranchResult = Result<ExternalBuildBranchOutcome, Arc<str>>;
+
+fn external_build_complete(
+    result: Result<BuildRequestedTarget, BuildCommandError>,
+    observations: PathObservationEpoch,
+) -> ExternalBuildBranchResult {
+    Ok(PreparationOutcome::Complete(Ok((result, observations))))
+}
+
+fn external_build_compute_error(
+    mode: BuildAnalysisMode,
+    error: impl fmt::Display,
+    observations: PathObservationEpoch,
+) -> ExternalBuildBranchResult {
+    match mode {
+        BuildAnalysisMode::Legacy => Err(Arc::from(error.to_string())),
+        BuildAnalysisMode::Observed => {
+            external_build_complete(Err(BuildCommandError::infrastructure(error)), observations)
+        }
+    }
+}
+
 fn build_branch_need(need: slug_bzlmod_v2::SourcePreparationNeeds) -> BuildBranchResult {
-    BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Need(need))
+    BuildBranchResult::Outcome(PreparationOutcome::Need(need))
 }
 
 fn build_branch_complete(
     result: Result<BuildRequestedTarget, BuildCommandError>,
 ) -> BuildBranchResult {
-    BuildBranchResult::Outcome(slug_bzlmod_v2::SourcePreparationOutcome::Complete(result))
+    BuildBranchResult::Outcome(PreparationOutcome::Complete(result))
 }
 
 #[derive(Clone, Copy)]
@@ -2909,12 +2984,23 @@ impl BuildCommandRootKey {
             _ => None,
         }
     }
+
+    fn singleton_external_single(&self) -> Option<slug_identity_v2::ApparentLabel> {
+        let [pattern] = self.targets.as_ref() else {
+            return None;
+        };
+        match TargetPattern::parse(pattern).ok()? {
+            TargetPattern::Single(label) if !label.repo().is_root() => Some(label),
+            _ => None,
+        }
+    }
 }
 
 #[allow(dead_code)]
 impl BuildCommandRootObservationKey {
     fn new(key: BuildCommandRootKey) -> Option<Self> {
-        key.singleton_root_package_all().map(|_| Self(key))
+        (key.singleton_root_package_all().is_some() || key.singleton_external_single().is_some())
+            .then_some(Self(key))
     }
 }
 
@@ -3402,7 +3488,11 @@ impl BuildCommandError {
         match &self.kind {
             BuildCommandErrorKind::RootSource {
                 source_certificate, ..
-            } => source_certificate.as_deref(),
+            }
+            | BuildCommandErrorKind::RepositorySource(_, source_certificate)
+            | BuildCommandErrorKind::SourceMissing(_, source_certificate) => {
+                source_certificate.as_deref()
+            }
             _ => None,
         }
     }
@@ -3430,8 +3520,8 @@ impl fmt::Display for BuildCommandError {
             BuildCommandErrorKind::Package(error) => error.fmt(f),
             BuildCommandErrorKind::RepositoryRoute(error) => error.fmt(f),
             BuildCommandErrorKind::RepositoryPackage(error) => error.fmt(f),
-            BuildCommandErrorKind::RepositorySource(error) => write!(f, "{error:?}"),
-            BuildCommandErrorKind::SourceMissing(label) => {
+            BuildCommandErrorKind::RepositorySource(error, _) => write!(f, "{error:?}"),
+            BuildCommandErrorKind::SourceMissing(label, _) => {
                 write!(f, "{label}: missing input file '{label}'")
             }
             BuildCommandErrorKind::RootSource { observation, .. } => {
@@ -3588,28 +3678,48 @@ type SingletonBuildInputsOutcome = ObservedBuildOutcome<(
     PathObservationEpoch,
 )>;
 
+type BuildAnchorInputOutcome = Result<
+    ObservedBuildOutcome<(
+        Result<RootModuleLoadingAnchor, RootModuleLoadingAnchorError>,
+        PathObservationEpoch,
+    )>,
+    Arc<str>,
+>;
+
+async fn compute_build_anchor_input(
+    ctx: &mut DiceComputations<'_>,
+    workspace: NormalizedAbsolutePath,
+    mode: BuildAnalysisMode,
+) -> BuildAnchorInputOutcome {
+    match mode {
+        BuildAnalysisMode::Legacy => ctx
+            .compute(&RootModuleLoadingAnchorKey::new(workspace))
+            .await
+            .map(|outcome| {
+                outcome.map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty())))
+            }),
+        BuildAnalysisMode::Observed => ctx
+            .compute(&RootModuleLoadingAnchorObservationKey::new(workspace))
+            .await
+            .map(|outcome| {
+                outcome.map(|value| {
+                    value
+                        .map(|observed| (observed.result().clone(), observed.observations().dupe()))
+                })
+            }),
+    }
+    .map_err(|error| Arc::from(error.to_string()))
+}
+
 async fn compute_singleton_build_inputs(
     key: &BuildCommandRootKey,
     ctx: &mut DiceComputations<'_>,
     mode: BuildAnalysisMode,
     package: PackagePath,
 ) -> SingletonBuildInputsOutcome {
-    let anchor = match mode {
-        BuildAnalysisMode::Legacy => ctx
-            .compute(&RootModuleLoadingAnchorKey::new(key.workspace.dupe()))
-            .await
-            .expect("build root-module anchor DICE invariant")
-            .map(|value| Ok((value.as_ref().clone(), PathObservationEpoch::empty()))),
-        BuildAnalysisMode::Observed => ctx
-            .compute(&RootModuleLoadingAnchorObservationKey::new(
-                key.workspace.dupe(),
-            ))
-            .await
-            .expect("observed build root-module anchor DICE invariant")
-            .map(|value| {
-                value.map(|observed| (observed.result().clone(), observed.observations().dupe()))
-            }),
-    };
+    let anchor = compute_build_anchor_input(ctx, key.workspace.dupe(), mode)
+        .await
+        .expect("build root-module anchor DICE invariant");
     let (anchor, mut observations) = match anchor {
         slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
             return slug_bzlmod_v2::SourcePreparationOutcome::Need(need);
@@ -3944,13 +4054,26 @@ async fn compute_build_branch(
         .expect("BuildCommandRootKey stores validated canonical target patterns");
     if let TargetPattern::Single(label) = &parsed {
         if !label.repo().is_root() {
-            return compute_external_exported_source_build_branch(
+            return match drive_external_exported_source_build_branch(
                 ctx,
                 key.workspace.dupe(),
                 pattern,
                 label,
+                BuildAnalysisMode::Legacy,
+                PathObservationEpoch::empty(),
             )
-            .await;
+            .await
+            {
+                Err(error) => BuildBranchResult::Infrastructure(error),
+                Ok(PreparationOutcome::Need(need)) => build_branch_need(need),
+                Ok(PreparationOutcome::Complete(Err(error))) => {
+                    BuildBranchResult::ObservedOuter(error)
+                }
+                Ok(PreparationOutcome::Complete(Ok((result, observations)))) => {
+                    debug_assert_eq!(observations, PathObservationEpoch::empty());
+                    build_branch_complete(result)
+                }
+            };
         }
     }
     let package = match &parsed {
@@ -4177,69 +4300,133 @@ async fn compute_loaded_build_branch(
     }))
 }
 
-async fn compute_external_exported_source_build_branch(
+macro_rules! compute_external_build_child {
+    ($ctx:expr, $mode:expr, $prefix:expr, $legacy:expr, $legacy_project:expr,
+        $observed:expr, $observed_project:expr) => {{
+        let outcome = match $mode {
+            BuildAnalysisMode::Legacy => match $ctx.compute(&$legacy).await {
+                Ok(outcome) => outcome
+                    .map(|value| Ok((($legacy_project)(value), PathObservationEpoch::empty()))),
+                Err(error) => return external_build_compute_error($mode, error, $prefix.dupe()),
+            },
+            BuildAnalysisMode::Observed => match $ctx.compute(&$observed).await {
+                Ok(outcome) => outcome.map(|value| value.map($observed_project)),
+                Err(error) => return external_build_compute_error($mode, error, $prefix.dupe()),
+            },
+        };
+        let (result, incoming) = match outcome {
+            PreparationOutcome::Need(need) => {
+                return Ok(PreparationOutcome::Need(need));
+            }
+            PreparationOutcome::Complete(Err(error)) => {
+                return Ok(PreparationOutcome::Complete(Err(error)));
+            }
+            PreparationOutcome::Complete(Ok(value)) => value,
+        };
+        let merged = match union_build_observations($prefix, &incoming) {
+            Ok(merged) => merged,
+            Err(error) => {
+                return Ok(PreparationOutcome::Complete(Err(error)));
+            }
+        };
+        (result, merged, incoming)
+    }};
+}
+
+async fn drive_external_exported_source_build_branch(
     ctx: &mut DiceComputations<'_>,
     workspace: NormalizedAbsolutePath,
     pattern: Arc<str>,
     label: &slug_identity_v2::ApparentLabel,
-) -> BuildBranchResult {
-    let route = match RootRepositoryRouteKey::new(workspace, label.repo().clone())
-        .expect("external single target has a nonroot repository route")
-    {
-        key => match ctx.compute(&key).await {
-            Err(error) => return BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
-            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
-                return build_branch_need(need);
-            }
-            Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(route) => route.clone(),
-                Err(error) => {
-                    return build_branch_complete(Err(BuildCommandError::new(
-                        BuildCommandErrorKind::RepositoryRoute(error.clone()),
-                    )));
-                }
-            },
-        },
-    };
-    let package = match ctx
-        .compute(&RepositoryPackageLoadKey::new(
-            route.clone(),
-            label.package().clone(),
-        ))
-        .await
-    {
-        Err(error) => return BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
-        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => {
-            return build_branch_need(need);
+    mode: BuildAnalysisMode,
+    observations: PathObservationEpoch,
+) -> ExternalBuildBranchResult {
+    let route_key = RootRepositoryRouteKey::new(workspace.dupe(), label.repo().clone())
+        .expect("external single target has a nonroot repository route");
+    let observed_route_key =
+        RootRepositoryRouteObservationKey::new(workspace.dupe(), label.repo().clone())
+            .expect("external single target has a nonroot repository route");
+    let (route, observations, _) = compute_external_build_child!(
+        ctx,
+        mode,
+        &observations,
+        route_key,
+        |result: Arc<Result<slug_bzlmod_v2::RootRepositoryRoute, RootRepositoryRouteError>>| result
+            .as_ref()
+            .clone(),
+        observed_route_key,
+        |observed: slug_bzlmod_v2::ObservedRootRepositoryRoute| (
+            observed.result().as_ref().clone(),
+            observed.observations().dupe()
+        )
+    );
+    let route = match route {
+        Ok(route) => route,
+        Err(error) => {
+            return external_build_complete(
+                Err(BuildCommandError::new(
+                    BuildCommandErrorKind::RepositoryRoute(error),
+                )),
+                observations,
+            );
         }
-        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-            Ok(package) => package.clone(),
-            Err(error) => {
-                return build_branch_complete(Err(BuildCommandError::new(
-                    BuildCommandErrorKind::RepositoryPackage(error.clone()),
-                )));
-            }
-        },
+    };
+    let (package, observations, _) = compute_external_build_child!(
+        ctx,
+        mode,
+        &observations,
+        RepositoryPackageLoadKey::new(route.clone(), label.package().clone()),
+        |result: Arc<Result<LoadedPackage, RepositoryPackageLoadError>>| result.as_ref().clone(),
+        RepositoryPackageLoadObservationKey::new(route.clone(), label.package().clone()),
+        |observed: slug_loading_v2::ObservedRepositoryPackageLoad| (
+            observed.result().as_ref().clone(),
+            observed.observations().dupe()
+        )
+    );
+    let package = match package {
+        Ok(package) => package,
+        Err(error) => {
+            return external_build_complete(
+                Err(BuildCommandError::new(
+                    BuildCommandErrorKind::RepositoryPackage(error),
+                )),
+                observations,
+            );
+        }
     };
     let Some(target) = package
         .targets
         .iter()
         .find(|candidate| candidate.name == label.target().as_str())
     else {
-        return build_branch_complete(Err(BuildCommandError::target_not_found(
-            pattern,
-            label.package().clone(),
-            label.target().clone(),
-            package.build_file.clone(),
-        )));
+        return external_build_complete(
+            Err(BuildCommandError::target_not_found(
+                pattern,
+                label.package().clone(),
+                label.target().clone(),
+                package.build_file.clone(),
+            )),
+            observations,
+        );
     };
     if !matches!(
         target.kind,
         slug_loading_v2::PackageTargetKind::ExportedFile
     ) {
-        return build_branch_complete(Err(BuildCommandError::new(
-            BuildCommandErrorKind::ExternalTargetKind,
-        )));
+        return external_build_complete(
+            Err(BuildCommandError::new(
+                BuildCommandErrorKind::ExternalTargetKind,
+            )),
+            observations,
+        );
+    }
+    if matches!(mode, BuildAnalysisMode::Observed) {
+        if let Err(error) = ctx
+            .compute(&RequestRevisionKey::new(workspace.dupe()))
+            .await
+        {
+            return external_build_compute_error(mode, error, observations);
+        }
     }
     let source_label = CanonicalLabel::parse(&format!(
         "{}//{}:{}",
@@ -4249,31 +4436,55 @@ async fn compute_external_exported_source_build_branch(
     ))
     .expect("validated routed external label has a canonical projection");
     let source = PathBuf::from(label.package().as_str()).join(label.target().as_str());
-    match ctx
-        .compute(&HostRepositorySourceFileKey::new(route, source))
-        .await
-    {
-        Err(error) => BuildBranchResult::Infrastructure(Arc::from(error.to_string())),
-        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Need(need)) => build_branch_need(need),
-        Ok(slug_bzlmod_v2::SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-            Ok(HostRepositorySourceFileValue::Present { .. })
-            | Err(RepositorySourceFileError::WrongKind {
-                actual: PathNodeKind::Directory,
-                ..
-            }) => build_branch_complete(Ok(BuildRequestedTarget {
+    let (source_result, observations, source_observations) = compute_external_build_child!(
+        ctx,
+        mode,
+        &observations,
+        HostRepositorySourceFileKey::new(route.clone(), source.clone()),
+        |result: Result<HostRepositorySourceFileValue, RepositorySourceFileError>| result,
+        HostRepositorySourceFileObservationKey::new(route, source),
+        |observed: slug_bzlmod_v2::ObservedHostRepositorySourceFile| (
+            observed.result().as_ref().clone(),
+            observed.observations().dupe()
+        )
+    );
+    let source_certificate = match mode {
+        BuildAnalysisMode::Legacy => None,
+        BuildAnalysisMode::Observed => Some(
+            SourceCertificate::from_epoch(source_observations)
+                .expect("observed repository source has a nonempty epoch"),
+        ),
+    };
+    match source_result {
+        Ok(HostRepositorySourceFileValue::Present { .. })
+        | Err(RepositorySourceFileError::WrongKind {
+            actual: PathNodeKind::Directory,
+            ..
+        }) => external_build_complete(
+            Ok(BuildRequestedTarget {
                 pattern,
                 package,
                 analysis: None,
                 completion: BuildTargetCompletion::ObservedExportedSource,
-                source_certificate: None,
-            })),
-            Ok(HostRepositorySourceFileValue::Absent) => build_branch_complete(Err(
-                BuildCommandError::new(BuildCommandErrorKind::SourceMissing(source_label)),
+                source_certificate,
+            }),
+            observations,
+        ),
+        Ok(HostRepositorySourceFileValue::Absent) => external_build_complete(
+            Err(BuildCommandError::new(
+                BuildCommandErrorKind::SourceMissing(
+                    source_label,
+                    source_certificate.map(Box::new),
+                ),
             )),
-            Err(error) => build_branch_complete(Err(BuildCommandError::new(
-                BuildCommandErrorKind::RepositorySource(error.clone()),
-            ))),
-        },
+            observations,
+        ),
+        Err(error) => external_build_complete(
+            Err(BuildCommandError::new(
+                BuildCommandErrorKind::RepositorySource(error, source_certificate.map(Box::new)),
+            )),
+            observations,
+        ),
     }
 }
 
@@ -4292,13 +4503,13 @@ fn singleton_root_single_complete(
         None => None,
         Some(certificate) => {
             match PathObservationEpoch::from_shared(
-                input_observations
+                certificate
+                    .observations()
                     .observations()
                     .iter()
                     .map(|(demand, result)| (demand.dupe(), result.dupe()))
                     .chain(
-                        certificate
-                            .observations()
+                        input_observations
                             .observations()
                             .iter()
                             .map(|(demand, result)| (demand.dupe(), result.dupe())),
@@ -4529,6 +4740,75 @@ impl Key for BuildCommandRootKey {
     }
 }
 
+async fn compute_external_single_observed(
+    key: &BuildCommandRootKey,
+    label: &slug_identity_v2::ApparentLabel,
+    ctx: &mut DiceComputations<'_>,
+) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
+    let anchor_outcome =
+        match compute_build_anchor_input(ctx, key.workspace.dupe(), BuildAnalysisMode::Observed)
+            .await
+        {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                return observed_build_root_complete(
+                    Err(BuildCommandError::infrastructure(error)),
+                    PathObservationEpoch::empty(),
+                );
+            }
+        };
+    let (anchor, observations) = match anchor_outcome {
+        slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Need(need);
+        }
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
+            return slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error));
+        }
+        slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(value)) => value,
+    };
+    let anchor = match anchor {
+        Ok(anchor) => anchor,
+        Err(error) => {
+            return observed_build_root_complete(
+                Err(BuildCommandError::new(BuildCommandErrorKind::RootAnchor(
+                    error,
+                ))),
+                observations,
+            );
+        }
+    };
+    drive_external_exported_source_build_branch(
+        ctx,
+        key.workspace.dupe(),
+        key.targets[0].dupe(),
+        label,
+        BuildAnalysisMode::Observed,
+        observations,
+    )
+    .await
+    .expect("observed external build child DICE failures are semantic")
+    .map(|value| {
+        value.map(|(result, observations)| ObservedBuildCommandRoot {
+            result: Arc::new(result.map(|target| BuildCommandEvaluation {
+                anchor,
+                targets: Arc::from([target]),
+                action_closure: Arc::from([]),
+            })),
+            observations,
+        })
+    })
+}
+
+fn observed_build_root_complete(
+    result: Result<BuildCommandEvaluation, BuildCommandError>,
+    observations: PathObservationEpoch,
+) -> ObservedBuildOutcome<ObservedBuildCommandRoot> {
+    slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(ObservedBuildCommandRoot {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
 #[async_trait]
 impl Key for BuildCommandRootObservationKey {
     type Value = slug_bzlmod_v2::SourcePreparationOutcome<
@@ -4540,20 +4820,17 @@ impl Key for BuildCommandRootObservationKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        match compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed).await {
-            slug_bzlmod_v2::SourcePreparationOutcome::Need(need) => {
-                slug_bzlmod_v2::SourcePreparationOutcome::Need(need)
-            }
-            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error)) => {
-                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Err(error))
-            }
-            slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok((result, observations))) => {
-                slug_bzlmod_v2::SourcePreparationOutcome::Complete(Ok(ObservedBuildCommandRoot {
+        if let Some(label) = self.0.singleton_external_single() {
+            return compute_external_single_observed(&self.0, &label, ctx).await;
+        }
+        compute_singleton_package_all(&self.0, ctx, BuildAnalysisMode::Observed)
+            .await
+            .map(|value| {
+                value.map(|(result, observations)| ObservedBuildCommandRoot {
                     result,
                     observations,
-                }))
-            }
-        }
+                })
+            })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -4901,6 +5178,7 @@ impl WorkspaceRuntime {
         let allows_empty_terminal = root.allows_empty_terminal();
         let mut attempts = 0usize;
         let mut revision_retries = 0usize;
+        let mut revision_events = None;
         loop {
             attempts += 1;
             if let Err(error) = guard.begin_attempt() {
@@ -4933,6 +5211,11 @@ impl WorkspaceRuntime {
                         let terminal = terminal.clone();
                         let source_certificate =
                             attempt_root.source_certificate(&terminal).cloned();
+                        let event_reconciliation_policy =
+                            attempt_root.event_reconciliation_policy(&terminal);
+                        if let Some(observations) = attempt_root.observations(&terminal) {
+                            guard.associate_terminal_observations(observations)?;
+                        }
                         let sealed = if attempt_root.allows_unavailable_terminal_roots(&terminal) {
                             guard.seal_terminal_allowing_unavailable_roots()?
                         } else if allows_empty_terminal {
@@ -4942,7 +5225,14 @@ impl WorkspaceRuntime {
                         };
                         let terminal_root_count = sealed.root_count();
                         let selected = sealed.select(&transaction).await?;
-                        let mut prepared = match guard.prepare_accept(selected, &transaction).await
+                        let mut prepared = match guard
+                            .prepare_accept_with_revision_events(
+                                selected,
+                                &transaction,
+                                revision_events.as_ref(),
+                                event_reconciliation_policy,
+                            )
+                            .await
                         {
                             Ok(prepared) => prepared,
                             Err(error) => {
@@ -5019,7 +5309,10 @@ impl WorkspaceRuntime {
                                 .terminal_token
                                 .reset_to_idle()
                                 .map_err(NativeDemandSessionError::Effect)?;
-                            Ok(CommandAttemptResult::RevisionRetry(epoch))
+                            Ok(CommandAttemptResult::RevisionRetry {
+                                epoch,
+                                events: prepared.provisional_events.dupe(),
+                            })
                         } else {
                             Ok(CommandAttemptResult::Terminal(
                                 terminal,
@@ -5045,7 +5338,7 @@ impl WorkspaceRuntime {
                         return guard.abort(error);
                     }
                 }
-                CommandAttemptResult::RevisionRetry(epoch) => {
+                CommandAttemptResult::RevisionRetry { epoch, events } => {
                     if let Some(epoch) = epoch {
                         guard
                             .command
@@ -5053,6 +5346,7 @@ impl WorkspaceRuntime {
                             .expect("revision retry retains its native command")
                             .path_observations = *epoch;
                     }
+                    revision_events = Some(events);
                     revision_retries += 1;
                     if revision_retries >= MAX_NATIVE_REVISION_RETRIES {
                         return guard.abort(NativeDemandSessionError::RevisionInternalNonProgress);
@@ -6068,6 +6362,15 @@ impl NativeDemandCommand<'_> {
         Ok(NativeDemandProgress::Paths)
     }
 
+    fn associate_terminal_observations(
+        &mut self,
+        terminal: &PathObservationEpoch,
+    ) -> Result<(), NativeDemandSessionError> {
+        self.path_observations =
+            associate_terminal_observation_epoch(terminal, &self.path_observations)?;
+        Ok(())
+    }
+
     fn discard_in_place(&mut self) -> Result<(), NativeDemandSessionError> {
         #[cfg(test)]
         if self
@@ -6190,6 +6493,20 @@ impl NativeDemandCommand<'_> {
             validation,
         ))
     }
+}
+
+fn associate_terminal_observation_epoch(
+    terminal: &PathObservationEpoch,
+    command: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, NativeDemandSessionError> {
+    PathObservationEpoch::from_shared(
+        terminal
+            .observations()
+            .iter()
+            .chain(command.observations().iter())
+            .map(|(demand, result)| (demand.clone(), result.dupe())),
+    )
+    .map_err(NativeDemandSessionError::PathEpoch)
 }
 
 fn validate_observed_terminal(
@@ -6358,6 +6675,16 @@ impl<'a> NativeDemandAbortGuard<'a> {
             .progress(needs)
     }
 
+    fn associate_terminal_observations(
+        &mut self,
+        observations: &PathObservationEpoch,
+    ) -> Result<(), NativeDemandSessionError> {
+        self.command
+            .as_mut()
+            .expect("native-demand command is armed")
+            .associate_terminal_observations(observations)
+    }
+
     fn suppress_attempt(&mut self) -> Result<(), NativeDemandSessionError> {
         let Some(attempt) = self.attempt.as_ref() else {
             return Ok(());
@@ -6457,17 +6784,38 @@ impl<'a> NativeDemandAbortGuard<'a> {
         selected: NativeDemandTerminalSelection,
         terminal_authority: &dice::DiceTransaction,
     ) -> Result<NativeDemandPreparedAcceptance, NativeDemandSessionError> {
+        self.prepare_accept_with_revision_events(
+            selected,
+            terminal_authority,
+            None,
+            EventReconciliationPolicy::Strict,
+        )
+        .await
+    }
+
+    async fn prepare_accept_with_revision_events(
+        &self,
+        selected: NativeDemandTerminalSelection,
+        terminal_authority: &dice::DiceTransaction,
+        revision_events: Option<&ProvisionalEventEpoch>,
+        event_reconciliation_policy: EventReconciliationPolicy,
+    ) -> Result<NativeDemandPreparedAcceptance, NativeDemandSessionError> {
         if !Arc::ptr_eq(&self.command().effects, &selected.effects) {
             return Err(NativeDemandSessionError::ForeignEffects);
         }
         let (events, demands, terminal_token) = selected.sidecars.into_parts();
         let (mut snapshot, validation) = self.command().selected_snapshot(demands)?;
-        let (events, accepted_events) = events.reconcile(&self.command().prior.events);
+        let (events, accepted_events, provisional_events) = events.reconcile_revision(
+            &self.command().prior.events,
+            revision_events,
+            event_reconciliation_policy,
+        );
         snapshot.events = accepted_events;
         let selected_updater =
             prepare_selected_native_demand_snapshot(self.command(), terminal_authority, &snapshot)?;
         Ok(NativeDemandPreparedAcceptance {
             events,
+            provisional_events,
             snapshot,
             validation,
             selected_updater: Some(selected_updater),
@@ -6482,6 +6830,7 @@ impl<'a> NativeDemandAbortGuard<'a> {
     ) -> Result<AcceptedCommand<T>, NativeDemandSessionError> {
         let NativeDemandPreparedAcceptance {
             events,
+            provisional_events: _,
             snapshot,
             validation,
             selected_updater,

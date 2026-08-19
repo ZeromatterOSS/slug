@@ -111,18 +111,30 @@ enum SelectedEventTransition {
     Known(Option<EventBatch>),
 }
 
-/// Ordered command-local event state selected from one exact terminal closure.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum EventReconciliationPolicy {
+    Strict,
+    SourceCertifiedCurrentClosure,
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct SelectedEventState {
+    roots: Arc<[DiceNodeId]>,
     nodes: Arc<[(DiceNodeId, SelectedEventTransition)]>,
     #[cfg(test)]
     batches: Arc<[EventBatch]>,
 }
 
-/// Compact event state from the last successfully accepted command.
 #[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
 pub(super) struct AcceptedEventEpoch {
-    entries: Arc<[(DiceNodeId, EventBatch)]>,
+    roots: Arc<[DiceNodeId]>,
+    pub(super) entries: Arc<[(DiceNodeId, EventBatch)]>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
+pub(super) struct ProvisionalEventEpoch {
+    roots: Arc<[DiceNodeId]>,
+    entries: Arc<[(DiceNodeId, Option<EventBatch>)]>,
 }
 
 /// Ordered event batches selected for publication by the current command.
@@ -199,6 +211,7 @@ impl SelectedCommandSidecars {
     pub(super) fn for_test(demands: SelectedWorkspaceDemands) -> Self {
         Self {
             events: SelectedEventState {
+                roots: Arc::from([]),
                 nodes: Arc::from([]),
                 batches: Arc::from([]),
             },
@@ -253,6 +266,7 @@ impl Drop for SelectedTerminalToken {
 impl AcceptedEventEpoch {
     pub(super) fn empty() -> Self {
         Self {
+            roots: Arc::from([]),
             entries: Arc::from([]),
         }
     }
@@ -268,34 +282,115 @@ impl SelectedEventState {
         self,
         prior: &AcceptedEventEpoch,
     ) -> (SelectedEventBatches, AcceptedEventEpoch) {
+        let (batches, accepted, _) =
+            self.reconcile_revision(prior, None, EventReconciliationPolicy::Strict);
+        (batches, accepted)
+    }
+
+    pub(super) fn reconcile_revision(
+        self,
+        prior: &AcceptedEventEpoch,
+        carried: Option<&ProvisionalEventEpoch>,
+        policy: EventReconciliationPolicy,
+    ) -> (
+        SelectedEventBatches,
+        AcceptedEventEpoch,
+        ProvisionalEventEpoch,
+    ) {
+        let carried = carried.filter(|carried| carried.roots == self.roots);
+        let source_association = policy == EventReconciliationPolicy::SourceCertifiedCurrentClosure
+            && !self.roots.is_empty()
+            && self.roots == prior.roots;
+        use SelectedEventTransition::Known;
+        use SelectedEventTransition::NoTransition;
         let mut prior_by_node = SmallMap::new();
         for (node, batch) in prior.entries.iter() {
             prior_by_node.insert(*node, batch.dupe());
         }
-        let mut batches = Vec::new();
-        let mut entries = Vec::new();
-        for (node, transition) in self.nodes.iter() {
-            match transition {
-                SelectedEventTransition::Known(Some(batch)) => {
-                    if prior_by_node.get(node) != Some(batch) && !batch.events().is_empty() {
-                        batches.push(batch.dupe());
-                    }
-                    entries.push((*node, batch.dupe()));
+        let mut carried_by_node = SmallMap::new();
+        let mut order = Vec::new();
+        let mut ordered = SmallMap::new();
+        if let Some(carried) = carried {
+            for (node, batch) in carried.entries.iter() {
+                carried_by_node.insert(*node, batch.as_ref().map(Dupe::dupe));
+                if !source_association {
+                    ordered.insert(*node, ());
+                    order.push(*node);
                 }
-                SelectedEventTransition::Known(None) => {}
-                SelectedEventTransition::NoTransition => {
-                    if let Some(batch) = prior_by_node.get(node) {
-                        entries.push((*node, batch.dupe()));
+            }
+        }
+        let mut final_by_node = SmallMap::new();
+        for (node, transition) in self.nodes.iter() {
+            final_by_node.insert(*node, transition.clone());
+            if ordered.insert(*node, ()).is_none() {
+                order.push(*node);
+            }
+        }
+        if source_association {
+            let domain = carried.map(|carried| &carried.entries[..]);
+            if let Some(domain) = domain {
+                for (node, _) in domain {
+                    if ordered.insert(*node, ()).is_none() {
+                        order.push(*node);
+                    }
+                }
+            } else {
+                for (node, _) in prior.entries.iter() {
+                    if ordered.insert(*node, ()).is_none() {
+                        order.push(*node);
                     }
                 }
             }
+        }
+        let mut batches = Vec::new();
+        let mut accepted = Vec::new();
+        let mut provisional = Vec::new();
+        for node in order {
+            let fallback = || match carried {
+                Some(_) => carried_by_node.get(&node).cloned(),
+                None => prior_by_node.get(&node).map(|batch| Some(batch.dupe())),
+            };
+            let effective = if source_association {
+                match final_by_node.get(&node) {
+                    Some(Known(Some(batch))) => Some(Some(batch.dupe())),
+                    Some(Known(None) | NoTransition) => fallback(),
+                    None => Some(None),
+                }
+            } else {
+                match final_by_node.get(&node) {
+                    Some(Known(Some(batch))) => Some(Some(batch.dupe())),
+                    Some(Known(None)) => (carried_by_node.contains_key(&node)
+                        || prior_by_node.contains_key(&node))
+                    .then_some(None),
+                    Some(NoTransition) => carried_by_node
+                        .get(&node)
+                        .cloned()
+                        .or_else(|| prior_by_node.get(&node).map(|batch| Some(batch.dupe()))),
+                    None => carried_by_node.get(&node).cloned(),
+                }
+            };
+            let Some(effective) = effective else {
+                continue;
+            };
+            if let Some(batch) = &effective {
+                if prior_by_node.get(&node) != Some(batch) && !batch.events().is_empty() {
+                    batches.push(batch.dupe());
+                }
+                accepted.push((node, batch.dupe()));
+            }
+            provisional.push((node, effective));
         }
         (
             SelectedEventBatches {
                 batches: batches.into(),
             },
             AcceptedEventEpoch {
-                entries: entries.into(),
+                roots: self.roots.dupe(),
+                entries: accepted.into(),
+            },
+            ProvisionalEventEpoch {
+                roots: self.roots,
+                entries: provisional.into(),
             },
         )
     }
@@ -810,6 +905,7 @@ impl CommandEffectOwner {
             nodes.push((node.node(), transition));
         }
         Ok(SelectedEventState {
+            roots: closure.roots().into(),
             nodes: nodes.into(),
             #[cfg(test)]
             batches: batches.into(),
@@ -951,8 +1047,11 @@ mod tests {
     use super::CommandEffectOwner;
     use super::CommandEffectPhase;
     use super::CommandOutputBuffer;
+    use super::EventReconciliationPolicy;
     use super::SealedCommandAttempt;
     use super::SelectedEventBatches;
+    use super::SelectedEventState;
+    use super::SelectedEventTransition;
     use super::SelectedTerminalToken;
     use super::TerminalOutput;
     use crate::runtime::demands::WorkspaceDemandOwner;
@@ -1390,6 +1489,14 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
         dice: &Arc<Dice>,
         mode: Option<u8>,
     ) -> Result<super::SelectedEventState, CommandEffectError> {
+        select_graph_state(dice, EventGraphKey::Parent, mode).await
+    }
+
+    async fn select_graph_state(
+        dice: &Arc<Dice>,
+        root: EventGraphKey,
+        mode: Option<u8>,
+    ) -> Result<super::SelectedEventState, CommandEffectError> {
         let owner = CommandEffectOwner::new();
         let attempt = owner.begin_attempt()?;
         let mut updater = dice.updater_with_data(user_data(dice, &attempt)?);
@@ -1400,9 +1507,9 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
         }
         let mut transaction = updater.commit().await;
         transaction
-            .compute(&EventGraphKey::Parent)
+            .compute(&root)
             .await
-            .expect("event graph computation succeeds");
+            .expect("event graph compute");
         let sealed = attempt.seal_terminal()?;
         Ok(sealed.select(&transaction).await?.events().clone())
     }
@@ -1468,6 +1575,132 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
             .await?
             .reconcile(&empty_epoch);
         assert_eq!(selected_text(&changed), ["changed-leaf", "changed-parent"]);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn source_certified_policy_carries_known_none_only_for_matching_roots()
+    -> anyhow::Result<()> {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let (_, accepted) = select_parent_state(&dice, Some(0))
+            .await?
+            .reconcile(&AcceptedEventEpoch::empty());
+
+        let removed_state = select_parent_state(&dice, Some(3)).await?;
+        let (strict, strict_epoch, _) = removed_state.clone().reconcile_revision(
+            &accepted,
+            None,
+            EventReconciliationPolicy::Strict,
+        );
+        assert!(strict.batches().is_empty());
+        assert_eq!(strict_epoch.entries.len(), 1);
+
+        let (carried, carried_epoch, _) = removed_state.clone().reconcile_revision(
+            &accepted,
+            None,
+            EventReconciliationPolicy::SourceCertifiedCurrentClosure,
+        );
+        assert!(carried.batches().is_empty());
+        assert_eq!(carried_epoch, accepted);
+
+        let mut mismatched = removed_state;
+        mismatched.roots = Arc::from([]);
+        let (_, mismatched_epoch, _) = mismatched.reconcile_revision(
+            &accepted,
+            None,
+            EventReconciliationPolicy::SourceCertifiedCurrentClosure,
+        );
+        assert_eq!(mismatched_epoch.entries.len(), 1);
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn source_certified_retries_fold_mixed_nodes_in_current_closure_order()
+    -> anyhow::Result<()> {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let base = select_parent_state(&dice, Some(0)).await?;
+        let (_, mut prior) = base.clone().reconcile(&AcceptedEventEpoch::empty());
+        let left = select_graph_state(&dice, EventGraphKey::Left, None).await?;
+        let right = select_graph_state(&dice, EventGraphKey::Right, None).await?;
+        let mut extras = left
+            .nodes
+            .iter()
+            .chain(right.nodes.iter())
+            .map(|(node, _)| *node)
+            .filter(|node| prior.entries.iter().all(|(known, _)| known != node))
+            .collect::<Vec<_>>();
+        extras.sort();
+        extras.dedup();
+        let [removed, empty, new, ..] = extras.as_slice() else {
+            panic!("synthetic graph did not provide three distinct nodes");
+        };
+        prior.entries = prior
+            .entries
+            .iter()
+            .cloned()
+            .chain([(*removed, batch("removed"))])
+            .collect();
+        let leaf = prior.entries[0].0;
+        let parent = prior.entries[1].0;
+        let retry = SelectedEventState {
+            roots: prior.roots.clone(),
+            nodes: Arc::from([
+                (leaf, SelectedEventTransition::Known(None)),
+                (parent, SelectedEventTransition::NoTransition),
+            ]),
+            batches: Arc::from([]),
+        };
+        let (_, _, carried) = retry.reconcile_revision(
+            &prior,
+            None,
+            EventReconciliationPolicy::SourceCertifiedCurrentClosure,
+        );
+        let retry_again = SelectedEventState {
+            roots: prior.roots.clone(),
+            nodes: Arc::from([
+                (leaf, SelectedEventTransition::NoTransition),
+                (parent, SelectedEventTransition::NoTransition),
+                (*removed, SelectedEventTransition::NoTransition),
+            ]),
+            batches: Arc::from([]),
+        };
+        let (_, _, carried) = retry_again.reconcile_revision(
+            &prior,
+            Some(&carried),
+            EventReconciliationPolicy::SourceCertifiedCurrentClosure,
+        );
+        let final_state = SelectedEventState {
+            roots: prior.roots.clone(),
+            nodes: Arc::from([
+                (leaf, SelectedEventTransition::NoTransition),
+                (
+                    parent,
+                    SelectedEventTransition::Known(Some(batch("changed"))),
+                ),
+                (*removed, SelectedEventTransition::NoTransition),
+                (
+                    *empty,
+                    SelectedEventTransition::Known(Some(EventBatch::empty())),
+                ),
+                (*new, SelectedEventTransition::Known(Some(batch("new")))),
+            ]),
+            batches: Arc::from([]),
+        };
+        let (output, accepted, _) = final_state.reconcile_revision(
+            &prior,
+            Some(&carried),
+            EventReconciliationPolicy::SourceCertifiedCurrentClosure,
+        );
+        assert_eq!(selected_text(&output), ["changed", "new"]);
+        assert_eq!(
+            accepted
+                .entries
+                .iter()
+                .map(|(node, _)| *node)
+                .collect::<Vec<_>>(),
+            [leaf, parent, *empty, *new]
+        );
+        assert!(accepted.entries[2].1.events().is_empty());
         Ok(())
     }
 

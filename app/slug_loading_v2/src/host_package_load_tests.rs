@@ -1442,7 +1442,7 @@ fn repository_package_observation_reducer_preserves_outer_union_and_legacy_arc()
     );
     let core = include_str!("../../slug_core_v2/src/runtime/dice.rs");
     assert!(query.contains("RepositoryPackageLoadObservationKey"));
-    assert!(!core.contains("RepositoryPackageLoadObservationKey"));
+    assert!(core.contains("RepositoryPackageLoadObservationKey"));
 }
 #[tokio::test]
 async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {
