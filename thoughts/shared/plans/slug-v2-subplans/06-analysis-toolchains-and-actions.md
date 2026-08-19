@@ -7877,3 +7877,22 @@ another file/owner/caller, Debug error projection, direct Host reads, selected
 graph/extension/package/analysis activation, cap excess and milestone closure.
 After independent design ACCEPT, resume exactly one implementation retry; after
 implementation ACCEPT, design only the selected-module-graph frontier.
+
+### Root MODULE-files cap/proof correction accepted (2026-08-19)
+
+Correction `47746115` accepts the measured two-file envelope without changing
+the owner. Run only
+`WP-6-7A-root-module-files-observation-completion-implementation-retry` from
+Rust/design base `335cfa45`. Authority remains exactly `host_module.rs` and
+`module_eval.rs`; caps are +80 production/+120 tests/4,740 physical and +340
+production/+300 tests/6,100 physical, <=840 aggregate semantic and <=10,840
+combined physical.
+
+Preserve the matching Legacy/Observed driver, extension-usage transfer,
+mode-first lockfile selection, root-then-lockfile exact-Arc epoch algebra,
+child-only events and one Result Arc+epoch retention. Replace Debug-derived
+root/lockfile semantic strings with explicit exact legacy-equivalent
+projections and stable Slug-native Host-only path/source-kind messages; prove
+both with real terminal comparisons. No third file/caller/owner, direct Host
+read, selected-graph/extension/package/analysis activation or milestone close.
+After ACCEPT, design only the selected-module-graph observation frontier.
