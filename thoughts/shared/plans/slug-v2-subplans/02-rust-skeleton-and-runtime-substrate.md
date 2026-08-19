@@ -5866,3 +5866,41 @@ validation, strict-root relaxation, retained scratch, behavior drift, cap
 excess or broader activation. REPLAN on an incomplete source certificate,
 terminal-retained repository sidecar or unbounded owner. After ACCEPT return
 only to one docs-only remaining M1 owner audit.
+
+### External singleton loading-proof authority REPLAN (2026-08-18)
+
+The retained two-file implementation passes its focused public proof and
+independent ownership review within +259 DICE production, +352 build proof and
++611 aggregate semantic lines at 11,174/3,302/14,476 physical. Full core is
+240/241 only on the recorded stale external-query visibility wording.
+
+Full loading is 137/138 on a current-packet proof regression:
+`host_package_load_tests.rs` still asserts that core does not name
+`RepositoryPackageLoadObservationKey`, while accepted design `1a217e2a`
+requires the observed external branch to consume exactly that carrier. The
+test file is outside the implementation authority. Hiding the type or
+restoring legacy package loading would make the accepted matching-family proof
+dishonest, so formally REPLAN before any third-file edit.
+
+Run only
+`WP-2A-m1-external-singleton-observed-build-loading-proof-authority-correction-design`
+from scheduling base `ea0d1d41`. Docs authority is exactly canonical/current/
+Stage 2/routing under 40/180/120/30 and 370 aggregate net. Retain but do not
+write the dirty two-file Rust candidate. Freeze one future line-neutral test
+change: replace the core-negative `RepositoryPackageLoadObservationKey` static
+assertion with the corresponding positive assertion, leaving the adjacent
+query assertion and every other loading proof byte unchanged.
+
+After independent design ACCEPT, resume exactly
+`WP-2A-m1-external-singleton-observed-build-implementation-retry`. Its Rust
+authority is the original DICE and build-proof files plus only that assertion
+in `host_package_load_tests.rs`. Preserve 260/360 production/test caps and add
+zero loading net; physical caps are 11,220/3,350/3,439 and 18,009 combined,
+with <=620 aggregate semantic unchanged. Preserve the complete owner/order/
+prefix/certificate/repository/event/family/memory/compatibility contract.
+
+STOP every other Rust or loading byte, Cargo/BUILD/fixture/oracle writes,
+production redesign, new state/owner/event, behavior drift, cap excess and M1
+closure. Require focused build, full loading 138/138, the documented core
+baseline, formatting/diff, cleanup/retention and independent review. After
+retry ACCEPT return only to one docs-only remaining M1 owner audit.
