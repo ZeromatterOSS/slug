@@ -8399,3 +8399,31 @@ ACCEPT schedule only
 `WP-6-7A-repository-source-file-observation-implementation-retry`; after its
 independent ACCEPT return only to
 `WP-6-7A-selected-module-graph-observation-frontier-design`.
+
+### Repository-source-file proof-cap correction accepted (2026-08-19)
+
+Correction `edc533ff` accepts the proof-only REPLAN for the retained source
+candidate from Rust base `ae8aa35e` and semantic design `9040e168`. Production
+authority remains exactly `source_preparation.rs` at <=300 production, <=30
+colocated proof and <=15,320 physical. Proof authority remains exactly
+`source_preparation_observation_tests.rs`, raised to <=700 tests and <=3,250
+physical. Aggregate caps are <=1,030 semantic and <=18,570 physical.
+
+The retry preserves the accepted key/carrier, matching-family driver,
+materialization -> resolution -> FileBytes order, materialization-first exact
+Arc algebra, carrierless Need/outer, eventlessness and compact retention. Only
+line-neutral production-called terminal projectors may be extracted; no
+production semantics, owner, family, event, state or caller may change.
+
+The corrected proof must cover exact epoch iteration order, every terminal
+prefix, duplicate/conflict/operation mismatch, neutral FileBytes dependency
+rows, phase-separated cold child events and warm silence, identical-request
+same-DICE cancellation recovery, and local+immutable
+A -> B -> absent -> directory -> A with held/restored Result, bytes and epoch
+Arcs. Keep every upper/registry/public family dormant.
+
+Run only `WP-6-7A-repository-source-file-observation-implementation-retry` in
+the exact two Rust files and corrected caps. STOP a third file, caller/export,
+upper/registry activation, semantic/event/memory/family drift, proof deletion,
+cap excess or milestone closure. After independent ACCEPT schedule only the
+docs-only selected-module-graph observation frontier design.
