@@ -5618,3 +5618,77 @@ freeze future Rust files/caps, complete terminal/epoch/certificate/event/memory
 proof, compatibility and STOP conditions before scheduling one implementation.
 STOP Rust, Cargo, BUILD, fixtures/oracles, public activation, adjacent breadth,
 cap excess and M1 closure.
+
+### Post-loading-query audit selects an epoch certificate prerequisite (2026-08-18)
+
+The audit from `82b87ddb` accepts the existing
+`BuildCommandRootObservationKey` as the eventual external singleton owner,
+but finds its current source-certificate boundary incomplete. Public build
+already selects that structural sibling first, and exactly one nonroot
+`TargetPattern::Single` is syntactically isolated. Accepted observed anchor,
+route, repository-package and Host-source carriers close all lower DICE edges.
+Multi-build is later because certificate/result publication and joined
+branch/analysis ordering are aggregate; one-shot adapters still create a fresh
+runtime and reject external package paths.
+
+The accepted Host source carrier owns a complete path epoch, not one universal
+FileBytes edge. Missing and wrong-kind states stop before FileBytes, symlink
+retargeting changes resolution before real-path bytes, and immutable sources
+use a Materialization namespace. Current `RequestRevisionOwner::observe_exact`
+has no materialization roots. A one-demand certificate therefore cannot certify
+the future external terminal without weakening final reobservation.
+
+The uniquely smaller prerequisite is
+`WP-2A-m1-source-certificate-epoch-acceptance-design`. It changes no lower
+producer or public behavior. The subsequent external owner will pass the
+already complete Host-source epoch into this generic acceptance boundary.
+
+### Source-certificate epoch acceptance design active (2026-08-18)
+
+Run only `WP-2A-m1-source-certificate-epoch-acceptance-design` from scheduling
+base `82b87ddb` and Rust base `2e1c1334`. This design writes only canonical,
+current, Stage 2 and routing under 40/220/180/30 net and 470 aggregate.
+
+Freeze `SourceCertificate` as a nonempty compact `PathObservationEpoch` with
+exact shared Result Arcs, `Dupe` and `Allocative`. Retain the current
+one-demand constructor and add a checked epoch constructor. Require the
+certificate to be an exact Arc-identical subset of the complete terminal and
+selected epoch. Reuse the existing V2/Buck2-derived SortedMap-backed epoch; add
+no map, interner, cache or Stage 9 extraction row.
+
+After selected snapshot preparation and observed-terminal validation,
+`finalize_native` must reobserve the complete certificate through one
+synchronous active-`RepositoryMaterializer::observe_native` callback. It
+supplies Host and Materialization roots and performs no DICE compute/await.
+Request-revision ownership spans reobservation plus revision publication;
+prove the workspace lease -> revision owner -> short materializer observation
+order has no reverse edge and no mutex spans DICE.
+
+Equal observations commit the prepared updater without replacing any Arc.
+Changed observations replace only changed certificate demands in the full
+epoch, preserve equal certificate and unrelated Arcs, publish the next revision
+and retry. Missing demand/association, observation, namespace, injection and
+publication failures are fail-closed. Need, outer, cancel and every restorable
+failure preserve the prior accepted path/repository/event snapshot and emit no
+provisional batch.
+
+Future implementation authority is exactly
+`runtime/request_revision.rs` (+120 production/+180 tests, <=1,750 physical),
+`runtime/dice.rs` (+80/+40, <=11,050), and
+`runtime/tests/build_command_tests.rs` (+300 tests, <=3,000), with <=720
+semantic and <=15,800 physical aggregate. Existing large owners stay cohesive;
+touched helpers remain under 200 lines.
+
+Require one-demand parity, multi-demand Host/Materialization refresh, exact Arc
+preservation/replacement, empty/conflict/mismatch rejection, missing/directory
+and symlink-retarget A/B/A, fault/cancel rollback, no retry events, legacy/
+public parity, zero external observed-root activation, accounting/formatting,
+focused revision/build plus server dependent validation, archive/retention/
+cleanup and independent review.
+
+Exact current values/errors/events remain exact; the private epoch certificate
+and retry are Slug-native. External build activation, multi-build, one-shot and
+identity bytes remain deferred. STOP every other file/key/caller/lower carrier,
+new state/lock/Host read, partial comparison, cap excess and M1 closure. After
+design ACCEPT schedule exactly one implementation, then return to an external
+singleton observed-build design.

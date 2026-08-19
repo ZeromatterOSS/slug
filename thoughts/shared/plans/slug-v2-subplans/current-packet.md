@@ -1,104 +1,151 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-post-loading-query-publication-owner-audit`
+Packet: `WP-2A-m1-source-certificate-epoch-acceptance-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling and accepted Rust base: `2e1c1334`
-Result: identify the uniquely smallest complete remaining M1 publication owner
-before any further Rust or public cutover.
+Scheduling base: `82b87ddb`
+Accepted Rust base: `2e1c1334`
+Result: freeze the epoch-shaped final source-certificate prerequisite before
+external exported-source build publication.
 
 ## Exact docs-only authority and caps
 
-Write exactly:
+Write exactly canonical, this manifest, Stage 2 and the orchestration routing
+log. Caps against `82b87ddb`: canonical <=40 net, this manifest <=220, Stage
+2 <=180, routing <=30 and aggregate <=470. Rust, Cargo, BUILD, fixtures,
+oracles, generated evidence and caller/public activation are forbidden.
 
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
-2. this manifest,
-3. `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`, and
-4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
+## Learned facts and decision
 
-Caps against `2e1c1334`: canonical <=40 net, this manifest <=180, Stage 2
-<=160, routing <=30 and aggregate <=430. Rust, Cargo, BUILD, fixtures, oracles,
-generated evidence and public/caller activation are forbidden.
+The completed post-query audit selects a uniquely smaller prerequisite. The
+eventual upper owner is the existing structurally distinct
+`BuildCommandRootObservationKey`: public build already tries it first, and
+syntax can admit exactly one nonroot `TargetPattern::Single` without widening
+multi-build. Its external branch can later sequence accepted observed anchor,
+route, repository-package and Host-source carriers.
 
-## Accepted predecessor and learned facts
+The current one-demand `SourceCertificate` is incomplete for that owner.
+`HostRepositorySourceFileObservationKey` retains a complete resolution plus
+source epoch. Absent and non-file terminals stop before FileBytes, symlink
+retargeting requires the logical resolution prefix as well as real-path bytes,
+and Materialization-namespace demands cannot be refreshed by
+`RequestRevisionOwner::observe_exact`, which supplies no materialization
+roots. Extracting one FileBytes entry is therefore neither total nor
+race-complete. Do not alter or duplicate the accepted lower carriers.
 
-Accepted `2e1c1334` gives the sole public/native loading-query command a
-structurally distinct observed root, observed graph/subtree mechanisms, exact
-path Result-Arc association, query-only closure-selected repository sidecars
-and compact accepted event reconciliation. It retains one query Result Arc plus
-one path epoch; child keys remain event owners. Query validation is 121/121,
-loading is 204/204, bzlmod is 426 unit plus its accepted 193 integration set,
-and the only broader core failures are the recorded stale visibility assertion
-and the inherited PathObservationEpoch injection baseline.
+Bazel 9.2 `BuildTool.buildTargets/processRequest` remains the exact public
+build boundary; `TargetDefinitionContext.createInputFile` and `InputFile`
+remain the accepted exported-source classification evidence. This packet
+changes only Slug-native acceptance/retry association. Retained Buck2-derived
+DICE transaction/cancellation behavior is grounded in
+`dice/dice/src/transaction.rs` and
+`dice/dice/src/impls/tests/general.rs`; no donor code is imported.
 
-The remaining surfaces do not share that terminal owner:
+## Frozen certificate and finalization contract
 
-- `compute_external_exported_source_build_branch` in core owns repository
-  route -> repository package load -> target-kind check -> selected Host source.
-  It still selects legacy lower keys and publishes `source_certificate: None`.
-- `BuildCommandRootKey` and its singleton/observed variants own multi-target
-  build aggregation, target ordering, analysis/loading mixes, revision and
-  source-certificate publication.
-- `evaluate_workspace_targets{,_with_bzlmod_inputs}` creates a one-shot
-  runtime and injects observations before projecting workspace build results;
-  it is not the accepted `RootQueryCommandObservationKey` publication path.
-- Direct query APIs and accepted loading-query behavior remain exact and must
-  not be pulled into a new combined owner merely because they share lower DICE
-  producers.
+Replace the private certificate payload with a nonempty compact
+`PathObservationEpoch`. Keep a one-demand constructor for the existing root
+source path and add a checked epoch constructor/accessor. The epoch retains the
+exact shared Result Arcs from the semantic producer, derives `Allocative` and
+`Dupe`, rejects empty/duplicate/conflicting or operation-mismatched input, and
+adds no second map or interner. A terminal certificate must be an exact
+demand/value/`Arc::ptr_eq` subset of the full terminal/selected path epoch.
 
-Bazel 9.2 remains the compatibility oracle. This audit may read pinned Bazel
-source/tests and accepted Slug evidence, but creates no new oracle or fixture.
+After terminal selection, selected-snapshot preparation and complete observed
+terminal validation, `finalize_native` must reobserve every certificate
+demand through one synchronous callback backed by the active
+`RepositoryMaterializer::observe_native` session. That existing owner supplies
+both Host and retained Materialization namespace roots. The callback performs no
+DICE compute and no await.
 
-## Audit obligations
+Hold the request-revision publication owner continuously across exact
+reobservation and revision publication. The command owns the workspace lease
+before opening the materializer session; finalization may synchronously enter
+the materializer while holding the revision owner, but no path may hold the
+materializer mutex while acquiring the revision owner. Freeze and prove this
+lock order and keep every mutex guard outside DICE computation.
 
-Trace only enough live code to rank the first complete natural owner across the
-external exported-source build, multi-build aggregation and one-shot adapters.
-For each candidate record:
+If every demand/value is equal, preserve the original certificate/full-epoch
+Result Arcs and commit the already prepared selected updater. If any value
+changed, drop that updater, replace only changed certificate demands in the
+full epoch with newly observed Arcs, preserve every equal certificate and
+unrelated Arc, publish the next request revision and retry. Missing certificate
+demands, value/Arc association mismatch, observation failure, namespace/root
+failure, injection or publication failure are typed fail-closed session errors;
+they never publish a terminal.
 
-1. its structural key/request identity and exact terminal Result Arc;
-2. every mutable path/repository/package/source/certificate or revision edge,
-   including whether an accepted observed sibling already carries a complete
-   epoch;
-3. Need, typed outer, semantic error, cancellation and retry ordering;
-4. child versus command event ownership and public acceptance boundaries;
-5. retained DICE/command state versus compute-local scratch, with no inferred
-   cache, interner, store, lock, task or Host read;
-6. family isolation, legacy/direct callers and the precise public constructor;
-7. lifecycle and exact-Arc proof needed for create/edit/delete/recreate and
-   A/B/A; and
-8. measured future Rust allowlist, production/test/aggregate growth and
-   physical caps before any implementation scheduling.
+Need, typed outer, cancellation, selection/validation/materializer failure and
+restorable abort preserve the prior accepted path/repository/event snapshot.
+Revision retry emits no provisional events. Accepted event reconciliation and
+repository selection remain unchanged and occur at their existing atomic
+boundary.
 
-Prefer a producer-owned fact and the first aggregation point that already owns
-all changed semantics. Do not combine query and build roots, duplicate a
-certificate or selected-snapshot sidecar in a terminal, or create a callerless
-partial carrier merely to avoid a smaller prerequisite.
+## Memory, request and compatibility
 
-## Compatibility and terminal
+The semantic build Result may retain one certificate epoch in addition to the
+existing complete selected epoch; both share immutable Result Arcs. Reobserved
+epoch, changed-demand scan and replacement entries are command scratch. Add no
+retained map, Vec, cache, store, interner, task or lock and no direct Host read
+outside the existing materializer callback. Overlapping commands remain
+serialized by the native workspace lease; no historical filesystem snapshot is
+invented.
 
-Exact: accepted public query values/errors/order/events/materialization,
-repository acceptance, all legacy/direct APIs and accepted build behavior.
+Exact: current root-source success/error bytes, diagnostics, revision retries,
+public build/query/cquery results, event order and every legacy/direct API.
 
-Slug-native: private observed siblings, typed outer values, path/event epoch
-association and exact shared-Arc validation.
+Slug-native: epoch-shaped certificate, exact Arc association, materialization-
+aware final reobservation and private retry mechanics.
 
-Unsupported/deferred until this audit selects an owner: external exported-source
-publication/certificate, multi-build publication, one-shot cutover, broader
-query/build breadth and exact Bazel identity bytes.
+Unsupported/deferred: admission of external observed build, multi-build
+certificate aggregation, one-shot cutover, broader build/query surfaces and
+exact Bazel identity bytes.
 
-End with exactly one independently reviewable result:
+No fixture or new oracle is needed: accepted source/build lifecycle evidence is
+reused. No fallback or Stage 9 ledger row is created because the implementation
+reuses the existing V2 `PathObservationEpoch`, `Dupe` and `Allocative`
+representation without importing donor code.
 
-1. schedule one docs-only design for the uniquely smallest complete owner;
-2. schedule one uniquely smaller prerequisite design and explain why the upper
-   owner is incomplete without it; or
-3. record formal `REPLAN` when no bounded exact/Slug-native owner exists.
+## Future implementation authority and proof
 
-Any future design must freeze the natural key/value owner, exact Rust allowlist
-and caps, result/epoch/certificate/revision algebra, event and family authority,
-memory/cancellation/lifecycle proof, compatibility classes and explicit STOP/
-REPLAN conditions. It may schedule at most one bounded implementation only
-after independent design acceptance.
+After independent design ACCEPT, schedule exactly one implementation over:
 
-STOP on implementation, a preselected owner without complete evidence, weakened
-exact path/result/event association, another retained side store, adjacent
-breadth, cap excess or M1 closure.
+1. `app/slug_core_v2/src/runtime/request_revision.rs`: <=120 production and
+   <=180 colocated test net, <=1,750 physical;
+2. `app/slug_core_v2/src/runtime/dice.rs`: <=80 production and <=40 colocated
+   test net, <=11,050 physical; and
+3. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=300 test net,
+   <=3,000 physical.
+
+Aggregate semantic cap <=720 and combined physical <=15,800 against
+`2e1c1334`. The large core owner/test files remain cohesive exceptions; every
+new or materially touched helper must stay below 200 lines. Do not write
+`repository_io.rs`, events, bzlmod/loading, exports, callers or public files.
+
+Prove:
+
+- existing singleton root one-demand semantic/result/event parity and exact
+  certificate/full-epoch Arc identity;
+- nonempty construction plus empty/duplicate/conflict/operation-mismatch
+  rejection;
+- multi-demand equality and one/multiple changed demands, preserving exact
+  equal and unrelated Arcs;
+- Host and Materialization namespace refresh through the active repository
+  session;
+- missing/directory and symlink-retarget A/B/A certificate epochs, including
+  equal FileBytes behind a changed resolution prefix;
+- observation, injection and publication failure plus poll-drop cancellation
+  leave prior accepted path/repository/event state and recover;
+- retry publishes no provisional batch and accepted changed source batches
+  retain existing order/suppression;
+- legacy/public output parity and zero external observed-root activation; and
+- exact accounting, formatting, focused revision/build tests, direct server
+  dependent, archive status, Buck2 retention scan, AI cleanup and independent
+  final review.
+
+STOP on any fourth Rust file, lower-carrier/public/caller change, new key/store/
+lock/task, direct Host observation, partial certificate comparison, changed
+legacy output/event semantics, cap excess or external-build activation. REPLAN
+if the materializer callback cannot refresh every namespace while preserving
+the lock/atomicity contract. After implementation ACCEPT, return directly to
+one docs-only external singleton observed-build design; do not activate
+multi-build, one-shot or close M1.
