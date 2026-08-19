@@ -1,138 +1,135 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-external-singleton-observed-build-implementation-retry`
+Packet: `WP-2A-m1-external-singleton-revision-event-carry-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `ce110d9a`
+Scheduling base: `de38d1b8`
 Accepted Rust base: `a4dd40d6`
-Accepted semantic design: `1a217e2a`
-Accepted proof-authority correction: `ce110d9a`
-Result: publish exactly one nonroot exported-source build through the existing
-observed build root and correct its stale loading static proof.
+Accepted external-build design: `1a217e2a`
+Accepted loading-proof correction: `ce110d9a`
+Result: preserve exact child-event suppression across a source-certificate
+revision retry, then resume the retained external singleton implementation.
 
-## Exact Rust authority and caps
+## Exact docs authority and retained candidate
 
-Write exactly:
+Write exactly canonical/current/Stage 2/routing under <=40/220/180/30 and
+<=470 aggregate docs net against `de38d1b8`. Retain but do not write the dirty
+candidate in:
 
-1. `app/slug_core_v2/src/runtime/dice.rs`: <=260 production net and <=11,220
-   physical;
-2. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=360 test net
-   and <=3,350 physical; and
-3. `app/slug_loading_v2/src/host_package_load_tests.rs`: zero net and <=3,439
-   physical, with only the exact assertion replacement frozen below.
+- `app/slug_core_v2/src/runtime/dice.rs`;
+- `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`; and
+- `app/slug_loading_v2/src/host_package_load_tests.rs`.
 
-Aggregate semantic <=620 and combined physical <=18,009 against `a4dd40d6`.
-No relocation or other loading byte. Cargo manifests, BUILD, fixtures, oracles,
-generated evidence, exports, other callers and planning docs are forbidden.
-The large files remain cohesive owner exceptions; every new or materially
-touched helper stays below 200 lines.
+STOP all Rust, Cargo, BUILD, fixture, oracle, export, caller and public-behavior
+changes during this design.
 
-## Frozen owner, identity and driver
+## Formal REPLAN evidence and owner
 
-Keep the same structural `BuildCommandRootObservationKey(BuildCommandRootKey)`.
-Its constructor admits the existing singleton root PackageAll plus every
-syntactic nonroot Single. External wrong-kind rule/filegroup requests enter
-observed and fail only after package classification. Every root Single,
-multi-target and other identity preserves the neutral/legacy route. Keep the
-sole public observed -> neutral -> legacy constructor order and add no key or
-public seam.
+The retained candidate passes 33/33 build-command, full loading 138/138, full
+bzlmod and the documented 240/241 core baseline within +611 semantic lines and
+17,915 physical. Independent implementation review accepted its build owner,
+prefix/certificate/family/memory proof.
 
-Keep PackageAll observed behavior unchanged. One private mode-aware external
-semantic driver selects only matching legacy or observed route/package/source
-children; neither mode activates the other. Preserve target classification,
-diagnostics and semantic projection on that shared path.
+Focused server validation exposes one exact event regression. At accepted Rust
+base `a4dd40d6`, the external server lifecycle passes source edit/delete/
+directory/recreate and fails only on the documented later root-switch
+`ROOT_EVENT` replay. The candidate fixes that switch but newly replays the
+unchanged child-owned `DEP_BUILD_EVENT` when the exported source is deleted.
+The other four current server query failures reproduce at the Rust base and are
+unchanged baselines. Therefore the moved external-build failure is current,
+not inherited.
 
-Observed order is root loading anchor -> repository route -> repository package
-load -> exact ExportedFile classification -> RequestRevisionKey -> selected
-repository source. Compute revision only after classification and before
-source; missing/wrong-kind targets activate neither revision nor source.
+`RepositoryPackageLoadObservationKey` solely owns the replayed batch. The build
+root may neither filter it nor weaken its equality/path epoch. The gap is at
+the native event-selection/revision-retry boundary: pre-revision preparation
+computes the effective ordered event epoch, but retry discards it; an equality-
+reused final root can hide a previously accepted child from the final closure,
+causing the flat accepted epoch to drop that node and replay its equal batch on
+the next reevaluation.
 
-Validate and union every completed observed child epoch left-first before
-semantic inspection. Equal duplicates keep the first exact Result Arc;
-conflict/operation mismatch is typed `ObservedPathFrontierError`. Need or typed
-outer is immediate and carrierless with no later activation. This sequential
-owner performs no Need union.
+Freeze the correction in `runtime/events.rs` plus the narrow `runtime/dice.rs`
+acceptance call site. Do not change the child key, external driver, DICE key
+equality, exact path validation, event producer or public surface.
 
-Freeze prefixes: anchor compute failure empty, anchor semantic anchor; route
-compute anchor, route semantic anchor+route; package compute anchor+route,
-package semantic anchor+route+package; target/revision failure
-anchor+route+package; source compute anchor+route+package; source Present,
-Absent, semantic, directory WrongKind and success full
-anchor+route+package+source. Success is one loaded-only target with empty action
-closure. Preserve the distinct legacy infrastructure channel and its existing
-post-`compute_join` ordering; observed compute errors remain semantic with the
-decisive prefix.
+## Frozen revision-event carry
 
-## Certificate, publication and events
+Add one private command-local `ProvisionalEventEpoch`: a compact Dupe/Allocative
+Arc-backed ordered slice of `(DiceNodeId, Option<EventBatch>)`. `Some(batch)` is
+the effective batch; `None` is an explicit known-removal tombstone; absence
+alone permits fallback to the true prior. It is not accepted event state.
 
-Every terminal after a completed source child retains a `SourceCertificate`
-made from that child's entire observed epoch. Present, Absent, accepted
-directory WrongKind and source semantic error retain it; earlier terminals do
-not. It is an exact demand/value/Arc subset of the full root epoch. Exact error
-formatting, codes, values and equality remain unchanged.
+Carry that provisional epoch only in the revision-retry loop. Pre-retry
+`prepare_accept` derives it from the selected exact closure, the true prior and
+any earlier carry. It remains unpublished. A Need before any revision carry
+behaves unchanged. Once a carry exists, preserve it through later Need attempts
+for the same fixed command root; eventual final Known transitions override it.
+Typed outer, cancellation, abort and every acceptance/materializer/revision
+failure drop it.
 
-Only admitted external Single initializes request revision, exposes the full
-epoch/certificate and selects `ClosureRepositories`. PackageAll remains
-strict-empty. `selected_snapshot` remains the sole repository sidecar owner;
-full path demand/value/Arc comparison remains unconditional and no repository
-collection enters the terminal. Finalization reobserves the complete
-certificate through the active materializer. Equal demands preserve exact
-Arcs; changed demands alone publish one revision and retry. Need, outer,
-cancel and every acceptance failure preserve prior path/repository/event state.
+On the next terminal preparation, reconcile the final `SelectedEventState`,
+the carried retry epoch and the true prior accepted epoch in deterministic
+order:
 
-The observed root owns no event batch. Matching anchor/module/package/source
-children remain sole owners. Preserve exact cold child order/text, semantic-
-error batches, warm suppression, and external -> root PackageAll no replay.
+1. start with retry entries and tombstones in their selected closure order;
+2. for a final `Known(Some(batch))`, replace the carried/prior entry and compare
+   that final batch with the true prior for emission;
+3. for final `Known(None)`, retain a `None` tombstone and emit nothing;
+4. for final `NoTransition`, use the carried Some/None first, then true-prior
+   Some, with absence only when neither exists;
+5. append final-only nodes in final closure order; and
+6. emit only nonempty final effective batches whose node/batch differs from the
+   true prior.
 
-## Exact loading-proof correction
+Fold multiple revision retries into the carried effective epoch. Stable first
+occurrence fixes ordering; latest known transition fixes value/removal. This
+carry is valid only after a source-certificate revision retry and only inside
+the same fixed native command root. A later ordinary Need preserves that carry
+without publishing or modifying it; no carry crosses commands.
 
-In `app/slug_loading_v2/src/host_package_load_tests.rs`, replace exactly:
+Filter only provisional `Some` entries into the effective accepted epoch;
+tombstones never enter it. Accepted event state remains exactly one Arc-backed
+ordered node/batch slice and changes only after materializer acceptance. The
+provisional slice is owned by the stack/command attempt. Use only compute-local
+merge scratch. Add no retained map, other collection, cache, interner, store,
+lock, task, Host read or event owner. Hold no lock across DICE.
 
-```rust
-assert!(!core.contains("RepositoryPackageLoadObservationKey"));
-```
+## Future retry authority, caps and proof
 
-with:
+After independent design ACCEPT, schedule exactly
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-2` with:
 
-```rust
-assert!(core.contains("RepositoryPackageLoadObservationKey"));
-```
+1. `runtime/dice.rs`: <=300 production net, <=11,300 physical;
+2. `runtime/tests/build_command_tests.rs`: <=400 test net, <=3,400 physical;
+3. `slug_loading_v2/src/host_package_load_tests.rs`: the already-frozen
+   line-neutral assertion only, <=3,439 physical; and
+4. `runtime/events.rs`: <=80 production plus <=100 tests, <=1,950 physical.
 
-Keep the adjacent positive query assertion and every other file byte
-unchanged. The core integration proof remains the authority for external-only
-observed activation, both family directions, later-child suppression and zero
-query/multi-build/one-shot activation.
+Aggregate semantic <=880 and combined physical <=20,089 against `a4dd40d6`.
+No server test edit is authorized.
 
-## Retention, compatibility, proof and STOP
+Prove exact reducer sequences: prior A -> retry-hidden A -> final no-transition
+suppresses and retains A; retry B -> final omitted emits B once; final C
+overrides provisional B and emits only C; prior Some(A) -> retry Known(None) ->
+final NoTransition remains absent with no output; a later Known(Some(A)) emits;
+Some(empty) remains distinct; multiple retries preserve first node order and
+latest transition.
+Prove a revision retry followed by Need and equality-reused completion retains
+the hidden child; cancel/abort/failure leaves the true prior epoch unchanged.
 
-Retain exactly one local build Result Arc plus one compact full epoch. The
-semantic Result may retain one compact source certificate epoch sharing exact
-child Arcs. Child carriers/outcomes, selected path and union/event scratch stay
-compute-local or dependency-owned. Add no map, Vec, cache, store, interner,
-lock, task, direct Host read, revision duplicate, event owner or historical
-snapshot.
+Extend the public external lifecycle to assert no package replay across source
+edit/delete/directory/recreate, exact cold/error order, changed BUILD/`.bzl`
+replay and external -> root suppression. Run the existing server test unchanged
+and require it to pass through the entire lifecycle. Preserve full loading,
+build, bzlmod and documented core/query baselines, exact caps, fmt/diff,
+retention/cleanup and independent review.
 
-Exact: public external source values/errors/classification, BUILD/module event
-text/order, root PackageAll, root Single, multi-target and all legacy/direct
-APIs. Slug-native: observed admission, carrier/epoch/typed-outer association,
-external-only repository selection and private certificate attachment.
-Unsupported/deferred: multi-build, one-shot, broader actions, external globs
-and exact Bazel identity bytes.
+Exact public values/errors/event text/order and all existing paths remain
+exact. The private observed carrier, certificate and retry-event association
+are Slug-native. Multi-build, one-shot, broader actions, external globs and
+identity bytes remain unsupported/deferred.
 
-Prove identity/routing, exact shared-driver legacy parity and both family
-directions; every prefix/Need/outer/compute/semantic terminal and later-child
-suppression; exact epoch membership/Arc order, certificate subset, duplicate/
-conflict/mismatch; revision-before-source; repository request/validation and
-strict PackageAll polarity; exact lifecycle/retained bytes, cold/warm/error/no-
-replay events, pointer abort, cancellation/recovery and zero broader activation.
-
-Require the focused public test, 33/33 build-command group, full loading
-138/138, full core with only the recorded stale visibility-wording baseline,
-formatting/diff, exact accounting, Buck2 retention, AI cleanup and independent
-final review.
-
-STOP on any other file/loading byte, new key/state/event owner, lower/public
-change, partial validation, strict-root relaxation, behavior/family/order
-drift, retained scratch, direct Host read, cap excess, broader activation or M1
-closure. REPLAN on any new blocker. After ACCEPT return only to one docs-only
-remaining M1 owner audit.
+STOP on any other file, child-event filtering, path/equality weakening, new
+accepted state, retained scratch, behavior/family/order drift, cap excess,
+baseline widening or M1 closure. REPLAN if command-local carry cannot
+distinguish hidden retry descendants without suppressing genuinely removed
+nodes. After retry ACCEPT return only to one docs-only remaining M1 owner audit.

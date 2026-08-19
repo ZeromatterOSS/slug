@@ -5927,3 +5927,53 @@ formatting/diff, exact caps, retention/cleanup and independent final review.
 STOP every other file, production redesign, new state/owner/event, behavior or
 family/order drift, cap excess, broader activation and M1 closure. After ACCEPT
 return only to one docs-only remaining M1 owner audit.
+
+### External singleton revision-event carry REPLAN (2026-08-18)
+
+The retained external-singleton candidate passes 33/33 build-command, loading
+138/138, full bzlmod and the documented 240/241 core baseline. Independent
+review accepts its owner/prefix/certificate/family/memory contract at +611
+semantic and 17,915 physical.
+
+Focused server comparison against `a4dd40d6` finds a current exact-event delta.
+The base passes source edit/delete/directory/recreate and fails only on its
+documented later root-switch replay. The candidate fixes the root switch but
+newly replays the equal child-owned package BUILD batch on source deletion.
+The four query ResultArc server failures reproduce at the base; they are not
+this packet's regression.
+
+The external root cannot filter the package child's batch. The native event
+acceptance path discards the provisional effective event epoch when source-
+certificate finalization requests a revision retry; the equality-reused final
+root can omit a previously accepted child from its closure, so the flat epoch
+drops the child before its next equal reevaluation.
+
+Run only `WP-2A-m1-external-singleton-revision-event-carry-design` from
+scheduling base `de38d1b8`. Write only canonical/current/Stage/routing under
+40/220/180/30 and 470 aggregate docs net. Retain but do not write the three
+dirty Rust files. STOP all implementation/public changes.
+
+Freeze one private command-local compact Dupe/Allocative provisional Arc slice
+of `(DiceNodeId, Option<EventBatch>)` across revision retries only. Some is the
+effective batch, None is a known-removal tombstone, and absence alone permits
+true-prior fallback. Merge retry entries left-first with final selected
+transitions: final Some replaces, final None retains a tombstone, final
+NoTransition uses carried Some/None then prior Some, final-only nodes append,
+and only the final filtered Some epoch's nonempty delta emits. Multiple retries
+keep first node order and latest transition. A Need before revision behaves
+unchanged; once a carry exists, later Needs for the same fixed root preserve it
+without publication or mutation until completion. Outer/cancel/abort/failure
+drops the carry; accepted state remains the existing Arc-backed Some-only slice
+and changes only after materializer acceptance. Add no accepted state/map/
+other collection/cache/interner/lock/task/Host read and weaken no path/key
+equality.
+
+Future retry authority is the retained DICE/build/loading files plus
+`runtime/events.rs`, under 300/400/0 and 80+100 semantic caps, 11,300/3,400/
+3,439/1,950 physical, <=880 semantic and <=20,089 combined. Prove hidden carry,
+changed override, prior A -> retry None -> final NoTransition remains absent ->
+later A replays, empty, revision->Need->completion, multiple retries, exact
+order, rollback, public source lifecycle and the unchanged server lifecycle.
+Preserve every original external owner/certificate/event/family/compatibility
+contract and schedule only one implementation retry after independent design
+ACCEPT. After implementation ACCEPT return only to a docs-only M1 owner audit.
