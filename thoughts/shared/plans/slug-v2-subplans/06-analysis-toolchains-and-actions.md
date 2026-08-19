@@ -7798,3 +7798,31 @@ analysis/toolchain/action activation, core ownership inversion, a partial
 mapping carrier, duplicate retained state, Stage 10 and M7A/M8/M7B/M9 closure.
 After design and implementation ACCEPT, return directly to the docs-only
 `WP-6-7A-external-rules-rust-toolchain-owner-design`.
+
+### Generated-repository frontier first-owner REPLAN (2026-08-19)
+
+The design audit at `d1755008` traced past selected graph into the actual root
+MODULE-files owner. `HostRootModuleFileObservationKey` already owns exact root
+MODULE/include path observations and the sole local MODULE event batch, but its
+private semantic value drops the evaluated `extension_usages`. The legacy
+`RootModuleFilesKey` separately computes `VisibleLockfileKey`, whose completed
+workspace read has no retained `PathObservationEpoch`. Consequently neither an
+observed selected graph nor extension input request can start from an exact
+root MODULE + lockfile prefix without reconstructing or rereading state.
+
+Run only `WP-6-7A-root-module-files-observation-completion-design`, docs-only.
+Freeze a two-file matching Legacy/Observed `RootModuleFiles` driver in
+`host_module.rs` and `module_eval.rs`: retain the already-evaluated extension
+usages in the private root-module value; observed visible-lockfile handling
+must preserve legacy mode-first semantics, use the accepted Host FileBytes
+observation only when the mode reads the file, and union root then lockfile
+epochs left-first before semantic inspection. The parent remains eventless and
+retains exactly one local `RootModuleFiles` Result Arc plus one compact epoch.
+
+Provisional implementation caps from 4,531/5,451 physical baselines are +80
+production/+120 tests for `host_module.rs`, +180 production/+220 tests for
+`module_eval.rs`, <=600 aggregate semantic lines and <=10,590 combined physical
+lines. STOP any third Rust file, selected-graph/registry/extension/package or
+analysis activation, direct Host read, duplicate collection/state/event owner,
+or parity drift. After design and implementation ACCEPT, schedule only the
+docs-only selected-module-graph observation-frontier design.
