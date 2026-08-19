@@ -8879,3 +8879,36 @@ milestone closure. After independent correction ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-implementation-retry`;
 after retry ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-package-preflight-observation-design`.
+
+### Host nonregistry repository-ignore observation proof correction accepted (2026-08-19)
+
+Correction `4c9f344b` accepts the measured proof envelope for semantic design
+`9c0a5473` from Rust base `b08b7f2e`. Run only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-implementation-retry`.
+
+Exact Rust authority is only
+`app/slug_bzlmod_v2/src/repository_ignore.rs`: <=180 production, <=720 proof,
+<=900 aggregate semantic and <=4,250 physical lines; helpers remain below 200.
+Every other file is read-only.
+
+Preserve the private one-Result-Arc+compact-epoch carrier and matching-family
+repo -> source -> parser driver. Merge each later Complete epoch into the
+earlier prefix left-first before semantic inspection; preserve the earliest
+equal Arc. Need/typed outer stays carrierless and suppresses later work. Both
+families share the neutral Windows parser observation when reached.
+
+The ignore parent stays eventless; its matching REPO child remains sole local
+batch owner. Retain no child carrier, source bytes, parser scratch, extra
+collection/state, cache/interner/store/lock/task, Host read, revision,
+certificate or event state.
+
+Complete the corrected proof matrix: source Need/outer; exact terminal prefixes
+and messages; epoch order/ptr identity/duplicate/conflict/mismatch; exact event
+silence and REPO batch/warm/cancellation; family rows and upper exclusion; and
+independent local+immutable REPO-file and `.bazelignore` lifecycles with held
+handles and restored child-parent Arc identity.
+
+STOP a second file/key/caller/export, production or legacy drift, retained-state
+growth, upper/registry activation, cap excess and milestone closure. After
+implementation ACCEPT schedule only the docs-only
+`WP-6-7A-host-nonregistry-package-preflight-observation-design`.

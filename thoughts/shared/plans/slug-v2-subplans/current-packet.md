@@ -1,48 +1,24 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repository-ignore-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-host-nonregistry-repository-ignore-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `e9fc14a6`
+Scheduling base: `4c9f344b`
 Rust base: `b08b7f2e`
 Accepted semantic design: `9c0a5473`
-Stopped implementation: `WP-6-7A-host-nonregistry-repository-ignore-observation-implementation`
+Accepted proof-cap correction: `4c9f344b`
 
-## Formal REPLAN evidence
+## Objective and exact authority
 
-The retained one-file candidate is production-sound but cannot honestly fit the
-accepted proof envelope. Against `b08b7f2e`, `repository_ignore.rs` is +180
-production and +484 proof lines, +664 aggregate semantic, at 3,961 physical
-lines. The new real parent integration passes 1/1; formatting and diff hygiene
-are clean. The dirty Rust candidate is retained and non-writable during this
-docs-only correction.
+Complete the accepted private repository-ignore observation owner without
+changing its production semantics, event ownership, matching families or
+retained representation. The pre-existing candidate is writable only for
+compact proof restructuring and additions required below.
 
-The private driver preserves exact repo -> source -> parser matching-family
-order, unions each Complete child epoch left-first before semantic inspection,
-returns Need/typed outer carrierless, leaves the parent eventless and retains
-only one local matcher Result Arc plus the compact epoch. It adds no caller,
-upper activation, Host read, collection, cache/interner/store/lock/task,
-revision, certificate or event state. No production redesign is indicated.
-
-The original <=400 proof, <=580 aggregate and <=3,900 physical caps are already
-exceeded by 84 proof/aggregate and 61 physical lines. Reclaiming 84 proof lines
-would only reach the old ceiling while deleting real cancellation, family,
-event, exact-Arc or local/immutable lifecycle discrimination, and the frozen
-matrix is not yet complete.
-
-## Docs-only correction authority
-
-Write only the canonical plan, this manifest, Stage 6 and the routing log at
-<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
-fixtures, oracles, callers and public files are read-only.
-
-Retain the exact one-file future retry authority
-`app/slug_bzlmod_v2/src/repository_ignore.rs` from the 3,297-line
-`b08b7f2e` baseline. Keep production <=180. Raise only proof from <=400 to
-<=720, aggregate semantic growth from <=580 to <=900 and final physical size
-from <=3,900 to <=4,250. This measured correction leaves 236 proof/aggregate
-and 289 physical lines beyond the current candidate. Touched helpers remain
-below 200 lines.
+Write exactly `app/slug_bzlmod_v2/src/repository_ignore.rs` from its 3,297-line
+`b08b7f2e` baseline. Caps are <=180 production, <=720 proof, <=900 aggregate
+semantic and <=4,250 physical lines. Touched helpers remain below 200 lines.
+Every other Rust/Cargo/BUILD/fixture/oracle/caller/public file is read-only.
 
 ## Frozen production contract
 
@@ -105,12 +81,9 @@ Unsupported/deferred: package preflight/closure/discovery/selected graph;
 registry preparation/patches; extension repositories, M8/M7B and identity
 bytes.
 
-STOP Rust/Cargo/BUILD/fixture/oracle/public writes during design. STOP a second
-Rust file/key/caller/export, production semantic/order/event/memory/family
-change, direct Host read, upper/registry activation, proof deletion, cap excess
-or milestone closure. REPLAN again if the complete matrix cannot fit.
+STOP a second Rust file/key/caller/export, production semantic/order/event/
+memory/family change, direct Host read, upper/registry activation, proof
+deletion, cap excess or milestone closure. REPLAN if the matrix cannot fit.
 
-After independent correction ACCEPT schedule only
-`WP-6-7A-host-nonregistry-repository-ignore-observation-implementation-retry`.
-After independent retry ACCEPT schedule only the docs-only
+After independent implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-package-preflight-observation-design`.
