@@ -1,19 +1,19 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repo-file-observation-proof-cap-correction-2-design`
+Packet: `WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `9aafca07`
+Scheduling base: `aff21fdb`
 Rust base: `12f68983`
 Accepted semantic design: `3c598dd5`
 Accepted first proof-cap correction: `6b75865f`
+Accepted second proof-cap correction: `aff21fdb`
 
-## Formal REPLAN and retained candidate
+## Accepted second correction and retained candidate
 
-The implementation retry is **REPLAN** before acceptance. Retain the exact
-one-file Rust candidate from scheduling base `9aafca07`, Rust base
-`12f68983`, semantic design `3c598dd5` and first correction `6b75865f`;
-it is non-writable during this docs-only design.
+Correction `aff21fdb` accepts the bounded proof-only REPLAN. Resume the exact
+one-file Rust candidate from Rust base `12f68983`, semantic design
+`3c598dd5` and first correction `6b75865f`.
 
 Against `12f68983`, live `repo_file.rs` is +170 production and +628 proof,
 +798 aggregate semantic, at 3,477 physical lines. Focused observed proof passes
@@ -32,15 +32,10 @@ No production semantic or owner change is required.
 
 ## Exact Rust authority and caps
 
-During this design write only the canonical plan, this manifest, Stage 6 and
-the routing log: <=40, <=220, <=180 and <=30 net lines respectively, <=470
-aggregate. The dirty `app/slug_bzlmod_v2/src/repo_file.rs` candidate is
-retained and non-writable; every other file is read-only.
-
-The sole future retry authority remains only `repo_file.rs`. From the
-2,679-line Rust base, keep production <=180 and raise only proof to <=720,
+Write only `app/slug_bzlmod_v2/src/repo_file.rs`. From the 2,679-line Rust
+base, keep production <=180, proof <=720,
 aggregate semantic growth to <=900 and final physical size to <=3,700. Helpers
-remain below 200 lines.
+remain below 200 lines. Every other file is read-only.
 
 ## Frozen correction authority
 
@@ -159,13 +154,10 @@ extensions, rules_rust actions, M8/M7B and exact identity bytes.
 
 ## STOP and sole successor
 
-STOP Rust/Cargo/BUILD/fixture/oracle/public writes during this design. STOP a
-second retry file/key/caller/export, production semantic/order/event/memory/
-family drift, direct Host read, upper/registry activation, proof deletion, cap
-excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN again if the full
-matrix cannot fit the corrected envelope.
+STOP a second retry file/key/caller/export, production semantic/order/event/
+memory/family drift, direct Host read, upper/registry activation, proof
+deletion, cap excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN
+again if the full matrix cannot fit the corrected envelope.
 
-After independent design ACCEPT schedule only
-`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2`.
-Only after that retry's independent ACCEPT schedule the docs-only
+Only after independent retry ACCEPT schedule the docs-only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.

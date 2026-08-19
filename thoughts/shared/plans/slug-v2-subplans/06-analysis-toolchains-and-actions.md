@@ -8668,3 +8668,28 @@ After independent correction ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2`.
 After that retry's independent ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
+
+### Host nonregistry REPO-file second proof-cap correction accepted (2026-08-19)
+
+Correction `aff21fdb` accepts the second proof-only REPLAN from Rust base
+`12f68983`, semantic design `3c598dd5` and first correction `6b75865f`.
+Run only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2` in
+`app/slug_bzlmod_v2/src/repo_file.rs`.
+
+Keep production <=180, proof <=720, aggregate semantic growth <=900 and final
+physical size <=3,700 from the 2,679-line base. Helpers stay below 200 lines.
+Preserve the accepted private key/carrier, source-first matching-family driver,
+Complete/Need/outer algebra, exact Result-Arc projection, matching local REPO
+event ownership and compact one-Result-Arc-plus-epoch retention.
+
+Use the added proof room only for exact key identity, semantic result/message,
+diagnostic/print batch, success/error dependency-row, source-silence,
+legacy-parity and feasible held/restored Arc discrimination. Preserve every
+existing Need/outer, prefix, conflict/mismatch, cancellation, warm, family,
+lifecycle and upper-exclusion discriminator.
+
+STOP a second file/key/caller/export, production semantic/order/event/memory/
+family drift, direct Host read, upper/registry activation, proof deletion, cap
+excess or milestone closure. After independent retry ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
