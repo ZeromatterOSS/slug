@@ -1,109 +1,136 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-repository-materialization-request-observation-implementation-retry`
+Packet: `WP-6-7A-repository-materialization-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Rust base: `3d174006`
-Accepted semantic design: `e606e1b2`
-Accepted proof-cap correction: `7592334b`
+Scheduling/Rust base: `cc847c98`
 
-## Exact Rust authority and corrected caps
+## Exact docs authority
 
-Write only `app/slug_bzlmod_v2/src/source_preparation.rs` from the
-13,747-line `3d174006` baseline: <=180 production, <=480 tests, <=660
-aggregate semantic and <=14,480 physical lines. The file is a cohesive
-large-owner exception and every touched helper remains below 200 lines. Every
-other file is read-only.
+This packet is docs-only. Write only:
 
-The retained candidate is +161
-production/+319 tests/+480 aggregate at 14,227 physical lines. It fits the
-production cap; corrected proof limits leave 161 test-net and 253 physical
-lines for the missing observed terminal and lifecycle matrix.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`: <=40 net lines.
+2. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`: <=180 net lines.
+3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`: <=160 net lines.
+4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`: <=30 net lines.
 
-## Frozen owner and implementation contract
+Aggregate docs delta is <=430 net lines. Rust, Cargo/BUILD metadata, fixtures,
+oracles and every other plan are read-only.
 
-Add the private structural
-`RepositoryMaterializationRequestObservationKey(RepositoryMaterializationRequestKey)`
-and private observed carrier containing exactly one local
-`Arc<Result<RepositoryMaterializationRequest, RepositoryMaterializationError>>`
-plus one compact `PathObservationEpoch`, with `Dupe` and `Allocative`.
-Keep only the module-local constructor and borrowed result/epoch accessors
-needed by the later materialization sibling.
+## Accepted predecessor and owner decision
 
-Use one Legacy/Observed driver. Normalize the workspace first, select only the
-matching `HostEffectiveModuleOverrideKey` or
-`HostEffectiveModuleOverrideObservationKey`, then use one pure shared
-projection for nonregistry override selection, canonical repository identity,
-local/command path policy and local versus immutable request kind. Legacy moves
-the exact local Result Arc; neither sibling computes the other.
+Implementation `cc847c98` accepts the private repository-materialization
+request sibling from Rust base `3d174006` and design `e606e1b2`, with proof
+correction `7592334b`. Final one-file accounting is +161 production/+471
+tests/+632 aggregate at 14,379 physical lines. Focused 4/4, full bzlmod
+433/433, loading 138/138 and full query pass. Core remains 245/246 only on the
+recorded inherited stale visibility wording assertion. Formatting, diff,
+cleanup/retention and independent review pass.
 
-Invalid workspace and effective DICE compute failure are semantic Complete with
-an empty epoch. Effective Need or typed outer is immediate and carrierless. A
-completed effective semantic error and every missing/unsupported override,
-invalid canonical repository, request-kind/spec error and local/immutable
-success terminal retain the complete effective prefix. Accept the observed
-child epoch before semantic inspection and forward it unchanged; there is no
-joined batch or Need union.
+Do not freeze `HostSelectedModuleGraphKey` yet. Its nonregistry discovery path
+uses `HostNonregistryModuleClosureKey`, which computes
+`RepositoryMaterializationKey` before reading the root repository source.
+`RepositorySourceFileKey` independently consumes the same materialization
+owner. That key is the first complete reusable carrierless boundary after the
+accepted request sibling: it sequences `RepositoryMaterializationRequestKey`
+then the path-neutral/eventless `RepositoryMaterializationResultKey`.
+
+Observing source, closure, discovery or selected graph first would duplicate or
+bypass materialization semantics. Registry discovery separately crosses the
+carrierless `ModuleSourcePreparationKey`/`RegistryFileKey` branch and
+remains a later prerequisite. The uniquely smallest next owner is therefore one
+private observed sibling of `RepositoryMaterializationKey`.
+
+## Frozen design
+
+Add private structural
+`RepositoryMaterializationObservationKey(RepositoryMaterializationKey)` and
+private `ObservedRepositoryMaterialization`. Its value is
+`SourcePreparationOutcome<Result<ObservedRepositoryMaterialization,
+ObservedPathFrontierError>>`. The carrier retains exactly one
+`Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>` plus
+one compact `PathObservationEpoch`, and implements `Dupe` and `Allocative`.
+Expose only module-local construction and borrowed result/epoch accessors.
+
+Use one Legacy/Observed materialization driver. Both modes preserve request
+then result order. Legacy selects only
+`RepositoryMaterializationRequestKey`; observed selects only
+`RepositoryMaterializationRequestObservationKey`. Both then compute the same
+neutral `RepositoryMaterializationResultKey` from the successful request.
+Neither sibling computes the other. Legacy projects/moves the exact local
+materialization Result Arc.
+
+Accept and retain the observed request epoch before inspecting its semantic
+Result. The result key and its generation/epoch inputs add no path observation,
+so forward that request epoch unchanged and perform no epoch union. Request
+DICE compute failure is semantic `RootModuleFiles` with an empty prefix.
+Request semantic failure retains the request prefix. Result DICE compute
+failure is semantic `ResultCompute` with the request prefix. Local/immutable
+success and result semantic errors retain the request prefix.
+
+Request Need or typed outer returns immediately with no carrier and does not
+activate the result. Result Need likewise returns immediately with no carrier.
+This includes missing result-epoch entry, request mismatch and stale
+transport/materialization generation. There is no joined batch or Need union.
 
 Need is invalid/self-unequal. Complete typed outer is valid/equal by outer
-value. Complete carrier is valid/equal by semantic Result plus epoch. Preserve
-the child's exact shared Result Arcs. The parent is eventless for every terminal
-and cancellation; root MODULE children remain sole event owners.
+value. Complete carrier is valid/equal by semantic Result plus epoch. The
+parent and result owner remain eventless on success, semantic error, Need,
+outer and cancellation. Root MODULE/request children remain their existing
+event owners; materialization result injection remains neutral.
 
-Retain only the local request Result Arc plus compact epoch. Effective child
-carrier, normalized workspace, canonical formatting, request-kind and
-projection scratch remain compute-local. Add no collection, cache, store,
-interner, lock, task, direct Host read, revision, certificate or event owner.
-Do not activate materialization result injection, repository source,
-preparation/closure, discovery, selected graph, extension, analysis or any
-caller.
+Retain no request child Result Arc, result child carrier Arc, collection,
+snapshot, generation map, cache, store, interner, lock, task, direct Host read,
+revision, certificate or event state. Request extraction, result-key
+construction and reducer scratch are compute-local. Keep all touched helpers
+below 200 lines.
 
-The retry may only restructure or add proof. Production semantics,
-identity, driver order, Result-Arc projection, event ownership, retained state
-and the <=180 production cap are frozen. Required additions must drive the live
-observed owner, or a pure reducer used directly by it, through empty
-invalid-workspace/effective-compute prefixes and full missing, unsupported,
-canonical, request-kind/spec and success prefixes. They must discriminate
-root-local, command-absolute and HTTP/Git immutable projections; malformed
-request kinds; command/request-kind A-B-A with held Result and epoch Arcs; and
-later-child suppression. Existing proof remains required.
+## Future implementation authority and caps
 
-## Required proof and compatibility
+After independent design ACCEPT, authorize exactly:
 
-Discriminate distinct key identity/Display and private access; exact legacy
-request/error/value and Result-Arc projection; exact effective epoch membership
-and per-demand `Arc::ptr_eq`; empty invalid-workspace/effective-compute
-prefixes; full effective-semantic/missing/unsupported/canonical/spec/success
-prefixes; root-local, command-absolute, http/git immutable and malformed
-request-kind behavior; Need/outer validity, equality, no carrier and later
-suppression; both family directions and exact parent dependency rows; child
-cold events, eventless parent, warm silence, real poll-drop/no-publication/
-same-DICE recovery; root/command/request-kind A-B-A with held Result and epoch
-Arcs; and zero later-owner/public activation.
+- `app/slug_bzlmod_v2/src/source_preparation.rs`, from the 14,379-line
+  `cc847c98` baseline: <=180 production, <=400 tests, <=580 aggregate
+  semantic and <=15,000 physical lines.
 
-Reuse Bazel 9.2 `BazelModuleResolutionFunction.discoverAndSelect`,
-`Discovery.run/advanceHorizon` and `DiscoveryTest`, the accepted
-materialization-request/effective-override tests and
-`docs/developers/dice.md`. No new fixture or oracle is authorized.
+The file is a cohesive large-owner exception. No second Rust file, export or
+caller is authorized.
 
-Exact: existing request values/errors/order, normalized path/canonical
-repository semantics, legacy Results and child events. Slug-native: the private
+## Proof and compatibility
+
+Discriminate distinct key identity/hash/Display and private access; exact
+legacy value/error and Result-Arc parity; exact request epoch membership and
+per-demand `Arc::ptr_eq`; request compute-empty, request-semantic full,
+result-compute prior and result-semantic/full prefixes; local and immutable
+success; spec, transport, materialization and missing-generation errors;
+missing/mismatched/stale result Needs; request Need/outer and result Need
+carrierlessness, validity/equality and later suppression; observed-request
+versus legacy-request family rows with the neutral result shared; child-owned
+events, eventless parent and warm silence; real poll-drop/no-publication/
+same-DICE recovery; result injection and request A-B-A with held Result/epoch
+Arcs; and zero source/closure/preparation/discovery/selected-graph activation.
+
+Exact: existing materialization values/errors/order, request/result/generation
+semantics, legacy Result Arc and child event behavior. Slug-native: the private
 sibling/carrier, typed outer and epoch association. Unsupported/deferred:
-materialization/source observation, registry patches, nonregistry closure,
-discovered modules, selected graph, generated repositories, rules_rust
+repository source and nonregistry closure observation, registry file/source
+preparation, discovered modules, selected graph, extension evaluation and
+instantiation, generated repository loading, external rules_rust
 analysis/actions, M8/M7B and exact Bazel identity bytes.
 
-Run focused owner tests, full bzlmod, affected loading/query/core baselines,
-formatting, diff-check, exact accounting and AI-cleanup/Buck2 retention review.
+Reuse accepted request/result tests, `docs/developers/dice.md` and pinned Bazel
+9.2 module discovery sources. No fixture or oracle is authorized.
 
 ## STOP and successor
 
-STOP on any second Rust file/key/caller/export,
-downstream activation, semantic or error drift, event/family change, retained
-child carrier or scratch collection, direct Host read, new state, cap excess
-or milestone closure. REPLAN rather than weaken exact request behavior,
-discard an existing discriminator or fabricate proof.
+STOP on Rust during this design, any second file/key/caller/export, source or
+closure activation, registry/preparation/discovery/selected-graph activation,
+direct Host read, event/family/error/order drift, retained scratch/state, cap
+excess or milestone closure. REPLAN rather than merge a path-neutral result
+input into the epoch or duplicate lower materialization semantics.
 
-After independent implementation ACCEPT, schedule only the docs-only
+After independent design ACCEPT, schedule exactly one bounded
+`WP-6-7A-repository-materialization-observation-implementation`. After
+independent implementation ACCEPT, return only to the docs-only
 `WP-6-7A-selected-module-graph-observation-frontier-design`. Exactly one
 immediate successor is authorized.

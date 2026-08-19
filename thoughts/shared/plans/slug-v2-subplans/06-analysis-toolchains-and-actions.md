@@ -8142,3 +8142,66 @@ restructuring and the missing observed terminal/projection and command/
 request-kind lifecycle cases. No caller, second file, semantic/event/state
 change or later-owner activation is authorized. After independent ACCEPT,
 schedule only the docs-only selected-module-graph observation-frontier design.
+
+### Materialization-request observation implementation accepted (2026-08-19)
+
+Implementation `cc847c98` completes the private request owner from Rust base
+`3d174006`, design `e606e1b2` and proof correction `7592334b`. The
+matching-family driver accepts the complete effective-override epoch before
+semantic inspection, preserves exact legacy request Results and every
+local/command/immutable projection, remains eventless, and retains only one
+request Result Arc plus the compact epoch.
+
+Final one-file accounting is +161 production/+471 tests/+632 aggregate at
+14,379 physical lines. Focused 4/4, full bzlmod 433/433, loading 138/138 and
+full query pass. Core remains 245/246 only on the inherited stale visibility
+wording assertion. Formatting, diff, cleanup/retention and independent review
+pass.
+
+### Selected-module-graph frontier materialization REPLAN (2026-08-19)
+
+Do not freeze the selected graph sibling yet. Nonregistry discovery computes
+`HostNonregistryModuleClosureKey`, which consumes
+`RepositoryMaterializationKey` before repository source reads.
+`RepositorySourceFileKey` independently consumes the same materialization
+owner. The accepted request sibling closes that key's only observed path child;
+its neutral `RepositoryMaterializationResultKey` adds no Host/path observation
+and owns no event. This makes `RepositoryMaterializationKey` the uniquely
+smallest complete next carrier boundary.
+
+Run only `WP-6-7A-repository-materialization-observation-design`, docs-only,
+from scheduling/Rust base `cc847c98`. Freeze one private structural sibling
+and a `Dupe`/`Allocative` carrier containing exactly one materialization
+Result Arc plus the unchanged request epoch. A shared Legacy/Observed driver
+selects only the matching request family, then the same neutral result key.
+Request compute failure is empty-prefix; request semantic, result compute,
+result semantic and success retain the request prefix. Request Need/outer and
+result Need are immediate and carrierless; no epoch union or joined Need exists.
+Legacy moves the exact materialization Result Arc.
+
+Both parent and result stay eventless. Retain no request/result child carrier,
+collection, cache, store, interner, lock, task, Host read, revision or
+certificate. Registry `ModuleSourcePreparationKey`/`RegistryFileKey`,
+repository source, nonregistry closure, discovery, selected graph, extension
+and generated repository activation remain deferred.
+
+Future implementation authority after independent design ACCEPT is exactly
+`source_preparation.rs` from 14,379 physical lines: <=180 production, <=400
+tests, <=580 aggregate semantic and <=15,000 physical lines. Keep touched
+helpers below 200 lines. Proof must discriminate exact Result and epoch Arcs,
+all request/result terminal prefixes and Needs, family rows, child events,
+parent silence, cancellation/recovery, result/request lifecycle, and zero later
+activation.
+
+Exact behavior is existing materialization values/errors/order, request/result/
+generation semantics, legacy Result Arc and child events. The sibling,
+carrier, typed outer and epoch association are Slug-native. Registry/source/
+closure/discovery/selected graph, extensions, generated repositories,
+rules_rust analysis/actions, M8/M7B and exact identity bytes remain deferred.
+
+STOP Rust during design and stop every other file/key/caller/export, later
+activation, direct Host read, event/family/order/error drift, retained state,
+cap excess and milestone closure. After independent design ACCEPT schedule only
+`WP-6-7A-repository-materialization-observation-implementation`; after
+implementation ACCEPT return only to the docs-only selected-module-graph
+frontier design.
