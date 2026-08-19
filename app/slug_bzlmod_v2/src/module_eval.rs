@@ -31,6 +31,9 @@ use slug_identity_v2::RepositoryMapping;
 use slug_identity_v2::RepositoryMappingId;
 use slug_identity_v2::TargetName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::WorkspaceFileKey;
 use slug_workspace_v2::WorkspaceFileValue;
 use slug_workspace_v2::WorkspaceRawFileKey;
@@ -90,8 +93,14 @@ use crate::NonrootModuleBuilder;
 use crate::NonrootModuleKey;
 use crate::NonrootRepoImports;
 use crate::NonrootRepoOverride;
+use crate::SourcePreparationNeeds;
+use crate::SourcePreparationOutcome;
 use crate::VisibleLockfileRead;
 use crate::dice::CommandModuleOverrides;
+use crate::host_file::HostFileBytes;
+use crate::host_file::HostFileBytesObservationKey;
+use crate::host_file::HostFileError;
+use crate::host_module::HostRootModuleFileObservationKey;
 use crate::lockfile::bad_visible_lockfile_message;
 use crate::lockfile::parse_visible_lockfile_bytes_for_mode;
 use crate::module_version::BazelModuleVersion;
@@ -1477,6 +1486,291 @@ pub struct RootModuleFilesKey {
     pub workspace: PathBuf,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
+pub(crate) struct RootModuleFilesObservationKey {
+    workspace: NormalizedAbsolutePath,
+}
+
+impl RootModuleFilesObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self { workspace }
+    }
+}
+
+impl fmt::Display for RootModuleFilesObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-root-module-files:{}", self.workspace)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedRootModuleFiles {
+    result: Arc<Result<RootModuleFiles, CompactString>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRootModuleFiles {
+    pub(crate) fn result(&self) -> &Arc<Result<RootModuleFiles, CompactString>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type RootModuleFilesDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (
+            Arc<Result<RootModuleFiles, CompactString>>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+>;
+
+#[derive(Clone, Copy)]
+enum RootModuleFilesMode {
+    Legacy,
+    Observed,
+}
+
+fn empty_observations() -> PathObservationEpoch {
+    PathObservationEpoch::new(std::iter::empty()).expect("the empty epoch is valid")
+}
+
+fn union_root_module_observations(
+    left: &PathObservationEpoch,
+    right: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    PathObservationEpoch::from_shared(
+        left.observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                right
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(ObservedPathFrontierError::from)
+}
+
+pub(crate) fn host_file_semantic_error(error: &HostFileError) -> CompactString {
+    let (class, path) = match error {
+        HostFileError::Observation { logical_path, .. } => ("observation failed", logical_path),
+        HostFileError::InconsistentState { logical_path, .. } => {
+            ("changed while being observed", logical_path)
+        }
+        HostFileError::WrongKind { logical_path, .. } => ("has unsupported kind", logical_path),
+        HostFileError::Cycle { logical_path } => ("contains a symlink cycle", logical_path),
+        HostFileError::InfiniteExpansion { logical_path } => {
+            ("has infinite symlink expansion", logical_path)
+        }
+    };
+    CompactString::new(format!("host file {} {class}", path.as_path().display()))
+}
+
+async fn observed_visible_lockfile(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+) -> SourcePreparationOutcome<
+    Result<
+        (
+            Result<VisibleLockfileRead, CompactString>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+> {
+    let mode = match ctx
+        .compute(&RootModuleLockfileModeKey {
+            workspace: workspace.as_path().to_owned(),
+        })
+        .await
+    {
+        Ok(mode) => mode.semantic_mode(),
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Ok((
+                Err(CompactString::new(format!(
+                    "missing injected root module lockfile mode: {error}"
+                ))),
+                empty_observations(),
+            )));
+        }
+    };
+    if matches!(mode, LockfileMode::Off) {
+        return SourcePreparationOutcome::Complete(Ok((
+            Ok(VisibleLockfileRead::Ignored),
+            empty_observations(),
+        )));
+    }
+    let logical_path = NormalizedAbsolutePath::new(workspace.as_path().join("MODULE.bazel.lock"))
+        .expect("joining the visible lockfile basename remains normalized absolute");
+    let observed = match ctx
+        .compute(&HostFileBytesObservationKey::new(logical_path))
+        .await
+        .expect("Host FileBytes observation is an infallible DICE owner")
+    {
+        PathOutcome::Need(need) => {
+            return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
+        }
+        PathOutcome::Complete(Err(error)) => {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        PathOutcome::Complete(Ok(observed)) => observed,
+    };
+    let observations = observed.observations().dupe();
+    let bytes = match observed.result() {
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Ok((
+                Err(CompactString::new(bad_visible_lockfile_message(
+                    host_file_semantic_error(error),
+                ))),
+                observations,
+            )));
+        }
+        Ok(HostFileBytes::Missing) => None,
+        Ok(HostFileBytes::Present(bytes)) => Some(bytes.as_ref()),
+    };
+    SourcePreparationOutcome::Complete(Ok((
+        parse_visible_lockfile_bytes_for_mode(&mode, bytes).map_err(CompactString::new),
+        observations,
+    )))
+}
+
+async fn drive_root_module_files(
+    ctx: &mut DiceComputations<'_>,
+    key: &RootModuleFilesKey,
+    mode: RootModuleFilesMode,
+) -> RootModuleFilesDriverOutcome {
+    match mode {
+        RootModuleFilesMode::Legacy => {
+            let evaluation = match ctx
+                .compute(&RootModuleEvaluationKey {
+                    workspace: key.workspace.clone(),
+                })
+                .await
+            {
+                Ok(value) => match value.as_ref().clone() {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Ok((
+                            Arc::new(Err(error)),
+                            empty_observations(),
+                        )));
+                    }
+                },
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Ok((
+                        Arc::new(Err(CompactString::new(error.to_string()))),
+                        empty_observations(),
+                    )));
+                }
+            };
+            let visible_lockfile = match ctx
+                .compute(&VisibleLockfileKey {
+                    workspace: key.workspace.clone(),
+                })
+                .await
+            {
+                Ok(value) => match value.as_ref().clone() {
+                    Ok(value) => value,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Ok((
+                            Arc::new(Err(error)),
+                            empty_observations(),
+                        )));
+                    }
+                },
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Ok((
+                        Arc::new(Err(CompactString::new(error.to_string()))),
+                        empty_observations(),
+                    )));
+                }
+            };
+            SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Ok(RootModuleFiles {
+                    module: evaluation.module,
+                    module_file_paths: evaluation.module_file_paths,
+                    visible_lockfile,
+                    overrides: evaluation.overrides,
+                    extension_usages: evaluation.extension_usages,
+                })),
+                empty_observations(),
+            )))
+        }
+        RootModuleFilesMode::Observed => {
+            let workspace = NormalizedAbsolutePath::new(key.workspace.clone())
+                .expect("RootModuleFiles workspace is normalized absolute");
+            let root = match ctx
+                .compute(&HostRootModuleFileObservationKey::new(workspace.dupe()))
+                .await
+            {
+                Ok(SourcePreparationOutcome::Need(need)) => {
+                    return SourcePreparationOutcome::Need(need);
+                }
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                    return SourcePreparationOutcome::Complete(Err(error));
+                }
+                Ok(SourcePreparationOutcome::Complete(Ok(root))) => root,
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Ok((
+                        Arc::new(Err(CompactString::new(error.to_string()))),
+                        empty_observations(),
+                    )));
+                }
+            };
+            let root_observations = root.observations().dupe();
+            let root = match root.result() {
+                Ok(root) => root,
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Ok((
+                        Arc::new(Err(error.semantic_message())),
+                        root_observations,
+                    )));
+                }
+            };
+            let (visible_lockfile, lockfile_observations) =
+                match observed_visible_lockfile(ctx, &workspace).await {
+                    SourcePreparationOutcome::Need(need) => {
+                        return SourcePreparationOutcome::Need(need);
+                    }
+                    SourcePreparationOutcome::Complete(Err(error)) => {
+                        return SourcePreparationOutcome::Complete(Err(error));
+                    }
+                    SourcePreparationOutcome::Complete(Ok(value)) => value,
+                };
+            let observations =
+                match union_root_module_observations(&root_observations, &lockfile_observations) {
+                    Ok(observations) => observations,
+                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                };
+            let visible_lockfile = match visible_lockfile {
+                Ok(value) => value,
+                Err(error) => {
+                    return SourcePreparationOutcome::Complete(Ok((
+                        Arc::new(Err(error)),
+                        observations,
+                    )));
+                }
+            };
+            SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Ok(RootModuleFiles {
+                    module: root.module.clone(),
+                    module_file_paths: root.module_file_paths.dupe(),
+                    visible_lockfile,
+                    overrides: root.overrides.clone(),
+                    extension_usages: root.extension_usages.dupe(),
+                })),
+                observations,
+            )))
+        }
+    }
+}
+
 impl fmt::Display for RootModuleFilesKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "root-module-files:{}", self.workspace.display())
@@ -1487,40 +1781,347 @@ impl fmt::Display for RootModuleFilesKey {
 impl Key for RootModuleFilesKey {
     type Value = Arc<Result<RootModuleFiles, CompactString>>;
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let evaluation = match ctx
-            .compute(&RootModuleEvaluationKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(value) => match value.as_ref().clone() {
-                Ok(value) => value,
-                Err(error) => return Arc::new(Err(error)),
-            },
-            Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
-        };
-        let visible_lockfile = match ctx
-            .compute(&VisibleLockfileKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(value) => match value.as_ref().clone() {
-                Ok(value) => value,
-                Err(error) => return Arc::new(Err(error)),
-            },
-            Err(error) => return Arc::new(Err(CompactString::new(error.to_string()))),
-        };
-        Arc::new(Ok(RootModuleFiles {
-            module: evaluation.module,
-            module_file_paths: evaluation.module_file_paths,
-            visible_lockfile,
-            overrides: evaluation.overrides,
-            extension_usages: evaluation.extension_usages,
-        }))
+        match drive_root_module_files(ctx, self, RootModuleFilesMode::Legacy).await {
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                debug_assert!(observations.observations().is_empty());
+                result
+            }
+            SourcePreparationOutcome::Need(_) => {
+                panic!("legacy RootModuleFiles driver returned Need")
+            }
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy RootModuleFiles driver returned observed outer: {error}")
+            }
+        }
     }
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
+    }
+}
+
+#[async_trait]
+impl Key for RootModuleFilesObservationKey {
+    type Value =
+        SourcePreparationOutcome<Result<ObservedRootModuleFiles, ObservedPathFrontierError>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        let key = RootModuleFilesKey {
+            workspace: self.workspace.as_path().to_owned(),
+        };
+        drive_root_module_files(ctx, &key, RootModuleFilesMode::Observed)
+            .await
+            .map(|outcome| {
+                outcome.map(|(result, observations)| ObservedRootModuleFiles {
+                    result,
+                    observations,
+                })
+            })
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[cfg(all(test, unix))]
+mod root_module_files_observation_tests {
+    use dice::DetectCycles;
+    use dice::Dice;
+    use slug_workspace_v2::NeedPathObservations;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
+    use slug_workspace_v2::PathObservationDemand;
+    use slug_workspace_v2::PathObservationEpochError;
+    use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationNamespace;
+    use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+    use slug_workspace_v2::WorkspaceFileValue;
+    use slug_workspace_v2::WorkspaceRawFileValue;
+    use slug_workspace_v2::WorkspaceRawSnapshot;
+    use slug_workspace_v2::WorkspaceRawSnapshotKey;
+    use slug_workspace_v2::WorkspaceSnapshot;
+    use slug_workspace_v2::WorkspaceSnapshotKey;
+    use starlark_map::small_map::SmallMap;
+    use starlark_map::sorted_map::SortedMap;
+
+    use super::*;
+    use crate::BzlmodCommandPolicyKey;
+    use crate::BzlmodEnvironmentPolicyKey;
+    use crate::RootPackagePolicyInputs;
+    use crate::RootPackagePolicyProjectionError;
+    use crate::host_include::HostRootIncludePackageFailure;
+    use crate::host_package::HostRootPackageLookupError;
+    use crate::inject_root_module_request_inputs;
+    use crate::inject_root_package_policy_inputs;
+
+    fn workspace() -> NormalizedAbsolutePath {
+        NormalizedAbsolutePath::new("/workspace").unwrap()
+    }
+
+    fn epoch(source: &str, lockfile: Option<&str>, variant: i64) -> PathObservationEpoch {
+        let mut entries = SmallMap::new();
+        for path in ["/", "/workspace"] {
+            entries.insert(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                    PathNodeKind::Directory,
+                    variant,
+                    variant,
+                    variant,
+                    variant,
+                    0o755,
+                ))),
+            );
+        }
+        for (path, bytes) in [
+            ("/workspace/MODULE.bazel", Some(source)),
+            ("/workspace/MODULE.bazel.lock", lockfile),
+        ] {
+            let path = NormalizedAbsolutePath::new(path).unwrap();
+            let lstat = PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                path.dupe(),
+                PathObservationOperation::Lstat,
+            );
+            match bytes {
+                Some(bytes) => {
+                    entries.insert(
+                        lstat,
+                        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                            PathNodeKind::RegularFile,
+                            variant,
+                            variant,
+                            variant,
+                            variant,
+                            0o644,
+                        ))),
+                    );
+                    entries.insert(
+                        PathObservationDemand::new(
+                            PathObservationNamespace::Host,
+                            path,
+                            PathObservationOperation::FileBytes,
+                        ),
+                        PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                            bytes.as_bytes(),
+                        ))),
+                    );
+                }
+                None => {
+                    entries.insert(
+                        lstat,
+                        PathObservationResult::Lstat(PathOperationResult::Missing),
+                    );
+                }
+            }
+        }
+        PathObservationEpoch::new(entries).unwrap()
+    }
+
+    fn snapshot(source: &str, lockfile: Option<&str>) -> Arc<WorkspaceSnapshot> {
+        let files = [
+            ("/workspace/MODULE.bazel", Some(source)),
+            ("/workspace/MODULE.bazel.lock", lockfile),
+        ]
+        .into_iter()
+        .filter_map(|(path, source)| {
+            source.map(|source| {
+                (
+                    PathBuf::from(path),
+                    WorkspaceFileValue::Present(Arc::new(source.to_owned())),
+                )
+            })
+        })
+        .collect::<SortedMap<_, _>>();
+        Arc::new(WorkspaceSnapshot {
+            files: Arc::new(files),
+        })
+    }
+
+    async fn compute(
+        dice: &Arc<Dice>,
+        source: &str,
+        lockfile: Option<&str>,
+        mode: LockfileMode,
+        variant: i64,
+    ) -> (
+        <RootModuleFilesObservationKey as Key>::Value,
+        Arc<Result<RootModuleFiles, CompactString>>,
+        PathObservationEpoch,
+    ) {
+        let injected = epoch(source, lockfile, variant);
+        let mut updater = dice.updater();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, injected.dupe())])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                snapshot(source, lockfile),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                Arc::new(WorkspaceRawSnapshot {
+                    files: Arc::new(SortedMap::from_iter([(
+                        PathBuf::from("/workspace/MODULE.bazel.lock"),
+                        match lockfile {
+                            Some(source) => {
+                                WorkspaceRawFileValue::Present(Arc::from(source.as_bytes()))
+                            }
+                            None => WorkspaceRawFileValue::Absent,
+                        },
+                    )])),
+                }),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            &mut updater,
+            RootPackagePolicyInputs::new(
+                workspace(),
+                [workspace()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace().as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            mode,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let observed = transaction
+            .compute(&RootModuleFilesObservationKey::new(workspace()))
+            .await
+            .unwrap();
+        let legacy = transaction
+            .compute(&RootModuleFilesKey {
+                workspace: PathBuf::from("/workspace"),
+            })
+            .await
+            .unwrap();
+        (observed, legacy, injected)
+    }
+
+    fn complete(
+        outcome: &<RootModuleFilesObservationKey as Key>::Value,
+    ) -> &ObservedRootModuleFiles {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("observed root files did not complete: {outcome:?}");
+        };
+        observed
+    }
+
+    #[tokio::test]
+    async fn observed_root_files_preserve_values_errors_epochs_and_off_mode() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let source = "module(name='root')\np=use_extension('//:ext.bzl','ext')\nuse_repo(p, rust_toolchains='rust_toolchains')";
+        let (success, legacy, injected) = compute(
+            &dice,
+            source,
+            Some(r#"{"lockFileVersion":28}"#),
+            LockfileMode::Update,
+            1,
+        )
+        .await;
+        let success = complete(&success);
+        assert_eq!(success.result().as_ref(), legacy.as_ref());
+        let files = success.result().as_ref().as_ref().unwrap();
+        assert_eq!(files.extension_usages.len(), 1);
+        assert_eq!(
+            success.observations().observations().len(),
+            injected.observations().len()
+        );
+        for (demand, result) in success.observations().observations() {
+            assert!(Arc::ptr_eq(
+                result,
+                injected.observations().get(demand).unwrap()
+            ));
+        }
+
+        let (off, off_legacy, _) =
+            compute(&dice, source, Some("broken"), LockfileMode::Off, 2).await;
+        let off = complete(&off);
+        assert_eq!(off.result().as_ref(), off_legacy.as_ref());
+        assert!(off.observations().observations().keys().all(|demand| {
+            demand.path().as_path() != Path::new("/workspace/MODULE.bazel.lock")
+        }));
+
+        let (bad_root, bad_root_legacy, _) =
+            compute(&dice, "module(name=", None, LockfileMode::Update, 3).await;
+        let bad_root = complete(&bad_root);
+        assert_eq!(bad_root.result().as_ref(), bad_root_legacy.as_ref());
+        assert!(bad_root.observations().observations().keys().all(|demand| {
+            demand.path().as_path() != Path::new("/workspace/MODULE.bazel.lock")
+        }));
+
+        let (bad_lockfile, bad_lockfile_legacy, bad_lockfile_epoch) =
+            compute(&dice, source, Some("{"), LockfileMode::Update, 4).await;
+        let bad_lockfile = complete(&bad_lockfile);
+        assert_eq!(bad_lockfile.result().as_ref(), bad_lockfile_legacy.as_ref());
+        assert_eq!(bad_lockfile.observations(), &bad_lockfile_epoch);
+
+        let observations = success.observations().observations();
+        let demand = observations.keys().next().unwrap().dupe();
+        let first = observations.get(&demand).unwrap().dupe();
+        let one = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let merged = union_root_module_observations(&one, &one).unwrap();
+        assert!(Arc::ptr_eq(
+            merged.observations().get(&demand).unwrap(),
+            &first
+        ));
+        let conflict = PathObservationEpoch::from_shared([(
+            demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+        )])
+        .unwrap();
+        assert!(union_root_module_observations(&one, &conflict).is_err());
+
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(demand.dupe()),
+        ));
+        assert!(!RootModuleFilesObservationKey::validity(&need));
+        assert!(!RootModuleFilesObservationKey::equality(&need, &need));
+        let outer = SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+            PathObservationEpochError::DuplicateDemand(demand),
+        )));
+        assert!(RootModuleFilesObservationKey::validity(&outer));
+        assert!(RootModuleFilesObservationKey::equality(&outer, &outer));
+        let failures = [
+            HostRootIncludePackageFailure::NoBuildFile,
+            HostRootIncludePackageFailure::Deleted,
+            HostRootIncludePackageFailure::InvalidPackageName {
+                message: Arc::from("invalid name"),
+            },
+            HostRootIncludePackageFailure::Operational(HostRootPackageLookupError::PolicyInput(
+                RootPackagePolicyProjectionError::MissingInput {
+                    workspace: workspace(),
+                },
+            )),
+        ];
+        let messages = failures.map(|failure| crate::host_module::package_error("//pkg", &failure));
+        assert!(messages.windows(2).all(|pair| pair[0] != pair[1]));
     }
 }
 

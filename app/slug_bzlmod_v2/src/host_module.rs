@@ -32,6 +32,7 @@ use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
+use slug_workspace_v2::PathResolutionError;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -55,10 +56,14 @@ use crate::host_file::HostFileBytesKey;
 use crate::host_file::HostFileBytesObservationKey;
 use crate::host_file::HostFileError;
 use crate::host_include::HostRootIncludeError;
+use crate::host_include::HostRootIncludePackageFailure as Failure;
 use crate::host_include::preflight_root_include_horizon;
 use crate::host_include::preflight_root_include_horizon_observed;
+use crate::host_package::HostRootPackageLookupError;
+use crate::module_eval::RootExtensionUsage;
 use crate::module_eval::RootModuleSourceFile;
 use crate::module_eval::evaluate_root_module_closure_with_events;
+use crate::module_eval::host_file_semantic_error;
 use crate::module_eval::root_module_ignore_dev_dependency;
 use crate::module_eval::validate_root_module_source;
 
@@ -67,6 +72,7 @@ pub(crate) struct HostRootModuleFileValue {
     pub(crate) module: EvaluatedRootModule,
     pub(crate) overrides: RootModuleOverrides,
     pub(crate) module_file_paths: Arc<[PathBuf]>,
+    pub(crate) extension_usages: Arc<[RootExtensionUsage]>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -120,6 +126,75 @@ impl fmt::Display for HostRootModuleFileError {
 
 impl std::error::Error for HostRootModuleFileError {}
 
+pub(crate) fn package_error(raw_label: &str, failure: &Failure) -> CompactString {
+    CompactString::new(match failure {
+        Failure::NoBuildFile => {
+            format!("root MODULE include package has no BUILD file: {raw_label}")
+        }
+        Failure::Deleted => format!("root MODULE include package is deleted: {raw_label}"),
+        Failure::InvalidPackageName { message } => {
+            format!("root MODULE include package name is invalid: {raw_label}: {message}")
+        }
+        Failure::Operational(error) => match error {
+            HostRootPackageLookupError::PolicyInput(error) => {
+                format!("root MODULE include package policy failed: {raw_label}: {error}")
+            }
+            HostRootPackageLookupError::RepositoryIgnore(_) => {
+                format!("root MODULE include repository-ignore failed: {raw_label}")
+            }
+            HostRootPackageLookupError::Resolution {
+                logical_path,
+                error,
+            } => {
+                let class = match error {
+                    PathResolutionError::Observation { .. } => "observation failed",
+                    PathResolutionError::InconsistentState { .. } => "changed during resolution",
+                    PathResolutionError::Cycle { .. } => "has a symlink cycle",
+                    PathResolutionError::InfiniteExpansion { .. } => {
+                        "has infinite symlink expansion"
+                    }
+                };
+                format!(
+                    "root MODULE include package marker {} {class}: {raw_label}",
+                    logical_path.as_path().display()
+                )
+            }
+        },
+    })
+}
+
+impl HostRootModuleFileError {
+    pub(crate) fn semantic_message(&self) -> CompactString {
+        match self {
+            Self::CommandPolicy { message }
+            | Self::RootValidation { message, .. }
+            | Self::IncludeValidation { message, .. }
+            | Self::Evaluation { message, .. } => message.clone(),
+            Self::RootFile { error } | Self::IncludeFile { error, .. } => {
+                host_file_semantic_error(error)
+            }
+            Self::IncludePreflight { error } => match error {
+                HostRootIncludeError::BadLabel {
+                    raw_label, message, ..
+                } => CompactString::new(format!(
+                    "invalid root MODULE include {raw_label}: {message}"
+                )),
+                HostRootIncludeError::Package {
+                    raw_label, failure, ..
+                } => package_error(raw_label, failure),
+            },
+            Self::IncludeMissing { logical_path, .. } => CompactString::new(format!(
+                "workspace file is absent: {}",
+                logical_path.as_path().display()
+            )),
+            Self::IncludeCycle { logical_path, .. } => CompactString::new(format!(
+                "root MODULE include cycle at {}",
+                logical_path.as_path().display()
+            )),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative, Dupe)]
 pub(crate) struct HostRootModuleFileKey {
     workspace: NormalizedAbsolutePath,
@@ -168,6 +243,7 @@ fn evaluate_root_module_terminal(
             module: evaluation.module,
             overrides: evaluation.overrides,
             module_file_paths: evaluation.module_file_paths,
+            extension_usages: evaluation.extension_usages,
         })
         .map_err(|message| HostRootModuleFileError::Evaluation {
             message,
@@ -1545,6 +1621,8 @@ mod tests {
     use crate::host_package::HostRootPackageLookupObservationKey;
     use crate::inject_root_module_request_inputs;
     use crate::inject_root_package_policy_inputs;
+    use crate::module_eval::RootModuleFilesKey;
+    use crate::module_eval::RootModuleFilesObservationKey;
     use crate::module_eval::clear_validated_root_module_logical_ids;
     use crate::module_eval::take_validated_root_module_logical_ids;
     use crate::repo_file::HostRepoFileKey;
@@ -1582,6 +1660,7 @@ mod tests {
             },
             overrides: RootModuleOverrides::default(),
             module_file_paths: ["MODULE.bazel".into()].into(),
+            extension_usages: Arc::from([]),
         }
     }
 
@@ -1724,6 +1803,10 @@ mod tests {
                 || key
                     .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
                     .is_some()
+                || key.downcast_ref::<RootModuleFilesKey>().is_some()
+                || key
+                    .downcast_ref::<RootModuleFilesObservationKey>()
+                    .is_some()
             {
                 self.anchor_dependencies
                     .lock()
@@ -1744,6 +1827,10 @@ mod tests {
                 && key.downcast_ref::<RootModuleLoadingAnchorKey>().is_none()
                 && key
                     .downcast_ref::<RootModuleLoadingAnchorObservationKey>()
+                    .is_none()
+                && key.downcast_ref::<RootModuleFilesKey>().is_none()
+                && key
+                    .downcast_ref::<RootModuleFilesObservationKey>()
                     .is_none()
                 && key.downcast_ref::<RootRepositoryRouteKey>().is_none()
                 && key
@@ -1912,6 +1999,45 @@ mod tests {
         let mut transaction = updater.commit().await;
         transaction
             .compute(&HostRootModuleFileObservationKey::new(workspace()))
+            .await
+            .unwrap()
+    }
+
+    async fn observed_root_files(
+        dice: &Arc<Dice>,
+        epoch: PathObservationEpoch,
+        tracker: &Arc<EventTracker>,
+    ) -> <RootModuleFilesObservationKey as Key>::Value {
+        let mut user_data = UserComputationData {
+            activation_tracker: Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        user_data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(user_data);
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from("/workspace"),
+                },
+                snapshot(None),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(&mut updater, policy(&["/workspace"])).unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace().as_path(),
+            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            LockfileMode::Update,
+        )
+        .unwrap();
+        updater
+            .commit()
+            .await
+            .compute(&RootModuleFilesObservationKey::new(workspace()))
             .await
             .unwrap()
     }
@@ -4527,5 +4653,74 @@ include('//b:b.MODULE.bazel')
         };
         assert!(bootstrap.root_module_bootstrap_request().is_some());
         assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+    }
+
+    #[tokio::test]
+    async fn root_files_parent_is_eventless_family_isolated_and_restores_a_b_a() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(EventTracker::default());
+        let source = |value: &str| {
+            format!(
+                "module(name='root')\nprint('{value}')\np=use_extension('//:{value}.bzl','{value}')\nuse_repo(p, rust_toolchains='rust_toolchains')"
+            )
+        };
+        let epoch = |value: &str, variant| {
+            let mut epoch = EpochBuilder::root(source(value), variant);
+            epoch.missing("/workspace/MODULE.bazel.lock");
+            epoch.build()
+        };
+
+        let first = observed_root_files(&dice, epoch("a", 1), &tracker).await;
+        let SourcePreparationOutcome::Complete(Ok(first)) = first else {
+            panic!("root files did not complete: {first:?}");
+        };
+        let held = first.result().dupe();
+        let dependencies = tracker.take_anchor_dependencies();
+        assert!(dependencies.iter().any(|row| {
+            row.iter()
+                .any(|key| key.starts_with("bzlmod-observed-host-root-module-file:"))
+                && row
+                    .iter()
+                    .any(|key| key.starts_with("bzlmod-observed-host-file-bytes:"))
+                && row.iter().all(|key| {
+                    !key.starts_with("root-module-evaluation:")
+                        && !key.starts_with("visible-lockfile:")
+                })
+        }));
+        let cold = tracker.take();
+        assert!(cold.iter().any(|entry| {
+            entry
+                .key
+                .starts_with("bzlmod-observed-host-root-module-file:")
+                && entry
+                    .batch
+                    .as_ref()
+                    .is_some_and(|batch| !batch.events().is_empty())
+        }));
+        assert!(cold.iter().any(|entry| {
+            entry.key.starts_with("observed-root-module-files:") && entry.batch.is_none()
+        }));
+
+        observed_root_files(&dice, epoch("a", 1), &tracker).await;
+        assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
+        tracker.take_anchor_dependencies();
+
+        let changed = observed_root_files(&dice, epoch("b", 2), &tracker).await;
+        assert!(!RootModuleFilesObservationKey::equality(
+            &SourcePreparationOutcome::Complete(Ok(first.clone())),
+            &changed
+        ));
+        tracker.take();
+        tracker.take_anchor_dependencies();
+
+        let restored = observed_root_files(&dice, epoch("a", 3), &tracker).await;
+        let SourcePreparationOutcome::Complete(Ok(restored)) = &restored else {
+            panic!("restored root files did not complete: {restored:?}");
+        };
+        assert_eq!(held.as_ref(), restored.result().as_ref());
+        assert_eq!(
+            held.as_ref().as_ref().unwrap().extension_usages[0].extension_name,
+            "a"
+        );
     }
 }
