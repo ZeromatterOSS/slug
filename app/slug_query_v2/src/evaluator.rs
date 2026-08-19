@@ -20,9 +20,13 @@ use compact_str::CompactString;
 use dice::CancellationContext;
 use dice::DiceComputations;
 use dice::Key;
+use dupe::Dupe;
 use slug_bzlmod_v2::RootModuleLoadingAnchorKey;
+use slug_bzlmod_v2::RootModuleLoadingAnchorObservationKey;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 
 use crate::QueryPolicy;
 use crate::generic::QueryEvaluator;
@@ -49,6 +53,34 @@ pub struct RootQueryCommandKey {
     completion: QueryOutputCompletion,
 }
 
+#[doc(hidden)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Allocative)]
+pub struct RootQueryCommandObservationKey(RootQueryCommandKey);
+
+#[doc(hidden)]
+#[derive(Debug, Clone, Eq, PartialEq, Allocative, Dupe)]
+pub struct ObservedRootQueryCommand {
+    result: Arc<Result<QueryOutput, QueryError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRootQueryCommand {
+    #[doc(hidden)]
+    pub fn result(&self) -> &Arc<Result<QueryOutput, QueryError>> {
+        &self.result
+    }
+
+    #[doc(hidden)]
+    pub fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+
+    #[doc(hidden)]
+    pub fn into_result(self) -> Arc<Result<QueryOutput, QueryError>> {
+        self.result
+    }
+}
+
 impl RootQueryCommandKey {
     pub fn new(
         workspace: NormalizedAbsolutePath,
@@ -72,10 +104,48 @@ impl RootQueryCommandKey {
     }
 }
 
+impl RootQueryCommandObservationKey {
+    #[doc(hidden)]
+    pub fn new(
+        workspace: NormalizedAbsolutePath,
+        source: impl Into<CompactString>,
+        order: QueryOrder,
+        policy: QueryPolicy,
+        completion: QueryOutputCompletion,
+    ) -> Result<Self, QueryError> {
+        RootQueryCommandKey::new(workspace, source, order, policy, completion).map(Self)
+    }
+}
+
 impl fmt::Display for RootQueryCommandKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "root-query-command:{}", self.source)
     }
+}
+
+impl fmt::Display for RootQueryCommandObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum RootQueryMode {
+    Legacy,
+    Observed,
+}
+
+type ObservedRootQueryValue =
+    LoadingPreparationOutcome<Result<ObservedRootQueryCommand, ObservedPathFrontierError>>;
+
+fn root_query_complete(
+    result: Result<QueryOutput, QueryError>,
+    observations: PathObservationEpoch,
+) -> ObservedRootQueryValue {
+    LoadingPreparationOutcome::Complete(Ok(ObservedRootQueryCommand {
+        result: Arc::new(result),
+        observations,
+    }))
 }
 
 #[async_trait]
@@ -87,54 +157,15 @@ impl Key for RootQueryCommandKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        match ctx
-            .compute(&RootModuleLoadingAnchorKey::new(self.workspace.clone()))
-            .await
-            .expect("root module loading anchor DICE invariant")
-        {
-            LoadingPreparationOutcome::Need(need) => {
-                return LoadingPreparationOutcome::Need(need);
+        match compute_root_query_command(self, ctx, RootQueryMode::Legacy).await {
+            LoadingPreparationOutcome::Need(need) => LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Ok(value)) => {
+                LoadingPreparationOutcome::Complete(value.result)
             }
-            LoadingPreparationOutcome::Complete(anchor) => {
-                if let Err(error) = anchor.as_ref() {
-                    return LoadingPreparationOutcome::Complete(Arc::new(Err(
-                        QueryError::package_loading(error.to_string()),
-                    )));
-                }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                panic!("legacy root query produced observed outer error: {error}")
             }
         }
-
-        let expression = match parse_query_expression(&self.source) {
-            Ok(expression) => expression,
-            Err(error) => {
-                return LoadingPreparationOutcome::Complete(Arc::new(Err(QueryError::syntax(
-                    error.to_string(),
-                ))));
-            }
-        };
-        let mut evaluator = QueryEvaluator::new(LoadingQueryEnvironment::new_root(
-            ctx,
-            self.workspace.clone(),
-            self.policy,
-        ));
-        let result =
-            evaluate_parsed_query(&mut evaluator, &expression, self.order, self.completion).await;
-        if result
-            .as_ref()
-            .is_err_and(QueryError::is_preparation_restart)
-        {
-            return LoadingPreparationOutcome::Need(
-                evaluator
-                    .environment
-                    .take_preparation_needs()
-                    .expect("query restart sentinel requires typed preparation Needs"),
-            );
-        }
-        assert!(
-            evaluator.environment.take_preparation_needs().is_none(),
-            "typed query Needs require the private restart sentinel"
-        );
-        LoadingPreparationOutcome::Complete(Arc::new(result))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -144,6 +175,128 @@ impl Key for RootQueryCommandKey {
     fn validity(value: &Self::Value) -> bool {
         value.is_complete()
     }
+}
+
+#[async_trait]
+impl Key for RootQueryCommandObservationKey {
+    type Value = ObservedRootQueryValue;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        compute_root_query_command(&self.0, ctx, RootQueryMode::Observed).await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+async fn compute_root_query_command(
+    key: &RootQueryCommandKey,
+    ctx: &mut DiceComputations<'_>,
+    mode: RootQueryMode,
+) -> ObservedRootQueryValue {
+    let observations = match mode {
+        RootQueryMode::Legacy => match ctx
+            .compute(&RootModuleLoadingAnchorKey::new(key.workspace.clone()))
+            .await
+            .expect("root module loading anchor DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(anchor) => match anchor.as_ref() {
+                Ok(_) => PathObservationEpoch::empty(),
+                Err(error) => {
+                    return root_query_complete(
+                        Err(QueryError::package_loading(error.to_string())),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+            },
+        },
+        RootQueryMode::Observed => match ctx
+            .compute(&RootModuleLoadingAnchorObservationKey::new(
+                key.workspace.clone(),
+            ))
+            .await
+            .expect("observed root module loading anchor DICE invariant")
+        {
+            LoadingPreparationOutcome::Need(need) => {
+                return LoadingPreparationOutcome::Need(need);
+            }
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(anchor)) => match anchor.result() {
+                Ok(_) => anchor.observations().dupe(),
+                Err(error) => {
+                    return root_query_complete(
+                        Err(QueryError::package_loading(error.to_string())),
+                        anchor.observations().dupe(),
+                    );
+                }
+            },
+        },
+    };
+
+    let expression = match parse_query_expression(&key.source) {
+        Ok(expression) => expression,
+        Err(error) => {
+            return root_query_complete(Err(QueryError::syntax(error.to_string())), observations);
+        }
+    };
+    let environment = match mode {
+        RootQueryMode::Legacy => {
+            LoadingQueryEnvironment::new_root(ctx, key.workspace.clone(), key.policy)
+        }
+        RootQueryMode::Observed => LoadingQueryEnvironment::new_root_observed(
+            ctx,
+            key.workspace.clone(),
+            key.policy,
+            observations,
+        ),
+    };
+    let mut evaluator = QueryEvaluator::new(environment);
+    let result =
+        evaluate_parsed_query(&mut evaluator, &expression, key.order, key.completion).await;
+    if result
+        .as_ref()
+        .is_err_and(QueryError::is_preparation_restart)
+    {
+        return LoadingPreparationOutcome::Need(
+            evaluator
+                .environment
+                .take_preparation_needs()
+                .expect("query restart sentinel requires typed preparation Needs"),
+        );
+    }
+    if result
+        .as_ref()
+        .is_err_and(QueryError::is_observation_restart)
+    {
+        return LoadingPreparationOutcome::Complete(Err(evaluator
+            .environment
+            .take_observation_outer()
+            .expect("query observation sentinel requires typed outer failure")));
+    }
+    assert!(
+        evaluator.environment.take_preparation_needs().is_none(),
+        "typed query Needs require the private restart sentinel"
+    );
+    assert!(
+        evaluator.environment.take_observation_outer().is_none(),
+        "typed query outer failures require the private restart sentinel"
+    );
+    let observations = evaluator.environment.take_observations();
+    root_query_complete(result, observations)
 }
 
 pub async fn evaluate_loading_query(

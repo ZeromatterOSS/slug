@@ -1436,12 +1436,13 @@ fn repository_package_observation_reducer_preserves_outer_union_and_legacy_arc()
         panic!("expected legacy projection");
     };
     assert!(Arc::ptr_eq(&held, &projected));
-    let upper = concat!(
+    let query = concat!(
         include_str!("../../slug_query_v2/src/graph.rs"),
         include_str!("../../slug_query_v2/src/loading_environment.rs"),
-        include_str!("../../slug_core_v2/src/runtime/dice.rs")
     );
-    assert!(!upper.contains("RepositoryPackageLoadObservationKey"));
+    let core = include_str!("../../slug_core_v2/src/runtime/dice.rs");
+    assert!(query.contains("RepositoryPackageLoadObservationKey"));
+    assert!(!core.contains("RepositoryPackageLoadObservationKey"));
 }
 #[tokio::test]
 async fn observed_external_bzl_retains_recursive_epoch_arcs_and_local_events() {

@@ -20,24 +20,31 @@ use dupe::Dupe;
 use regex::Regex;
 use slug_bzlmod_v2::HostRootPackageBoundaryKey;
 use slug_bzlmod_v2::HostRootPackageBoundaryKind;
+use slug_bzlmod_v2::HostRootPackageBoundaryObservationKey;
 use slug_bzlmod_v2::RootRepositoryRoute;
 use slug_bzlmod_v2::RootRepositoryRouteKey;
+use slug_bzlmod_v2::RootRepositoryRouteObservationKey;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::PackagePath;
 use slug_identity_v2::TargetPattern;
 use slug_loading_v2::LoadingPreparationNeeds;
 use slug_loading_v2::LoadingPreparationOutcome;
 use slug_loading_v2::RepositoryPackageLoadKey;
+use slug_loading_v2::RepositoryPackageLoadObservationKey;
 use slug_loading_v2::RootPackageLoadKey;
+use slug_loading_v2::RootPackageLoadObservationKey;
 use slug_loading_v2::RuleVisibility;
 use slug_loading_v2::TestRuleKind;
 use slug_loading_v2::discover_build_file_companion;
 use slug_loading_v2::keys::PackageLoadKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathNodeKind;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathOutcome;
 use slug_workspace_v2::ResolvedPathKey;
+use slug_workspace_v2::ResolvedPathObservationKey;
 use slug_workspace_v2::ResolvedPathState;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -50,11 +57,15 @@ use crate::generic::TestSuiteAttribute;
 use crate::generic::TestTargetInfo;
 use crate::generic::TestTargetKind;
 use crate::graph::ExternalUnconfiguredPackageGraphKey;
+use crate::graph::ExternalUnconfiguredPackageGraphObservationKey;
 use crate::graph::QueryError;
 use crate::graph::QueryLabel;
 use crate::graph::QueryNode;
+use crate::graph::QueryObservationMode;
 use crate::graph::RootSubtreePackageSetKey;
+use crate::graph::RootSubtreePackageSetObservationKey;
 use crate::graph::RootUnconfiguredPackageGraphKey;
+use crate::graph::RootUnconfiguredPackageGraphObservationKey;
 use crate::graph::SubtreePackageSetKey;
 use crate::graph::UnconfiguredPackageGraph;
 use crate::graph::UnconfiguredPackageGraphKey;
@@ -67,11 +78,22 @@ use crate::provenance::QueryCandidateId;
 use crate::provenance::QueryPackageIdentity;
 use crate::traversal::ResolvedGraph;
 
+fn map_external_load_error(error: &slug_loading_v2::RepositoryPackageLoadError) -> QueryError {
+    if error.is_unsupported_feature() {
+        QueryError::unsupported_feature(error.to_string())
+    } else {
+        QueryError::evaluation(error.to_string())
+    }
+}
+
 pub(crate) struct LoadingQueryEnvironment<'a, 'd> {
     ctx: &'a mut DiceComputations<'d>,
     workspace: PathBuf,
     root_workspace: Option<NormalizedAbsolutePath>,
     preparation_needs: Option<LoadingPreparationNeeds>,
+    observation_outer: Option<ObservedPathFrontierError>,
+    observations: PathObservationEpoch,
+    observation_mode: QueryObservationMode,
     policy: QueryPolicy,
     evaluation_graph: ResolvedGraph<QueryLabel>,
     node_kinds: SmallMap<QueryLabel, CompactString>,
@@ -90,6 +112,9 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             workspace,
             root_workspace: None,
             preparation_needs: None,
+            observation_outer: None,
+            observations: PathObservationEpoch::empty(),
+            observation_mode: QueryObservationMode::Legacy,
             policy,
             evaluation_graph: ResolvedGraph::new(),
             node_kinds: SmallMap::new(),
@@ -108,6 +133,9 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             workspace: workspace.as_path().to_path_buf(),
             root_workspace: Some(workspace),
             preparation_needs: None,
+            observation_outer: None,
+            observations: PathObservationEpoch::empty(),
+            observation_mode: QueryObservationMode::Legacy,
             policy,
             evaluation_graph: ResolvedGraph::new(),
             node_kinds: SmallMap::new(),
@@ -116,8 +144,45 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         }
     }
 
+    pub(crate) fn new_root_observed(
+        ctx: &'a mut DiceComputations<'d>,
+        workspace: NormalizedAbsolutePath,
+        policy: QueryPolicy,
+        observations: PathObservationEpoch,
+    ) -> Self {
+        let mut environment = Self::new_root(ctx, workspace, policy);
+        environment.observation_mode = QueryObservationMode::Observed;
+        environment.observations = observations;
+        environment
+    }
+
     pub(crate) fn take_preparation_needs(&mut self) -> Option<LoadingPreparationNeeds> {
         self.preparation_needs.take()
+    }
+
+    pub(crate) fn take_observation_outer(&mut self) -> Option<ObservedPathFrontierError> {
+        self.observation_outer.take()
+    }
+
+    pub(crate) fn take_observations(&mut self) -> PathObservationEpoch {
+        std::mem::replace(&mut self.observations, PathObservationEpoch::empty())
+    }
+
+    fn merge_observations(&mut self, incoming: &PathObservationEpoch) -> Result<(), QueryError> {
+        self.observations = PathObservationEpoch::from_shared(
+            self.observations
+                .observations()
+                .iter()
+                .chain(incoming.observations())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .map_err(|error| self.observation_restart(error.into()))?;
+        Ok(())
+    }
+
+    fn observation_restart(&mut self, error: ObservedPathFrontierError) -> QueryError {
+        self.observation_outer.get_or_insert(error);
+        QueryError::observation_restart()
     }
 
     fn preparation_restart(&mut self, need: LoadingPreparationNeeds) -> QueryError {
@@ -136,14 +201,33 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     ) -> Result<Arc<UnconfiguredPackageGraph>, QueryError> {
         if let Some(workspace) = self.root_workspace.clone() {
             let package = PackagePath::parse(package).map_err(QueryError::evaluation)?;
-            return match self
-                .ctx
-                .compute(&RootUnconfiguredPackageGraphKey::new(workspace, package))
-                .await
-                .expect("root query graph DICE invariant")
-            {
-                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
-                LoadingPreparationOutcome::Complete(value) => value.as_ref().clone(),
+            return match self.observation_mode {
+                QueryObservationMode::Legacy => match self
+                    .ctx
+                    .compute(&RootUnconfiguredPackageGraphKey::new(workspace, package))
+                    .await
+                    .expect("root query graph DICE invariant")
+                {
+                    LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                    LoadingPreparationOutcome::Complete(value) => value.as_ref().clone(),
+                },
+                QueryObservationMode::Observed => match self
+                    .ctx
+                    .compute(&RootUnconfiguredPackageGraphObservationKey::new(
+                        workspace, package,
+                    ))
+                    .await
+                    .expect("observed root query graph DICE invariant")
+                {
+                    LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        Err(self.observation_restart(error))
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(value)) => {
+                        self.merge_observations(value.observations())?;
+                        value.result().as_ref().clone()
+                    }
+                },
             };
         }
         self.ctx
@@ -164,20 +248,43 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
         let workspace = self.root_workspace.clone().ok_or_else(|| {
             QueryError::evaluation("external repository query requires Host mode")
         })?;
-        let key = RootRepositoryRouteKey::new(workspace, apparent_repo.clone())
+        let key = RootRepositoryRouteKey::new(workspace.clone(), apparent_repo.clone())
             .map_err(QueryError::evaluation)?;
-        match self
-            .ctx
-            .compute(&key)
-            .await
-            .expect("root repository route DICE invariant")
-        {
-            LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
-            LoadingPreparationOutcome::Complete(value) => value
-                .as_ref()
-                .as_ref()
-                .cloned()
-                .map_err(|error| QueryError::evaluation(error.to_string())),
+        match self.observation_mode {
+            QueryObservationMode::Legacy => match self
+                .ctx
+                .compute(&key)
+                .await
+                .expect("root repository route DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(value) => value
+                    .as_ref()
+                    .as_ref()
+                    .cloned()
+                    .map_err(|error| QueryError::evaluation(error.to_string())),
+            },
+            QueryObservationMode::Observed => match self
+                .ctx
+                .compute(
+                    &RootRepositoryRouteObservationKey::new(workspace, apparent_repo.clone())
+                        .map_err(QueryError::evaluation)?,
+                )
+                .await
+                .expect("observed root repository route DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    Err(self.observation_restart(error))
+                }
+                LoadingPreparationOutcome::Complete(Ok(value)) => {
+                    self.merge_observations(value.observations())?;
+                    match value.result().as_ref() {
+                        Ok(route) => Ok(route.clone()),
+                        Err(error) => Err(QueryError::evaluation(error.to_string())),
+                    }
+                }
+            },
         }
     }
 
@@ -211,17 +318,37 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             return self.package_graph(owner.package().as_str()).await;
         }
         let route = self.verified_repository_route(owner).await?;
-        match self
-            .ctx
-            .compute(&ExternalUnconfiguredPackageGraphKey::new(
-                route,
-                owner.package().clone(),
-            ))
-            .await
-            .expect("external query graph DICE invariant")
-        {
-            LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
-            LoadingPreparationOutcome::Complete(value) => value.as_ref().clone(),
+        match self.observation_mode {
+            QueryObservationMode::Legacy => match self
+                .ctx
+                .compute(&ExternalUnconfiguredPackageGraphKey::new(
+                    route,
+                    owner.package().clone(),
+                ))
+                .await
+                .expect("external query graph DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(value) => value.as_ref().clone(),
+            },
+            QueryObservationMode::Observed => match self
+                .ctx
+                .compute(&ExternalUnconfiguredPackageGraphObservationKey::new(
+                    route,
+                    owner.package().clone(),
+                ))
+                .await
+                .expect("observed external query graph DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    Err(self.observation_restart(error))
+                }
+                LoadingPreparationOutcome::Complete(Ok(value)) => {
+                    self.merge_observations(value.observations())?;
+                    value.result().as_ref().clone()
+                }
+            },
         }
     }
 
@@ -282,18 +409,40 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     ) -> Result<(PathBuf, Arc<[slug_loading_v2::BzlModuleIdentity]>), QueryError> {
         if let Some(workspace) = self.root_workspace.clone() {
             let package = PackagePath::parse(package).map_err(QueryError::evaluation)?;
-            return match self
-                .ctx
-                .compute(&RootPackageLoadKey::new(workspace, package))
-                .await
-                .expect("root package loading DICE invariant")
-            {
-                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
-                LoadingPreparationOutcome::Complete(value) => value
-                    .as_ref()
-                    .as_ref()
-                    .map(|loaded| (loaded.build_file.clone(), loaded.reachable_loads.clone()))
-                    .map_err(|error| QueryError::evaluation(error.to_string())),
+            return match self.observation_mode {
+                QueryObservationMode::Legacy => match self
+                    .ctx
+                    .compute(&RootPackageLoadKey::new(workspace, package))
+                    .await
+                    .expect("root package loading DICE invariant")
+                {
+                    LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                    LoadingPreparationOutcome::Complete(value) => value
+                        .as_ref()
+                        .as_ref()
+                        .map(|loaded| (loaded.build_file.clone(), loaded.reachable_loads.clone()))
+                        .map_err(|error| QueryError::evaluation(error.to_string())),
+                },
+                QueryObservationMode::Observed => match self
+                    .ctx
+                    .compute(&RootPackageLoadObservationKey::new(workspace, package))
+                    .await
+                    .expect("observed root package loading DICE invariant")
+                {
+                    LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        Err(self.observation_restart(error))
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(value)) => {
+                        self.merge_observations(value.observations())?;
+                        match value.result().as_ref() {
+                            Ok(loaded) => {
+                                Ok((loaded.build_file.clone(), loaded.reachable_loads.clone()))
+                            }
+                            Err(error) => Err(QueryError::evaluation(error.to_string())),
+                        }
+                    }
+                },
             };
         }
         let value = self
@@ -319,26 +468,44 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             return self.package_load_provenance(owner.package().as_str()).await;
         }
         let route = self.verified_repository_route(owner).await?;
-        match self
-            .ctx
-            .compute(&RepositoryPackageLoadKey::new(
-                route,
-                owner.package().clone(),
-            ))
-            .await
-            .expect("external package loading DICE invariant")
-        {
-            LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
-            LoadingPreparationOutcome::Complete(value) => {
-                let loaded = value.as_ref().as_ref().map_err(|error| {
-                    if error.is_unsupported_feature() {
-                        QueryError::unsupported_feature(error.to_string())
-                    } else {
-                        QueryError::evaluation(error.to_string())
-                    }
-                })?;
-                Ok((loaded.build_file.clone(), loaded.reachable_loads.clone()))
-            }
+        match self.observation_mode {
+            QueryObservationMode::Legacy => match self
+                .ctx
+                .compute(&RepositoryPackageLoadKey::new(
+                    route,
+                    owner.package().clone(),
+                ))
+                .await
+                .expect("external package loading DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(value) => {
+                    let loaded = value.as_ref().as_ref().map_err(map_external_load_error)?;
+                    Ok((loaded.build_file.clone(), loaded.reachable_loads.clone()))
+                }
+            },
+            QueryObservationMode::Observed => match self
+                .ctx
+                .compute(&RepositoryPackageLoadObservationKey::new(
+                    route,
+                    owner.package().clone(),
+                ))
+                .await
+                .expect("observed external package loading DICE invariant")
+            {
+                LoadingPreparationOutcome::Need(need) => Err(self.preparation_restart(need)),
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    Err(self.observation_restart(error))
+                }
+                LoadingPreparationOutcome::Complete(Ok(value)) => {
+                    self.merge_observations(value.observations())?;
+                    let loaded = match value.result().as_ref() {
+                        Ok(loaded) => loaded,
+                        Err(error) => return Err(map_external_load_error(error)),
+                    };
+                    Ok((loaded.build_file.clone(), loaded.reachable_loads.clone()))
+                }
+            },
         }
     }
 
@@ -492,16 +659,35 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
     ) -> Result<TargetSet<QueryLabel>, QueryError> {
         let packages = if let Some(workspace) = self.root_workspace.clone() {
             let prefix = PackagePath::parse(prefix).map_err(QueryError::evaluation)?;
-            match self
-                .ctx
-                .compute(&RootSubtreePackageSetKey::new(workspace, prefix))
-                .await
-                .expect("root subtree package-set DICE invariant")
-            {
-                LoadingPreparationOutcome::Need(need) => {
-                    return Err(self.preparation_restart(need));
-                }
-                LoadingPreparationOutcome::Complete(packages) => packages,
+            match self.observation_mode {
+                QueryObservationMode::Legacy => match self
+                    .ctx
+                    .compute(&RootSubtreePackageSetKey::new(workspace, prefix))
+                    .await
+                    .expect("root subtree package-set DICE invariant")
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return Err(self.preparation_restart(need));
+                    }
+                    LoadingPreparationOutcome::Complete(packages) => packages,
+                },
+                QueryObservationMode::Observed => match self
+                    .ctx
+                    .compute(&RootSubtreePackageSetObservationKey::new(workspace, prefix))
+                    .await
+                    .expect("observed root subtree package-set DICE invariant")
+                {
+                    LoadingPreparationOutcome::Need(need) => {
+                        return Err(self.preparation_restart(need));
+                    }
+                    LoadingPreparationOutcome::Complete(Err(error)) => {
+                        return Err(self.observation_restart(error));
+                    }
+                    LoadingPreparationOutcome::Complete(Ok(packages)) => {
+                        self.merge_observations(packages.observations())?;
+                        packages.result().dupe()
+                    }
+                },
             }
         } else {
             self.ctx
@@ -543,24 +729,55 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
             .root_workspace
             .clone()
             .expect("root companion lookup requires root query mode");
-        let boundary = self
-            .ctx
-            .compute(&HostRootPackageBoundaryKey::new(workspace, package.clone()))
-            .await
-            .expect("Host package-boundary DICE invariant");
-        let selected_root = match boundary {
-            PathOutcome::Need(need) => {
-                return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
-            }
-            PathOutcome::Complete(value) => match value.as_ref() {
-                Err(error) => return Err(QueryError::evaluation(error.to_string())),
-                Ok(boundary) if boundary.kind() != HostRootPackageBoundaryKind::Package => {
-                    return Ok(None);
+        let selected_root = match self.observation_mode {
+            QueryObservationMode::Legacy => match self
+                .ctx
+                .compute(&HostRootPackageBoundaryKey::new(workspace, package.clone()))
+                .await
+                .expect("Host package-boundary DICE invariant")
+            {
+                PathOutcome::Need(need) => {
+                    return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
                 }
-                Ok(boundary) => boundary
-                    .selected_package_root()
-                    .expect("Package boundary retains its selected root")
-                    .clone(),
+                PathOutcome::Complete(value) => match value.as_ref() {
+                    Err(error) => return Err(QueryError::evaluation(error.to_string())),
+                    Ok(boundary) if boundary.kind() != HostRootPackageBoundaryKind::Package => {
+                        return Ok(None);
+                    }
+                    Ok(boundary) => boundary
+                        .selected_package_root()
+                        .expect("Package boundary retains its selected root")
+                        .clone(),
+                },
+            },
+            QueryObservationMode::Observed => match self
+                .ctx
+                .compute(&HostRootPackageBoundaryObservationKey::new(
+                    workspace,
+                    package.clone(),
+                ))
+                .await
+                .expect("observed Host package-boundary DICE invariant")
+            {
+                PathOutcome::Need(need) => {
+                    return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
+                }
+                PathOutcome::Complete(Err(error)) => {
+                    return Err(self.observation_restart(error));
+                }
+                PathOutcome::Complete(Ok(value)) => {
+                    self.merge_observations(value.observations())?;
+                    match value.result() {
+                        Err(error) => return Err(QueryError::evaluation(error.to_string())),
+                        Ok(boundary) if boundary.kind() != HostRootPackageBoundaryKind::Package => {
+                            return Ok(None);
+                        }
+                        Ok(boundary) => boundary
+                            .selected_package_root()
+                            .expect("Package boundary retains its selected root")
+                            .clone(),
+                    }
+                }
             },
         };
         let mut selected = None;
@@ -572,35 +789,60 @@ impl<'a, 'd> LoadingQueryEnvironment<'a, 'd> {
                     .join(basename),
             )
             .expect("selected BUILD marker remains absolute");
-            match self
-                .ctx
-                .compute(&ResolvedPathKey::new(
-                    PathObservationNamespace::Host,
-                    marker,
-                ))
-                .await
-                .expect("resolved BUILD marker DICE invariant")
-            {
-                PathOutcome::Need(need) => {
-                    return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
-                }
-                PathOutcome::Complete(Err(error)) => {
-                    return Err(QueryError::evaluation(format!("{error:?}")));
-                }
-                PathOutcome::Complete(Ok(resolved))
-                    if matches!(
-                        resolved.state(),
-                        ResolvedPathState::Present(lstat)
-                            if matches!(
-                                lstat.kind(),
-                                PathNodeKind::RegularFile | PathNodeKind::SpecialFile
-                            )
-                    ) =>
+            let state = match self.observation_mode {
+                QueryObservationMode::Legacy => match self
+                    .ctx
+                    .compute(&ResolvedPathKey::new(
+                        PathObservationNamespace::Host,
+                        marker,
+                    ))
+                    .await
+                    .expect("resolved BUILD marker DICE invariant")
                 {
-                    selected = Some(basename);
-                    break;
-                }
-                PathOutcome::Complete(Ok(_)) => {}
+                    PathOutcome::Need(need) => {
+                        return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
+                    }
+                    PathOutcome::Complete(result) => result
+                        .as_ref()
+                        .as_ref()
+                        .map(|resolved| resolved.state().clone())
+                        .map_err(|error| QueryError::evaluation(format!("{error:?}")))?,
+                },
+                QueryObservationMode::Observed => match self
+                    .ctx
+                    .compute(&ResolvedPathObservationKey::new(
+                        PathObservationNamespace::Host,
+                        marker,
+                    ))
+                    .await
+                    .expect("observed resolved BUILD marker DICE invariant")
+                {
+                    PathOutcome::Need(need) => {
+                        return Err(self.preparation_restart(LoadingPreparationNeeds::path(need)));
+                    }
+                    PathOutcome::Complete(Err(error)) => {
+                        return Err(self.observation_restart(error));
+                    }
+                    PathOutcome::Complete(Ok(value)) => {
+                        self.merge_observations(value.observations())?;
+                        value
+                            .result()
+                            .as_ref()
+                            .map(|resolved| resolved.state().clone())
+                            .map_err(|error| QueryError::evaluation(format!("{error:?}")))?
+                    }
+                },
+            };
+            if matches!(
+                state,
+                ResolvedPathState::Present(lstat)
+                    if matches!(
+                        lstat.kind(),
+                        PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                    )
+            ) {
+                selected = Some(basename);
+                break;
             }
         }
         let basename = selected.expect("Package boundary selected one BUILD marker");

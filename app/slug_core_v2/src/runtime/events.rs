@@ -16,6 +16,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::Weak;
 
+use allocative::Allocative;
 use dice::ActivationClosure;
 use dice::ActivationClosureError;
 use dice::ActivationKind;
@@ -104,7 +105,27 @@ pub(super) struct SelectedTerminalToken {
     armed: bool,
 }
 
-/// Ordered command-local batches selected from one exact terminal closure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+enum SelectedEventTransition {
+    NoTransition,
+    Known(Option<EventBatch>),
+}
+
+/// Ordered command-local event state selected from one exact terminal closure.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct SelectedEventState {
+    nodes: Arc<[(DiceNodeId, SelectedEventTransition)]>,
+    #[cfg(test)]
+    batches: Arc<[EventBatch]>,
+}
+
+/// Compact event state from the last successfully accepted command.
+#[derive(Clone, Debug, Eq, PartialEq, Allocative, Dupe)]
+pub(super) struct AcceptedEventEpoch {
+    entries: Arc<[(DiceNodeId, EventBatch)]>,
+}
+
+/// Ordered event batches selected for publication by the current command.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(super) struct SelectedEventBatches {
     batches: Arc<[EventBatch]>,
@@ -150,13 +171,13 @@ pub struct PublishedCommand<T> {
 
 #[derive(Debug)]
 pub(super) struct SelectedCommandSidecars {
-    events: SelectedEventBatches,
+    events: SelectedEventState,
     demands: SelectedWorkspaceDemands,
     terminal: SelectedTerminalToken,
 }
 
 impl SelectedCommandSidecars {
-    pub(super) fn events(&self) -> &SelectedEventBatches {
+    pub(super) fn events(&self) -> &SelectedEventState {
         &self.events
     }
 
@@ -167,7 +188,7 @@ impl SelectedCommandSidecars {
     pub(super) fn into_parts(
         self,
     ) -> (
-        SelectedEventBatches,
+        SelectedEventState,
         SelectedWorkspaceDemands,
         SelectedTerminalToken,
     ) {
@@ -177,7 +198,8 @@ impl SelectedCommandSidecars {
     #[cfg(test)]
     pub(super) fn for_test(demands: SelectedWorkspaceDemands) -> Self {
         Self {
-            events: SelectedEventBatches {
+            events: SelectedEventState {
+                nodes: Arc::from([]),
                 batches: Arc::from([]),
             },
             demands,
@@ -225,6 +247,57 @@ impl Drop for SelectedTerminalToken {
             let _ = self.owner.reset_terminal(self.id);
             self.armed = false;
         }
+    }
+}
+
+impl AcceptedEventEpoch {
+    pub(super) fn empty() -> Self {
+        Self {
+            entries: Arc::from([]),
+        }
+    }
+}
+
+impl SelectedEventState {
+    #[cfg(test)]
+    pub(super) fn batches(&self) -> &[EventBatch] {
+        &self.batches
+    }
+
+    pub(super) fn reconcile(
+        self,
+        prior: &AcceptedEventEpoch,
+    ) -> (SelectedEventBatches, AcceptedEventEpoch) {
+        let mut prior_by_node = SmallMap::new();
+        for (node, batch) in prior.entries.iter() {
+            prior_by_node.insert(*node, batch.dupe());
+        }
+        let mut batches = Vec::new();
+        let mut entries = Vec::new();
+        for (node, transition) in self.nodes.iter() {
+            match transition {
+                SelectedEventTransition::Known(Some(batch)) => {
+                    if prior_by_node.get(node) != Some(batch) && !batch.events().is_empty() {
+                        batches.push(batch.dupe());
+                    }
+                    entries.push((*node, batch.dupe()));
+                }
+                SelectedEventTransition::Known(None) => {}
+                SelectedEventTransition::NoTransition => {
+                    if let Some(batch) = prior_by_node.get(node) {
+                        entries.push((*node, batch.dupe()));
+                    }
+                }
+            }
+        }
+        (
+            SelectedEventBatches {
+                batches: batches.into(),
+            },
+            AcceptedEventEpoch {
+                entries: entries.into(),
+            },
+        )
     }
 }
 
@@ -542,9 +615,6 @@ impl CommandEffectOwner {
             .evaluation_data()
             .and_then(|data| data.downcast_ref::<EventBatch>())
             .map(Dupe::dupe);
-        if batch.is_none() && !state.lineage.contains_key(&activation.node()) {
-            return;
-        }
         if !state.lineage.contains_key(&activation.node()) {
             state.lineage.insert(activation.node(), Vec::new());
         }
@@ -696,7 +766,7 @@ impl CommandEffectOwner {
         &self,
         sealed: &SealedCommandAttempt,
         closure: &ActivationClosure,
-    ) -> Result<SelectedEventBatches, CommandEffectError> {
+    ) -> Result<SelectedEventState, CommandEffectError> {
         if let Some(version) = sealed.version
             && closure.version() != version
         {
@@ -715,23 +785,35 @@ impl CommandEffectOwner {
         if !matches!(state.phase, CommandEffectPhase::Terminal(id) if id == sealed.id) {
             return Err(CommandEffectError::StaleAttempt);
         }
-        let batches = closure
-            .nodes()
-            .iter()
-            .filter_map(|node| {
-                state.lineage.get(&node.node()).and_then(|transitions| {
+        let mut nodes = Vec::with_capacity(closure.nodes().len());
+        #[cfg(test)]
+        let mut batches = Vec::new();
+        for node in closure.nodes() {
+            let transition = state
+                .lineage
+                .get(&node.node())
+                .and_then(|transitions| {
                     transitions
                         .iter()
                         .rev()
                         .find(|entry| entry.version <= closure.version())
-                        .and_then(|entry| entry.batch.as_ref())
-                        .filter(|batch| !batch.events().is_empty())
-                        .map(Dupe::dupe)
                 })
-            })
-            .collect::<Vec<_>>()
-            .into();
-        Ok(SelectedEventBatches { batches })
+                .map_or(SelectedEventTransition::NoTransition, |entry| {
+                    SelectedEventTransition::Known(entry.batch.as_ref().map(Dupe::dupe))
+                });
+            #[cfg(test)]
+            if let SelectedEventTransition::Known(Some(batch)) = &transition
+                && !batch.events().is_empty()
+            {
+                batches.push(batch.dupe());
+            }
+            nodes.push((node.node(), transition));
+        }
+        Ok(SelectedEventState {
+            nodes: nodes.into(),
+            #[cfg(test)]
+            batches: batches.into(),
+        })
     }
 }
 
@@ -863,6 +945,7 @@ mod tests {
     use tokio::sync::Notify;
 
     use super::AcceptedCommand;
+    use super::AcceptedEventEpoch;
     use super::CommandAttemptId;
     use super::CommandEffectError;
     use super::CommandEffectOwner;
@@ -1135,16 +1218,22 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
             match self {
                 Self::Leaf => {
                     let mode = ctx.compute(&EventMode).await.unwrap();
-                    ctx.store_evaluation_data(if mode == 0 {
-                        batch("leaf")
-                    } else {
-                        EventBatch::empty()
-                    })
-                    .unwrap();
+                    match mode {
+                        0 | 2 => ctx.store_evaluation_data(batch("leaf")).unwrap(),
+                        1 => ctx.store_evaluation_data(EventBatch::empty()).unwrap(),
+                        3 => {}
+                        4 => ctx.store_evaluation_data(batch("changed-leaf")).unwrap(),
+                        _ => unreachable!("event mode is bounded by its tests"),
+                    }
                 }
                 Self::Parent => {
                     ctx.compute(&Self::Leaf).await.unwrap();
-                    ctx.store_evaluation_data(batch("parent")).unwrap();
+                    let text = if ctx.compute(&EventMode).await.unwrap() == 4 {
+                        "changed-parent"
+                    } else {
+                        "parent"
+                    };
+                    ctx.store_evaluation_data(batch(text)).unwrap();
                 }
                 Self::OldLeaf => {
                     ctx.store_evaluation_data(batch("old")).unwrap();
@@ -1293,7 +1382,29 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
         sealed: super::SealedCommandAttempt,
         transaction: &dice::DiceTransaction,
     ) -> Result<SelectedEventBatches, CommandEffectError> {
-        Ok(sealed.select(transaction).await?.events().clone())
+        let state = sealed.select(transaction).await?.events().clone();
+        Ok(state.reconcile(&AcceptedEventEpoch::empty()).0)
+    }
+
+    async fn select_parent_state(
+        dice: &Arc<Dice>,
+        mode: Option<u8>,
+    ) -> Result<super::SelectedEventState, CommandEffectError> {
+        let owner = CommandEffectOwner::new();
+        let attempt = owner.begin_attempt()?;
+        let mut updater = dice.updater_with_data(user_data(dice, &attempt)?);
+        if let Some(mode) = mode {
+            updater
+                .changed_to(vec![(EventMode, mode)])
+                .expect("event mode injection is valid");
+        }
+        let mut transaction = updater.commit().await;
+        transaction
+            .compute(&EventGraphKey::Parent)
+            .await
+            .expect("event graph computation succeeds");
+        let sealed = attempt.seal_terminal()?;
+        Ok(sealed.select(&transaction).await?.events().clone())
     }
 
     fn selected_text(selected: &SelectedEventBatches) -> Vec<&str> {
@@ -1308,6 +1419,56 @@ ERROR: /workspace/REPO.bazel: error{separator}terminal stderr\n"
                 }
             })
             .collect()
+    }
+
+    #[tokio::test]
+    async fn accepted_epoch_distinguishes_reuse_none_and_empty() -> anyhow::Result<()> {
+        let dice = Dice::builder().build(DetectCycles::Enabled);
+        let (first, accepted) = select_parent_state(&dice, Some(0))
+            .await?
+            .reconcile(&AcceptedEventEpoch::empty());
+        assert_eq!(selected_text(&first), ["leaf", "parent"]);
+
+        let (warm, carried) = select_parent_state(&dice, None).await?.reconcile(&accepted);
+        assert!(warm.batches().is_empty());
+        assert_eq!(carried, accepted);
+        let (equal, equal_epoch) = select_parent_state(&dice, Some(2))
+            .await?
+            .reconcile(&carried);
+        assert!(equal.batches().is_empty());
+        assert_eq!(equal_epoch, accepted);
+
+        let (removed, removed_epoch) = select_parent_state(&dice, Some(3))
+            .await?
+            .reconcile(&equal_epoch);
+        assert!(removed.batches().is_empty());
+        assert_eq!(removed_epoch.entries.len(), 1);
+        let (still_removed, still_removed_epoch) = select_parent_state(&dice, None)
+            .await?
+            .reconcile(&removed_epoch);
+        assert!(still_removed.batches().is_empty());
+        assert_eq!(still_removed_epoch, removed_epoch);
+        let (reappeared, reappeared_epoch) = select_parent_state(&dice, Some(2))
+            .await?
+            .reconcile(&still_removed_epoch);
+        assert_eq!(selected_text(&reappeared), ["leaf"]);
+
+        let (empty_output, empty_epoch) = select_parent_state(&dice, Some(1))
+            .await?
+            .reconcile(&reappeared_epoch);
+        assert!(empty_output.batches().is_empty());
+        assert_eq!(empty_epoch.entries.len(), 2);
+        assert!(
+            empty_epoch
+                .entries
+                .iter()
+                .any(|(_, batch)| batch.events().is_empty())
+        );
+        let (changed, _) = select_parent_state(&dice, Some(4))
+            .await?
+            .reconcile(&empty_epoch);
+        assert_eq!(selected_text(&changed), ["changed-leaf", "changed-parent"]);
+        Ok(())
     }
 
     #[tokio::test]
