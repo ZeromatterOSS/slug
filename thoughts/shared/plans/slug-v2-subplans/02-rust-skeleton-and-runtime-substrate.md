@@ -5904,3 +5904,26 @@ production redesign, new state/owner/event, behavior drift, cap excess and M1
 closure. Require focused build, full loading 138/138, the documented core
 baseline, formatting/diff, cleanup/retention and independent review. After
 retry ACCEPT return only to one docs-only remaining M1 owner audit.
+
+### External singleton observed-build implementation retry active (2026-08-18)
+
+Run only `WP-2A-m1-external-singleton-observed-build-implementation-retry`
+from Rust base `a4dd40d6`, semantic design `1a217e2a` and accepted proof
+correction `ce110d9a`. Authority is exactly DICE +260/11,220, build proof
++360/3,350, and the line-neutral core-negative -> core-positive
+`RepositoryPackageLoadObservationKey` assertion in
+`host_package_load_tests.rs` at zero net/3,439 physical. Aggregate semantic
+remains <=620 and combined physical <=18,009.
+
+Preserve the complete matching-family external owner, anchor -> route ->
+package -> classification -> revision -> source order, left-first epoch and
+prefix algebra, source-child certificate, external-only repository selection,
+child-only event ownership, compact retention and exact/Slug-native/deferred
+classes frozen in `1a217e2a`. Preserve the legacy infrastructure channel and
+all existing routes. Change no other loading byte.
+
+Require focused build, full loading 138/138, the documented full-core baseline,
+formatting/diff, exact caps, retention/cleanup and independent final review.
+STOP every other file, production redesign, new state/owner/event, behavior or
+family/order drift, cap excess, broader activation and M1 closure. After ACCEPT
+return only to one docs-only remaining M1 owner audit.
