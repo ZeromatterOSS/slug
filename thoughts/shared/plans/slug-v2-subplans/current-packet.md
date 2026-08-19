@@ -1,207 +1,138 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-multi-build-observed-publication-implementation`
+Packet: `WP-2A-m1-multi-build-analysis-error-acceptance-correction-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling and accepted design base: `a2d440cb`
+Scheduling and retained-candidate base: `7d027088`
+Accepted semantic design: `a2d440cb`
 Accepted Rust base: `3f1d4dd4`
-Result: implement the accepted bounded observed-publication sibling for
-already-admitted root-only multi-target native builds.
+Result: formally REPLAN the observed multi-build implementation at its native
+semantic-analysis-error acceptance boundary. Retain the dirty two-file Rust
+candidate, but make it non-writable during this docs-only design.
 
-## Exact Rust authority and caps
+## Exact docs authority and caps
 
 Write exactly:
 
-1. `app/slug_core_v2/src/runtime/dice.rs`: <=380 production plus <=40
-   colocated-test net; <=11,700 physical lines.
-2. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=500 test
-   net; <=3,900 physical lines.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`: <=40 net.
+2. this manifest: <=220 net.
+3. `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`: <=160 net.
+4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`: <=30 net.
 
-Aggregate semantic <=920 and combined physical <=15,600 from the accepted
-11,264/3,389 baselines. Every other Rust file, Cargo, BUILD, fixture, oracle,
-generated artifact and caller/public surface is forbidden.
+Aggregate docs net <=450. STOP every Rust, Cargo, BUILD, fixture, oracle,
+generated artifact and public/caller edit. The retained `runtime/dice.rs` and
+`runtime/tests/build_command_tests.rs` candidate is evidence only.
 
-## Accepted owner decision
+## Formal REPLAN evidence
 
-The audit accepts the existing `BuildCommandRootKey` aggregation as the
-uniquely smallest complete next natural owner. It already owns the structural
-ordered target slice, rejects recursive and nonroot multi requests, computes
-the target batch in request order, reduces compatible Needs before the first
-semantic error, builds the action closure, and hands one semantic Result Arc
-to native retry, selection, event reconciliation and atomic publication.
+The retained candidate proves the natural owner and success association are
+sound: a public three-branch build with two exported sources and a recursively
+analyzed rule reaches only the observed family, produces the ordered semantic
+result/events, retains an exact aggregate certificate, and accepts a local
+terminal epoch as a pointer-identical subset of the larger selected dependency
+epoch.
 
-The one-shot `evaluate_workspace_targets{,_with_bzlmod_inputs}` adapters are
-not a smaller owner. They create a fresh runtime, eagerly inject a Host-observed
-workspace snapshot and directly project `WorkspaceBuildEvaluation` outside
-`AcceptedCommand`. Their public/lifecycle migration remains separate and
-must not be used to bypass the native aggregate owner.
+One frozen terminal is impossible under `a2d440cb`. Configured analysis
+semantic errors are transient DICE values. The multi root therefore also
+becomes unavailable for activation-closure selection. Keeping selection strict
+fails with `UnavailableRoot`; applying the existing exact legacy behavior and
+dropping that unavailable error root yields an empty selected demand set, after
+which `SelectedDependencySuperset` rejects the nonempty local
+anchor/package/source epoch as `Demand`. Making analysis errors DICE-valid,
+discarding the local epoch/certificate, weakening exact Arc validation or
+duplicating the analysis observation graph would all be unsound.
 
-No lower prerequisite is missing. Accepted observed anchor, root-package and
-path children expose the local branch epochs, while observed configured
-analysis intentionally exposes only its semantic value and remains represented
-by the exact selected dependency closure. `SourceCertificate::from_epoch`
-already accepts a nonempty multi-demand epoch. The missing state belongs at the
-aggregate root and native validation policy: an observed branch carrier, one
-terminal aggregate certificate and one private subset association. Do not
-create another DICE producer, branch map, selected snapshot or revision owner.
+The retained proof also exposed two bounded implementation corrections, not
+new owners: per-branch source certificates must be taken out of semantic
+targets/errors once their Arcs enter the aggregate certificate, and the public
+mixed-build proof needs an invocation-exclusive precreated stable parent so a
+parallel sibling cannot mutate an observed ancestor.
 
-## Frozen identity and activation
+## Frozen correction owner and algebra
 
-Extend only the existing private `BuildCommandRootObservationKey` admission:
+Native terminal acceptance remains the uniquely smallest owner. Add one private
+terminal-demand association, defaulting to existing closure-only selection.
+Only `BuildCommandRootObservationKey` with more than one target and an exact
+semantic `BuildCommandErrorKind::Analysis` terminal may select
+`TransientTerminalLocal`.
 
-- retain the accepted singleton root PackageAll and external Single identities;
-- additionally admit exactly `targets.len() > 1` requests already validated by
-  `BuildCommandRootKey`, which therefore contain only root-repository Single
-  and PackageAll patterns;
-- keep empty requests and root singleton Single on their current legacy/neutral
-  routes;
-- preserve exact request rejection for recursive, mixed root/external and
-  multi-external patterns; and
-- keep every direct `BuildCommandRootKey` caller legacy-only.
+For that one case:
 
-The observed multi root initializes `RequestRevisionKey` before target-kind
-classification because any admitted Single may be an exported source. This is
-a private Slug-native dependency change only; public results and no-source
-commands remain exact. Repository selection stays `StrictPathOnly`: this
-packet admits no external repository sidecar. Add one private terminal
-epoch-validation policy, default `Exact`, with
-`SelectedDependencySuperset` used only by observed root multi requests. Its
-local terminal epoch must be an exact pointer-identical subset of the
-closure-selected path epoch. Every other observed root retains full epoch
-equality.
+- preserve the existing unavailable-root seal/drop behavior and exact legacy
+  analysis-error event semantics;
+- before `selected_snapshot`, extend only the selected unscoped path demands
+  with every demand from the terminal's already-associated local epoch,
+  deterministically sorted and deduplicated;
+- source every selected value/Arc from the command epoch after terminal-first
+  association, so equal values retain the terminal Arc and conflicts have
+  already failed closed;
+- keep repository requests/validations strictly empty and reject any attempt to
+  use this policy for a non-analysis terminal, singleton, external, query,
+  cquery, neutral, legacy/direct or one-shot root;
+- validate exact demand/value/Arc identity for the entire local epoch and exact
+  certificate-subset identity; and
+- retain no policy, selected set, map or second epoch after acceptance.
 
-## Frozen driver, batch and certificate algebra
+The accepted `SelectedDependencySuperset` success policy stays unchanged:
+terminal-only demands still fail and configured-analysis/action-closure
+remainder remains activation-closure owned. The new local selection is sound
+only for the semantic analysis terminal whose exact lower prefix is already
+owned by the terminal while the transient upper root cannot supply a closure.
+Need/typed outer/cancel, selection, revision, materializer or publication
+failure remains atomic and leaves prior path/repository/event state unchanged.
 
-Use one bounded mode-aware aggregate driver so legacy projection remains exact
-and observed multi selection cannot drift.
+Add the smallest crate-private helper in `runtime/demands.rs` to return a new
+`SelectedWorkspaceDemands` with additional unscoped terminal paths while
+preserving repository fields. Use compute-local sorting/deduplication; retain no
+map/cache/interner/store/lock/task and perform no Host read.
 
-1. Compute the matching-family root-module anchor first. Observed mode installs
-   its exact epoch before semantic inspection.
-2. Compute every target branch with `compute_join` in request order. Legacy
-   mode selects only legacy package/analysis/path children. Observed mode
-   selects only observed root-package and configured-analysis siblings plus
-   the existing exact root FileBytes demand.
-3. Each observed Complete branch returns its semantic target/error, its compact
-   locally owned anchor/package/source epoch and any source certificate. Need
-   and typed outer carry no
-   branch carrier and activate no work beyond that branch's existing order.
-4. Inspect the full input-ordered batch. Merge every Complete branch epoch
-   left-first before semantic inspection. Equal duplicate demands retain the
-   earliest exact Arc; value conflict or operation mismatch is a typed outer.
-   Preserve the first typed outer, then any incompatible-Need failure, then the
-   deterministic union of all compatible Needs, then the first semantic error
-   in request order, otherwise ordered success. Do not invent a new public
-   BuildCommandError if existing Need kinds cannot union: STOP/REPLAN.
-5. DICE/infrastructure failures keep exact legacy post-join behavior. Observed
-   failures project to the existing semantic Infrastructure error with the
-   reached prefix; they do not panic or become a new outer class.
-6. Only after successful target aggregation, compute the configured action
-   closure through the matching family and preserve its existing BFS/layer
-   order and outer > Need > semantic behavior. Analysis children keep their
-   own path/event authority; the command selected snapshot remains their
-   acceptance owner.
+During the retry, take each Complete branch certificate out of its
+`BuildRequestedTarget` or source-bearing error when building the aggregate.
+The observed multi semantic Result must therefore match legacy multi semantics
+and retain no per-branch certificate; the one aggregate certificate beside the
+Result Arc remains the sole certificate carrier and shares every exact Arc
+with the local epoch.
 
-Build one aggregate `SourceCertificate` from every source-bearing Complete
-branch certificate in request order, using stable shared-Arc construction.
-Equal duplicates preserve the first certificate Arc; conflict/mismatch fails
-closed before terminal selection. No-source terminals retain none. The
-certificate must be an exact pointer-identical subset of the terminal epoch.
-Retain it beside, not inside or by reconstructing, the one semantic Result Arc;
-the public projection still consumes only that Result Arc.
+## Retry authority, compatibility and proof
 
-The Complete observed terminal retains exactly one semantic Result Arc, one
-local anchor-plus-Complete-branch `PathObservationEpoch`, and at most one
-aggregate certificate epoch sharing the same Arcs. Complete carrier equality is
-semantic Result+epoch+certificate; Complete typed outer is valid/equal by
-outer value; Need is invalid/self-unequal. Branch outcomes, epoch snapshots,
-Needs, source lists, action-frontier collections and union scratch are
-compute-local.
+After independent design acceptance, schedule exactly
+`WP-2A-m1-multi-build-observed-publication-implementation-retry` with:
 
-## Events, acceptance and lifetime
+1. `app/slug_core_v2/src/runtime/dice.rs`: <=410 production plus <=40
+   colocated tests; <=11,700 physical.
+2. `app/slug_core_v2/src/runtime/demands.rs`: <=20 production; <=1,230
+   physical.
+3. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=500 tests;
+   <=3,900 physical.
 
-The aggregate root remains eventless. Root-package and analysis children remain
-the sole local batch owners and public branch/event order stays exact.
-Certificate-bearing multi terminals use the already accepted
-`SourceCertifiedCurrentClosure` policy, and implementation must prove every
-reachable semantic-Complete event owner stores `Some(batch)`, including
-empty; multi terminals without a certificate remain `Strict`. All singleton, query,
-cquery, legacy/direct and one-shot policies remain unchanged.
+Aggregate semantic <=970 and combined physical <=16,830. Preserve every
+accepted `a2d440cb` identity, full-batch, epoch, revision, event, memory and
+compatibility contract except the explicit analysis-error selection correction
+above.
 
-Terminal-first epoch association, selected-demand membership, revision
-reobservation, repository materializer acceptance and path/repository/event
-snapshot replacement remain the existing native acceptance owner's job. For
-the private multi association, forbid repository requests/validations and
-require every terminal demand to exist in the selected epoch with exact
-demand/value/Arc identity; reject terminal-only demands. Additional selected
-demands from configured-analysis and action-closure dependencies remain exact
-closure-owned entries copied directly from the command epoch and need not be
-duplicated or retained in the terminal. Terminal-first association may install
-or prefer local Arcs before selection, but it must not add membership: a local
-demand absent from the selected dependency set still fails.
-All other observed roots keep exact length/demand/value/Arc equality.
-Need/outer/cancel, union conflict, validation, revision, selection, materializer
-or publication failure leaves every prior snapshot unchanged and emits no
-provisional events.
+Required new discrimination:
 
-Retain no branch carrier Arc, child Result Arc, outcome/target map, selected
-snapshot duplicate, cache, interner, store, new lock/task or direct Host read.
-Keep the existing semantic target/action closure in the Result Arc and the two
-compact Arc-backed epochs only. Require `Allocative` and `Dupe`, a Buck2
-retention scan, AI cleanup, and touched shared helpers below 200 lines.
+- a real source-plus-rule analysis error accepts the exact local prefix and
+  aggregate certificate, selects no repository sidecar, publishes exact legacy
+  semantic/error event behavior and recovers after the rule fix;
+- success with recursive analysis still has a strict selected remainder, while
+  a terminal-only demand remains rejected;
+- default closure-only roots reject the same synthetic local injection;
+- multi public targets/errors retain no branch certificate, the internal
+  aggregate retains both source epochs with exact `Arc::ptr_eq`, and direct
+  legacy projection remains semantically exact;
+- an invocation-exclusive parent is created before either retained runtime,
+  followed by warm/edit/restore and default-parallel validation; and
+- cap, `Allocative`/`Dupe`, Buck2 retention, AI cleanup and rollback scans
+  remain clean.
 
-## Compatibility and proof
+Exact: public/legacy semantic errors, target values/order, child events and all
+previously accepted roots. Slug-native: the private transient-terminal local
+demand association and aggregate-only certificate carrier. Unsupported/
+deferred: mixed/external multi, recursive patterns, one-shot migration, broader
+actions/globs and exact Bazel identity bytes.
 
-Exact: public multi-build target values/errors/order, configured semantics,
-repositories and events; accepted singleton build/query/cquery behavior; every
-legacy/direct API and one-shot adapter.
-
-Slug-native: the private multi observed identity, typed outer, local
-branch/terminal epoch, selected-dependency-superset association, aggregate
-certificate and revision/event association.
-
-Unsupported/deferred: mixed or multi external build, recursive build patterns,
-one-shot migration, broader actions/external globs and exact Bazel identity
-bytes.
-
-Implementation proof must discriminate:
-
-- identity/Display/equality/validity and routing for empty, singleton, root
-  multi, mixed/external and direct legacy requests;
-- anchor plus first/middle/last PackageAll, rule, filegroup and exported-source
-  branches; Need/outer/semantic positions, later branch completion, full Need
-  union, first semantic and exact target order;
-- exact epoch demand order/membership and per-demand `Arc::ptr_eq`, equal
-  duplicate first Arc, conflict and operation mismatch;
-- revision-before-source activation, no-source behavior, two-source aggregate
-  certificate exact subset, duplicate sources, source error certificate and
-  terminal-first selected Arc survival;
-- mixed source+rule and recursive action-closure paths with selected remainder
-  change/reuse, exact terminal-subset Arcs, terminal-only demand rejection and
-  strict repository-sidecar rejection;
-- source+rule+filegroup and repeated-package builds, configured action-closure
-  BFS, exact child-before-child public event order, semantic-error batches,
-  warm suppression, source edit suppression and BUILD/analysis change replay;
-- observed-to-zero-legacy and legacy-to-zero-observed family isolation,
-  concurrent roots, and zero external/query/one-shot activation;
-- real poll-drop cancellation/recovery, forced revision retry and later Need,
-  selection/materializer failure rollback, create/edit/delete/directory/
-  recreate and A/B/A for multiple sources and BUILD files; and
-- held semantic/certificate/epoch lifetime, exact cap accounting, full focused
-  and broad validation, retention/cleanup and independent implementation
-  review.
-
-## Implementation terminal
-
-The existing two files are cohesive owner/proof exceptions; do not add a third
-Rust file. Run focused multi-build, build-command and native acceptance tests,
-then full core/loading/analysis/query coverage, formatting and diff checks.
-Record inherited baselines without weakening them. Finish with Buck2 retention,
-AI cleanup and an independent implementation review.
-
-STOP/REPLAN on another owner/file, widened external/recursive admission,
-legacy/public/one-shot drift, incomplete epoch or certificate, incompatible
-Need coercion, changed child event authority, retained branch state, cap excess,
-partial validation or M1 closure.
-
-End with exactly one independently reviewed decision: ACCEPT and return only
-to one docs-only M1 next-owner audit, or REPLAN. Do not close M1.
+STOP/REPLAN on any fourth Rust file, wider unavailable-root behavior, retained
+selected state, repository sidecar, terminal-only success admission, child
+event/equality change, cap excess, partial validation or M1 closure. This design
+may schedule only the named implementation retry.

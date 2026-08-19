@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-2A-m1-multi-build-observed-publication-implementation](./slug-v2-subplans/current-packet.md).
+[WP-2A-m1-multi-build-analysis-error-acceptance-correction-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

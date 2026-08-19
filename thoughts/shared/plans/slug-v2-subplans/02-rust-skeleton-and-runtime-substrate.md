@@ -6452,3 +6452,52 @@ STOP every other file/owner, widened external/recursive admission, public or
 one-shot drift, child event ownership change, retained branch state,
 incompatible-Need coercion, cap excess, partial validation or M1 closure. After
 ACCEPT return only to one docs-only next-owner audit.
+
+### Multi-build analysis-error acceptance REPLAN (2026-08-18)
+
+The implementation from `7d027088` confirms the accepted multi root, ordered
+full-batch reducer, aggregate certificate and success-only
+`SelectedDependencySuperset` association. A public two-source plus recursive
+rule build reaches only observed children, retains exact certificate Arcs and
+accepts its local terminal epoch as a strict subset of the selected dependency
+epoch.
+
+The semantic analysis-error lane is not implementable under `a2d440cb`.
+Configured analysis errors are transient, making the completed aggregate root
+unavailable to activation-closure selection. Strict selection fails at the
+unavailable root; exact legacy unavailable-root pruning leaves no selected
+demands, so the nonempty local terminal epoch fails the required subset check.
+Do not make transient analysis errors valid, discard the prefix/certificate,
+weaken pointer identity or invent another analysis producer.
+
+Run only
+`WP-2A-m1-multi-build-analysis-error-acceptance-correction-design`.
+This is a four-document design from retained-candidate base `7d027088`;
+canonical/current/Stage/routing are writable within 40/220/160/30 and 450
+aggregate docs net. The dirty two-file Rust candidate is retained but
+non-writable.
+
+Freeze one native-acceptance `TransientTerminalLocal` association used only by
+an observed root multi semantic Analysis error. Preserve unavailable-root
+pruning and exact legacy error-event behavior, then add the terminal local
+epoch's demands to selected unscoped paths before snapshot construction. Values
+must come from the terminal-first command epoch; validate the complete local
+demand/value/Arc set and certificate subset, keep repositories empty, and
+retain no selected map/state. Success stays closure-owned and terminal-only
+demands still fail.
+
+The retry may add only a bounded `SelectedWorkspaceDemands` path-extension
+helper, clear per-branch certificates after moving their Arcs into the sole
+aggregate, and isolate the mixed public proof beneath an invocation-exclusive
+precreated parent. Future Rust is exactly `runtime/dice.rs` <=410
+production/+40 test and 11,700 physical, `runtime/demands.rs` <=20/1,230, and
+`runtime/tests/build_command_tests.rs` <=500/3,900; aggregate <=970/16,830.
+
+Prove real source-plus-analysis-error acceptance/recovery and exact legacy
+error/event parity; success remainder and terminal-only rejection; default
+strict rejection; aggregate-only exact certificate Arcs; warm/edit/restore and
+parallel isolation; rollback, retention, cleanup and all accepted packet
+validation. STOP Rust during design, broader unavailable-root handling,
+repository/event/equality drift, retained selection state, cap excess or M1
+closure. After independent design ACCEPT schedule only
+`WP-2A-m1-multi-build-observed-publication-implementation-retry`.
