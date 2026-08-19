@@ -5458,3 +5458,60 @@ root rejection proof, isolated corrected tests, default-parallel core, full
 query/loading/bzlmod, fmt/diff/accounting, cleanup and independent review. Stop
 any other root/file/caller/state/body change or M1 closure. After ACCEPT return
 only to a docs-only next-owner audit.
+
+### Loading-query accepted-event epoch REPLAN (2026-08-18)
+
+The accepted repository-selection policy lets the isolated external query
+reach publication, exposing a second material miss. Creating an unrelated
+source file beside an unchanged external package changes exact operational
+observations and recomputes event-owning children, but their semantic results
+and local batches remain equal. Current terminal selection drops `DiceNodeId`
+and the native accepted snapshot retains no prior event association, so equal
+batches replay and violate the accepted warm/event behavior.
+
+Do not weaken path epochs or child-key equality: both would make exact mutable
+inputs or carriers stale. Run docs-only
+`WP-2A-m1-loading-query-event-acceptance-epoch-correction-design` from
+scheduling base `0568f845` and Rust base `a9270586`, retaining the eight-file
+query candidate non-writable. Write only canonical/current/Stage/routing under
+40/220/180/30 and 470 aggregate caps.
+
+Freeze native event acceptance as the complete owner. Each command has a fresh
+tracker and DICE reused activations expose no evaluation data, so selection
+returns a compute-local exact closure stream distinguishing known current
+`Option<EventBatch>` transitions from nodes with no current transition. One
+`Arc`-backed accepted `(DiceNodeId, EventBatch)` epoch is stored beside the
+accepted native demand snapshot. Fold in closure order: known Some replaces and
+emits only when changed/nonempty; known None removes; no-transition carries a
+matching prior entry without emission; prior nodes absent from the closure are
+dropped. This preserves warm reuse and lets a later evaluated reappearance
+replay. Comparison maps, closure state and output vectors are scratch only.
+Reuse existing `EventBatch`, `Dupe`, `Allocative` and compact immutable-
+slice patterns; the Stage 9 retained DICE row requires no new donor import or
+ledger entry.
+
+Prepare filtered output and the next epoch locally, then replace event/path/
+repository state together only after materializer acceptance. Need, outer,
+cancel, selection/validation/materializer failure and restorable abort preserve
+the prior epoch; post-irreversible failure remains fail-closed. Child keys stay
+sole event producers, public `AcceptedCommand` retains no epoch, exact path and
+repository validation remain unconditional, and no lock spans DICE.
+
+Future authority is the existing eight Rust files plus `runtime/events.rs`.
+Keep their caps unchanged; add only +80 events production/+100 colocated tests
+at <=1,800 physical. Aggregate semantic becomes 1,234/1,428/2,662 and the
+primary physical envelope plus events is <=21,331; loading proof remains
+separately <=3,442. Prove accepted Some(A) -> next-command no-transition carry
+-> evaluated Some(A) with no output; accepted Some(A) -> evaluated known None
+removal/no output -> no-transition no resurrection -> evaluated Some(A)
+new/emitted; and distinct retained Some(empty). Also prove changed closure-order
+replay, cross-command replacement, rollback/cancel,
+unrelated source sibling churn, BUILD/`.bzl` lifecycle, exact selected Arcs,
+repository sidecars, family and build/legacy policy. Exact public values and
+events remain exact; the private accepted epoch is Slug-native; broader callers
+stay deferred.
+
+STOP Rust during design and later STOP a tenth file, retained map/interner,
+path/carrier weakening, child-owner drift, non-atomic replacement, cap excess
+or M1 closure. After independent design ACCEPT, resume exactly the same query
+implementation retry and no other successor.
