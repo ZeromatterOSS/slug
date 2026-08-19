@@ -1,153 +1,121 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-repository-source-file-observation-implementation`
+Packet: `WP-6-7A-repository-source-file-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling base: `178dec27`
 Rust base: `ae8aa35e`
-Accepted design: `9040e168`
+Accepted semantic design: `9040e168`
 
-## Exact Rust authority and caps
+## Formal REPLAN evidence
 
-Write only:
+The retained two-file implementation candidate is semantically sound and has
+exact scope/diff hygiene. Against `ae8aa35e`,
+`source_preparation.rs` is +298 net at 15,238 physical lines and
+`source_preparation_observation_tests.rs` is +500 net at 2,970 physical
+lines: +798 semantic and 18,208 physical aggregate. The shared driver is 179
+lines, selects the matching families, merges the materialization prefix
+left-first before resolution semantics, appends FileBytes before inspection,
+and retains only the local Result Arc plus compact epoch. Focused proof is 3/3;
+full bzlmod is 439/439; loading is 138/138; query is 53/53; core remains the
+inherited 245/246 stale visibility wording baseline.
 
-1. `app/slug_bzlmod_v2/src/source_preparation.rs`, from 14,940 physical lines:
-   <=300 production and <=30 colocated proof semantic lines, <=15,320 physical.
-2. `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, from 2,470
-   physical lines: <=500 test semantic lines, <=3,020 physical.
+Independent review found proof-only gaps. The exact +500 proof ceiling leaves
+no room to discriminate the production-used materialization/resolution
+reducers for Need/typed outer, compute errors, duplicate/conflict/operation
+mismatch and reached prefixes. Current family rows do not include the neutral
+FileBytes dependency; event tracking starts after the event-owning child and
+cannot prove its cold batch or warm suppression. Cancellation recovers through
+a different request, local restoration lacks an explicit equality assertion,
+and immutable edit/delete/directory/recreate A-B-A plus restored held Arcs is
+absent. Forcing these cases into the old ceiling would delete required
+behavioral proof or obscure it. Production semantics, ownership, retention,
+events and family selection do not require redesign.
 
-Aggregate semantic growth is <=830 lines and combined physical size is
-<=18,340. `source_preparation.rs` is a cohesive large-owner exception. Every
-new or touched helper must stay below 200 lines. Every other file is read-only.
+## Exact docs authority and caps
 
-## Frozen implementation authority
+During this design write only:
 
-Add crate-private structural
-`RepositorySourceFileObservationKey(RepositorySourceFileKey)` and distinctly
-named `ObservedRepositorySourceFileValue`. Preserve the existing private
-`ObservedRepositorySourceFile` enum as the compute-local resolved semantic
-projection. The new carrier contains exactly one local
-`Arc<Result<RepositorySourceFileValue, RepositorySourceFileError>>` plus one
-compact cumulative `PathObservationEpoch`. The key and carrier implement
-`Allocative`; the carrier implements `Dupe`. Expose only crate-private
-construction and borrowed result/epoch accessors. Do not export through
-`lib.rs` or add a production caller.
+1. canonical plan, <=40 net lines;
+2. this manifest, <=200 net lines;
+3. `06-analysis-toolchains-and-actions.md`, <=140 net lines; and
+4. routing log, <=30 net lines.
 
-Use one Legacy/Observed repository-source driver. Validate the relative path
-before any child. Legacy selects only `RepositoryMaterializationKey` then
-`ResolvedPathKey`. Observed selects only
-`RepositoryMaterializationObservationKey` then
-`ResolvedPathObservationKey`. Both use the same neutral `PathObservationKey`
-for FileBytes. Neither source sibling computes the other.
+Aggregate docs growth is <=410 net lines. Retain the two dirty Rust candidate
+files exactly and treat them as non-writable. Every other file is read-only.
 
-Reuse/refactor the existing resolved-source and stable shared-epoch helpers.
-Preserve exact relative-path, materialization, namespace, symlink, path-kind and
-FileBytes semantics. Project the legacy key's exact existing unwrapped
-value/error shape and preserve the nested bytes Arc; only the observed sibling
-retains the new local Result Arc.
+## Frozen correction
 
-## Order and terminal algebra
+Preserve the accepted structural key/carrier, Legacy/Observed driver,
+materialization -> resolution -> FileBytes order, materialization-first
+left-biased epoch algebra, carrierless Need/outer, exact legacy projection,
+eventless parent/path owners, matching-family isolation and compact one-Result-
+Arc-plus-epoch retention. Add no production owner, caller, export, state,
+event, Host read, cache, store, interner, lock or task.
 
-The exact order is relative-path validation -> materialization -> resolved path
--> FileBytes when the resolved node is readable.
+Correct only the proof envelope for the immediate implementation retry:
 
-Invalid relative path and materialization DICE compute failure are semantic
-Complete with an empty epoch. Materialization Need or typed outer returns
-immediately with no carrier and suppresses resolution. Accept a completed
-observed materialization epoch before semantic inspection; its semantic error
-retains that prefix.
+- keep `source_preparation.rs` at <=300 production, <=30 colocated proof and
+  <=15,320 physical from 14,940;
+- raise `source_preparation_observation_tests.rs` from <=500 tests/3,020
+  physical to <=700 tests/3,250 physical from 2,470;
+- raise aggregate semantic growth from <=830 to <=1,030 and combined physical
+  size from <=18,340 to <=18,570.
 
-After materialization success, construct the existing Host or Materialization
-namespace and requested path. Invalid materialized path and resolution DICE
-compute failure retain the materialization prefix. Resolution Need or typed
-outer returns immediately with no carrier. Union the materialization prefix
-left-first with the complete resolved-path epoch before semantic inspection.
-Resolution semantic error, Absent and WrongKind retain that merged prefix and
-suppress FileBytes.
+This adds at most 200 test-semantic and 230 proof physical lines. It may fund
+only compact restructuring/addition of the missing discriminators. The retry
+may not change production semantics, owner, event behavior, retained shape,
+family selection or downstream activation.
+Line-neutral extraction of pure, production-called terminal projectors is
+allowed only where needed to make the existing live branches discriminating.
 
-FileBytes Need returns immediately with no carrier. FileBytes DICE compute
-failure retains the materialization+resolution prefix. On Complete, append the
-exact shared FileBytes demand/result to the existing prefix before semantic
-inspection. Present success, inconsistent Missing and observation Error retain
-the full epoch.
+## Required retry proof
 
-Equal duplicate demands preserve the earliest exact Arc. Conflicting values or
-operation mismatch return the existing typed `ObservedPathFrontierError`.
-There is no joined batch or Need union. Need is invalid/self-unequal; Complete
-typed outer is valid/equal by outer value; Complete carrier is valid/equal by
-semantic Result plus epoch.
+Use production-called seams or real keyed outcomes to prove:
 
-## Events, families and retention
+- distinct key identity/hash/Display, accessors and carrier/typed-outer
+  validity/equality;
+- invalid materialized path and materialization/resolution/FileBytes DICE
+  compute failures through production-called projectors with exact empty/prior
+  prefixes;
+- materialization and resolution Need/typed outer validity/equality,
+  carrierlessness, later suppression, compute-error prefixes and semantic
+  prefixes;
+- materialization-prefix-first iteration order and duplicate Arc retention,
+  plus conflicting-value and operation-mismatch outer polarity through the
+  same merge/append seams used by production;
+- FileBytes Need/compute/Complete append behavior with exact prior/full prefix
+  order and carrierlessness;
+- exact observed and legacy direct-dependency rows, including matching
+  materialization/resolution families and neutral `PathObservationKey`;
+- a phase-separated cold materialization/root child batch, parent/path/
+  FileBytes silence, warm suppression and no batch on Need/outer/cancel;
+- real poll-drop followed by same-DICE, identical-request recovery; and
+- local and immutable edit/delete/directory/recreate A-B-A with A==restored,
+  held Result/bytes/epoch equality and restored per-demand Arc checks.
 
-Source parent, resolved-path owners and FileBytes owner remain eventless on
-success, semantic error, Need, outer and cancellation. Accepted materialization,
-request and root-MODULE descendants remain their sole event owners. Warm reuse
-does not replay a child batch.
+Retain the existing invalid-path, source terminal, exact epoch/bytes and legacy
+parity proof. Reuse accepted lower-key tests without claiming they alone prove
+the new parent's branch or prefix decisions. Keep explicit nonactivation checks
+for package preflight, REPO-file, repository-ignore, module preparation,
+closure, discovery, selected graph, registry and public callers.
 
-Legacy direct dependencies contain only legacy materialization/resolution plus
-neutral FileBytes. Observed direct dependencies contain only observed
-materialization/resolution plus neutral FileBytes. No package preflight,
-REPO-file, repository-ignore, module preparation, closure, discovery,
-selected-graph, registry or public caller is activated.
+## Compatibility and STOP
 
-The observed source carrier retains only its local semantic Result Arc (which
-may own the existing bytes Arc) plus the compact cumulative epoch.
-Materialization/resolution carriers, requested/resolved paths, namespace,
-source and union scratch remain dependency-owned or compute-local. Add no other
-carrier Arc, collection, cache, store, interner, lock, task, direct Host read,
-revision, certificate or event state.
+Exact behavior remains relative-path validation, materialization/source order,
+Host versus Materialization namespace, symlink/path/FileBytes semantics,
+values/errors/nested bytes Arc and all legacy behavior. The sibling, local
+Result Arc, compact epoch and typed outer remain Slug-native. Registry/
+preparation/closure/discovery/selected graph, extensions/generated
+repositories, rules_rust actions, M8/M7B and exact identity bytes remain
+deferred.
 
-## Required proof
+STOP Rust, Cargo, BUILD, fixture, oracle and public writes during design.
+STOP any production semantic/event/memory/family change, third retry file,
+caller/export, upper/registry activation, proof deletion or cap excess.
+REPLAN again if the complete proof cannot fit the corrected envelope.
 
-Discriminate:
-
-- distinct key identity/hash/Display, accessors, `Dupe`/`Allocative`, equality
-  and validity for Need, typed outer and carrier;
-- invalid relative path and materialization compute/Need/outer/semantic
-  terminals with exact empty/full prefixes and later suppression;
-- invalid materialized path and resolution compute/Need/outer/semantic,
-  Absent/WrongKind terminals with exact prior/merged prefixes;
-- FileBytes compute/Need/Present/Missing/Error terminals, exact prior/full
-  prefixes and carrierlessness;
-- materialization -> resolution -> FileBytes epoch membership/order and every
-  per-demand `Arc::ptr_eq`;
-- stable duplicate first Arc, conflicting value and operation mismatch;
-- local and immutable source namespaces, Present/Absent/WrongKind and exact
-  bytes Arc;
-- exact legacy value/error/order parity and nested bytes Arc preservation;
-- exact legacy and observed dependency-family rows with neutral FileBytes;
-- child-owned events, parent silence, warm suppression and no batch on
-  Need/outer/cancel;
-- real poll-drop/no-publication/same-DICE recovery;
-- local and immutable edit/delete/directory/recreate plus A-B-A restoration
-  with held semantic Result, bytes and epoch Arcs; and
-- zero upper preparation/closure/discovery/selected-graph/registry/public
-  activation.
-
-Reuse accepted materialization/path/source proof and
-`docs/developers/dice.md`. No fixture or Bazel oracle is authorized. Run
-focused owner proof, full bzlmod, affected loading/query/core baselines, fmt,
-diff-check, exact cap accounting and AI-cleanup/Buck2 retention review.
-
-## Compatibility
-
-Exact: relative-path validation, materialization/source order, Host versus
-Materialization namespace, symlink resolution, Absent/WrongKind/FileBytes
-semantics, source values/errors, nested bytes Arc and all legacy behavior.
-Slug-native: the structural sibling, local Result Arc, compact epoch and typed
-outer. Unsupported/deferred: observed package-preflight/REPO/ignore/module
-preparation and nonregistry closure, registry file/source preparation and
-patches, discovered modules, selected graph, extension evaluation/
-instantiation, generated repository loading, rules_rust analysis/actions,
-M8/M7B and exact Bazel identity bytes.
-
-## STOP and sole successor
-
-STOP on a third file; any caller or lib export; upper preparation/closure/
-discovery/selected-graph or registry activation; direct Host read; semantic,
-error, order, event or family drift; retained scratch/state; cap excess; proof
-deletion; M7A closure; M8/M7B/M9; or a second successor. REPLAN rather than
-reconstruct route identity, split an unused path owner, weaken exact Arc
-validation or compress required proof beyond discrimination.
-
-After independent implementation ACCEPT, schedule only the docs-only
+After independent design ACCEPT, schedule exactly
+`WP-6-7A-repository-source-file-observation-implementation-retry` with the
+same two Rust files. Only after implementation ACCEPT return to
 `WP-6-7A-selected-module-graph-observation-frontier-design`.

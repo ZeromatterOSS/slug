@@ -8339,3 +8339,63 @@ zero upper activation. STOP every third file, caller/export, registry or upper
 activation, direct Host read, semantic/event/family/state drift, cap excess or
 milestone closure. After independent implementation ACCEPT return only to the
 docs-only selected-module-graph observation frontier.
+
+### Repository-source-file observation proof-cap correction REPLAN (2026-08-19)
+
+
+`WP-6-7A-repository-source-file-observation-implementation` is **REPLAN**
+before acceptance. Retain the exact two-file Rust candidate from scheduling
+base `178dec27`, Rust base `ae8aa35e` and accepted semantic design `9040e168`;
+it is non-writable during this docs-only design.
+
+The candidate is ownership- and retention-sound. `source_preparation.rs` is
++298 net at 15,238 physical; the proof file is exactly +500 at 2,970 physical;
+aggregate is +798 and 18,208. The 179-line driver selects matching
+materialization/resolution families, merges the materialization prefix
+left-first, appends FileBytes before semantics, and retains only one local
+Result Arc plus the epoch. Focused 3/3, bzlmod 439/439, loading 138/138 and
+query 53/53 pass; core remains the inherited 245/246 visibility-text baseline.
+
+The old proof ceiling is exhausted before the parent-specific matrix is
+complete. The retry must discriminate the production-used materialization and
+resolution reducers for Need, typed outer, compute/semantic prefix and later
+suppression; exact epoch iteration order; equal-first Arc, conflicting value
+and operation mismatch through merge/FileBytes append; and exact carrier
+validity/equality. It must assert exact direct dependency rows including
+neutral FileBytes, phase-separate cold child events from parent silence and
+warm suppression, and keep every upper family—including repository-ignore and
+module preparation—unactivated.
+
+Lifecycle proof must poll/drop and recover the identical request on the same
+DICE engine. Both local and immutable namespaces must run
+A -> B -> absent -> directory -> A, assert A equals restoration, and hold the
+semantic Result, bytes and epoch Arcs through churn before comparing restored
+per-demand Arcs. Preserve the existing invalid-relative-path, source terminal,
+legacy nested-bytes parity and zero-upper proof. Accepted lower-key tests may
+support but cannot replace the new parent's branch/prefix decisions.
+
+Run only
+`WP-6-7A-repository-source-file-observation-proof-cap-correction-design`,
+docs-only. Keep `source_preparation.rs` at <=300 production, <=30 colocated
+proof and <=15,320 physical from 14,940. Raise only
+`source_preparation_observation_tests.rs` from <=500 tests/3,020 physical to
+<=700 tests/3,250 physical from 2,470. Aggregate becomes <=1,030 semantic and
+<=18,570 physical. The +200 semantic/+230 physical proof margin authorizes no
+production semantic, event, retention, family or owner change.
+
+The accepted exact behavior remains relative-path/materialization/source
+order, Host versus Materialization namespace, symlink/path/FileBytes
+semantics, values/errors/nested bytes Arc and all legacy behavior. The
+sibling, local Result Arc, epoch and typed outer remain Slug-native. Registry,
+preparation/closure/discovery/selected graph, extensions/generated
+repositories, rules_rust actions, M8/M7B and exact identity bytes remain
+deferred.
+
+STOP Rust/Cargo/BUILD/fixture/oracle writes during design. STOP a third retry
+file, caller/export, upper or registry activation, changed production
+semantics/events/memory/families, proof deletion, cap excess and milestone
+closure. REPLAN again if the full matrix cannot fit. After independent design
+ACCEPT schedule only
+`WP-6-7A-repository-source-file-observation-implementation-retry`; after its
+independent ACCEPT return only to
+`WP-6-7A-selected-module-graph-observation-frontier-design`.
