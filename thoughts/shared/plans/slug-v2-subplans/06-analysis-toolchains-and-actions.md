@@ -8126,3 +8126,19 @@ exactly the same one-file implementation retry. After its independent ACCEPT,
 return only to
 `WP-6-7A-selected-module-graph-observation-frontier-design`, docs-only.
 Exactly one immediate successor is authorized.
+
+### Materialization-request observation implementation retry scheduled (2026-08-19)
+
+Correction `7592334b` accepts only the measured proof-cap increase. Run
+`WP-6-7A-repository-materialization-request-observation-implementation-retry`
+from Rust base `3d174006`, semantic design `e606e1b2` and correction
+`7592334b`. Authority remains exactly `source_preparation.rs`: <=180
+production, <=480 tests, <=660 aggregate semantic and <=14,480 physical lines.
+
+Preserve the matching-family driver, exact Result-Arc projection, effective
+epoch, empty/full prefix algebra, eventless parent, compact retention,
+compatibility and every existing discriminator. Added room may fund only proof
+restructuring and the missing observed terminal/projection and command/
+request-kind lifecycle cases. No caller, second file, semantic/event/state
+change or later-owner activation is authorized. After independent ACCEPT,
+schedule only the docs-only selected-module-graph observation-frontier design.
