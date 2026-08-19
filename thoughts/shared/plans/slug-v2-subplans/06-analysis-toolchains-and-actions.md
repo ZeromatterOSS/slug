@@ -8016,3 +8016,17 @@ Run only `WP-6-7A-effective-module-override-observation-proof-cap-correction-2-d
 docs-only. Retain `module_eval.rs` non-writable; keep production <=200 and
 raise only tests to <=420, aggregate to <=620 and physical to <=6,750. After
 independent ACCEPT, retry the same one-file implementation, then return only to
+`WP-6-7A-selected-module-graph-observation-frontier-design`, docs-only.
+
+### Effective-module-override implementation retry-2 scheduled (2026-08-19)
+
+Correction `b832736d` accepts the second measured proof-cap increase while
+freezing all production semantics and the +200 production limit. Run only
+`WP-6-7A-effective-module-override-observation-implementation-retry-2` from
+Rust base `a3efa1b7`, semantic design `c2d1f893` and corrections
+`5ebc274a`/`b832736d`. Authority remains exactly `module_eval.rs`: <=200
+production, <=420 tests, <=620 aggregate and <=6,750 physical lines. Preserve
+the complete root/command, dependency-row, reducer, Arc, event, cancellation,
+family and lifecycle proof with no semantic/event/retention change. After
+independent Rust ACCEPT, schedule only the docs-only selected-module-graph
+frontier design, `WP-6-7A-selected-module-graph-observation-frontier-design`.
