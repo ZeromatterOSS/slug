@@ -6163,3 +6163,37 @@ independent review. STOP every other file/loading byte, child filtering,
 equality weakening, absent-node carry, producer-invariant failure, retained
 closure/map, behavior drift, cap excess and M1 closure. After ACCEPT return only
 to one docs-only M1 owner audit.
+
+### External singleton source-certified event policy REPLAN (2026-08-18)
+
+Retry 4 constructs the reviewed first-revision current-closure provisional, but
+exact logs show cold, warm and source edit all reconcile with no carry. Source
+preflight already observes the change and finalization accepts directly. The
+edit's ordinary fold drops four accepted entries to two while its unused
+provisional retains all four.
+
+Run only `WP-2A-m1-external-singleton-source-certified-event-policy-design`
+from `c1b7cca1`. Write only canonical/current/Stage/routing under
+40/220/180/30 and 470 aggregate docs net. Retain but do not write the four-file
+candidate. STOP all implementation/public/server changes.
+
+Freeze a private terminal-dependent Strict/SourceCertifiedCurrentClosure policy
+on NativeCommandRoot. Default every root to Strict. Only an observed external
+terminal retaining a SourceCertificate opts in. Pass it explicitly through
+prepare_accept; retain no policy state.
+
+Strict preserves KnownNone removal. SourceCertifiedCurrentClosure applies the
+matching-root current-order per-node fold to normal acceptance and provisional
+retries alike: current Some wins, present-prior KnownNone/NoTransition carries,
+absent prior drops, new Some contributes. Preserve retry/Need/tombstone/order/
+atomicity behavior. The opt-in invariant is semantic-Complete child owners
+always store Some including empty; Need/outer cannot accept.
+
+Retain only compact root/entry Arc slices and compute-local scratch. Prove
+strict removal unchanged, source-policy carry, mixed current-order/root
+mismatch/removal/change/empty cases, direct source edit with no RevisionRetry,
+forced actual retry, all failures, root switch and server lifecycle.
+
+After independent ACCEPT schedule only retry 5 in the same four files and
+unchanged 1,040 semantic/20,289 physical caps. Remove temporary logs; preserve
+every external owner/certificate/repository/family/event/legacy contract.
