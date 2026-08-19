@@ -7517,3 +7517,30 @@ execution-platform consumers iterate modules from the selected dependency
 graph using each module's full contextual mapping. A callerless embedded MODULE
 value may preserve registration order, but it cannot activate Stage 6
 registration or selection before the one combined graph exists.
+
+### M7A bootstrap action-owner context audit accepted (2026-08-18)
+
+The read-only audit from `35e84646` selects one uniquely smaller just-in-time
+Bazel 9.2 evidence prerequisite before the immutable Rust owner design. M1 is
+complete; no lower observation/publication owner is missing.
+
+Live `ActionSpec` retains intrinsic action fields and an optional exec-group
+string, while `ConfiguredNodeResult` separately retains the action slice and
+one `ToolchainTopology`. The borrowed FileWrite view reconstructs a single
+topology-selected platform, exposes only the default group, and rejects named
+groups and per-action execution fields. Identity, aquery and REAPI consume
+that reconstruction. The natural future owner is therefore an analysis-owned
+immutable configured-action row, not a new DICE key or a configured identity
+embedded into build-API `ActionSpec`.
+
+Existing evidence cannot freeze that row. `actions-api-basic` supplies action
+summaries, `toolchain-resolution-first-platform` has no actions, and the
+dedicated `exec-groups-action-platform` fixture is an ungenerated one-action
+scaffold with an empty expected command list.
+
+Run only `WP-1-6-7A-exec-group-action-owner-context-evidence`. Replace that
+fixture with one Bazel 9.2 single-owner, two-action default/named-group
+discriminator over distinct platforms/toolchains/properties and ordered named
+platform A/B/A restoration. Use a deterministic non-summary aquery shape.
+No Rust, harness, other fixture, rules_rust breadth, applied aspect, execution,
+M8, M7B or M9 work.
