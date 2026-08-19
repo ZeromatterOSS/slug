@@ -1,124 +1,116 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repository-ignore-observation-implementation`
+Packet: `WP-6-7A-host-nonregistry-repository-ignore-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `9c0a5473`
+Scheduling base: `e9fc14a6`
 Rust base: `b08b7f2e`
-Accepted design: `9c0a5473`
+Accepted semantic design: `9c0a5473`
+Stopped implementation: `WP-6-7A-host-nonregistry-repository-ignore-observation-implementation`
 
-## Objective and exact authority
+## Formal REPLAN evidence
 
-Implement the accepted private nonregistry repository-ignore observation owner.
-Write only `app/slug_bzlmod_v2/src/repository_ignore.rs` from its 3,297-line
-`b08b7f2e` baseline. Cap production at <=180 lines, proof at <=400,
-aggregate semantic growth at <=580 and final physical size at <=3,900.
-Touched helpers remain below 200 lines; the file is the cohesive owner/proof
-exception. Every other Rust, Cargo, BUILD, fixture, oracle, caller and public
-file is read-only.
+The retained one-file candidate is production-sound but cannot honestly fit the
+accepted proof envelope. Against `b08b7f2e`, `repository_ignore.rs` is +180
+production and +484 proof lines, +664 aggregate semantic, at 3,961 physical
+lines. The new real parent integration passes 1/1; formatting and diff hygiene
+are clean. The dirty Rust candidate is retained and non-writable during this
+docs-only correction.
 
-## Frozen identity and retained value
+The private driver preserves exact repo -> source -> parser matching-family
+order, unions each Complete child epoch left-first before semantic inspection,
+returns Need/typed outer carrierless, leaves the parent eventless and retains
+only one local matcher Result Arc plus the compact epoch. It adds no caller,
+upper activation, Host read, collection, cache/interner/store/lock/task,
+revision, certificate or event state. No production redesign is indicated.
 
-Add one private structural
-`HostNonregistryRepositoryIgnoreObservationKey(HostNonregistryRepositoryIgnoreKey)`
-and one private `ObservedHostNonregistryRepositoryIgnore`. Its DICE value is
-`SourcePreparationOutcome<Result<ObservedHostNonregistryRepositoryIgnore,
-ObservedPathFrontierError>>`. The carrier retains exactly one local
-`Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>` plus one
-compact `PathObservationEpoch`, derives `Dupe`/`Allocative`, and exposes
-borrowed result/epoch accessors. Add no export or caller.
+The original <=400 proof, <=580 aggregate and <=3,900 physical caps are already
+exceeded by 84 proof/aggregate and 61 physical lines. Reclaiming 84 proof lines
+would only reach the old ceiling while deleting real cancellation, family,
+event, exact-Arc or local/immutable lifecycle discrimination, and the frozen
+matrix is not yet complete.
 
-## Shared driver and exact order
+## Docs-only correction authority
 
-Use one Legacy/Observed driver and preserve exact repo -> source -> parser
-order. Legacy selects only `HostNonregistryRepoFileKey`, then
-`RepositorySourceFileKey`, and moves the exact local matcher Result Arc.
-Observed selects only `HostNonregistryRepoFileObservationKey`, then
-`RepositorySourceFileObservationKey`, and uses
-`parse_ignore_file_observed`. Neither sibling computes the other family.
-Parser grammar, platform behavior and matcher construction remain shared and
-exact. Both modes retain the same neutral Windows long-path parser dependency
-when that parser path is reached.
+Write only the canonical plan, this manifest, Stage 6 and the routing log at
+<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
+fixtures, oracles, callers and public files are read-only.
 
-Repo Need/typed outer returns immediately, carrierless. Accept the complete
-repo epoch before semantic inspection; repo semantic failure retains the
-repo-only prefix and suppresses source work. After repo success, source
-Need/typed outer is carrierless. Union the accepted repo prefix left-first with
-the complete source epoch before source semantic inspection. Source
-error/Absent/Directory/Present retains repo+source; Absent/Directory suppress
-parser work.
+Retain the exact one-file future retry authority
+`app/slug_bzlmod_v2/src/repository_ignore.rs` from the 3,297-line
+`b08b7f2e` baseline. Keep production <=180. Raise only proof from <=400 to
+<=720, aggregate semantic growth from <=580 to <=900 and final physical size
+from <=3,900 to <=4,250. This measured correction leaves 236 proof/aggregate
+and 289 physical lines beyond the current candidate. Touched helpers remain
+below 200 lines.
 
-Present invokes `parse_ignore_file_observed`. Parser Need/typed outer is
-carrierless. Union the accumulated repo+source prefix left-first with the
-complete parser epoch before parser semantic inspection. Parser error/success
-retains the full prefix. Equal duplicates preserve the earliest exact Arc;
-conflicting values and operation mismatch are typed outer. This sequential
-owner has no Need union.
+## Frozen production contract
 
-Need is invalid/self-unequal. Complete outer is valid/equal by outer value.
-Complete carrier is valid/equal by semantic Result plus epoch. Preserve every
-existing legacy DICE invariant and error class.
+Preserve the private
+`HostNonregistryRepositoryIgnoreObservationKey` and
+`ObservedHostNonregistryRepositoryIgnore`, one local matcher Result Arc plus
+one compact `PathObservationEpoch`, `Dupe`/`Allocative`, borrowed
+accessors and no export/caller.
 
-## Events, family isolation and memory
+Preserve one Legacy/Observed driver and exact repo -> source -> parser order.
+Legacy selects only legacy REPO/source siblings; observed selects only their
+accepted observed siblings. Both modes retain the same neutral Windows
+long-path parser dependency when reached. Neither computes the other family.
 
-Both ignore siblings remain eventless. The matching REPO-file child remains
-sole owner of its local REPO batch; repository source and parser observations
-remain eventless. Semantic Complete includes the child batch exactly as before;
-Need/outer/cancellation stores no parent state; warm reuse emits nothing.
+Repo semantic retains repo-only. Merge the accepted repo prefix left-first
+with a Complete source epoch before source semantics; source terminals retain
+repo+source. Merge that accumulated prefix left-first with a Complete parser
+epoch before parser semantics; parser terminals retain full. Equal duplicates
+keep the earliest exact Arc; conflict/operation mismatch is typed outer. Need
+or typed outer at any position is carrierless and suppresses later work. There
+is no Need union.
 
-Observed dependency rows contain observed REPO/source families plus neutral
-Windows parser observations when reached. Legacy rows contain legacy
-REPO/source families plus that same neutral parser observation. Retain no child
-carrier/source bytes/parser scratch, second collection, cache/interner/store,
-lock/task, direct Host read, revision, certificate or event state. Activate no
-package preflight, closure, discovery, selected graph, registry preparation,
-extension or public caller.
+The ignore parent stays eventless; matching REPO child remains sole local batch
+owner and source/parser remain eventless. Legacy projection moves the exact
+local Result Arc. Retain no child carrier/source bytes/parser scratch or second
+collection/state.
 
-## Required proof and validation
+## Required retry correction
 
-Discriminate:
+Keep every existing discriminator and add or restructure proof to cover:
 
-- distinct key equality/hash and Display; carrier accessors,
-  `Dupe`/`Allocative`, Complete/Need/outer equality and validity;
-- the production reducer at repo/source/parser positions, carrierless
-  Need/outer and later suppression;
-- real repo/source Need and typed outer; repo semantic; source
-  error/Absent/Directory/Present; parser syntax/absolute/platform terminals
-  with exact prior/merged/full prefixes;
-- exact epoch iteration order and per-demand `Arc::ptr_eq`, duplicate-first,
-  conflict and operation mismatch;
-- on Windows, real WindowsLongPath Need/outer/append through the existing
-  parser;
-- exact observed/legacy dependency rows, reverse-family isolation and the
-  neutral Windows parser edge in both modes;
-- exact child-owned REPO batch/order/text, parent/source/parser silence, warm
-  suppression and poll-drop same-DICE recovery;
-- independent local and immutable REPO/`.bazelignore` A -> B -> absent ->
-  directory -> A matcher restoration with held Result/epoch handles and exact
-  restored child-to-parent Arc identity; and
-- zero preflight/closure/discovery/selected-graph/registry/extension/public
-  activation.
+- real source-position Need and typed outer with no parser/later activation;
+- repo and source semantic variants with exact error class/message and exact
+  repo-only versus repo+source prefixes;
+- parser error/success full-prefix polarity and carrierless outer behavior;
+- exact epoch iteration order and per-demand `Arc::ptr_eq`, earliest duplicate
+  Arc, parent-union conflict and operation mismatch;
+- exact parent/source/parser batch silence, matching child REPO batch
+  text/order, cold-to-warm suppression and cancellation recovery;
+- exact observed and legacy dependency rows, reverse isolation, shared neutral
+  Windows parser dependencies and zero preflight/closure/discovery/
+  selected-graph/registry/extension/public activation;
+- independent local and immutable REPO-file A -> B -> absent -> directory -> A
+  changes as well as independent `.bazelignore` lifecycle, matcher restoration,
+  held Result/epoch readability and restored child-to-parent Arc identity; and
+- Complete carrier/outer and Need equality/validity plus exact legacy semantic
+  and event parity.
 
 Run focused ignore proof, full bzlmod, affected loading/query/core baselines,
-`cargo fmt --all -- --check`, `git diff --check b08b7f2e`, exact cap
-accounting and AI-cleanup/Buck2 retention review. Reuse accepted evidence; add
-no fixture or Bazel oracle because semantic grammar, platform policy, errors
-and events are unchanged.
+fmt, diff-check, exact accounting and AI-cleanup/Buck2 retention review. Add no
+fixture or Bazel oracle because parser grammar/platform semantics, values,
+errors and events remain exact and unchanged.
 
 ## Compatibility and STOP
 
-Exact: existing nonregistry REPO -> `.bazelignore` -> parser ordering,
+Exact: current nonregistry REPO -> `.bazelignore` -> parser ordering,
 grammar/platform behavior, matcher values/errors and every legacy child event.
 Slug-native: private sibling, Result-Arc+epoch carrier and typed outer.
 Unsupported/deferred: package preflight/closure/discovery/selected graph;
-registry preparation/patches; extension-generated repositories, M8/M7B and
-exact identity bytes.
+registry preparation/patches; extension repositories, M8/M7B and identity
+bytes.
 
-STOP a second Rust file/key/caller/export, parser or legacy behavior drift,
-event-owner change, extra retained state, direct Host read, upper/registry
-activation, cap excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN if
-the owner cannot fit the frozen one-file envelope without weakening exact
-behavior.
+STOP Rust/Cargo/BUILD/fixture/oracle/public writes during design. STOP a second
+Rust file/key/caller/export, production semantic/order/event/memory/family
+change, direct Host read, upper/registry activation, proof deletion, cap excess
+or milestone closure. REPLAN again if the complete matrix cannot fit.
 
-After independent implementation ACCEPT schedule only the docs-only
+After independent correction ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-implementation-retry`.
+After independent retry ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-package-preflight-observation-design`.

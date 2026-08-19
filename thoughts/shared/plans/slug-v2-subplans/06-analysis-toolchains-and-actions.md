@@ -8827,3 +8827,55 @@ STOP a second file/key/caller/export, parser/legacy/event drift, extra retained
 state, direct Host read, upper/registry activation, cap excess and milestone
 closure. After independent implementation ACCEPT schedule only
 `WP-6-7A-host-nonregistry-package-preflight-observation-design`.
+
+### Host nonregistry repository-ignore observation proof-cap REPLAN (2026-08-19)
+
+Run only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-proof-cap-correction-design`
+from scheduling base `e9fc14a6`, Rust base `b08b7f2e` and accepted semantic
+design `9c0a5473`. Retain the dirty one-file implementation candidate and make
+it non-writable during this docs-only correction.
+
+The candidate is production-sound and its focused parent integration passes.
+Against `b08b7f2e`, `repository_ignore.rs` is +180 production and +484 proof
+lines, +664 aggregate semantic, at 3,961 physical lines. The original <=400
+proof, <=580 aggregate and <=3,900 physical caps are already exceeded before
+the full frozen parent matrix is discriminated. This is a proof/cap stop, not a
+semantic, ownership, family, event or retention redesign.
+
+Write only the canonical plan, current manifest, this Stage 6 plan and routing
+log at <=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
+fixtures, oracles, callers and public files are read-only.
+
+The future retry retains exact authority only over
+`app/slug_bzlmod_v2/src/repository_ignore.rs` from its 3,297-line baseline.
+Keep production <=180; raise only proof to <=720, aggregate semantic growth to
+<=900 and final physical size to <=4,250. Touched helpers remain below 200
+lines.
+
+Freeze the private one-Result-Arc+compact-epoch carrier and single
+Legacy/Observed driver. Preserve exact repo -> source -> parser matching-family
+order. Merge the earlier repo prefix left-first with each later Complete source
+and parser epoch before semantic inspection, preserving the earliest exact Arc.
+Need/typed outer is carrierless and suppresses later work; there is no Need
+union. Both families share the neutral Windows long-path parser dependency when
+reached. The ignore parent stays eventless, the matching REPO child stays sole
+batch owner, and no child carrier, source bytes, parser scratch, second
+collection, cache/interner/store/lock/task, Host read, revision, certificate or
+event state may be retained.
+
+The retry must preserve current proof and add real source-position Need/outer;
+exact repo/source/parser semantic prefixes and messages; exact ordered epoch
+Arcs, duplicate-first/conflict/operation mismatch; parent/source/parser silence,
+child REPO text/order, warm and cancellation recovery; exact family rows and
+upper exclusion; and independent local and immutable REPO-file and
+`.bazelignore` A/B/absent/directory/A lifecycles with held handles and restored
+child-parent Arc identity. Exact current grammar/platform values/errors/events
+remain unchanged; the private sibling/carrier/typed outer is Slug-native.
+
+STOP Rust writes during design and STOP a second file/key/caller/export,
+production drift, upper/registry activation, proof deletion, cap excess or
+milestone closure. After independent correction ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-implementation-retry`;
+after retry ACCEPT schedule only the docs-only
+`WP-6-7A-host-nonregistry-package-preflight-observation-design`.
