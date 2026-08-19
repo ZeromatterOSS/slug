@@ -1,12 +1,80 @@
 [fixture]
 name = "exec-groups-action-platform"
-description = "Exec group action fixture for per-action platform/toolchain context."
-comparison = "semantic"
-manifest_roots = ["bazel-bin"]
-oracle_notes = "Regenerate with upstream Bazel 9 using --update-expected once Stage 6 toolchain resolution exists."
+description = "Bazel 9.2 gives default and named exec-group actions of one owner distinct immutable platform/toolchain/property contexts."
+comparison = "message_shape"
+oracle_notes = "The default action omits Starlark's exec_group argument; the compile action names it. Text aquery exposes owner, action order, platform and opaque ActionKey. Platform exec_properties are source-pinned and discriminated by same-platform ActionKey A/B/A, not claimed as a serialized aquery field or exact M9 byte value."
+
+[provenance]
+bazel_release = "9.2.0"
+bazel_commit = "8220c6198837d5c13d53fea211cf3282aa12408a"
+source_anchors = [
+  "src/main/java/com/google/devtools/build/lib/analysis/RuleContext.java#getActionOwner",
+  "src/main/java/com/google/devtools/build/lib/actions/ActionOwner.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/platform/ExecGroupCollection.java",
+  "src/main/java/com/google/devtools/build/lib/analysis/ResolvedToolchainContext.java",
+  "src/main/java/com/google/devtools/build/lib/skyframe/toolchains/ToolchainResolutionFunction.java#findExecutionPlatformForToolchains",
+  "src/main/java/com/google/devtools/build/lib/query2/aquery/ActionGraphTextOutputFormatterCallback.java#writeText",
+]
+translation_notes = "Bazel constructs an ActionOwner for the requested exec group from the configured owner, aspect descriptors, merged exec properties and selected execution platform. This fixture has no applied aspect, so provenance is explicitly absent. Slug's future compact configured-action owner row remains Slug-native and exact Bazel ActionKey bytes remain M9."
+generation_command = "python3 -B -m tools.v2_oracle run --fixture exec-groups-action-platform --tool bazel --bazel bazel --update-expected"
+verification_command = "python3 -B -m tools.v2_oracle run --fixture exec-groups-action-platform --tool bazel --bazel bazel"
 
 [[commands]]
-name = "build_probe"
-argv = ["build", "//:probe"]
-compare = "semantic"
+name = "cold_platform_a_property_a"
+argv = ["aquery", "//:probe", "--output=text"]
 expected_exit = 0
+stdout_patterns = ["(?s)\\Aaction .*Mnemonic: DefaultOwnerProbe.*Execution platform: //:default_platform.*action .*Mnemonic: CompileOwnerProbe.*Execution platform: //:compile_a.*\\Z"]
+
+[[commands]]
+name = "warm_platform_a_property_a"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["(?s)\\Aaction .*Mnemonic: DefaultOwnerProbe.*Execution platform: //:default_platform.*action .*Mnemonic: CompileOwnerProbe.*Execution platform: //:compile_a.*\\Z"]
+
+[[commands]]
+name = "same_platform_property_b"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["(?s)\\Aaction .*Mnemonic: DefaultOwnerProbe.*Execution platform: //:default_platform.*action .*Mnemonic: CompileOwnerProbe.*Execution platform: //:compile_a.*\\Z"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = '"mutable": "A"'
+  replace = '"mutable": "B"'
+
+[[commands]]
+name = "same_platform_property_restored_a"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["(?s)\\Aaction .*Mnemonic: DefaultOwnerProbe.*Execution platform: //:default_platform.*action .*Mnemonic: CompileOwnerProbe.*Execution platform: //:compile_a.*\\Z"]
+
+  [[commands.mutations]]
+  path = "BUILD.bazel"
+  find = '"mutable": "B"'
+  replace = '"mutable": "A"'
+
+[[commands]]
+name = "named_platform_b"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["(?s)\\Aaction .*Mnemonic: DefaultOwnerProbe.*Execution platform: //:default_platform.*action .*Mnemonic: CompileOwnerProbe.*Execution platform: //:compile_b.*\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = '''    "//:compile_a",
+    "//:compile_b",'''
+  replace = '''    "//:compile_b",
+    "//:compile_a",'''
+
+[[commands]]
+name = "named_platform_restored_a"
+argv = ["aquery", "//:probe", "--output=text"]
+expected_exit = 0
+stdout_patterns = ["(?s)\\Aaction .*Mnemonic: DefaultOwnerProbe.*Execution platform: //:default_platform.*action .*Mnemonic: CompileOwnerProbe.*Execution platform: //:compile_a.*\\Z"]
+
+  [[commands.mutations]]
+  path = "MODULE.bazel"
+  find = '''    "//:compile_b",
+    "//:compile_a",'''
+  replace = '''    "//:compile_a",
+    "//:compile_b",'''

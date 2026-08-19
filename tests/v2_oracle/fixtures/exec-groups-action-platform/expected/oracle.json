@@ -1,7 +1,208 @@
 {
-  "schema_version": 1,
+  "commands": [
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "cold_platform_a_property_a",
+      "normalized_stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf default > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf compile > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}",
+      "startup_argv": [],
+      "stderr": "Starting local Bazel server (9.2.0) and connecting to it...\nComputing main repo mapping: \nComputing main repo mapping: \nComputing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 4.636s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf default > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf compile > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [],
+      "name": "warm_platform_a_property_a",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf default > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf compile > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.675s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf default > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf compile > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "\"mutable\": \"A\"",
+          "old_digest_hint": "1214",
+          "path": "BUILD.bazel",
+          "replace": "\"mutable\": \"B\""
+        }
+      ],
+      "name": "same_platform_property_b",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 167 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf default > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 66318cd2d0bc14c987a194de7a41f9f5cfba6c0d887842460510819309b549e1\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf compile > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: B, owner-group: compile}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 167 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.213s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf default > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 66318cd2d0bc14c987a194de7a41f9f5cfba6c0d887842460510819309b549e1\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf compile > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: B, owner-group: compile}\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "\"mutable\": \"B\"",
+          "old_digest_hint": "1214",
+          "path": "BUILD.bazel",
+          "replace": "\"mutable\": \"A\""
+        }
+      ],
+      "name": "same_platform_property_restored_a",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 167 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf default > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf compile > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (1 packages loaded, 0 targets configured)\nINFO: Analyzed target //:probe (1 packages loaded, 167 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.197s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf default > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf compile > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    \"//:compile_a\",\n    \"//:compile_b\",",
+          "old_digest_hint": "217",
+          "path": "MODULE.bazel",
+          "replace": "    \"//:compile_b\",\n    \"//:compile_a\","
+        }
+      ],
+      "name": "named_platform_b",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf default > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_b\n  ActionKey: d25f4e7a0040f7d3a381d23d087abe42197176143736df92f9d80eb972fb3e30\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf compile > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_b\n  ExecutionInfo: {mutable: B-platform, owner-group: compile}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.546s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf default > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_b\n  ActionKey: d25f4e7a0040f7d3a381d23d087abe42197176143736df92f9d80eb972fb3e30\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf compile > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_b\n  ExecutionInfo: {mutable: B-platform, owner-group: compile}\n\n"
+    },
+    {
+      "argv": [
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "cwd": "<workspace>",
+      "duration_ms": "<duration_ms>",
+      "env_allowlist": {},
+      "env_overrides": {},
+      "executed_argv": [
+        "<tool_executable>",
+        "aquery",
+        "//:probe",
+        "--output=text"
+      ],
+      "exit_code": 0,
+      "fixture_env_overrides": {},
+      "fixture_startup_argv": [],
+      "manifest": [],
+      "mutations": [
+        {
+          "find": "    \"//:compile_b\",\n    \"//:compile_a\",",
+          "old_digest_hint": "217",
+          "path": "MODULE.bazel",
+          "replace": "    \"//:compile_a\",\n    \"//:compile_b\","
+        }
+      ],
+      "name": "named_platform_restored_a",
+      "normalized_stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: <duration>, Critical Path: <duration>\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions",
+      "normalized_stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf default > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash /\n    -c /\n    'printf compile > $1' /\n    '' /\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}",
+      "startup_argv": [],
+      "stderr": "Computing main repo mapping: \nLoading: \nLoading: 0 packages loaded\nAnalyzing: target //:probe (5 packages loaded, 6 targets configured)\nINFO: Analyzed target //:probe (78 packages loaded, 442 targets configured).\nINFO: Found 1 target...\nINFO: Elapsed time: 0.500s, Critical Path: 0.00s\nINFO: 0 processes.\nINFO: Build completed successfully, 0 total actions\n",
+      "stdout": "action 'DefaultOwnerProbe default-owner.txt'\n  Mnemonic: DefaultOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:default_platform\n  ActionKey: 51328988221d5e5db48fae786af62e87f4f0bde2c7381bca046ac3bad2efe015\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/default-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf default > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/default-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:default_platform\n  ExecutionInfo: {owner-group: default, stable: default}\n\naction 'CompileOwnerProbe compile-owner.txt'\n  Mnemonic: CompileOwnerProbe\n  Target: //:probe\n  Configuration: k8-fastbuild\n  Execution platform: //:compile_a\n  ActionKey: 38af986507b8eb27bd15fe554305d7895cacd675f1edfd86b611521019c086a4\n  Inputs: []\n  Outputs: [bazel-out/k8-fastbuild/bin/compile-owner.txt]\n  Command Line: (exec /bin/bash \\\n    -c \\\n    'printf compile > $1' \\\n    '' \\\n    bazel-out/k8-fastbuild/bin/compile-owner.txt)\n# Configuration: a7a71fd16b14112464272f754633480c74c664f2488224c592ebf2dfc7a06b18\n# Execution platform: //:compile_a\n  ExecutionInfo: {mutable: A, owner-group: compile}\n\n"
+    }
+  ],
   "fixture": "exec-groups-action-platform",
-  "generated": false,
-  "oracle_notes": "No local Bazel 9 oracle was generated in this checkpoint; run tools/v2_oracle with --bazel /path/to/bazel --update-expected.",
-  "commands": []
+  "generated": true,
+  "output_base": "<output_base>",
+  "run_dir": "<run_dir>",
+  "schema_version": 1,
+  "tool": "bazel",
+  "tool_executable": "<tool_executable>",
+  "workspace": "<workspace>"
 }

@@ -1,130 +1,112 @@
 # Current Slug V2 Packet
 
-Packet: `WP-1-6-7A-exec-group-action-owner-context-evidence`
+Packet: `WP-6-7A-immutable-configured-action-owner-context-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
-Owners: `01-compliance-oracle-harness.md` and
-`06-analysis-toolchains-and-actions.md`
-Scheduling base: `35e84646`
+Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling and evidence base: `9ab2fa4a`
 Accepted Rust base: `51127df8`
-Result: generate the bounded Bazel 9.2 default/named exec-group action-owner
-discriminator required before the immutable Rust owner design.
+Result: freeze the smallest immutable analysis-owned configured-action row and
+one bounded implementation packet.
 
-## Exact authority and caps
+## Exact docs-only authority and caps
 
 Write exactly:
 
 1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
-2. this manifest,
-3. `thoughts/shared/plans/slug-v2-subplans/01-compliance-oracle-harness.md`,
-4. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
-5. `tests/v2_oracle/fixtures/exec-groups-action-platform/fixture.toml`,
-6. its `workspace/MODULE.bazel`,
-7. its `workspace/BUILD.bazel`,
-8. its `workspace/defs.bzl`, and
-9. its `expected/oracle.json`.
+2. this manifest, and
+3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`.
 
-Caps against `35e84646`: canonical <=40 net/1,694 physical, this manifest
-<=180/287, Stage 1 <=120/1,532, Stage 6 <=160/7,679, the four authored fixture
-files <=200 net/248 physical combined, generated expected output <=450/456,
-and aggregate <=1,150 semantic/11,896 physical. No tenth file.
+Caps against `9ab2fa4a`: canonical <=40 net, this manifest <=220, Stage 6
+<=240 and aggregate <=500. Stage 1/7/8/10, the accepted fixture and live Rust
+are read-only. Rust, Cargo, BUILD, fixture/oracle, generated evidence and
+public/caller changes are forbidden.
 
-## Accepted owner audit
+## Accepted just-in-time evidence
 
-M1 is accepted and no lower DICE/publication prerequisite remains. The first
-M7A gate is immutable creation-time action ownership, but live Slug retains
-plain `ActionSpec` separately from `ToolchainTopology`. `ActionSpec` has
-intrinsic action fields plus an optional exec-group string but no configured
-owner/configuration, selected platform/toolchain or aspect provenance.
-`configured_file_write_actions` later reconstructs one topology-derived
-platform, exposes only `ConfiguredActionExecGroup::Default`, and rejects named
-groups and per-action execution fields. FileWrite identity, aquery and REAPI
-therefore consume a borrowed reconstruction rather than one retained row.
+The Bazel 9.2 `exec-groups-action-platform` oracle is generated and cleanly
+replays six rows for two actions of one configured owner. The default action
+omits Starlark's `exec_group` argument and stays on `default_platform`; the
+named `compile` action stays on `compile_a` cold/warm. Editing only a property
+on that same platform changes only the compile action's opaque ActionKey and
+restoration recovers its prior token. Reordering compatible compile platforms
+moves only that action to `compile_b`; restoring order returns its platform and
+opaque token. Exact ActionKey bytes remain M9.
 
-The future natural owner is an analysis-owned immutable configured-action row,
-not a configured identity embedded into build-API `ActionSpec` and not another
-DICE key. Existing evidence is insufficient: `actions-api-basic` proves action
-kind summaries, `toolchain-resolution-first-platform` proves an actions-free
-selection, and `exec-groups-action-platform` is an ungenerated one-action
-scaffold whose expected record contains no commands.
+The evidence pins `RuleContext#getActionOwner(execGroup)`: Bazel derives the
+per-group owner from configuration, aspect descriptors, merged exec properties
+and selected execution platform. This fixture admits explicit absent aspect
+provenance; applied aspects remain unsupported.
 
-## Exact Bazel 9.2 evidence contract
+## Design authority
 
-Keep the existing fixture identity and replace the scaffold with one small
-workspace in which a single configured rule owner registers two actions:
+Freeze one analysis-owned immutable configured-action representation. Preserve
+build-API `ActionSpec` as intrinsic action material; do not add configured
+analysis types to the lower crate and do not create a DICE key. The retained
+row (or authenticated compact projections with identical lifetime) must own:
 
-1. one action that omits Starlark's `exec_group` argument but retains explicit
-   default-group identity in the evidence model; and
-2. one named `compile`-group action.
+- configured target owner and complete structural configuration identity;
+- explicit default or named exec-group identity;
+- the group-selected execution platform;
+- deterministic merged platform/target/group exec properties;
+- the selected group toolchain context required by the action; and
+- explicit absent aspect provenance now, with a fail-closed extension point
+  for later applied-aspect evidence.
 
-Give the actions distinct fixed mnemonics and outputs. The rule declares a
-default toolchain type and a different named-group type. Register one default
-platform and two compatible named-group platforms with distinct constraint/
-property markers; ordered registration selects named platform A cold, then a
-literal MODULE mutation selects B, then restoration selects A again. Keep the
-default action on its distinct platform throughout. The source must not infer
-platform identity from output paths or command completion order.
+Decide the exact construction seam. Current Starlark evaluation registers
+intrinsic specs through `CtxActions`; `finish_analysis` separately has the
+configured key, prepared toolchain selection, candidate platforms and computed
+platform facts. The design must bind every accepted action to a precomputed
+matching group context before the `ConfiguredNodeResult` becomes immutable.
+It may finalize the registry into configured rows at that boundary, but later
+`configured_file_write_actions`, aquery or REAPI may not infer platform,
+properties or toolchains from the owner's current topology.
 
-Use pinned Bazel 9.2.0 from commit
-`8220c6198837d5c13d53fea211cf3282aa12408a`. Add immutable provenance anchors
-for rule/aspect action ownership, `RuleContext#getActionOwner(execGroup)`,
-default/named exec-group toolchain contexts, execution-platform selection and
-exec-property merge. The translation note must state that Bazel constructs a
-per-group action owner from configuration, aspect descriptors, properties and
-the selected platform; Slug's later representation remains Rust-native.
+The default group is data, not `None`. Named-group lookup must fail on unknown,
+missing or mismatched contexts before retaining a result. Two actions of one
+owner may bind different groups/platforms/properties. A `cfg = "exec"` tool or
+dependency must use the selected group's exec configuration. Preserve Bazel's
+output-conflict and action-construction error precedence.
 
-Run an aquery representation that exposes both owner/action rows, mnemonics,
-outputs, selected execution platforms, execution-info fields and opaque
-ActionKey tokens. Bazel 9.2's `analysis_v2.Action` does not serialize the
-owner's merged exec-properties map, so do not claim it does. Source-pin the
-property merge and prove it indirectly: edit and restore one property on the
-same selected platform and require the affected action's opaque ActionKey to
-change and restore while the other action stays fixed. Do not compare or infer
-the ActionKey bytes themselves; exact bytes remain M9. Textproto or jsonproto
-is allowed only with deterministic fixture-owned normalization already
-supported by the harness. A summary alone is forbidden. Pin exact action order,
-the property A -> B -> A sequence, and selected-platform A -> B -> A
-restoration. Add a build row only if it discriminates the same owner facts or
-output bytes without host shell behavior.
+Replace, rather than duplicate, the current retained action slice where
+possible. Inventory exact clone/allocation cost, `Allocative`, equality and
+invalidation inputs. Retain no second action collection, topology snapshot,
+resolver map, registry, evaluator, lock, cache, interner or task after analysis.
+No lock may span DICE. Use the Buck2 utility-reuse review for any new retained
+collection/string representation.
 
-Aspect provenance is source-pinned but no applied-aspect action is admitted by
-this bootstrap evidence packet. The future owner row must represent explicit
-absent provenance; applied aspects remain unsupported until a separate exact
-fixture is accepted. Likewise do not widen this packet into rules_rust,
-additional action kinds, backend execution or M9 identity evidence.
+Freeze how `ConfiguredNodeResult`, recursive build action closure,
+FileWrite semantic identity, text aquery and `FileWriteReapiPlan` consume the
+same row without re-resolution. Exact public FileWrite values/order and REAPI
+wire semantics remain unchanged; named-group exposure is proof/internal until
+a later separately admitted command/action packet.
 
-## Validation and lifecycle
+## Proof and future packet
 
-Generate expected output once with the pinned Bazel binary, then replay the
-fixture clean. Verify the expected record is marked generated, contains every
-declared command, distinguishes both actions and all A/B/A rows, and contains
-no credentials, machine paths, unstable durations, invocation URLs or raw
-output-base material. Run the fixture manifest/schema checks and diff hygiene.
-Clean all temporary output bases/processes.
+The design must name exact Rust files, measured baselines, semantic/physical
+caps and cohesive helper limits. Required discriminators include:
 
-No Slug command is required: this is just-in-time Bazel evidence for the next
-Rust design. Do not reinterpret a missing Slug implementation as oracle
-failure and do not update any unrelated expected record.
+- default and named actions of one owner retain distinct group/platform/
+  property/toolchain rows in declaration order;
+- C0/C1/C0, platform A/B/A, property A/B/A and toolchain registration/provider
+  edits invalidate and restore structural equality;
+- unknown/missing/mismatched group contexts and ambiguous platforms fail
+  before result retention with unchanged diagnostic precedence;
+- exact configured-owner/action Arc and clone behavior; no projection-time
+  topology reconstruction;
+- aquery identity/text and REAPI derive from the identical retained row and
+  preserve the accepted FileWrite public output;
+- recursive action closure has one owner row per action with deterministic
+  order and no duplicated collection;
+- `Allocative`/retention cleanup and zero new Host read/cache/interner/lock/task;
+  and
+- applied aspects, broader action kinds and public named-group behavior remain
+  nonactivated.
 
-## Compatibility and terminal
+Classify exact Bazel semantics, Slug-native representation/identity and every
+unsupported surface. End with one implementation packet or formal REPLAN.
 
-Exact: Bazel 9.2 owner/action order, default/named group selection, selected
-platform/toolchain/property semantics and the admitted normalized aquery facts.
-
-Slug-native: the future compact immutable Rust owner row and collision-safe
-configuration/action identity. Bazel checksum/ActionKey bytes remain M9.
-
-Unsupported/deferred: applied-aspect actions, unrelated action kinds/rulesets,
-M7B commands, broader REAPI/backend behavior and exact identity bytes.
-
-End with exactly one result:
-
-1. accept the generated evidence and schedule one docs-only immutable
-   action-owner-context design;
-2. identify one uniquely smaller source/normalization prerequisite; or
-3. formal `REPLAN` if the required distinctions cannot be generated within
-   the fixture/caps.
-
-At most one successor. STOP Rust/Cargo, another fixture, harness changes,
-summary-only evidence, inferred fields, nondeterministic normalization,
-credentials/network metadata, direct owner implementation, M8, M7B, M9, JVM
-production code, cap excess, partial validation or multiple successors.
+STOP Rust/Cargo, fixture/oracle changes, a new DICE owner, dependency inversion,
+projection-time reconstruction, duplicate retained graphs, guessed aspect
+semantics, public named-group/action activation, rules_rust breadth, execution
+backend changes, M8, M7B, M9, JVM production code, cap excess or multiple
+successors.

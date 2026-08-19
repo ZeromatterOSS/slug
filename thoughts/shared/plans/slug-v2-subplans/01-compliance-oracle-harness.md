@@ -1410,3 +1410,25 @@ diagnostic/output relationships, and the stable pinned V1 observation. It does
 not accept V1 as Slug final-publication behavior. The active successor is the
 docs-only request-revision/source-certificate design; no further oracle subset
 is required before its first private root-host vertical.
+
+### M7A exec-group action-owner evidence accepted (2026-08-19)
+
+The generated Bazel 9.2 `exec-groups-action-platform` record now contains six
+cleanly replayed non-summary aquery rows for two actions of one configured
+owner. The default action omits the Starlark `exec_group` argument and retains
+`default_platform`; the named compile action selects `compile_a` cold/warm.
+
+A same-platform exec-property A/B/A edit changes and restores only the compile
+action's opaque ActionKey. Ordered compatible-platform A/B/A mutation moves
+only that action to `compile_b` and restores its prior platform/token; the
+default action stays byte-for-byte stable in every expected row. The evidence
+does not claim the property map is serialized or that ActionKey bytes are exact
+Slug requirements.
+
+The five fixture files total 364 physical lines: 156 authored and 208 generated.
+Generation and clean replay pass with Bazel 9.2.0; schema/list discovery, fixed
+message-shape assertions, provenance, cleanup and diff hygiene pass. No harness,
+Slug implementation, other fixture or expected record changed.
+
+Run next only the docs-only
+`WP-6-7A-immutable-configured-action-owner-context-design`.

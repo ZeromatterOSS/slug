@@ -1,16 +1,39 @@
-load(":defs.bzl", "linux_toolchain_impl", "probe_rule")
+load(":defs.bzl", "probe_rule", "toolchain_impl")
 
-constraint_setting(name = "os")
-constraint_value(name = "linux", constraint_setting = ":os")
-constraint_value(name = "macos", constraint_setting = ":os")
-platform(name = "exec_macos", constraint_values = [":macos"])
-platform(name = "exec_linux", constraint_values = [":linux"])
-toolchain_type(name = "demo_type")
-linux_toolchain_impl(name = "linux_impl")
+constraint_setting(name = "owner_group")
+constraint_value(name = "default_group", constraint_setting = ":owner_group")
+constraint_value(name = "compile_group", constraint_setting = ":owner_group")
+
+platform(
+    name = "default_platform",
+    constraint_values = [":default_group"],
+    exec_properties = {"owner-group": "default", "stable": "default"},
+)
+platform(
+    name = "compile_a",
+    constraint_values = [":compile_group"],
+    exec_properties = {"owner-group": "compile", "mutable": "A"},
+)
+platform(
+    name = "compile_b",
+    constraint_values = [":compile_group"],
+    exec_properties = {"owner-group": "compile", "mutable": "B-platform"},
+)
+
+toolchain_type(name = "default_type")
+toolchain_type(name = "compile_type")
+toolchain_impl(name = "default_impl")
+toolchain_impl(name = "compile_impl")
 toolchain(
-    name = "linux_toolchain",
-    exec_compatible_with = [":linux"],
-    toolchain = ":linux_impl",
-    toolchain_type = ":demo_type",
+    name = "default_toolchain",
+    exec_compatible_with = [":default_group"],
+    toolchain = ":default_impl",
+    toolchain_type = ":default_type",
+)
+toolchain(
+    name = "compile_toolchain",
+    exec_compatible_with = [":compile_group"],
+    toolchain = ":compile_impl",
+    toolchain_type = ":compile_type",
 )
 probe_rule(name = "probe")

@@ -7544,3 +7544,22 @@ discriminator over distinct platforms/toolchains/properties and ordered named
 platform A/B/A restoration. Use a deterministic non-summary aquery shape.
 No Rust, harness, other fixture, rules_rust breadth, applied aspect, execution,
 M8, M7B or M9 work.
+
+### M7A exec-group action-owner evidence accepted (2026-08-19)
+
+The Bazel 9.2 fixture is now generated and cleanly replayed. One owner creates
+default and named compile actions in declaration order. Default remains on its
+distinct platform/key through every row. The compile action is cold/warm
+stable, changes only its opaque key for a same-platform property edit, restores
+that key, moves to the second compatible platform after registration reorder,
+and restores its original platform/key. Exact key bytes remain M9.
+
+Pinned `RuleContext#getActionOwner(execGroup)` source ties the selected group
+to configuration, aspect descriptors, merged properties and execution
+platform. The accepted fixture has explicit absent aspect provenance; it does
+not admit applied aspects, broader action kinds, rules_rust or execution.
+
+Run next only
+`WP-6-7A-immutable-configured-action-owner-context-design`, docs-only. Freeze
+one analysis-owned configured-action row from the accepted evidence before any
+Rust implementation or public named-group activation.

@@ -1,21 +1,30 @@
 def _tc_impl(ctx):
-    return [platform_common.ToolchainInfo(value = "exec-group")]
+    return [platform_common.ToolchainInfo(value = ctx.label.name)]
 
-linux_toolchain_impl = rule(implementation = _tc_impl)
+toolchain_impl = rule(implementation = _tc_impl)
 
 def _probe_impl(ctx):
-    out = ctx.actions.declare_file(ctx.label.name + ".txt")
+    default_out = ctx.actions.declare_file("default-owner.txt")
     ctx.actions.run_shell(
-        outputs = [out],
-        command = "printf exec-group > $1",
-        arguments = [out.path],
-        exec_group = "compile",
+        outputs = [default_out],
+        command = "printf default > $1",
+        arguments = [default_out.path],
+        mnemonic = "DefaultOwnerProbe",
     )
-    return [DefaultInfo(files = depset([out]))]
+    compile_out = ctx.actions.declare_file("compile-owner.txt")
+    ctx.actions.run_shell(
+        outputs = [compile_out],
+        command = "printf compile > $1",
+        arguments = [compile_out.path],
+        exec_group = "compile",
+        mnemonic = "CompileOwnerProbe",
+    )
+    return [DefaultInfo(files = depset([default_out, compile_out]))]
 
 probe_rule = rule(
     implementation = _probe_impl,
+    toolchains = ["//:default_type"],
     exec_groups = {
-        "compile": exec_group(toolchains = ["//:demo_type"]),
+        "compile": exec_group(toolchains = ["//:compile_type"]),
     },
 )
