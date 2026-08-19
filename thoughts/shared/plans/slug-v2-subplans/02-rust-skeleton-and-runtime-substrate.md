@@ -6501,3 +6501,39 @@ validation. STOP Rust during design, broader unavailable-root handling,
 repository/event/equality drift, retained selection state, cap excess or M1
 closure. After independent design ACCEPT schedule only
 `WP-2A-m1-multi-build-observed-publication-implementation-retry`.
+
+### Multi-build observed-publication implementation retry active (2026-08-18)
+
+Run only
+`WP-2A-m1-multi-build-observed-publication-implementation-retry` from Rust
+base `3f1d4dd4`, semantic design `a2d440cb` and accepted analysis-error
+correction `5e1df076`.
+
+Write exactly core `runtime/dice.rs` <=410 production/+40 colocated tests and
+11,700 physical, `runtime/demands.rs` <=20/1,230, and
+`runtime/tests/build_command_tests.rs` <=500/3,900; aggregate <=970/16,830.
+No fourth file or caller.
+
+Preserve root-only multi admission, matching-family anchor/branch/action order,
+full-batch outer/incompatible-Need/Need/semantic reduction, local epoch,
+revision-before-source, aggregate certificate, child-only events, strict
+repositories, compact lifetime and every exact/Slug-native/deferred class.
+Clear branch certificates after their exact Arcs enter the sole aggregate.
+
+Success remains `SelectedDependencySuperset` and rejects terminal-only
+demands. Only a multi semantic Analysis terminal may preserve legacy
+unavailable-root pruning and add its trusted local epoch demands to selected
+unscoped paths before snapshot construction. Values come from the
+terminal-first command epoch; validate every local demand/value/Arc and the
+certificate subset. Retain no selected set or new state.
+
+Complete the real analysis-error/recovery, aggregate-only certificate,
+recursive selected-remainder, strict/default rejection, isolated-parent,
+event/family/revision/cancellation/lifecycle and exact legacy proof. Run
+focused/broad validation, cap accounting, Buck2 retention, AI cleanup and
+independent implementation review.
+
+STOP every other file/owner, wider unavailable-root behavior, successful
+terminal-local admission, repository/event/equality drift, retained selection
+state, incompatible-Need coercion, cap excess, partial validation or M1
+closure. After ACCEPT return only to one docs-only remaining-owner audit.

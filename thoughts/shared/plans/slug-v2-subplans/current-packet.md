@@ -1,102 +1,17 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-multi-build-analysis-error-acceptance-correction-design`
+Packet: `WP-2A-m1-multi-build-observed-publication-implementation-retry`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling and retained-candidate base: `7d027088`
-Accepted semantic design: `a2d440cb`
 Accepted Rust base: `3f1d4dd4`
-Result: formally REPLAN the observed multi-build implementation at its native
-semantic-analysis-error acceptance boundary. Retain the dirty two-file Rust
-candidate, but make it non-writable during this docs-only design.
+Accepted semantic design: `a2d440cb`
+Accepted analysis-error correction: `5e1df076`
+Result: resume and complete the retained observed multi-build candidate under
+the corrected transient-analysis acceptance contract.
 
-## Exact docs authority and caps
+## Exact Rust authority and caps
 
 Write exactly:
-
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`: <=40 net.
-2. this manifest: <=220 net.
-3. `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`: <=160 net.
-4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`: <=30 net.
-
-Aggregate docs net <=450. STOP every Rust, Cargo, BUILD, fixture, oracle,
-generated artifact and public/caller edit. The retained `runtime/dice.rs` and
-`runtime/tests/build_command_tests.rs` candidate is evidence only.
-
-## Formal REPLAN evidence
-
-The retained candidate proves the natural owner and success association are
-sound: a public three-branch build with two exported sources and a recursively
-analyzed rule reaches only the observed family, produces the ordered semantic
-result/events, retains an exact aggregate certificate, and accepts a local
-terminal epoch as a pointer-identical subset of the larger selected dependency
-epoch.
-
-One frozen terminal is impossible under `a2d440cb`. Configured analysis
-semantic errors are transient DICE values. The multi root therefore also
-becomes unavailable for activation-closure selection. Keeping selection strict
-fails with `UnavailableRoot`; applying the existing exact legacy behavior and
-dropping that unavailable error root yields an empty selected demand set, after
-which `SelectedDependencySuperset` rejects the nonempty local
-anchor/package/source epoch as `Demand`. Making analysis errors DICE-valid,
-discarding the local epoch/certificate, weakening exact Arc validation or
-duplicating the analysis observation graph would all be unsound.
-
-The retained proof also exposed two bounded implementation corrections, not
-new owners: per-branch source certificates must be taken out of semantic
-targets/errors once their Arcs enter the aggregate certificate, and the public
-mixed-build proof needs an invocation-exclusive precreated stable parent so a
-parallel sibling cannot mutate an observed ancestor.
-
-## Frozen correction owner and algebra
-
-Native terminal acceptance remains the uniquely smallest owner. Add one private
-terminal-demand association, defaulting to existing closure-only selection.
-Only `BuildCommandRootObservationKey` with more than one target and an exact
-semantic `BuildCommandErrorKind::Analysis` terminal may select
-`TransientTerminalLocal`.
-
-For that one case:
-
-- preserve the existing unavailable-root seal/drop behavior and exact legacy
-  analysis-error event semantics;
-- before `selected_snapshot`, extend only the selected unscoped path demands
-  with every demand from the terminal's already-associated local epoch,
-  deterministically sorted and deduplicated;
-- source every selected value/Arc from the command epoch after terminal-first
-  association, so equal values retain the terminal Arc and conflicts have
-  already failed closed;
-- keep repository requests/validations strictly empty and reject any attempt to
-  use this policy for a non-analysis terminal, singleton, external, query,
-  cquery, neutral, legacy/direct or one-shot root;
-- validate exact demand/value/Arc identity for the entire local epoch and exact
-  certificate-subset identity; and
-- retain no policy, selected set, map or second epoch after acceptance.
-
-The accepted `SelectedDependencySuperset` success policy stays unchanged:
-terminal-only demands still fail and configured-analysis/action-closure
-remainder remains activation-closure owned. The new local selection is sound
-only for the semantic analysis terminal whose exact lower prefix is already
-owned by the terminal while the transient upper root cannot supply a closure.
-Need/typed outer/cancel, selection, revision, materializer or publication
-failure remains atomic and leaves prior path/repository/event state unchanged.
-
-Add the smallest crate-private helper in `runtime/demands.rs` to return a new
-`SelectedWorkspaceDemands` with additional unscoped terminal paths while
-preserving repository fields. Use compute-local sorting/deduplication; retain no
-map/cache/interner/store/lock/task and perform no Host read.
-
-During the retry, take each Complete branch certificate out of its
-`BuildRequestedTarget` or source-bearing error when building the aggregate.
-The observed multi semantic Result must therefore match legacy multi semantics
-and retain no per-branch certificate; the one aggregate certificate beside the
-Result Arc remains the sole certificate carrier and shares every exact Arc
-with the local epoch.
-
-## Retry authority, compatibility and proof
-
-After independent design acceptance, schedule exactly
-`WP-2A-m1-multi-build-observed-publication-implementation-retry` with:
 
 1. `app/slug_core_v2/src/runtime/dice.rs`: <=410 production plus <=40
    colocated tests; <=11,700 physical.
@@ -105,34 +20,82 @@ After independent design acceptance, schedule exactly
 3. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=500 tests;
    <=3,900 physical.
 
-Aggregate semantic <=970 and combined physical <=16,830. Preserve every
-accepted `a2d440cb` identity, full-batch, epoch, revision, event, memory and
-compatibility contract except the explicit analysis-error selection correction
-above.
+Aggregate semantic <=970 and combined physical <=16,830. Every other Rust
+file, Cargo, BUILD, fixture, oracle, generated artifact and caller/public
+surface is forbidden.
 
-Required new discrimination:
+## Frozen implementation contract
 
-- a real source-plus-rule analysis error accepts the exact local prefix and
-  aggregate certificate, selects no repository sidecar, publishes exact legacy
-  semantic/error event behavior and recovers after the rule fix;
-- success with recursive analysis still has a strict selected remainder, while
-  a terminal-only demand remains rejected;
-- default closure-only roots reject the same synthetic local injection;
-- multi public targets/errors retain no branch certificate, the internal
-  aggregate retains both source epochs with exact `Arc::ptr_eq`, and direct
-  legacy projection remains semantically exact;
-- an invocation-exclusive parent is created before either retained runtime,
-  followed by warm/edit/restore and default-parallel validation; and
-- cap, `Allocative`/`Dupe`, Buck2 retention, AI cleanup and rollback scans
-  remain clean.
+Preserve `a2d440cb`: extend only private
+`BuildCommandRootObservationKey` to already-validated root-only multi
+requests; keep empty, singleton neutral/PackageAll/external and every direct
+legacy/one-shot route exact. Anchor first, then request-ordered
+`compute_join` branches through matching observed package/analysis/path
+families, then the matching configured action closure. Merge every Complete
+local epoch left-first before semantic inspection. Preserve first typed outer,
+incompatible-Need failure, compatible Need union, first semantic error and
+ordered success. STOP rather than inventing a new public error if live Need
+kinds cannot union.
 
-Exact: public/legacy semantic errors, target values/order, child events and all
-previously accepted roots. Slug-native: the private transient-terminal local
-demand association and aggregate-only certificate carrier. Unsupported/
-deferred: mixed/external multi, recursive patterns, one-shot migration, broader
-actions/globs and exact Bazel identity bytes.
+Observed multi initializes `RequestRevisionKey` before exported-source
+observation. Build one request-ordered aggregate `SourceCertificate` with
+stable shared Arcs. Take each source certificate out of its branch target/error
+after merging it, so the semantic Result matches legacy multi behavior and the
+aggregate beside the Result Arc is the sole retained certificate. The terminal
+retains exactly one Result Arc, one local anchor/package/source epoch and at
+most one aggregate certificate epoch. Branch outcomes, analysis remainder,
+Needs, maps/frontiers and union scratch remain compute-local.
 
-STOP/REPLAN on any fourth Rust file, wider unavailable-root behavior, retained
-selected state, repository sidecar, terminal-only success admission, child
-event/equality change, cap excess, partial validation or M1 closure. This design
-may schedule only the named implementation retry.
+Success uses multi-only `SelectedDependencySuperset`: repository sidecars are
+forbidden, every terminal demand must be an exact pointer-identical selected
+demand, terminal-only demands fail, and additional analysis/action-closure
+entries stay selected-closure owned. Every other observed root keeps exact full
+epoch validation.
+
+Implement `5e1df076` only for a multi semantic
+`BuildCommandErrorKind::Analysis` terminal. Preserve exact legacy
+unavailable-root pruning, then extend the selected unscoped path set with every
+demand in the already-associated local terminal epoch before snapshot
+construction. Add the bounded helper in `runtime/demands.rs`; preserve
+repository fields, sort/deduplicate compute-locally, and source all values/Arcs
+from the terminal-first command epoch. Validate the full local epoch and
+certificate subset. Do not use this policy for success or any other root/error.
+
+The root remains eventless. Child package/analysis keys remain sole batch
+owners. Certificate terminals use `SourceCertifiedCurrentClosure` only with
+the semantic-Complete Some(including empty) invariant; no-certificate terminals
+stay Strict. Need/outer/cancel and selection/revision/materializer/publication
+failure publish nothing and leave prior path/repository/event state intact.
+Retain no selected set, child carrier Arc, cache/interner/store, new lock/task
+or direct Host read. Keep touched helpers below 200 lines and require
+`Allocative`/`Dupe`, Buck2 retention and AI cleanup review.
+
+## Compatibility, proof and STOP
+
+Exact: public multi target/error/order/configured semantics and child events;
+all singleton, legacy/direct and one-shot behavior. Slug-native: private
+observed multi carrier/outer, aggregate-only certificate,
+SelectedDependencySuperset and transient-analysis terminal-local association.
+Deferred: external/mixed multi, recursive patterns, one-shot migration,
+broader actions/globs and exact Bazel identity bytes.
+
+Proof must retain the full `a2d440cb` identity/branch/order/Need/outer/epoch/
+revision/event/family/cancellation/lifecycle matrix and additionally
+discriminate:
+
+- real source-plus-rule analysis error acceptance/recovery with exact local
+  prefix, aggregate certificate, legacy semantic/event parity and no repository
+  sidecar;
+- recursive-analysis success with a strict selected remainder, terminal-only
+  rejection and default-root rejection of the same local injection;
+- aggregate-only branch semantics plus exact two-source certificate Arcs and
+  direct legacy parity;
+- an invocation-exclusive parent created before retained runtimes, followed by
+  warm/source-edit/restore and default-parallel validation; and
+- exact cap/physical accounting, full focused/broad validation and rollback,
+  retention and cleanup scans.
+
+STOP/REPLAN on any fourth Rust file, wider unavailable-root policy, successful
+terminal-local admission, repository/event/equality drift, retained selected
+state, cap excess, partial validation or M1 closure. After independent ACCEPT,
+schedule only one docs-only remaining-owner audit.
