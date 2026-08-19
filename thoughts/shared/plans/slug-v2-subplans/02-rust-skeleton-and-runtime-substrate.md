@@ -6347,3 +6347,72 @@ End with exactly one independently reviewed docs-only owner design, one
 uniquely smaller prerequisite design or formal REPLAN. STOP Rust, Cargo, BUILD,
 fixtures/oracles, public activation, adjacent breadth, cap excess and M1
 closure.
+
+### Post-external-singleton owner audit accepted (2026-08-18)
+
+The audit from `abb951de` selects the existing root-only multi-target
+`BuildCommandRootKey` aggregation as the uniquely smallest complete next
+owner. It already owns structural ordered request identity, full target
+`compute_join`, compatible-Need and first-semantic reduction, configured
+action closure and the one semantic Result Arc handed to native acceptance.
+
+No smaller lower producer is missing. Accepted observed anchor, root-package
+and exact root path children expose local epochs, while configured analysis
+intentionally exposes only its semantic value and stays represented by the
+selected dependency closure. The epoch-shaped `SourceCertificate` already
+represents multiple demands. The missing local branch epoch, aggregate
+certificate and private selected-subset association belong at the command
+root/native acceptance boundary.
+
+The one-shot `evaluate_workspace_targets{,_with_bzlmod_inputs}` adapters are
+not selected. They create a fresh runtime, inject an eager Host workspace
+snapshot and directly project `WorkspaceBuildEvaluation` outside
+`AcceptedCommand`; their public/lifecycle migration remains deferred.
+
+### Multi-build observed-publication design active (2026-08-18)
+
+Run only `WP-2A-m1-multi-build-observed-publication-design` from scheduling
+base `abb951de` and accepted Rust base `3f1d4dd4`. Write only
+canonical/current/Stage/routing within 40/220/180/30 and 470 aggregate docs net.
+
+Freeze the existing private observed root to additionally admit only already
+validated root-only requests with more than one target. Empty, singleton
+neutral/PackageAll/external and direct legacy routes stay exact; recursive,
+mixed and multi-external requests remain rejected. The observed multi root
+initializes revision before target-kind classification and stays
+StrictPathOnly. Its local anchor/package/source epoch must be an exact
+pointer-identical subset of the closure-selected epoch; terminal-only demands
+and repository sidecars fail, while configured-analysis remainder entries stay
+selected-owned. Freeze a private default-Exact versus multi-only
+SelectedDependencySuperset validation policy; every other observed root keeps
+full epoch equality.
+
+Require one mode-aware anchor/target/action aggregate driver. Observed branches
+select matching observed root-package/analysis children, retain one local
+anchor/package/source epoch and optional source certificate, and merge all
+Complete local epochs left-first in request order before reduction. Preserve
+first typed outer, incompatible Need failure, full compatible Need union, first
+semantic error and ordered success. Equal duplicate demands keep the first
+Arc; conflict or operation mismatch is typed outer. STOP rather than inventing
+a public error for incompatible Needs.
+
+Retain exactly one semantic Result Arc, one local anchor/branch epoch and at most
+one request-ordered aggregate source-certificate epoch with shared exact Arcs.
+No-source terminals retain none. The root remains eventless; certificate
+terminals use the accepted source-certified policy and must prove the
+Some(including empty) producer invariant, while no-certificate terminals stay
+Strict. Native terminal association, selection, revision, materializer and
+atomic path/repository/event publication remain unchanged.
+
+Future Rust is exactly `runtime/dice.rs` <=380 production/+40 colocated tests
+and 11,700 physical, plus `runtime/tests/build_command_tests.rs` <=500 tests
+and 3,900 physical; aggregate <=920/15,600 from 11,264/3,389. Freeze complete
+identity, branch-position, epoch/Arc/certificate, revision, event, family,
+rollback, lifecycle, retention and broad-validation proof. Compatibility is
+exact for public/legacy/direct/one-shot behavior, Slug-native for the private
+multi carrier/outer/association, and deferred for external multi, recursive,
+one-shot cutover, broader globs/actions and exact identity bytes.
+
+STOP Rust, any third file/owner, admission/public/event drift, retained branch
+state, cap excess or M1 closure. After independent design ACCEPT schedule only
+`WP-2A-m1-multi-build-observed-publication-implementation`; otherwise REPLAN.
