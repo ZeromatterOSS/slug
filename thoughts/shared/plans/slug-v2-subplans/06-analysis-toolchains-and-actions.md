@@ -8529,3 +8529,51 @@ scratch/state, direct Host read, ignore/preflight/closure/discovery/selected
 graph/registry/extension activation, cap excess and milestone closure. After
 independent implementation ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
+
+### Host nonregistry REPO-file proof-cap correction REPLAN (2026-08-19)
+
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation` is **REPLAN**
+before acceptance. Retain the exact one-file Rust candidate from scheduling
+base `aaa0bd3a`, Rust base `12f68983` and accepted semantic design `3c598dd5`;
+it is non-writable during this docs-only design.
+
+The candidate is ownership- and retention-sound. `repo_file.rs` is +163
+production and +421 proof lines, +584 aggregate semantic, at 3,263 physical
+lines. The source-first driver selects the matching source family, accepts the
+complete observed epoch before semantics, stores only its matching local REPO
+batch and retains one local Result Arc plus the compact epoch. Focused observed
+proof passes 2/2; all pre-existing focused REPO proof and diff hygiene pass.
+
+The old +320 proof/3,200 physical envelope is exhausted before the parent matrix
+is complete. The retry must add real source Need/typed-outer and later-child
+suppression; policy, parse and evaluation error prefixes/batches; exact epoch
+iteration and shared-Arc order; parent empty/nonempty/error and warm/no-batch
+behavior; real poll-drop identical-request recovery; held Result/epoch lifetime
+through both local and immutable A/B/absent/directory/A; and explicit zero
+ignore/preflight/closure/discovery/selected-graph/registry/extension/public
+activation. Preserve the current exact observed/legacy dependency rows and
+source-carrier pointer proof. Accepted child tests support but cannot replace
+the parent's branch/event decisions.
+
+Run only
+`WP-6-7A-host-nonregistry-repo-file-observation-proof-cap-correction-design`,
+docs-only. Keep production <=180 from the 2,679-line base. Raise only proof from
+<=320 to <=550, aggregate semantic growth from <=500 to <=730 and final physical
+size from <=3,200 to <=3,450. This measured +230 semantic/+250 physical proof
+margin leaves the candidate 129 proof and 187 physical lines for the missing
+discriminators. It authorizes no production semantic, event, retention, family,
+owner or upper-activation change.
+
+Exact behavior remains existing nonregistry REPO source order, UTF-8 policy,
+values/errors/diagnostics/events and every legacy result. The private sibling,
+Result-Arc+epoch carrier and typed outer remain Slug-native. Ignore/preflight/
+closure/discovery/selected graph, registry preparation/patches, extensions,
+rules_rust actions, M8/M7B and exact identity bytes remain deferred.
+
+STOP Rust/Cargo/BUILD/fixture/oracle/public writes during design. STOP a second
+retry file/key/caller/export, changed production semantics/order/events/memory/
+families, direct Host read, upper/registry activation, proof deletion, cap
+excess or milestone closure. REPLAN again if the full matrix cannot fit.
+After independent design ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry`; after its
+independent ACCEPT schedule only the docs-only nonregistry ignore design.

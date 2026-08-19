@@ -1,18 +1,61 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repo-file-observation-implementation`
+Packet: `WP-6-7A-host-nonregistry-repo-file-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling base: `aaa0bd3a`
 Rust base: `12f68983`
-Accepted design: `3c598dd5`
+Accepted semantic design: `3c598dd5`
 
-## Exact Rust authority and caps
+## Formal REPLAN evidence
 
-Write only `app/slug_bzlmod_v2/src/repo_file.rs`, baseline 2,679 physical
-lines. Production growth is <=180, test growth is <=320, aggregate semantic
-growth is <=500 and final physical size is <=3,200. Every new or touched helper
-stays below 200 lines. Every other Rust, Cargo, BUILD, fixture, oracle and docs
-file is read-only during implementation.
+The retained one-file candidate is ownership- and retention-sound. Against
+`12f68983`, `repo_file.rs` is +163 production and +421 proof lines, +584
+aggregate semantic, at 3,263 physical lines. The shared source-first driver and
+private Result-Arc+epoch carrier compile; focused observed proof passes 2/2 and
+all pre-existing focused REPO proof remains green. Scope is exactly the
+authorized file and diff-check is clean.
+
+The frozen +320 proof and 3,200 physical ceilings cannot hold the complete
+parent-specific matrix. The candidate still needs real source Need/typed-outer
+suppression, policy and parse/evaluation error batches, exact iteration order,
+warm/no-batch and poll-drop recovery, explicit held Result/epoch Arc lifetime,
+and zero-upper-activation checks. Removing 101 current proof lines would already
+discard exact source-carrier Arc forwarding, both family rows, or one of the
+local/immutable lifecycles. Production semantics, owner, order, events, retained
+shape and family selection do not require redesign.
+
+## Exact docs authority and caps
+
+During this design write only:
+
+1. canonical plan, <=40 net lines;
+2. this manifest, <=220 net lines;
+3. `06-analysis-toolchains-and-actions.md`, <=160 net lines; and
+4. routing log, <=30 net lines.
+
+Aggregate docs growth is <=450 net lines. Retain the dirty `repo_file.rs`
+candidate exactly and treat it as non-writable. Every other file is read-only.
+
+## Frozen correction
+
+Preserve the accepted private key/carrier, matching Legacy/Observed source
+family, source-first Present-only continuation, exact Result-Arc projection,
+carrierless Need/typed outer, semantic-Complete local REPO batches and compact
+one-Result-Arc-plus-epoch retention. Add no production owner, caller, export,
+state, event, Host read, cache, store, interner, lock or task.
+
+Correct only the proof envelope for the immediate implementation retry:
+
+- keep production at <=180 from the 2,679-line base;
+- raise proof from <=320 to <=550 lines;
+- raise aggregate semantic growth from <=500 to <=730; and
+- raise final physical size from <=3,200 to <=3,450.
+
+This adds at most 230 proof-semantic and 250 physical lines. The measured
+candidate has 129 proof-semantic and 187 physical lines of corrected headroom.
+It may fund only compact proof completion/restructuring; production semantics,
+owner, events, retention, family selection and upper activation stay frozen.
 
 ## Frozen owner and driver
 
@@ -99,10 +142,13 @@ extensions, rules_rust actions, M8/M7B and exact identity bytes.
 
 ## STOP and sole successor
 
-STOP on a second file/key/caller/export, source-order or event drift, retained
-scratch/state, direct Host read, upper/registry activation, proof weakness, cap
-excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN rather than move the
-REPO batch upward or invent another producer.
+STOP Rust, Cargo, BUILD, fixture, oracle and public writes during design. STOP a
+second retry file/key/caller/export, production semantic/order/event/memory/
+family drift, direct Host read, upper/registry activation, proof deletion, cap
+excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN again if the full
+matrix cannot fit the corrected envelope.
 
-After independent implementation ACCEPT schedule only the docs-only
+After independent design ACCEPT schedule exactly
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry` in the
+same one Rust file. Only after independent retry ACCEPT schedule the docs-only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
