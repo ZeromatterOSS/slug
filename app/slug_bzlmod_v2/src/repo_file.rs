@@ -12,6 +12,7 @@
 
 use std::cell::RefCell;
 use std::fmt;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::sync::OnceLock;
 
@@ -71,6 +72,7 @@ use crate::source_preparation::HostRepositorySourceFileObservationKey;
 use crate::source_preparation::HostRepositorySourceFileValue;
 use crate::source_preparation::RepositorySourceFileError;
 use crate::source_preparation::RepositorySourceFileKey;
+use crate::source_preparation::RepositorySourceFileObservationKey;
 use crate::source_preparation::RepositorySourceFileValue;
 use crate::source_preparation::SourcePreparationOutcome;
 
@@ -1076,76 +1078,244 @@ impl fmt::Display for HostNonregistryRepoFileKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryRepoFileObservationKey(pub(crate) HostNonregistryRepoFileKey);
+
+impl fmt::Display for HostNonregistryRepoFileObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostNonregistryRepoFile {
+    result: Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostNonregistryRepoFile {
+    pub(crate) fn result(&self) -> &Arc<Result<HostRepoFileValue, HostRouteRepoFileError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Clone, Copy)]
+enum HostNonregistryRepoFileMode {
+    Legacy,
+    Observed,
+}
+
+type HostNonregistryRepoFileProjection = (
+    Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>,
+    PathObservationEpoch,
+);
+type HostNonregistryRepoFileDriverOutcome =
+    SourcePreparationOutcome<Result<HostNonregistryRepoFileProjection, ObservedPathFrontierError>>;
+
+type HostNonregistryRepoSourceOutcome = SourcePreparationOutcome<
+    Result<
+        (
+            Result<RepositorySourceFileValue, RepositorySourceFileError>,
+            PathObservationEpoch,
+        ),
+        ObservedPathFrontierError,
+    >,
+>;
+
+fn finish_nonregistry_repo_source(
+    outcome: HostNonregistryRepoSourceOutcome,
+) -> ControlFlow<
+    HostNonregistryRepoFileDriverOutcome,
+    (
+        Result<RepositorySourceFileValue, RepositorySourceFileError>,
+        PathObservationEpoch,
+    ),
+> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(source)) => ControlFlow::Continue(source),
+    }
+}
+
+fn project_nonregistry_repo_legacy(
+    outcome: HostNonregistryRepoFileDriverOutcome,
+) -> SourcePreparationOutcome<Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy nonregistry REPO cannot produce an observed outer error")
+        }
+    }
+}
+
+fn nonregistry_repo_complete(
+    ctx: &mut DiceComputations<'_>,
+    capture_events: bool,
+    result: Result<HostRepoFileValue, HostRouteRepoFileError>,
+    observations: PathObservationEpoch,
+    batch: EventBatch,
+) -> HostNonregistryRepoFileDriverOutcome {
+    store_route_repo_batch(ctx, capture_events, batch);
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn drive_host_nonregistry_repo_file(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryRepoFileKey,
+    mode: HostNonregistryRepoFileMode,
+) -> HostNonregistryRepoFileDriverOutcome {
+    let capture_events = ctx
+        .per_transaction_data()
+        .data
+        .get::<CaptureEvaluationEvents>()
+        .is_ok();
+    let source_key = RepositorySourceFileKey {
+        workspace: key.workspace.as_path().to_owned(),
+        module_name: key.module.name.clone(),
+        repo_relative_path: "REPO.bazel".into(),
+    };
+    let (source, observations) = match mode {
+        HostNonregistryRepoFileMode::Legacy => match dice_invariant(ctx.compute(&source_key).await)
+        {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(source) => (
+                match source.as_ref() {
+                    Ok(value) => Ok(value.dupe()),
+                    Err(error) => Err(error.dupe()),
+                },
+                PathObservationEpoch::empty(),
+            ),
+        },
+        HostNonregistryRepoFileMode::Observed => {
+            let outcome = match dice_invariant(
+                ctx.compute(&RepositorySourceFileObservationKey(source_key))
+                    .await,
+            ) {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    SourcePreparationOutcome::Complete(Err(error))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    SourcePreparationOutcome::Complete(Ok((
+                        observed.result().as_ref().clone(),
+                        observed.observations().dupe(),
+                    )))
+                }
+            };
+            match finish_nonregistry_repo_source(outcome) {
+                ControlFlow::Continue(source) => source,
+                ControlFlow::Break(outcome) => return outcome,
+            }
+        }
+    };
+    let source = match source {
+        Ok(RepositorySourceFileValue::Absent) => {
+            return nonregistry_repo_complete(
+                ctx,
+                capture_events,
+                Ok(HostRepoFileValue::empty()),
+                observations,
+                EventBatch::empty(),
+            );
+        }
+        Ok(RepositorySourceFileValue::Present(bytes)) => bytes,
+        Err(error) => {
+            return nonregistry_repo_complete(
+                ctx,
+                capture_events,
+                Err(HostRouteRepoFileError::Source(error)),
+                observations,
+                EventBatch::empty(),
+            );
+        }
+    };
+    let semantics = match dice_invariant(
+        ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
+            key.workspace.dupe(),
+        ))
+        .await,
+    ) {
+        Ok(semantics) => semantics,
+        Err(error) => {
+            return nonregistry_repo_complete(
+                ctx,
+                capture_events,
+                Err(HostRouteRepoFileError::PolicyProjection(error)),
+                observations,
+                EventBatch::empty(),
+            );
+        }
+    };
+    let logical_path = NormalizedAbsolutePath::new(
+        key.workspace
+            .as_path()
+            .join(".slug-nonregistry")
+            .join(key.module.name.as_str())
+            .join("REPO.bazel"),
+    )
+    .expect("joining a normalized workspace remains absolute");
+    let recording = capture_events.then(RecordingRepoEventReporter::default);
+    let direct = DirectRepoEventReporter;
+    let reporter: &dyn RepoEventReporter = recording
+        .as_ref()
+        .map_or(&direct, |recording| recording as &dyn RepoEventReporter);
+    let result = evaluate_repo_file(&logical_path, &source, semantics.utf8_mode, reporter)
+        .map_err(HostRouteRepoFileError::Evaluation);
+    nonregistry_repo_complete(
+        ctx,
+        capture_events,
+        result,
+        observations,
+        recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch),
+    )
+}
+
 #[async_trait]
 impl Key for HostNonregistryRepoFileKey {
     type Value = SourcePreparationOutcome<Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let capture_events = ctx
-            .per_transaction_data()
-            .data
-            .get::<CaptureEvaluationEvents>()
-            .is_ok();
-        let source = match dice_invariant(
-            ctx.compute(&RepositorySourceFileKey {
-                workspace: self.workspace.as_path().to_owned(),
-                module_name: self.module.name.clone(),
-                repo_relative_path: "REPO.bazel".into(),
-            })
-            .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent)) => {
-                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
-                return SourcePreparationOutcome::Complete(Arc::new(
-                    Ok(HostRepoFileValue::empty()),
-                ));
-            }
-            SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(bytes))) => {
-                bytes
-            }
-            SourcePreparationOutcome::Complete(Err(error)) => {
-                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostRouteRepoFileError::Source(error),
-                )));
-            }
-        };
-        let semantics = match dice_invariant(
-            ctx.compute(&RootRepoFileSemanticsProjectionKey::new(
-                self.workspace.dupe(),
-            ))
-            .await,
-        ) {
-            Ok(semantics) => semantics,
-            Err(error) => {
-                store_route_repo_batch(ctx, capture_events, EventBatch::empty());
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostRouteRepoFileError::PolicyProjection(error),
-                )));
-            }
-        };
-        let logical_path = NormalizedAbsolutePath::new(
-            self.workspace
-                .as_path()
-                .join(".slug-nonregistry")
-                .join(self.module.name.as_str())
-                .join("REPO.bazel"),
+        project_nonregistry_repo_legacy(
+            drive_host_nonregistry_repo_file(ctx, self, HostNonregistryRepoFileMode::Legacy).await,
         )
-        .expect("joining a normalized workspace remains absolute");
-        let recording = capture_events.then(RecordingRepoEventReporter::default);
-        let direct = DirectRepoEventReporter;
-        let reporter: &dyn RepoEventReporter = recording
-            .as_ref()
-            .map_or(&direct, |value| value as &dyn RepoEventReporter);
-        let value = evaluate_repo_file(&logical_path, &source, semantics.utf8_mode, reporter)
-            .map_err(HostRouteRepoFileError::Evaluation);
-        store_route_repo_batch(
-            ctx,
-            capture_events,
-            recording.map_or_else(EventBatch::empty, RecordingRepoEventReporter::into_batch),
-        );
-        SourcePreparationOutcome::Complete(Arc::new(value))
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostNonregistryRepoFileObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostNonregistryRepoFile, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_nonregistry_repo_file(ctx, &self.0, HostNonregistryRepoFileMode::Observed)
+            .await
+            .map(|outcome| {
+                outcome.map(|(result, observations)| ObservedHostNonregistryRepoFile {
+                    result,
+                    observations,
+                })
+            })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -1480,6 +1650,8 @@ pub(crate) mod tests {
     use crate::RootRepositoryRoute;
     #[cfg(unix)]
     use crate::SourcePreparationOutcome;
+    #[cfg(unix)]
+    use crate::inject_root_module_request_inputs;
     #[cfg(unix)]
     use crate::inject_root_package_policy_inputs;
     #[cfg(unix)]
@@ -2178,12 +2350,18 @@ pub(crate) mod tests {
         legacy_repo: AtomicUsize,
         legacy_host_file: AtomicUsize,
         observed_host_file: AtomicUsize,
+        upper: AtomicUsize,
+        rows: Mutex<Vec<(String, Vec<String>)>>,
     }
 
     #[cfg(unix)]
     impl ObservedRepoEventTracker {
         fn take(&self) -> Vec<RepoActivation> {
             std::mem::take(&mut *self.activations.lock().unwrap())
+        }
+
+        fn take_rows(&self) -> Vec<(String, Vec<String>)> {
+            std::mem::take(&mut *self.rows.lock().unwrap())
         }
 
         fn assert_legacy_keys_inactive(&self) {
@@ -2203,9 +2381,9 @@ pub(crate) mod tests {
 
     #[cfg(unix)]
     fn assert_empty_batches(activations: Vec<RepoActivation>) {
-        assert!(activations.into_iter().all(
-            |activation| matches!(activation.batch, Some(batch) if batch.events().is_empty())
-        ));
+        assert_eq!(activations.len(), 1);
+        assert_eq!(activations[0].kind, ActivationKind::Evaluated);
+        assert!(matches!(&activations[0].batch, Some(batch) if batch.events().is_empty()));
     }
 
     #[cfg(unix)]
@@ -2223,13 +2401,73 @@ pub(crate) mod tests {
     }
 
     #[cfg(unix)]
+    fn assert_nonregistry_rows(
+        tracker: &ObservedRepoEventTracker,
+        observed_key: &super::HostNonregistryRepoFileObservationKey,
+        legacy_key: &super::HostNonregistryRepoFileKey,
+        semantics: bool,
+        observed: bool,
+        legacy: bool,
+    ) {
+        let deps = |observed| {
+            let source = format!(
+                "{}repository-source-file:dep:REPO.bazel",
+                if observed { "observed-" } else { "" }
+            );
+            [source]
+                .into_iter()
+                .chain(semantics.then(|| "root-repo-file-semantics:\"/workspace\"".to_owned()))
+                .collect()
+        };
+        let mut expected = Vec::new();
+        if observed {
+            expected.push((observed_key.to_string(), deps(true)));
+        }
+        if legacy {
+            expected.push((legacy_key.to_string(), deps(false)));
+        }
+        assert_eq!(tracker.take_rows(), expected);
+    }
+
+    #[cfg(unix)]
+    fn assert_epoch_ptrs(expected: &PathObservationEpoch, actual: &PathObservationEpoch) {
+        assert_eq!(expected, actual);
+        for (demand, result) in expected.observations() {
+            assert!(Arc::ptr_eq(result, actual.get(demand).unwrap()));
+        }
+    }
+
+    #[cfg(unix)]
     impl ActivationTracker for ObservedRepoEventTracker {
         fn key_activated(
             &self,
-            _key: &DynKey,
-            _deps: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
             _activation: ActivationData,
         ) {
+            let name = key.to_string();
+            if [
+                "host-nonregistry-repository-ignore:",
+                "host-nonregistry-package-preflight:",
+                "host-nonregistry-module-closure:",
+                "module-source-preparation:",
+                "host-discovered-module:",
+                "host-selected-module-graph:",
+                "registry-file:",
+            ]
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+            {
+                self.upper.fetch_add(1, Ordering::SeqCst);
+            }
+            if name.starts_with("host-nonregistry-repo-file:")
+                || name.starts_with("observed-host-nonregistry-repo-file:")
+            {
+                self.rows
+                    .lock()
+                    .unwrap()
+                    .push((name, deps.map(ToString::to_string).collect()));
+            }
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -2241,6 +2479,12 @@ pub(crate) mod tests {
                 || key
                     .downcast_ref::<super::HostRouteRepoFileObservationKey>()
                     .is_some()
+                || key
+                    .downcast_ref::<super::HostNonregistryRepoFileObservationKey>()
+                    .is_some()
+                || key
+                    .downcast_ref::<super::HostNonregistryRepoFileKey>()
+                    .is_some()
             {
                 self.activations.lock().unwrap().push(RepoActivation {
                     kind: activation.kind(),
@@ -2249,6 +2493,14 @@ pub(crate) mod tests {
                         .and_then(|data| data.downcast_ref::<EventBatch>())
                         .map(Dupe::dupe),
                 });
+            } else if key
+                .downcast_ref::<super::RepositorySourceFileObservationKey>()
+                .is_some()
+                || key
+                    .downcast_ref::<super::RepositorySourceFileKey>()
+                    .is_some()
+            {
+                assert!(activation.evaluation_data().is_none());
             } else if key.downcast_ref::<super::HostRepoFileKey>().is_some() {
                 self.legacy_repo.fetch_add(1, Ordering::SeqCst);
             } else if key
@@ -2675,5 +2927,641 @@ pub(crate) mod tests {
         let restored = observed_repo_frontier(&dice, tracker.dupe(), a, true, true).await;
         assert!(HostRepoFileObservationKey::equality(&restored, &first));
         assert_print(tracker.take(), "A");
+    }
+
+    #[cfg(unix)]
+    fn nonregistry_epoch(
+        root: &str,
+        source: Option<(&[u8], PathNodeKind)>,
+        namespace: PathObservationNamespace,
+        source_root: &str,
+        variant: i64,
+    ) -> PathObservationEpoch {
+        let lstat = |kind| {
+            PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+                kind, variant, variant, variant, variant, 0o755,
+            )))
+        };
+        let demand = |namespace, path: &str, operation| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(path).unwrap(),
+                operation,
+            )
+        };
+        let mut entries = SmallMap::new();
+        for path in ["/", "/workspace"] {
+            entries.insert(
+                demand(
+                    PathObservationNamespace::Host,
+                    path,
+                    PathObservationOperation::Lstat,
+                ),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        entries.insert(
+            demand(
+                PathObservationNamespace::Host,
+                "/workspace/MODULE.bazel",
+                PathObservationOperation::Lstat,
+            ),
+            lstat(PathNodeKind::RegularFile),
+        );
+        entries.insert(
+            demand(
+                PathObservationNamespace::Host,
+                "/workspace/MODULE.bazel",
+                PathObservationOperation::FileBytes,
+            ),
+            PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                root.as_bytes(),
+            ))),
+        );
+        let source_path = format!("{source_root}/REPO.bazel");
+        for ancestor in std::path::Path::new(&source_path).ancestors().skip(1) {
+            entries.insert(
+                demand(
+                    namespace,
+                    ancestor.to_str().unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                lstat(PathNodeKind::Directory),
+            );
+        }
+        entries.insert(
+            demand(namespace, &source_path, PathObservationOperation::Lstat),
+            source.map_or(
+                PathObservationResult::Lstat(PathOperationResult::Missing),
+                |(_, kind)| lstat(kind),
+            ),
+        );
+        if let Some((bytes, kind)) = source
+            && kind == PathNodeKind::RegularFile
+        {
+            entries.insert(
+                demand(namespace, &source_path, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(bytes))),
+            );
+        }
+        PathObservationEpoch::new(entries).unwrap()
+    }
+
+    #[cfg(unix)]
+    async fn nonregistry_transaction(
+        dice: &Arc<Dice>,
+        tracker: Arc<ObservedRepoEventTracker>,
+        root: &str,
+        epoch: PathObservationEpoch,
+        result: Option<RepositoryMaterializationResult>,
+        inject_policy: bool,
+    ) -> dice::DiceTransaction {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(
+                slug_workspace_v2::WorkspaceSnapshotKey {
+                    workspace: workspace.as_path().to_owned(),
+                },
+                Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                    files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                        workspace.as_path().join("MODULE.bazel"),
+                        slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(root.to_owned())),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(PathObservationEpochKey, epoch)])
+            .unwrap();
+        inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Off,
+        )
+        .unwrap();
+        if inject_policy {
+            inject_root_package_policy_inputs(
+                &mut updater,
+                RootPackagePolicyInputs::new(
+                    workspace.dupe(),
+                    [workspace.dupe()],
+                    std::iter::empty::<&str>(),
+                    None,
+                    Some("warning"),
+                )
+                .unwrap(),
+            )
+            .unwrap();
+        }
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(workspace.dupe(), []).unwrap(),
+            )])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let pending = transaction
+            .compute(&super::RepositorySourceFileObservationKey(
+                super::RepositorySourceFileKey {
+                    workspace: workspace.as_path().to_owned(),
+                    module_name: "dep".into(),
+                    repo_relative_path: "REPO.bazel".into(),
+                },
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Need(need) = pending else {
+            panic!("missing injected result must expose the exact request")
+        };
+        let request = need
+            .repository_materializations()
+            .values()
+            .next()
+            .unwrap()
+            .as_ref()
+            .clone();
+        let mut updater = transaction.into_updater();
+        let Some(result) = result else {
+            return updater.commit().await;
+        };
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: workspace.dupe(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    workspace,
+                    [RepositoryMaterializationEpochEntry {
+                        request: Arc::new(request),
+                        result,
+                    }],
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        updater.commit().await
+    }
+
+    #[cfg(unix)]
+    fn observed_nonregistry(
+        value: &SourcePreparationOutcome<
+            Result<super::ObservedHostNonregistryRepoFile, ObservedPathFrontierError>,
+        >,
+    ) -> &super::ObservedHostNonregistryRepoFile {
+        match value {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            _ => panic!("observed nonregistry REPO did not complete: {value:?}"),
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn observed_nonregistry_repo_identity_and_child_outcome_polarity_are_exact() {
+        let key =
+            super::HostNonregistryRepoFileObservationKey(super::HostNonregistryRepoFileKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                crate::NonrootModuleKey::new("dep", "1"),
+            ));
+        assert_eq!(key.to_string(), "observed-host-nonregistry-repo-file:dep@1");
+        let different =
+            super::HostNonregistryRepoFileObservationKey(super::HostNonregistryRepoFileKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                crate::NonrootModuleKey::new("other", "1"),
+            ));
+        let mut identities = std::collections::HashSet::from([key.clone()]);
+        assert!(!identities.insert(key.clone()) && identities.insert(different));
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/dep/REPO.bazel").unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let shared = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(b"repo".as_slice())),
+        ));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), shared.dupe())]).unwrap();
+        let continued =
+            super::finish_nonregistry_repo_source(SourcePreparationOutcome::Complete(Ok((
+                Ok(crate::source_preparation::RepositorySourceFileValue::Absent),
+                epoch.dupe(),
+            ))));
+        let std::ops::ControlFlow::Continue((_, retained)) = continued else {
+            panic!("complete source must continue")
+        };
+        assert!(Arc::ptr_eq(retained.get(&demand).unwrap(), &shared));
+        let semantic = Arc::new(Ok(super::HostRepoFileValue::empty()));
+        let projected = super::project_nonregistry_repo_legacy(SourcePreparationOutcome::Complete(
+            Ok((semantic.dupe(), epoch)),
+        ));
+        let SourcePreparationOutcome::Complete(projected) = projected else {
+            panic!("legacy projection must remain complete")
+        };
+        assert!(Arc::ptr_eq(&semantic, &projected));
+        for error in [
+            PathObservationEpochError::ConflictingDemand(demand.dupe()),
+            PathObservationEpochError::OperationMismatch {
+                demand,
+                result_operation: PathObservationOperation::DirectoryEntries,
+            },
+        ] {
+            let expected = ObservedPathFrontierError::from(error);
+            let stopped = super::finish_nonregistry_repo_source(
+                SourcePreparationOutcome::Complete(Err(expected.dupe())),
+            )
+            .break_value()
+            .unwrap();
+            let SourcePreparationOutcome::Complete(Err(actual)) = stopped else {
+                panic!("outer source error must pass through")
+            };
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_nonregistry_repo_real_stops_are_carrierless_and_suppress_semantics() {
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let root = "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n";
+        let key = super::HostNonregistryRepoFileKey::new(
+            workspace.dupe(),
+            crate::NonrootModuleKey::new("dep", "1"),
+        );
+        let observed_key = super::HostNonregistryRepoFileObservationKey(key.clone());
+        let child_key = super::RepositorySourceFileObservationKey(super::RepositorySourceFileKey {
+            workspace: workspace.as_path().to_owned(),
+            module_name: "dep".into(),
+            repo_relative_path: "REPO.bazel".into(),
+        });
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/dep/REPO.bazel").unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedRepoEventTracker::default());
+        let epoch = nonregistry_epoch(
+            root,
+            Some((b"print('A')\n", PathNodeKind::RegularFile)),
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            90,
+        );
+        let mut need_tx =
+            nonregistry_transaction(&dice, tracker.dupe(), root, epoch.dupe(), None, true).await;
+        tracker.take();
+        tracker.take_rows();
+        let mut cancelled = Box::pin(need_tx.compute(&observed_key));
+        std::future::poll_fn(|cx| {
+            assert!(std::future::Future::poll(cancelled.as_mut(), cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(cancelled);
+        assert_no_batches(tracker.take());
+        let need = need_tx.compute(&observed_key).await.unwrap();
+        assert!(!super::HostNonregistryRepoFileObservationKey::validity(
+            &need
+        ));
+        assert!(!super::HostNonregistryRepoFileObservationKey::equality(
+            &need, &need
+        ));
+        assert_no_batches(tracker.take());
+        assert_eq!(
+            tracker.take_rows(),
+            [(observed_key.to_string(), vec![child_key.to_string()])]
+        );
+        let mut recovered = nonregistry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            epoch.dupe(),
+            Some(RepositoryMaterializationResult::Success(
+                RepositoryMaterializationSuccess::Local,
+            )),
+            true,
+        )
+        .await;
+        assert!(
+            recovered
+                .compute(&observed_key)
+                .await
+                .unwrap()
+                .is_complete()
+        );
+        assert_print(tracker.take(), "A");
+
+        let outer_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let outer_tracker = Arc::new(ObservedRepoEventTracker::default());
+        let mut outer_data = UserComputationData {
+            activation_tracker: Some(outer_tracker.dupe()),
+            ..Default::default()
+        };
+        outer_data.data.set(CaptureEvaluationEvents);
+        let mut outer_tx = outer_dice.updater_with_data(outer_data);
+        outer_tx
+            .changed_to(vec![(
+                child_key,
+                SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+                    PathObservationEpochError::OperationMismatch {
+                        demand,
+                        result_operation: PathObservationOperation::DirectoryEntries,
+                    },
+                ))),
+            )])
+            .unwrap();
+        let mut outer_tx = outer_tx.commit().await;
+        let outer = outer_tx.compute(&observed_key).await.unwrap();
+        assert!(
+            super::HostNonregistryRepoFileObservationKey::validity(&outer)
+                && super::HostNonregistryRepoFileObservationKey::equality(&outer, &outer)
+                && matches!(outer, SourcePreparationOutcome::Complete(Err(_)))
+        );
+        assert_no_batches(outer_tracker.take());
+        assert_eq!(
+            outer_tracker.take_rows(),
+            [(
+                observed_key.to_string(),
+                vec!["observed-repository-source-file:dep:REPO.bazel".to_owned()]
+            )]
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn observed_nonregistry_repo_preserves_families_prefixes_events_and_lifecycle() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let policy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(ObservedRepoEventTracker::default());
+        let root = "module(name='root')\nprint('ROOT')\nlocal_path_override(module_name='dep',path='dep')\n";
+        let key = super::HostNonregistryRepoFileKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            crate::NonrootModuleKey::new("dep", "1"),
+        );
+        let observed_key = super::HostNonregistryRepoFileObservationKey(key.clone());
+        let source_key =
+            super::RepositorySourceFileObservationKey(super::RepositorySourceFileKey {
+                workspace: "/workspace".into(),
+                module_name: "dep".into(),
+                repo_relative_path: "REPO.bazel".into(),
+            });
+        let (mut first, mut held, mut held_result, mut held_epoch) = (None, None, None, None);
+        let a = b"print('A')\nignore_directories(['a'])\n".as_slice();
+        let local_sources = [
+            Some((a, PathNodeKind::RegularFile)),
+            Some((a, PathNodeKind::RegularFile)),
+            Some((
+                b"print('B')\nignore_directories(['b'])\n".as_slice(),
+                PathNodeKind::RegularFile,
+            )),
+            None,
+            Some((b"".as_slice(), PathNodeKind::Directory)),
+            Some((b"(".as_slice(), PathNodeKind::RegularFile)),
+            Some((
+                b"print('PREFIX')\nfail('boom')\n".as_slice(),
+                PathNodeKind::RegularFile,
+            )),
+            Some((a, PathNodeKind::RegularFile)),
+        ];
+        for (index, source) in local_sources.into_iter().enumerate() {
+            let epoch = nonregistry_epoch(
+                root,
+                source,
+                PathObservationNamespace::Host,
+                "/workspace/dep",
+                [99, 100, 101, 102, 103, 104, 105, 100][index],
+            );
+            let mut transaction = nonregistry_transaction(
+                if index == 0 { &policy_dice } else { &dice },
+                tracker.dupe(),
+                root,
+                epoch.dupe(),
+                Some(RepositoryMaterializationResult::Success(
+                    RepositoryMaterializationSuccess::Local,
+                )),
+                index != 0,
+            )
+            .await;
+            let source = transaction.compute(&source_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(source)) = source else {
+                panic!("observed source must complete")
+            };
+            let expected = source.observations().dupe();
+            tracker.take();
+            tracker.take_rows();
+            let value = transaction.compute(&observed_key).await.unwrap();
+            let observed = observed_nonregistry(&value);
+            assert_epoch_ptrs(&expected, observed.observations());
+            match index {
+                0 => {
+                    assert!(matches!(
+                        observed.result().as_ref(),
+                        Err(super::HostRouteRepoFileError::PolicyProjection(
+                            crate::RootPackagePolicyProjectionError::MissingInput { .. }
+                        ))
+                    ));
+                    let observed_events = tracker.take();
+                    assert_empty_batches(observed_events.clone());
+                    let SourcePreparationOutcome::Complete(legacy) =
+                        transaction.compute(&key).await.unwrap()
+                    else {
+                        panic!("legacy policy failure must complete")
+                    };
+                    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+                    assert_eq!(tracker.take(), observed_events);
+                    assert_nonregistry_rows(&tracker, &observed_key, &key, true, true, true);
+                }
+                1 => {
+                    first = Some(value.clone());
+                    held = Some(observed.dupe());
+                    held_result = Some(observed.result().dupe());
+                    held_epoch = Some(observed.observations().dupe());
+                    assert_print(tracker.take(), "A");
+                    assert_nonregistry_rows(&tracker, &observed_key, &key, true, true, false);
+                    let warm = transaction.compute(&observed_key).await.unwrap();
+                    assert!(super::HostNonregistryRepoFileObservationKey::equality(
+                        &value, &warm
+                    ));
+                    assert_no_batches(tracker.take());
+                    tracker.take_rows();
+                    let SourcePreparationOutcome::Complete(legacy) =
+                        transaction.compute(&key).await.unwrap()
+                    else {
+                        panic!("legacy REPO must complete")
+                    };
+                    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+                    assert_print(tracker.take(), "A");
+                    assert_nonregistry_rows(&tracker, &observed_key, &key, true, false, true);
+                }
+                3 | 4 => {
+                    assert!(match (index, observed.result().as_ref()) {
+                        (3, Ok(value)) => value.ignored_directories().is_empty(),
+                        (
+                            4,
+                            Err(super::HostRouteRepoFileError::Source(
+                                crate::source_preparation::RepositorySourceFileError::WrongKind {
+                                    actual: PathNodeKind::Directory,
+                                    ..
+                                },
+                            )),
+                        ) => true,
+                        _ => false,
+                    });
+                    assert_empty_batches(tracker.take());
+                    if index == 4 {
+                        let SourcePreparationOutcome::Complete(legacy) =
+                            transaction.compute(&key).await.unwrap()
+                        else {
+                            panic!("legacy wrong-kind must complete")
+                        };
+                        assert_eq!(legacy.as_ref(), observed.result().as_ref());
+                        assert_empty_batches(tracker.take());
+                    }
+                    assert_nonregistry_rows(&tracker, &observed_key, &key, false, true, index == 4);
+                }
+                5 | 6 => {
+                    let observed_events = tracker.take();
+                    assert_eq!(observed_events.len(), 1);
+                    assert_eq!(observed_events[0].kind, ActivationKind::Evaluated);
+                    let batch = observed_events[0].batch.as_ref().unwrap();
+                    assert_eq!(batch.events().len(), index - 4);
+                    assert!(matches!(
+                        batch.events().last(),
+                        Some(EvaluationEvent::Diagnostic {
+                            level: EvaluationDiagnosticLevel::Error,
+                            ..
+                        })
+                    ));
+                    if index == 6 {
+                        assert!(matches!(batch.events().first(), Some(
+                            EvaluationEvent::StarlarkPrint { text, .. }) if text == "PREFIX"));
+                    }
+                    assert!(match (index, observed.result().as_ref()) {
+                        (
+                            5,
+                            Err(super::HostRouteRepoFileError::Evaluation(
+                                HostRepoFileError::Syntax { message, .. },
+                            )),
+                        ) => !message.is_empty(),
+                        (
+                            6,
+                            Err(super::HostRouteRepoFileError::Evaluation(
+                                HostRepoFileError::Evaluation { message, .. },
+                            )),
+                        ) => message.contains("boom"),
+                        _ => false,
+                    });
+                    let SourcePreparationOutcome::Complete(legacy) =
+                        transaction.compute(&key).await.unwrap()
+                    else {
+                        panic!("legacy REPO error must complete")
+                    };
+                    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+                    assert_eq!(tracker.take(), observed_events);
+                    assert_nonregistry_rows(&tracker, &observed_key, &key, true, true, true);
+                }
+                7 => {
+                    let held = held.as_ref().unwrap();
+                    assert!(super::HostNonregistryRepoFileObservationKey::equality(
+                        first.as_ref().unwrap(),
+                        &value
+                    ));
+                    assert_eq!(held.result().as_ref(), observed.result().as_ref());
+                    assert!(Arc::ptr_eq(held.result(), held_result.as_ref().unwrap()));
+                    assert_epoch_ptrs(held_epoch.as_ref().unwrap(), held.observations());
+                    tracker.take();
+                }
+                _ => {
+                    tracker.take();
+                }
+            }
+            tracker.take_rows();
+        }
+
+        immutable_lifecycle(&dice, tracker.dupe(), &observed_key, &source_key).await;
+    }
+
+    #[cfg(unix)]
+    async fn immutable_lifecycle(
+        dice: &Arc<Dice>,
+        tracker: Arc<ObservedRepoEventTracker>,
+        observed_key: &super::HostNonregistryRepoFileObservationKey,
+        source_key: &super::RepositorySourceFileObservationKey,
+    ) {
+        let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
+        let instance = slug_workspace_v2::PathObservationInstanceId::new(7);
+        let success =
+            RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+                source_identity: Arc::from("sha256-x"),
+                generation_root: std::path::PathBuf::from("/immutable/7"),
+                observation_instance: instance,
+            });
+        let (mut values, mut immutable_held) = (Vec::new(), None);
+        let a = b"ignore_directories(['a'])".as_slice();
+        let immutable_sources = [
+            Some((a, PathNodeKind::RegularFile)),
+            Some((
+                b"ignore_directories(['b'])".as_slice(),
+                PathNodeKind::RegularFile,
+            )),
+            None,
+            Some((b"".as_slice(), PathNodeKind::Directory)),
+            Some((a, PathNodeKind::RegularFile)),
+        ];
+        for (index, source) in immutable_sources.into_iter().enumerate() {
+            let epoch = nonregistry_epoch(
+                archive,
+                source,
+                PathObservationNamespace::Materialization(instance),
+                "/immutable/7",
+                [200, 201, 202, 203, 200][index],
+            );
+            let mut tx = nonregistry_transaction(
+                &dice,
+                tracker.dupe(),
+                archive,
+                epoch.dupe(),
+                Some(success.clone()),
+                true,
+            )
+            .await;
+            let source = tx.compute(source_key).await.unwrap();
+            let SourcePreparationOutcome::Complete(Ok(source)) = source else {
+                panic!("observed immutable source must complete")
+            };
+            let expected = source.observations().dupe();
+            let value = tx.compute(observed_key).await.unwrap();
+            let observed = observed_nonregistry(&value);
+            if index == 0 {
+                immutable_held = Some((observed.result().dupe(), observed.observations().dupe()));
+            }
+            assert_epoch_ptrs(&expected, observed.observations());
+            values.push(value);
+            tracker.take();
+            tracker.take_rows();
+        }
+        assert!(super::HostNonregistryRepoFileObservationKey::equality(
+            &values[0], &values[4]
+        ));
+        assert!(!super::HostNonregistryRepoFileObservationKey::equality(
+            &values[0], &values[1]
+        ));
+        let held = observed_nonregistry(&values[0]);
+        let restored = observed_nonregistry(&values[4]);
+        assert_eq!(held.result().as_ref(), restored.result().as_ref());
+        let (held_result, held_epoch) = immutable_held.unwrap();
+        assert!(Arc::ptr_eq(held.result(), &held_result));
+        assert_epoch_ptrs(&held_epoch, held.observations());
+        assert!(!held.observations().observations().is_empty());
+        assert_eq!(tracker.upper.load(Ordering::SeqCst), 0);
     }
 }
