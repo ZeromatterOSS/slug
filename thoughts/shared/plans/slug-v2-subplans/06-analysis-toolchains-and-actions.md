@@ -7619,3 +7619,44 @@ platform, property and toolchain marker/provider A/B/A; Platform-before-
 implementation suppression; failure-before-retention and diagnostic
 precedence; matching-family selected-Platform Need/outer/error; removal of
 projection reconstruction; identical identity/aquery/REAPI consumption; exact
+default action behavior; and bounded retention/cap accounting.
+
+### Immutable action-owner absence correction REPLAN (2026-08-19)
+
+The first implementation cannot be accepted under `460dea72`. Full analysis
+validation exposed six existing action tests failing at finalization. Ordinary
+action-producing rules without a required toolchain have no prepared context,
+and a selected toolchain implementation can likewise register actions while
+its own analysis has no requirement. The frozen mandatory concrete
+`ToolchainSelection` plus marker is therefore not total. Inventing either value
+would corrupt semantic identity; rejecting the actions would regress exact
+intrinsic `ActionSpec` behavior.
+
+Run only `WP-6-7A-action-owner-context-absence-correction-design`, docs-only.
+Retain the eleven-file Rust candidate non-writable. Freeze one explicit
+execution-state distinction inside the immutable owner context:
+
+- selected toolchain: selected Platform fact/constraints plus exact compact
+  selection and marker;
+- selected platform only: the same Platform projection with explicit absent
+  toolchain, admitted only for the existing unique-candidate topology; and
+- unresolved default: owner/group/aspect only, with no guessed platform,
+  properties, constraints, selection or marker.
+
+Production always supplies exactly one Default context, selected or explicitly
+unresolved. Intrinsic actions remain exact and ordered. Configured FileWrite
+projection continues to require a selected platform: the existing sole-
+candidate case remains usable and an unresolved/ambiguous action remains
+intrinsically retained but unprojectable. Named contexts remain private proof.
+Platform analysis stays matching-family and terminal-before-rule wherever a
+selected platform exists.
+
+The retry must also split the oversized root-toolchain routine into bounded
+Platform, implementation and orchestration helpers below 200 lines without a
+new key or retained state. All other accepted ownership, memory, identity,
+aquery and REAPI contracts remain unchanged. After independent design ACCEPT,
+schedule only
+`WP-6-7A-immutable-configured-action-owner-context-implementation-retry` with
+the same eleven files. Raise only `result.rs` to +300/730 physical and aggregate
+to 848 production, 860 tests, 1,708 semantic and 25,895 physical. No Rust,
+oracle, public named-group, M7A/M8/M7B or M9 activation is authorized now.
