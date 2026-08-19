@@ -8310,3 +8310,32 @@ state, cap excess and milestone closure. After independent design ACCEPT,
 schedule only `WP-6-7A-repository-source-file-observation-implementation`;
 after implementation ACCEPT return only to the docs-only selected-graph
 frontier design.
+
+### Repository-source-file observation design accepted (2026-08-19)
+
+Design `9040e168` freezes the uniquely smallest reusable source owner from Rust
+base `ae8aa35e`. One crate-private structural sibling and carrier retain exactly
+one local repository-source Result Arc plus the cumulative materialization ->
+resolution -> FileBytes epoch. A shared Legacy/Observed driver selects only the
+matching materialization and resolution families and the same neutral FileBytes
+key, preserving exact legacy values/errors and nested bytes Arcs.
+
+The accepted algebra keeps the materialization prefix left-first when merging
+the resolution epoch, then appends FileBytes, preserving the earliest equal Arc
+and returning typed outer on conflict/mismatch. All Need/outer terminals are
+carrierless; semantic terminals retain their exact reached prefix. Parent and
+path owners remain eventless and retained state is one local Result Arc plus
+the compact epoch.
+
+Run only `WP-6-7A-repository-source-file-observation-implementation` in exactly
+`source_preparation.rs` (<=300 production, <=30 colocated proof, <=15,320
+physical from 14,940) and `source_preparation_observation_tests.rs` (<=500
+tests, <=3,020 physical from 2,470). Aggregate semantic growth is <=830 and
+combined physical size <=18,340; helpers stay below 200 lines.
+
+Proof every child terminal/prefix, first-Arc/conflict/mismatch, exact local and
+immutable bytes/epoch Arcs, family rows, events/warm/cancellation, lifecycle and
+zero upper activation. STOP every third file, caller/export, registry or upper
+activation, direct Host read, semantic/event/family/state drift, cap excess or
+milestone closure. After independent implementation ACCEPT return only to the
+docs-only selected-module-graph observation frontier.
