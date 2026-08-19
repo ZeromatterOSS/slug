@@ -7980,3 +7980,13 @@ identity, eventlessness, override lifecycle and the full proof/STOP contract.
 No caller/export or selected graph/discovered/preparation/repository activation
 is authorized. After ACCEPT return only to the docs-only selected-module-graph
 frontier design.
+
+### Effective-module-override proof/cap REPLAN (2026-08-19)
+
+The retained one-file candidate preserves the accepted effective-override owner, matching-family root-files selection, command-policy order, exact precedence projection, eventlessness and compact Result-Arc+epoch retention. Focused 2/2 and full bzlmod validation pass. Against `a3efa1b7`, it is +170 production/+236 tests/+406 aggregate at 6,458 physical lines.
+
+Independent proof review found that the four remaining test lines cannot discriminate the parent dependency row, production root Need/typed-outer reduction, command-policy error prefix, exact legacy Result Arc, cold child events, real poll-drop recovery and command-override lifecycle. The smallest production-used reducer also exceeds the +160 production ceiling; synthetic proof or dense macros would violate the proof and cleanup gates.
+
+Run only `WP-6-7A-effective-module-override-observation-proof-cap-correction-design`, docs-only. Retain `module_eval.rs` non-writable. Keep the same one-file retry and raise only its limits to +200 production/+320 tests/+520 aggregate and 6,700 physical lines. The increase may fund only the existing live reducer, legacy Arc projection seam and missing discriminators; it authorizes no semantic/event/retention change, caller or later owner.
+
+STOP Rust, every other file/key/caller/export, direct Host read, new retained state, selected graph/discovery/preparation/repository activation and milestone closure. After independent correction ACCEPT, resume exactly one bounded implementation retry; after its ACCEPT, return only to the selected-module-graph frontier design.
