@@ -6090,3 +6090,46 @@ STOP every other file/loading byte, child filtering, equality weakening,
 seeding evaluated/mismatched roots, retained closure/map, behavior/family/order
 drift, cap excess, broader activation and M1 closure. After ACCEPT return only
 to one docs-only remaining M1 owner audit.
+
+### External singleton current-closure event REPLAN (2026-08-18)
+
+Retry 3 implemented the accepted root-ID predicate, but exact trace evidence
+shows the fixed root transition is Known(None) on cold, warm and source-edit
+attempts. On edit every accepted event node is still in the current closure:
+unchanged owners are NoTransition and the equal package BUILD owner is
+Known(None). The reviewed root-NoTransition premise is therefore impossible and
+normal reconciliation drops the package entry before the later replay.
+
+Run only
+`WP-2A-m1-external-singleton-event-current-closure-correction-design` from
+`98b6d787`. Write only canonical/current/Stage/routing under 40/220/180/30
+and 470 aggregate docs net. Retain but do not write the four-file candidate.
+STOP all Rust/Cargo/BUILD/fixture/oracle/server/caller/public changes.
+
+Freeze exact ordered root equality only as the cross-command gate. On the first
+revision retry with matching roots, reconcile in current closure order per
+node: prior+Known(Some), including empty, uses current; prior+Known(None) or
+NoTransition carries prior; absent prior drops; new Known(Some) contributes in
+current order. Root mismatch uses ordinary reconciliation. Preserve final
+transition override, tombstones, revision->Need, multiple retry order, true
+prior delta and post-materializer atomicity.
+
+This is safe under the explicit admitted-producer invariant: every
+semantic-Complete source-certified child owner stores Some(batch), including
+Some(empty), while Need/outer cannot be accepted. Thus first-revision
+Known(None) for a present prior event node is transient lineage; semantic
+removal is exact closure absence. STOP/REPLAN on any producer violation.
+
+Keep only compact Dupe/Allocative accepted/provisional root and entry slices;
+closure/order maps remain compute-local. Prove a mixed current-closure table,
+root mismatch/reorder, simultaneous `.bzl` removal plus source change,
+changed/empty/current-order replay, final transitions, Need/retries/failures,
+accepted edit membership, root switch and unchanged server lifecycle.
+
+After independent ACCEPT schedule only
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-4` in the
+same four files and unchanged corrected caps: DICE +340/11,350, build proof
++440/3,450, loading zero/3,439, events +100 production/+160 tests/2,050,
+aggregate <=1,040 semantic and <=20,289 physical. Preserve every external
+owner/certificate/repository/family/event and legacy contract; remove temporary
+trace logging. After implementation ACCEPT return only to a docs-only M1 audit.

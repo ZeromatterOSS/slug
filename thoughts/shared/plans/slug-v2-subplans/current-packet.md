@@ -1,128 +1,108 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-external-singleton-observed-build-implementation-retry-3`
+Packet: `WP-2A-m1-external-singleton-event-current-closure-correction-design`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `340159c0`
+Scheduling base: `98b6d787`
 Accepted Rust base: `a4dd40d6`
 Accepted external-build design: `1a217e2a`
 Accepted loading-proof correction: `ce110d9a`
 Accepted revision-event design: `5dabd4bf`
-Accepted root-association correction: `340159c0`
-Result: publish one nonroot exported-source build through the observed root
-without replaying equal child events across certificate revision retries.
+Superseded root-association design: `340159c0`
+Result: freeze the exact current-closure reconciliation that distinguishes a
+transient retry `None` from a removed child event owner.
 
-## Exact Rust authority and caps
+## Exact docs authority and measured stop
 
-Write exactly:
+Write exactly canonical/current/Stage/routing under 40/220/180/30 net and 470
+aggregate against `98b6d787`. Retain but do not write the dirty four-file Rust
+candidate in `runtime/{dice,events}.rs`,
+`runtime/tests/build_command_tests.rs`, and
+`slug_loading_v2/src/host_package_load_tests.rs`. Cargo, BUILD, fixtures,
+oracles, server tests, generated evidence, callers, exports and public behavior
+are forbidden.
 
-1. `app/slug_core_v2/src/runtime/dice.rs`: <=340 production net and <=11,350
-   physical;
-2. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=440 test net
-   and <=3,450 physical;
-3. `app/slug_loading_v2/src/host_package_load_tests.rs`: only the accepted
-   line-neutral assertion change, zero net and <=3,439 physical; and
-4. `app/slug_core_v2/src/runtime/events.rs`: <=100 production plus <=160 test
-   net and <=2,050 physical.
+Exact retry-3 instrumentation disproves the accepted root-transition premise.
+Cold, warm and source-edit attempts have the same ordered root, but that root is
+always `Known(None)`, never `NoTransition`. On source edit all prior event
+nodes remain in the current closure: unchanged nodes are `NoTransition`,
+while the equal package BUILD owner is `Known(None)`. Normal reconciliation
+tombstones it and drops the accepted entry before the later delete replay.
 
-Aggregate semantic <=1,040 and combined physical <=20,289 against
-`a4dd40d6`. No other loading byte or file. Planning docs, Cargo, BUILD,
-fixtures, oracles, generated evidence, exports, callers and server-test edits
-are forbidden. Large owners remain cohesive exceptions; touched helpers stay
-below 200 lines.
+This is command-local event lineage at native revision acceptance, not a
+build-root, child-owner, path-epoch or key-equality defect. Root IDs remain the
+smallest cross-command association, but the first revision carry must classify
+each prior event node by current closure membership and transition.
 
-## External owner, order and terminal algebra
+## Frozen current-closure carry contract
 
-Keep structural `BuildCommandRootObservationKey` admission for root PackageAll
-and every syntactic nonroot Single. External wrong-kind targets classify only
-after observed package load. Root Single, multi-target and every other identity
-retain neutral/legacy routing and observed -> neutral -> legacy constructor
-order.
+Keep compact ordered accepted roots plus Some-only accepted entries, exact
+selected closure roots/transitions, and the command-local optional-batch
+provisional slice. Normal commands remain unchanged and drop absent nodes.
 
-One private mode-aware external driver selects only matching legacy or observed
-route/package/source children and preserves exact legacy infrastructure
-projection/post-join precedence. Observed order is anchor -> route ->
-repository package -> ExportedFile classification -> RequestRevisionKey ->
-source. Missing/wrong-kind targets activate neither revision nor source.
+On the first source-certificate revision retry:
 
-Union every Complete observed epoch left-first before semantic inspection;
-equal duplicates keep the first exact Arc, conflict/operation mismatch is typed
-outer, and Need/outer is immediate and carrierless. Preserve
-empty/anchor/anchor+route/anchor+route+package/full-source prefixes. Present,
-Absent, source semantic, accepted directory WrongKind and success retain the
-full source child epoch as exact SourceCertificate; earlier terminals retain
-none. Only external observed Single initializes revision and selects
-ClosureRepositories; PackageAll remains strict-empty. Full selected path
-value/Arc validation and entire-certificate materializer reobservation remain
-unconditional.
+1. if exact ordered current roots differ from accepted roots, use ordinary
+   reconciliation and seed nothing;
+2. if roots match, iterate nodes in exact current closure order;
+3. a prior event node with current `Known(Some(batch))`, including empty, uses
+   the current batch;
+4. a prior event node with current `Known(None)` or `NoTransition` carries
+   its prior Some batch;
+5. a prior event node absent from the current closure is dropped; and
+6. a new current node contributes only `Known(Some(batch))), in current
+   closure order.
 
-The root owns no event batch. Matching anchor/module/package/source keys remain
-sole owners. Preserve exact cold/error text/order, warm suppression, changed
-BUILD/`.bzl` replay, equal sibling-source churn suppression and external ->
-root PackageAll no replay.
+Do not preserve prior order when the current closure reorders event owners.
+After the first carry, retain the frozen retry algebra: later final Known(Some)
+or Known(None) overrides, final NoTransition uses carry then true prior,
+retry-only nodes retain retry order, final-only nodes append, Needs preserve
+the fixed-root carry, multiple retries keep first order/latest transition, and
+only the final effective nonempty delta emits. Accepted roots/Some-only entries
+replace atomically only after materializer acceptance; every failure drops
+command-local state.
 
-## Accepted roots and revision-event carry
+Freeze the producer invariant for admitted source-certified roots: every
+semantic-Complete event-owning child stores `Some(EventBatch)`, including
+`Some(empty)`; Need/typed outer stores none and cannot be accepted. Therefore
+a present prior event node's first-revision `Known(None)` is transient
+lineage, while semantic removal is represented by exact absence from the
+current closure. STOP/REPLAN if any admitted child violates this invariant.
 
-`AcceptedEventEpoch` retains exactly an ordered
-`Arc<[DiceNodeId]>` of accepted closure roots plus its Some-only ordered event
-entries. `SelectedEventState` captures exact ordered closure roots. The
-command-local `ProvisionalEventEpoch` retains the same roots plus ordered
-`(DiceNodeId, Option<EventBatch>)` entries; Some is effective, None is an
-explicit tombstone, and absence alone permits fallback.
+Retain only Dupe/Allocative ordered root and entry Arc slices. Current-order
+maps/Vecs are compute-local. Add no retained closure/dependency graph/map,
+cache, store, interner, lock, task, Host read, child carrier, event owner or
+historical snapshot, and hold no lock across DICE.
 
-Normal reconciliation drops nodes absent from the current closure. On the
-first source-certificate revision retry, seed missing true-prior entries only
-when the current ordered roots exactly equal prior accepted roots and every
-matched root transition is NoTransition/reused. Any root/order/length mismatch,
-unavailable root, or root Known(Some/None) uses ordinary closure reconciliation
-and seeds nothing.
+## Retry authority, proof and compatibility
 
-After seeding, preserve carry through later Needs for the same fixed roots.
-Fold retries left-first: final Known(Some) replaces, Known(None) tombstones,
-NoTransition uses carry then true prior, retry-only nodes retain first retry
-order, and final-only nodes append in final closure order. Diff only the final
-effective epoch against true prior and emit changed nonempty Some batches.
-Accept filtered Some entries and current roots only after materializer
-acceptance. Outer/cancel/abort/selection/revision/materializer failure drops
-carry and changes no accepted state.
+After independent design ACCEPT, schedule exactly
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-4` with the
+same four Rust files and unchanged corrected caps: DICE +340/11,350, build proof
++440/3,450, loading zero/3,439, events +100 production/+160 tests/2,050;
+aggregate <=1,040 semantic and <=20,289 physical against `a4dd40d6`.
 
-Retain only one build Result Arc, compact full/certificate path epochs, compact
-accepted/provisional event root and entry slices. Child carriers/outcomes,
-selected paths, closure, dependency graph, event/union maps/Vecs and repository
-sidecars stay compute-local or dependency-owned. Add no retained map/cache/
-store/interner/lock/task, Host read, child carrier, event owner or historical
-snapshot; hold no lock across DICE.
+Preserve every external owner/order/prefix/certificate/repository/family/event,
+legacy infrastructure, tombstone/Need/multiple-retry/atomicity and compatibility
+contract from `1a217e2a`, `ce110d9a`, and `5dabd4bf`. Remove temporary
+trace logging during implementation.
 
-## Loading proof, compatibility, proof and STOP
+Required proof: one mixed current-closure table with prior+KnownNone carry,
+prior+NoTransition carry, prior+changed Some, prior+Some(empty), absent prior
+drop and new Some, asserting exact current order; root mismatch; reordered
+same-root nodes; simultaneous `.bzl` removal plus source change drops the
+removed owner while retaining equal siblings; changed/reordered BUILD emits in
+current order; final Some/None/NoTransition, revision->Need, multiple retries
+and failure atomicity; accepted epoch membership after source edit; changed
+BUILD/`.bzl` replay, root switch and unchanged server lifecycle.
 
-In `host_package_load_tests.rs`, only replace the stale core-negative
-`RepositoryPackageLoadObservationKey` assertion with the accepted positive
-assertion. Preserve every other byte.
+Exact: public build values/errors, child event text/order and every legacy/root
+route. Slug-native: observed carrier/certificate/repository, accepted root IDs
+and current-closure retry-event association. Unsupported/deferred: multi-build,
+one-shot, broader actions, external globs and exact Bazel identity bytes.
 
-Exact: public build values/errors/classification, child event text/order,
-PackageAll/root Single/multi-target and every legacy/direct API. Slug-native:
-observed carrier/certificate/repository, accepted root IDs and provisional
-retry-event association. Unsupported/deferred: multi-build, one-shot, broader
-actions, external globs and exact Bazel identity bytes.
-
-Preserve all existing routing/family/prefix/Arc/certificate/repository/
-lifecycle/cancellation/rollback proof. Add reuse-only root association proof:
-same roots plus root NoTransition seeds/suppresses hidden equal child; same root
-plus root Known(Some/None) does not seed and removes absent owners; different
-and reordered roots do not seed; simultaneous BUILD or `.bzl` plus source
-change replays changed/removes absent batches. Cover revision -> Need,
-final Some/None/NoTransition, Some(empty), multiple retry order, tombstone
-reappearance and all failure atomicity. The public source edit/delete/directory/
-recreate lifecycle emits no package replay, external -> root stays silent, and
-the unchanged server lifecycle passes except separately recorded inherited
-query baselines.
-
-Require focused event/build, 33/33 build group, loading 138/138, full bzlmod,
-documented core/query/server baselines, fmt/diff, exact caps, Buck2 retention,
-AI cleanup and independent final review.
-
-STOP on every other file/loading byte, child filtering, path/key equality
-weakening, seeding an evaluated/mismatched root, retaining a closure/map,
-behavior/family/order drift, cap excess, broader activation or M1 closure.
-REPLAN on any new blocker. After ACCEPT return only to one docs-only remaining
-M1 owner audit.
+STOP now on Rust or any file outside the four docs, child filtering,
+path/key-equality weakening, treating initial KnownNone as removal for a present
+prior source-certified event node, carrying an absent prior node, prior-order
+replay, retained closure/map, behavior/family/order drift, cap excess, broader
+activation or M1 closure. The design may schedule only the one bounded retry.
