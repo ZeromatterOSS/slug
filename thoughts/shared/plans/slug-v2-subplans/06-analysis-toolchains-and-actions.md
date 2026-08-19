@@ -9089,3 +9089,38 @@ or milestone closure. After independent correction ACCEPT schedule only
 `WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry`;
 after retry ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
+
+### Host nonregistry package-preflight proof correction accepted (2026-08-19)
+
+Correction `ed3a9d05` accepts the measured proof envelope for semantic design
+`0c5a1366` from Rust base `754e7619`. Run only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry`.
+
+Exact Rust authority is only
+`app/slug_bzlmod_v2/src/source_preparation.rs`, <=320 production and <=15,650
+physical, plus `source_preparation_observation_tests.rs`, <=960 proof and
+<=4,250 physical; aggregate is <=1,300 semantic and <=19,900 physical. Helpers
+remain below 200 lines; every other file is read-only.
+
+Preserve the private stage-aware one-Result-Arc+compact-epoch carrier and exact
+effective -> invalid-name -> neutral deleted-policy -> ignore -> BUILD.bazel ->
+BUILD matching-family driver. Merge each Complete child epoch into the earlier
+prefix left-first before semantics; Need/typed outer remains carrierless, later
+work is suppressed, equal duplicates retain the earliest exact Arc, and there
+is no Need union.
+
+The parent remains eventless and ROOT/REPO descendants remain sole batch owners.
+Retain no child carrier, policy value, matcher, marker bytes, extra collection/
+state, cache/interner/store/lock/task, Host read, revision, certificate or event
+state.
+
+Preserve current passing proof and complete production-used compute projections,
+every semantic terminal/prefix/suppression, semantic policy versus DICE failure,
+exact ordered Arcs/conflict/mismatch, exact family rows and ROOT/REPO events,
+warm/cancellation recovery, local+immutable marker lifecycle/held handles, and
+upper nonactivation.
+
+STOP a third file/caller/export, production/order/event/family/memory drift,
+upper/registry activation, proof deletion, cap excess or milestone closure.
+After independent implementation ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-design`.

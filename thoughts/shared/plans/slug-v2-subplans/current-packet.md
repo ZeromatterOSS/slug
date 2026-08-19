@@ -1,33 +1,23 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `14e6a571`
+Scheduling base and accepted proof correction: `ed3a9d05`
 Rust base: `754e7619`
 Accepted semantic design: `0c5a1366`
 
 ## Objective and exact authority
 
-Correct only the measured proof envelope for the independently accepted private
-package-preflight observation owner. Retain the dirty two-file Rust candidate
-and make it non-writable during this docs-only design.
+Complete the independently accepted private package-preflight observation owner
+under the corrected proof envelope without activating its horizon consumer.
 
-Against `754e7619`, the focused 7/7 candidate is +319 production and +15
-colocated proof in `source_preparation.rs`, +832 external proof, +1,166
-aggregate semantic, and 15,601/4,002/19,603 physical lines. The original <=720
-proof and <=1,040 aggregate caps are exceeded while exact compute/semantic
-prefix, policy-error and child-batch discriminators remain to be completed.
-Deleting 126 lines would remove evidence rather than compact an overbuilt owner.
-
-Write only the canonical plan, current manifest, Stage 6 plan and routing log at
-<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
-fixtures, oracles, callers and public files are read-only.
-
-The future retry keeps `source_preparation.rs` at <=320 production and <=15,650
-physical. Raise only `source_preparation_observation_tests.rs` to <=960 proof
-and <=4,250 physical; aggregate becomes <=1,300 semantic and <=19,900 physical.
-Touched helpers remain below 200 lines.
+Write exactly `app/slug_bzlmod_v2/src/source_preparation.rs` from the 15,267-line
+`754e7619` baseline at <=320 production and <=15,650 physical, plus
+`source_preparation_observation_tests.rs` from 3,170 lines at <=960 proof and
+<=4,250 physical. Aggregate is <=1,300 semantic and <=19,900 physical. Every
+other Rust/Cargo/BUILD/fixture/oracle/caller/public file is read-only. Touched
+helpers remain below 200 lines.
 
 ## Frozen production contract
 
@@ -111,12 +101,9 @@ Slug-native: private sibling, Result-Arc+epoch carrier and typed outer.
 Unsupported/deferred: horizon/closure/discovery/selected graph, registry
 preparation/patches, extension repositories, M8/M7B and identity bytes.
 
-STOP Rust writes during this design and STOP a caller/export/third file,
-legacy/order/event/family drift, semantic compute-error invention, direct Host
-read, extra retained state, upper/registry activation, proof deletion, cap
-excess or milestone closure.
+STOP a caller/export/third file, legacy/order/event/family drift, semantic
+compute-error invention, direct Host read, extra retained state, upper/registry
+activation, proof deletion, cap excess or milestone closure.
 
-After independent correction ACCEPT schedule only
-`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry`;
-after retry ACCEPT schedule only the docs-only
+After independent implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
