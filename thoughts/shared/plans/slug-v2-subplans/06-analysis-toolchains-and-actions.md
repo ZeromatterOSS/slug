@@ -8205,3 +8205,31 @@ cap excess and milestone closure. After independent design ACCEPT schedule only
 `WP-6-7A-repository-materialization-observation-implementation`; after
 implementation ACCEPT return only to the docs-only selected-module-graph
 frontier design.
+
+### Repository-materialization observation design accepted (2026-08-19)
+
+Design `b2fd01e7` freezes the uniquely smallest complete carrier after accepted
+request implementation `cc847c98`. One private structural sibling and carrier
+retain exactly one materialization Result Arc plus the unchanged request epoch.
+A matching-family driver preserves request-then-neutral-result order, exact
+legacy Result-Arc projection, empty request-compute and full later prefixes,
+immediate carrierless Need/outer, eventlessness and compact retention.
+
+Run only
+`WP-6-7A-repository-materialization-observation-implementation`. Authority is
+exactly `source_preparation.rs` from the 14,379-line `cc847c98` baseline:
+<=180 production, <=400 tests, <=580 aggregate semantic and <=15,000 physical
+lines. Keep touched helpers below 200 lines.
+
+Preserve exact request/result/generation values, errors, order, legacy Arc and
+child events. The sibling/carrier/typed outer/epoch association is Slug-native.
+Registry preparation, repository source/nonregistry closure, discovery,
+selected graph, extensions, generated repositories, external rules_rust
+analysis/actions, M8/M7B and exact identity bytes remain deferred.
+
+Proof must cover every request/result terminal prefix and Need/outer position,
+exact Result/epoch Arcs, family rows, eventlessness, warm/cancel/recovery,
+request/result A-B-A and zero later activation. STOP every second file/key/
+caller/export, semantic/event/family/state drift, direct Host read, cap excess
+or milestone closure. After independent implementation ACCEPT, schedule only
+the docs-only selected-module-graph observation-frontier design.
