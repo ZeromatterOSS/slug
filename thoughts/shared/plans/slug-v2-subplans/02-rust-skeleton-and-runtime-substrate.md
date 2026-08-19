@@ -6630,3 +6630,25 @@ bytes remain M9.
 Otherwise schedule only one smallest missing M1 proof packet or formal REPLAN.
 STOP premature M1 acceptance, direct M7A implementation, adjacent M7B/M8/M9,
 scope/cap excess or multiple successors.
+
+### M1 semantic spine accepted (2026-08-18)
+
+The exit audit from `57a7a69c` accepts M1. Typed one-shot wrappers and the
+daemon use the same native command methods; the daemon retains one
+`WorkspaceRuntime`/DICE graph. Existing tests discriminate overlapping request
+isolation, shared and last-waiter cancellation, mutation-driven revision retry,
+exact multi-demand certificate reobservation, materializer-first atomic
+publication and rollback.
+
+Lifecycle proof covers create/edit/delete/recreate and A/B/A with exact shared
+Arc restoration where required. Cold and changed child batches publish in
+owner order, compatible warm commands remain silent, and retained state is
+bounded to natural DICE values plus compact accepted epochs without a lock
+across DICE. Snapshot workspace-target/query adapters remain exact non-
+published test/compatibility APIs and are not M1 dependencies.
+
+Run next only `WP-6-7A-bootstrap-action-owner-context-evidence-audit`. Its
+writable docs are canonical/current/Stage 6/routing; Stage 7/8/10 and live Rust
+are read-only. It must decide one immutable action-owner-context design, one
+uniquely smaller just-in-time Bazel 9.2 evidence prerequisite, or REPLAN before
+any M7A implementation. M8 follows accepted M7A; M7B and M9 remain later.
