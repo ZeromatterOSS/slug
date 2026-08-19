@@ -1,95 +1,114 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-post-owner-context-bootstrap-closure-owner-audit`
+Packet: `WP-1-6-7A-rules-rust-0.73-toolchain-action-owner-evidence`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Accepted implementation: `cb5073e0`
-Result: audit the remaining bootstrap closure after accepting the immutable
-configured-action owner, then select exactly one smallest next design or
-evidence prerequisite without changing Rust.
+Scheduling base: `86d23ca8`
+Accepted owner audit: `86d23ca8`
+Result: generate one isolated Bazel 9.2/rules_rust 0.73 discriminator before
+designing the external toolchain owner.
+
+## Why evidence is the smallest prerequisite
+
+Live analysis still rejects external topology registrations, external native
+toolchain references, and external registered toolchains in
+`slug_analysis_v2/src/dice.rs`. The accepted direct-label evidence is complete
+for its narrower surfaces: `nonroot-module-consumers` pins nonroot registration
+and dev suppression, `toolchain-resolution-first-platform` pins root order and
+selected context, and `exec-groups-action-platform` pins immutable action-owner
+selection. None expands rules_rust 0.73's module-extension-generated
+`@rust_toolchains//:all`, proves its apparent-to-canonical mapping, or exposes
+the selected Rust provider/action relationship.
+
+The older `rules-rust-basic` record is Bazel 9.1.1/rules_rust 0.71.1 and checks
+only test/run success plus mnemonic counts. Rewriting it would mix M7B run/test
+breadth with this M7A owner decision. A new analysis-only fixture is therefore
+uniquely smaller than guessing a DICE topology owner or broadening the old
+fixture.
 
 ## Exact authority and caps
 
-Write only:
+Write only these eleven files:
 
-1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`: <=40 net;
-2. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`: <=180 net;
-3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`:
-   <=160 net; and
-4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`: <=30 net.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`;
+2. `thoughts/shared/plans/slug-v2-subplans/current-packet.md`;
+3. `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`;
+4. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/fixture.toml`;
+5. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/expected/oracle.json`;
+6. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/MODULE.bazel`;
+7. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/BUILD.bazel`;
+8. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/lib.rs`;
+9. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/main.rs`;
+10. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/pkg/data.txt`;
+11. `tests/v2_oracle/fixtures/rules-rust-073-toolchain-owner/workspace/cquery_format.bzl`.
 
-Aggregate docs cap <=410 net. Rust, tests, fixtures, oracle outputs, Cargo/BUILD
-metadata and every other plan are read-only.
+Fixture-authored content is <=350 physical lines. Generated `oracle.json` is
+<=3,000 physical lines and <=200 KiB. Docs are <=40 canonical, <=180 current
+and <=180 Stage 6 net lines. Aggregate physical growth is <=3,750 lines. Every
+other file is read-only; no harness change is authorized.
 
-## Accepted completion input
+## Frozen fixture and command contract
 
-`cb5073e0` completes the first immutable analysis-owned configured-action row.
-It moves intrinsic `ActionSpec` values into one configured-action slice, shares
-one compact owner context per group, records explicit `SelectedToolchain`,
-`SelectedPlatformOnly` and `UnresolvedDefault` states, and makes FileWrite
-identity/aquery/REAPI consumers borrow the retained row rather than reconstruct
-platform state from topology. Platform analysis remains matching-family and
-precedes implementation/rule evaluation. No new DICE key, retained map, Host
-read, lock, task, scanner or public named-group surface was added.
+Use Bazel 9.2.0 at pinned commit
+`8220c6198837d5c13d53fea211cf3282aa12408a`, rules_rust 0.73.0, edition 2024
+and the Stage 10 pinned nightly `nightly/2025-09-14`. The fixture uses bzlmod,
+`use_repo(rust, "rust_toolchains")`, and
+`register_toolchains("@rust_toolchains//:all")`. It contains only one minimal
+`rust_library`, one `rust_binary`, and one data file. Use daemon retention and
+`startup_argv = ["--ignore_all_rc_files"]`; do not read workspace/home RCs or
+claim remote execution/cache evidence.
 
-Measured accounting against `51127df8` is +397 production, +538 test and +935
-aggregate semantic lines; physical size is 24,807 across the exact eleven-file
-authority. Full analysis passes 4 library, 11 configured-target, 10 root,
-21 Starlark-rule and 4 toolchain tests. The affected core and REAPI suites keep
-only the already recorded inherited core baselines; workspace check, fmt,
-diff-check, cap accounting, Buck2-retention/AI-cleanup and independent review
-pass.
+Pin exact, anchored command output for:
 
-## Read-only audit
+- `query --order_output=full` of the generated registration package filtered
+  to toolchain rules, preserving exact canonical-label membership and only the
+  formatter's deterministic order; registration precedence is claimed solely
+  through the selected provider/action result;
+- cquery of the binary and its direct configured/toolchain edges, plus a
+  Starlark provider projection that exposes the admitted CrateInfo
+  owner/type/edition/root/output/dependency relationship without claiming
+  opaque configuration bytes;
+- text aquery restricted to the binary's Rustc and runfiles/symlink closure,
+  preserving owner/action order, selected execution platform, compiler and
+  process-wrapper association, parameter-file use, and declared outputs; and
+- cold, unchanged warm, edition 2024 -> 2021 -> 2024 mutation/restoration.
 
-Trace only enough live code, accepted Stage 4-8 evidence, and the exact Stage
-10 bootstrap closure to rank the remaining M7A owners:
+The edition mutation must change the provider projection and opaque Rustc
+ActionKey and restoration must recover both. Compare equality/restoration of
+the opaque key only; do not claim its bytes. All output patterns are fully
+anchored and fail on extra selected registrations, configured edges, provider
+fields, or admitted action blocks.
 
-- repository sources and the external rules_rust/provider/toolchain graph;
-- bootstrap-required rule/provider semantics and toolchain registration/
-  selection not already covered by the immutable row;
-- required action kinds, Args/paramfiles, tools, runfiles and input-tree
-  construction beyond bounded FileWrite;
-- the corresponding normalized aquery shapes; and
-- REAPI command/input-root, execution, cache and materialization behavior
-  required by Stage 10.3/10.4.
+Provenance must cite Bazel 9.2
+`RegisteredToolchainsFunction#getBzlmodToolchains`, target-pattern expansion,
+single/multi-toolchain resolution, `ResolvedToolchainContext`, and aquery text
+formatting, plus rules_rust 0.73 `rust/extensions.bzl`,
+`rust/private/repositories.bzl`, `rust/private/toolchain.bzl`,
+`rust/private/rust.bzl`, and `rust/private/utils.bzl`.
 
-For each candidate, identify the existing semantic owner, DICE dependency and
-caller order, retained value/identity, error/Need/event boundary, exact Bazel
-9.2 evidence, memory lifetime, and whether accepted lower producers are already
-complete. Inspect one-shot or compatibility adapters only to prove they do not
-own a second semantic path. Do not choose an umbrella packet merely because
-several later consumers share the bootstrap closure.
+Generate once, shut down the fixture Bazel server, then replay from no server
+without `--update-expected`. Inventory authored/generated lines and bytes,
+verify Bazel/rules_rust/nightly pins, and require clean no-update comparison,
+archive, diff-check, credential-pattern and scope gates. A nondeterministic or
+unanchorable output is REPLAN, not message-shape acceptance.
 
-The audit must return exactly one terminal:
+## Compatibility, STOP and successor
 
-1. one bounded docs-only design for the uniquely smallest complete natural
-   owner, with measured future Rust/test allowlist, caps, compatibility and
-   proof matrix;
-2. one uniquely smaller just-in-time Bazel 9.2 evidence prerequisite when live
-   ownership cannot be frozen discriminatingly from accepted evidence; or
-3. formal `REPLAN` with the smallest missing owner/evidence boundary.
+Exact: Bazel 9.2 extension expansion/mapping and the observed rules_rust 0.73
+provider, toolchain, configured-edge and action relationships named above.
 
-Any implementation requires an independently accepted design and may have at
-most one immediate successor. M7A remains partial during this audit.
+Slug-native: the future DICE owner, structural configuration/action identity,
+compact provider/context representation, and any observed family boundary.
 
-## Compatibility and STOP
+Unsupported/deferred: crate_universe, proc macros, build scripts, full sysroot
+input closure, action execution/REAPI/materialization, public named groups,
+applied aspects, M7B run/test/BEP breadth, and exact Bazel identity bytes.
 
-Exact: accepted FileWrite/action declaration order, configured ownership,
-default selected platform/toolchain/property semantics, diagnostics, text
-aquery and REAPI wire behavior.
+STOP on Rust, Cargo/BUILD outside the fixture, Stage 10, harness changes,
+`rules-rust-basic`, Java/JVM delegation, broad rules_rust evaluation,
+execution/cache claims, M7A closure, M8/M7B/M9 activation, cap excess, or a
+second successor. If bounded evidence requires full sysroot expansion, secret
+configuration, or runner redesign, record REPLAN.
 
-Slug-native: immutable configured-action/context rows, explicit execution
-states, compact Arc sharing, structural configuration/path/action identity and
-the private named-group representation.
-
-Unsupported/deferred until selected by this audit: public named exec groups,
-applied-aspect actions, broader action/rules_rust/input-tree semantics,
-bootstrap aquery/REAPI execution breadth, one-shot snapshot migration, M7B
-run/test/BEP breadth, and exact Bazel configuration/ActionKey bytes in M9.
-
-STOP on Rust/tests/fixtures/oracles, generated evidence, direct implementation,
-reopening the accepted owner for uniformity, a second action/publication owner,
-Java/JVM delegation, bootstrap-only manifests or execution paths, M7A closure,
-M8/M7B/M9 activation, cap excess, multiple successors, or a nondiscriminating
-owner choice. Preserve the ordering M7A -> M8 -> M7B.
+After independent ACCEPT, schedule exactly one docs-only successor:
+`WP-6-7A-external-rules-rust-toolchain-owner-design`.

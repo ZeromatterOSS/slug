@@ -7713,3 +7713,32 @@ canonical plan, current manifest, this Stage 6 plan and the routing log. Rust,
 tests, fixtures, oracle generation, Cargo/BUILD, public named groups, applied
 aspects, bootstrap-only paths, M7A closure, M8, M7B and M9 are stopped. Preserve
 M7A -> M8 -> M7B and require an independently accepted design before code.
+
+### Post-owner-context bootstrap closure audit accepted (2026-08-19)
+
+The read-only audit from `86d23ca8` selects one uniquely smaller just-in-time
+Bazel 9.2 evidence prerequisite before the external rules_rust toolchain owner
+design. Live analysis still rejects external topology registrations, native
+references and registered toolchains. The accepted direct nonroot-registration,
+root first-platform and immutable action-owner fixtures do not expose
+rules_rust 0.73's module-extension-generated `@rust_toolchains//:all`
+expansion/mapping or the selected Rust provider/action context. The only
+rules_rust fixture is Bazel 9.1.1/rules_rust 0.71.1 message-shape evidence and
+cannot freeze the Stage 10 owner.
+
+Run only `WP-1-6-7A-rules-rust-0.73-toolchain-action-owner-evidence`. Add one
+isolated Bazel 9.2/rules_rust 0.73 analysis-only fixture matching Stage 10's
+edition-2024 pinned nightly. Pin generated registration expansion, configured
+toolchain/provider edges and the Rustc/runfiles action-owner projection, with
+unchanged warm reuse and edition 2024 -> 2021 -> 2024 restoration. Use anchored
+query/cquery/text-aquery output; message-shape counts are insufficient.
+
+Authority is only canonical/current/this Stage plus the eight new fixture
+files named in the manifest. Handwritten fixture content is <=350 physical
+lines, generated JSON <=3,000 lines/200 KiB, and aggregate physical growth
+<=3,750 lines. Do not edit the harness, `rules-rust-basic`, Stage 10, Rust,
+Cargo or nonfixture BUILD metadata. Do not execute actions or claim REAPI,
+cache, run/test, sysroot-closure or exact ActionKey bytes. Generate once, shut
+down Bazel, replay from no server, and REPLAN if exact bounded output cannot be
+anchored. After evidence ACCEPT, design only
+`WP-6-7A-external-rules-rust-toolchain-owner-design`.
