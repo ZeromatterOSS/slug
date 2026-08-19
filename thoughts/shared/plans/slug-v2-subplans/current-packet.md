@@ -1,106 +1,93 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-observed-terminal-epoch-association-correction-design`
+Packet: `WP-2A-m1-external-singleton-observed-build-implementation-retry-6`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `95148642`
+Scheduling/design base: `503af0a9`
 Accepted Rust base: `a4dd40d6`
 Accepted external-build design: `1a217e2a`
 Accepted loading-proof correction: `ce110d9a`
 Accepted revision-event design: `5dabd4bf`
 Accepted source-certified event policy: `0b4b5210`
-Result: freeze the exact terminal-carrier Arc association required after an
-observed root is reused across an intervening accepted root.
+Accepted terminal-epoch correction: `503af0a9`
+Result: accept the observed external singleton build with exact terminal Arc
+authority and unchanged public/event semantics.
 
-## Docs-only authority
+## Exact Rust authority and caps
 
-Write only canonical, this manifest, Stage 2 and the orchestration routing log,
-under respectively 40/220/180/30 net lines and 470 aggregate. The retained
-four-file Rust candidate is evidence and is non-writable during this design.
-No Rust, Cargo, BUILD, fixture, oracle, caller, server or public-behavior change
-is authorized.
+Write exactly `runtime/dice.rs` <=380 semantic/11,400 physical,
+`runtime/tests/build_command_tests.rs` <=440 tests/3,450,
+`slug_loading_v2/src/host_package_load_tests.rs` only the accepted line-neutral
+assertion at 3,439, and `runtime/events.rs` <=100 production plus <=160 tests/
+2,050. Aggregate <=1,080 semantic and <=20,339 physical against `a4dd40d6`.
+No other file/loading byte, docs, Cargo, BUILD, fixture, oracle, caller or server
+test. Remove every temporary trace; touched helpers stay below 200 lines.
 
-## REPLAN evidence and owner
+## Complete implementation contract
 
-Retry 5 fixes the equal package-event replay: its focused external lifecycle
-and strict/source event reducer pass. The unchanged server lifecycle then
-fails only after external success/edit/missing/directory/recreate, an accepted
-root PackageAll command, and an external wrong-kind filegroup. Exact tracing
-showed `ObservedTerminal(ResultArc)` for the Host Lstat of the external route
-directory.
+Preserve structural nonroot-Single observed admission, exact matching-family
+legacy/observed driver, anchor -> route -> package -> ExportedFile
+classification -> revision -> source order, union-before-semantic prefixes,
+exact source-child certificate, external-only repository selection, selected
+value/Arc validation, child-only event ownership, exact legacy infrastructure
+projection, compact retention and every accepted failure polarity.
 
-The intervening root command correctly removes that external observation from
-the accepted command epoch. On the later external command, the observed
-package child is DICE-reused and its terminal carrier still owns the prior
-exact result Arc, while preflight/repository preparation supplies an equal new
-Arc to the command epoch. Whole-terminal pointer validation correctly rejects
-the mismatch. This is the previously frozen further-erasure REPLAN condition;
-do not weaken validation, key equality, child ownership or DICE reuse.
+Preserve private terminal-dependent
+`EventReconciliationPolicy::{Strict, SourceCertifiedCurrentClosure}`. Default
+every root/terminal to Strict. Only an observed external singleton terminal
+retaining a SourceCertificate opts in. Apply matching-root current-closure
+reconciliation to normal acceptance and actual retries: current Some including
+empty wins; present-prior KnownNone/NoTransition carries; absent prior drops;
+new Some contributes in current order. Preserve provisional tombstones,
+revision->Need, multiple retries, true-prior delta and post-materializer atomic
+replacement. Retain no policy/closure/map and do not change global KnownNone.
 
-Native terminal acceptance in `runtime/dice.rs` is the uniquely smallest
-owner. It has both the Complete root carrier and the command epoch before
-selection. No lower key, event owner, Host producer or side store is needed.
+For every Complete root exposing `observations()`, before sealing/selection,
+rebuild the command epoch through stable shared construction with terminal
+entries first and current command entries second. Terminal-only demands install
+the terminal exact Arc; equal duplicates preserve that Arc; unrelated command
+demands/Arcs survive; differing values, operation conflicts or invalid epochs
+fail closed before selection, finalization, materializer acceptance or
+publication. Need/outer and terminal-less roots do not merge.
 
-## Frozen association contract
+The reconciled command-local epoch is the sole input to ordinary selected
+demand filtering. Selected closure demands still exclusively control
+membership. Repository selection/validation and unconditional terminal
+length/demand/value/`Arc::ptr_eq` validation remain unchanged. A terminal demand
+outside the selected closure still fails the existing membership/length proof.
+Any merge/selection/revision/repository/materializer/cancel/abort failure leaves
+the prior accepted path/repository/event snapshots untouched.
 
-For every Complete `NativeCommandRoot` that exposes `observations()`, reconcile
-the terminal epoch into the command epoch before sealing and selecting the
-terminal. Build one stable shared epoch with terminal entries first and current
-command entries second:
+Retain only the build Result, full selected path epoch, certificate epoch, and
+compact Dupe/Allocative accepted/provisional event root/entry slices. Merge
+input, children, maps/Vecs and repository/event scratch stay compute-local or
+dependency-owned. Add no Host read, side store, collection, cache, interner,
+lock, task, child carrier, event owner or accepted state.
 
-- terminal-only demands install the terminal's exact shared result Arc;
-- equal duplicates retain the terminal Arc;
-- unrelated command demands and their exact Arcs remain unchanged;
-- differing values, operation conflicts or invalid epochs fail closed before
-  selection, revision finalization, materializer acceptance or publication.
+## Proof, compatibility and STOP
 
-The reconciled epoch is command-local and becomes the sole input to ordinary
-selected-demand filtering. `selected_snapshot` still selects only the exact
-activation-closure demands, constructs the same repository validations and
-retains exact Arcs. Reconciliation changes Arc authority, never demand
-membership: a terminal demand not selected by the closure must still fail the
-existing length/demand validation. Full terminal validation by length, demand,
-value and `Arc::ptr_eq` remains unconditional.
-
-Terminal-less roots are unchanged. Need and typed outer have no terminal epoch
-and do not reconcile. Any reconciliation, selection, revision, repository,
-materializer, cancellation or abort failure leaves the prior accepted path,
-repository and event snapshots untouched. Add no Host read, retained map/Vec,
-cache, interner, task, lock, side store, child carrier or event owner.
-
-Preserve every accepted external owner/order/prefix/certificate/repository and
-source-certified event-policy contract. The terminal Result, full selected
-epoch and certificate epoch remain the only retained semantic state; temporary
-merge input is compute-local and reuses `PathObservationEpoch::from_shared`.
-This use follows the Buck2-derived compact Arc-backed representation and adds
-no parallel collection.
-
-## Retry authority, caps and proof
-
-After independent design ACCEPT, schedule exactly
-`WP-2A-m1-external-singleton-observed-build-implementation-retry-6` in the
-same four Rust files. Correct only DICE to <=380 semantic/11,400 physical;
-retain build proof <=440/3,450, the line-neutral loading assertion at 3,439,
-and events <=100 production plus <=160 tests/2,050. Aggregate <=1,080 semantic
-and <=20,339 physical against `a4dd40d6`. No server-test write.
-
-Discriminating proof must cover terminal-only installation; equal fresh command
-Arc replacement by exact terminal Arc; unrelated Arc preservation; differing
-value/conflict failure before selection/publication with prior path/repository/
-event snapshots intact; strict selected-demand membership/length; external
-success -> root PackageAll -> external wrong-kind and success with exact Arcs;
-observed query/build root switches; warm reuse, cancellation and child-event
-parity. Retain the complete external, certificate, revision, event-policy,
-loading assertion, lifecycle, rollback and exact-cap proof.
+Retain the complete external family/prefix/Arc/certificate/repository/event/
+lifecycle/cancellation/rollback proof and line-neutral loading assertion. Add
+terminal-only install; equal fresh command Arc replacement by terminal Arc;
+unrelated Arc preservation; conflicting value failure before publication with
+prior snapshots intact; strict selected membership; external success -> root
+PackageAll -> external wrong-kind and success with exact terminal Arcs;
+observed query/build root switches; warm/cancel/event parity. Preserve Strict
+event removal, source-policy carry, direct edit without RevisionRetry, actual
+retry and child removal/change/current-order proof.
 
 Exact: public values/errors, selected paths/repositories and child events.
-Slug-native: observed terminal-carrier/command-epoch Arc association.
-Unsupported/deferred: multi-build, one-shot adapters, broader actions/external
-globs and exact identity bytes.
+Slug-native: observed terminal/command epoch association, certificate,
+repository and event retry association. Unsupported/deferred: multi-build,
+one-shot, broader actions/external globs and exact identity bytes.
 
-STOP on Rust during design; another file/owner/state/API, direct Host read,
-membership weakening, pointer-validation weakening, stale-value preference,
-child/event drift, retained scratch, cap excess, broader activation or M1
-closure. REPLAN if stable terminal-first shared reconciliation cannot preserve
-the exact selected carrier. After accepted retry 6 return only to one docs-only
-M1 owner audit.
+Run focused event/build/server lifecycle, 33/33 build, loading 138/138, full
+bzlmod, documented core/query/server baselines, fmt/diff, exact accounting,
+Buck2 retention, AI cleanup and independent final review.
+
+STOP every other file/loading byte, global event change, terminal merge on
+Need/outer, selected-membership or pointer-validation weakening, stale-value
+preference, child filtering, another owner/state/API/Host read, retained
+scratch, behavior/family drift, cap excess, broader activation or M1 closure.
+REPLAN on any new blocker. After ACCEPT return only to one docs-only M1 owner
+audit.

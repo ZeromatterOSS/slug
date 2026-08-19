@@ -6260,3 +6260,31 @@ switches, rollback, cancellation and event parity. STOP every other write,
 validation/membership weakening, stale-value preference, behavior drift, cap
 excess and M1 closure. After implementation ACCEPT return only to a docs-only
 M1 audit.
+
+### External singleton observed-build implementation retry 6 active (2026-08-18)
+
+Run only
+`WP-2A-m1-external-singleton-observed-build-implementation-retry-6` from Rust
+base `a4dd40d6` with external/loading/revision-event/source-policy authorities
+`1a217e2a`, `ce110d9a`, `5dabd4bf`, `0b4b5210` and terminal-epoch correction
+`503af0a9`.
+
+Authority is exactly DICE <=380/11,400, build proof <=440/3,450, the one
+line-neutral loading assertion at 3,439, and events <=100 production +160
+tests/2,050; aggregate <=1,080 semantic/20,339 physical.
+
+Preserve the full external owner/certificate/repository/event contract. Before
+selection for a Complete observed root, rebuild the command epoch terminal
+first: install terminal-only Arcs, preserve terminal Arcs for equal duplicates,
+keep unrelated command Arcs and fail closed on differing values/conflicts.
+Selected-demand membership and unconditional full pointer validation stay
+exact. Need/outer/terminal-less roots do not merge. Preserve Strict versus
+source-certified event reconciliation, tombstones/Needs/retries and atomic
+acceptance without retained policy/scratch.
+
+Prove the merge cases, strict membership, external -> root -> external
+wrong-kind/success, observed query/build root switches, event/certificate/
+lifecycle/rollback behavior, focused/full validation, exact caps, cleanup and
+independent review. STOP every other file/loading byte, validation weakening,
+stale preference, behavior drift, cap excess and M1 closure. After ACCEPT
+return only to one docs-only M1 audit.
