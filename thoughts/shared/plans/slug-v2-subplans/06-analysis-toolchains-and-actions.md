@@ -8577,3 +8577,22 @@ excess or milestone closure. REPLAN again if the full matrix cannot fit.
 After independent design ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry`; after its
 independent ACCEPT schedule only the docs-only nonregistry ignore design.
+
+### Host nonregistry REPO-file proof-cap correction accepted (2026-08-19)
+
+Correction `6b75865f` accepts the measured proof-only envelope from Rust base
+`12f68983` and semantic design `3c598dd5`. Run only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry` in
+`app/slug_bzlmod_v2/src/repo_file.rs`.
+
+Keep production <=180 from the 2,679-line base. Proof is <=550, aggregate
+semantic growth <=730 and final physical size <=3,450. Preserve the private
+source-first sibling/carrier, exact matching-family/result/event behavior and
+compact one-Result-Arc-plus-epoch retention. The added room may fund only the
+missing real terminal, epoch/order, event/warm/cancel, lifecycle and upper-
+exclusion discriminators recorded above.
+
+STOP a second file/key/caller/export, production semantic/order/event/memory/
+family drift, direct Host read, upper/registry activation, proof deletion, cap
+excess or milestone closure. After independent retry ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-design`.

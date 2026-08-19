@@ -1,13 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repo-file-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `aaa0bd3a`
+Scheduling base: `6b75865f`
 Rust base: `12f68983`
 Accepted semantic design: `3c598dd5`
+Accepted proof-cap correction: `6b75865f`
 
-## Formal REPLAN evidence
+## Accepted correction and retained candidate
 
 The retained one-file candidate is ownership- and retention-sound. Against
 `12f68983`, `repo_file.rs` is +163 production and +421 proof lines, +584
@@ -25,19 +26,13 @@ discard exact source-carrier Arc forwarding, both family rows, or one of the
 local/immutable lifecycles. Production semantics, owner, order, events, retained
 shape and family selection do not require redesign.
 
-## Exact docs authority and caps
+## Exact Rust authority and caps
 
-During this design write only:
+Write only `app/slug_bzlmod_v2/src/repo_file.rs`. From the 2,679-line Rust
+base, allow <=180 production, <=550 proof, <=730 aggregate semantic and <=3,450
+physical lines. Helpers remain below 200 lines. Every other file is read-only.
 
-1. canonical plan, <=40 net lines;
-2. this manifest, <=220 net lines;
-3. `06-analysis-toolchains-and-actions.md`, <=160 net lines; and
-4. routing log, <=30 net lines.
-
-Aggregate docs growth is <=450 net lines. Retain the dirty `repo_file.rs`
-candidate exactly and treat it as non-writable. Every other file is read-only.
-
-## Frozen correction
+## Frozen correction authority
 
 Preserve the accepted private key/carrier, matching Legacy/Observed source
 family, source-first Present-only continuation, exact Result-Arc projection,
@@ -45,7 +40,7 @@ carrierless Need/typed outer, semantic-Complete local REPO batches and compact
 one-Result-Arc-plus-epoch retention. Add no production owner, caller, export,
 state, event, Host read, cache, store, interner, lock or task.
 
-Correct only the proof envelope for the immediate implementation retry:
+The accepted correction changes only the proof envelope for this retry:
 
 - keep production at <=180 from the 2,679-line base;
 - raise proof from <=320 to <=550 lines;
@@ -142,13 +137,10 @@ extensions, rules_rust actions, M8/M7B and exact identity bytes.
 
 ## STOP and sole successor
 
-STOP Rust, Cargo, BUILD, fixture, oracle and public writes during design. STOP a
-second retry file/key/caller/export, production semantic/order/event/memory/
-family drift, direct Host read, upper/registry activation, proof deletion, cap
-excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN again if the full
-matrix cannot fit the corrected envelope.
+STOP a second retry file/key/caller/export, production semantic/order/event/
+memory/family drift, direct Host read, upper/registry activation, proof
+deletion, cap excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN
+again if the full matrix cannot fit the corrected envelope.
 
-After independent design ACCEPT schedule exactly
-`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry` in the
-same one Rust file. Only after independent retry ACCEPT schedule the docs-only
+Only after independent retry ACCEPT schedule the docs-only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
