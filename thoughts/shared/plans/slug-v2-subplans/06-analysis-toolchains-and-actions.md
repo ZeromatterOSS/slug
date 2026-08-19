@@ -9028,3 +9028,64 @@ STOP a third file/caller/export, semantic/order/event/family drift, retained
 state growth, upper/registry activation, cap excess and milestone closure.
 After implementation ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
+
+### Host nonregistry package-preflight observation proof-cap REPLAN (2026-08-19)
+
+Run only
+`WP-6-7A-host-nonregistry-package-preflight-observation-proof-cap-correction-design`
+from scheduling base `14e6a571`, Rust base `754e7619` and accepted semantic
+design `0c5a1366`. Retain the dirty two-file implementation candidate and make
+it non-writable during this docs-only correction.
+
+The candidate's focused observed-preflight proof is 7/7 and production ownership
+is sound. Against `754e7619`, `source_preparation.rs` is +319 production/+15
+colocated proof at 15,601 physical lines; the external proof is +832 at 4,002;
+aggregate semantic growth is +1,166 at 19,603 physical. The original <=720 proof
+and <=1,040 aggregate caps are exceeded before every frozen semantic-prefix,
+policy-error and exact child-batch discriminator is complete. Removing 126 lines
+would delete evidence rather than compact an overbuilt owner.
+
+Write only the canonical plan, current manifest, this Stage 6 plan and routing
+log at <=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
+fixtures, oracles, callers and public files are read-only.
+
+The future retry retains exact authority over only
+`app/slug_bzlmod_v2/src/source_preparation.rs` and
+`source_preparation_observation_tests.rs` from the 15,267/3,170 baselines.
+Keep source production <=320 and source physical <=15,650. Raise only external
+proof to <=960 and <=4,250 physical; aggregate becomes <=1,300 semantic and
+<=19,900 physical. Touched helpers remain below 200 lines.
+
+Freeze the private stage-aware one-Result-Arc+compact-epoch carrier and the one
+Legacy/Observed driver in effective -> invalid-name -> neutral deleted-policy ->
+ignore -> BUILD.bazel -> BUILD order. Preserve matching-family selection and
+left-first Complete epoch merging before semantic inspection. Need/typed outer
+is carrierless, later work is suppressed, equal duplicates retain the earliest
+exact Arc, conflict/operation mismatch is typed outer, and there is no Need
+union.
+
+The parent remains eventless; ROOT/REPO descendants remain sole batch owners.
+Retain no child carrier, policy value, matcher, marker bytes, extra collection or
+state, cache/interner/store/lock/task, direct Host read, revision, certificate or
+event state.
+
+Preserve the retained passing key/projection/reducer, prefix/family/event,
+local+immutable lifecycle and cancellation proof. Complete exact production-used
+DICE-compute projections at every child, every semantic terminal with exact
+prior/merged prefix and later suppression, semantic policy projection error
+versus policy DICE failure, exact ordered per-demand Arcs and first/conflict/
+mismatch behavior, exact legacy/observed rows, child-owned ROOT/REPO text/order
+with all parent/helper silence, warm and cancellation recovery, local+immutable
+marker preference/restoration, held handles and zero upper activation.
+
+Exact current order, values/errors, legacy Result Arc and child events remain
+unchanged; the private sibling/carrier/typed outer is Slug-native. Horizon/
+closure/discovery/selected graph, registry preparation/patches, extensions,
+M8/M7B and identity bytes remain deferred.
+
+STOP Rust during design and STOP a third file/caller/export, production/order/
+event/family/memory drift, upper/registry activation, proof deletion, cap excess
+or milestone closure. After independent correction ACCEPT schedule only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry`;
+after retry ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-design`.
