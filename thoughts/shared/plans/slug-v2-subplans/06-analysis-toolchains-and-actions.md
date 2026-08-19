@@ -7958,3 +7958,25 @@ family/order/error/event/retention drift, cap excess or milestone closure.
 After design ACCEPT schedule only the bounded effective-override implementation;
 after implementation ACCEPT return only to the selected-module-graph frontier
 design.
+
+### Effective-module-override observation design accepted (2026-08-19)
+
+Design `c2d1f893` freezes the uniquely smaller shared child. One crate-private
+observed key/carrier in `module_eval.rs` forwards the exact accepted
+root-files epoch beside one local effective-override Result Arc. A shared
+Legacy/Observed driver selects only the matching root-files family, then
+preserves command-policy order and the existing root-name/command/root/None
+projection. Root Need/typed outer is immediate and carrierless; root compute
+failure is empty-prefix and every later semantic terminal retains the root
+prefix. The parent remains eventless and compact.
+
+Run only
+`WP-6-7A-effective-module-override-observation-implementation` from Rust base
+`a3efa1b7` and accepted design `c2d1f893`. Authority is exactly
+`module_eval.rs`: <=160 production, <=240 tests, <=400 aggregate semantic and
+<=6,500 physical lines from 6,052. Keep helpers below 200 lines. Preserve exact
+legacy Result/value/error/command-path behavior, family isolation, epoch Arc
+identity, eventlessness, override lifecycle and the full proof/STOP contract.
+No caller/export or selected graph/discovered/preparation/repository activation
+is authorized. After ACCEPT return only to the docs-only selected-module-graph
+frontier design.
