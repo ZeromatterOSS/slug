@@ -36,7 +36,7 @@ and must name the same packet.
 
 ### Current packet
 
-[WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2](./slug-v2-subplans/current-packet.md).
+[WP-6-7A-host-nonregistry-repository-ignore-observation-design](./slug-v2-subplans/current-packet.md).
 
 ### Rust-only semantic-compatibility reset (2026-08-08)
 

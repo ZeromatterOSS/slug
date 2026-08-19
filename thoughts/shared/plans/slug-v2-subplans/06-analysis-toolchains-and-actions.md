@@ -8693,3 +8693,102 @@ STOP a second file/key/caller/export, production semantic/order/event/memory/
 family drift, direct Host read, upper/registry activation, proof deletion, cap
 excess or milestone closure. After independent retry ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
+### Host nonregistry REPO-file observation accepted (2026-08-19)
+
+Commit `b08b7f2e` accepts
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2`
+from Rust base `12f68983`, semantic design `3c598dd5` and proof corrections
+`6b75865f`/`aff21fdb`. The one-file implementation is +170 production and
++718 proof lines, +888 aggregate semantic, at 3,567 physical lines. Focused
+proof is 3/3; full bzlmod is 442 unit plus 193 integration; loading is 204/204
+and query is 121/121. Core retains only the documented stale visibility-wording
+and legacy snapshot-adapter Need baselines. Formatting, diff hygiene,
+cleanup/Buck2 retention and independent review are accepted.
+
+The private sibling selects only its matching repository-source family,
+forwards the exact accepted epoch before semantic inspection, owns exactly its
+matching local REPO batch and retains one local semantic Result Arc plus the
+compact epoch. No ignore/preflight/closure/discovery/selected-graph/registry
+caller was activated.
+
+### Host nonregistry repository-ignore observation design (2026-08-19)
+
+Run only `WP-6-7A-host-nonregistry-repository-ignore-observation-design`
+from scheduling/Rust base `b08b7f2e`. Write authority is exactly the canonical
+plan, current manifest, this Stage 6 plan and the routing log at
+<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
+fixtures and oracles are read-only.
+
+`HostNonregistryRepositoryIgnoreKey` is the uniquely smallest complete next
+owner. Its existing order is event-owning `HostNonregistryRepoFileKey`, then
+the `.bazelignore` `RepositorySourceFileKey`, then the existing parser. Both
+semantic children have accepted observed siblings. The parser's only additional
+mutable edge is the existing Windows long-path observation, already returned
+by `parse_ignore_file_observed` as a compact epoch with Need/typed-outer
+polarity. Package preflight is the sole consumer and remains deferred.
+
+Freeze one private structural
+`HostNonregistryRepositoryIgnoreObservationKey(HostNonregistryRepositoryIgnoreKey)`
+and one private `ObservedHostNonregistryRepositoryIgnore`. Retain exactly one
+local `Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>` plus
+one compact `PathObservationEpoch`, with `Dupe`/`Allocative` and borrowed
+accessors. Add no export or caller.
+
+Use one Legacy/Observed driver. Preserve exact repo -> source -> parser order.
+Legacy selects only the legacy REPO and repository-source children and moves
+the exact local matcher Result Arc. Observed selects only the accepted observed
+siblings and uses `parse_ignore_file_observed`. Neither mode computes the
+other family.
+Both modes retain the same neutral Windows long-path parser dependency when
+that parser path is reached.
+
+Repo Need/typed outer is immediate and carrierless. Accept a complete repo
+epoch before semantic inspection; repo semantic failure keeps the repo-only
+prefix and suppresses source work. After repo success, source Need/typed outer
+is carrierless. Merge the accepted repo prefix left-first with the complete
+source epoch before source semantics. Source error/Absent/Directory/Present
+keeps that merged prefix; Absent/Directory suppress the parser. Present invokes
+the observed parser. Parser Need/typed outer is carrierless; merge the existing
+repo+source prefix left-first with its complete epoch before parser semantics.
+Parser error/success keeps the full prefix. Equal duplicates retain the earliest
+exact Arc; conflict/operation mismatch is typed outer. This sequential owner
+has no Need union.
+
+Both ignore siblings remain eventless. Their matching REPO child remains sole
+owner of its local batch; repository source and parser observations are
+eventless. Need/outer/cancellation stores no parent state and warm reuse emits
+nothing. Retain no child carrier, source bytes, parser scratch, second
+collection, cache/interner/store/lock/task, direct Host read, revision,
+certificate or event state.
+
+After design ACCEPT, exact Rust authority is only
+`app/slug_bzlmod_v2/src/repository_ignore.rs` from the 3,297-line
+`b08b7f2e` baseline: <=180 production, <=400 proof, <=580 aggregate semantic
+and <=3,900 physical; touched helpers remain below 200 lines.
+
+Proof must discriminate key/hash/Display and carrier equality; production
+repo/source/parser terminal reduction; real Need/outer and later suppression;
+all repo/source/parser semantic terminals with exact prior/merged/full prefixes;
+ordered epoch membership, exact shared Arcs, duplicate-first/conflict/mismatch;
+Windows long-path behavior where applicable; exact family rows and reverse
+isolation; child REPO batch and parent/source/parser silence, warm and
+poll-drop recovery; independent local/immutable REPO plus `.bazelignore`
+A/B/absent/directory/A with held Result/epoch handles; and zero upper, registry,
+extension or public activation. Reuse accepted semantic evidence; no Bazel
+oracle is needed because grammar, platform policy, errors and legacy events are
+unchanged.
+
+Exact compatibility is current REPO -> `.bazelignore` -> parser order,
+grammar/platform behavior, matcher/errors and legacy child events. The private
+sibling/carrier/typed outer is Slug-native. Preflight/closure/discovery/selected
+graph, registry preparation/patches, extension repositories, M8/M7B and exact
+identity bytes remain deferred.
+
+STOP Rust writes during design. STOP a second file/key/caller/export, semantic
+or parser drift, event-owner change, extra retained state, direct Host read,
+upper/registry activation, cap excess or milestone closure. REPLAN if the
+one-file envelope cannot preserve exact behavior. After independent design
+ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-implementation`;
+after independent implementation ACCEPT schedule only the docs-only
+`WP-6-7A-host-nonregistry-package-preflight-observation-design`.
