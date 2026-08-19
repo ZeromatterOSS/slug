@@ -7845,3 +7845,35 @@ plus compact epoch; no third file, selected graph/registry/extension/package or
 analysis activation, direct Host read, extra collection/state/event owner, or
 cap excess. After ACCEPT, schedule only the docs-only selected-module-graph
 observation-frontier design.
+
+### Root MODULE-files implementation cap/proof REPLAN (2026-08-19)
+
+The retained two-file candidate compiles and full `slug_bzlmod_v2 --lib`
+passes 426/426. Ownership, matching-family order, union-before-semantic,
+child-only events and compact Result-Arc+epoch retention are sound. Measured
+against `335cfa45`, `host_module.rs` is +4 production at 4,535 physical lines;
+`module_eval.rs` is 315/30, +285 production at 5,736 physical lines and exceeds
+its frozen +180 production cap. Its approximately 66-line observed-lockfile
+helper and 128-line shared driver are cohesive and already below the 200-line
+helper gate. A 105-line forced reduction would require macro compression,
+ownership duplication or abandoning the accepted shared driver.
+
+The retry must also replace the candidate's Debug-derived
+`HostRootModuleFileError` and lockfile `HostFileError` strings with explicit
+semantic projections. Equivalent command-policy, validation, evaluation,
+lockfile-mode/read/parse terminals preserve exact legacy messages. Slug-native
+Need/typed outer and Host-only source-kind/path errors remain structurally
+distinct and must use stable explicit messages. Real legacy/observed terminal
+comparisons discriminate this boundary.
+
+Run only
+`WP-6-7A-root-module-files-observation-proof-cap-correction-design`, docs-only.
+Retain the Rust candidate non-writable. The corrected retry keeps
+`host_module.rs` at +80 production/+120 tests/4,740 physical and raises only
+`module_eval.rs` to +340 production/+300 tests/6,100 physical; aggregate caps
+are +840 semantic and 10,840 physical. Preserve every owner, algebra, event,
+memory, family and deferred-boundary requirement from `335cfa45`. STOP Rust,
+another file/owner/caller, Debug error projection, direct Host reads, selected
+graph/extension/package/analysis activation, cap excess and milestone closure.
+After independent design ACCEPT, resume exactly one implementation retry; after
+implementation ACCEPT, design only the selected-module-graph frontier.
