@@ -1,104 +1,104 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-observed-publication-implementation-retry`
+Packet: `WP-2A-m1-post-loading-query-publication-owner-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Rust base: `a9270586`
-Accepted query design: `44c1b444`
-Accepted proof correction: `e22404a8`
-Accepted repository-selection correction: `1f2fb3f6`
-Accepted event-epoch correction: `533fe50f`
-Result: finish, validate and accept only the retained observed loading-query
-candidate with native accepted-event reconciliation.
+Scheduling and accepted Rust base: `2e1c1334`
+Result: identify the uniquely smallest complete remaining M1 publication owner
+before any further Rust or public cutover.
 
-## Exact authority and caps
+## Exact docs-only authority and caps
 
-Write exactly evaluator/loading_environment/graph/lib and new
-`observed_loading_query.rs` in `slug_query_v2`; core `runtime/dice.rs`,
-`runtime/events.rs` and new `runtime/tests/query_command_tests.rs`; and
-loading `host_package_load_tests.rs`. No tenth file.
+Write exactly:
 
-Preserve existing caps 170+20/417, 360+60/2,346, 520+100/3,771, 4/81,
-760/780, 100+12/11,000, relocation+372/1,132, and loading proof +4/3,442.
-Allow events only +80 production/+100 colocated tests, <=1,800 physical.
-Aggregate semantic caps are +1,234 production/+1,428 tests/+2,662. The primary
-physical envelope plus events is <=21,331; loading proof remains separately
-<=3,442. Base core lines 7,318-8,036 relocate exactly; only the three accepted
-stable-parent replacements may differ.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
+2. this manifest,
+3. `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`, and
+4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-## Frozen query and selection implementation
+Caps against `2e1c1334`: canonical <=40 net, this manifest <=180, Stage 2
+<=160, routing <=30 and aggregate <=430. Rust, Cargo, BUILD, fixtures, oracles,
+generated evidence and public/caller activation are forbidden.
 
-Preserve the structural observed query root, private observed graph/subtree
-siblings, matching Legacy/Observed drivers, compute-local environment,
-anchor/evaluator order, left-first union-before-semantic exact Arcs, immediate
-sequential terminals and full subtree-batch outer > compatible Need union >
-semantic > success. REPLAN rather than inventing a QueryError for Need union.
+## Accepted predecessor and learned facts
 
-Carriers remain one natural Result Arc plus compact path epoch with
-`Allocative` and `Dupe`; root retains no child carrier. Environment/arena/
-graph/traversal/listing/union scratch remains compute-local. Child keys alone
-produce local batches; Need/outer/cancel publishes none. Add no Host read,
-revision, certificate, producer, cache, interner, store, lock or task.
+Accepted `2e1c1334` gives the sole public/native loading-query command a
+structurally distinct observed root, observed graph/subtree mechanisms, exact
+path Result-Arc association, query-only closure-selected repository sidecars
+and compact accepted event reconciliation. It retains one query Result Arc plus
+one path epoch; child keys remain event owners. Query validation is 121/121,
+loading is 204/204, bzlmod is 426 unit plus its accepted 193 integration set,
+and the only broader core failures are the recorded stale visibility assertion
+and the inherited PathObservationEpoch injection baseline.
 
-Retain the exact loading query-positive/core-negative assertion and three
-distinct crate-target `tempdir_in` parents from `e22404a8`. Preserve the
-private typed `NativeCommandRoot` selection policy from `1f2fb3f6`: strict
-path-only by default; closure-selected repository sidecars only for observed
-query. Keep `selected_snapshot` and materializer acceptance as sole repository
-owners and unconditionally compare the complete selected path epoch by length,
-demand, value and `Arc::ptr_eq`. Add no repository state to the query carrier.
+The remaining surfaces do not share that terminal owner:
 
-## Accepted-event epoch correction
+- `compute_external_exported_source_build_branch` in core owns repository
+  route -> repository package load -> target-kind check -> selected Host source.
+  It still selects legacy lower keys and publishes `source_certificate: None`.
+- `BuildCommandRootKey` and its singleton/observed variants own multi-target
+  build aggregation, target ordering, analysis/loading mixes, revision and
+  source-certificate publication.
+- `evaluate_workspace_targets{,_with_bzlmod_inputs}` creates a one-shot
+  runtime and injects observations before projecting workspace build results;
+  it is not the accepted `RootQueryCommandObservationKey` publication path.
+- Direct query APIs and accepted loading-query behavior remain exact and must
+  not be pulled into a new combined owner merely because they share lower DICE
+  producers.
 
-Each command has a fresh event tracker and DICE reused activations expose no
-evaluation data. Make terminal selection return exact closure order plus, per
-node, either a known current `Option<EventBatch>` transition or no transition.
-Known Some includes empty batches; known None removes a batch. Selection state
-is scratch and must not enter the accepted snapshot.
+Bazel 9.2 remains the compatibility oracle. This audit may read pinned Bazel
+source/tests and accepted Slug evidence, but creates no new oracle or fixture.
 
-Retain exactly one private `Arc<[(DiceNodeId, EventBatch)]>` event epoch in
-`AcceptedNativeDemandSnapshot`, with cheap clone and memory accounting. Fold
-the selected closure against the prior epoch in closure order: current Some
-replaces and emits only when exact batch value changed and is nonempty; current
-None removes; no-transition carries a matching prior entry without emission;
-prior nodes absent from closure drop. Retain Some(empty) distinctly. Reordering
-alone emits nothing but replaces retained order. Use only compute-local
-`SmallMap`/vectors; no retained map, deep clone or event Arc-identity check.
+## Audit obligations
 
-Prepare filtered output and next epoch locally. Replace event/path/repository
-accepted state together only at the existing post-materializer native snapshot
-boundary. Need, outer, selection/validation/materializer failure, cancellation
-and restorable abort preserve the prior epoch; post-irreversible failure stays
-fail-closed. Public `AcceptedCommand` moves only filtered batches and semantic
-terminal. Add no lock across DICE and do not change path/carrier equality,
-activation closure, child batch ownership or repository association.
+Trace only enough live code to rank the first complete natural owner across the
+external exported-source build, multi-build aggregation and one-shot adapters.
+For each candidate record:
 
-## Compatibility, proof and terminal
+1. its structural key/request identity and exact terminal Result Arc;
+2. every mutable path/repository/package/source/certificate or revision edge,
+   including whether an accepted observed sibling already carries a complete
+   epoch;
+3. Need, typed outer, semantic error, cancellation and retry ordering;
+4. child versus command event ownership and public acceptance boundaries;
+5. retained DICE/command state versus compute-local scratch, with no inferred
+   cache, interner, store, lock, task or Host read;
+6. family isolation, legacy/direct callers and the precise public constructor;
+7. lifecycle and exact-Arc proof needed for create/edit/delete/recreate and
+   A/B/A; and
+8. measured future Rust allowlist, production/test/aggregate growth and
+   physical caps before any implementation scheduling.
 
-Exact public query values/errors/order/events/materialization, loading proof and
-all legacy/build/direct APIs remain exact. Private observation, selection and
-accepted-event association plus stable test parents are Slug-native. One-shot
-query, external exported source, multi-build, unsupported breadth and exact
-identity bytes remain deferred.
+Prefer a producer-owned fact and the first aggregation point that already owns
+all changed semantics. Do not combine query and build roots, duplicate a
+certificate or selected-snapshot sidecar in a terminal, or create a callerless
+partial carrier merely to avoid a smaller prerequisite.
 
-Prove accepted Some(A) -> next-command no-transition carry -> evaluated Some(A)
-with no output. Prove accepted Some(A) -> evaluated known None removal/no output
--> no-transition no resurrection -> evaluated Some(A) new/emitted. Prove
-Some(empty) retained distinctly; changed batches replay in current closure
-order; absent/reordered/cross-command state is exact; failure and cancel roll
-back. The external sibling-file mutation must suppress, while BUILD and `.bzl`
-A/B/delete/recreate/A replay changed local batches and suppress after restore.
+## Compatibility and terminal
 
-Retain external nonempty repository request+validation acceptance, root-empty
-and strict-root rejection proof, complete selected path/result Arc identity,
-family/event/lifecycle parity and zero upper activation. Run corrected tests
-isolated, then default-parallel core, full query/loading/bzlmod, fmt, diff-check,
-exact relocation/accounting, archive status, Buck2 retention/AI cleanup and
-independent final review.
+Exact: accepted public query values/errors/order/events/materialization,
+repository acceptance, all legacy/direct APIs and accepted build behavior.
 
-STOP on a tenth file/root opt-in, unrestricted boolean, weakened validation,
-path/carrier/key equality drift, retained map/cache/interner, deep-cloned
-events, child event-owner change, non-atomic accepted replacement, lost changed
-event replay, body drift beyond accepted exceptions, cap excess, caller/public
-expansion or M1 closure. REPLAN on another material miss. After ACCEPT commit
-and return to exactly one docs-only next-owner audit.
+Slug-native: private observed siblings, typed outer values, path/event epoch
+association and exact shared-Arc validation.
+
+Unsupported/deferred until this audit selects an owner: external exported-source
+publication/certificate, multi-build publication, one-shot cutover, broader
+query/build breadth and exact Bazel identity bytes.
+
+End with exactly one independently reviewable result:
+
+1. schedule one docs-only design for the uniquely smallest complete owner;
+2. schedule one uniquely smaller prerequisite design and explain why the upper
+   owner is incomplete without it; or
+3. record formal `REPLAN` when no bounded exact/Slug-native owner exists.
+
+Any future design must freeze the natural key/value owner, exact Rust allowlist
+and caps, result/epoch/certificate/revision algebra, event and family authority,
+memory/cancellation/lifecycle proof, compatibility classes and explicit STOP/
+REPLAN conditions. It may schedule at most one bounded implementation only
+after independent design acceptance.
+
+STOP on implementation, a preselected owner without complete evidence, weakened
+exact path/result/event association, another retained side store, adjacent
+breadth, cap excess or M1 closure.

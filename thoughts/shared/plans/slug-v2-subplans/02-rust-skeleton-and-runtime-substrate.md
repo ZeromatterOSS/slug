@@ -5548,3 +5548,73 @@ STOP a tenth file, weakened path/key equality, retained map/interner/cache,
 child-owner/event-order drift, non-atomic replacement, cap excess, caller/public
 expansion and M1 closure. After ACCEPT return only to one docs-only next-owner
 audit.
+
+### Loading-query observed publication accepted (2026-08-18)
+
+Accepted implementation `2e1c1334` completes the bounded loading-query
+publication owner from Rust base `a9270586`, query design `44c1b444`, proof
+authority `e22404a8`, repository-selection design `1f2fb3f6` and accepted
+event design `533fe50f`.
+
+The public query constructor now selects one structurally distinct observed
+root. Private observed root/external graph and subtree siblings consume only
+matching observed package, boundary, listing and path families. The accepted
+terminal retains the exact query Result Arc plus its complete path epoch;
+`validate_observed_terminal` still compares every demand, semantic value and
+Result Arc. Only this query root admits repository requests and validations
+already selected from its exact activation closure. Existing build roots remain
+strict-empty.
+
+Native acceptance additionally retains one compact Arc-backed event epoch.
+Current Some/None/no-transition closure state is reconciled in closure order:
+equal batches suppress, changed nonempty batches replay, None removes,
+no-transition carries, and absent nodes drop. Preparation changes only the
+local candidate snapshot; path/repository/event state is replaced together
+after materializer acceptance, so Need, outer, cancellation and restorable
+failure preserve the prior accepted state. Child DICE keys remain sole event
+producers.
+
+The exact nine-file diff is `evaluator.rs`, `loading_environment.rs`,
+`graph.rs`, query `lib.rs`, new `observed_loading_query.rs`, core
+`runtime/{dice,events}.rs`, new `runtime/tests/query_command_tests.rs`, and
+loading `host_package_load_tests.rs`. Aggregate formatted net growth is
++1,360 including the semantic-neutral 719-line core-test relocation. Final
+physical sizes are 380/2,168/3,663/81/73/10,902/1,770/860/3,439; the primary
+eight-file envelope is 19,897 and the loading proof is 3,439. Events accounts
+for +66 production and +95 tests.
+
+Validation passes 121/121 query, 204/204 loading, 426 bzlmod unit plus the
+accepted 193 integration set, focused event/repository/Arc proofs, formatting,
+diff and exact relocation checks. Full core is 237/238 only on the documented
+stale generic visibility text while direct query proof expects the accepted
+wrong-kind diagnostic; runtime integration is 12/13 only on the inherited
+PathObservationEpoch injection baseline. Clippy and archive status stop only on
+their recorded unchanged baselines. Buck2 retention, AI cleanup categories 1-9
+and independent review returned `ACCEPT`.
+
+Compatibility remains exact for public query values/errors/order/events,
+materialization and every legacy/build/direct API. Private observed
+carrier/epoch/repository/event association is Slug-native. Core external
+exported-source publication, multi-build aggregation, one-shot cutover,
+unsupported breadth and exact identity bytes remain deferred. M1 is partial.
+
+### Post-loading-query publication owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-post-loading-query-publication-owner-audit` from accepted
+base `2e1c1334`. This is a four-document, read-only source audit; write only
+canonical/current/Stage/routing within 40/180/160/30 net and 430 aggregate.
+
+Rank the first complete owner among core external exported-source build
+publication, multi-build aggregation and one-shot workspace adapters. Trace
+structural key/result identity, all observed path/package/source/certificate
+and revision edges, Need/outer/semantic/cancel ordering, event/publication
+authority, retained versus scratch lifetime, family isolation, constructors and
+exact lifecycle proof. Do not merge query and build ownership or duplicate
+selected-snapshot/certificate state.
+
+End with exactly one independently reviewed docs-only owner design, one
+uniquely smaller prerequisite design or formal REPLAN. Any selected design must
+freeze future Rust files/caps, complete terminal/epoch/certificate/event/memory
+proof, compatibility and STOP conditions before scheduling one implementation.
+STOP Rust, Cargo, BUILD, fixtures/oracles, public activation, adjacent breadth,
+cap excess and M1 closure.
