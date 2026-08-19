@@ -1394,6 +1394,55 @@ impl fmt::Display for HostEffectiveModuleOverrideKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostEffectiveModuleOverrideObservationKey(HostEffectiveModuleOverrideKey);
+
+impl HostEffectiveModuleOverrideObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath, module_name: CompactString) -> Self {
+        Self(HostEffectiveModuleOverrideKey::new(workspace, module_name))
+    }
+}
+
+impl fmt::Display for HostEffectiveModuleOverrideObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type OverrideResult = Arc<Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostEffectiveModuleOverride {
+    result: OverrideResult,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostEffectiveModuleOverride {
+    pub(crate) fn new(result: OverrideResult, observations: PathObservationEpoch) -> Self {
+        Self {
+            result,
+            observations,
+        }
+    }
+
+    pub(crate) fn result(&self) -> &OverrideResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type HostEffectiveModuleOverrideDriverOutcome = SourcePreparationOutcome<
+    Result<(OverrideResult, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+enum HostEffectiveModuleOverrideMode {
+    Legacy,
+    Observed,
+}
+
 fn command_local_path_override(path: &Path) -> RootModuleOverride {
     RootModuleOverride::NonRegistry(RepoSpec {
         rule_id: repo_rule_id(
@@ -1411,68 +1460,194 @@ fn command_local_path_override(path: &Path) -> RootModuleOverride {
     })
 }
 
+fn project_host_effective_module_override(
+    files: &RootModuleFiles,
+    policy: &RootModuleCommandPolicy,
+    module_name: &CompactString,
+) -> Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError> {
+    if let Some(root_name) = files.module.header.as_ref().map(|header| &header.name)
+        && policy.command_module_override(root_name).is_some()
+    {
+        return Err(HostEffectiveModuleOverrideError::RootModuleOverride {
+            module_name: root_name.clone(),
+        });
+    }
+    if let Some(path) = policy.command_module_override(module_name.as_str()) {
+        return Ok(HostEffectiveModuleOverride::Command {
+            path: NormalizedAbsolutePath::new(path.to_owned())
+                .expect("injected command override paths are normalized"),
+            override_: command_local_path_override(path),
+        });
+    }
+    Ok(match files.overrides.get(module_name.as_str()) {
+        Some(override_) => HostEffectiveModuleOverride::Root {
+            override_: override_.clone(),
+        },
+        None => HostEffectiveModuleOverride::None,
+    })
+}
+
+fn effective_override_complete(
+    result: Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>,
+    observations: PathObservationEpoch,
+) -> HostEffectiveModuleOverrideDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn effective_override_root_error(
+    message: CompactString,
+    observations: PathObservationEpoch,
+) -> HostEffectiveModuleOverrideDriverOutcome {
+    effective_override_complete(
+        Err(HostEffectiveModuleOverrideError::RootModuleFiles(message)),
+        observations,
+    )
+}
+
+fn effective_override_policy_error(
+    message: CompactString,
+    observations: PathObservationEpoch,
+) -> HostEffectiveModuleOverrideDriverOutcome {
+    effective_override_complete(
+        Err(HostEffectiveModuleOverrideError::CommandPolicy(message)),
+        observations,
+    )
+}
+
+fn finish_observed_effective_override_root(
+    outcome: <RootModuleFilesObservationKey as Key>::Value,
+) -> Result<(RootModuleFiles, PathObservationEpoch), HostEffectiveModuleOverrideDriverOutcome> {
+    use SourcePreparationOutcome::Complete;
+    use SourcePreparationOutcome::Need;
+    match outcome {
+        Need(need) => Err(Need(need)),
+        Complete(Err(error)) => Err(Complete(Err(error))),
+        Complete(Ok(root)) => {
+            let observations = root.observations().dupe();
+            match root.result().as_ref() {
+                Ok(files) => Ok((files.clone(), observations)),
+                Err(error) => Err(effective_override_root_error(error.clone(), observations)),
+            }
+        }
+    }
+}
+
+async fn drive_host_effective_module_override(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostEffectiveModuleOverrideKey,
+    mode: HostEffectiveModuleOverrideMode,
+) -> HostEffectiveModuleOverrideDriverOutcome {
+    let (files, observations) = match mode {
+        HostEffectiveModuleOverrideMode::Legacy => match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: key.workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Ok(files) => match files.as_ref() {
+                Ok(files) => (files.clone(), empty_observations()),
+                Err(error) => {
+                    return effective_override_root_error(error.clone(), empty_observations());
+                }
+            },
+            Err(error) => {
+                return effective_override_root_error(
+                    error.to_string().into(),
+                    empty_observations(),
+                );
+            }
+        },
+        HostEffectiveModuleOverrideMode::Observed => {
+            let root = match ctx
+                .compute(&RootModuleFilesObservationKey::new(key.workspace.dupe()))
+                .await
+            {
+                Ok(root) => root,
+                Err(error) => {
+                    return effective_override_root_error(
+                        error.to_string().into(),
+                        empty_observations(),
+                    );
+                }
+            };
+            match finish_observed_effective_override_root(root) {
+                Ok(root) => root,
+                Err(outcome) => return outcome,
+            }
+        }
+    };
+    let policy = match ctx
+        .compute(&RootModuleCommandPolicyKey {
+            workspace: key.workspace.as_path().to_owned(),
+        })
+        .await
+    {
+        Ok(policy) => policy,
+        Err(error) => {
+            return effective_override_policy_error(error.to_string().into(), observations);
+        }
+    };
+    effective_override_complete(
+        project_host_effective_module_override(&files, &policy, &key.module_name),
+        observations,
+    )
+}
+
+fn project_legacy_effective_override(
+    outcome: HostEffectiveModuleOverrideDriverOutcome,
+) -> OverrideResult {
+    match outcome {
+        SourcePreparationOutcome::Complete(Ok((result, _))) => result,
+        _ => panic!("legacy effective override invariant failed"),
+    }
+}
+
 #[async_trait]
 impl Key for HostEffectiveModuleOverrideKey {
     type Value = Arc<Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let files = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.as_path().to_owned(),
-            })
-            .await
-        {
-            Ok(files) => match files.as_ref().clone() {
-                Ok(files) => files,
-                Err(error) => {
-                    return Arc::new(Err(HostEffectiveModuleOverrideError::RootModuleFiles(
-                        error.clone(),
-                    )));
-                }
-            },
-            Err(error) => {
-                return Arc::new(Err(HostEffectiveModuleOverrideError::RootModuleFiles(
-                    error.to_string().into(),
-                )));
-            }
-        };
-        let policy = match ctx
-            .compute(&RootModuleCommandPolicyKey {
-                workspace: self.workspace.as_path().to_owned(),
-            })
-            .await
-        {
-            Ok(policy) => policy,
-            Err(error) => {
-                return Arc::new(Err(HostEffectiveModuleOverrideError::CommandPolicy(
-                    error.to_string().into(),
-                )));
-            }
-        };
-        if let Some(root_name) = files.module.header.as_ref().map(|header| &header.name)
-            && policy.command_module_override(root_name).is_some()
-        {
-            return Arc::new(Err(HostEffectiveModuleOverrideError::RootModuleOverride {
-                module_name: root_name.clone(),
-            }));
-        }
-        if let Some(path) = policy.command_module_override(self.module_name.as_str()) {
-            return Arc::new(Ok(HostEffectiveModuleOverride::Command {
-                path: NormalizedAbsolutePath::new(path.to_owned())
-                    .expect("injected command override paths are normalized"),
-                override_: command_local_path_override(path),
-            }));
-        }
-        Arc::new(Ok(match files.overrides.get(self.module_name.as_str()) {
-            Some(override_) => HostEffectiveModuleOverride::Root {
-                override_: override_.clone(),
-            },
-            None => HostEffectiveModuleOverride::None,
-        }))
+        project_legacy_effective_override(
+            drive_host_effective_module_override(
+                ctx,
+                self,
+                HostEffectiveModuleOverrideMode::Legacy,
+            )
+            .await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
+    }
+}
+
+#[async_trait]
+impl Key for HostEffectiveModuleOverrideObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostEffectiveModuleOverride, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_effective_module_override(
+            ctx,
+            &self.0,
+            HostEffectiveModuleOverrideMode::Observed,
+        )
+        .await
+        .map(|outcome| {
+            outcome.map(|(result, observations)| {
+                ObservedHostEffectiveModuleOverride::new(result, observations)
+            })
+        })
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 impl fmt::Display for RootModuleGraphKey {
@@ -1829,8 +2004,18 @@ impl Key for RootModuleFilesObservationKey {
 
 #[cfg(all(test, unix))]
 mod root_module_files_observation_tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
+    use std::sync::Mutex;
+
+    use dice::ActivationData;
+    use dice::ActivationTracker;
     use dice::DetectCycles;
     use dice::Dice;
+    use dice::DynKey;
+    use dice::RichActivation;
+    use dice::UserComputationData;
     use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::PathLstat;
     use slug_workspace_v2::PathNodeKind;
@@ -1948,21 +2133,25 @@ mod root_module_files_observation_tests {
         })
     }
 
-    async fn compute(
-        dice: &Arc<Dice>,
+    fn inject_inputs(
+        updater: &mut DiceTransactionUpdater,
         source: &str,
         lockfile: Option<&str>,
         mode: LockfileMode,
         variant: i64,
-    ) -> (
-        <RootModuleFilesObservationKey as Key>::Value,
-        Arc<Result<RootModuleFiles, CompactString>>,
-        PathObservationEpoch,
-    ) {
+        overrides: &[&str],
+        observe: bool,
+    ) -> PathObservationEpoch {
         let injected = epoch(source, lockfile, variant);
-        let mut updater = dice.updater();
         updater
-            .changed_to(vec![(PathObservationEpochKey, injected.dupe())])
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                if observe {
+                    injected.dupe()
+                } else {
+                    empty_observations()
+                },
+            )])
             .unwrap();
         updater
             .changed_to(vec![(
@@ -1991,7 +2180,7 @@ mod root_module_files_observation_tests {
             )])
             .unwrap();
         inject_root_package_policy_inputs(
-            &mut updater,
+            updater,
             RootPackagePolicyInputs::new(
                 workspace(),
                 [workspace()],
@@ -2003,13 +2192,35 @@ mod root_module_files_observation_tests {
         )
         .unwrap();
         inject_root_module_request_inputs(
-            &mut updater,
+            updater,
             workspace().as_path(),
-            BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                workspace().as_path(),
+                overrides.iter().copied(),
+            )
+            .unwrap(),
             BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
             mode,
         )
         .unwrap();
+        injected
+    }
+
+    async fn compute(
+        dice: &Arc<Dice>,
+        source: &str,
+        lockfile: Option<&str>,
+        mode: LockfileMode,
+        variant: i64,
+    ) -> (
+        <RootModuleFilesObservationKey as Key>::Value,
+        Arc<Result<RootModuleFiles, CompactString>>,
+        PathObservationEpoch,
+    ) {
+        let mut updater = dice.updater();
+        let injected = inject_inputs(&mut updater, source, lockfile, mode, variant, &[], true);
         let mut transaction = updater.commit().await;
         let observed = transaction
             .compute(&RootModuleFilesObservationKey::new(workspace()))
@@ -2122,6 +2333,390 @@ mod root_module_files_observation_tests {
         ];
         let messages = failures.map(|failure| crate::host_module::package_error("//pkg", &failure));
         assert!(messages.windows(2).all(|pair| pair[0] != pair[1]));
+    }
+    #[derive(Default)]
+    struct EffectiveOverrideTracker(Mutex<Vec<(String, bool)>>);
+
+    impl EffectiveOverrideTracker {
+        fn take(&self) -> Vec<(String, bool)> {
+            std::mem::take(&mut *self.0.lock().unwrap())
+        }
+    }
+
+    impl ActivationTracker for EffectiveOverrideTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+            self.0.lock().unwrap().push((
+                format!(
+                    "row:{key}=>{}",
+                    deps.map(ToString::to_string).collect::<Vec<_>>().join(",")
+                ),
+                false,
+            ));
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            self.0
+                .lock()
+                .unwrap()
+                .push((key.to_string(), activation.evaluation_data().is_some()));
+        }
+    }
+
+    type EffectiveOverrideOutcome = <HostEffectiveModuleOverrideObservationKey as Key>::Value;
+
+    fn override_updater(
+        dice: &Arc<Dice>,
+        tracker: Arc<EffectiveOverrideTracker>,
+    ) -> DiceTransactionUpdater {
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        dice.updater_with_data(data)
+    }
+
+    fn inject_override_inputs(
+        updater: &mut DiceTransactionUpdater,
+        source: &str,
+        variant: i64,
+        overrides: &[&str],
+        observe: bool,
+    ) -> PathObservationEpoch {
+        inject_inputs(
+            updater,
+            source,
+            None,
+            LockfileMode::Update,
+            variant,
+            overrides,
+            observe,
+        )
+    }
+
+    async fn compute_override(
+        dice: &Arc<Dice>,
+        source: &str,
+        variant: i64,
+        overrides: &[&str],
+        module_name: &str,
+        need: bool,
+        cancel_first: bool,
+    ) -> (
+        EffectiveOverrideOutcome,
+        OverrideResult,
+        PathObservationEpoch,
+        Vec<(String, bool)>,
+        Vec<(String, bool)>,
+    ) {
+        let tracker = Arc::new(EffectiveOverrideTracker::default());
+        let mut updater = override_updater(dice, tracker.dupe());
+        let injected = inject_override_inputs(&mut updater, source, variant, overrides, !need);
+        let mut transaction = updater.commit().await;
+        if cancel_first {
+            let key =
+                HostEffectiveModuleOverrideObservationKey::new(workspace(), module_name.into());
+            let mut future = Box::pin(transaction.compute(&key));
+            std::future::poll_fn(|context| {
+                assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+                std::task::Poll::Ready(())
+            })
+            .await;
+            drop(future);
+            drop(transaction);
+            assert!(tracker.take().is_empty());
+            let mut updater = override_updater(dice, tracker.dupe());
+            inject_override_inputs(&mut updater, source, variant, overrides, !need);
+            transaction = updater.commit().await;
+        }
+        let observed = transaction
+            .compute(&HostEffectiveModuleOverrideObservationKey::new(
+                workspace(),
+                module_name.into(),
+            ))
+            .await
+            .unwrap();
+        let observed_activations = tracker.take();
+        let legacy = transaction
+            .compute(&HostEffectiveModuleOverrideKey::new(
+                workspace(),
+                module_name.into(),
+            ))
+            .await
+            .unwrap();
+        (
+            observed,
+            legacy,
+            injected,
+            observed_activations,
+            tracker.take(),
+        )
+    }
+
+    fn complete_override(
+        outcome: &EffectiveOverrideOutcome,
+    ) -> &ObservedHostEffectiveModuleOverride {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("observed effective override did not complete: {outcome:?}");
+        };
+        observed
+    }
+
+    fn driver_complete(
+        outcome: HostEffectiveModuleOverrideDriverOutcome,
+    ) -> (OverrideResult, PathObservationEpoch) {
+        let SourcePreparationOutcome::Complete(Ok(value)) = outcome else {
+            panic!("driver did not complete");
+        };
+        value
+    }
+
+    fn has_activation(entries: &[(String, bool)], prefix: &str, batch: Option<bool>) -> bool {
+        entries.iter().any(|(key, seen)| {
+            key.starts_with(prefix) && batch.map_or(true, |value| value == *seen)
+        })
+    }
+
+    fn assert_epoch_arcs(actual: &PathObservationEpoch, expected: &PathObservationEpoch) {
+        for (demand, result) in actual.observations() {
+            assert!(Arc::ptr_eq(
+                result,
+                expected.observations().get(demand).unwrap()
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_effective_override_preserves_precedence_epochs_families_and_lifecycle() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let observed_key =
+            HostEffectiveModuleOverrideObservationKey::new(workspace(), "dep".into());
+        assert_eq!(
+            observed_key.to_string(),
+            "observed-host-effective-module-override:\"/workspace\":dep"
+        );
+        assert_ne!(observed_key.to_string(), observed_key.0.to_string());
+        let hash = |key: &HostEffectiveModuleOverrideObservationKey| {
+            let mut state = DefaultHasher::new();
+            key.hash(&mut state);
+            state.finish()
+        };
+        assert_ne!(
+            hash(&observed_key),
+            hash(&HostEffectiveModuleOverrideObservationKey::new(
+                workspace(),
+                "other".into()
+            ))
+        );
+        let root_a = "print('OVERRIDE')\nmodule(name='root')\nlocal_path_override(module_name='dep',path='/root-a')";
+        let (a_outcome, legacy_a, epoch_a, cold, legacy_activations) =
+            compute_override(&dice, root_a, 20, &[], "dep", false, false).await;
+        let a = complete_override(&a_outcome);
+        let held_result = a.result().dupe();
+        let held_epoch = a.observations().dupe();
+        assert_eq!(a.result().as_ref(), legacy_a.as_ref());
+        assert_eq!(a.observations(), &epoch_a);
+        assert_epoch_arcs(a.observations(), &epoch_a);
+        assert!(HostEffectiveModuleOverrideObservationKey::validity(
+            &a_outcome
+        ));
+        assert!(HostEffectiveModuleOverrideObservationKey::equality(
+            &a_outcome, &a_outcome
+        ));
+        assert!(matches!(
+            a.result().as_ref(),
+            Ok(HostEffectiveModuleOverride::Root { .. })
+        ));
+        assert!(has_activation(
+            &cold,
+            "bzlmod-observed-host-root-module-file:",
+            Some(true)
+        ));
+        assert!(has_activation(
+            &cold,
+            "observed-host-effective-module-override:",
+            Some(false)
+        ));
+        for forbidden in [
+            "root-module-files:",
+            "host-effective-module-override:",
+            "host-selected-module-graph:",
+            "host-discovered-module:",
+            "repository-materialization-request:",
+            "module-source-preparation:",
+            "host-selected-registry-repo-specs:",
+        ] {
+            assert!(!has_activation(&cold, forbidden, None));
+        }
+        assert!(has_activation(
+            &legacy_activations,
+            "root-module-files:",
+            None
+        ));
+        assert!(!has_activation(
+            &legacy_activations,
+            "observed-root-module-files:",
+            None
+        ));
+
+        let (warm, _, _, warm_activations, _) =
+            compute_override(&dice, root_a, 20, &[], "dep", false, false).await;
+        assert_eq!(complete_override(&warm).result(), a.result());
+        assert!(warm_activations.iter().all(|(_, batch)| !batch));
+
+        let (none, none_legacy, _, _, _) =
+            compute_override(&dice, "module(name='root')", 20, &[], "dep", false, false).await;
+        assert_eq!(
+            complete_override(&none).result().as_ref(),
+            none_legacy.as_ref()
+        );
+        assert!(matches!(
+            complete_override(&none).result().as_ref(),
+            Ok(HostEffectiveModuleOverride::None)
+        ));
+
+        let mut commands = Vec::new();
+        for override_ in [
+            Some("dep=/command-a"),
+            Some("dep=/command-b"),
+            None,
+            Some("dep=/command-a"),
+        ] {
+            let (value, legacy, _, _, _) =
+                compute_override(&dice, root_a, 20, override_.as_slice(), "dep", false, false)
+                    .await;
+            assert_eq!(complete_override(&value).result().as_ref(), legacy.as_ref());
+            commands.push(complete_override(&value).result().dupe());
+        }
+        assert_ne!(commands[0], commands[1]);
+        assert!(matches!(
+            commands[2].as_ref(),
+            Ok(HostEffectiveModuleOverride::Root { .. })
+        ));
+        assert_eq!(commands[0], commands[3]);
+
+        let (forbidden, forbidden_legacy, _, _, _) =
+            compute_override(&dice, root_a, 20, &["root=/command"], "dep", false, false).await;
+        assert_eq!(
+            complete_override(&forbidden).result().as_ref(),
+            forbidden_legacy.as_ref()
+        );
+        assert!(matches!(
+            complete_override(&forbidden).result().as_ref(),
+            Err(HostEffectiveModuleOverrideError::RootModuleOverride { module_name })
+                if module_name == "root"
+        ));
+
+        let root_b = "module(name='root')\nlocal_path_override(module_name='dep',path='/root-b')";
+        let (b, _, _, _, _) = compute_override(&dice, root_b, 21, &[], "dep", false, false).await;
+        let (restored, _, _, _, _) =
+            compute_override(&dice, root_a, 20, &[], "dep", false, false).await;
+        assert_ne!(held_result, *complete_override(&b).result());
+        assert_eq!(held_result, *complete_override(&restored).result());
+        assert_epoch_arcs(&held_epoch, &epoch_a);
+
+        let (bad_root, bad_root_legacy, _, _, _) =
+            compute_override(&dice, "module(name=", 22, &[], "dep", false, false).await;
+        let bad_root = complete_override(&bad_root);
+        assert_eq!(bad_root.result().as_ref(), bad_root_legacy.as_ref());
+        assert!(matches!(
+            bad_root.result().as_ref(),
+            Err(HostEffectiveModuleOverrideError::RootModuleFiles(_))
+        ));
+        assert!(bad_root.observations().observations().keys().all(|demand| {
+            demand.path().as_path() != Path::new("/workspace/MODULE.bazel.lock")
+        }));
+
+        let (need, _, _, need_activations, _) =
+            compute_override(&dice, root_a, 23, &[], "dep", true, false).await;
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!HostEffectiveModuleOverrideObservationKey::validity(&need));
+        assert!(!HostEffectiveModuleOverrideObservationKey::equality(
+            &need, &need
+        ));
+        let parent_row = need_activations
+            .iter()
+            .find(|(key, _)| key.starts_with("row:observed-host-effective-module-override:"))
+            .unwrap();
+        assert_eq!(
+            parent_row.0.split_once("=>").unwrap().1,
+            "observed-root-module-files:\"/workspace\""
+        );
+
+        let demand = epoch_a.observations().keys().next().unwrap().dupe();
+        let reducer_need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(demand.dupe()),
+        ));
+        assert!(matches!(
+            finish_observed_effective_override_root(reducer_need),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        let outer_error =
+            ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(demand));
+        let root_outer = SourcePreparationOutcome::Complete(Err(outer_error.dupe()));
+        let Err(SourcePreparationOutcome::Complete(Err(projected_outer))) =
+            finish_observed_effective_override_root(root_outer)
+        else {
+            panic!("root outer must remain outer");
+        };
+        assert_eq!(projected_outer, outer_error);
+        let parent_outer: EffectiveOverrideOutcome =
+            SourcePreparationOutcome::Complete(Err(outer_error));
+        assert!(HostEffectiveModuleOverrideObservationKey::validity(
+            &parent_outer
+        ));
+        assert!(HostEffectiveModuleOverrideObservationKey::equality(
+            &parent_outer,
+            &parent_outer
+        ));
+        let semantic = ObservedRootModuleFiles {
+            result: Arc::new(Err("root semantic".into())),
+            observations: epoch_a.dupe(),
+        };
+        let (semantic_result, semantic_epoch) = driver_complete(
+            finish_observed_effective_override_root(SourcePreparationOutcome::Complete(Ok(
+                semantic,
+            )))
+            .unwrap_err(),
+        );
+        assert!(matches!(semantic_result.as_ref(),
+            Err(HostEffectiveModuleOverrideError::RootModuleFiles(message))
+                if message == "root semantic"));
+        assert_eq!(semantic_epoch, epoch_a);
+        let (policy_result, policy_epoch) = driver_complete(effective_override_policy_error(
+            "policy compute".into(),
+            epoch_a.dupe(),
+        ));
+        assert!(matches!(policy_result.as_ref(),
+            Err(HostEffectiveModuleOverrideError::CommandPolicy(message))
+                if message == "policy compute"));
+        assert_eq!(policy_epoch, epoch_a);
+        let legacy_result = Arc::new(Ok(HostEffectiveModuleOverride::None));
+        let projected = project_legacy_effective_override(SourcePreparationOutcome::Complete(Ok(
+            (legacy_result.dupe(), empty_observations()),
+        )));
+        assert!(Arc::ptr_eq(&projected, &legacy_result));
+
+        let cancel_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let (recovered, _, _, recovered_events, _) =
+            compute_override(&cancel_dice, root_a, 24, &[], "dep", false, true).await;
+        assert!(HostEffectiveModuleOverrideObservationKey::validity(
+            &recovered
+        ));
+        assert!(has_activation(
+            &recovered_events,
+            "bzlmod-observed-host-root-module-file:",
+            Some(true)
+        ));
     }
 }
 
