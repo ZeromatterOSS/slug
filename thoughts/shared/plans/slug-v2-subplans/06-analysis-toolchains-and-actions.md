@@ -8596,3 +8596,75 @@ STOP a second file/key/caller/export, production semantic/order/event/memory/
 family drift, direct Host read, upper/registry activation, proof deletion, cap
 excess or milestone closure. After independent retry ACCEPT schedule only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
+
+### Host nonregistry REPO-file second proof-cap correction REPLAN (2026-08-19)
+
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry` is
+**REPLAN** before acceptance. Retain the exact one-file Rust candidate from
+scheduling base `9aafca07`, Rust base `12f68983`, semantic design
+`3c598dd5` and first proof correction `6b75865f`; it is non-writable during
+this docs-only design.
+
+The live candidate remains production-sound and cohesive. `repo_file.rs` is
++170 production and +628 proof, +798 aggregate semantic, at 3,477 physical
+lines. Focused observed proof passes 3/3; scope is exactly the one authorized
+Rust file, formatting is applied and diff-check is clean. The matching-family
+source-first driver, accepted source epoch, local REPO event ownership and one
+Result Arc plus compact epoch retention require no semantic redesign.
+
+The first corrected <=550 proof, <=730 aggregate and <=3,450 physical envelope
+is exhausted before the exact parent matrix is complete. Safe factoring can
+recover only about 25--40 lines, while exact identity/hash, semantic variants,
+diagnostic/event text, error dependency rows, held Arc lifetime and complete
+legacy parity need more space. Forcing the old ceiling would remove
+discriminating Need/outer, cancellation, family, epoch or lifecycle proof.
+
+Run only
+`WP-6-7A-host-nonregistry-repo-file-observation-proof-cap-correction-2-design`,
+docs-only. Write authority is exactly the canonical plan, current manifest,
+this Stage 6 plan and the routing log at <=40/<=220/<=180/<=30 net lines and
+<=470 aggregate. The retained Rust candidate is non-writable.
+
+The sole future retry authority remains `repo_file.rs` from its 2,679-line
+base. Keep production <=180. Raise only proof from <=550 to <=720, aggregate
+semantic growth from <=730 to <=900 and physical size from <=3,450 to <=3,700.
+This adds <=170 proof-semantic and <=250 physical lines, leaving the measured
+candidate 92 proof, 102 aggregate and 223 physical lines of headroom. Helpers
+remain below 200 lines.
+
+Preserve the private key/carrier, matching Legacy/Observed source selection,
+Present-only continuation, exact Result-Arc projection, carrierless Need/outer,
+semantic-Complete matching local batches, source eventlessness and compact
+one-Result-Arc-plus-epoch retention. Add no production owner, caller, export,
+state, event, Host read, cache, store, interner, lock or task.
+
+The retry must discriminate distinct key equality/hash and Display; exact
+Absent/WrongKind/policy/parse/evaluation result classes and messages; exact
+diagnostic/print batch text/order and legacy result/event parity; success and
+error direct-dependency rows; source-child event silence; and the already
+frozen prefix, conflict/mismatch, Need/outer, cancellation, warm, family and
+upper boundaries.
+
+For both local and immutable A -> B -> absent -> directory -> A, retain
+duplicate handles to the first Result and epoch Arcs and prove those held
+handles remain readable and pointer-identical to their duplicates through
+churn. Prove restored carrier equality and exact restored per-demand Arc
+identity against the restored observed source child. Do not require pointer
+identity between independently reconstructed but equal first/restored epochs.
+
+Exact compatibility remains existing nonregistry REPO source order, UTF-8
+policy, values/errors/diagnostics/events and every legacy result. The private
+sibling, Result-Arc+epoch carrier and typed outer remain Slug-native.
+Ignore/preflight/closure/discovery/selected graph, registry preparation/patches,
+extensions, rules_rust actions, M8/M7B and exact identity bytes remain
+deferred.
+
+STOP Rust/Cargo/BUILD/fixture/oracle/public writes during design. STOP a second
+file/key/caller/export, production semantic/order/event/memory/family drift,
+direct Host read, upper/registry activation, proof deletion, cap excess or
+milestone closure. REPLAN again if the full matrix cannot fit.
+
+After independent correction ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2`.
+After that retry's independent ACCEPT schedule only the docs-only
+`WP-6-7A-host-nonregistry-repository-ignore-observation-design`.

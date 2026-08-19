@@ -1,36 +1,46 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry`
+Packet: `WP-6-7A-host-nonregistry-repo-file-observation-proof-cap-correction-2-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `6b75865f`
+Scheduling base: `9aafca07`
 Rust base: `12f68983`
 Accepted semantic design: `3c598dd5`
-Accepted proof-cap correction: `6b75865f`
+Accepted first proof-cap correction: `6b75865f`
 
-## Accepted correction and retained candidate
+## Formal REPLAN and retained candidate
 
-The retained one-file candidate is ownership- and retention-sound. Against
-`12f68983`, `repo_file.rs` is +163 production and +421 proof lines, +584
-aggregate semantic, at 3,263 physical lines. The shared source-first driver and
-private Result-Arc+epoch carrier compile; focused observed proof passes 2/2 and
-all pre-existing focused REPO proof remains green. Scope is exactly the
-authorized file and diff-check is clean.
+The implementation retry is **REPLAN** before acceptance. Retain the exact
+one-file Rust candidate from scheduling base `9aafca07`, Rust base
+`12f68983`, semantic design `3c598dd5` and first correction `6b75865f`;
+it is non-writable during this docs-only design.
 
-The frozen +320 proof and 3,200 physical ceilings cannot hold the complete
-parent-specific matrix. The candidate still needs real source Need/typed-outer
-suppression, policy and parse/evaluation error batches, exact iteration order,
-warm/no-batch and poll-drop recovery, explicit held Result/epoch Arc lifetime,
-and zero-upper-activation checks. Removing 101 current proof lines would already
-discard exact source-carrier Arc forwarding, both family rows, or one of the
-local/immutable lifecycles. Production semantics, owner, order, events, retained
-shape and family selection do not require redesign.
+Against `12f68983`, live `repo_file.rs` is +170 production and +628 proof,
++798 aggregate semantic, at 3,477 physical lines. Focused observed proof passes
+3/3; scope is exactly the authorized file, formatting is applied and
+diff-check is clean. Production ownership, source-first order, family
+selection, event ownership and compact Result-Arc+epoch retention remain sound.
+
+The first corrected <=550 proof, <=730 aggregate and <=3,450 physical envelope
+cannot honestly contain the frozen parent matrix. Safe factoring can recover
+only about 25--40 lines. The candidate already exceeds the proof ceiling by 78
+lines, while exact identity, semantic variants, batches, dependency rows,
+lifetime and legacy parity still need additional proof. Removing >=78 live
+proof lines would delete discriminating Need/outer, cancellation, family, epoch
+or lifecycle evidence.
+No production semantic or owner change is required.
 
 ## Exact Rust authority and caps
 
-Write only `app/slug_bzlmod_v2/src/repo_file.rs`. From the 2,679-line Rust
-base, allow <=180 production, <=550 proof, <=730 aggregate semantic and <=3,450
-physical lines. Helpers remain below 200 lines. Every other file is read-only.
+During this design write only the canonical plan, this manifest, Stage 6 and
+the routing log: <=40, <=220, <=180 and <=30 net lines respectively, <=470
+aggregate. The dirty `app/slug_bzlmod_v2/src/repo_file.rs` candidate is
+retained and non-writable; every other file is read-only.
+
+The sole future retry authority remains only `repo_file.rs`. From the
+2,679-line Rust base, keep production <=180 and raise only proof to <=720,
+aggregate semantic growth to <=900 and final physical size to <=3,700. Helpers
+remain below 200 lines.
 
 ## Frozen correction authority
 
@@ -40,15 +50,16 @@ carrierless Need/typed outer, semantic-Complete local REPO batches and compact
 one-Result-Arc-plus-epoch retention. Add no production owner, caller, export,
 state, event, Host read, cache, store, interner, lock or task.
 
-The accepted correction changes only the proof envelope for this retry:
+This second correction changes only the proof envelope:
 
 - keep production at <=180 from the 2,679-line base;
-- raise proof from <=320 to <=550 lines;
-- raise aggregate semantic growth from <=500 to <=730; and
-- raise final physical size from <=3,200 to <=3,450.
+- raise proof from <=550 to <=720 lines;
+- raise aggregate semantic growth from <=730 to <=900; and
+- raise final physical size from <=3,450 to <=3,700.
 
-This adds at most 230 proof-semantic and 250 physical lines. The measured
-candidate has 129 proof-semantic and 187 physical lines of corrected headroom.
+This adds at most 170 proof-semantic and 250 physical lines. The measured
+candidate has 92 proof-semantic, 102 aggregate-semantic and 223 physical lines
+of corrected headroom.
 It may fund only compact proof completion/restructuring; production semantics,
 owner, events, retention, family selection and upper activation stay frozen.
 
@@ -106,26 +117,37 @@ lock, task, direct Host read, revision, certificate or new event state.
 
 Discriminate:
 
-- key/carrier identity, hash, Display, accessors, Dupe/Allocative and
-  Complete/Need/outer equality/validity;
+- distinct key equality/hash as well as Display; carrier accessors,
+  Dupe/Allocative and Complete/Need/outer equality/validity;
 - real source Need, typed outer, Absent, Present and semantic error with exact
-  epoch/carrier polarity and later-child suppression;
+  result variants, epoch/carrier polarity and later-child suppression;
 - neutral policy failure and REPO parse/evaluation success/error with exact
-  prefixes and legacy Result-Arc/value/event parity;
+  error classes/messages, diagnostic/print batch text/order, prefixes and
+  legacy Result-Arc/value/event parity for success and every error class;
 - exact epoch iteration and per-demand Arc identity, held lifetime, and source
   conflict/operation-mismatch outer propagation;
-- exact observed/legacy dependency rows and reverse-family isolation;
-- source child silence, parent empty/nonempty/error batches, warm suppression
-  and no batch on Need/outer/cancel;
+- exact observed/legacy direct-dependency rows on success, policy, parse and
+  evaluation lanes, including the neutral semantics child only when reached,
+  plus reverse-family isolation;
+- tracker-observed source-child event silence, parent empty/nonempty/error
+  batches, warm suppression and no batch on Need/outer/cancel;
 - real poll-drop and identical-request same-DICE recovery;
-- local and immutable A -> B -> absent -> directory -> A restoration with held
-  semantic Result and epoch Arcs; and
+- local and immutable A -> B -> absent -> directory -> A restoration. Retain
+  duplicate handles to the first Result and epoch Arcs and prove those held
+  handles stay readable and pointer-identical to their duplicates after churn.
+  Prove restored carrier equality and exact restored per-demand Arc identity
+  against the restored observed source child. Do not require pointer identity
+  between independently reconstructed but equal first/restored epochs; and
 - zero ignore/preflight/closure/discovery/selected-graph/registry/extension/public
   activation.
 
 Run focused REPO proof, full bzlmod, affected loading/query/core baselines, fmt,
 diff-check, exact cap accounting and AI-cleanup/Buck2 retention review. Reuse
 accepted evidence; add no fixture or Bazel oracle.
+
+Compact repeated epoch/row/source-fixture loops where useful, but do not remove
+any already discriminating Need/outer, source prefix, conflict/mismatch,
+cancellation, warm, family, lifecycle or upper-exclusion proof.
 
 ## Compatibility
 
@@ -137,10 +159,13 @@ extensions, rules_rust actions, M8/M7B and exact identity bytes.
 
 ## STOP and sole successor
 
-STOP a second retry file/key/caller/export, production semantic/order/event/
-memory/family drift, direct Host read, upper/registry activation, proof
-deletion, cap excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN
-again if the full matrix cannot fit the corrected envelope.
+STOP Rust/Cargo/BUILD/fixture/oracle/public writes during this design. STOP a
+second retry file/key/caller/export, production semantic/order/event/memory/
+family drift, direct Host read, upper/registry activation, proof deletion, cap
+excess, M7A closure, M8/M7B/M9 or a second successor. REPLAN again if the full
+matrix cannot fit the corrected envelope.
 
-Only after independent retry ACCEPT schedule the docs-only
+After independent design ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation-retry-2`.
+Only after that retry's independent ACCEPT schedule the docs-only
 `WP-6-7A-host-nonregistry-repository-ignore-observation-design`.
