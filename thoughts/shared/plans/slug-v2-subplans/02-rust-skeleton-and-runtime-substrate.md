@@ -5692,3 +5692,40 @@ identity bytes remain deferred. STOP every other file/key/caller/lower carrier,
 new state/lock/Host read, partial comparison, cap excess and M1 closure. After
 design ACCEPT schedule exactly one implementation, then return to an external
 singleton observed-build design.
+
+### Source-certificate epoch acceptance implementation active (2026-08-18)
+
+Run only `WP-2A-m1-source-certificate-epoch-acceptance-implementation` from
+Rust base `2e1c1334` and accepted design `5cd5e72c`. Authority is exactly
+`runtime/request_revision.rs`, `runtime/dice.rs` and
+`runtime/tests/build_command_tests.rs` under unchanged 120+180, 80+40 and 300
+semantic caps, <=720 aggregate, and 1,750/11,050/3,000, <=15,800 physical.
+
+Implement a nonempty compact `PathObservationEpoch` certificate with exact
+shared Arcs, a preserved one-demand constructor and checked epoch association.
+After selected preparation and full observed-terminal validation, reobserve all
+certificate demands synchronously through the active materializer session
+while the request-revision publication owner is held. Equal demands preserve
+the original full-epoch Arcs; changed demands alone take fresh Arcs before one
+revision publication and retry. Preserve workspace-lease -> revision-owner ->
+short materializer observation order; perform no DICE compute while locked.
+
+Need, typed outer, cancellation and every failure retain prior selected path,
+repository and accepted-event state and publish no provisional batch. Retain
+only the semantic certificate epoch and existing selected epoch; reobserved
+epochs and replacement entries are scratch. Add no map, Vec, cache, store,
+interner, task, lock, direct Host read, key or event owner.
+
+Prove existing one-demand parity; multi-demand Host and Materialization refresh;
+exact equal/unrelated Arc preservation and changed replacement; invalid epoch
+construction/association; missing/directory and symlink-retarget A/B/A; fault
+and cancellation rollback; retry event suppression; public/legacy parity; and
+zero external observed-root activation. Exact behavior remains exact, the
+private certificate/retry is Slug-native, and external build, multi-build,
+one-shot and identity bytes remain deferred.
+
+STOP every other file, lower carrier/caller/public activation, partial compare,
+new retained state/lock/Host read, event drift, cap excess and M1 closure.
+REPLAN if the callback cannot cover every namespace with the frozen atomicity.
+After ACCEPT schedule only one docs-only external singleton observed-build
+design.

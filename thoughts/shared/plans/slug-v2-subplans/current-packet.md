@@ -1,19 +1,30 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-source-certificate-epoch-acceptance-design`
+Packet: `WP-2A-m1-source-certificate-epoch-acceptance-implementation`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `82b87ddb`
+Scheduling base: `5cd5e72c`
 Accepted Rust base: `2e1c1334`
-Result: freeze the epoch-shaped final source-certificate prerequisite before
+Accepted design: `5cd5e72c`
+Result: implement the epoch-shaped final source-certificate prerequisite before
 external exported-source build publication.
 
-## Exact docs-only authority and caps
+## Exact Rust authority and caps
 
-Write exactly canonical, this manifest, Stage 2 and the orchestration routing
-log. Caps against `82b87ddb`: canonical <=40 net, this manifest <=220, Stage
-2 <=180, routing <=30 and aggregate <=470. Rust, Cargo, BUILD, fixtures,
-oracles, generated evidence and caller/public activation are forbidden.
+Write exactly these files against Rust base `2e1c1334`:
+
+1. `app/slug_core_v2/src/runtime/request_revision.rs`: <=120 production and
+   <=180 colocated test net, <=1,750 physical;
+2. `app/slug_core_v2/src/runtime/dice.rs`: <=80 production and <=40 colocated
+   test net, <=11,050 physical; and
+3. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=300 test net,
+   <=3,000 physical.
+
+Aggregate semantic cap <=720 and combined physical <=15,800. The large core
+owner/test files remain cohesive exceptions; every new or materially touched
+helper stays below 200 lines. Cargo manifests, BUILD, fixtures, oracles,
+generated evidence, `repository_io.rs`, events, bzlmod/loading, exports,
+callers and public activation are forbidden.
 
 ## Learned facts and decision
 
@@ -105,21 +116,7 @@ reused. No fallback or Stage 9 ledger row is created because the implementation
 reuses the existing V2 `PathObservationEpoch`, `Dupe` and `Allocative`
 representation without importing donor code.
 
-## Future implementation authority and proof
-
-After independent design ACCEPT, schedule exactly one implementation over:
-
-1. `app/slug_core_v2/src/runtime/request_revision.rs`: <=120 production and
-   <=180 colocated test net, <=1,750 physical;
-2. `app/slug_core_v2/src/runtime/dice.rs`: <=80 production and <=40 colocated
-   test net, <=11,050 physical; and
-3. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=300 test net,
-   <=3,000 physical.
-
-Aggregate semantic cap <=720 and combined physical <=15,800 against
-`2e1c1334`. The large core owner/test files remain cohesive exceptions; every
-new or materially touched helper must stay below 200 lines. Do not write
-`repository_io.rs`, events, bzlmod/loading, exports, callers or public files.
+## Required proof
 
 Prove:
 
