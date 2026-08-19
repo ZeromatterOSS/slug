@@ -1,101 +1,117 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-multi-build-observed-publication-implementation-retry`
+Packet: `WP-2A-m1-post-multi-build-remaining-owner-audit`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Accepted Rust base: `3f1d4dd4`
-Accepted semantic design: `a2d440cb`
-Accepted analysis-error correction: `5e1df076`
-Result: resume and complete the retained observed multi-build candidate under
-the corrected transient-analysis acceptance contract.
+Scheduling and accepted Rust base: `51127df8`
+Result: identify whether any complete M1 publication owner remains after the
+accepted observed multi-build root, before implementation or milestone close.
 
-## Exact Rust authority and caps
+## Exact docs-only authority and caps
 
 Write exactly:
 
-1. `app/slug_core_v2/src/runtime/dice.rs`: <=410 production plus <=40
-   colocated tests; <=11,700 physical.
-2. `app/slug_core_v2/src/runtime/demands.rs`: <=20 production; <=1,230
-   physical.
-3. `app/slug_core_v2/src/runtime/tests/build_command_tests.rs`: <=500 tests;
-   <=3,900 physical.
+1. `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`,
+2. this manifest,
+3. `thoughts/shared/plans/slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`, and
+4. `.codex/skills/slug-agent-orchestration/references/routing-log.md`.
 
-Aggregate semantic <=970 and combined physical <=16,830. Every other Rust
-file, Cargo, BUILD, fixture, oracle, generated artifact and caller/public
-surface is forbidden.
+Caps against `51127df8`: canonical <=40 net, this manifest <=180, Stage 2
+<=160, routing <=30 and aggregate <=430. Rust, Cargo, BUILD, fixtures, oracles,
+generated evidence and caller/public activation are forbidden.
 
-## Frozen implementation contract
+## Accepted predecessor
 
-Preserve `a2d440cb`: extend only private
-`BuildCommandRootObservationKey` to already-validated root-only multi
-requests; keep empty, singleton neutral/PackageAll/external and every direct
-legacy/one-shot route exact. Anchor first, then request-ordered
-`compute_join` branches through matching observed package/analysis/path
-families, then the matching configured action closure. Merge every Complete
-local epoch left-first before semantic inspection. Preserve first typed outer,
-incompatible-Need failure, compatible Need union, first semantic error and
-ordered success. STOP rather than inventing a new public error if live Need
-kinds cannot union.
+Accepted `51127df8` adds root-only multi-target admission to the private
+observed build root. It preserves anchor-first and request-ordered branch/action
+evaluation, matching observed package/analysis/path families, full-batch typed
+outer/incompatible-Need/Need/semantic precedence, a compact local epoch and one
+request-ordered aggregate source certificate. Per-branch certificates are
+moved out before the semantic Result is retained.
 
-Observed multi initializes `RequestRevisionKey` before exported-source
-observation. Build one request-ordered aggregate `SourceCertificate` with
-stable shared Arcs. Take each source certificate out of its branch target/error
-after merging it, so the semantic Result matches legacy multi behavior and the
-aggregate beside the Result Arc is the sole retained certificate. The terminal
-retains exactly one Result Arc, one local anchor/package/source epoch and at
-most one aggregate certificate epoch. Branch outcomes, analysis remainder,
-Needs, maps/frontiers and union scratch remain compute-local.
+Successful multi commands require every local terminal demand to be an exact
+pointer-identical member of the closure-selected dependency superset and reject
+repository sidecars or terminal-only demands. Only a transient multi Analysis
+terminal may add its already-associated local demands before selected snapshot
+construction; values still come from the terminal-first command epoch and all
+other roots remain strict. Child keys retain sole event ownership.
 
-Success uses multi-only `SelectedDependencySuperset`: repository sidecars are
-forbidden, every terminal demand must be an exact pointer-identical selected
-demand, terminal-only demands fail, and additional analysis/action-closure
-entries stay selected-closure owned. Every other observed root keeps exact full
-epoch validation.
+The exact accepted accounting is DICE +402 at 11,666 physical lines, demands
++12 at 1,218, and build proof +484 at 3,873; aggregate +898/16,757. Focused
+build is 36/36, loading 138/138, analysis 4/4, bzlmod 426 plus its integration
+suites, and query 53+56+1+11. Full core is 245/246 only because of the recorded
+stale generic visibility expectation; the accepted specific wrong-kind result
+is unchanged. Workspace check, formatting, diff hygiene, compact-retention/AI
+cleanup and independent implementation review pass.
 
-Implement `5e1df076` only for a multi semantic
-`BuildCommandErrorKind::Analysis` terminal. Preserve exact legacy
-unavailable-root pruning, then extend the selected unscoped path set with every
-demand in the already-associated local terminal epoch before snapshot
-construction. Add the bounded helper in `runtime/demands.rs`; preserve
-repository fields, sort/deduplicate compute-locally, and source all values/Arcs
-from the terminal-first command epoch. Validate the full local epoch and
-certificate subset. Do not use this policy for success or any other root/error.
+## Remaining surfaces to audit
 
-The root remains eventless. Child package/analysis keys remain sole batch
-owners. Certificate terminals use `SourceCertifiedCurrentClosure` only with
-the semantic-Complete Some(including empty) invariant; no-certificate terminals
-stay Strict. Need/outer/cancel and selection/revision/materializer/publication
-failure publish nothing and leave prior path/repository/event state intact.
-Retain no selected set, child carrier Arc, cache/interner/store, new lock/task
-or direct Host read. Keep touched helpers below 200 lines and require
-`Allocative`/`Dupe`, Buck2 retention and AI cleanup review.
+Trace the residual command-facing paths without assuming that each adapter
+needs an observed sibling:
 
-## Compatibility, proof and STOP
+- `evaluate_workspace_targets{,_with_bzlmod_inputs}` and any callers that
+  create a fresh `WorkspaceRuntime`, inject one workspace observation and
+  project a build Result outside retained native-command acceptance;
+- direct `BuildCommandRootKey` and other one-shot legacy APIs that must remain
+  exact even though public retained commands now select the observed root;
+- any remaining build/query/cquery construction point that still bypasses an
+  accepted observed lower producer on an admitted M1 request; and
+- only enough next-milestone handoff code to determine whether the residual is
+  an M1 semantic owner, a compatibility adapter, or later breadth.
 
-Exact: public multi target/error/order/configured semantics and child events;
-all singleton, legacy/direct and one-shot behavior. Slug-native: private
-observed multi carrier/outer, aggregate-only certificate,
-SelectedDependencySuperset and transient-analysis terminal-local association.
-Deferred: external/mixed multi, recursive patterns, one-shot migration,
-broader actions/globs and exact Bazel identity bytes.
+Do not reopen accepted singleton PackageAll, neutral root Single, external
+Single, multi-build, cquery or loading-query owners merely because an adapter
+shares their lower DICE keys.
 
-Proof must retain the full `a2d440cb` identity/branch/order/Need/outer/epoch/
-revision/event/family/cancellation/lifecycle matrix and additionally
-discriminate:
+## Audit obligations
 
-- real source-plus-rule analysis error acceptance/recovery with exact local
-  prefix, aggregate certificate, legacy semantic/event parity and no repository
-  sidecar;
-- recursive-analysis success with a strict selected remainder, terminal-only
-  rejection and default-root rejection of the same local injection;
-- aggregate-only branch semantics plus exact two-source certificate Arcs and
-  direct legacy parity;
-- an invocation-exclusive parent created before retained runtimes, followed by
-  warm/source-edit/restore and default-parallel validation; and
-- exact cap/physical accounting, full focused/broad validation and rollback,
-  retention and cleanup scans.
+For each candidate record:
 
-STOP/REPLAN on any fourth Rust file, wider unavailable-root policy, successful
-terminal-local admission, repository/event/equality drift, retained selected
-state, cap excess, partial validation or M1 closure. After independent ACCEPT,
-schedule only one docs-only remaining-owner audit.
+1. structural identity, caller set and the exact semantic Result boundary;
+2. whether it participates in retained `AcceptedCommand`, request revision,
+   source certificates, repository materialization or event acceptance;
+3. every mutable Host/package/analysis/source edge and whether an accepted
+   matching-family carrier already owns it;
+4. Need/typed outer/semantic ordering, cancellation, rollback and lifecycle;
+5. child/root event authority and warm replay behavior;
+6. retained DICE/command state versus fresh-runtime or compute-local scratch;
+7. exact legacy/direct/one-shot behavior and family isolation;
+8. compatibility classification as exact, Slug-native or deferred; and
+9. a measured future allowlist/cap/proof envelope before scheduling Rust.
+
+Prefer an existing owner that already aggregates every changed semantic and
+effect. A fresh-runtime convenience adapter is not automatically a native
+publication owner. Do not create a callerless carrier, duplicate accepted
+epochs/certificates, add a side store, or migrate an adapter merely to make all
+entry points structurally uniform.
+
+## Compatibility and terminal
+
+Exact: accepted public build/query/cquery values, errors, ordering, repository
+selection and child events; all direct and one-shot APIs unless an independently
+accepted design says otherwise.
+
+Slug-native: private observed roots, typed outer values, exact shared-Arc epoch
+association and collision-safe structural identity.
+
+Unsupported/deferred: one-shot migration if it is not an M1 owner, broader
+actions/globs, recursive patterns and exact Bazel identity bytes.
+
+End with exactly one independently reviewable result:
+
+1. schedule one docs-only design for the uniquely smallest complete remaining
+   M1 owner;
+2. schedule one uniquely smaller prerequisite design and explain why the upper
+   owner is incomplete without it;
+3. schedule one docs-only M1 completion/next-milestone transition audit if no
+   semantic publication owner remains; or
+4. record formal `REPLAN` when no bounded exact/Slug-native result exists.
+
+Any future design must freeze its natural owner, exact Rust allowlist/caps,
+terminal/event/revision/memory algebra, lifecycle proof, compatibility classes
+and STOP/REPLAN. It may schedule at most one implementation only after
+independent design acceptance.
+
+STOP implementation, Rust/public writes, preselected ownership, weakened exact
+Arc/event/repository validation, retained scratch/state, adjacent breadth, cap
+excess or M1 closure in this packet.

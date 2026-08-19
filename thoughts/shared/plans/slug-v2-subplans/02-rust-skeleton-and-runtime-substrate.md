@@ -6537,3 +6537,55 @@ STOP every other file/owner, wider unavailable-root behavior, successful
 terminal-local admission, repository/event/equality drift, retained selection
 state, incompatible-Need coercion, cap excess, partial validation or M1
 closure. After ACCEPT return only to one docs-only remaining-owner audit.
+
+### Multi-build observed publication accepted (2026-08-18)
+
+Accepted `51127df8` completes the root-only observed multi-build owner from
+Rust base `3f1d4dd4`, design `a2d440cb` and analysis-terminal correction
+`5e1df076`. The matching-family driver preserves anchor-first and ordered joined
+branches/action closure, complete-epoch union before semantic inspection,
+typed outer/incompatible-Need/Need/semantic precedence, revision-before-source
+and one aggregate source certificate. Per-branch certificates are removed
+before retaining the exact legacy-shaped semantic Result.
+
+Success retains strict closure-selected dependency-superset membership. Only
+multi Analysis errors preserve legacy unavailable-root pruning and add their
+already-associated local demands before snapshot selection; repositories stay
+empty and values/Arcs still come from the terminal-first command epoch. The
+root remains eventless and child package/analysis owners retain their batches.
+
+Final accounting is DICE +402/11,666, demands +12/1,218 and build proof
++484/3,873, aggregate +898/16,757. Focused build is 36/36, loading 138/138,
+analysis 4/4, bzlmod 426 plus integration suites, and query 53+56+1+11. Full
+core is 245/246 only at the recorded stale generic visibility expectation;
+workspace check, formatting, diff hygiene, retention/AI cleanup and independent
+review pass.
+
+### Post-multi-build remaining-owner audit active (2026-08-18)
+
+Run only `WP-2A-m1-post-multi-build-remaining-owner-audit` from accepted base
+`51127df8`. This is docs-only: canonical/current/Stage/routing are writable
+within 40/180/160/30 and 430 aggregate net. Rust, Cargo, BUILD, fixture, oracle,
+generated evidence and caller/public changes are forbidden.
+
+Audit the residual `evaluate_workspace_targets{,_with_bzlmod_inputs}` fresh-
+runtime adapters, direct legacy build roots and any remaining admitted command
+construction point. Determine whether each is an M1 semantic publication owner,
+an exact compatibility adapter, or deferred later breadth. Do not reopen the
+accepted singleton, external, multi, query or cquery roots merely to make entry
+points structurally uniform.
+
+For every candidate record structural identity/callers, semantic Result,
+retained-command versus fresh-runtime ownership, mutable lower edges,
+Need/outer/error order, revision/certificate/repository/event participation,
+cancellation/rollback/lifecycle, retained versus compute-local state,
+compatibility class and measured future allowlist/caps/proof.
+
+End with exactly one docs-only result: one complete-owner design, one uniquely
+smaller prerequisite design, one M1 completion/next-milestone transition audit
+when no semantic owner remains, or formal REPLAN. Any design precedes and may
+schedule at most one implementation.
+
+STOP implementation, preselected ownership, weakened exact Arc/event/
+repository validation, new retained state, adjacent breadth, cap excess or M1
+closure in this audit.
