@@ -8912,3 +8912,92 @@ STOP a second file/key/caller/export, production or legacy drift, retained-state
 growth, upper/registry activation, cap excess and milestone closure. After
 implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-package-preflight-observation-design`.
+
+### Nonregistry repository-ignore observation accepted (2026-08-19)
+
+Implementation `754e7619` accepts the private matching-family repository-ignore
+owner from Rust base `b08b7f2e` and semantic design `9c0a5473`. Exact growth is
++179 production/+715 proof/+894 aggregate at 4,191 physical lines. Focused
+proof is 2/2; full bzlmod/loading/query remain green, and core is 245/246 with
+only the recorded inherited stale external-visibility wording baseline.
+
+The accepted owner preserves repo -> source -> parser order, earliest exact
+epoch Arcs, carrierless Need/outer, child-only REPO events, warm suppression,
+local+immutable lifecycles, and one local matcher Result Arc plus compact epoch.
+No upper family was activated.
+
+Run only `WP-6-7A-host-nonregistry-package-preflight-observation-design`.
+
+### Host nonregistry package-preflight observation design (2026-08-19)
+
+`HostNonregistryPackagePreflightKey` is the smallest complete next owner. It is
+the reusable boundary consumed by the nonregistry include horizon. Accepted
+observed siblings now cover its effective override, repository ignore and both
+repository-source marker children; the deleted-package projection is neutral
+command input and owns no path epoch or event. No lower prerequisite remains.
+
+Freeze private `HostNonregistryPackagePreflightObservationKey`,
+`ObservedHostNonregistryPackagePreflight`, and stage-aware
+`HostNonregistryPackagePreflightObservationError`. Key Value is exactly
+`SourcePreparationOutcome<Result<ObservedHostNonregistryPackagePreflight,
+HostNonregistryPackagePreflightObservationError>>`. The carrier retains one
+local semantic Result Arc plus cumulative epoch, with Dupe/Allocative and
+borrowed accessors. Add no export or caller.
+
+Use one Legacy/Observed driver in exact order: effective override, invalid-name
+short circuit, neutral deleted-package policy, repository ignore, `BUILD.bazel`,
+then `BUILD`. Legacy selects only legacy effective/ignore/source families;
+observed selects only accepted observed siblings; both share the neutral policy.
+
+Accept the effective epoch before semantics. Effective error, absent nonregistry
+override, invalid name, policy error and nonempty deleted policy retain that
+prefix. Merge the effective prefix left-first with a Complete ignore epoch
+before ignore semantics. Ignored suppresses both markers. Merge each reached
+marker epoch into the accumulated prefix left-first before its semantics.
+`BUILD.bazel` Present suppresses `BUILD`; second-marker and NoBuild terminals
+retain both marker epochs. Equal duplicates keep the earliest exact Arc;
+conflict or operation mismatch is typed outer.
+
+The outer distinguishes effective/ignore/marker child frontier errors and
+stage-specific effective/policy/ignore/marker DICE compute failures. All are
+carrierless and suppress later work. Invalid-name is pure; semantic deleted-
+policy projection error remains Complete with the effective prefix. Need applies
+only at effective, ignore and markers. There is no Need union. Need is invalid/
+self-unequal; Complete outer is valid/equal by outer; Complete carrier is
+valid/equal by semantic Result plus epoch. Preserve the legacy invariant and
+invent no semantic compute error.
+
+The preflight parent remains eventless. Root MODULE and matching REPO descendants
+remain sole batch owners; effective, policy, ignore parent and marker sources
+stay eventless. Retain no child carrier, policy value, matcher, marker bytes,
+extra collection/state, cache/interner/store/lock/task, direct Host read,
+revision, certificate or event state.
+
+After independent design ACCEPT, exact Rust authority is:
+
+- `app/slug_bzlmod_v2/src/source_preparation.rs`, 15,267-line baseline, <=320
+  production and <=15,650 physical;
+- `source_preparation_observation_tests.rs`, 3,170-line baseline, <=720 proof
+  and <=3,950 physical;
+- <=1,040 semantic and <=19,600 physical aggregate; helpers below 200 lines.
+
+Proof key identity/accessors/equality; Need/child outer only at effective, ignore
+and marker positions; DICE-compute outer at every computed dependency; every
+semantic terminal and later suppression; semantic policy projection error versus
+policy compute failure; invalid-name/deleted-policy order; marker preference;
+exact epoch order/Arcs/duplicate/conflict/mismatch; exact family rows; ROOT/REPO
+child events with parent silence/warm/cancellation; local+immutable marker
+A/B/absent/directory/A and BUILD.bazel<->BUILD restoration; held handles; and
+zero horizon/closure/discovery/selected-graph/registry/extension/public activation.
+
+Exact compatibility is current order, short circuits, marker preference,
+values/errors, legacy Result Arc and child events. The private sibling/carrier/
+typed outer is Slug-native. Horizon/closure/discovery/selected graph, registry
+preparation, extensions, M8/M7B and identity bytes remain deferred.
+
+STOP Rust during design and STOP a caller/export/third file, semantic/order/
+event/family drift, retained-state growth, upper/registry activation, cap excess
+or milestone closure. After design ACCEPT schedule only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation`; after
+implementation ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-design`.
