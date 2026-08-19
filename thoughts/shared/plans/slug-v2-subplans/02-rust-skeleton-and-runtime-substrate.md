@@ -5515,3 +5515,36 @@ STOP Rust during design and later STOP a tenth file, retained map/interner,
 path/carrier weakening, child-owner drift, non-atomic replacement, cap excess
 or M1 closure. After independent design ACCEPT, resume exactly the same query
 implementation retry and no other successor.
+
+### Loading-query implementation retry with accepted event epoch active (2026-08-18)
+
+Accepted event design `533fe50f` resumes only
+`WP-2A-m1-loading-query-observed-publication-implementation-retry` from Rust
+base `a9270586`, query design `44c1b444`, proof correction `e22404a8` and
+repository-selection correction `1f2fb3f6`.
+
+Future authority is exactly the existing eight query/loading/core files plus
+`runtime/events.rs`. Preserve prior per-file caps and add only +80 events
+production/+100 colocated tests at <=1,800 physical. Aggregate semantic caps
+are 1,234/1,428/2,662; the primary physical envelope plus events is <=21,331
+and loading proof stays separately <=3,442.
+
+Implement exact closure order plus current known Some/None versus no-transition
+selection, and fold it against one accepted Arc-backed node/batch epoch. Some
+replaces and emits only changed nonempty value, None removes, no-transition
+carries prior, and absent prior nodes drop. Keep Some(empty) distinct. Replace
+event/path/repository accepted state together only after materializer
+acceptance; every restorable failure and cancellation preserves prior state.
+
+Preserve exact query/path/repository Arc validation, child batch ownership,
+stable parents, relocation exceptions, family/order/error semantics and compact
+query carriers. Prove both frozen multi-command reducer sequences, empty/
+removal/reappearance, sibling churn suppression, changed BUILD/`.bzl` replay,
+rollback, repository selection, exact Arcs and legacy/build behavior. Run
+isolated corrections, full default-parallel core/query/loading/bzlmod, fmt,
+diff/accounting/archive, retention/cleanup and independent review.
+
+STOP a tenth file, weakened path/key equality, retained map/interner/cache,
+child-owner/event-order drift, non-atomic replacement, cap excess, caller/public
+expansion and M1 closure. After ACCEPT return only to one docs-only next-owner
+audit.

@@ -1,106 +1,104 @@
 # Current Slug V2 Packet
 
-Packet: `WP-2A-m1-loading-query-event-acceptance-epoch-correction-design`
+Packet: `WP-2A-m1-loading-query-observed-publication-implementation-retry`
 Milestone: M1 one semantic spine
 Owner: `slug-v2-subplans/02-rust-skeleton-and-runtime-substrate.md`
-Scheduling base: `0568f845`
 Rust base: `a9270586`
-Retained query candidate authority: `44c1b444`, `e22404a8`, `1f2fb3f6`
-Result: freeze one native-command accepted event epoch before resuming the same
-loading-query implementation retry.
+Accepted query design: `44c1b444`
+Accepted proof correction: `e22404a8`
+Accepted repository-selection correction: `1f2fb3f6`
+Accepted event-epoch correction: `533fe50f`
+Result: finish, validate and accept only the retained observed loading-query
+candidate with native accepted-event reconciliation.
 
-## Exact docs-only authority
+## Exact authority and caps
 
-Write only canonical Live Status, this manifest, Stage 2 and the Slug routing
-log, within 40/220/180/30 net lines and 470 aggregate. The existing eight-file
-Rust candidate remains retained but non-writable. Stop Cargo, BUILD, fixture,
-oracle, Rust, public/caller activation and M1 closure.
+Write exactly evaluator/loading_environment/graph/lib and new
+`observed_loading_query.rs` in `slug_query_v2`; core `runtime/dice.rs`,
+`runtime/events.rs` and new `runtime/tests/query_command_tests.rs`; and
+loading `host_package_load_tests.rs`. No tenth file.
 
-## Learned failure and natural owner
+Preserve existing caps 170+20/417, 360+60/2,346, 520+100/3,771, 4/81,
+760/780, 100+12/11,000, relocation+372/1,132, and loading proof +4/3,442.
+Allow events only +80 production/+100 colocated tests, <=1,800 physical.
+Aggregate semantic caps are +1,234 production/+1,428 tests/+2,662. The primary
+physical envelope plus events is <=21,331; loading proof remains separately
+<=3,442. Base core lines 7,318-8,036 relocate exactly; only the three accepted
+stable-parent replacements may differ.
 
-The stable-parent external query now passes repository selection, but creating
-an unrelated `missing_input.txt` beside an unchanged external BUILD graph
-recomputes exact observed children and replays their equal local event batches.
-The semantic query result and exact path epoch are correct; weakening either
-the epoch or child-key equality would retain stale carriers.
+## Frozen query and selection implementation
 
-`SealedCommandAttempt::select` owns the exact terminal activation closure and
-currently projects only nonempty `EventBatch` values, discarding each
-`DiceNodeId`. `AcceptedNativeDemandSnapshot` owns the prior successfully
-accepted command state but retains no event association. The uniquely smallest
-owner is therefore native-command event acceptance, not a query carrier or a
-lower producer. Bazel 9.2 public query values/event order and the already
-accepted cold/warm/edit tests remain the exact oracle; this is a regression of
-that evidence and needs no new fixture. DICE activation-closure selection and
-the retained runtime transaction remain the Stage 2/Buck2 evidence basis.
+Preserve the structural observed query root, private observed graph/subtree
+siblings, matching Legacy/Observed drivers, compute-local environment,
+anchor/evaluator order, left-first union-before-semantic exact Arcs, immediate
+sequential terminals and full subtree-batch outer > compatible Need union >
+semantic > success. REPLAN rather than inventing a QueryError for Need union.
 
-## Frozen design
+Carriers remain one natural Result Arc plus compact path epoch with
+`Allocative` and `Dupe`; root retains no child carrier. Environment/arena/
+graph/traversal/listing/union scratch remains compute-local. Child keys alone
+produce local batches; Need/outer/cancel publishes none. Add no Host read,
+revision, certificate, producer, cache, interner, store, lock or task.
 
-Each command has a fresh event tracker, and DICE reused activations expose no
-evaluation data. Event selection must therefore return the exact ordered
-closure as a compute-local node stream that distinguishes a known current
-transition `Option<EventBatch>` from a node with no current transition. A
-known `Some` includes empty batches; known `None` removes a prior batch. Add
-one private accepted event epoch backed by
-`Arc<[(DiceNodeId, EventBatch)]>` with cheap clone and memory accounting.
-`EventBatch` stays the existing immutable Arc-backed `Dupe` value. Reuse the
-V2/Buck2 compact immutable-slice pattern; add no retained map, interner, cache
-or event producer. Closure nodes, a `SmallMap` and emitted-batch `Vec` are
-permitted only as selection/acceptance scratch.
+Retain the exact loading query-positive/core-negative assertion and three
+distinct crate-target `tempdir_in` parents from `e22404a8`. Preserve the
+private typed `NativeCommandRoot` selection policy from `1f2fb3f6`: strict
+path-only by default; closure-selected repository sidecars only for observed
+query. Keep `selected_snapshot` and materializer acceptance as sole repository
+owners and unconditionally compare the complete selected path epoch by length,
+demand, value and `Arc::ptr_eq`. Add no repository state to the query carrier.
 
-Fold the selected closure against the prior accepted epoch in closure order.
-A known current `Some(batch)` replaces that node and emits only when the exact
-batch differs and is nonempty. Known `None` removes it. A node with no current
-transition carries a matching prior entry without emission; this preserves a
-warm reused closure instead of clearing the epoch. Prior nodes absent from the
-current closure are dropped, so a later evaluated reappearance is new and
-replays. Reordering alone emits nothing but replaces retained order. Do not
-compare event Arc identity and do not change child batch ownership, activation
-closure, exact path observations or repository selection.
+## Accepted-event epoch correction
 
-Store the next event epoch in `AcceptedNativeDemandSnapshot`; prepare the
-filtered output and next epoch locally, then replace path/repository/event
-accepted state together at the existing post-materializer acceptance boundary.
-Need, typed outer, selection/validation/materializer failure, cancellation and
-restorable abort leave the prior epoch untouched. Existing post-irreversible
-failure remains fail-closed. The public `AcceptedCommand` moves only filtered
-output batches and the semantic terminal; it retains no epoch. Cross-command
-replacement uses the serialized native lease and adds no lock across DICE.
+Each command has a fresh event tracker and DICE reused activations expose no
+evaluation data. Make terminal selection return exact closure order plus, per
+node, either a known current `Option<EventBatch>` transition or no transition.
+Known Some includes empty batches; known None removes a batch. Selection state
+is scratch and must not enter the accepted snapshot.
 
-## Future implementation authority and proof
+Retain exactly one private `Arc<[(DiceNodeId, EventBatch)]>` event epoch in
+`AcceptedNativeDemandSnapshot`, with cheap clone and memory accounting. Fold
+the selected closure against the prior epoch in closure order: current Some
+replaces and emits only when exact batch value changed and is nonempty; current
+None removes; no-transition carries a matching prior entry without emission;
+prior nodes absent from closure drop. Retain Some(empty) distinctly. Reordering
+alone emits nothing but replaces retained order. Use only compute-local
+`SmallMap`/vectors; no retained map, deep clone or event Arc-identity check.
 
-After independent design ACCEPT, retry may write the existing eight files plus
-`app/slug_core_v2/src/runtime/events.rs`. Preserve every existing per-file cap
-and the three relocation exceptions. Allow events only +80 production/+100
-colocated tests, <=1,800 physical; aggregate semantic becomes +1,234
-production/+1,428 tests/+2,662. The prior 19,531 primary envelope plus the
-full events file is <=21,331; loading proof remains separately <=3,442.
+Prepare filtered output and next epoch locally. Replace event/path/repository
+accepted state together only at the existing post-materializer native snapshot
+boundary. Need, outer, selection/validation/materializer failure, cancellation
+and restorable abort preserve the prior epoch; post-irreversible failure stays
+fail-closed. Public `AcceptedCommand` moves only filtered batches and semantic
+terminal. Add no lock across DICE and do not change path/carrier equality,
+activation closure, child batch ownership or repository association.
 
-Prove ordered selection distinguishes known Some/None from no-transition nodes,
-includes empty owners and exact node identity, and carries warm reused entries.
-Discriminate accepted Some(A) -> next-command no-transition carry -> evaluated
-Some(A) with no output. Separately prove accepted Some(A) -> evaluated known
-None removal with no output -> no-transition does not resurrect it -> evaluated
-Some(A) is new and emits. Keep Some(empty) as a distinct retained entry.
-Changed batches replay in closure order; removal/evaluated-reappearance and
-cross-command replacement behave exactly; no retained map or deep clone
-survives acceptance.
-Prove sibling source-file churn suppresses,
-while BUILD and `.bzl` A/B/delete/recreate/A events replay changed local
-batches and suppress after restoration. Cover failed selection/validation/
-materializer, strict-root mismatch, cancellation and abort rollback; root/
-external query, legacy/build policy, repository sidecars, exact selected path/
-result Arcs, family isolation and warm behavior remain unchanged.
+## Compatibility, proof and terminal
 
-Exact public query values/errors/order/events/materialization and all existing
-legacy/build behavior remain exact. The private accepted event epoch and
-deduplication association are Slug-native. One-shot query, external exported
-source, multi-build, unsupported breadth and identity bytes remain deferred.
+Exact public query values/errors/order/events/materialization, loading proof and
+all legacy/build/direct APIs remain exact. Private observation, selection and
+accepted-event association plus stable test parents are Slug-native. One-shot
+query, external exported source, multi-build, unsupported breadth and exact
+identity bytes remain deferred.
 
-STOP on Rust now; later STOP any tenth file, path/carrier/equality weakening,
-child event-owner change, retained map/interner/cache, non-atomic epoch update,
-lost changed-event replay, cap excess, public/caller expansion or M1 closure.
-REPLAN if node identity is not stable for one workspace runtime, acceptance
-cannot replace the epoch atomically, or the bounded representation cannot
-preserve exact event behavior. Schedule exactly the same implementation retry
-after independent ACCEPT; no other successor.
+Prove accepted Some(A) -> next-command no-transition carry -> evaluated Some(A)
+with no output. Prove accepted Some(A) -> evaluated known None removal/no output
+-> no-transition no resurrection -> evaluated Some(A) new/emitted. Prove
+Some(empty) retained distinctly; changed batches replay in current closure
+order; absent/reordered/cross-command state is exact; failure and cancel roll
+back. The external sibling-file mutation must suppress, while BUILD and `.bzl`
+A/B/delete/recreate/A replay changed local batches and suppress after restore.
+
+Retain external nonempty repository request+validation acceptance, root-empty
+and strict-root rejection proof, complete selected path/result Arc identity,
+family/event/lifecycle parity and zero upper activation. Run corrected tests
+isolated, then default-parallel core, full query/loading/bzlmod, fmt, diff-check,
+exact relocation/accounting, archive status, Buck2 retention/AI cleanup and
+independent final review.
+
+STOP on a tenth file/root opt-in, unrestricted boolean, weakened validation,
+path/carrier/key equality drift, retained map/cache/interner, deep-cloned
+events, child event-owner change, non-atomic accepted replacement, lost changed
+event replay, body drift beyond accepted exceptions, cap excess, caller/public
+expansion or M1 closure. REPLAN on another material miss. After ACCEPT commit
+and return to exactly one docs-only next-owner audit.
