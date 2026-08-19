@@ -8427,3 +8427,83 @@ the exact two Rust files and corrected caps. STOP a third file, caller/export,
 upper/registry activation, semantic/event/memory/family drift, proof deletion,
 cap excess or milestone closure. After independent ACCEPT schedule only the
 docs-only selected-module-graph observation frontier design.
+### Repository-source observation accepted and selected-graph frontier REPLAN (2026-08-19)
+
+Implementation `12f68983` accepts the repository-source observation sibling
+from Rust base `ae8aa35e`, semantic design `9040e168` and proof correction
+`edc533ff`. Exact accounting is +297 production and +30 colocated proof in
+`source_preparation.rs`, +700 external proof, +1,027 aggregate semantic, and
+15,267/3,170/18,437 physical. Focused proof passes 3/3, bzlmod passes 439+193,
+loading 204 and query 121; core retains only the inherited 245/246 stale generic
+visibility wording baseline. Formatting, diff-check, cleanup/retention and
+independent final review pass.
+
+The resumed selected-graph frontier is **REPLAN**. `HostSelectedModuleGraphKey`
+still joins legacy `HostDiscoveredModuleKey` leaves. Nonregistry discovery
+crosses `HostNonregistryModuleClosureKey`; its Host include horizon remains
+legacy-only and reaches `HostNonregistryPackagePreflightKey`, then carrierless
+`HostNonregistryRepositoryIgnoreKey`, then carrierless/event-owning
+`HostNonregistryRepoFileKey`. Observing closure, discovery or selected graph
+would duplicate or relocate that REPO batch. The registry
+`ModuleSourcePreparationKey` -> `RegistryFileKey`/patch frontier is separate.
+
+The uniquely smallest next producer is `HostNonregistryRepoFileKey`: it owns
+only repository-source `REPO.bazel` -> neutral root REPO semantics -> pure
+evaluation and one local batch, and its sole mutable source edge now has the
+accepted observed sibling.
+
+### Host nonregistry REPO-file observation design
+
+Run only `WP-6-7A-host-nonregistry-repo-file-observation-design`, docs-only,
+from scheduling/Rust base `12f68983`.
+
+Freeze private
+`HostNonregistryRepoFileObservationKey(HostNonregistryRepoFileKey)` and
+`ObservedHostNonregistryRepoFile`. The carrier is exactly one local
+`Arc<Result<HostRepoFileValue, HostRouteRepoFileError>>` plus compact
+`PathObservationEpoch`, with `Dupe`/`Allocative` and borrowed accessors.
+No export or caller is authorized.
+
+One Legacy/Observed driver preserves source-first order. Legacy selects only
+`RepositorySourceFileKey`; observed selects only
+`RepositorySourceFileObservationKey`. Only Present continues to the shared
+neutral `RootRepoFileSemanticsProjectionKey` and pure evaluation. Move the
+exact local Result Arc to legacy.
+
+Source Need/typed outer is immediate, carrierless and stores no parent batch.
+Accept the Complete source epoch before semantics. Source Absent/error and policy
+failure retain it and store the existing empty batch. Evaluation success/error
+retains it and stores the exact current local batch, including semantic
+`Some(empty)`. Preserve DICE-invariant behavior. No epoch or Need union exists
+at this single-child owner. Complete carrier equality is Result+epoch; outer is
+by outer value; Need is invalid/self-unequal.
+
+Each sibling remains sole owner of its matching REPO batch. Source stays
+eventless; Need/outer/cancel stores none and warm reuse is silent. Retain only
+the local Result Arc+epoch; source carrier/bytes, path, reporter/evaluator and
+event scratch are compute-local. Add no collection/cache/store/interner/lock/
+task/Host read/revision/certificate/event state.
+
+Future exact Rust authority is only
+`app/slug_bzlmod_v2/src/repo_file.rs`, baseline 2,679: <=180 production,
+<=320 tests, <=500 aggregate semantic and <=3,200 physical; touched helpers
+remain below 200 lines.
+
+Proof must discriminate identity/accessors/equality; real source
+Need/outer/Absent/Present/error and later suppression; policy and evaluation
+terminals with exact prefix and legacy Result-Arc parity; exact epoch order and
+per-demand Arcs plus conflict/mismatch outer; exact family rows; child silence
+and parent empty/nonempty/error batches; warm/cancel/recovery; local+immutable
+A/B/absent/directory/A held Result+epoch restoration; and zero ignore/preflight/
+closure/discovery/selected-graph/registry/extension/public activation.
+
+Exact compatibility is current REPO source/order/UTF-8/result/diagnostic/event
+behavior. The private sibling/carrier/typed outer is Slug-native. Ignore,
+preflight, closure, discovery/selected graph, registry preparation/patches,
+extensions, rules_rust actions, M8/M7B and identity bytes remain deferred.
+
+STOP Rust during design, a second file/key/caller/export, changed event ownership
+or text, retained scratch/state, direct Host read, upper/registry activation,
+cap excess and milestone closure. After independent design ACCEPT schedule only
+`WP-6-7A-host-nonregistry-repo-file-observation-implementation`; after its
+ACCEPT design only the nonregistry repository-ignore observed owner.
