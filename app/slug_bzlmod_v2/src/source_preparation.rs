@@ -4109,6 +4109,52 @@ impl Key for RepositoryMaterializationRequestObservationKey {
         value.is_complete()
     }
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+struct RepositoryMaterializationObservationKey(RepositoryMaterializationKey);
+
+impl RepositoryMaterializationObservationKey {
+    fn new(workspace: PathBuf, module_name: CompactString) -> Self {
+        Self(RepositoryMaterializationKey {
+            workspace,
+            module_name,
+        })
+    }
+}
+
+impl fmt::Display for RepositoryMaterializationObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type MaterializationSemanticResult =
+    Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedRepositoryMaterialization {
+    result: MaterializationSemanticResult,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedRepositoryMaterialization {
+    fn result(&self) -> &MaterializationSemanticResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type RepositoryMaterializationDriverOutcome =
+    SourcePreparationOutcome<Result<ObservedRepositoryMaterialization, ObservedPathFrontierError>>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RepositoryMaterializationMode {
+    Legacy,
+    Observed,
+}
 fn request_kind(
     workspace: &NormalizedAbsolutePath,
     repo_spec: &RepoSpec,
@@ -4632,42 +4678,164 @@ impl Key for RepositoryMaterializationResultKey {
     }
 }
 
+fn repository_materialization_complete(
+    result: MaterializationSemanticResult,
+    observations: PathObservationEpoch,
+) -> RepositoryMaterializationDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedRepositoryMaterialization {
+        result,
+        observations,
+    }))
+}
+
+fn repository_materialization_request_compute_error(
+    error: impl fmt::Display,
+) -> RepositoryMaterializationDriverOutcome {
+    repository_materialization_complete(
+        Arc::new(Err(RepositoryMaterializationError::RootModuleFiles(
+            error.to_string().into(),
+        ))),
+        PathObservationEpoch::empty(),
+    )
+}
+
+fn repository_materialization_result_compute_error(
+    error: impl fmt::Display,
+    observations: PathObservationEpoch,
+) -> RepositoryMaterializationDriverOutcome {
+    repository_materialization_complete(
+        Arc::new(Err(RepositoryMaterializationError::ResultCompute(
+            error.to_string().into(),
+        ))),
+        observations,
+    )
+}
+
+fn finish_observed_materialization_request(
+    outcome: MaterializationRequestDriverOutcome,
+) -> ControlFlow<
+    RepositoryMaterializationDriverOutcome,
+    (RepositoryMaterializationRequest, PathObservationEpoch),
+> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            let observations = observed.observations().dupe();
+            match observed.result().as_ref() {
+                Ok(request) => ControlFlow::Continue((request.clone(), observations)),
+                Err(error) => ControlFlow::Break(repository_materialization_complete(
+                    Arc::new(Err(error.clone())),
+                    observations,
+                )),
+            }
+        }
+    }
+}
+
+async fn drive_repository_materialization(
+    ctx: &mut DiceComputations<'_>,
+    key: &RepositoryMaterializationKey,
+    mode: RepositoryMaterializationMode,
+) -> RepositoryMaterializationDriverOutcome {
+    let (request, observations) = match mode {
+        RepositoryMaterializationMode::Legacy => {
+            let request = match ctx
+                .compute(&RepositoryMaterializationRequestKey {
+                    workspace: key.workspace.clone(),
+                    module_name: key.module_name.clone(),
+                })
+                .await
+            {
+                Ok(request) => request,
+                Err(error) => return repository_materialization_request_compute_error(error),
+            };
+            match request.as_ref() {
+                Ok(request) => (request.clone(), PathObservationEpoch::empty()),
+                Err(error) => {
+                    return repository_materialization_complete(
+                        Arc::new(Err(error.clone())),
+                        PathObservationEpoch::empty(),
+                    );
+                }
+            }
+        }
+        RepositoryMaterializationMode::Observed => {
+            let request = match ctx
+                .compute(&RepositoryMaterializationRequestObservationKey::new(
+                    key.workspace.clone(),
+                    key.module_name.clone(),
+                ))
+                .await
+            {
+                Ok(request) => request,
+                Err(error) => return repository_materialization_request_compute_error(error),
+            };
+            match finish_observed_materialization_request(request) {
+                ControlFlow::Continue(request) => request,
+                ControlFlow::Break(outcome) => return outcome,
+            }
+        }
+    };
+    match ctx
+        .compute(&RepositoryMaterializationResultKey {
+            request: Arc::new(request),
+        })
+        .await
+    {
+        Ok(SourcePreparationOutcome::Need(need)) => SourcePreparationOutcome::Need(need),
+        Ok(SourcePreparationOutcome::Complete(result)) => {
+            repository_materialization_complete(result, observations)
+        }
+        Err(error) => repository_materialization_result_compute_error(error, observations),
+    }
+}
+
+fn project_legacy_repository_materialization(
+    outcome: RepositoryMaterializationDriverOutcome,
+) -> <RepositoryMaterializationKey as Key>::Value {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            SourcePreparationOutcome::Complete(observed.result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy materialization cannot produce an observed outer error")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for RepositoryMaterializationKey {
-    type Value = SourcePreparationOutcome<
-        Arc<Result<RepositoryMaterialization, RepositoryMaterializationError>>,
-    >;
+    type Value = SourcePreparationOutcome<MaterializationSemanticResult>;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let request = match ctx
-            .compute(&RepositoryMaterializationRequestKey {
-                workspace: self.workspace.clone(),
-                module_name: self.module_name.clone(),
-            })
+        project_legacy_repository_materialization(
+            drive_repository_materialization(ctx, self, RepositoryMaterializationMode::Legacy)
+                .await,
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for RepositoryMaterializationObservationKey {
+    type Value = RepositoryMaterializationDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_repository_materialization(ctx, &self.0, RepositoryMaterializationMode::Observed)
             .await
-        {
-            Ok(request) => request,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    RepositoryMaterializationError::RootModuleFiles(error.to_string().into()),
-                )));
-            }
-        };
-        let request = match request.as_ref() {
-            Ok(request) => request.clone(),
-            Err(error) => return SourcePreparationOutcome::Complete(Arc::new(Err(error.clone()))),
-        };
-        match ctx
-            .compute(&RepositoryMaterializationResultKey {
-                request: Arc::new(request),
-            })
-            .await
-        {
-            Ok(value) => value,
-            Err(error) => SourcePreparationOutcome::Complete(Arc::new(Err(
-                RepositoryMaterializationError::ResultCompute(error.to_string().into()),
-            ))),
-        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -13926,6 +14094,8 @@ mod tests {
             let name = key.to_string();
             if name.starts_with("repository-materialization-request:")
                 || name.starts_with("observed-repository-materialization-request:")
+                || name.starts_with("repository-materialization:")
+                || name.starts_with("observed-repository-materialization:")
             {
                 self.rows
                     .lock()
@@ -14371,6 +14541,397 @@ mod tests {
         assert!(matches!(held_kind.as_ref(), Ok(request)
             if request.repo_spec.rule_id.rule_name == "http_archive"
                 && request.kind == RepositoryMaterializationKind::Immutable));
+    }
+
+    fn observed_repository_materialization(
+        outcome: &RepositoryMaterializationDriverOutcome,
+    ) -> &ObservedRepositoryMaterialization {
+        match outcome {
+            SourcePreparationOutcome::Complete(Ok(value)) => value,
+            _ => panic!("observed materialization did not complete: {outcome:?}"),
+        }
+    }
+
+    async fn repository_materialization_case(
+        dice: &Arc<Dice>,
+        source: &str,
+        variant: i64,
+        result: Option<RepositoryMaterializationResult>,
+        generation: Option<RepositoryMaterializationGeneration>,
+        mismatch_request: bool,
+    ) -> (
+        RepositoryMaterializationDriverOutcome,
+        <RepositoryMaterializationKey as Key>::Value,
+        PathObservationEpoch,
+        Vec<(String, ActivationKind, bool)>,
+        Vec<(String, Vec<String>)>,
+    ) {
+        let tracker = Arc::new(MaterializationRequestTracker::default());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        inject_materialization_request_inputs(&mut updater, source, variant, &[], true);
+        let mut transaction = updater.commit().await;
+        let request = transaction
+            .compute(&RepositoryMaterializationRequestObservationKey::new(
+                PathBuf::from("/workspace"),
+                "dep".into(),
+            ))
+            .await
+            .unwrap();
+        let injected = observed_materialization_value(&request)
+            .observations()
+            .dupe();
+        let request = observed_materialization_value(&request)
+            .result()
+            .as_ref()
+            .as_ref()
+            .unwrap()
+            .clone();
+        let epoch_request = if mismatch_request {
+            RepositoryMaterializationRequest {
+                repo_spec: local_route_with_path("other").repo_spec().clone(),
+                kind: RepositoryMaterializationKind::Local {
+                    logical_root: NormalizedAbsolutePath::new("/workspace/other").unwrap(),
+                },
+                ..request.clone()
+            }
+        } else {
+            request
+        };
+        let entries = result
+            .into_iter()
+            .map(|result| RepositoryMaterializationEpochEntry {
+                request: Arc::new(epoch_request.clone()),
+                result,
+            });
+        let mut updater = transaction.into_updater();
+        updater
+            .changed_to(vec![(
+                RepositoryMaterializationResultEpochKey {
+                    workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                },
+                RepositoryMaterializationResultEpoch::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    entries,
+                )
+                .unwrap(),
+            )])
+            .unwrap();
+        if let Some(generation) = generation {
+            updater
+                .changed_to(vec![(
+                    RepositoryMaterializationGenerationKey {
+                        workspace: PathBuf::from("/workspace"),
+                    },
+                    generation,
+                )])
+                .unwrap();
+        }
+        transaction = updater.commit().await;
+        let observed = transaction
+            .compute(&RepositoryMaterializationObservationKey::new(
+                PathBuf::from("/workspace"),
+                "dep".into(),
+            ))
+            .await
+            .unwrap();
+        let legacy = transaction
+            .compute(&RepositoryMaterializationKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+            })
+            .await
+            .unwrap();
+        (
+            observed,
+            legacy,
+            injected,
+            tracker.rich.lock().unwrap().clone(),
+            tracker.rows.lock().unwrap().clone(),
+        )
+    }
+
+    type MaterializationKey = RepositoryMaterializationObservationKey;
+    type MResult = RepositoryMaterializationResult;
+    type MError = RepositoryMaterializationError;
+
+    #[test]
+    fn observed_repository_materialization_reducer_projection_and_prefixes_are_exact() {
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let shared = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(demand.dupe(), shared.dupe())]).unwrap();
+        let request = RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: local_route_with_path("dep").repo_spec().clone(),
+            kind: RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new("/workspace/dep").unwrap(),
+            },
+        };
+        let ControlFlow::Continue((_forwarded, prefix)) = finish_observed_materialization_request(
+            SourcePreparationOutcome::Complete(Ok(ObservedRepositoryMaterializationRequest {
+                result: Arc::new(Ok(request)),
+                observations: epoch.dupe(),
+            })),
+        ) else {
+            panic!("request success must continue")
+        };
+        assert!(Arc::ptr_eq(
+            prefix.observations().get(&demand).unwrap(),
+            &shared
+        ));
+        let request_compute = repository_materialization_request_compute_error("request compute");
+        let request_compute = observed_repository_materialization(&request_compute);
+        assert!(
+            matches!(
+                request_compute.result().as_ref(),
+                Err(MError::RootModuleFiles(message))
+                    if message == "request compute"
+            ) && request_compute.observations().observations().is_empty()
+        );
+        let result_compute =
+            repository_materialization_result_compute_error("result compute", epoch.dupe());
+        let result_compute = observed_repository_materialization(&result_compute);
+        assert!(
+            matches!(
+                result_compute.result().as_ref(),
+                Err(MError::ResultCompute(message))
+                    if message == "result compute"
+            ) && result_compute.observations() == &epoch
+        );
+
+        let request_error = Arc::new(Err(MError::MissingOverride("dep".into())));
+        let ControlFlow::Break(error) = finish_observed_materialization_request(
+            SourcePreparationOutcome::Complete(Ok(ObservedRepositoryMaterializationRequest {
+                result: request_error,
+                observations: epoch.dupe(),
+            })),
+        ) else {
+            panic!("request semantic error must stop")
+        };
+        assert_eq!(
+            observed_repository_materialization(&error).observations(),
+            &epoch
+        );
+
+        for (input, valid) in [
+            (
+                SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+                    NeedPathObservations::singleton(demand.dupe()),
+                )),
+                false,
+            ),
+            (
+                SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+                    slug_workspace_v2::PathObservationEpochError::DuplicateDemand(demand),
+                ))),
+                true,
+            ),
+        ] {
+            let ControlFlow::Break(outcome) = finish_observed_materialization_request(input) else {
+                panic!("request terminal must stop")
+            };
+            assert_eq!(MaterializationKey::validity(&outcome), valid);
+            assert_eq!(MaterializationKey::equality(&outcome, &outcome), valid);
+        }
+
+        let held = Arc::new(Err(MError::Spec("spec".into())));
+        let carrier = repository_materialization_complete(held.dupe(), epoch.dupe());
+        assert!(Arc::ptr_eq(
+            observed_repository_materialization(&carrier).result(),
+            &held
+        ));
+        let SourcePreparationOutcome::Complete(projected) =
+            project_legacy_repository_materialization(carrier)
+        else {
+            panic!("legacy projection must complete")
+        };
+        assert!(Arc::ptr_eq(&held, &projected));
+    }
+
+    #[tokio::test]
+    async fn observed_repository_materialization_lifecycle_families_events_and_needs() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let a_source = "module(name='root')\nprint('root-a')\nlocal_path_override(module_name='dep',path='dep-a')\n";
+        let local = MResult::Success(RepositoryMaterializationSuccess::Local);
+        let (a, legacy, injected, cold, rows) =
+            repository_materialization_case(&dice, a_source, 101, Some(local.clone()), None, false)
+                .await;
+        let key = MaterializationKey::new(PathBuf::from("/workspace"), "dep".into());
+        let a_value = observed_repository_materialization(&a);
+        let SourcePreparationOutcome::Complete(legacy) = &legacy else {
+            panic!("legacy materialization must complete")
+        };
+        assert!(Arc::ptr_eq(a_value.result(), legacy));
+        let result_dep = "repository-materialization-result:@@dep+".to_owned();
+        assert!(rows.contains(&(
+            key.to_string(),
+            vec![
+                "observed-repository-materialization-request:dep".into(),
+                result_dep.clone()
+            ],
+        )));
+        assert!(rows.contains(&(
+            "repository-materialization:dep".into(),
+            vec!["repository-materialization-request:dep".into(), result_dep],
+        )));
+        let parent_silent = cold
+            .iter()
+            .any(|(name, _, event)| name == &key.to_string() && !event);
+        let child_event = cold
+            .iter()
+            .any(|(name, _, event)| name.contains("root-module") && *event);
+        assert!(parent_silent && child_event);
+        assert!(!cold.iter().any(|(name, _, _)| {
+            [
+                "repository-source-file:",
+                "host-nonregistry-module",
+                "host-discovered-module:",
+                "host-selected-module-graph:",
+            ]
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+        }));
+
+        let (warm, _, _, reuse, _) =
+            repository_materialization_case(&dice, a_source, 101, Some(local.clone()), None, false)
+                .await;
+        assert!(MaterializationKey::equality(&a, &warm));
+        assert!(reuse.iter().any(|(name, kind, event)| {
+            name == &key.to_string() && *kind == ActivationKind::Reused && !event
+        }));
+        let held_result = a_value.result().dupe();
+        let changed = MResult::SpecError("changed".into());
+        let (b, _, _, _, _) =
+            repository_materialization_case(&dice, a_source, 101, Some(changed), None, false).await;
+        let (restored, _, _, _, _) =
+            repository_materialization_case(&dice, a_source, 101, Some(local.clone()), None, false)
+                .await;
+        assert!(!MaterializationKey::equality(&a, &b));
+        assert!(MaterializationKey::equality(&a, &restored));
+        assert!(matches!(
+            held_result.as_ref(),
+            Ok(RepositoryMaterialization::Local { source_root, .. })
+                if source_root == Path::new("/workspace/dep-a")
+        ));
+        assert!(injected.observations().iter().all(|(demand, result)| {
+            Arc::ptr_eq(
+                result,
+                a_value.observations().observations().get(demand).unwrap(),
+            )
+        }));
+
+        let (missing, _, _, _, _) =
+            repository_materialization_case(&dice, a_source, 103, None, None, false).await;
+        assert!(
+            !MaterializationKey::validity(&missing)
+                && !MaterializationKey::equality(&missing, &missing)
+        );
+        let (mismatch, _, _, _, _) =
+            repository_materialization_case(&dice, a_source, 104, Some(local), None, true).await;
+        assert!(matches!(mismatch, SourcePreparationOutcome::Need(_)));
+
+        for case in 0..5 {
+            let result_generation = RepositoryMaterializationGeneration(case);
+            let result = match case {
+                0 => MResult::SpecError("spec".into()),
+                2 | 4 => MResult::TransportError {
+                    generation: result_generation,
+                    message: "transport".into(),
+                },
+                _ => MResult::MaterializationError {
+                    generation: result_generation,
+                    message: "materialization".into(),
+                },
+            };
+            let generation = match case {
+                2 | 3 => Some(result_generation),
+                4 => Some(RepositoryMaterializationGeneration(9)),
+                _ => None,
+            };
+            let (outcome, _, prefix, _, _) = repository_materialization_case(
+                &dice,
+                a_source,
+                105 + case as i64,
+                Some(result),
+                generation,
+                false,
+            )
+            .await;
+            if case < 4 {
+                let observed = observed_repository_materialization(&outcome);
+                assert_eq!(observed.observations(), &prefix);
+                assert!(match (case, observed.result().as_ref()) {
+                    (0, Err(MError::Spec(message))) if message == "spec" => true,
+                    (1, Err(MError::MissingGeneration(_))) => true,
+                    (2, Err(MError::Transport(message))) if message == "transport" => true,
+                    (3, Err(MError::Materialization(message))) if message == "materialization" =>
+                        true,
+                    _ => false,
+                });
+            } else {
+                assert!(matches!(outcome, SourcePreparationOutcome::Need(_)));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_repository_materialization_immutable_error_and_cancellation_are_exact() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
+        let immutable = MResult::Success(RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("sha256-a"),
+            generation_root: PathBuf::from("/immutable/a"),
+            observation_instance: PathObservationInstanceId::new(7),
+        });
+        let (success, _, epoch, _, _) =
+            repository_materialization_case(&dice, archive, 201, Some(immutable), None, false)
+                .await;
+        let success = observed_repository_materialization(&success);
+        assert!(matches!(
+            success.result().as_ref(),
+            Ok(RepositoryMaterialization::Immutable {
+                source_identity,
+                generation_root,
+                ..
+            }) if source_identity.as_ref() == "sha256-a"
+                && generation_root == Path::new("/immutable/a")
+        ));
+        assert_eq!(success.observations(), &epoch);
+
+        let tracker = Arc::new(MaterializationRequestTracker::default());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.dupe()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        inject_materialization_request_inputs(&mut updater, archive, 203, &[], true);
+        let mut cancelled = updater.commit().await;
+        let key = MaterializationKey::new(PathBuf::from("/workspace"), "dep".into());
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|cx| {
+            assert!(std::future::Future::poll(future.as_mut(), cx).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(cancelled);
+        assert!(tracker.rich.lock().unwrap().is_empty());
+        let result = Some(MResult::SpecError("recovered".into()));
+        let (recovered, _, _, _, _) =
+            repository_materialization_case(&dice, archive, 203, result, None, false).await;
+        assert!(MaterializationKey::validity(&recovered));
     }
     mod observation_tests {
         use super::*;
