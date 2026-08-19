@@ -1,5 +1,30 @@
 use super::*;
 
+fn finalize_epoch_for_test(
+    runtime: &WorkspaceRuntime,
+    token: crate::runtime::repository_io::RepositorySessionToken,
+    certificate: &SourceCertificate,
+    epoch: &PathObservationEpoch,
+) -> NativeFinalization {
+    runtime.runtime.block_on(async {
+        let terminal = runtime.dice.updater().existing_state().await;
+        let mut selected = runtime.dice.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, epoch.clone())])
+            .unwrap();
+        runtime
+            .request_revision
+            .finalize_native(&terminal, certificate, selected, epoch, |demands| {
+                runtime
+                    .repository_materializer
+                    .observe_native(token, demands)
+                    .map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
+            })
+            .await
+            .unwrap()
+    })
+}
+
     #[test]
     fn multi_target_exported_sources_do_not_enter_revision_bridge() {
         let workspace = tempfile::tempdir().unwrap();
@@ -166,6 +191,263 @@ use super::*;
         assert_eq!(restored.attempts, 2);
         assert!(restored.accepted.terminal_for_test().as_ref().is_ok());
         assert_source(&accepted_epoch(), Some(b"V1"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn epoch_certificate_reobserves_retained_materialization_and_symlink_lifecycle() {
+        use compact_str::CompactString;
+        use sha2::Digest;
+        use slug_bzlmod_v2::OverrideAttributeValue;
+        use slug_bzlmod_v2::RepoRuleId;
+        use slug_bzlmod_v2::RepoSpec;
+        use slug_bzlmod_v2::RepositoryMaterializationKind;
+        use sha2::Sha256;
+
+        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/debug/incremental/slug-epoch-source-certificate");
+        fs::create_dir_all(&stable_parent).unwrap();
+        let workspace = tempfile::tempdir_in(stable_parent).unwrap();
+        let archive = workspace.path().join("empty.tar");
+        fs::write(&archive, vec![0; 1_024]).unwrap();
+        let digest = format!("{:x}", Sha256::digest(fs::read(&archive).unwrap()));
+        let attributes = [
+            (
+                CompactString::new("urls"),
+                OverrideAttributeValue::Iterable(Arc::new([
+                    OverrideAttributeValue::String(
+                        url::Url::from_file_path(&archive)
+                            .unwrap()
+                            .to_string()
+                            .into(),
+                    ),
+                ])),
+            ),
+            (
+                CompactString::new("sha256"),
+                OverrideAttributeValue::String(digest.into()),
+            ),
+            (
+                CompactString::new("type"),
+                OverrideAttributeValue::String("tar".into()),
+            ),
+        ];
+        let workspace_path = NormalizedAbsolutePath::new(workspace.path().to_path_buf()).unwrap();
+        let request = Arc::new(RepositoryMaterializationRequest {
+            id: RepositoryMaterializationRequestId {
+                workspace: workspace_path.clone(),
+                canonical_repo: slug_identity_v2::CanonicalRepoName::new("cert").unwrap(),
+            },
+            repo_spec: RepoSpec {
+                rule_id: RepoRuleId {
+                    bzl_file: CanonicalLabel::parse(
+                        "@@bazel_tools//tools/build_defs/repo:http.bzl",
+                    )
+                    .unwrap(),
+                    rule_name: "http_archive".into(),
+                },
+                attributes: Arc::new(SmallMap::from_iter(attributes)),
+            },
+            kind: RepositoryMaterializationKind::Immutable,
+        });
+        let runtime = test_runtime(workspace.path()).unwrap();
+        let token = runtime.repository_materializer.begin().unwrap();
+        runtime
+            .repository_materializer
+            .preflight_native(token, std::iter::empty())
+            .unwrap();
+        runtime
+            .repository_materializer
+            .materialize_native(token, request, RepositoryMaterializationGeneration(1))
+            .unwrap();
+
+        let target_a = workspace.path().join("a");
+        let target_b = workspace.path().join("b");
+        let logical = workspace.path().join("logical");
+        let unrelated = workspace.path().join("unrelated");
+        fs::write(&target_a, b"same").unwrap();
+        fs::write(&target_b, b"same").unwrap();
+        fs::write(&unrelated, b"unrelated").unwrap();
+        std::os::unix::fs::symlink(&target_a, &logical).unwrap();
+        let readlink = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(logical.clone()).unwrap(),
+            PathObservationOperation::ReadLink,
+        );
+        let materialized = PathObservationDemand::new(
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(1),
+            ),
+            NormalizedAbsolutePath::new(target_a).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let unrelated = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(unrelated).unwrap(),
+            PathObservationOperation::FileBytes,
+        );
+        let initial = runtime
+            .repository_materializer
+            .observe_native(
+                token,
+                [readlink.dupe(), materialized.dupe(), unrelated.dupe()],
+            )
+            .unwrap();
+        let certificate = SourceCertificate::from_epoch(
+            PathObservationEpoch::from_shared(
+                [readlink.dupe(), materialized.dupe()]
+                    .into_iter()
+                    .map(|demand| (demand.dupe(), initial.get(&demand).unwrap().dupe())),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        runtime.runtime.block_on(async {
+            let mut updater = runtime.dice.updater();
+            updater
+                .changed_to(vec![(PathObservationEpochKey, initial.clone())])
+                .unwrap();
+            drop(
+                runtime
+                    .request_revision
+                    .commit_native_attempt(updater)
+                    .await
+                    .unwrap(),
+            );
+        });
+        let accepted_before_failure = accepted_native_snapshot(&runtime);
+        runtime.runtime.block_on(async {
+            let terminal = runtime.dice.updater().existing_state().await;
+            let mut selected = runtime.dice.updater();
+            selected
+                .changed_to(vec![(PathObservationEpochKey, initial.clone())])
+                .unwrap();
+            assert!(matches!(
+                runtime
+                    .request_revision
+                    .finalize_native(
+                        &terminal,
+                        &certificate,
+                        selected,
+                        &initial,
+                        |_| Err(RequestRevisionError::Observation("forced".to_owned())),
+                    )
+                    .await,
+                Err(RequestRevisionError::Observation(_))
+            ));
+            let mut current = runtime.dice.updater().existing_state().await;
+            let retained = current.compute(&PathObservationEpochKey).await.unwrap();
+            assert!(initial
+                .observations()
+                .iter()
+                .all(|(demand, result)| Arc::ptr_eq(result, retained.get(demand).unwrap())));
+        });
+        let accepted_after_failure = accepted_native_snapshot(&runtime);
+        assert_eq!(
+            accepted_after_failure.path_observations,
+            accepted_before_failure.path_observations
+        );
+        assert_eq!(
+            accepted_after_failure.repository_results,
+            accepted_before_failure.repository_results
+        );
+        assert_eq!(accepted_after_failure.events, accepted_before_failure.events);
+
+        fs::remove_file(&logical).unwrap();
+        std::os::unix::fs::symlink(&target_b, &logical).unwrap();
+        let NativeFinalization::RetrySourceChanged { merged_epoch: changed } =
+            finalize_epoch_for_test(&runtime, token, &certificate, &initial)
+        else {
+            panic!("symlink retarget did not advance the certificate epoch");
+        };
+        assert!(!Arc::ptr_eq(
+            initial.get(&readlink).unwrap(),
+            changed.get(&readlink).unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            initial.get(&materialized).unwrap(),
+            changed.get(&materialized).unwrap()
+        ));
+        assert!(Arc::ptr_eq(
+            initial.get(&unrelated).unwrap(),
+            changed.get(&unrelated).unwrap()
+        ));
+
+        let changed_certificate = SourceCertificate::from_epoch(
+            PathObservationEpoch::from_shared(
+                [readlink.dupe(), materialized.dupe()]
+                    .into_iter()
+                    .map(|demand| (demand.dupe(), changed.get(&demand).unwrap().dupe())),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        fs::write(workspace.path().join("a"), b"changed").unwrap();
+        fs::remove_file(&logical).unwrap();
+        let NativeFinalization::RetrySourceChanged {
+            merged_epoch: missing,
+        } = finalize_epoch_for_test(&runtime, token, &changed_certificate, &changed)
+        else {
+            panic!("missing symlink did not advance the certificate epoch");
+        };
+        assert!(matches!(
+            missing.get(&readlink).unwrap().as_ref(),
+            PathObservationResult::ReadLink(PathOperationResult::Missing)
+        ));
+        assert!(!Arc::ptr_eq(
+            changed.get(&materialized).unwrap(),
+            missing.get(&materialized).unwrap()
+        ));
+
+        fs::create_dir(&logical).unwrap();
+        let missing_certificate = SourceCertificate::from_epoch(
+            PathObservationEpoch::from_shared(
+                [readlink.dupe(), materialized.dupe()]
+                    .into_iter()
+                    .map(|demand| (demand.dupe(), missing.get(&demand).unwrap().dupe())),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let NativeFinalization::RetrySourceChanged {
+            merged_epoch: directory,
+        } = finalize_epoch_for_test(&runtime, token, &missing_certificate, &missing)
+        else {
+            panic!("directory replacement did not advance the certificate epoch");
+        };
+        assert!(matches!(
+            directory.get(&readlink).unwrap().as_ref(),
+            PathObservationResult::ReadLink(PathOperationResult::Error(_))
+        ));
+
+        fs::remove_dir(&logical).unwrap();
+        fs::write(workspace.path().join("a"), b"same").unwrap();
+        std::os::unix::fs::symlink(workspace.path().join("a"), &logical).unwrap();
+        let directory_certificate = SourceCertificate::from_epoch(
+            PathObservationEpoch::from_shared(
+                [readlink.dupe(), materialized.dupe()]
+                    .into_iter()
+                    .map(|demand| (demand.dupe(), directory.get(&demand).unwrap().dupe())),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let NativeFinalization::RetrySourceChanged {
+            merged_epoch: restored,
+        } = finalize_epoch_for_test(&runtime, token, &directory_certificate, &directory)
+        else {
+            panic!("restored symlink did not advance the certificate epoch");
+        };
+        assert_eq!(restored.get(&readlink), initial.get(&readlink));
+        assert_eq!(
+            restored.get(&materialized).unwrap(),
+            initial.get(&materialized).unwrap()
+        );
+        assert!(!Arc::ptr_eq(
+            restored.get(&materialized).unwrap(),
+            initial.get(&materialized).unwrap()
+        ));
+        runtime.repository_materializer.discard(token).unwrap();
     }
 
     #[test]
@@ -1837,7 +2119,10 @@ probe = rule(implementation = _impl)
 
     #[test]
     fn pointer_distinct_observed_epoch_aborts_before_publication_and_recovers() {
-        let workspace = tempfile::tempdir().unwrap();
+        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/debug/incremental/slug-pointer-distinct-observed-build");
+        fs::create_dir_all(&stable_parent).unwrap();
+        let workspace = tempfile::tempdir_in(stable_parent).unwrap();
         fs::write(
             workspace.path().join("MODULE.bazel"),
             "module(name = 'abort')\n",
@@ -2577,10 +2862,9 @@ probe = rule(implementation = _impl)
 
     #[test]
     fn public_neutral_source_preserves_exact_arcs_and_mismatch_aborts() {
-        let stable_parent =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/debug/incremental")
-                .canonicalize()
-                .unwrap();
+        let stable_parent = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../target/debug/incremental/slug-public-neutral-source");
+        fs::create_dir_all(&stable_parent).unwrap();
         let workspace = tempfile::tempdir_in(stable_parent).unwrap();
         fs::write(
             workspace.path().join("MODULE.bazel"),

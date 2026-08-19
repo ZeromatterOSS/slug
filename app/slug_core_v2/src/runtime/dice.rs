@@ -4296,10 +4296,13 @@ fn singleton_root_single_complete(
                     .observations()
                     .iter()
                     .map(|(demand, result)| (demand.dupe(), result.dupe()))
-                    .chain(std::iter::once((
-                        certificate.demand().dupe(),
-                        certificate.observation().dupe(),
-                    ))),
+                    .chain(
+                        certificate
+                            .observations()
+                            .observations()
+                            .iter()
+                            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+                    ),
             ) {
                 Ok(observations) => Some(observations),
                 Err(error) => {
@@ -4966,6 +4969,7 @@ impl WorkspaceRuntime {
                                 .take()
                                 .expect("prepared native terminal owns its selected updater");
                             let full_epoch = guard.command().path_observations.clone();
+                            let repository_session = guard.command().repository_session;
                             match self
                                 .request_revision
                                 .finalize_native(
@@ -4973,6 +4977,15 @@ impl WorkspaceRuntime {
                                     &source_certificate,
                                     selected_updater,
                                     &full_epoch,
+                                    |demands| {
+                                        self.repository_materializer
+                                            .observe_native(repository_session, demands)
+                                            .map_err(|error| {
+                                                RequestRevisionError::Observation(format!(
+                                                    "{error:?}"
+                                                ))
+                                            })
+                                    },
                                 )
                                 .await
                                 .map_err(NativeDemandSessionError::Revision)?

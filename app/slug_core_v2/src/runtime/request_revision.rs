@@ -148,8 +148,7 @@ impl RequestOverlay {
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
 pub(super) struct SourceCertificate {
-    demand: PathObservationDemand,
-    observation: Arc<PathObservationResult>,
+    observations: PathObservationEpoch,
 }
 
 impl SourceCertificate {
@@ -157,18 +156,47 @@ impl SourceCertificate {
         demand: PathObservationDemand,
         observation: Arc<PathObservationResult>,
     ) -> Self {
-        Self {
-            demand,
-            observation,
+        Self::from_epoch(
+            PathObservationEpoch::from_shared([(demand, observation)])
+                .expect("one associated observation forms an epoch"),
+        )
+        .expect("one observation forms a nonempty certificate")
+    }
+
+    pub(super) fn from_epoch(
+        observations: PathObservationEpoch,
+    ) -> Result<Self, RequestRevisionError> {
+        if observations.observations().is_empty() {
+            return Err(RequestRevisionError::Injection(
+                "source certificate must not be empty".to_owned(),
+            ));
         }
+        Ok(Self { observations })
+    }
+
+    pub(super) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
     }
 
     pub(super) fn demand(&self) -> &PathObservationDemand {
-        &self.demand
+        self.singleton().0
     }
 
     pub(super) fn observation(&self) -> &Arc<PathObservationResult> {
-        &self.observation
+        self.singleton().1
+    }
+
+    fn singleton(&self) -> (&PathObservationDemand, &Arc<PathObservationResult>) {
+        assert_eq!(
+            self.observations.observations().len(),
+            1,
+            "singleton certificate accessor used for an epoch certificate"
+        );
+        self.observations
+            .observations()
+            .iter()
+            .next()
+            .expect("certificate is nonempty")
     }
 }
 
@@ -203,7 +231,7 @@ impl RootHostRequestResult {
 
     #[cfg(test)]
     fn bytes(&self) -> Option<&[u8]> {
-        match self.terminal.certificate.observation.as_ref() {
+        match self.terminal.certificate.observation().as_ref() {
             PathObservationResult::FileBytes(slug_workspace_v2::PathOperationResult::Present(
                 bytes,
             )) => Some(bytes.as_ref()),
@@ -386,13 +414,17 @@ impl RequestRevisionRuntime {
 
     /// Validate a provisional native terminal and atomically publish either its
     /// already-injected selected epoch or the exact changed replacement.
-    pub(super) async fn finalize_native(
+    pub(super) async fn finalize_native<F>(
         &self,
         terminal: &DiceTransaction,
         certificate: &SourceCertificate,
         selected_updater: dice::DiceTransactionUpdater,
         full_epoch: &PathObservationEpoch,
-    ) -> Result<NativeFinalization, RequestRevisionError> {
+        observe: F,
+    ) -> Result<NativeFinalization, RequestRevisionError>
+    where
+        F: FnOnce(Vec<PathObservationDemand>) -> Result<PathObservationEpoch, RequestRevisionError>,
+    {
         let mut owner = self.owner.lock().await;
         let current = selected_updater.existing_state().await;
         if !current.equivalent(terminal) {
@@ -420,8 +452,22 @@ impl RequestRevisionRuntime {
             }
         }
 
-        let observed = self.observe_exact(certificate.demand())?;
-        if observed.as_ref() == certificate.observation().as_ref() {
+        validate_certificate_association(full_epoch, certificate)?;
+        let observed = observe(
+            certificate
+                .observations()
+                .observations()
+                .keys()
+                .cloned()
+                .collect(),
+        )?;
+        validate_reobserved_certificate(certificate, &observed)?;
+        let unchanged = certificate
+            .observations()
+            .observations()
+            .iter()
+            .all(|(demand, result)| observed.get(demand).is_some_and(|new| new == result));
+        if unchanged {
             let revision = self
                 .commit_native_revision_under_owner(&mut owner, selected_updater)
                 .await?;
@@ -432,7 +478,7 @@ impl RequestRevisionRuntime {
         }
 
         drop(selected_updater);
-        let merged_epoch = replace_epoch_observation(full_epoch, certificate.demand(), &observed)?;
+        let merged_epoch = replace_certificate_observations(full_epoch, certificate, &observed)?;
         let mut updater = self.updater();
         updater
             .changed_to(vec![(PathObservationEpochKey, merged_epoch.clone())])
@@ -737,8 +783,8 @@ impl RequestRevisionRuntime {
         {
             return Ok(None);
         }
-        let observed = self.observe_exact(&terminal.certificate.demand)?;
-        if observed.as_ref() == terminal.certificate.observation.as_ref() {
+        let observed = self.observe_exact(terminal.certificate.demand())?;
+        if observed.as_ref() == terminal.certificate.observation().as_ref() {
             let revision = owner
                 .published_revision
                 .ok_or(RequestRevisionError::RetryNonProgress)?;
@@ -748,7 +794,7 @@ impl RequestRevisionRuntime {
         self.commit_observation_under_owner(
             &mut owner,
             updater,
-            &terminal.certificate.demand,
+            terminal.certificate.demand(),
             observed,
         )
         .await?;
@@ -757,24 +803,57 @@ impl RequestRevisionRuntime {
     }
 }
 
-fn replace_epoch_observation(
+fn validate_certificate_association(
     epoch: &PathObservationEpoch,
-    demand: &PathObservationDemand,
-    observation: &Arc<PathObservationResult>,
-) -> Result<PathObservationEpoch, RequestRevisionError> {
-    if epoch.get(demand).is_none() {
-        return Err(RequestRevisionError::Injection(
-            "native full epoch omitted certificate demand".to_owned(),
+    certificate: &SourceCertificate,
+) -> Result<(), RequestRevisionError> {
+    for (demand, result) in certificate.observations().observations() {
+        let Some(known) = epoch.get(demand) else {
+            return Err(RequestRevisionError::Injection(
+                "native full epoch omitted certificate demand".to_owned(),
+            ));
+        };
+        if !Arc::ptr_eq(known, result) {
+            return Err(RequestRevisionError::Injection(
+                "native full epoch did not retain the certificate result Arc".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_reobserved_certificate(
+    certificate: &SourceCertificate,
+    observed: &PathObservationEpoch,
+) -> Result<(), RequestRevisionError> {
+    if certificate.observations().observations().len() != observed.observations().len()
+        || certificate
+            .observations()
+            .observations()
+            .keys()
+            .ne(observed.observations().keys())
+    {
+        return Err(RequestRevisionError::Observation(
+            "kernel returned a different certificate demand set".to_owned(),
         ));
     }
-    let entries = epoch.observations().iter().map(|(known, result)| {
-        if known == demand {
-            (known.clone(), observation.as_ref().clone())
-        } else {
-            (known.clone(), result.as_ref().clone())
+    Ok(())
+}
+
+fn replace_certificate_observations(
+    epoch: &PathObservationEpoch,
+    certificate: &SourceCertificate,
+    observed: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, RequestRevisionError> {
+    let entries = epoch.observations().iter().map(|(demand, result)| {
+        match (certificate.observations().get(demand), observed.get(demand)) {
+            (Some(previous), Some(replacement)) if previous.as_ref() != replacement.as_ref() => {
+                (demand.clone(), replacement.dupe())
+            }
+            _ => (demand.clone(), result.dupe()),
         }
     });
-    PathObservationEpoch::new(entries)
+    PathObservationEpoch::from_shared(entries)
         .map_err(|error| RequestRevisionError::Injection(error.to_string()))
 }
 
@@ -965,6 +1044,20 @@ mod tests {
         }
     }
 
+    fn observe_certificate(
+        demands: Vec<PathObservationDemand>,
+    ) -> Result<PathObservationEpoch, RequestRevisionError> {
+        super::super::path_observation::observe_native(
+            &(),
+            std::iter::empty::<(
+                slug_workspace_v2::PathObservationInstanceId,
+                NormalizedAbsolutePath,
+            )>(),
+            demands,
+        )
+        .map_err(|error| RequestRevisionError::Observation(format!("{error:?}")))
+    }
+
     fn delta(after: Audit, before: Audit) -> Audit {
         Audit {
             root_starts: after.root_starts - before.root_starts,
@@ -1127,7 +1220,7 @@ mod tests {
             .await
             .unwrap();
         assert!(matches!(
-            missing.certificate().observation.as_ref(),
+            missing.certificate().observation().as_ref(),
             PathObservationResult::FileBytes(slug_workspace_v2::PathOperationResult::Missing)
         ));
     }
@@ -1394,7 +1487,13 @@ mod tests {
             .unwrap();
         assert!(matches!(
             runtime
-                .finalize_native(&terminal, first.certificate(), selected, &epoch)
+                .finalize_native(
+                    &terminal,
+                    first.certificate(),
+                    selected,
+                    &epoch,
+                    observe_certificate
+                )
                 .await
                 .unwrap(),
             NativeFinalization::Accepted { revision: 3 }
@@ -1409,7 +1508,13 @@ mod tests {
             .changed_to(vec![(PathObservationEpochKey, epoch.clone())])
             .unwrap();
         let result = runtime
-            .finalize_native(&terminal, first.certificate(), selected, &epoch)
+            .finalize_native(
+                &terminal,
+                first.certificate(),
+                selected,
+                &epoch,
+                observe_certificate,
+            )
             .await
             .unwrap();
         let NativeFinalization::RetrySourceChanged { merged_epoch } = result else {
@@ -1419,6 +1524,140 @@ mod tests {
             merged_epoch.get(first.certificate().demand()).unwrap(),
             first.certificate().observation()
         );
+    }
+
+    #[tokio::test]
+    async fn native_epoch_certificate_preserves_equal_and_replaces_only_changed_arcs() {
+        let directory = tempfile::tempdir().unwrap();
+        let runtime = runtime(&directory);
+        let demand = |name: &str, namespace| {
+            PathObservationDemand::new(
+                namespace,
+                NormalizedAbsolutePath::new(directory.path().join(name)).unwrap(),
+                PathObservationOperation::FileBytes,
+            )
+        };
+        let host = demand("host", PathObservationNamespace::Host);
+        let materialized = demand(
+            "immutable",
+            PathObservationNamespace::Materialization(
+                slug_workspace_v2::PathObservationInstanceId::new(7),
+            ),
+        );
+        let unrelated = demand("unrelated", PathObservationNamespace::Host);
+        let bytes = |value: &'static [u8]| {
+            Arc::new(PathObservationResult::FileBytes(
+                slug_workspace_v2::PathOperationResult::Present(Arc::from(value)),
+            ))
+        };
+        let host_v1 = bytes(b"host-v1");
+        let materialized_v1 = bytes(b"materialized-v1");
+        let unrelated_v1 = bytes(b"unrelated-v1");
+        let full_epoch = PathObservationEpoch::from_shared([
+            (host.dupe(), host_v1.dupe()),
+            (materialized.dupe(), materialized_v1.dupe()),
+            (unrelated.dupe(), unrelated_v1.dupe()),
+        ])
+        .unwrap();
+        let certificate = SourceCertificate::from_epoch(
+            PathObservationEpoch::from_shared([
+                (host.dupe(), host_v1.dupe()),
+                (materialized.dupe(), materialized_v1.dupe()),
+            ])
+            .unwrap(),
+        )
+        .unwrap();
+        assert!(SourceCertificate::from_epoch(PathObservationEpoch::empty()).is_err());
+        assert!(
+            PathObservationEpoch::new([
+                (host.dupe(), host_v1.as_ref().clone()),
+                (host.dupe(), host_v1.as_ref().clone()),
+            ])
+            .is_err()
+        );
+        assert!(
+            PathObservationEpoch::from_shared([
+                (host.dupe(), host_v1.dupe()),
+                (host.dupe(), bytes(b"conflict")),
+            ])
+            .is_err()
+        );
+        assert!(
+            PathObservationEpoch::from_shared([(
+                host.dupe(),
+                Arc::new(PathObservationResult::Lstat(
+                    slug_workspace_v2::PathOperationResult::Missing,
+                )),
+            )])
+            .is_err()
+        );
+        validate_certificate_association(&full_epoch, &certificate).unwrap();
+        let pointer_distinct = PathObservationEpoch::from_shared([
+            (host.dupe(), bytes(b"host-v1")),
+            (materialized.dupe(), materialized_v1.dupe()),
+            (unrelated.dupe(), unrelated_v1.dupe()),
+        ])
+        .unwrap();
+        assert!(matches!(
+            validate_certificate_association(&pointer_distinct, &certificate),
+            Err(RequestRevisionError::Injection(_))
+        ));
+
+        let mut initial = runtime.updater();
+        initial
+            .changed_to(vec![(PathObservationEpochKey, full_epoch.clone())])
+            .unwrap();
+        let terminal = runtime.commit_native_attempt(initial).await.unwrap();
+        let mut selected = runtime.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, full_epoch.clone())])
+            .unwrap();
+        assert!(matches!(
+            runtime
+                .finalize_native(&terminal, &certificate, selected, &full_epoch, |_| {
+                    PathObservationEpoch::from_shared([
+                        (host.dupe(), bytes(b"host-v1")),
+                        (materialized.dupe(), bytes(b"materialized-v1")),
+                    ])
+                    .map_err(|error| RequestRevisionError::Observation(error.to_string()))
+                },)
+                .await
+                .unwrap(),
+            NativeFinalization::Accepted { .. }
+        ));
+
+        let mut current = runtime.updater().existing_state().await;
+        let retained = current.compute(&PathObservationEpochKey).await.unwrap();
+        for (demand, result) in full_epoch.observations() {
+            assert!(Arc::ptr_eq(result, retained.get(demand).unwrap()));
+        }
+        let mut selected = runtime.updater();
+        selected
+            .changed_to(vec![(PathObservationEpochKey, full_epoch.clone())])
+            .unwrap();
+        let materialized_v2 = bytes(b"materialized-v2");
+        let outcome = runtime
+            .finalize_native(&current, &certificate, selected, &full_epoch, |_| {
+                PathObservationEpoch::from_shared([
+                    (host.dupe(), bytes(b"host-v1")),
+                    (materialized.dupe(), materialized_v2.dupe()),
+                ])
+                .map_err(|error| RequestRevisionError::Observation(error.to_string()))
+            })
+            .await
+            .unwrap();
+        let NativeFinalization::RetrySourceChanged { merged_epoch } = outcome else {
+            panic!("changed materialized demand did not retry");
+        };
+        assert!(Arc::ptr_eq(merged_epoch.get(&host).unwrap(), &host_v1));
+        assert!(Arc::ptr_eq(
+            merged_epoch.get(&unrelated).unwrap(),
+            &unrelated_v1
+        ));
+        assert!(Arc::ptr_eq(
+            merged_epoch.get(&materialized).unwrap(),
+            &materialized_v2
+        ));
     }
 
     #[tokio::test]
@@ -1463,7 +1702,13 @@ mod tests {
             .unwrap();
         assert!(matches!(
             runtime
-                .finalize_native(&stale_terminal, first.certificate(), selected, &stale_epoch,)
+                .finalize_native(
+                    &stale_terminal,
+                    first.certificate(),
+                    selected,
+                    &stale_epoch,
+                    observe_certificate,
+                )
                 .await
                 .unwrap(),
             NativeFinalization::RetryVersionAdvanced
@@ -1487,6 +1732,7 @@ mod tests {
                     first.certificate(),
                     selected,
                     &stale_epoch,
+                    observe_certificate,
                 )
                 .await
                 .unwrap(),
