@@ -7660,3 +7660,25 @@ schedule only
 the same eleven files. Raise only `result.rs` to +300/730 physical and aggregate
 to 848 production, 860 tests, 1,708 semantic and 25,895 physical. No Rust,
 oracle, public named-group, M7A/M8/M7B or M9 activation is authorized now.
+
+### Action-owner absence correction accepted (2026-08-19)
+
+The three-state correction is implementation-ready. `SelectedToolchain`
+preserves the accepted full platform/toolchain context. The existing unique-
+candidate topology may produce `SelectedPlatformOnly` after matching-family
+Platform analysis, with explicit absent toolchain. Rules with no selected
+candidate receive `UnresolvedDefault`, retaining owner/group/aspect and exact
+intrinsic action order without a fabricated platform, property, constraint,
+selection or marker. Configured FileWrite projection still requires a selected
+platform, so the former sole-candidate success and unresolved rejection remain
+unchanged.
+
+Run only
+`WP-6-7A-immutable-configured-action-owner-context-implementation-retry` from
+Rust base `51127df8`, semantic design `460dea72` and correction `11934418`.
+Authority remains the same eleven Rust files. Raise only `result.rs` to
++300/730 physical and aggregate caps to 848 production, 860 tests, 1,708
+semantic and 25,895 physical. Split the root-toolchain owner into Platform,
+implementation and orchestration helpers below 200 lines. Preserve every other
+owner/order/memory/identity/aquery/REAPI/proof boundary and schedule only a
+docs-only M7A next-owner audit after ACCEPT.
