@@ -6589,3 +6589,44 @@ schedule at most one implementation.
 STOP implementation, preselected ownership, weakened exact Arc/event/
 repository validation, new retained state, adjacent breadth, cap excess or M1
 closure in this audit.
+
+### Post-multi-build remaining-owner audit accepted (2026-08-18)
+
+The read-only audit from `93627b12` finds no remaining M1 semantic publication
+owner. Private build identity reaches observed PackageAll/external/multi or the
+neutral root Single before the preserved legacy fallback. Typed one-shot CLI
+wrappers create a fresh runtime but call the same accepted native command
+methods and return `AcceptedCommand`; the daemon calls those methods on one
+retained runtime. No adapter owns another revision/certificate/repository/event
+acceptance boundary.
+
+The residual `evaluate_workspace_targets*`/`evaluate_observations*` APIs are
+exact snapshot/test compatibility paths. They eagerly inject workspace
+snapshots, call legacy loading/configured analysis, reject external targets and
+return `WorkspaceBuildEvaluation`; migration for structural uniformity would
+duplicate accepted ownership. Snapshot query conveniences are classified the
+same way.
+
+### M1 completion and next-milestone transition audit active (2026-08-18)
+
+Run only `WP-2A-m1-completion-next-milestone-transition-audit` from scheduling
+base `93627b12` and accepted Rust `51127df8`. Canonical/current/Stage/routing are
+the only writable files within 40/180/140/30 and 390 aggregate net. No Rust,
+test, fixture, oracle, generated evidence or public change.
+
+Reconcile every canonical M1 exit clause against accepted evidence: shared
+daemon roots, overlapping-request isolation, mutation/retry, final exact
+certificate reobservation, atomic materializer/path/repository/event
+publication, lifecycle restoration, warm suppression and compact retained
+state without fallback scanning. Deferred snapshot adapters must be outside the
+admitted result, not silently ignored dependencies.
+
+If complete, accept M1 and schedule exactly one docs-only first M7A bootstrap-
+critical owner/evidence audit. M7A is only the repository, rules_rust/provider/
+toolchain, action/input-tree, aquery and REAPI closure needed for bootstrap;
+M8 follows M7A, while unrelated run/test/BEP remains M7B and exact identity
+bytes remain M9.
+
+Otherwise schedule only one smallest missing M1 proof packet or formal REPLAN.
+STOP premature M1 acceptance, direct M7A implementation, adjacent M7B/M8/M9,
+scope/cap excess or multiple successors.
