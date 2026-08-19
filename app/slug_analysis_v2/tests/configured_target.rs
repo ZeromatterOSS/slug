@@ -13,7 +13,12 @@ use std::sync::Arc;
 
 use slug_analysis_v2::AnalysisDiagnostic;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredActionAspectProvenance;
 use slug_analysis_v2::ConfiguredActionExecGroup;
+use slug_analysis_v2::ConfiguredActionExecutionState as State;
+use slug_analysis_v2::ConfiguredActionOwnerContext;
+use slug_analysis_v2::ConfiguredActionPlatformConstraint;
+use slug_analysis_v2::ConfiguredActionToolchainContext;
 use slug_analysis_v2::ConfiguredEdge;
 use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
@@ -21,6 +26,7 @@ use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
 use slug_analysis_v2::DiagnosticSeverity;
+use slug_analysis_v2::PlatformSemanticFact;
 use slug_analysis_v2::ToolchainSelection;
 use slug_analysis_v2::ToolchainTopology;
 use slug_analysis_v2::key::RootStringSettingValue;
@@ -86,6 +92,94 @@ fn mapped_label(mapping_name: &str, repo_version: &str) -> CanonicalLabel {
     apparent.resolve(&mapping)
 }
 
+fn default_action_context(
+    owner: &ConfiguredTargetKey,
+    platform_label: &str,
+) -> (Arc<ConfiguredActionOwnerContext>, ToolchainTopology) {
+    let platform = ConfiguredTargetKey::new(
+        canonical(platform_label),
+        structural_configurations()[1].clone(),
+    );
+    let selection = ToolchainSelection::new(
+        platform.clone(),
+        canonical("@@//:toolchain"),
+        ConfiguredTargetKey::new(canonical("@@//:type"), owner.configuration().clone()),
+        ConfiguredTargetKey::new(
+            canonical("@@//:implementation"),
+            owner.configuration().clone(),
+        ),
+    );
+    let context = ConfiguredActionOwnerContext::new(
+        owner.clone(),
+        ConfiguredActionExecGroup::Default,
+        platform.clone(),
+        PlatformSemanticFact {
+            exec_properties: Arc::from([]),
+        },
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+        Vec::new(),
+        Some(Arc::new(ConfiguredActionToolchainContext::new(
+            selection.clone(),
+            "marker".into(),
+        ))),
+        ConfiguredActionAspectProvenance::Absent,
+    )
+    .unwrap();
+    (
+        Arc::new(context),
+        ToolchainTopology::new(vec![platform], Some(selection)).unwrap(),
+    )
+}
+
+fn action_context(
+    owner: &ConfiguredTargetKey,
+    group: ConfiguredActionExecGroup,
+    platform: ConfiguredTargetKey,
+    platform_properties: &[(&str, &str)],
+    target_properties: &[(&str, &str)],
+    group_properties: &[(&str, &str)],
+    marker: &str,
+    constraints: Vec<ConfiguredActionPlatformConstraint>,
+) -> Result<Arc<ConfiguredActionOwnerContext>, String> {
+    let properties = |entries: &[(&str, &str)]| {
+        entries
+            .iter()
+            .map(|(key, value)| ((*key).to_owned(), (*value).to_owned()))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let selection = ToolchainSelection::new(
+        platform.clone(),
+        canonical("@@//:toolchain"),
+        ConfiguredTargetKey::new(canonical("@@//:type"), owner.configuration().clone()),
+        ConfiguredTargetKey::new(
+            canonical("@@//:implementation"),
+            owner.configuration().clone(),
+        ),
+    );
+    ConfiguredActionOwnerContext::new(
+        owner.clone(),
+        group,
+        platform,
+        PlatformSemanticFact {
+            exec_properties: platform_properties
+                .iter()
+                .map(|(key, value)| ((*key).into(), (*value).into()))
+                .collect::<Vec<_>>()
+                .into(),
+        },
+        &properties(target_properties),
+        &properties(group_properties),
+        constraints,
+        Some(Arc::new(ConfiguredActionToolchainContext::new(
+            selection,
+            marker.into(),
+        ))),
+        ConfiguredActionAspectProvenance::Absent,
+    )
+    .map(Arc::new)
+}
+
 fn file_write_result(
     configuration: ConfigurationKey,
     platform_label: &str,
@@ -93,31 +187,22 @@ fn file_write_result(
     output_path: &str,
 ) -> ConfiguredNodeResult {
     let owner = ConfiguredTargetKey::new(canonical("@@//:probe"), configuration.clone());
-    let platform = ConfiguredTargetKey::new(
-        canonical(platform_label),
-        structural_configurations()[1].clone(),
-    );
-    let topology = ToolchainTopology::new(
-        vec![platform.clone()],
-        Some(ToolchainSelection::new(
-            platform,
-            canonical("@@//:toolchain"),
-            ConfiguredTargetKey::new(canonical("@@//:type"), configuration.clone()),
-            ConfiguredTargetKey::new(canonical("@@//:implementation"), configuration),
-        )),
-    )
-    .unwrap();
+    let (context, topology) = default_action_context(&owner, platform_label);
     let providers =
         ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
     ConfiguredNodeResult::new_rule(owner, providers, None)
-        .with_actions(vec![ActionSpec::new(
-            ActionKind::Write {
-                content: content.to_owned(),
-                is_executable: false,
-            },
-            "FileWrite",
-            vec![ActionOutput::new(output_path, ActionOutputKind::File)],
-        )])
+        .with_action_specs(
+            vec![ActionSpec::new(
+                ActionKind::Write {
+                    content: content.to_owned(),
+                    is_executable: false,
+                },
+                "FileWrite",
+                vec![ActionOutput::new(output_path, ActionOutputKind::File)],
+            )],
+            vec![context],
+        )
+        .unwrap()
         .with_toolchain_topology(topology)
 }
 
@@ -294,24 +379,26 @@ fn configured_node_result_keeps_provider_collection_outputs_and_diagnostics() {
     ])
     .unwrap();
 
-    let result = ConfiguredNodeResult::new_rule(
-        ConfiguredTargetKey::new(canonical("@@//pkg:custom"), target_config()),
-        providers,
-        None,
-    )
-    .with_actions(vec![ActionSpec::new(
-        ActionKind::Write {
-            content: "out".to_owned(),
-            is_executable: false,
-        },
-        "FileWrite",
-        vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
-    )])
-    .with_declared_outputs(vec!["pkg/out.txt".to_owned()])
-    .with_diagnostics(vec![AnalysisDiagnostic::new(
-        DiagnosticSeverity::Warning,
-        "placeholder analysis warning",
-    )]);
+    let owner = ConfiguredTargetKey::new(canonical("@@//pkg:custom"), target_config());
+    let (context, _) = default_action_context(&owner, "@@//:platform");
+    let result = ConfiguredNodeResult::new_rule(owner, providers, None)
+        .with_action_specs(
+            vec![ActionSpec::new(
+                ActionKind::Write {
+                    content: "out".to_owned(),
+                    is_executable: false,
+                },
+                "FileWrite",
+                vec![ActionOutput::new("pkg/out.txt", ActionOutputKind::File)],
+            )],
+            vec![context],
+        )
+        .unwrap()
+        .with_declared_outputs(vec!["pkg/out.txt".to_owned()])
+        .with_diagnostics(vec![AnalysisDiagnostic::new(
+            DiagnosticSeverity::Warning,
+            "placeholder analysis warning",
+        )]);
 
     assert_eq!(
         result.configured_target_key().unwrap().stable_serialize(),
@@ -418,7 +505,7 @@ fn configured_file_write_view_tracks_and_restores_structural_identity() {
     let restored = file_write_result(c0, "@@//:p0", "content-A", "path-A.txt");
 
     let baseline = only_file_write(&baseline);
-    assert_eq!(baseline.exec_group(), ConfiguredActionExecGroup::Default);
+    assert_eq!(baseline.exec_group(), &ConfiguredActionExecGroup::Default);
     assert_eq!(baseline.owner().label(), &canonical("@@//:probe"));
     assert_eq!(baseline.execution_platform().label(), &canonical("@@//:p0"));
     assert_eq!(baseline.output().path(), "path-A.txt");
@@ -434,49 +521,247 @@ fn configured_file_write_view_tracks_and_restores_structural_identity() {
 }
 
 #[test]
-fn configured_file_write_view_rejects_unowned_or_ambiguous_shapes() {
+fn configured_actions_share_group_contexts_merge_properties_and_reject_mismatches() {
+    let owner = ConfiguredTargetKey::new(
+        canonical("@@//:probe"),
+        structural_configurations()[0].clone(),
+    );
+    let exec = structural_configurations()[1].clone();
+    let platform = |label: &str| ConfiguredTargetKey::new(canonical(label), exec.clone());
+    let constraint = ConfiguredActionPlatformConstraint::new(
+        ConfiguredTargetKey::new(canonical("@@//:linux"), exec.clone()),
+        ConfiguredTargetKey::new(canonical("@@//:os"), exec.clone()),
+    );
+    let default = action_context(
+        &owner,
+        ConfiguredActionExecGroup::Default,
+        platform("@@//:p0"),
+        &[("a", "platform"), ("z", "platform")],
+        &[("a", "target"), ("b", "target")],
+        &[("a", "default"), ("c", "default")],
+        "marker-A",
+        vec![constraint.clone()],
+    )
+    .unwrap();
+    let named = action_context(
+        &owner,
+        ConfiguredActionExecGroup::Named("named".into()),
+        platform("@@//:p1"),
+        &[("a", "platform")],
+        &[("a", "target")],
+        &[("a", "named")],
+        "marker-B",
+        vec![constraint],
+    )
+    .unwrap();
+    let spec = |path: &str| {
+        ActionSpec::new(
+            ActionKind::Write {
+                content: path.to_owned(),
+                is_executable: false,
+            },
+            "FileWrite",
+            vec![ActionOutput::new(path, ActionOutputKind::File)],
+        )
+    };
+    let providers =
+        ProviderCollection::new(vec![ProviderValue::DefaultInfo(DefaultInfo::empty())]).unwrap();
+    let result = ConfiguredNodeResult::new_rule(owner.clone(), providers.clone(), None)
+        .with_action_specs(
+            vec![spec("a"), spec("b"), spec("c").with_exec_group("named")],
+            vec![default.clone(), named.clone()],
+        )
+        .unwrap();
+    assert_eq!(
+        result
+            .actions()
+            .iter()
+            .map(|row| row.outputs()[0].path())
+            .collect::<Vec<_>>(),
+        ["a", "b", "c"]
+    );
+    assert!(Arc::ptr_eq(
+        result.actions()[0].context(),
+        result.actions()[1].context()
+    ));
+    assert!(Arc::ptr_eq(result.actions()[0].context(), &default));
+    assert!(Arc::ptr_eq(result.actions()[2].context(), &named));
+    assert_eq!(
+        default.platform_fact().unwrap().exec_properties.as_ref(),
+        &[
+            ("a".into(), "default".into()),
+            ("b".into(), "target".into()),
+            ("c".into(), "default".into()),
+            ("z".into(), "platform".into()),
+        ]
+    );
+    assert_eq!(default.toolchain().unwrap().marker(), "marker-A");
+    assert_eq!(named.toolchain().unwrap().marker(), "marker-B");
+    assert_eq!(default.execution_state(), State::SelectedToolchain);
+    assert_ne!(default, named);
+
+    let platform_only = Arc::new(
+        ConfiguredActionOwnerContext::new(
+            owner.clone(),
+            ConfiguredActionExecGroup::Default,
+            platform("@@//:p0"),
+            PlatformSemanticFact {
+                exec_properties: Arc::from([]),
+            },
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            Vec::new(),
+            None,
+            ConfiguredActionAspectProvenance::Absent,
+        )
+        .unwrap(),
+    );
+    assert_eq!(platform_only.execution_state(), State::SelectedPlatformOnly);
+    assert!(platform_only.toolchain().is_none());
+
+    let restored = action_context(
+        &owner,
+        ConfiguredActionExecGroup::Default,
+        platform("@@//:p0"),
+        &[("a", "platform"), ("z", "platform")],
+        &[("a", "target"), ("b", "target")],
+        &[("a", "default"), ("c", "default")],
+        "marker-A",
+        vec![ConfiguredActionPlatformConstraint::new(
+            ConfiguredTargetKey::new(canonical("@@//:linux"), exec.clone()),
+            ConfiguredTargetKey::new(canonical("@@//:os"), exec.clone()),
+        )],
+    )
+    .unwrap();
+    assert_eq!(default, restored);
+    assert_ne!(
+        default,
+        action_context(
+            &owner,
+            ConfiguredActionExecGroup::Default,
+            platform("@@//:p0"),
+            &[("a", "platform"), ("z", "platform")],
+            &[],
+            &[("a", "edited")],
+            "marker-A",
+            Vec::new(),
+        )
+        .unwrap()
+    );
+
+    let wrong_owner =
+        ConfiguredTargetKey::new(canonical("@@//:other"), owner.configuration().clone());
+    let wrong_context = action_context(
+        &wrong_owner,
+        ConfiguredActionExecGroup::Default,
+        platform("@@//:p0"),
+        &[],
+        &[],
+        &[],
+        "marker",
+        Vec::new(),
+    )
+    .unwrap();
+    assert_eq!(
+        ConfiguredNodeResult::new_rule(owner.clone(), providers.clone(), None)
+            .with_action_specs(vec![spec("out")], vec![wrong_context])
+            .unwrap_err(),
+        "configured action context has mismatched owner"
+    );
+    assert_eq!(
+        ConfiguredNodeResult::new_rule(owner.clone(), providers.clone(), None)
+            .with_action_specs(vec![spec("out")], vec![default.clone(), default.clone()])
+            .unwrap_err(),
+        "configured action contexts contain duplicate group"
+    );
+    assert!(
+        action_context(
+            &owner,
+            ConfiguredActionExecGroup::Default,
+            ConfiguredTargetKey::new(canonical("@@//:bad"), target_config()),
+            &[],
+            &[],
+            &[],
+            "marker",
+            Vec::new(),
+        )
+        .is_err()
+    );
+    assert!(
+        action_context(
+            &owner,
+            ConfiguredActionExecGroup::Default,
+            platform("@@//:p0"),
+            &[("z", "last"), ("a", "first")],
+            &[],
+            &[],
+            "marker",
+            Vec::new(),
+        )
+        .is_err()
+    );
+    let bad_constraint = ConfiguredActionPlatformConstraint::new(
+        ConfiguredTargetKey::new(canonical("@@//:linux"), target_config()),
+        ConfiguredTargetKey::new(canonical("@@//:os"), target_config()),
+    );
+    assert!(
+        action_context(
+            &owner,
+            ConfiguredActionExecGroup::Default,
+            platform("@@//:p0"),
+            &[],
+            &[],
+            &[],
+            "marker",
+            vec![bad_constraint],
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn configured_file_write_view_uses_retained_context_and_rejects_shapes() {
     let c0 = structural_configurations()[0].clone();
     let baseline = file_write_result(c0, "@@//:p0", "content-A", "path-A.txt");
-    let action = baseline.actions()[0].clone();
-    let without_platform = ConfiguredNodeResult::new_rule(
+    let action = ActionSpec::clone(&baseline.actions()[0]);
+    let context = baseline.actions()[0].context().clone();
+    let empty = ConfiguredNodeResult::new_rule(
         baseline.configured_target_key().unwrap().clone(),
         baseline.providers().clone(),
         None,
-    )
-    .with_actions(vec![action.clone()]);
-    let empty = without_platform.clone().with_actions(Vec::new());
+    );
     assert_eq!(empty.configured_file_write_actions().unwrap().len(), 0);
+    let unresolved = Arc::new(
+        ConfiguredActionOwnerContext::unresolved_default(
+            baseline.configured_target_key().unwrap().clone(),
+        )
+        .unwrap(),
+    );
+    assert_eq!(unresolved.execution_state(), State::UnresolvedDefault);
+    let unresolved = empty
+        .clone()
+        .with_action_specs(vec![action.clone()], vec![unresolved])
+        .unwrap();
+    assert!(unresolved.configured_file_write_actions().is_err());
     assert_eq!(
-        without_platform.configured_file_write_actions().err(),
-        Some("configured FileWrite action requires a selected toolchain platform")
+        empty
+            .clone()
+            .with_action_specs(vec![action.clone()], Vec::new())
+            .unwrap_err(),
+        "configured action has no matching exec-group context"
     );
 
-    let sole = ConfiguredTargetKey::new(
-        canonical("@@//:sole"),
+    let unrelated = ConfiguredTargetKey::new(
+        canonical("@@//:unrelated"),
         structural_configurations()[1].clone(),
     );
-    let derived = without_platform
+    let retained = baseline
         .clone()
-        .with_toolchain_topology(ToolchainTopology::new(vec![sole.clone()], None).unwrap());
-    assert_eq!(only_file_write(&derived).execution_platform(), &sole);
-    for candidates in [
-        Vec::new(),
-        vec![
-            sole,
-            ConfiguredTargetKey::new(
-                canonical("@@//:other"),
-                structural_configurations()[1].clone(),
-            ),
-        ],
-    ] {
-        let ambiguous = without_platform
-            .clone()
-            .with_toolchain_topology(ToolchainTopology::new(candidates, None).unwrap());
-        assert_eq!(
-            ambiguous.configured_file_write_actions().err(),
-            Some("configured FileWrite action requires a selected toolchain platform")
-        );
-    }
+        .with_toolchain_topology(ToolchainTopology::new(vec![unrelated], None).unwrap());
+    assert_eq!(
+        only_file_write(&retained).execution_platform().label(),
+        &canonical("@@//:p0")
+    );
 
     let unsupported_shapes = vec![
         ActionSpec::new(ActionKind::Run, "Spawn", action.outputs().to_vec()),
@@ -485,12 +770,24 @@ fn configured_file_write_view_rejects_unowned_or_ambiguous_shapes() {
             "FileWrite",
             vec![ActionOutput::new("tree", ActionOutputKind::Directory)],
         ),
-        action.clone().with_exec_group("named"),
     ];
     for unsupported in unsupported_shapes {
-        let result = baseline.clone().with_actions(vec![unsupported]);
+        let result = baseline
+            .clone()
+            .with_action_specs(vec![unsupported], vec![context.clone()])
+            .unwrap();
         assert!(result.configured_file_write_actions().is_err());
     }
+    assert_eq!(
+        baseline
+            .clone()
+            .with_action_specs(
+                vec![action.clone().with_exec_group("named")],
+                vec![context.clone()],
+            )
+            .unwrap_err(),
+        "configured action has no matching exec-group context"
+    );
 
     let mut field = BTreeMap::new();
     field.insert("key".to_owned(), "value".to_owned());
@@ -513,7 +810,10 @@ fn configured_file_write_view_rejects_unowned_or_ambiguous_shapes() {
         action.with_progress_message("writing"),
     ];
     for unsupported in unsupported_execution_fields {
-        let result = baseline.clone().with_actions(vec![unsupported]);
+        let result = baseline
+            .clone()
+            .with_action_specs(vec![unsupported], vec![context.clone()])
+            .unwrap();
         assert_eq!(
             result.configured_file_write_actions().err(),
             Some("configured FileWrite action has unsupported execution fields")

@@ -873,7 +873,7 @@ fn finalize_epoch_for_test(
     }
 
     #[tokio::test]
-    async fn resolved_file_write_view_borrows_exact_platform_fact_and_rejects_bad_closures() {
+    async fn resolved_file_write_view_borrows_immutable_owner_context_without_closure_lookup() {
         let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
         let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
         let targets = [TargetPattern::parse("//:write").unwrap()];
@@ -883,103 +883,33 @@ fn finalize_epoch_for_test(
             build_root_transaction(&dice, resolved_write_epoch(3, "setting_a", &[])).await;
         let outcome = transaction.compute(&key).await.unwrap();
         let base = complete_build_evaluation(&outcome);
-        let platform = base
-            .action_closure
-            .iter()
-            .find(|node| node.kind() == &ConfiguredNodeKind::Platform)
-            .unwrap()
-            .dupe();
-        let evaluation = |closure: Vec<Arc<ConfiguredNodeResult>>| BuildCommandEvaluation {
-            anchor: base.anchor.clone(),
-            targets: base.targets.clone(),
-            action_closure: closure.into(),
-        };
         let views = base.resolved_file_write_semantic_views().unwrap();
-        let constraint = views[0].platform_constraints()[0];
         let baseline_projection = resolved_setting_label(base);
         assert_eq!(baseline_projection, "@@//:setting_a");
-        let platform_key = platform.configured_target_key().unwrap().clone();
-        let wrong = Arc::new(ConfiguredNodeResult::new_rule(
-            platform_key,
-            platform.providers().clone(),
-            None,
-        ));
-        let unordered = Arc::new(platform.as_ref().clone().with_edges(vec![
-            slug_analysis_v2::ConfiguredEdge::new(
-                platform.edges()[0].target().clone(),
-                ConfiguredEdgeKind::PlatformConstraint { index: 1 },
-            ),
-        ]));
-        let bad_value = Arc::new(ConfiguredNodeResult::new_rule(
-            constraint
-                .constraint_value()
-                .configured_target_key()
-                .unwrap()
-                .clone(),
-            constraint.constraint_value().providers().clone(),
-            None,
-        ));
-        let missing_setting =
-            Arc::new(constraint.constraint_value().clone().with_edges(Vec::new()));
-        let mismatched = Arc::new(platform.as_ref().clone().with_edges(vec![
-            slug_analysis_v2::ConfiguredEdge::new(
-                ConfiguredTargetKey::new(
-                    constraint.constraint_value().key().label().clone(),
-                    ConfigurationKey::exec("legacy-mismatch").unwrap(),
-                )
-                .into(),
-                ConfiguredEdgeKind::PlatformConstraint { index: 0 },
-            ),
-        ]));
-        let duplicate_setting = Arc::new(platform.as_ref().clone().with_edges(vec![
-            platform.edges()[0].clone(),
-            slug_analysis_v2::ConfiguredEdge::new(
-                platform.edges()[0].target().clone(),
-                ConfiguredEdgeKind::PlatformConstraint { index: 1 },
-            ),
-        ]));
-        let replace = |replacement: Arc<ConfiguredNodeResult>| {
-            let key = replacement.configured_target_key().unwrap();
-            base.action_closure
+        assert_eq!(
+            views[0].action().execution_platform().label().to_string(),
+            "@@//:platform"
+        );
+        assert_eq!(
+            views[0].action().toolchain().unwrap().marker(),
+            "toolchain"
+        );
+        let without_platform = BuildCommandEvaluation {
+            anchor: base.anchor.clone(),
+            targets: base.targets.clone(),
+            action_closure: base
+                .action_closure
                 .iter()
-                .map(|node| {
-                    if node.configured_target_key() == Some(key) {
-                        replacement.dupe()
-                    } else {
-                        node.dupe()
-                    }
-                })
-                .collect()
+                .filter(|node| node.kind() != &ConfiguredNodeKind::Platform)
+                .cloned()
+                .collect(),
         };
-        for (closure, message) in [
-            (
-                base.action_closure
-                    .iter()
-                    .filter(|node| node.kind() != &ConfiguredNodeKind::Platform)
-                    .cloned()
-                    .collect(),
-                "absent",
-            ),
-            (
-                base.action_closure
-                    .iter()
-                    .cloned()
-                    .chain([platform.dupe()])
-                    .collect(),
-                "duplicated",
-            ),
-            (replace(wrong), "wrong kind"),
-            (replace(unordered), "unordered"),
-            (replace(bad_value), "wrong kind"),
-            (replace(missing_setting), "exactly one setting edge"),
-            (replace(mismatched), "mismatched configuration"),
-            (replace(duplicate_setting), "duplicate constraint setting"),
-        ] {
-            let error = evaluation(closure)
-                .resolved_file_write_semantic_views()
-                .unwrap_err();
-            assert!(error.contains(message));
-        }
+        let retained = without_platform.resolved_file_write_semantic_views().unwrap();
+        assert_eq!(resolved_setting_label(&without_platform), baseline_projection);
+        assert!(Arc::ptr_eq(
+            views[0].action().context(),
+            retained[0].action().context(),
+        ));
         let mut edited_tx =
             build_root_transaction(&dice, resolved_write_epoch(4, "setting_b", &[])).await;
         let edited = edited_tx.compute(&key).await.unwrap();

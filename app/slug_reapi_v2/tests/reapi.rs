@@ -16,6 +16,7 @@ use slug_build_api_v2::ActionOutput;
 use slug_build_api_v2::ActionOutputKind;
 use slug_build_api_v2::ActionSpec;
 use slug_reapi_v2::ExecutionEvidence;
+use slug_reapi_v2::FileWriteReapiPlan;
 use slug_reapi_v2::GeneratedOutput;
 use slug_reapi_v2::ReapiActionIdentity;
 use slug_reapi_v2::ReapiCommand;
@@ -123,6 +124,79 @@ fn declarative_write_action_rejects_the_raw_executor_projection() {
         ReapiCommand::for_execution(&action).unwrap_err(),
         "raw FileWrite REAPI lowering is forbidden"
     );
+}
+
+#[test]
+fn configured_file_write_reapi_plan_reads_retained_platform_properties() {
+    let workspace = std::env::temp_dir().join(format!(
+        "slug-reapi-configured-action-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&workspace);
+    std::fs::create_dir_all(&workspace).unwrap();
+    std::fs::write(
+        workspace.join("MODULE.bazel"),
+        "module(name = \"root\")\nregister_execution_platforms(\"//:platform\")\nregister_toolchains(\"//:toolchain\")\n",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("defs.bzl"),
+        r#"def _tool(ctx): return [platform_common.ToolchainInfo(marker = "retained")]
+def _write(ctx):
+    out = ctx.actions.declare_file("out.txt")
+    ctx.actions.write(out, "content")
+    return [DefaultInfo(files = depset([out]))]
+tool = rule(implementation = _tool, attrs = {"marker": attr.string(mandatory = True)})
+write = rule(implementation = _write, toolchains = ["//:type"])
+"#,
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("BUILD.bazel"),
+        r#"load(":defs.bzl", "tool", "write")
+platform(name = "platform", exec_properties = {"z": "last", "a": "first"})
+toolchain_type(name = "type")
+tool(name = "implementation", marker = "retained")
+toolchain(name = "toolchain", toolchain_type = ":type", toolchain = ":implementation")
+write(name = "write")
+"#,
+    )
+    .unwrap();
+
+    let targets = [slug_core_v2::runtime::TargetPattern::parse("//:write").unwrap()];
+    let mut remote_defaults = BTreeMap::new();
+    remote_defaults.insert("remote".to_owned(), "ignored".to_owned());
+    let accepted = slug_core_v2::runtime::evaluate_workspace_build_command_with_bzlmod_inputs(
+        &workspace,
+        &targets,
+        slug_core_v2::runtime::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+        slug_core_v2::runtime::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None)
+            .unwrap(),
+        slug_core_v2::runtime::LockfileMode::Update,
+        &[],
+        None,
+    )
+    .unwrap();
+    let projected = accepted.project(|terminal| {
+        let evaluation = terminal.as_ref().as_ref().unwrap();
+        let views = evaluation.resolved_file_write_semantic_views().unwrap();
+        let context = views[0].action().context().clone();
+        let plan = FileWriteReapiPlan::from_resolved(&views[0], &remote_defaults).unwrap();
+        assert_eq!(
+            plan.command().platform_properties,
+            BTreeMap::from([
+                ("a".to_owned(), "first".to_owned()),
+                ("z".to_owned(), "last".to_owned()),
+            ])
+        );
+        assert!(std::sync::Arc::ptr_eq(
+            views[0].action().context(),
+            &context,
+        ));
+        slug_core_v2::runtime::TerminalOutput::new(0, String::new(), String::new())
+    });
+    assert_eq!(projected.publish().into_parts().1, 0);
+    std::fs::remove_dir_all(workspace).unwrap();
 }
 
 #[test]

@@ -48,16 +48,14 @@ use dupe::Dupe;
 use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::ConfigurationKey;
-use slug_analysis_v2::ConfigurationKind;
+use slug_analysis_v2::ConfiguredActionPlatformConstraint;
 use slug_analysis_v2::ConfiguredActionView;
-use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
 use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
 use slug_analysis_v2::ConfiguredTargetKey;
-use slug_analysis_v2::PlatformSemanticFact;
 use slug_analysis_v2::prepare_configured_node_analysis;
 use slug_analysis_v2::prepare_configured_node_analysis_observed;
 use slug_bzlmod_v2::BzlmodCommandPolicyKey;
@@ -2778,9 +2776,6 @@ pub struct BuildCommandEvaluation {
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ResolvedFileWriteSemanticView<'a> {
     action: ConfiguredActionView<'a>,
-    platform: &'a ConfiguredNodeResult,
-    platform_fact: &'a PlatformSemanticFact,
-    platform_constraints: Vec<ResolvedPlatformConstraintSemanticView<'a>>,
 }
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ResolvedRunSemanticView<'a> {
@@ -2790,26 +2785,19 @@ pub struct ResolvedRunSemanticView<'a> {
     executable: &'a str,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub struct ResolvedPlatformConstraintSemanticView<'a> {
-    platform_edge: &'a slug_analysis_v2::ConfiguredEdge,
-    constraint_value: &'a ConfiguredNodeResult,
-    setting_edge: &'a slug_analysis_v2::ConfiguredEdge,
-    constraint_setting: &'a ConfiguredNodeResult,
-}
-
 impl<'a> ResolvedFileWriteSemanticView<'a> {
+    fn from_action(action: ConfiguredActionView<'a>) -> Self {
+        Self { action }
+    }
+
     pub fn action(&self) -> &ConfiguredActionView<'a> {
         &self.action
     }
-    pub fn platform(&self) -> &'a ConfiguredNodeResult {
-        self.platform
+    pub fn platform_fact(&self) -> &'a slug_analysis_v2::PlatformSemanticFact {
+        self.action.platform_fact()
     }
-    pub fn platform_fact(&self) -> &'a PlatformSemanticFact {
-        self.platform_fact
-    }
-    pub fn platform_constraints(&self) -> &[ResolvedPlatformConstraintSemanticView<'a>] {
-        &self.platform_constraints
+    pub fn platform_constraints(&self) -> &'a [ConfiguredActionPlatformConstraint] {
+        self.action.platform_constraints()
     }
 }
 
@@ -2830,21 +2818,6 @@ impl<'a> ResolvedRunSemanticView<'a> {
         self.executable
     }
 }
-impl<'a> ResolvedPlatformConstraintSemanticView<'a> {
-    pub fn platform_edge(&self) -> &'a slug_analysis_v2::ConfiguredEdge {
-        self.platform_edge
-    }
-    pub fn constraint_value(&self) -> &'a ConfiguredNodeResult {
-        self.constraint_value
-    }
-    pub fn setting_edge(&self) -> &'a slug_analysis_v2::ConfiguredEdge {
-        self.setting_edge
-    }
-    pub fn constraint_setting(&self) -> &'a ConfiguredNodeResult {
-        self.constraint_setting
-    }
-}
-
 #[derive(Debug, Clone, Eq, PartialEq, Allocative)]
 struct BuildRequestedTarget {
     pattern: Arc<str>,
@@ -3069,24 +3042,6 @@ impl SingletonRootSingleBuildCommandKey {
 }
 
 impl BuildCommandEvaluation {
-    fn unique_closure_node(
-        &self,
-        key: &ConfiguredTargetKey,
-    ) -> Result<&ConfiguredNodeResult, &'static str> {
-        let mut matches = self.action_closure.iter().filter(|candidate| {
-            candidate
-                .configured_target_key()
-                .is_some_and(|candidate| candidate == key)
-        });
-        let node = matches
-            .next()
-            .ok_or("configured semantic node is absent from action closure")?;
-        if matches.next().is_some() {
-            return Err("configured semantic node is duplicated in action closure");
-        }
-        Ok(node)
-    }
-
     pub fn loaded_package_count(&self) -> usize {
         self.targets.len()
     }
@@ -3138,77 +3093,7 @@ impl BuildCommandEvaluation {
         let mut views = Vec::new();
         for owner in owners {
             for action in owner.configured_file_write_actions()? {
-                let selected = action.execution_platform();
-                if selected.configuration().kind() != ConfigurationKind::Exec
-                    || selected.configuration().slug_configuration().is_none()
-                {
-                    return Err("FileWrite platform requires structural exec configuration");
-                }
-                let platform = self.unique_closure_node(selected)?;
-                if platform.kind() != &ConfiguredNodeKind::Platform {
-                    return Err("selected FileWrite platform closure node has wrong kind");
-                }
-                let fact = platform
-                    .platform_semantic_fact()
-                    .ok_or("selected FileWrite platform has no semantic fact")?;
-                let mut constraints = Vec::with_capacity(platform.edges().len());
-                for (index, platform_edge) in platform.edges().iter().enumerate() {
-                    if !matches!(platform_edge.kind(), ConfiguredEdgeKind::PlatformConstraint { index: edge_index } if usize::try_from(*edge_index) == Ok(index))
-                    {
-                        return Err("selected FileWrite platform has unordered constraint edges");
-                    }
-                    let value_key = platform_edge
-                        .configured_target()
-                        .ok_or("PlatformConstraint edge target is not configured")?;
-                    if value_key.configuration() != selected.configuration()
-                        || value_key.configuration().kind() != ConfigurationKind::Exec
-                        || value_key.configuration().slug_configuration().is_none()
-                    {
-                        return Err("PlatformConstraint value has mismatched configuration");
-                    }
-                    let value = self.unique_closure_node(value_key)?;
-                    if value.kind() != &ConfiguredNodeKind::ConstraintValue {
-                        return Err("PlatformConstraint edge target has wrong kind");
-                    }
-                    let [setting_edge] = value.edges() else {
-                        return Err("ConstraintValue requires exactly one setting edge");
-                    };
-                    if setting_edge.kind() != &ConfiguredEdgeKind::ConstraintSetting {
-                        return Err("ConstraintValue edge has wrong kind");
-                    }
-                    let setting_key = setting_edge
-                        .configured_target()
-                        .ok_or("ConstraintSetting edge target is not configured")?;
-                    if setting_key.configuration() != selected.configuration()
-                        || setting_key.configuration().kind() != ConfigurationKind::Exec
-                        || setting_key.configuration().slug_configuration().is_none()
-                    {
-                        return Err("ConstraintSetting has mismatched configuration");
-                    }
-                    let setting = self.unique_closure_node(setting_key)?;
-                    if setting.kind() != &ConfiguredNodeKind::ConstraintSetting {
-                        return Err("ConstraintSetting closure node has wrong kind");
-                    }
-                    if constraints.iter().any(
-                        |resolved: &ResolvedPlatformConstraintSemanticView<'_>| {
-                            resolved.constraint_setting().key() == setting.key()
-                        },
-                    ) {
-                        return Err("platform has duplicate constraint setting");
-                    }
-                    constraints.push(ResolvedPlatformConstraintSemanticView {
-                        platform_edge,
-                        constraint_value: value,
-                        setting_edge,
-                        constraint_setting: setting,
-                    });
-                }
-                views.push(ResolvedFileWriteSemanticView {
-                    action,
-                    platform,
-                    platform_fact: fact,
-                    platform_constraints: constraints,
-                });
+                views.push(ResolvedFileWriteSemanticView::from_action(action));
             }
         }
         Ok(views)
@@ -11642,7 +11527,6 @@ ordinary_rule(
     fn resolved_setting_label(evaluation: &BuildCommandEvaluation) -> String {
         evaluation.resolved_file_write_semantic_views().unwrap()[0].platform_constraints()[0]
             .constraint_setting()
-            .key()
             .label()
             .to_string()
     }

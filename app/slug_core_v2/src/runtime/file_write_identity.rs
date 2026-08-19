@@ -55,11 +55,9 @@ impl FileWriteSemanticIdentity {
         );
         encoder.field(0x0004, |field| match view.action().exec_group() {
             ConfiguredActionExecGroup::Default => field.field(0x0401, |_| {}),
+            ConfiguredActionExecGroup::Named(name) => field.field(0x0402, |value| value.text(name)),
         });
         let selected = view.action().execution_platform();
-        if view.platform().configured_target_key() != Some(selected) {
-            return Err("FileWrite identity platform key mismatch");
-        }
         encoder.field(0x0005, |field| configured_key(field, selected))?;
         if view
             .platform_fact()
@@ -84,22 +82,10 @@ impl FileWriteSemanticIdentity {
                 field.field(0x0701, |entry| {
                     entry.field(0x0710, |value| value.count(index));
                     entry.field(0x0711, |value| {
-                        configured_key(
-                            value,
-                            constraint
-                                .constraint_value()
-                                .configured_target_key()
-                                .ok_or("constraint value is not configured")?,
-                        )
+                        configured_key(value, constraint.constraint_value())
                     })?;
                     entry.field(0x0712, |setting| {
-                        configured_key(
-                            setting,
-                            constraint
-                                .constraint_setting()
-                                .configured_target_key()
-                                .ok_or("constraint setting is not configured")?,
-                        )
+                        configured_key(setting, constraint.constraint_setting())
                     })
                 })?;
             }

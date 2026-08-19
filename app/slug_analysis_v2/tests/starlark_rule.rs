@@ -22,6 +22,7 @@ use dice::Dice;
 use dice::DiceComputations;
 use dice::DiceNodeId;
 use dice::DynKey;
+use dice::Key;
 use dice::RichActivation;
 use dice::UserComputationData;
 use dupe::Dupe;
@@ -29,8 +30,10 @@ use slug_analysis_v2::AnalysisError;
 use slug_analysis_v2::AnalysisErrorKind;
 use slug_analysis_v2::AnalysisPreparationOutcome;
 use slug_analysis_v2::ConfigurationKey;
+use slug_analysis_v2::ConfiguredActionExecutionState as ActionExecutionState;
 use slug_analysis_v2::ConfiguredEdgeKind;
 use slug_analysis_v2::ConfiguredNodeAnalysisKey;
+use slug_analysis_v2::ConfiguredNodeAnalysisObservationKey;
 use slug_analysis_v2::ConfiguredNodeKey;
 use slug_analysis_v2::ConfiguredNodeKind;
 use slug_analysis_v2::ConfiguredNodeResult;
@@ -64,10 +67,12 @@ use slug_loading_v2::keys::WorkspaceFileValue;
 use slug_loading_v2::keys::WorkspaceSnapshot;
 use slug_loading_v2::keys::WorkspaceSnapshotKey;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathLstat;
 use slug_workspace_v2::PathNodeKind;
 use slug_workspace_v2::PathObservationDemand;
 use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochError;
 use slug_workspace_v2::PathObservationEpochKey;
 use slug_workspace_v2::PathObservationNamespace;
 use slug_workspace_v2::PathObservationOperation;
@@ -455,15 +460,11 @@ impl RootActivationTracker {
     }
 }
 
-fn root_activation_identity(key: &ConfiguredNodeAnalysisKey) -> String {
+fn root_activation_identity(key: &ConfiguredTargetKey) -> String {
     format!(
         "resolved/{}={}",
-        key.configured_target()
-            .expect("root-string analysis only activates configured targets")
-            .label(),
-        key.configured_target()
-            .expect("root-string analysis only activates configured targets")
-            .configuration()
+        key.label(),
+        key.configuration()
             .root_string_setting()
             .map_or("<default>", RootStringSettingValue::as_str)
     )
@@ -538,8 +539,18 @@ impl ActivationTracker for RootActivationTracker {
     }
 
     fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
-        if let Some(root_key) = key.downcast_ref::<ConfiguredNodeAnalysisKey>() {
-            let identity = root_activation_identity(root_key);
+        let analysis = key
+            .downcast_ref::<ConfiguredNodeAnalysisKey>()
+            .and_then(|key| key.configured_target().map(|target| (target, false)))
+            .or_else(|| {
+                key.downcast_ref::<ConfiguredNodeAnalysisObservationKey>()
+                    .and_then(|key| key.configured_target().map(|target| (target, true)))
+            });
+        if let Some((target, observed)) = analysis {
+            let mut identity = root_activation_identity(target);
+            if observed {
+                identity.insert_str(0, "observed/");
+            }
             self.activations
                 .lock()
                 .unwrap()
@@ -769,7 +780,9 @@ def _second(ctx):
     return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]
 def _request(ctx):
     print("REQUEST_LOCAL")
-    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker)]
+    out = ctx.actions.declare_file("request.out")
+    ctx.actions.write(out, "configured action")
+    return [ConsumerInfo(value = ctx.toolchains["//:type"].marker), DefaultInfo(files = depset([out]))]
 first_impl = rule(implementation = _first, attrs = {"marker": attr.string(mandatory = True)})
 second_impl = rule(implementation = _second, attrs = {"marker": attr.string(mandatory = True)})
 request = rule(implementation = _request, toolchains = ["//:type"])
@@ -828,8 +841,8 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         .await
         .unwrap();
     assert_eq!(provider_value(&first, &consumer), "second");
-    assert!(first.actions().is_empty());
-    assert!(first.declared_outputs().is_empty());
+    assert_eq!(first.actions().len(), 1);
+    assert_eq!(first.declared_outputs(), &["request.out"]);
     assert!(first.diagnostics().is_empty());
     assert_eq!(candidate_labels(&first), vec!["@@//:platform"]);
     let selection = first.toolchain_topology().unwrap().selection().unwrap();
@@ -843,6 +856,17 @@ async fn root_toolchain_selection_prepares_builtin_marker_context_in_registratio
         selection.implementation().label().to_string(),
         "@@//:second_impl"
     );
+    let context = first.actions()[0].context();
+    assert_eq!(
+        context.execution_state(),
+        ActionExecutionState::SelectedToolchain
+    );
+    assert_eq!(context.owner(), first.configured_target_key().unwrap());
+    assert_eq!(
+        context.exec_group(),
+        &slug_analysis_v2::ConfiguredActionExecGroup::Default
+    );
+    assert_eq!(context.toolchain().unwrap().marker(), "second");
     assert_eq!(
         first
             .edges()
@@ -1035,6 +1059,7 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
     let first = root_target_request(&dice, &workspace, "@@//:request", tracker())
         .await
         .unwrap();
+    let first_context = first.actions()[0].context();
     let first_selection = first.toolchain_topology().unwrap().selection().unwrap();
     assert_eq!(
         first_selection.declaration().to_string(),
@@ -1104,6 +1129,26 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
         &[("a".into(), "first".into()), ("z".into(), "last".into())]
     );
     assert_eq!(platform.edges().len(), 1);
+    assert!(Arc::ptr_eq(
+        &first_context.platform_fact().unwrap().exec_properties,
+        &platform.platform_semantic_fact().unwrap().exec_properties,
+    ));
+    assert_eq!(first_context.toolchain().unwrap().marker(), "first");
+    assert_eq!(first_context.platform_constraints().len(), 1);
+    assert_eq!(
+        first_context.platform_constraints()[0]
+            .constraint_value()
+            .label()
+            .to_string(),
+        "@@//:first"
+    );
+    assert_eq!(
+        first_context.platform_constraints()[0]
+            .constraint_setting()
+            .label()
+            .to_string(),
+        "@@//:selection"
+    );
     assert_eq!(
         platform.edges()[0].kind(),
         &ConfiguredEdgeKind::PlatformConstraint { index: 0 }
@@ -1154,12 +1199,24 @@ async fn root_toolchain_topology_retains_intrinsic_candidates_selection_and_cons
             .unwrap(),
         platform
     );
+    assert_ne!(
+        root_target_request(&dice, &workspace, "@@//:request", tracker())
+            .await
+            .unwrap(),
+        first
+    );
     fs::write(workspace.join("BUILD.bazel"), TOPOLOGY_BUILD).unwrap();
     assert_eq!(
         topology_platform(&dice, &workspace, &exec_configuration)
             .await
             .unwrap(),
         platform
+    );
+    assert_eq!(
+        root_target_request(&dice, &workspace, "@@//:request", tracker())
+            .await
+            .unwrap(),
+        first
     );
     assert!(
         root_target_request(&dice, &workspace, "@@//:first_platform", tracker())
@@ -1364,21 +1421,161 @@ async fn root_toolchain_resolution_rejects_leaf_provider_callable_and_context_es
 }
 #[tokio::test]
 async fn selected_toolchain_accepts_declared_actions_and_default_outputs() {
+    let workspace = scratch();
     let defs = TOOLCHAIN_DEFS.replacen(
         "    print(\"FIRST_LOCAL\")\n    return [platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
         "    out = ctx.actions.declare_file(\"toolchain.txt\")\n    ctx.actions.write(out, \"toolchain\")\n    return [DefaultInfo(files = depset([out])), platform_common.ToolchainInfo(marker = ctx.attr.marker)]",
         1,
     );
-    let result = toolchain_case(
-        &TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\""),
-        &defs,
-        TOOLCHAIN_BUILD,
-    )
-    .await
-    .unwrap();
+    let module =
+        TOOLCHAIN_MODULE.replace("\"//:second\", \"//:first\"", "\"//:first\", \"//:second\"");
+    fs::write(workspace.join("MODULE.bazel"), module).unwrap();
+    fs::write(workspace.join("defs.bzl"), &defs).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), TOOLCHAIN_BUILD).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = || Arc::new(RootActivationTracker::default());
+    let result = root_target_request(&dice, &workspace, "@@//:request", tracker())
+        .await
+        .unwrap();
     assert!(result.edges().iter().any(|edge| {
         edge.kind() == &slug_analysis_v2::ConfiguredEdgeKind::SelectedToolchainImplementation
     }));
+    let direct = root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
+        .await
+        .unwrap();
+    assert_eq!(direct.actions().len(), 1);
+    assert_eq!(
+        direct.actions()[0].context().execution_state(),
+        ActionExecutionState::SelectedPlatformOnly
+    );
+    assert!(direct.actions()[0].context().toolchain().is_none());
+    assert_eq!(direct.configured_file_write_actions().unwrap().len(), 1);
+    fs::write(
+        workspace.join("BUILD.bazel"),
+        TOOLCHAIN_BUILD.replace(
+            "platform(name = \"platform\", constraint_values = [\":linux\"])",
+            "platform(name = \"platform\", constraint_values = [\":linux\"], exec_properties = {\"mode\": \"edited\"})",
+        ),
+    )
+    .unwrap();
+    assert_ne!(
+        root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
+            .await
+            .unwrap(),
+        direct
+    );
+    fs::write(workspace.join("BUILD.bazel"), TOOLCHAIN_BUILD).unwrap();
+    assert_eq!(
+        root_target_request(&dice, &workspace, "@@//:first_impl", tracker())
+            .await
+            .unwrap(),
+        direct
+    );
+}
+
+#[tokio::test]
+async fn selected_platform_terminals_suppress_implementation_and_rule_evaluation() {
+    let workspace = scratch();
+    fs::write(workspace.join("MODULE.bazel"), TOOLCHAIN_MODULE).unwrap();
+    fs::write(workspace.join("defs.bzl"), TOOLCHAIN_DEFS).unwrap();
+    fs::write(workspace.join("BUILD.bazel"), TOOLCHAIN_BUILD).unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let seed = root_target_request(
+        &dice,
+        &workspace,
+        "@@//:request",
+        Arc::new(RootActivationTracker::default()),
+    )
+    .await
+    .unwrap();
+    let root = NormalizedAbsolutePath::new(workspace.clone()).unwrap();
+    let platform = seed
+        .toolchain_topology()
+        .unwrap()
+        .selection()
+        .unwrap()
+        .execution_platform();
+    let platform_key =
+        ConfiguredNodeAnalysisObservationKey::new(root.clone(), platform.clone()).unwrap();
+    let root_key = ConfiguredNodeAnalysisObservationKey::new(
+        root,
+        seed.configured_target_key().unwrap().clone(),
+    )
+    .unwrap();
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new(workspace.join("platform-terminal")).unwrap(),
+        PathObservationOperation::Lstat,
+    );
+    let outer =
+        ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(demand.dupe()));
+    let cases: [(&str, <ConfiguredNodeAnalysisObservationKey as Key>::Value); 2] = [
+        (
+            "outer",
+            AnalysisPreparationOutcome::Complete(Err(outer.clone())),
+        ),
+        (
+            "semantic",
+            AnalysisPreparationOutcome::Complete(Ok(Arc::new(Ok(seed.clone())))),
+        ),
+    ];
+    for (name, value) in cases {
+        let tracker = Arc::new(RootActivationTracker::with_loading());
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker.clone()),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
+        updater
+            .changed_to(vec![(platform_key.clone(), value)])
+            .unwrap();
+        let mut transaction = updater.commit().await;
+        let outcome = transaction.compute(&root_key).await.unwrap();
+        match name {
+            "outer" => assert!(
+                matches!(&outcome, AnalysisPreparationOutcome::Complete(Err(error)) if error == &outer)
+            ),
+            "semantic" => assert!(matches!(
+                &outcome,
+                AnalysisPreparationOutcome::Complete(Ok(result)) if result.as_ref().is_err()
+            )),
+            _ => unreachable!(),
+        }
+        assert_eq!(
+            ConfiguredNodeAnalysisObservationKey::validity(&outcome),
+            name == "outer"
+        );
+        assert_eq!(
+            ConfiguredNodeAnalysisObservationKey::equality(&outcome, &outcome),
+            name == "outer"
+        );
+        let (activations, batches, _) = tracker.take();
+        let identities = activations
+            .iter()
+            .map(|(identity, _)| identity)
+            .collect::<Vec<_>>();
+        assert!(
+            identities
+                .iter()
+                .any(|identity| identity.contains("@@//:platform"))
+        );
+        assert!(identities.iter().all(|identity| {
+            !identity.contains("@@//:first_impl") && !identity.contains("@@//:second_impl")
+        }));
+        assert!(
+            identities
+                .iter()
+                .filter(|identity| identity.contains("resolved/"))
+                .all(|identity| identity.starts_with("observed/")),
+            "{name}: {identities:#?}"
+        );
+        assert!(
+            batches
+                .iter()
+                .all(|(_, batch)| { !event_texts(batch).contains(&"REQUEST_LOCAL") })
+        );
+    }
 }
 
 #[tokio::test]
@@ -1389,21 +1586,19 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
         "module(name = \"root\")\nregister_toolchains(\"@external//:invalid\")\n",
     )
     .unwrap();
-    fs::write(workspace.join("defs.bzl"), "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx): return [ConsumerInfo(value = \"zero\")]\nrequest = rule(implementation = _request)\n").unwrap();
+    let defs = "ConsumerInfo = provider(fields = {\"value\": \"\"})\ndef _request(ctx):\n    out = ctx.actions.declare_file(\"zero.txt\")\n    ctx.actions.write(out, \"zero\")\n    return [ConsumerInfo(value = \"zero\"), DefaultInfo(files = depset([out]))]\nrequest = rule(implementation = _request)\n";
+    fs::write(workspace.join("defs.bzl"), defs).unwrap();
     fs::write(
         workspace.join("BUILD.bazel"),
         "load(\":defs.bzl\", \"request\")\nrequest(name = \"request\")\n",
     )
     .unwrap();
     let tracker = Arc::new(RootActivationTracker::with_loading());
-    let result = root_target_request(
-        &Dice::builder().build(DetectCycles::Enabled),
-        &workspace,
-        "@@//:request",
-        tracker.clone(),
-    )
-    .await
-    .unwrap();
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let quiet_tracker = || Arc::new(RootActivationTracker::default());
+    let result = root_target_request(&dice, &workspace, "@@//:request", tracker.clone())
+        .await
+        .unwrap();
     assert_eq!(
         provider_value(
             &result,
@@ -1412,6 +1607,30 @@ async fn zero_toolchain_requirement_bypasses_registration_resolution() {
         "zero"
     );
     assert!(result.configured_dependencies().next().is_none());
+    assert_eq!(result.actions().len(), 1);
+    assert_eq!(
+        result.actions()[0].context().execution_state(),
+        ActionExecutionState::UnresolvedDefault
+    );
+    assert!(result.configured_file_write_actions().is_err());
+    fs::write(
+        workspace.join("defs.bzl"),
+        defs.replace("\"zero\")", "\"edited\")"),
+    )
+    .unwrap();
+    assert_ne!(
+        root_target_request(&dice, &workspace, "@@//:request", quiet_tracker())
+            .await
+            .unwrap(),
+        result
+    );
+    fs::write(workspace.join("defs.bzl"), defs).unwrap();
+    assert_eq!(
+        root_target_request(&dice, &workspace, "@@//:request", quiet_tracker())
+            .await
+            .unwrap(),
+        result
+    );
     let (activations, _, nodes) = tracker.take();
     assert!(
         activations

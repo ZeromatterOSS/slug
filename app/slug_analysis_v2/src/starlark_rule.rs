@@ -20,7 +20,6 @@ use slug_build_api_v2::CtxActions;
 use slug_build_api_v2::ProviderCollection;
 use slug_build_api_v2::ProviderValue;
 use slug_build_api_v2::UserProvider;
-use slug_identity_v2::CanonicalLabel;
 use slug_loading_v2::LoadedPackage;
 use slug_loading_v2::PackageTargetKind;
 use slug_loading_v2::provider::FrozenUserProviderCallable;
@@ -47,6 +46,7 @@ use starlark::values::starlark_value;
 
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
+use crate::result::ConfiguredActionOwnerContext;
 use crate::result::ConfiguredNodeResult;
 
 /// Errors produced while synchronously evaluating a loaded rule after DICE has
@@ -135,11 +135,7 @@ pub(crate) struct PreparedDependency {
 #[derive(Debug, Clone, Allocative)]
 pub(crate) struct PreparedToolchain {
     pub(crate) required_type: CompactString,
-    pub(crate) marker: CompactString,
-    pub(crate) declaration: CanonicalLabel,
-    pub(crate) toolchain_type: ConfiguredTargetKey,
-    pub(crate) implementation: ConfiguredTargetKey,
-    pub(crate) selected_execution_platform: ConfiguredTargetKey,
+    pub(crate) action_context: Arc<ConfiguredActionOwnerContext>,
 }
 
 #[derive(Debug, Clone, ProvidesStaticType, NoSerialize, Allocative)]
@@ -220,7 +216,16 @@ starlark::starlark_simple_value!(AnalysisToolchainInfo);
 #[starlark_value(type = "ToolchainInfo")]
 impl<'v> StarlarkValue<'v> for AnalysisToolchainInfo {
     fn get_attr(&self, attribute: &str, heap: Heap<'v>) -> Option<Value<'v>> {
-        (attribute == "marker").then(|| heap.alloc_str(&self.0.marker).to_value())
+        (attribute == "marker").then(|| {
+            heap.alloc_str(
+                self.0
+                    .action_context
+                    .toolchain()
+                    .expect("prepared toolchain context retains a toolchain")
+                    .marker(),
+            )
+            .to_value()
+        })
     }
 }
 
@@ -419,6 +424,7 @@ pub(crate) fn evaluate_loaded_rule(
     package_path: &str,
     dependencies: Vec<PreparedDependency>,
     marker: Option<CompactString>,
+    action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
     print_handler: Option<&dyn PrintHandler>,
 ) -> Result<ConfiguredNodeResult, LoadedRuleError> {
@@ -432,6 +438,7 @@ pub(crate) fn evaluate_loaded_rule(
         return Err(format!("target `{target_name}` is not a Starlark rule").into());
     };
 
+    let action_contexts = vec![action_context];
     let actions = Arc::new(Mutex::new(CtxActions::new()));
     let module = Module::new();
     let context = module.heap().alloc_simple(AnalysisContext {
@@ -565,9 +572,8 @@ pub(crate) fn evaluate_loaded_rule(
         .registry()
         .actions()
         .to_vec();
-    Ok(
-        ConfiguredNodeResult::new_rule(key, providers, rule_capability)
-            .with_actions(actions)
-            .with_declared_outputs(declared_outputs),
-    )
+    let result = ConfiguredNodeResult::new_rule(key, providers, rule_capability)
+        .with_action_specs(actions, action_contexts)
+        .map_err(LoadedRuleError::from)?;
+    Ok(result.with_declared_outputs(declared_outputs))
 }

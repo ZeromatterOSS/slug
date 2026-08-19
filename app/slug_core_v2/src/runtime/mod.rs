@@ -35,7 +35,6 @@ pub use dice::BuildCommandEvaluation;
 pub use dice::CqueryCommandError;
 pub use dice::CqueryCommandEvaluation;
 pub use dice::ResolvedFileWriteSemanticView;
-pub use dice::ResolvedPlatformConstraintSemanticView;
 pub use dice::ResolvedRunSemanticView;
 pub use dice::WorkspaceBuildEvaluation;
 pub use dice::WorkspaceDirectoryObservation;
@@ -59,6 +58,10 @@ pub use file_write_aquery_text::format_file_write_aquery_text_output;
 pub use file_write_aquery_text::format_file_write_aquery_text_output_for_scope;
 pub use file_write_identity::FileWriteSemanticIdentity;
 pub use process_host::ProcessHostOwner;
+pub use slug_bzlmod_v2::BzlmodCommandPolicyKey;
+pub use slug_bzlmod_v2::BzlmodEnvironmentPolicyKey;
+pub use slug_bzlmod_v2::LockfileMode;
+pub use slug_identity_v2::TargetPattern;
 pub use slug_query_v2::QueryError;
 pub use slug_query_v2::QueryOutputCompletion;
 

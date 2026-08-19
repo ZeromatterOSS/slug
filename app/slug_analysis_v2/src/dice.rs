@@ -9,6 +9,7 @@
  */
 
 use std::cell::RefCell;
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -61,6 +62,11 @@ use crate::key::ConfigurationKind;
 use crate::key::ConfiguredNodeKey;
 use crate::key::ConfiguredTargetKey;
 use crate::key::RootStringSettingValue;
+use crate::result::ConfiguredActionAspectProvenance;
+use crate::result::ConfiguredActionExecGroup;
+use crate::result::ConfiguredActionOwnerContext;
+use crate::result::ConfiguredActionPlatformConstraint;
+use crate::result::ConfiguredActionToolchainContext;
 use crate::result::ConfiguredNodeKind;
 use crate::result::ConfiguredNodeResult;
 use crate::result::PlatformSemanticFact;
@@ -767,6 +773,7 @@ fn finish_analysis<T>(
     computed: &SmallMap<ConfiguredNodeKey, T>,
     marker: Option<CompactString>,
     candidate_execution_platforms: Option<Vec<ConfiguredTargetKey>>,
+    action_context: Arc<ConfiguredActionOwnerContext>,
     toolchain: Option<PreparedToolchain>,
     capture_events: bool,
     event_batch: &mut Option<EventBatch>,
@@ -829,20 +836,25 @@ where
         )
     }));
     let selection = toolchain.as_ref().map(|toolchain| {
-        ToolchainSelection::new(
-            toolchain.selected_execution_platform.clone(),
-            toolchain.declaration.clone(),
-            toolchain.toolchain_type.clone(),
-            toolchain.implementation.clone(),
-        )
+        toolchain
+            .action_context
+            .toolchain()
+            .expect("prepared toolchain context retains a toolchain")
+            .selection()
+            .clone()
     });
     if let Some(toolchain) = &toolchain {
+        let selection = toolchain
+            .action_context
+            .toolchain()
+            .expect("prepared toolchain context retains a toolchain")
+            .selection();
         edges.push(crate::configured_target::ConfiguredEdge::new(
-            toolchain.toolchain_type.clone().into(),
+            selection.toolchain_type().clone().into(),
             crate::configured_target::ConfiguredEdgeKind::ToolchainRequirement,
         ));
         edges.push(crate::configured_target::ConfiguredEdge::new(
-            toolchain.implementation.clone().into(),
+            selection.implementation().clone().into(),
             crate::configured_target::ConfiguredEdgeKind::SelectedToolchainImplementation,
         ));
     }
@@ -871,6 +883,7 @@ where
         label.package().package().as_str(),
         dependencies,
         marker,
+        action_context,
         toolchain,
         print_capture
             .as_ref()
@@ -1375,12 +1388,553 @@ fn require_root_native_reference(reference: &CanonicalLabel) -> Result<(), Analy
     }
 }
 
+async fn compute_toolchain_analysis_input(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    key: ConfiguredNodeAnalysisKey,
+    context: &str,
+) -> RootAnalysisDriverValue {
+    match mode {
+        ConfiguredAnalysisMode::Legacy => match ctx.compute(&key).await {
+            Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
+            Ok(LoadingPreparationOutcome::Complete(value)) => {
+                LoadingPreparationOutcome::Complete(Ok(value))
+            }
+            Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                "{context}: {error}"
+            )))),
+        },
+        ConfiguredAnalysisMode::Observed => {
+            match ctx
+                .compute(&ConfiguredNodeAnalysisObservationKey(key))
+                .await
+            {
+                Ok(value) => value,
+                Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(format!(
+                    "{context}: {error}"
+                )))),
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PreparedExecutionPlatform {
+    key: ConfiguredTargetKey,
+    fact: PlatformSemanticFact,
+    constraints: Vec<ConfiguredActionPlatformConstraint>,
+}
+
+type PreparedExecutionPlatformOutcome = AnalysisSemanticOutcome<PreparedExecutionPlatform>;
+
+fn finish_execution_platform_analysis(
+    analysis: RootAnalysisDriverValue,
+) -> Result<Arc<ConfiguredNodeResult>, PreparedExecutionPlatformOutcome> {
+    match analysis {
+        LoadingPreparationOutcome::Need(need) => Err(LoadingPreparationOutcome::Need(need)),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            Err(LoadingPreparationOutcome::Complete(Err(error)))
+        }
+        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
+            Ok(value) => Ok(value.dupe()),
+            Err(error) => Err(analysis_semantic_complete(Err(error.clone()))),
+        },
+    }
+}
+
+async fn prepare_execution_platform(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    packages: &RootPackages,
+    key: ConfiguredTargetKey,
+) -> PreparedExecutionPlatformOutcome {
+    let analysis_key = ConfiguredNodeAnalysisKey::new(workspace.dupe(), key.clone())
+        .expect("execution platform inherits structural exec configuration");
+    let analysis = compute_toolchain_analysis_input(
+        ctx,
+        mode,
+        analysis_key,
+        "analyzing selected execution platform through DICE",
+    )
+    .await;
+    let result = match finish_execution_platform_analysis(analysis) {
+        Ok(result) => result,
+        Err(terminal) => return terminal,
+    };
+    if result.configured_target_key() != Some(&key)
+        || result.kind() != &ConfiguredNodeKind::Platform
+        || !result.diagnostics().is_empty()
+        || result.platform_semantic_fact().is_none()
+    {
+        return analysis_semantic_complete(Err(AnalysisError::new(
+            "selected execution platform analysis has invalid semantic shape",
+        )));
+    }
+    let target = match package_target(packages, key.label()) {
+        Ok(target) => target,
+        Err(error) => return analysis_semantic_complete(Err(error)),
+    };
+    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform { constraint_values }) =
+        &target.kind
+    else {
+        return analysis_semantic_complete(Err(AnalysisError::new(
+            "selected execution platform is not platform",
+        )));
+    };
+    if result.edges().len() != constraint_values.len() {
+        return analysis_semantic_complete(Err(AnalysisError::new(
+            "selected execution platform has mismatched constraint edges",
+        )));
+    }
+    let mut constraints = Vec::with_capacity(constraint_values.len());
+    for (index, (edge, value)) in result
+        .edges()
+        .iter()
+        .zip(constraint_values.iter())
+        .enumerate()
+    {
+        let value_key = ConfiguredTargetKey::new(value.clone(), key.configuration().clone());
+        if edge.target() != &ConfiguredNodeKey::configured(value_key.clone())
+            || !matches!(edge.kind(), crate::configured_target::ConfiguredEdgeKind::PlatformConstraint { index: edge_index } if edge_index == &u32::try_from(index).expect("constraint index fits u32"))
+        {
+            return analysis_semantic_complete(Err(AnalysisError::new(
+                "selected execution platform has unordered constraint edges",
+            )));
+        }
+        let setting = match constraint_value_setting(packages, value) {
+            Ok(setting) => setting,
+            Err(error) => return analysis_semantic_complete(Err(error)),
+        };
+        constraints.push(ConfiguredActionPlatformConstraint::new(
+            value_key,
+            ConfiguredTargetKey::new(setting, key.configuration().clone()),
+        ));
+    }
+    analysis_semantic_complete(Ok(PreparedExecutionPlatform {
+        key,
+        fact: result
+            .platform_semantic_fact()
+            .expect("validated platform fact")
+            .clone(),
+        constraints,
+    }))
+}
+
+async fn load_root_native_packages(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    labels: &mut Vec<CanonicalLabel>,
+) -> AnalysisSemanticOutcome<RootPackages> {
+    let mut packages = Vec::new();
+    let mut seen = labels.iter().cloned().collect::<SmallSet<_>>();
+    loop {
+        let paths = labels
+            .iter()
+            .map(|label| label.package().package().clone())
+            .filter(|path| !packages.iter().any(|(loaded, _)| loaded == path))
+            .collect::<SmallSet<_>>();
+        if paths.is_empty() {
+            let mut next = SmallSet::new();
+            for label in labels.clone() {
+                if let Ok(target) = package_target(&packages, &label) {
+                    for reference in native_references(target) {
+                        if let Err(error) = require_root_native_reference(&reference) {
+                            return analysis_semantic_complete(Err(error));
+                        }
+                        if seen.insert(reference.clone()) {
+                            next.insert(reference.package().package().clone());
+                            labels.push(reference);
+                        }
+                    }
+                }
+            }
+            if next
+                .iter()
+                .all(|path| packages.iter().any(|(loaded, _)| loaded == path))
+            {
+                return analysis_semantic_complete(Ok(packages));
+            }
+        }
+        let outcomes = ctx
+            .compute_join(paths.into_iter(), |ctx, package| {
+                Box::pin(async move {
+                    let value = compute_root_package_input(
+                        ctx,
+                        mode,
+                        workspace.dupe(),
+                        package.clone(),
+                        "loading toolchain package through DICE",
+                    )
+                    .await;
+                    (package, value)
+                })
+            })
+            .await;
+        let mut needs: Option<LoadingPreparationNeeds> = None;
+        let mut first_outer = None;
+        let mut first_error = None;
+        for (path, outcome) in outcomes {
+            match outcome {
+                LoadingPreparationOutcome::Need(need) => {
+                    needs = Some(needs.map_or(need.clone(), |current| {
+                        current.try_union(&need).expect("root package Needs agree")
+                    }));
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) if first_outer.is_none() => {
+                    first_outer = Some(error);
+                }
+                LoadingPreparationOutcome::Complete(Err(_)) => {}
+                LoadingPreparationOutcome::Complete(Ok(Err(error))) if first_error.is_none() => {
+                    first_error = Some(error);
+                }
+                LoadingPreparationOutcome::Complete(Ok(Err(_))) => {}
+                LoadingPreparationOutcome::Complete(Ok(Ok(value))) => {
+                    packages.push((path, value));
+                }
+            }
+        }
+        if let Some(error) = first_outer {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        if let Some(need) = needs {
+            return LoadingPreparationOutcome::Need(need);
+        }
+        if let Some(error) = first_error {
+            return analysis_semantic_complete(Err(error));
+        }
+    }
+}
+
+async fn prepare_default_action_context(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    owner: &ConfiguredTargetKey,
+    candidates: Option<&[ConfiguredTargetKey]>,
+) -> AnalysisSemanticOutcome<Arc<ConfiguredActionOwnerContext>> {
+    let Some([platform_key]) = candidates else {
+        return analysis_semantic_complete(
+            ConfiguredActionOwnerContext::unresolved_default(owner.clone())
+                .map(Arc::new)
+                .map_err(AnalysisError::new),
+        );
+    };
+    let mut labels = vec![platform_key.label().clone()];
+    let packages = match load_root_native_packages(ctx, mode, workspace, &mut labels).await {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return analysis_semantic_complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(packages))) => packages,
+    };
+    let platform =
+        match prepare_execution_platform(ctx, mode, workspace, &packages, platform_key.clone())
+            .await
+        {
+            LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+            LoadingPreparationOutcome::Complete(Err(error)) => {
+                return LoadingPreparationOutcome::Complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                return analysis_semantic_complete(Err(error));
+            }
+            LoadingPreparationOutcome::Complete(Ok(Ok(platform))) => platform,
+        };
+    analysis_semantic_complete(
+        ConfiguredActionOwnerContext::new(
+            owner.clone(),
+            ConfiguredActionExecGroup::Default,
+            platform.key,
+            platform.fact,
+            &BTreeMap::new(),
+            &BTreeMap::new(),
+            platform.constraints,
+            None,
+            ConfiguredActionAspectProvenance::Absent,
+        )
+        .map(Arc::new)
+        .map_err(AnalysisError::new),
+    )
+}
+
+fn validate_constraint_settings(
+    packages: &RootPackages,
+    values: &[CanonicalLabel],
+    duplicate: impl Fn() -> AnalysisError,
+) -> Result<(), AnalysisError> {
+    let mut settings = SmallSet::with_capacity(values.len());
+    for value in values {
+        let setting = constraint_value_setting(packages, value)?;
+        if !settings.insert(setting) {
+            return Err(duplicate());
+        }
+    }
+    Ok(())
+}
+
+fn validate_marker_toolchain(
+    packages: &RootPackages,
+    label: &CanonicalLabel,
+) -> Result<(), AnalysisError> {
+    let target = package_target(packages, label)?;
+    let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+        toolchain_type,
+        implementation,
+        exec_compatible_with,
+    }) = &target.kind
+    else {
+        return Err(AnalysisError::new(format!(
+            "registered toolchain is not toolchain: {label}"
+        )));
+    };
+    if !matches!(package_target(packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
+    {
+        return Err(AnalysisError::new(format!(
+            "toolchain references a non-toolchain type: {label}"
+        )));
+    }
+    validate_constraint_settings(packages, exec_compatible_with, || {
+        AnalysisError::new(format!(
+            "toolchain has duplicate execution constraint setting: {label}"
+        ))
+    })?;
+    let implementation = package_target(packages, implementation)?;
+    let PackageTargetKind::StarlarkRule(rule) = &implementation.kind else {
+        return Err(AnalysisError::new(format!(
+            "toolchain implementation is not a Starlark rule: {label}"
+        )));
+    };
+    let marker = rule.values().iter().any(|value| {
+        value.declaration_name == "marker"
+            && value.provenance == AttributeProvenance::Explicit
+            && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
+    });
+    let capability = implementation
+        .rule_capability()
+        .expect("Starlark rule has a capability");
+    let empty_tags = rule.values().iter().any(|value| {
+        value.declaration_name == "tags"
+            && value.provenance == AttributeProvenance::Default
+            && matches!(value.value.as_ref(), CoercedAttributeValue::StringList(tags) if tags.is_empty())
+    });
+    let user_schema = rule
+        .schema()
+        .iter()
+        .filter(|schema| !schema.is_builtin())
+        .collect::<Vec<_>>();
+    let builtin_defaults = rule.values().iter().all(|value| {
+        let Some(schema) = rule
+            .schema()
+            .iter()
+            .find(|schema| schema.declaration_name() == value.declaration_name)
+        else {
+            return false;
+        };
+        if !schema.is_builtin() {
+            return true;
+        }
+        match schema.declaration_name() {
+            "name" => {
+                value.provenance == AttributeProvenance::Explicit
+                    && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
+            }
+            "visibility" => value.provenance == AttributeProvenance::Default,
+            "generator_name" | "generator_function" | "generator_location" => {
+                value.provenance == AttributeProvenance::Implicit
+                    && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
+            }
+            "deprecation" => {
+                value.provenance == AttributeProvenance::Default
+                    && matches!(value.value.as_ref(), CoercedAttributeValue::None)
+            }
+            _ => {
+                value.provenance != AttributeProvenance::Explicit
+                    && match value.value.as_ref() {
+                        CoercedAttributeValue::None => true,
+                        CoercedAttributeValue::String(value) => value.is_empty(),
+                        CoercedAttributeValue::LabelList(values) => values.is_empty(),
+                        CoercedAttributeValue::StringList(values) => values.is_empty(),
+                        CoercedAttributeValue::StringDict(values) => values.is_empty(),
+                        CoercedAttributeValue::LabelListDict(values) => values.is_empty(),
+                        CoercedAttributeValue::Boolean(value) => !value,
+                        CoercedAttributeValue::Integer(value) => *value == 0,
+                        _ => false,
+                    }
+            }
+        }
+    });
+    if !marker
+        || !rule.dependencies().is_empty()
+        || !rule.required_toolchains().is_empty()
+        || rule.is_root_string_build_setting()
+        || user_schema.len() != 1
+        || user_schema[0].declaration_name() != "marker"
+        || !matches!(user_schema[0].kind(), AttributeKind::String)
+        || user_schema[0].transition().is_some()
+        || user_schema[0].dependency_reachable()
+        || rule.values().len() != rule.schema().len()
+        || !builtin_defaults
+        || !empty_tags
+        || capability.executable
+        || capability.test_kind.is_some()
+    {
+        return Err(AnalysisError::new(format!(
+            "toolchain implementation is not a marker leaf: {label}"
+        )));
+    }
+    Ok(())
+}
+
+fn select_root_toolchain(
+    packages: &RootPackages,
+    required: &CanonicalLabel,
+    platforms: &[CanonicalLabel],
+    toolchains: &[CanonicalLabel],
+) -> Result<(CanonicalLabel, CanonicalLabel, CanonicalLabel), AnalysisError> {
+    for platform_label in platforms {
+        let platform = package_target(packages, platform_label)?;
+        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
+            constraint_values,
+        }) = &platform.kind
+        else {
+            unreachable!("registered platforms were prevalidated")
+        };
+        for declaration in toolchains {
+            let toolchain = package_target(packages, declaration)?;
+            let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
+                toolchain_type,
+                implementation,
+                exec_compatible_with,
+            }) = &toolchain.kind
+            else {
+                unreachable!("registered toolchains were prevalidated")
+            };
+            if toolchain_type == required
+                && exec_compatible_with
+                    .iter()
+                    .all(|value| constraint_values.contains(value))
+            {
+                return Ok((
+                    platform_label.clone(),
+                    declaration.clone(),
+                    implementation.clone(),
+                ));
+            }
+        }
+    }
+    Err(AnalysisError::new(format!(
+        "no compatible toolchain was registered for {required}"
+    )))
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn prepare_selected_toolchain(
+    ctx: &mut DiceComputations<'_>,
+    mode: ConfiguredAnalysisMode,
+    workspace: &NormalizedAbsolutePath,
+    owner: &ConfiguredTargetKey,
+    required: &CanonicalLabel,
+    required_type: CompactString,
+    candidates: &[ConfiguredTargetKey],
+    declaration: CanonicalLabel,
+    implementation: CanonicalLabel,
+    platform: PreparedExecutionPlatform,
+) -> PreparedToolchainOutcome {
+    let configuration = owner.configuration().clone();
+    let key = ConfiguredNodeAnalysisKey::new(
+        workspace.dupe(),
+        ConfiguredTargetKey::new(implementation.clone(), configuration.clone()),
+    )
+    .expect("toolchain analysis inherits a structural configuration");
+    let selected = compute_toolchain_analysis_input(
+        ctx,
+        mode,
+        key,
+        "analyzing selected toolchain through DICE",
+    )
+    .await;
+    let result = match selected {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
+            return LoadingPreparationOutcome::Complete(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
+            Ok(value) => value.clone(),
+            Err(error) => return toolchain_outcome(Err(error.clone())),
+        },
+    };
+    let topology_is_exact = if declaration.package() == implementation.package() {
+        result.edges().len() == candidates.len()
+            && result
+                .edges()
+                .iter()
+                .zip(candidates)
+                .enumerate()
+                .all(|(index, (edge, platform))| {
+                    edge.target() == &ConfiguredNodeKey::configured(platform.clone())
+                        && matches!(edge.kind(), crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform { index: edge_index } if *edge_index == u32::try_from(index).expect("candidate index fits u32"))
+                })
+            && result.toolchain_topology().is_some_and(|topology| {
+                topology.candidate_execution_platforms() == candidates
+                    && topology.selection().is_none()
+            })
+    } else {
+        result.edges().is_empty() && result.toolchain_topology().is_none()
+    };
+    if !topology_is_exact
+        || !result.diagnostics().is_empty()
+        || result.providers().len() != 2
+        || result.providers().default_info().is_none()
+        || result.providers().toolchain_info().is_none()
+    {
+        return toolchain_outcome(Err(AnalysisError::new(
+            "selected toolchain implementation must return only DefaultInfo and ToolchainInfo with exact topology",
+        )));
+    }
+    let toolchain = Arc::new(ConfiguredActionToolchainContext::new(
+        ToolchainSelection::new(
+            platform.key,
+            declaration,
+            ConfiguredTargetKey::new(required.clone(), configuration.clone()),
+            ConfiguredTargetKey::new(implementation, configuration),
+        ),
+        result
+            .providers()
+            .toolchain_info()
+            .expect("checked ToolchainInfo")
+            .marker
+            .clone(),
+    ));
+    let context = ConfiguredActionOwnerContext::new(
+        owner.clone(),
+        ConfiguredActionExecGroup::Default,
+        toolchain.selection().execution_platform().clone(),
+        platform.fact,
+        &BTreeMap::new(),
+        &BTreeMap::new(),
+        platform.constraints,
+        Some(toolchain),
+        ConfiguredActionAspectProvenance::Absent,
+    )
+    .map(Arc::new)
+    .map_err(AnalysisError::new);
+    toolchain_outcome(context.map(|action_context| PreparedToolchain {
+        required_type,
+        action_context,
+    }))
+}
+
 async fn resolve_root_toolchain(
     ctx: &mut DiceComputations<'_>,
     mode: ConfiguredAnalysisMode,
     workspace: &NormalizedAbsolutePath,
     required: &CanonicalLabel,
-    configuration: ConfigurationKey,
+    owner: &ConfiguredTargetKey,
     candidate_execution_platforms: &[ConfiguredTargetKey],
 ) -> PreparedToolchainOutcome {
     let required_type = match root_apparent_type(required) {
@@ -1426,154 +1980,25 @@ async fn resolve_root_toolchain(
         );
     }
     labels.push(required.clone());
-    let mut paths = SmallSet::with_capacity(labels.len());
-    for label in &labels {
-        paths.insert(label.package().package().clone());
-    }
-    let outcomes = ctx
-        .compute_join(paths.into_iter(), |ctx, package| {
-            Box::pin(async move {
-                let value = compute_root_package_input(
-                    ctx,
-                    mode,
-                    workspace.dupe(),
-                    package.clone(),
-                    "loading toolchain package through DICE",
-                )
-                .await;
-                (package, value)
-            })
-        })
-        .await;
-    let mut needs: Option<LoadingPreparationNeeds> = None;
-    let mut first_outer = None;
-    let mut first_error = None;
-    let mut packages = Vec::with_capacity(outcomes.len());
-    for (path, outcome) in outcomes {
-        match outcome {
-            LoadingPreparationOutcome::Need(need) => {
-                needs = Some(match needs {
-                    Some(current) => current.try_union(&need).expect("root package Needs agree"),
-                    None => need,
-                });
-            }
-            LoadingPreparationOutcome::Complete(Err(error)) if first_outer.is_none() => {
-                first_outer = Some(error);
-            }
-            LoadingPreparationOutcome::Complete(Err(_)) => {}
-            LoadingPreparationOutcome::Complete(Ok(Err(error))) if first_error.is_none() => {
-                first_error = Some(error);
-            }
-            LoadingPreparationOutcome::Complete(Ok(Err(_))) => {}
-            LoadingPreparationOutcome::Complete(Ok(Ok(value))) => {
-                packages.push((path, value));
-            }
-        }
-    }
-    if let Some(error) = first_outer {
-        return LoadingPreparationOutcome::Complete(Err(error));
-    }
-    if let Some(need) = needs {
-        return LoadingPreparationOutcome::Need(need);
-    }
-    if let Some(error) = first_error {
-        return toolchain_outcome(Err(error));
-    }
-    let mut seen = labels.iter().cloned().collect::<SmallSet<_>>();
-    loop {
-        let mut paths = SmallSet::new();
-        let mut reference_error = None;
-        for label in labels.clone() {
-            if let Ok(target) = package_target(&packages, &label) {
-                for reference in native_references(target) {
-                    if let Err(error) = require_root_native_reference(&reference) {
-                        reference_error.get_or_insert(error);
-                        continue;
-                    }
-                    if seen.insert(reference.clone()) {
-                        paths.insert(reference.package().package().clone());
-                        labels.push(reference);
-                    }
-                }
-            }
-        }
-        let paths = paths
-            .into_iter()
-            .filter(|path| !packages.iter().any(|(loaded, _)| loaded == path))
-            .collect::<Vec<_>>();
-        if paths.is_empty() {
-            if let Some(error) = reference_error {
-                return toolchain_outcome(Err(error));
-            }
-            break;
-        }
-        let outcomes = ctx
-            .compute_join(paths, |ctx, package| {
-                Box::pin(async move {
-                    let value = compute_root_package_input(
-                        ctx,
-                        mode,
-                        workspace.dupe(),
-                        package.clone(),
-                        "loading toolchain package through DICE",
-                    )
-                    .await;
-                    (package, value)
-                })
-            })
-            .await;
-        let mut needs: Option<LoadingPreparationNeeds> = None;
-        let mut first_outer = None;
-        let mut round_error = None;
-        for (path, outcome) in outcomes {
-            match outcome {
-                LoadingPreparationOutcome::Need(need) => {
-                    needs = Some(needs.map_or(need.clone(), |old| {
-                        old.try_union(&need).expect("root package Needs agree")
-                    }))
-                }
-                LoadingPreparationOutcome::Complete(Err(error)) if first_outer.is_none() => {
-                    first_outer = Some(error);
-                }
-                LoadingPreparationOutcome::Complete(Err(_)) => {}
-                LoadingPreparationOutcome::Complete(Ok(Err(error))) if round_error.is_none() => {
-                    round_error = Some(error);
-                }
-                LoadingPreparationOutcome::Complete(Ok(Err(_))) => {}
-                LoadingPreparationOutcome::Complete(Ok(Ok(value))) => {
-                    packages.push((path, value));
-                }
-            }
-        }
-        if let Some(error) = first_outer {
+    let packages = match load_root_native_packages(ctx, mode, workspace, &mut labels).await {
+        LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
+        LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }
-        if let Some(need) = needs {
-            return LoadingPreparationOutcome::Need(need);
-        }
-        if let Some(error) = round_error {
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
             return toolchain_outcome(Err(error));
         }
-        if let Some(error) = reference_error {
-            return toolchain_outcome(Err(error));
-        }
-    }
+        LoadingPreparationOutcome::Complete(Ok(Ok(packages))) => packages,
+    };
     if let Some(error) = registration_error {
         return toolchain_outcome(Err(error));
     }
-    match package_target(&packages, required) {
-        Ok(target)
-            if matches!(
-                target.kind,
-                PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)
-            ) => {}
-        Ok(_) => {
-            return toolchain_outcome(Err(AnalysisError::new(format!(
-                "required toolchain type is not toolchain_type: {required}"
-            ))));
-        }
-        Err(error) => return toolchain_outcome(Err(error)),
-    };
+    if !matches!(package_target(&packages, required), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
+    {
+        return toolchain_outcome(Err(AnalysisError::new(format!(
+            "required toolchain type is not toolchain_type: {required}"
+        ))));
+    }
     let platform_labels = candidate_execution_platforms
         .iter()
         .map(|platform| platform.label().clone())
@@ -1599,274 +2024,55 @@ async fn resolve_root_toolchain(
                 "registered execution platform is not platform: {platform_label}"
             ))));
         };
-        let mut settings = SmallSet::with_capacity(constraint_values.len());
-        for value in constraint_values.iter() {
-            match constraint_value_setting(&packages, value) {
-                Ok(setting) if settings.insert(setting.clone()) => {}
-                Ok(_) => {
-                    return toolchain_outcome(Err(AnalysisError::new(format!(
-                        "execution platform has duplicate constraint setting: {platform_label}"
-                    ))));
-                }
-                Err(error) => return toolchain_outcome(Err(error)),
-            }
+        if let Err(error) = validate_constraint_settings(&packages, constraint_values, || {
+            AnalysisError::new(format!(
+                "execution platform has duplicate constraint setting: {platform_label}"
+            ))
+        }) {
+            return toolchain_outcome(Err(error));
         }
     }
     for toolchain_label in &toolchain_labels {
-        let target = match package_target(&packages, toolchain_label) {
-            Ok(target) => target,
-            Err(error) => return toolchain_outcome(Err(error)),
-        };
-        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-            toolchain_type,
-            implementation,
-            exec_compatible_with,
-        }) = &target.kind
-        else {
-            return toolchain_outcome(Err(AnalysisError::new(format!(
-                "registered toolchain is not toolchain: {toolchain_label}"
-            ))));
-        };
-        if !matches!(package_target(&packages, toolchain_type), Ok(target) if matches!(target.kind, PackageTargetKind::NativeToolchain(NativeToolchainTarget::ToolchainType)))
-        {
-            return toolchain_outcome(Err(AnalysisError::new(format!(
-                "toolchain references a non-toolchain type: {toolchain_label}"
-            ))));
-        }
-        let mut settings = SmallSet::with_capacity(exec_compatible_with.len());
-        for value in exec_compatible_with.iter() {
-            match constraint_value_setting(&packages, value) {
-                Ok(setting) if settings.insert(setting.clone()) => {}
-                Ok(_) => {
-                    return toolchain_outcome(Err(AnalysisError::new(format!(
-                        "toolchain has duplicate execution constraint setting: {toolchain_label}"
-                    ))));
-                }
-                Err(error) => return toolchain_outcome(Err(error)),
-            }
-        }
-        let implementation = match package_target(&packages, implementation) {
-            Ok(target) => target,
-            Err(error) => return toolchain_outcome(Err(error)),
-        };
-        let PackageTargetKind::StarlarkRule(rule) = &implementation.kind else {
-            return toolchain_outcome(Err(AnalysisError::new(format!(
-                "toolchain implementation is not a Starlark rule: {toolchain_label}"
-            ))));
-        };
-        let marker = rule
-            .values()
-            .iter()
-            .find(|value| {
-                value.declaration_name == "marker"
-                    && value.provenance == AttributeProvenance::Explicit
-            })
-            .and_then(|value| match value.value.as_ref() {
-                CoercedAttributeValue::String(value) => Some(value),
-                _ => None,
-            });
-        let capability = implementation
-            .rule_capability()
-            .expect("Starlark rule has a capability");
-        let empty_tags = rule.values().iter().any(|value| {
-            value.declaration_name == "tags"
-                && value.provenance == AttributeProvenance::Default
-                && matches!(value.value.as_ref(), CoercedAttributeValue::StringList(tags) if tags.is_empty())
-        });
-        let user_schema = rule
-            .schema()
-            .iter()
-            .filter(|schema| !schema.is_builtin())
-            .collect::<Vec<_>>();
-        let builtin_values_are_marker_defaults = rule.values().iter().all(|value| {
-            let Some(schema) = rule
-                .schema()
-                .iter()
-                .find(|schema| schema.declaration_name() == value.declaration_name)
-            else {
-                return false;
-            };
-            if !schema.is_builtin() {
-                return true;
-            }
-            match schema.declaration_name() {
-                "name" => {
-                    value.provenance == AttributeProvenance::Explicit
-                        && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
-                }
-                "visibility" => value.provenance == AttributeProvenance::Default,
-                "generator_name" | "generator_function" | "generator_location" => {
-                    value.provenance == AttributeProvenance::Implicit
-                        && matches!(value.value.as_ref(), CoercedAttributeValue::String(_))
-                }
-                "deprecation" => {
-                    value.provenance == AttributeProvenance::Default
-                        && matches!(value.value.as_ref(), CoercedAttributeValue::None)
-                }
-                _ => {
-                    let intrinsic_empty = match value.value.as_ref() {
-                        CoercedAttributeValue::None => true,
-                        CoercedAttributeValue::String(value) => value.is_empty(),
-                        CoercedAttributeValue::LabelList(values) => values.is_empty(),
-                        CoercedAttributeValue::StringList(values) => values.is_empty(),
-                        CoercedAttributeValue::StringDict(values) => values.is_empty(),
-                        CoercedAttributeValue::LabelListDict(values) => values.is_empty(),
-                        CoercedAttributeValue::Boolean(value) => !value,
-                        CoercedAttributeValue::Integer(value) => *value == 0,
-                        _ => false,
-                    };
-                    value.provenance != AttributeProvenance::Explicit && intrinsic_empty
-                }
-            }
-        });
-        if marker.is_none()
-            || !rule.dependencies().is_empty()
-            || !rule.required_toolchains().is_empty()
-            || rule.is_root_string_build_setting()
-            || user_schema.len() != 1
-            || user_schema[0].declaration_name() != "marker"
-            || !matches!(user_schema[0].kind(), AttributeKind::String)
-            || user_schema[0].transition().is_some()
-            || user_schema[0].dependency_reachable()
-            || rule.values().len() != rule.schema().len()
-            || !builtin_values_are_marker_defaults
-            || !empty_tags
-            || capability.executable
-            || capability.test_kind.is_some()
-        {
-            return toolchain_outcome(Err(AnalysisError::new(format!(
-                "toolchain implementation is not a marker leaf: {toolchain_label}"
-            ))));
+        if let Err(error) = validate_marker_toolchain(&packages, toolchain_label) {
+            return toolchain_outcome(Err(error));
         }
     }
-    let mut selected = None;
-    for platform_label in &platform_labels {
-        let platform = package_target(&packages, &platform_label).expect("validated platform");
-        let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Platform {
-            constraint_values,
-        }) = &platform.kind
-        else {
-            unreachable!("registered platforms were prevalidated")
+    let (selected_platform, declaration, implementation) =
+        match select_root_toolchain(&packages, required, &platform_labels, &toolchain_labels) {
+            Ok(selected) => selected,
+            Err(error) => return toolchain_outcome(Err(error)),
         };
-        for toolchain_label in &toolchain_labels {
-            let toolchain =
-                package_target(&packages, toolchain_label).expect("validated toolchain");
-            let PackageTargetKind::NativeToolchain(NativeToolchainTarget::Toolchain {
-                toolchain_type,
-                implementation,
-                exec_compatible_with,
-            }) = &toolchain.kind
-            else {
-                unreachable!("registered toolchains were prevalidated")
-            };
-            let compatible = exec_compatible_with
-                .iter()
-                .all(|value| constraint_values.contains(value));
-            if toolchain_type == required && compatible {
-                selected = Some((
-                    platform_label.clone(),
-                    toolchain_label.clone(),
-                    implementation.clone(),
-                ));
-                break;
-            }
-        }
-        if selected.is_some() {
-            break;
-        }
-    }
-    let Some((selected_platform, declaration, implementation)) = selected else {
-        return toolchain_outcome(Err(AnalysisError::new(format!(
-            "no compatible toolchain was registered for {required}"
-        ))));
-    };
-    let selected_key = ConfiguredNodeAnalysisKey::new(
-        workspace.dupe(),
-        ConfiguredTargetKey::new(implementation.clone(), configuration.clone()),
-    )
-    .expect("toolchain analysis inherits a structural configuration");
-    let selected = match mode {
-        ConfiguredAnalysisMode::Legacy => match ctx.compute(&selected_key).await {
-            Ok(LoadingPreparationOutcome::Need(need)) => LoadingPreparationOutcome::Need(need),
-            Ok(LoadingPreparationOutcome::Complete(value)) => {
-                LoadingPreparationOutcome::Complete(Ok(value))
-            }
-            Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(format!(
-                "analyzing selected toolchain through DICE: {error}"
-            )))),
-        },
-        ConfiguredAnalysisMode::Observed => {
-            match ctx
-                .compute(&ConfiguredNodeAnalysisObservationKey(selected_key))
-                .await
-            {
-                Ok(value) => value,
-                Err(error) => root_analysis_driver_complete(Err(AnalysisError::new(format!(
-                    "analyzing selected toolchain through DICE: {error}"
-                )))),
-            }
-        }
-    };
-    let selected_result = match selected {
+    let selected_platform_key = candidate_execution_platforms
+        .iter()
+        .find(|platform| platform.label() == &selected_platform)
+        .expect("selected root platform retains its configured candidate identity")
+        .clone();
+    let platform =
+        prepare_execution_platform(ctx, mode, workspace, &packages, selected_platform_key).await;
+    let platform = match platform {
         LoadingPreparationOutcome::Need(need) => return LoadingPreparationOutcome::Need(need),
         LoadingPreparationOutcome::Complete(Err(error)) => {
             return LoadingPreparationOutcome::Complete(Err(error));
         }
-        LoadingPreparationOutcome::Complete(Ok(value)) => match value.as_ref() {
-            Ok(value) => value.clone(),
-            Err(error) => return toolchain_outcome(Err(error.clone())),
-        },
+        LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+            return toolchain_outcome(Err(error));
+        }
+        LoadingPreparationOutcome::Complete(Ok(Ok(value))) => value,
     };
-    let selected_topology_is_exact = if declaration.package() == implementation.package() {
-        selected_result.edges().len() == candidate_execution_platforms.len()
-            && selected_result
-                .edges()
-                .iter()
-                .zip(candidate_execution_platforms)
-                .enumerate()
-                .all(|(index, (edge, platform))| {
-                    edge.target() == &ConfiguredNodeKey::configured(platform.clone())
-                        && matches!(
-                            edge.kind(),
-                            crate::configured_target::ConfiguredEdgeKind::CandidateExecutionPlatform {
-                                index: edge_index
-                            } if *edge_index == u32::try_from(index).expect("candidate index fits u32")
-                        )
-                })
-            && selected_result.toolchain_topology().is_some_and(|topology| {
-                topology.candidate_execution_platforms() == candidate_execution_platforms
-                    && topology.selection().is_none()
-            })
-    } else {
-        selected_result.edges().is_empty() && selected_result.toolchain_topology().is_none()
-    };
-    if !selected_topology_is_exact
-        || !selected_result.diagnostics().is_empty()
-        || selected_result.providers().len() != 2
-        || selected_result.providers().default_info().is_none()
-        || selected_result.providers().toolchain_info().is_none()
-    {
-        return toolchain_outcome(Err(AnalysisError::new(
-            "selected toolchain implementation must return only DefaultInfo and ToolchainInfo with exact topology",
-        )));
-    }
-    toolchain_outcome(Ok(PreparedToolchain {
+
+    prepare_selected_toolchain(
+        ctx,
+        mode,
+        workspace,
+        owner,
+        required,
         required_type,
-        marker: selected_result
-            .providers()
-            .toolchain_info()
-            .expect("checked ToolchainInfo")
-            .marker
-            .clone(),
+        candidate_execution_platforms,
         declaration,
-        toolchain_type: ConfiguredTargetKey::new(required.clone(), configuration.clone()),
-        implementation: ConfiguredTargetKey::new(implementation, configuration),
-        selected_execution_platform: candidate_execution_platforms
-            .iter()
-            .find(|platform| platform.label() == &selected_platform)
-            .expect("selected root platform retains its configured candidate identity")
-            .clone(),
-    }))
+        implementation,
+        platform,
+    )
+    .await
 }
 
 #[cfg(test)]
@@ -1922,12 +2128,23 @@ mod tests {
             unreachable!()
         };
         assert!(Arc::ptr_eq(&semantic_arc, &projected));
+        assert!(matches!(
+            finish_execution_platform_analysis(semantic.clone()),
+            Err(LoadingPreparationOutcome::Complete(Ok(result))) if result.is_err()
+        ));
 
         let demand = slug_workspace_v2::PathObservationDemand::new(
             PathObservationNamespace::Host,
             NormalizedAbsolutePath::new("/outer").unwrap(),
             slug_workspace_v2::PathObservationOperation::Lstat,
         );
+        let need = LoadingPreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(demand.dupe()),
+        );
+        assert!(matches!(
+            finish_execution_platform_analysis(LoadingPreparationOutcome::Need(need)),
+            Err(LoadingPreparationOutcome::Need(_))
+        ));
         let outer: RootAnalysisDriverValue =
             LoadingPreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
                 slug_workspace_v2::PathObservationEpochError::DuplicateDemand(demand),
@@ -1935,6 +2152,10 @@ mod tests {
         assert!(ConfiguredNodeAnalysisObservationKey::validity(&outer));
         assert!(ConfiguredNodeAnalysisObservationKey::equality(
             &outer, &outer
+        ));
+        assert!(matches!(
+            finish_execution_platform_analysis(outer),
+            Err(LoadingPreparationOutcome::Complete(Err(_)))
         ));
     }
 }
@@ -2516,7 +2737,7 @@ impl ConfiguredNodeAnalysisKey {
                 mode,
                 &self.workspace,
                 &requirement,
-                configured_target.configuration().clone(),
+                configured_target,
                 candidates,
             )
             .await
@@ -2534,6 +2755,30 @@ impl ConfiguredNodeAnalysisKey {
             }
         } else {
             None
+        };
+        let action_context = if let Some(toolchain) = &prepared_toolchain {
+            toolchain.action_context.clone()
+        } else {
+            match prepare_default_action_context(
+                ctx,
+                mode,
+                &self.workspace,
+                configured_target,
+                candidate_execution_platforms.as_deref(),
+            )
+            .await
+            {
+                LoadingPreparationOutcome::Need(need) => {
+                    return LoadingPreparationOutcome::Need(need);
+                }
+                LoadingPreparationOutcome::Complete(Err(error)) => {
+                    return LoadingPreparationOutcome::Complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Err(error))) => {
+                    return root_analysis_driver_complete(Err(error));
+                }
+                LoadingPreparationOutcome::Complete(Ok(Ok(context))) => context,
+            }
         };
         let declared_dependency_keys = {
             let package = match package_value.as_ref() {
@@ -2705,6 +2950,7 @@ impl ConfiguredNodeAnalysisKey {
             &computed,
             marker,
             candidate_execution_platforms,
+            action_context,
             prepared_toolchain,
             capture_events,
             event_batch,
