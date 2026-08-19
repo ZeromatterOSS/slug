@@ -5729,3 +5729,100 @@ new retained state/lock/Host read, event drift, cap excess and M1 closure.
 REPLAN if the callback cannot cover every namespace with the frozen atomicity.
 After ACCEPT schedule only one docs-only external singleton observed-build
 design.
+
+
+### Accepted epoch-shaped source-certificate acceptance (2026-08-18)
+
+Commit `a4dd40d6` accepts the prerequisite designed in `5cd5e72c`.
+`SourceCertificate` now retains a nonempty compact
+`PathObservationEpoch` with exact shared Result Arcs. Native finalization
+validates exact certificate/full-epoch association, reobserves every Host and
+Materialization demand through the active repository session, preserves equal
+and unrelated Arcs, and replaces only changed certificate demands before one
+revision retry. The workspace-lease -> revision-owner -> synchronous
+materializer order performs no DICE computation while locked and adds no
+retained map, collection, cache, interner, task or lock.
+
+The accepted proof covers one and multiple changed demands, equal/unrelated Arc
+preservation, invalid construction/association, real materialization, equal-
+bytes symlink retarget, missing, directory and A/B/A restoration, callback
+failure rollback, native cancellation/publication failure, event suppression,
+public/legacy parity and zero external observed-root activation. Exact
+accounting against `2e1c1334` is request revision +79 production/+167 tests at
+1,743 physical, DICE +13 at 10,915, build proof +284 at 2,950, aggregate +543
+at 15,608.
+
+Focused validation passes 11 request-revision and 32 default-parallel
+build-command tests. Full core is 239/240 only on the recorded stale external-
+query visibility wording. The direct server dependent passes every certificate
+lifecycle assertion and reaches only its deferred mixed legacy-external versus
+observed-root event expectation; the implementation changes neither family
+selection nor event reconciliation. Clippy and archive status stop on their
+unchanged recorded baselines. Formatting, diff, Buck2 retention, AI cleanup
+categories 1-9 and independent review pass. Exact public behavior remains
+exact; the epoch certificate/final retry are Slug-native; external admission,
+multi-build, one-shot and identity bytes remain deferred.
+
+### External singleton observed-build design active (2026-08-18)
+
+Run only `WP-2A-m1-external-singleton-observed-build-design` from scheduling
+and Rust base `a4dd40d6`. Write only canonical/current/Stage 2 under
+40/220/180 and 420 aggregate docs net. STOP all Rust, Cargo, BUILD,
+fixture/oracle, export, caller and public-behavior changes.
+
+The existing `BuildCommandRootObservationKey` is the natural owner. Extend
+its future admission only from singleton root PackageAll to exactly one
+nonroot Single. Every nonroot Single, including an external wrong-kind
+rule/filegroup, is classified after observed package load; every root Single
+and every multi-target request preserves its neutral/legacy path and the public
+observed -> neutral -> legacy selection. Refactor the existing external branch
+into one mode-aware semantic driver: legacy selects only legacy
+route/package/source children and observed selects only observed siblings. The
+observed root sequences its matching anchor,
+repository route, repository package, target-kind lookup and selected Host
+source. After exported-source classification and before source, compute the
+existing request-revision dependency; its failure keeps the package prefix and
+does not activate source. Union each completed epoch left-first before
+semantic inspection;
+Need/typed outer is immediate and carrierless, equal duplicates preserve the
+first exact Arc, and conflict/operation mismatch stays typed outer.
+
+Freeze empty/anchor/anchor+route/anchor+route+package/full-source prefixes for
+every DICE/semantic terminal. Missing target and non-exported kind stop before
+source. Present, Absent, source semantic error and the existing accepted
+directory WrongKind retain the full source prefix and an exact source-child
+epoch certificate; earlier terminals retain none. Preserve exact target
+classification, diagnostics, one-target result and empty action closure.
+
+Only the admitted external observed root initializes request revision and opts
+into closure-selected repository requests/validations. PackageAll and every
+other observed root remain strict-empty. The terminal retains no repository
+collection: selected snapshot remains the sole sidecar constructor, complete
+path demand/value/Arc validation remains unconditional, and the accepted epoch
+certificate performs final Host+Materialization reobservation. Child keys
+remain sole event owners; cold order, warm suppression and exact no-replay when
+switching from external to root observed build require no event special case.
+
+Retain only one local build Result Arc plus one compact full epoch; the
+semantic Result may retain one compact source certificate epoch sharing exact
+Arcs. Child carriers/outcomes and union/event scratch remain compute-local or
+dependency-owned. Add no key, map, Vec, cache, store, interner, lock, task,
+direct Host read, revision duplicate or event owner.
+
+Future implementation authority after independent design ACCEPT is exactly
+`runtime/dice.rs` (+260 production, <=11,220 physical) and
+`runtime/tests/build_command_tests.rs` (+360 tests, <=3,350 physical), <=620
+semantic and <=14,570 combined physical. Require exact prefix/Arc/certificate,
+repository-selection, event/family, Need/outer/error, lifecycle, cancellation,
+failure rollback and retained-lifetime proof, focused server/core validation,
+cleanup and independent review. Exact external values/errors/events and every
+existing path stay exact; the sibling/carrier/typed outer/repository
+association is Slug-native; multi-build, one-shot, broader action analysis and
+identity bytes remain deferred.
+
+STOP/REPLAN on any third Rust file, new key/state/event owner, lower-carrier or
+public API change, partial validation, strict-root policy relaxation, retained
+scratch, direct Host read, behavior/family/order drift, cap excess or inability
+to carry the exact source child epoch without terminal-side collections.
+After design ACCEPT schedule exactly one bounded implementation; after
+implementation ACCEPT return to one docs-only remaining M1 owner audit.
