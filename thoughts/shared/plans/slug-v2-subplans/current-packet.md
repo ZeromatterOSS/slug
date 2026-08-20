@@ -1,123 +1,117 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-carrier-promotion-design`
+Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-carrier-promotion-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `e82057f2`
+Scheduling base: `f622babe`
 Accepted predecessor: `e82057f2`
 
-## Design authority
+## Goal
 
-This packet is docs-only. Write authority is exactly the canonical plan, this
-manifest, the Stage 6 owner plan and the orchestration routing log, at net caps
-<=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
-Cargo/BUILD metadata, APIs, exports and callers are read-only.
+Expose only the already accepted observed definition-load-request key, carrier
+and opaque typed outer through `slug_bzlmod_v2`'s doc-hidden API so the later
+loading owner can consume them. Change no semantic computation, caller, event,
+DICE dependency, retained state or Bazel-visible behavior.
 
-The ordinary terminal rollover changes canonical/current/Stage only. Routing
-remains unchanged unless the design reaches formal `REPLAN` or records a
-reusable routing lesson.
+## Write authority and caps
 
-## Audited decision and source facts
+Write exactly:
 
-The accepted observed definition-load-request key, carrier and typed outer are
-private to `app/slug_bzlmod_v2/src/selected_repo_spec.rs`. The crate root
-already doc-hidden reexports the legacy request value, error and key.
-`slug_loading_v2` already depends one way on Bzlmod and imports that legacy
-surface; Bzlmod does not and must not depend on loading.
+- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`;
+- `app/slug_bzlmod_v2/src/lib.rs`; and
+- new
+  `app/slug_bzlmod_v2/tests/definition_request_observation_api.rs`.
 
-`HostLoadedModuleExtensionDefinitionsKey` is the eventual natural owner in
-loading. It consumes ordered requests and, per request, parses the root Bzl
-target, computes the Host Bzl module, selects the named export and projects the
-heap-independent module-extension definition. Its sole direct semantic
-consumer is prepared inputs. The accepted crate-local
-`HostBzlModuleObservationKey` already owns the complete source/recursive-load
-epoch and its local `EventBatch`.
+Every other file is read-only, including loading, Cargo/BUILD metadata,
+fixtures, oracles and planning documents until terminal rollover.
 
-The audit therefore selects one visibility-only prerequisite. Loading cannot
-compute the observed request child, inspect its Result/epoch or preserve its
-typed outer until Bzlmod exposes a minimum doc-hidden carrier. Moving the
-loaded-definition owner into Bzlmod would reverse ownership and dependency.
-Combining promotion with loaded-definition implementation would cross two
-independently reviewable boundaries.
+Baselines are 11,657 selected-repo-spec lines with first `#[cfg(test)]` at
+4,484 and 403 lib lines. Caps are <=70 production, <=40 colocated proof, <=60
+external proof and <=170 aggregate semantic lines. Physical caps are
+11,730/415/60 for selected-repo-spec/lib/API smoke. Helpers/tests remain below
+100 lines.
 
-## Design question
+## Exact implementation
 
-Freeze the minimum Bzlmod -> loading API for the already accepted observed
-definition-request owner. Determine exactly:
+In `selected_repo_spec.rs`:
 
-- the doc-hidden constructible observed key and its stable identity;
-- the doc-hidden observed carrier accessors needed to borrow/dupe the exact
-  local request Result Arc and cumulative `PathObservationEpoch`;
-- one opaque doc-hidden typed observation error usable in loading without
-  exporting extension-mapping observation internals;
-- the exact crate-root reexports and visibility changes; and
-- the smallest compile/proof gate demonstrating cross-crate usability while
-  preserving every accepted private behavior.
+1. Make the existing
+   `HostSelectedExtensionDefinitionLoadRequestsObservationKey` doc-hidden
+   public and make only its existing `new(NormalizedAbsolutePath)` constructor
+   public. Preserve fields, derives, Hash and Display identity.
+2. Make `ObservedHostSelectedExtensionDefinitionLoadRequests` doc-hidden
+   public with private fields. Make only `result()` and `observations()`
+   public. Spell `result()` with the concrete public
+   `Arc<Result<HostSelectedExtensionDefinitionLoadRequests,
+   HostSelectedExtensionDefinitionLoadRequestsError>>` return type; do not
+   expose the private alias.
+3. Keep `DefinitionLoadRequestsObservationError` private and unchanged. Add a
+   doc-hidden public
+   `HostSelectedExtensionDefinitionLoadRequestsObservationError` newtype
+   around it with the same Debug/Clone/PartialEq/Eq/Allocative/Dupe traits.
+   Wrap the private error only when the observation key projects its public
+   `Key::Value`. The driver and mapping error graph remain private.
+4. Update only the existing same-file evaluation-input child and proofs needed
+   to carry/match the opaque wrapper. Do not alter request computation,
+   Complete/Need/outer projection, equality/validity, Result/epoch Arc identity,
+   error precedence or lifecycle behavior.
 
-Prefer a public opaque wrapper with a private internal kind if the existing
-private error enum would otherwise expose the mapping-observation graph. Do not
-make private fields public when constructors/accessors suffice. Do not export
-the evaluation-input observation carrier: loaded definitions does not consume
-it.
+In `lib.rs`, add doc-hidden reexports for exactly the observation key, observed
+carrier and public opaque observation error. Do not reexport the result alias,
+private error kind, evaluation-input observation types or mapping internals.
 
-## Frozen semantics and evidence
+## Proof and validation
 
-This is a visibility design, not a new owner. Preserve the accepted observed
-request computation exactly: mappings first; Complete forwards the exact
-request Result Arc and epoch; Need and typed outer are carrierless; mapping
-compute becomes the existing empty-prefix semantic request error; mapping
-semantic and pure request terminals retain the accepted prefix. The parent is
-eventless, warm reuse is silent, poll-drop publishes nothing and A -> B -> A
-restores the accepted Result/epoch association.
+Add one external integration smoke that:
 
-The implementation design must reuse the existing focused and full Bzlmod
-proof. Add only the smallest discriminator required to prove the doc-hidden
-surface is usable from the dependent loading crate. Do not add an oracle: the
-promotion changes no Bazel-visible value, order, error, event or identity.
+- imports/names exactly the three new reexports;
+- constructs the observation key from a normalized absolute workspace and pins
+  its existing Display text;
+- type-checks calls to the carrier Result/epoch accessors and names the opaque
+  outer without constructing either value; and
+- contains no DICE compute, semantic caller, private-source scan or test hook.
 
-Exact compatibility remains the existing request semantic values, errors,
-ordering and lower child events. The hidden observation key/API/carrier,
-including key identity and Result/epoch association, opaque typed outer and
-shared-Arc epoch are Slug-native and remain unchanged. Loaded definitions and
-every upper semantic owner remain deferred.
+Reuse the existing focused observed-definition-request tests for behavior,
+identity, event, Need/outer, cancellation and A -> B -> A proof. Run serially:
 
-## Later-owner handoff (non-authority)
+1. `cargo test -p slug_bzlmod_v2 observed_definition_requests --quiet`;
+2. `cargo test -p slug_bzlmod_v2 --test definition_request_observation_api --quiet`;
+3. `cargo test -p slug_bzlmod_v2 --quiet`;
+4. `cargo check -p slug_loading_v2 --quiet`;
+5. `cargo fmt --all -- --check`; and
+6. `git diff --check`.
 
-After promotion acceptance, a separate loaded-definition design may add one
-matching Legacy/Observed loading owner. It must preserve request -> per-request
-label -> Host Bzl module -> export -> wrong-kind/success order; merge the
-request epoch and each Complete Bzl epoch left-first before the corresponding
-semantics; retain earliest duplicate Arcs; and stop without scanning later
-requests or unioning Need.
+Do not add an oracle: visibility/wrapping changes no admitted Bazel surface.
 
-That later parent remains eventless while observed Bzl children own their
-ordered batches. Only its local Result Arc, cumulative epoch and semantic
-request/manifest/definition state may be retained. Child carriers, frozen
-handles beyond existing ownership, merge/export/event scratch, maps, caches,
-locks and tasks stay compute-local or forbidden. This paragraph authorizes no
-loading change.
+## Compatibility, lifetime and events
+
+Exact compatibility remains existing request semantic values, errors, order and
+lower child events. The hidden Rust/DICE key/API/carrier—including key identity,
+Result/epoch association, shared Arc and opaque typed outer—is Slug-native and
+must remain unchanged except for visibility and the nominal wrapper.
+
+The observation parent stays eventless and retains exactly one local request
+Result Arc plus its compact epoch. Need/outer/cancellation remains carrierless;
+warm reuse remains silent. No child carrier, mapping result, traversal/event
+scratch, map, cache, interner, store, lock, task, direct Host read, revision or
+certificate state may be added or retained.
 
 ## Terminal and stops
 
-Reach exactly one independently reviewed terminal:
+Implementation ACCEPT records exact accounting and validation, then activates
+only `WP-6-7A-loaded-module-extension-definitions-observation-design`.
+REPLAN before any wider or semantically different change.
 
-1. one minimum carrier-promotion design authorizing at most one implementation
-   successor; or
-2. formal `REPLAN` proving that cross-crate use requires a new semantic adapter
-   or an unbounded transitive API and naming one next packet.
-
-STOP Rust/test/fixture/oracle/Cargo/BUILD changes; loaded-definition design or
-implementation; a new adapter/key/owner; reverse crate dependency; public
-fields where accessors suffice; mapping-observation internals; evaluation-input
-carrier export; caller or upper activation; generic graph/route/mapping APIs;
-event movement; proof/cap waiver; milestone closure; M8/M7B or exact identity-
-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
+STOP loading changes or imports; a caller or DICE compute; a second key,
+adapter, owner or result alias; public fields; mapping-error or evaluation-input
+observation exports; semantic/error/order/equality/event/lifecycle drift;
+Cargo/BUILD changes; fixture/oracle work; proof/cap waiver; milestone closure;
+M8/M7B or exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B
+remains.
 
 ## Immediate predecessor
 
-The audit activated by `52df2e5c` over accepted Rust `e82057f2` establishes the
-natural loading owner and selects this uniquely smaller seam. The observed
-request carrier is
-complete and already proven but private to Bzlmod; loading's accepted observed
-Bzl carrier is already crate-local. Prepared/pure/instantiated/validated,
-root-mapping, generated and public owners are later or parallel consumers.
+Audit/design `f622babe` selects this uniquely smaller visibility prerequisite
+over accepted Rust `e82057f2`. The eventual loaded-definition owner remains in
+loading and its observed Host Bzl child is already crate-local; no loading or
+upper-owner work is part of this packet.

@@ -11629,3 +11629,50 @@ mapping-internal export, reverse dependencies, a second key or adapter, upper
 activation, proof waiver, milestone closure, M8/M7B and exact identity bytes.
 REPLAN only if an opaque usable carrier requires a new semantic owner or an
 unbounded transitive API. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension definition-request observation carrier-promotion design (2026-08-20)
+
+Accepted audit `f622babe` activates only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-carrier-promotion-design`
+over Rust base `e82057f2`.
+
+Promote exactly three doc-hidden nominal types from
+`selected_repo_spec.rs`: the existing observation key, the observed carrier and
+one new opaque public observation-error wrapper around the existing private
+`DefinitionLoadRequestsObservationError`. Make only the key constructor and
+carrier `result()`/`observations()` accessors public. Spell the Result accessor
+with its public concrete Arc/Result/value/error types; do not export the private
+result alias, fields or mapping-error kind. Add exactly those three crate-root
+reexports. Keep the private driver and error kind unchanged; wrap only at the
+observation key's public `Key::Value` boundary.
+
+Future Rust authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`,
+`app/slug_bzlmod_v2/src/lib.rs` and a new external-crate API smoke
+`app/slug_bzlmod_v2/tests/definition_request_observation_api.rs`. Baselines are
+11,657 lines with first `#[cfg(test)]` at 4,484 and 403 lib lines. Caps are
+<=70 production, <=40 colocated proof, <=60 external proof and <=170 aggregate;
+physical caps are 11,730/415/60 and every helper/test remains below 100.
+
+The smoke may only import/name the three hidden reexports, construct the key
+with `NormalizedAbsolutePath`, preserve its Display identity and type-check the
+carrier accessors plus opaque outer from an external crate context. It must not
+construct the carrier/error, compute a key, add a semantic caller or inspect a
+private error kind. Reuse the accepted observed-definition-request proof and
+full Bzlmod suite; also check the dependent loading crate. Add no oracle because
+no Bazel-visible behavior changes.
+
+Exact compatibility remains request semantic values, errors, order and child
+events. The hidden observation key/API/carrier, key identity, Result/epoch
+association and opaque typed outer are Slug-native and remain unchanged except
+for visibility/wrapping. There is no new event owner, retention, DICE dependency
+or lifecycle state.
+
+Design ACCEPT schedules only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-carrier-promotion-implementation`.
+After implementation ACCEPT activate only
+`WP-6-7A-loaded-module-extension-definitions-observation-design`. STOP loading
+changes, a second key/adapter/owner, evaluation-input or mapping-internal
+exports, public fields/result alias, semantic/event/equality drift, Cargo/BUILD,
+proof/cap waiver, milestone closure, M8/M7B and exact identity bytes. REPLAN
+before widening. M7 remains partial and M7A -> M8 -> M7B remains.
