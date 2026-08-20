@@ -1,5 +1,83 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-selected-registry-repo-specs-observation-frontier-audit`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Accepted implementation: `e155d74f`
+Semantic design: `38f40427`
+Rust base: `2a4041bb`
+
+## Accepted Host-registry-function completion
+
+Implementation `e155d74f` adds the private Host-registry observation owner in
+`host_registry.rs`. One Legacy/Observed driver preserves exact mode -> vendor
+projection -> conditional refresh -> matching visible lockfile -> resolved
+spelling -> mirrors -> primary URI/hash policy -> ordered mirror validation ->
+Result order. The observed child forwards carrierless Need/typed outer and its
+exact shared-Arc epoch; legacy projection moves the exact semantic Result Arc.
+
+The DICE value retains exactly one local semantic Result Arc plus the compact
+visible-lockfile epoch. No child carrier, parser/URI/mirror scratch,
+collection/cache/interner/store/lock/task/direct Host read, revision,
+certificate or event state is retained. Parent and children remain eventless.
+
+Accepted accounting against `2a4041bb` is +149 production/+460 proof/+609
+aggregate at 2,145 physical lines, within every frozen cap. Focused Host-
+registry validation passes 13/13; the full bzlmod suite passes 503 unit tests
+plus every integration/doc target. Formatting and diff hygiene pass.
+Independent terminal review ACCEPTs exact order/prefix/family/Arc association,
+neutral-input and visible-lockfile lifecycles, cancellation, compact retention,
+cleanup and security.
+
+## Exact docs-only frontier authority
+
+This audit may write only canonical, current, this Stage and the orchestration
+routing log, at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests,
+fixtures, oracles, exports and callers are read-only.
+
+Trace the accepted `HostSelectedModuleGraphObservationKey`,
+`RegistryFileObservationKey`, effective/discovery/preparation carriers and
+`HostRegistryFunctionObservationKey` through
+`HostSelectedRegistryRepoSpecsKey`, then through selected routes,
+extension-generated repositories and public/bootstrap consumers only far enough
+to identify the uniquely smallest complete remaining mutable frontier. Do not
+presume the selected repo-spec aggregate is complete and do not reopen accepted
+lower owners for structural uniformity.
+
+The audit must establish:
+
+- the first reusable semantic producer that can retain one exact Result Arc and
+  complete shared-Arc epoch without reconstructing selected graph, registry
+  file, preparation or Host-registry state;
+- exact selected-graph -> registry-file/effective/Host-registry -> per-entry
+  projection -> aggregate order, Need/typed-outer/error precedence, full-batch
+  terminal algebra and later suppression;
+- matching Legacy/Observed families, exact child EventBatch ownership/order,
+  eventless aggregate behavior where applicable, warm silence and poll-drop
+  recovery;
+- independent graph, registry-file, effective, Host-registry, repo-spec/route/
+  generated-repository A -> B -> A invalidation with held Result/epoch handles;
+  and
+- compact Buck2-shaped retention with join/frontier/event scratch compute-local
+  and no cache/interner/store/lock/task/direct Host read.
+
+Preserve admitted Bazel 9 values/errors/order/events as exact. Private typed
+outers and shared-Arc epoch association remain Slug-native. Route/extension/
+public/bootstrap breadth, M8/M7B and exact identity bytes remain deferred unless
+live evidence proves one is the uniquely smaller prerequisite.
+
+## Terminal discipline
+
+Reach exactly one terminal: one independently reviewed smallest-owner design,
+one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor. STOP Rust/tests/oracles/
+caller/export changes, speculative public activation, umbrella ownership,
+milestone closure, M8/M7B work, or bypassing the accepted selected-graph,
+registry and Host-registry carriers. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
+## Historical Host-registry-function observation implementation
+
 Packet: `WP-6-7A-host-registry-function-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
