@@ -10154,3 +10154,49 @@ STOP production semantic/event/family/memory drift, wider authority, upper
 activation, proof hook/waiver, cap excess or milestone closure. REPLAN before
 widening. After independent implementation ACCEPT return only to the docs-only
 selected-module-graph frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Discovered-module observation accepted; selected frontier resumed (2026-08-20)
+
+Accepted implementation `c6b1e108` completes design `b8e4cc03` under proof
+correction `b09d5e70` from Rust base `223c8112`. The shared driver preserves
+effective -> builtin/nonregistry/registry order, left-first Complete merging,
+carrierless Need/typed outer and exact legacy Result projection. Builtin owns no
+discovery-local batch; nonregistry and registry retain their exact evaluation
+batches. The carrier retains only one local Result Arc plus compact epoch.
+
+Exact accepted accounting is +309/16,811 physical in `source_preparation.rs`,
++1,175/8,406 in external proof and +1,484/25,217 aggregate. Focused discovery
+proof passes 10/10; full bzlmod validation passes 485 unit tests plus every
+integration/doc test. Fmt/diff hygiene and independent production/proof/
+retention/cleanup review pass. M7 remains partial.
+
+Activate only
+`WP-6-7A-selected-module-graph-observation-frontier-audit-resume-4`. This is a
+docs-only, read-only-Rust audit. Write exactly canonical, current, this Stage
+and routing. Net docs caps are canonical <=40, current <=220, Stage <=180 and
+routing <=30, with <=470 aggregate.
+
+Trace accepted discovered-module observation leaves through
+`HostSelectedModuleGraphKey`'s BFS/fixed-point join and every direct consumer.
+Audit discovery request/horizon ordering and every remaining mutable/path or
+carrierless edge. Inspect selected repo-spec, extension and public consumers
+only enough to distinguish a later owner from a necessary smaller prerequisite.
+Do not reopen accepted lower ownership for structural uniformity.
+
+Require exact Result/Arc/epoch association; full-batch Need/typed-outer/
+semantic precedence and suppression; matching families; child event ownership
+and order; warm/cancel recovery; mixed nonregistry/registry/recursive lifecycle;
+and compact retention with all join/frontier/event scratch compute-local. Exact
+compatibility is existing branch/result/error/order/events. Private typed outer
+and epoch association are Slug-native. Repo specs/extensions, broader bootstrap,
+M8/M7B and exact identity bytes remain deferred absent contrary owner evidence.
+
+Terminate with exactly one independently reviewable smallest-owner design, one
+uniquely smaller prerequisite design, or formal REPLAN with one smallest next
+audit/design. At most one successor may be scheduled and no Rust authority
+exists before independent design ACCEPT.
+
+STOP direct implementation, speculative selected/public activation, moved or
+duplicated child events, weakened Arc/epoch equality, retained-state growth,
+proof waiver, cap excess, M7 acceptance, M8/M7B or exact identity-byte work.
+Preserve M7A -> M8 -> M7B.

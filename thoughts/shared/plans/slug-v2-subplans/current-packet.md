@@ -1,5 +1,80 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-selected-module-graph-observation-frontier-audit-resume-4`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Accepted implementation: `c6b1e108`
+
+## Accepted discovered-module completion
+
+Implementation `c6b1e108` completes the private observed discovery owner from
+Rust base `223c8112`, semantic design `b8e4cc03` and proof correction
+`b09d5e70`. The shared driver preserves effective selection followed by the
+builtin, nonregistry-closure or registry-preparation branch. Complete epochs
+merge left-first before semantic inspection; Need/typed outer is carrierless;
+builtin publishes no discovery-local batch; nonregistry and registry retain
+sole ownership of their matching evaluation batch.
+
+The accepted carrier retains one exact local Result Arc plus a compact
+`PathObservationEpoch`. No child carrier, evaluator/event/merge scratch, cache,
+interner, store, lock, task or direct Host read is retained. Exact scope and
+accounting against `223c8112` are +309/16,811 physical in
+`source_preparation.rs`, +1,175/8,406 in
+`source_preparation_observation_tests.rs`, and +1,484/25,217 aggregate, within
+every corrected cap. Focused discovery proof passes 10/10 and the complete
+`slug_bzlmod_v2` suite passes 485 unit tests plus every integration/doc test;
+formatting and diff hygiene pass. Independent final review ACCEPTs production,
+proof, family/event ownership, retention and cleanup with no REPLAN.
+
+## Exact docs-only audit authority
+
+This packet is read-only for Rust, tests, fixtures, oracles, public APIs and
+callers. Write only canonical, current, `06-analysis-toolchains-and-actions.md`
+and the orchestration routing log. Net docs caps are canonical <=40, current
+<=220, Stage <=180 and routing <=30, with <=470 aggregate.
+
+Trace accepted `HostDiscoveredModuleObservationKey` leaves through the complete
+`HostSelectedModuleGraphKey` BFS/fixed-point join and every direct consumer.
+Inspect the selected-graph driver, discovery request/horizon ordering and every
+remaining mutable/path-producing or carrierless edge. Inspect selected
+repo-spec, extension and public consumers only far enough to prove that they
+are later owners or a necessary part of the smallest candidate. Do not reopen
+accepted effective, closure, repository, registry-file, preparation, patch or
+discovery ownership for structural uniformity.
+
+The audit must determine the uniquely smallest complete owner and establish:
+
+- exact key/Result/Arc/epoch association and whether the aggregate can retain a
+  compact local Result Arc plus complete cumulative epoch without rebuilding
+  child state;
+- exact input/BFS/fixed-point order, complete-batch Need/typed-outer/semantic
+  precedence, first-Arc conflict behavior and later-work suppression;
+- matching Legacy/Observed families, child evaluation-event ownership/order,
+  warm silence, cancellation recovery and zero provisional parent state;
+- lifecycle restoration and held-Arc behavior for nonregistry, registry,
+  recursive dependency and mixed horizons; and
+- compact Buck2-shaped retention with join/frontier/event scratch compute-local
+  and no new cache/interner/store/lock/task/direct Host read.
+
+Preserve current Bazel 9 branch/result/error/order/events as exact. Private
+typed outer and shared-Arc epoch association are Slug-native. Selected repo
+specs/extensions, broader bootstrap work, M8/M7B and exact identity bytes remain
+deferred unless live owner evidence proves one is the uniquely smaller
+prerequisite.
+
+Terminate with exactly one independently reviewable docs-only design for the
+smallest complete owner, one uniquely smaller prerequisite design, or formal
+REPLAN with contradictory evidence and one smallest next audit/design. At most
+one successor may be scheduled; no Rust authority exists before independent
+design ACCEPT.
+
+STOP direct implementation, speculative selected-graph/public activation,
+moving or duplicating child event ownership, weakened Arc/epoch equality,
+retained-state growth, proof waiver, cap excess, M7 acceptance, M8/M7B work or
+exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
+
+## Historical discovered-module implementation authority
+
 Packet: `WP-6-7A-host-discovered-module-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
