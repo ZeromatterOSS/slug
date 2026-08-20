@@ -1,5 +1,54 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-host-selected-module-graph-observation-implementation`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Rust base: `c6b1e108`
+Accepted design/scheduling: `09177514`
+
+## Exact implementation authority
+
+Write only `app/slug_bzlmod_v2/src/selected_graph.rs` and
+`app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`. Every third
+Rust/test file, fixture, oracle, caller, export and plan document is read-only.
+
+Keep `selected_graph.rs` baseline 1,592/test boundary 907 at <=520 production,
+<=320 colocated proof and <=2,450 physical. Keep external proof baseline 8,406
+at <=1,500/10,000 physical. Aggregate cap is <=2,340 semantic/12,450 physical;
+helpers/tests remain below 200.
+
+Implement only the accepted private graph key/carrier and shared Legacy/
+Observed driver. Preserve exact root-files -> neutral policy -> ordered candidate
+effective overrides -> root transforms -> first-seen BFS horizons -> horizon-
+ordered raw transforms -> repeated fixed point -> select/rewrite order. Merge
+Complete epochs left-first before semantics; cache effective values/epochs only
+on first computation; repeated equal epochs keep the earliest Arc.
+
+Every horizon scans all Complete carrier epochs in input order. First merge/
+child outer is carrierless fail-closed; otherwise preserve legacy precedence:
+first compute/semantic leaf error > incompatible Need > compatible Need union >
+ordered success. Need/outer discards provisional state; Complete semantic error
+retains the full valid sibling prefix and suppresses later work.
+
+Keep graph siblings eventless and child discovery batches solely child-owned.
+Retain exactly one local Result Arc plus compact epoch; every raw/traversal/
+frontier/cache/outcome/event/merge structure stays compute-local. Add no map,
+cache, interner, store, lock, task or direct Host read to retained state.
+
+Complete the frozen identity/Arc/prefix/full-horizon/family/event/warm/cancel/
+lifecycle/upper-exclusion proof matrix without hooks or caller activation.
+Exact compatibility is existing graph values/errors/order/events; Slug-native is
+the private typed outer/epoch association; later owners and identity bytes stay
+deferred.
+
+STOP a third file/caller/export, legacy precedence or child-event drift,
+retained traversal state, weakened Arc association, cap excess or milestone
+closure. REPLAN before widening. After independent implementation ACCEPT return
+only to the docs-only selected frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
+## Historical selected-module-graph observation design
+
 Packet: `WP-6-7A-host-selected-module-graph-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`

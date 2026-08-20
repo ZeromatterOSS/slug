@@ -10266,3 +10266,40 @@ closure. REPLAN before widening. After independent design ACCEPT schedule only
 `WP-6-7A-host-selected-module-graph-observation-implementation`; only after its
 ACCEPT return to the docs-only selected frontier. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Selected-module-graph observation design accepted (2026-08-20)
+
+Accepted design `09177514` from Rust base `c6b1e108` selects
+`HostSelectedModuleGraphKey` as the first complete aggregate after the
+accepted root-files, effective-override and discovered-module carriers. Activate
+only `WP-6-7A-host-selected-module-graph-observation-implementation`.
+
+Write exactly `selected_graph.rs` at baseline 1,592/test boundary 907 with
+<=520 production/+320 colocated proof and <=2,450 physical, plus
+`source_preparation_observation_tests.rs` at baseline 8,406 with <=1,500
+proof/10,000 physical. Aggregate authority is <=2,340 semantic/12,450 physical;
+helpers/tests remain below 200 and no third file/export/caller is writable.
+
+Preserve one Legacy/Observed driver and exact root-files -> neutral policy ->
+ordered candidate effective overrides -> root transforms -> first-seen BFS
+horizons -> horizon-ordered raw transforms -> fixed point -> select/rewrite
+order. Append effective epochs only on first computation and merge Complete
+epochs left-first before semantics, preserving the earliest equal Arc.
+
+Every horizon scans all Complete carriers in input order before selection.
+Merge conflict/mismatch or child typed outer is carrierless fail-closed;
+otherwise preserve first compute/semantic error > incompatible Need >
+compatible Need union > ordered success. Need/outer discards provisional state;
+Complete semantic errors retain the full valid sibling prefix and suppress later
+work.
+
+Graph siblings remain eventless and discovery children keep sole batch
+ownership. Retain exactly one local Result Arc plus compact epoch; all raw,
+traversal, frontier, cache, outcome, event and merge state remains compute-local.
+Complete the frozen identity/Arc/prefix/horizon/family/event/warm/cancel/
+lifecycle/upper proof without hooks or caller activation.
+
+STOP third-file/caller/export work, precedence or child-event drift, retained
+traversal state, weakened Arc association, cap excess or milestone closure.
+REPLAN before widening. After independent implementation ACCEPT return only to
+the docs-only selected frontier. M7 remains partial; preserve M7A -> M8 -> M7B.
