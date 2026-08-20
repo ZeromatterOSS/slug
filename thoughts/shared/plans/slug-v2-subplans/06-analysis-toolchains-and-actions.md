@@ -9714,3 +9714,35 @@ caller/export, reordered IO/patches, event/family/memory drift, upper activation
 cap excess or milestone closure. After independent design ACCEPT schedule only
 `WP-6-7A-module-source-preparation-observation-implementation`; after its
 acceptance return only to the selected-graph frontier for discovery.
+
+### Module-source preparation observation design accepted (2026-08-19)
+
+Design `5436a421` activates only
+`WP-6-7A-module-source-preparation-observation-implementation` from Rust base
+`0f9a0559`. Write exactly `source_preparation.rs` and
+`source_preparation_observation_tests.rs` at the frozen 16,135/5,262 baselines:
+<=700 production/+60 colocated proof/16,900 and <=1,440 external proof/6,800,
+<=2,200 semantic and <=23,700 physical aggregate. Helpers/tests stay below 200.
+
+Preserve the private Result-Arc+epoch carrier and one Legacy/Observed driver.
+Order is normalize -> matching effective -> nonregistry source, or
+version/policy -> ordered registry files -> all patch resolutions in label order
+-> for each retained resolution, FileBytes then immediate cumulative apply.
+Merge Complete epochs left-first before semantics; append FileBytes before
+inspection; Need/outer is carrierless with later suppression and no Need union.
+Legacy moves the exact Result Arc.
+
+Preparation remains eventless; children retain ROOT/MODULE/lockfile batches and
+discovery remains the later evaluation owner. Retain no child carrier/resolved
+path/patch scratch or extra collection/cache/interner/store/lock/task/Host read/
+revision/certificate/event state.
+
+Complete the frozen stage, Arc/order/prefix/conflict, nonregistry/registry,
+patch, family/event/warm/cancel and independent lifecycle proof, including early
+patch apply failure suppressing later FileBytes. Activate no discovery/selected/
+repo-spec/HostRegistry/extension/public consumer.
+
+STOP a third file/export/caller, reordered IO/patch semantics, event/family/
+memory drift, upper activation, cap excess or milestone closure. REPLAN before
+wider authority. After independent ACCEPT return only to the docs-only
+selected-module-graph frontier for discovery.

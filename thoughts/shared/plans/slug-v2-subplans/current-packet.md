@@ -1,12 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-source-preparation-observation-design`
+Packet: `WP-6-7A-module-source-preparation-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `79b56e8a`
+Scheduling base: `5436a421`
+Accepted design: `5436a421`
 Rust base: `0f9a0559`
 
-## Owner decision and exact design authority
+## Owner decision and exact implementation authority
 
 The selected-graph frontier audit selects `ModuleSourcePreparationKey` as the
 uniquely smallest complete next owner. It owns effective selection and the
@@ -19,11 +20,7 @@ consumer. `HostDiscoveredModuleKey` only consumes completed preparation and
 separately owns MODULE evaluation/events; selected graph only joins discovery
 horizons. No smaller prerequisite or upper owner is warranted.
 
-This packet is docs-only. Write only canonical/current/Stage 6/routing at
-<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, tests, fixtures,
-oracles, public surfaces and callers are read-only.
-
-Future implementation authority is exactly:
+Write authority is exactly:
 
 - `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 16,135 physical:
   <=700 production, <=60 colocated proof and <=16,900 physical; and
@@ -32,7 +29,7 @@ Future implementation authority is exactly:
 
 Aggregate semantic cap is <=2,200 and aggregate physical cap <=23,700. Helpers
 and tests remain below 200 lines; the shared owner file is the sole cohesive
-large-file exception. No third file, export or caller is authorized.
+large-file exception. Every third file, export and caller is read-only.
 
 ## Frozen owner, order and algebra
 
@@ -111,7 +108,6 @@ deferred.
 STOP a third file/export/caller, upper activation, reordered registry IO or
 patches, semantic/event/family/memory drift, direct Host read, cap excess or
 milestone closure. If this cannot fit, REPLAN before widening. After independent
-design ACCEPT schedule exactly
-`WP-6-7A-module-source-preparation-observation-implementation`; after its
-acceptance return only to the docs-only selected-module-graph frontier for the
-discovery owner. M7 remains partial and M7A -> M8 -> M7B remains.
+implementation ACCEPT return only to the docs-only selected-module-graph
+frontier for the discovery owner. M7 remains partial and M7A -> M8 -> M7B
+remains.
