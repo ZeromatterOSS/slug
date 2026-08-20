@@ -2789,7 +2789,8 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
         ));
         assert!(matches!(
             reduce(batch(slot, typed_outer.clone()), None),
-            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(found))) if found == outer
+            ControlFlow::Break(SourcePreparationOutcome::Complete(Err(found)))
+                if found == NonregistryPreparationFrontierError::Path(outer.dupe())
         ));
         let validation = success(slot).map(|outcome| {
             outcome.map(|result| {
@@ -2831,8 +2832,10 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
         assert!(matches!(
             reduce(batch(slot, conflict), None),
             ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
-                ObservedPathFrontierError::Epoch(
-                    slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
+                NonregistryPreparationFrontierError::Path(
+                    ObservedPathFrontierError::Epoch(
+                        slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
+                    )
                 )
             ))) if found == initial_demand
         ));
@@ -2865,7 +2868,8 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
     no_semantic.insert(paths[2].clone(), typed_outer);
     assert!(matches!(
         reduce(no_semantic, Some(path_need.dupe())),
-        ControlFlow::Break(SourcePreparationOutcome::Complete(Err(found))) if found == outer
+        ControlFlow::Break(SourcePreparationOutcome::Complete(Err(found)))
+            if found == NonregistryPreparationFrontierError::Path(outer)
     ));
 
     let union = path_need.try_union(&bootstrap_need).unwrap();
@@ -4227,4 +4231,1032 @@ async fn observed_preflight_semantic_terminals_keep_decisive_prefixes() {
         .1
         .clone();
     assert_eq!(row.len(), 4);
+}
+
+fn observed_host_closure_key() -> HostNonregistryModuleClosureObservationKey {
+    HostNonregistryModuleClosureObservationKey(HostNonregistryModuleClosureKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        NonrootModuleKey::new("dep", "1"),
+    ))
+}
+
+fn complete_observed_host_closure(
+    value: &<HostNonregistryModuleClosureObservationKey as Key>::Value,
+) -> &ObservedHostNonregistryModuleClosure {
+    let SourcePreparationOutcome::Complete(Ok(value)) = value else {
+        panic!("observed Host closure must complete semantically: {value:?}")
+    };
+    value
+}
+
+async fn observed_host_closure_case(
+    dice: &Arc<Dice>,
+    root_module: Option<&[u8]>,
+    root_wrong_kind: Option<PathNodeKind>,
+    fragments: &[(&str, Option<&[u8]>)],
+    fragment_needs: &[&str],
+    variant: i64,
+    immutable: Option<(&str, u64, &str)>,
+    tracker: Option<Arc<NonregistryPreflightTracker>>,
+    fragment_wrong_kind: Option<(&str, PathNodeKind)>,
+    capture_events: bool,
+) -> (
+    dice::DiceTransaction,
+    <HostNonregistryModuleClosureObservationKey as Key>::Value,
+) {
+    let transaction = host_nonregistry_transaction(
+        dice,
+        root_module,
+        root_wrong_kind,
+        fragments,
+        fragment_needs,
+        variant,
+        immutable,
+        tracker,
+        fragment_wrong_kind,
+        capture_events,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, immutable.is_some()).await;
+    let value = transaction
+        .compute(&observed_host_closure_key())
+        .await
+        .unwrap();
+    (transaction, value)
+}
+
+#[test]
+fn observed_host_closure_identity_projection_and_outer_algebra_are_exact() {
+    use std::hash::Hash;
+    use std::hash::Hasher;
+
+    let key = observed_host_closure_key();
+    let other = HostNonregistryModuleClosureObservationKey(
+        HostNonregistryModuleClosureKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("other", "1"),
+        ),
+    );
+    assert_ne!(key, other);
+    assert_eq!(
+        key.to_string(),
+        "observed-host-nonregistry-module-closure:dep@1"
+    );
+    let hash = |value: &HostNonregistryModuleClosureObservationKey| {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
+    };
+    assert_ne!(hash(&key), hash(&other));
+
+    let semantic = Arc::new(Err(HostNonregistryModuleClosureError::RootAbsent));
+    let complete = SourcePreparationOutcome::Complete(Ok(ObservedHostNonregistryModuleClosure {
+        result: semantic.dupe(),
+        observations: PathObservationEpoch::empty(),
+    }));
+    let SourcePreparationOutcome::Complete(projected) =
+        project_legacy_host_nonregistry_closure(complete.dupe())
+    else {
+        panic!("legacy projection must complete")
+    };
+    assert!(Arc::ptr_eq(&semantic, &projected));
+    assert!(HostNonregistryModuleClosureObservationKey::validity(
+        &complete
+    ));
+    assert!(HostNonregistryModuleClosureObservationKey::equality(
+        &complete, &complete
+    ));
+
+    let need = SourcePreparationOutcome::Need(preflight_need("closure"));
+    assert!(!HostNonregistryModuleClosureObservationKey::validity(&need));
+    assert!(!HostNonregistryModuleClosureObservationKey::equality(
+        &need, &need
+    ));
+    let outer = observed_host_nonregistry_closure_outer(
+        HostNonregistryModuleClosureObservationError::EffectiveCompute("compute".into()),
+    );
+    assert!(HostNonregistryModuleClosureObservationKey::validity(&outer));
+
+    assert!(HostNonregistryModuleClosureObservationKey::equality(
+        &outer, &outer
+    ));
+}
+
+#[test]
+fn observed_host_closure_initial_reducers_preserve_terminal_prefixes() {
+    let key = observed_host_closure_key();
+    let (prefix_demand, prefix_result, prefix) = observed_horizon_epoch("closure-prefix");
+    let need = preflight_need("closure-initial-need");
+    for stage in 0..3 {
+        let stopped = forward_host_nonregistry_closure_observation::<()>(
+            SourcePreparationOutcome::Need(need.dupe()),
+            |error| match stage {
+                0 => HostNonregistryModuleClosureObservationError::EffectiveFrontier(error),
+                1 => HostNonregistryModuleClosureObservationError::MaterializationFrontier(error),
+                _ => HostNonregistryModuleClosureObservationError::RootSourceFrontier(error),
+            },
+        );
+        assert!(matches!(
+            stopped,
+            ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == need
+        ));
+        let outer = ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand: prefix_demand.dupe(),
+                result_operation: PathObservationOperation::FileBytes,
+            },
+        );
+        let stopped = forward_host_nonregistry_closure_observation::<()>(
+            SourcePreparationOutcome::Complete(Err(outer)),
+            |error| match stage {
+                0 => HostNonregistryModuleClosureObservationError::EffectiveFrontier(error),
+                1 => HostNonregistryModuleClosureObservationError::MaterializationFrontier(error),
+                _ => HostNonregistryModuleClosureObservationError::RootSourceFrontier(error),
+            },
+        );
+        let ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))) = stopped else {
+            panic!("stage {stage} outer must be carrierless")
+        };
+        assert!(matches!(
+            (stage, error),
+            (
+                0,
+                HostNonregistryModuleClosureObservationError::EffectiveFrontier(_)
+            ) | (
+                1,
+                HostNonregistryModuleClosureObservationError::MaterializationFrontier(_)
+            ) | (
+                2,
+                HostNonregistryModuleClosureObservationError::RootSourceFrontier(_)
+            )
+        ));
+    }
+
+    assert!(matches!(
+        observed_host_nonregistry_closure_outer(
+            HostNonregistryModuleClosureObservationError::EffectiveCompute("effective compute".into())
+        ),
+        SourcePreparationOutcome::Complete(Err(
+            HostNonregistryModuleClosureObservationError::EffectiveCompute(message)
+        )) if message.as_ref() == "effective compute"
+    ));
+    for outcome in [
+        host_nonregistry_closure_compute_error(
+            HostNonregistryModuleClosureError::MaterializationCompute(
+                "materialization compute".into(),
+            ),
+            prefix.dupe(),
+        ),
+        host_nonregistry_closure_compute_error(
+            HostNonregistryModuleClosureError::RootSourceCompute("root source compute".into()),
+            prefix.dupe(),
+        ),
+    ] {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("compute failures remain semantic")
+        };
+        assert_exact_epoch(&prefix, observed.observations());
+        assert!(Arc::ptr_eq(
+            observed.observations().get(&prefix_demand).unwrap(),
+            &prefix_result
+        ));
+    }
+
+    let effective_error = Err(HostEffectiveModuleOverrideError::CommandPolicy(
+        "effective semantic".into(),
+    ));
+    let ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(observed))) =
+        finish_host_nonregistry_effective(&key.0, &effective_error, prefix.dupe())
+    else {
+        panic!("effective semantic failure")
+    };
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(HostNonregistryModuleClosureError::RootModuleFiles(message))
+            if message.as_str().contains("effective semantic")
+    ));
+    assert_exact_epoch(&prefix, observed.observations());
+
+    let materialization_incoming = observed_horizon_epoch("materialization-semantic").2;
+    let materialization_prefix =
+        merge_path_observations(&prefix, &materialization_incoming).unwrap();
+    let ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(observed))) =
+        finish_host_nonregistry_materialization(
+            &Err(RepositoryMaterializationError::Spec(
+                "materialization semantic".into(),
+            )),
+            &materialization_incoming,
+            prefix.dupe(),
+            HostRepositoryLocalPathPolicy::WorkspaceRelative,
+        )
+    else {
+        panic!("materialization semantic failure")
+    };
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(HostNonregistryModuleClosureError::Materialization(
+            RepositoryMaterializationError::Spec(message)
+        )) if message.as_str() == "materialization semantic"
+    ));
+    assert_exact_epoch(&materialization_prefix, observed.observations());
+
+    let input = HostNonregistryModuleClosureInput {
+        source_identity: HostNonregistryModuleSourceIdentity::Local {
+            repo_spec: local_route()
+                .source_capability()
+                .repo_spec()
+                .unwrap()
+                .clone(),
+        },
+        local_path_policy: HostRepositoryLocalPathPolicy::WorkspaceRelative,
+        observations: prefix.dupe(),
+    };
+    let root_incoming = observed_horizon_epoch("root-semantic").2;
+    let root_prefix = merge_path_observations(&prefix, &root_incoming).unwrap();
+    let ControlFlow::Break(SourcePreparationOutcome::Complete(Ok(observed))) =
+        finish_host_nonregistry_root_source(
+            Ok(RepositorySourceFileValue::Absent),
+            &root_incoming,
+            input,
+        )
+    else {
+        panic!("root semantic failure")
+    };
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(HostNonregistryModuleClosureError::RootAbsent)
+    ));
+    assert_exact_epoch(&root_prefix, observed.observations());
+}
+
+
+#[test]
+fn observed_host_horizon_reducer_is_occurrence_ordered_and_prefix_bounded() {
+    let occurrences = ["p", "q", "r"]
+        .into_iter()
+        .enumerate()
+        .map(|(slot, package)| {
+            let occurrence = horizon_occurrence(package, u32::try_from(slot + 1).unwrap());
+            NonregistryIncludeOccurrence {
+                package: occurrence.package.package().clone(),
+                target: occurrence.target,
+                raw_label: occurrence.raw_label,
+                location: occurrence.location,
+            }
+        })
+        .collect::<Vec<_>>();
+    let (initial_demand, initial_result, initial) = observed_horizon_epoch("host-horizon-initial");
+    let children = ["p", "q", "r"].map(|name| observed_horizon_epoch(&format!("host-{name}")));
+    let successful = || {
+        SmallMap::from_iter(occurrences.iter().enumerate().map(|(slot, occurrence)| {
+            (
+                occurrence.package.clone(),
+                Ok(SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostNonregistryPackagePreflight {
+                        result: Arc::new(Ok(HostNonregistryPackagePreflight::Build)),
+                        observations: children[slot].2.dupe(),
+                    },
+                ))),
+            )
+        }))
+    };
+    let expected_prefix = |completed: usize| {
+        children
+            .iter()
+            .take(completed)
+            .fold(initial.dupe(), |prefix, child| {
+                merge_path_observations(&prefix, &child.2).unwrap()
+            })
+    };
+
+    for slot in 0..3 {
+        let mut compute = successful();
+        compute.insert(occurrences[slot].package.clone(), Err("package compute".into()));
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            finish_observed_host_nonregistry_include_horizon(
+                occurrences.clone(),
+                &compute,
+                None,
+                initial.dupe(),
+            )
+        else {
+            panic!("package compute remains semantic")
+        };
+        assert!(matches!(
+            observed.result,
+            Err(NonregistryPreparationError::Host(
+                HostNonregistryModuleClosureError::Package {
+                    failure: HostNonregistryIncludePackageFailure::Compute(ref message),
+                    ..
+                }
+            )) if message.as_ref() == "package compute"
+        ));
+        assert_exact_epoch(&expected_prefix(slot), &observed.observations);
+        for later in children.iter().skip(slot) {
+            assert!(observed.observations.get(&later.0).is_none());
+        }
+
+        let need = preflight_need(&format!("host-horizon-{slot}-need"));
+        let mut needs = successful();
+        needs.insert(
+            occurrences[slot].package.clone(),
+            Ok(SourcePreparationOutcome::Need(need.dupe())),
+        );
+        assert!(matches!(
+            finish_observed_host_nonregistry_include_horizon(
+                occurrences.clone(),
+                &needs,
+                Some(need.dupe()),
+                initial.dupe(),
+            ),
+            SourcePreparationOutcome::Need(found) if found == need
+        ));
+
+        let outer =
+            HostNonregistryPackagePreflightObservationError::EffectiveCompute("outer".into());
+        let mut outers = successful();
+        outers.insert(
+            occurrences[slot].package.clone(),
+            Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+        );
+        assert!(matches!(
+            finish_observed_host_nonregistry_include_horizon(
+                occurrences.clone(),
+                &outers,
+                None,
+                initial.dupe(),
+            ),
+            SourcePreparationOutcome::Complete(Err(
+                NonregistryPreparationFrontierError::Package(found)
+            )) if found == outer
+        ));
+
+        let mut semantic = successful();
+        semantic.insert(
+            occurrences[slot].package.clone(),
+            Ok(SourcePreparationOutcome::Complete(Ok(
+                ObservedHostNonregistryPackagePreflight {
+                    result: Arc::new(Ok(HostNonregistryPackagePreflight::NoBuildFile)),
+                    observations: children[slot].2.dupe(),
+                },
+            ))),
+        );
+        let SourcePreparationOutcome::Complete(Ok(observed)) =
+            finish_observed_host_nonregistry_include_horizon(
+                occurrences.clone(),
+                &semantic,
+                None,
+                initial.dupe(),
+            )
+        else {
+            panic!("package semantic remains semantic")
+        };
+        assert!(matches!(
+            observed.result,
+            Err(NonregistryPreparationError::Host(
+                HostNonregistryModuleClosureError::Package {
+                    failure: HostNonregistryIncludePackageFailure::NoBuildFile,
+                    ..
+                }
+            ))
+        ));
+        assert_exact_epoch(&expected_prefix(slot + 1), &observed.observations);
+        for later in children.iter().skip(slot + 1) {
+            assert!(observed.observations.get(&later.0).is_none());
+        }
+    }
+
+    let path_need = preflight_need("host-horizon-union-path");
+    let bootstrap_need =
+        SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
+            workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+        });
+    let union = path_need.try_union(&bootstrap_need).unwrap();
+    let mut needs = successful();
+    needs.insert(
+        occurrences[0].package.clone(),
+        Ok(SourcePreparationOutcome::Need(path_need)),
+    );
+    needs.insert(
+        occurrences[2].package.clone(),
+        Ok(SourcePreparationOutcome::Need(bootstrap_need)),
+    );
+    let SourcePreparationOutcome::Need(found) =
+        finish_observed_host_nonregistry_include_horizon(
+            occurrences.clone(),
+            &needs,
+            Some(union),
+            initial.dupe(),
+        )
+    else {
+        panic!("full compatible Need union")
+    };
+    assert!(found.path_observations().is_some());
+    assert!(found.root_module_bootstrap_request().is_some());
+
+    let duplicate = PathObservationEpoch::from_shared([(
+        initial_demand.dupe(),
+        initial_result.dupe(),
+    )])
+    .unwrap();
+    let mut equal = successful();
+    equal.insert(
+        occurrences[0].package.clone(),
+        Ok(SourcePreparationOutcome::Complete(Ok(
+            ObservedHostNonregistryPackagePreflight {
+                result: Arc::new(Ok(HostNonregistryPackagePreflight::Build)),
+                observations: duplicate,
+            },
+        ))),
+    );
+    let SourcePreparationOutcome::Complete(Ok(observed)) =
+        finish_observed_host_nonregistry_include_horizon(
+            occurrences.clone(),
+            &equal,
+            None,
+            initial.dupe(),
+        )
+    else {
+        panic!("equal duplicate")
+    };
+    assert!(Arc::ptr_eq(
+        observed.observations.get(&initial_demand).unwrap(),
+        &initial_result
+    ));
+
+    let conflict = PathObservationEpoch::from_shared([(
+        initial_demand.dupe(),
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Error(
+            PathObservationError::NotALink,
+        ))),
+    )])
+    .unwrap();
+    let mut conflicting = successful();
+    conflicting.insert(
+        occurrences[0].package.clone(),
+        Ok(SourcePreparationOutcome::Complete(Ok(
+            ObservedHostNonregistryPackagePreflight {
+                result: Arc::new(Ok(HostNonregistryPackagePreflight::Build)),
+                observations: conflict,
+            },
+        ))),
+    );
+    assert!(matches!(
+        finish_observed_host_nonregistry_include_horizon(
+            occurrences,
+            &conflicting,
+            None,
+            initial,
+        ),
+        SourcePreparationOutcome::Complete(Err(
+            NonregistryPreparationFrontierError::Path(
+                ObservedPathFrontierError::Epoch(
+                    slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
+                )
+            )
+        )) if found == initial_demand
+    ));
+}
+#[tokio::test]
+async fn observed_host_closure_preserves_exact_epoch_rows_events_and_legacy_parity() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = b"module(name='dep',version='1')\ninclude('//pkg:a.MODULE.bazel')\ninclude('//pkg:a.MODULE.bazel')\n";
+    let fragments = [
+        (
+            "pkg/a.MODULE.bazel",
+            Some(&b"include('//other:b.MODULE.bazel')\n"[..]),
+        ),
+        (
+            "other/b.MODULE.bazel",
+            Some(&b"bazel_dep(name='b',version='1')\n"[..]),
+        ),
+    ];
+    let (mut transaction, cold) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &fragments,
+        &[],
+        600,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let observed = complete_observed_host_closure(&cold);
+    let HostNonregistryModuleClosure::Supported(closure) = observed.result().as_ref().as_ref().unwrap()
+    else {
+        panic!("expected supported observed closure")
+    };
+    assert_eq!(closure.fragments.len(), 4);
+    assert_eq!(
+        closure
+            .fragments
+            .iter()
+            .map(|fragment| fragment.occurrence.target.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "a.MODULE.bazel",
+            "a.MODULE.bazel",
+            "b.MODULE.bazel",
+            "b.MODULE.bazel"
+        ]
+    );
+    let held_result = observed.result().dupe();
+    let held_epoch = observed.observations().dupe();
+
+    let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        "dep".into(),
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    let materialization_key = RepositoryMaterializationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+    );
+    let SourcePreparationOutcome::Complete(Ok(materialization)) = transaction
+        .compute(&materialization_key)
+        .await
+        .unwrap()
+    else {
+        panic!("materialization carrier")
+    };
+    let root_source_key = RepositorySourceFileObservationKey(RepositorySourceFileKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        repo_relative_path: PathBuf::from("MODULE.bazel"),
+    });
+    let SourcePreparationOutcome::Complete(Ok(root_source)) =
+        transaction.compute(&root_source_key).await.unwrap()
+    else {
+        panic!("root source carrier")
+    };
+    let package_key = observed_preflight_key("pkg");
+    let package = transaction.compute(&package_key).await.unwrap();
+    let package = complete_observed_preflight(&package);
+    let package_source_key = RepositorySourceFileObservationKey(RepositorySourceFileKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        repo_relative_path: PathBuf::from("pkg/a.MODULE.bazel"),
+    });
+    let SourcePreparationOutcome::Complete(Ok(package_source)) =
+        transaction.compute(&package_source_key).await.unwrap()
+    else {
+        panic!("package fragment carrier")
+    };
+    let other_key = observed_preflight_key("other");
+    let other = transaction.compute(&other_key).await.unwrap();
+    let other = complete_observed_preflight(&other);
+    let other_source_key = RepositorySourceFileObservationKey(RepositorySourceFileKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        repo_relative_path: PathBuf::from("other/b.MODULE.bazel"),
+    });
+    let SourcePreparationOutcome::Complete(Ok(other_source)) =
+        transaction.compute(&other_source_key).await.unwrap()
+    else {
+        panic!("other fragment carrier")
+    };
+    let mut expected = effective.observations().dupe();
+    for incoming in [
+        materialization.observations(),
+        root_source.observations(),
+        package.observations(),
+        package_source.observations(),
+        other.observations(),
+        other_source.observations(),
+    ] {
+        expected = merge_path_observations(&expected, incoming).unwrap();
+    }
+    assert_exact_epoch(&expected, &held_epoch);
+    assert_selected_epoch(&mut transaction, &expected, &held_epoch).await;
+
+    let observed_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_host_closure_key().to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        observed_row,
+        vec![
+            effective_key.to_string(),
+            materialization_key.to_string(),
+            root_source_key.to_string(),
+            package_key.to_string(),
+            package_source_key.to_string(),
+            other_key.to_string(),
+            other_source_key.to_string(),
+        ]
+    );
+    let closure_batches = tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(owner, _, _)| owner == &observed_host_closure_key().to_string())
+        .cloned()
+        .collect::<Vec<_>>();
+    assert!(
+        closure_batches
+            .iter()
+            .all(|(_, kind, batch)| *kind == ActivationKind::Evaluated && batch.is_none())
+    );
+    let child_batches = tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .filter_map(|(owner, kind, batch)| {
+            (*kind == ActivationKind::Evaluated)
+                .then_some(batch.as_ref().map(|batch| (owner.clone(), batch.events().to_vec())))
+                .flatten()
+        })
+        .collect::<Vec<_>>();
+    assert!(matches!(
+        child_batches.as_slice(),
+        [(root_owner, root_events), (repo_owner, repo_events)]
+            if root_owner.starts_with("bzlmod-observed-host-root-module-file:")
+                && repo_owner.starts_with("observed-host-nonregistry-repo-file:")
+                && root_events.is_empty()
+                && repo_events.is_empty()
+    ));
+
+    tracker.batches.lock().unwrap().clear();
+    let warm = transaction
+        .compute(&observed_host_closure_key())
+        .await
+        .unwrap();
+    assert!(HostNonregistryModuleClosureObservationKey::equality(
+        &cold, &warm
+    ));
+    assert!(Arc::ptr_eq(
+        &held_result,
+        complete_observed_host_closure(&warm).result()
+    ));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(_, _, batch)| batch.is_none()));
+
+    let legacy_key = HostNonregistryModuleClosureKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        NonrootModuleKey::new("dep", "1"),
+    );
+
+    let legacy = transaction.compute(&legacy_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy closure must complete")
+    };
+    assert_eq!(legacy.as_ref(), held_result.as_ref());
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        legacy_row,
+        vec![
+            HostEffectiveModuleOverrideKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                "dep".into(),
+            )
+            .to_string(),
+            RepositoryMaterializationKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+            }
+            .to_string(),
+            RepositorySourceFileKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+                repo_relative_path: PathBuf::from("MODULE.bazel"),
+            }
+            .to_string(),
+            nonregistry_preflight("pkg").to_string(),
+            RepositorySourceFileKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+                repo_relative_path: PathBuf::from("pkg/a.MODULE.bazel"),
+            }
+            .to_string(),
+            nonregistry_preflight("other").to_string(),
+            RepositorySourceFileKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+                repo_relative_path: PathBuf::from("other/b.MODULE.bazel"),
+            }
+            .to_string(),
+        ]
+    );
+    for forbidden in [
+        "host-discovered-module:",
+        "host-selected-module-graph:",
+        "module-source-preparation:",
+        "registry-file:",
+        "host-selected-extension-",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, deps)| {
+            !owner.starts_with(forbidden) && deps.iter().all(|dep| !dep.starts_with(forbidden))
+        }));
+    }
+}
+#[tokio::test]
+async fn observed_host_closure_terminals_lifecycles_need_cycle_and_cancellation_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let root = b"module(name='dep',version='1')\ninclude('//pkg:a.MODULE.bazel')\n";
+    let fragment_a = [("pkg/a.MODULE.bazel", Some(&b"bazel_dep(name='a',version='1')\n"[..]))];
+    let fragment_b = [("pkg/a.MODULE.bazel", Some(&b"bazel_dep(name='b',version='1')\n"[..]))];
+    let (mut local_a_tx, local_a) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &fragment_a,
+        &[],
+        610,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    let held_local_result = complete_observed_host_closure(&local_a).result().dupe();
+    let held_local_epoch = complete_observed_host_closure(&local_a).observations().dupe();
+    assert_selected_epoch(
+        &mut local_a_tx,
+        &held_local_epoch,
+        complete_observed_host_closure(&local_a).observations(),
+    )
+    .await;
+    let (_, local_b) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &fragment_b,
+        &[],
+        611,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    let (_, local_absent) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &[("pkg/a.MODULE.bazel", None)],
+        &[],
+        612,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    let (_, local_directory) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &[("pkg/a.MODULE.bazel", None)],
+        &[],
+        613,
+        None,
+        None,
+        Some(("pkg/a.MODULE.bazel", PathNodeKind::Directory)),
+        false,
+    )
+    .await;
+    let (mut local_restored_tx, local_restored) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &fragment_a,
+        &[],
+        610,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    assert!(!HostNonregistryModuleClosureObservationKey::equality(
+        &local_a, &local_b
+    ));
+    assert!(matches!(
+        complete_observed_host_closure(&local_absent).result().as_ref(),
+        Err(HostNonregistryModuleClosureError::Fragment {
+            failure: DirectLocalIncludeFragmentFailure::Absent,
+            ..
+        })
+    ));
+    assert!(matches!(
+        complete_observed_host_closure(&local_directory).result().as_ref(),
+        Err(HostNonregistryModuleClosureError::Fragment {
+            failure: DirectLocalIncludeFragmentFailure::Source(
+                RepositorySourceFileError::WrongKind { .. }
+            ),
+            ..
+        })
+    ));
+    assert!(HostNonregistryModuleClosureObservationKey::equality(
+        &local_a,
+        &local_restored
+    ));
+    assert_eq!(held_local_result.as_ref(), complete_observed_host_closure(&local_restored).result().as_ref());
+    assert!(!held_local_epoch.observations().is_empty());
+    assert_selected_epoch(
+        &mut local_restored_tx,
+        complete_observed_host_closure(&local_restored).observations(),
+        complete_observed_host_closure(&local_restored).observations(),
+    )
+    .await;
+
+    let immutable = |generation, instance, fragments, wrong_kind| {
+        observed_host_closure_case(
+            &dice,
+            Some(root),
+            None,
+            fragments,
+            &[],
+            620 + instance as i64,
+            Some((generation, instance, "closure-content")),
+            None,
+            wrong_kind,
+            false,
+        )
+    };
+    let (_, immutable_a) = immutable("/generation/closure-a", 620, &fragment_a, None).await;
+    let held_immutable = complete_observed_host_closure(&immutable_a).dupe();
+    let (_, immutable_b) = immutable("/generation/closure-a", 620, &fragment_b, None).await;
+    let (_, immutable_absent) = immutable(
+        "/generation/closure-a",
+        620,
+        &[("pkg/a.MODULE.bazel", None)],
+        None,
+    )
+    .await;
+    let (_, immutable_directory) = immutable(
+        "/generation/closure-a",
+        620,
+        &[("pkg/a.MODULE.bazel", None)],
+        Some(("pkg/a.MODULE.bazel", PathNodeKind::Directory)),
+    )
+    .await;
+    let (mut immutable_restored_tx, immutable_restored) =
+        immutable("/generation/closure-a", 620, &fragment_a, None).await;
+    assert!(!HostNonregistryModuleClosureObservationKey::equality(
+        &immutable_a,
+        &immutable_b
+    ));
+    assert!(matches!(
+        complete_observed_host_closure(&immutable_absent).result().as_ref(),
+        Err(HostNonregistryModuleClosureError::Fragment {
+            failure: DirectLocalIncludeFragmentFailure::Absent,
+            ..
+        })
+    ));
+    assert!(matches!(
+        complete_observed_host_closure(&immutable_directory).result().as_ref(),
+        Err(HostNonregistryModuleClosureError::Fragment {
+            failure: DirectLocalIncludeFragmentFailure::Source(
+                RepositorySourceFileError::WrongKind { .. }
+            ),
+            ..
+        })
+    ));
+    assert!(HostNonregistryModuleClosureObservationKey::equality(
+        &immutable_a,
+        &immutable_restored
+    ));
+    assert_eq!(held_immutable, complete_observed_host_closure(&immutable_restored).dupe());
+    assert_selected_epoch(
+        &mut immutable_restored_tx,
+        complete_observed_host_closure(&immutable_restored).observations(),
+        complete_observed_host_closure(&immutable_restored).observations(),
+    )
+    .await;
+
+    let need_root = b"module(name='dep',version='1')\ninclude('//pkg:a.MODULE.bazel')\ninclude('//other:b.MODULE.bazel')\n";
+    let (_, need) = observed_host_closure_case(
+        &dice,
+        Some(need_root),
+        None,
+        &[],
+        &["pkg/a.MODULE.bazel", "other/b.MODULE.bazel"],
+        630,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    assert!(matches!(
+        &need,
+        SourcePreparationOutcome::Need(found)
+            if found.path_observations().unwrap().demands().len() == 2
+    ));
+    assert!(!HostNonregistryModuleClosureObservationKey::validity(&need));
+    assert!(!HostNonregistryModuleClosureObservationKey::equality(
+        &need, &need
+    ));
+    let cycle_fragment = [("pkg/a.MODULE.bazel", Some(&b"include('//pkg:a.MODULE.bazel')\n"[..]))];
+    let (_, cycle) = observed_host_closure_case(
+        &dice,
+        Some(root),
+        None,
+        &cycle_fragment,
+        &[],
+        631,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    assert!(matches!(
+        complete_observed_host_closure(&cycle).result().as_ref(),
+        Ok(HostNonregistryModuleClosure::UnsupportedCycle { closure, .. })
+            if closure.fragments.len() == 2
+    ));
+    let (_, bad_label) = observed_host_closure_case(
+        &dice,
+        Some(b"module(name='dep',version='1')\ninclude('bad')\n"),
+        None,
+        &[],
+        &[],
+        632,
+        None,
+        None,
+        None,
+        false,
+    )
+    .await;
+    assert!(matches!(
+        complete_observed_host_closure(&bad_label).result().as_ref(),
+        Err(HostNonregistryModuleClosureError::BadLabel { .. })
+    ));
+
+    let cancelled_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let cancelled_tracker = Arc::new(NonregistryPreflightTracker::default());
+    let cancelled = host_nonregistry_transaction(
+        &cancelled_dice,
+        Some(root),
+        None,
+        &fragment_a,
+        &[],
+        640,
+        None,
+        Some(cancelled_tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut cancelled = complete_preflight_transaction(cancelled, false).await;
+    cancelled_tracker.rows.lock().unwrap().clear();
+    cancelled_tracker.batches.lock().unwrap().clear();
+    cancelled_tracker.closure.lock().unwrap().clear();
+    let mut future = Box::pin(cancelled.compute(&observed_host_closure_key()));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(cancelled_tracker.rows.lock().unwrap().is_empty());
+    assert!(cancelled_tracker.batches.lock().unwrap().is_empty());
+    assert!(cancelled_tracker.closure.lock().unwrap().is_empty());
+    let (_, recovered) = observed_host_closure_case(
+        &cancelled_dice,
+        Some(root),
+        None,
+        &fragment_a,
+        &[],
+        640,
+        None,
+        Some(cancelled_tracker),
+        None,
+        true,
+    )
+    .await;
+    assert!(matches!(
+        complete_observed_host_closure(&recovered).result().as_ref(),
+        Ok(HostNonregistryModuleClosure::Supported(_))
+    ));
 }

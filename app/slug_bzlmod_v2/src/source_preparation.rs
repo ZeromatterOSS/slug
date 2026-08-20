@@ -2283,9 +2283,6 @@ enum NonregistryPreparationError {
     Host(HostNonregistryModuleClosureError),
 }
 
-type NonregistryPreparationValue =
-    SourcePreparationOutcome<Result<NonregistryPreparedModule, NonregistryPreparationError>>;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 #[allow(dead_code)]
 struct DirectLocalModulePreparationObservationKey(DirectLocalModulePreparationKey);
@@ -2306,8 +2303,15 @@ struct ObservedNonregistryPreparation {
     observations: PathObservationEpoch,
 }
 
-type NonregistryPreparationDriverOutcome =
-    SourcePreparationOutcome<Result<ObservedNonregistryPreparation, ObservedPathFrontierError>>;
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum NonregistryPreparationFrontierError {
+    Path(ObservedPathFrontierError),
+    Package(HostNonregistryPackagePreflightObservationError),
+}
+
+type NonregistryPreparationDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedNonregistryPreparation, NonregistryPreparationFrontierError>,
+>;
 
 impl DirectLocalModulePreparationKey {
     fn new(workspace: NormalizedAbsolutePath, apparent_repo: ApparentRepoName) -> Option<Self> {
@@ -2516,9 +2520,12 @@ async fn prepare_direct_local_module(
     .await
     {
         SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-        SourcePreparationOutcome::Complete(Err(error)) => {
-            return SourcePreparationOutcome::Complete(Err(error));
-        }
+        SourcePreparationOutcome::Complete(Err(NonregistryPreparationFrontierError::Path(
+            error,
+        ))) => return SourcePreparationOutcome::Complete(Err(error)),
+        SourcePreparationOutcome::Complete(Err(NonregistryPreparationFrontierError::Package(
+            _,
+        ))) => unreachable!("direct preparation cannot produce a Host package frontier"),
         SourcePreparationOutcome::Complete(Ok(observed)) => match observed.result {
             Ok(value) => (value, observed.observations),
             Err(NonregistryPreparationError::Direct(error)) => {
@@ -2573,8 +2580,9 @@ struct ObservedNonregistryIncludeHorizon {
     observations: PathObservationEpoch,
 }
 
-type NonregistryIncludeHorizonDriverOutcome =
-    SourcePreparationOutcome<Result<ObservedNonregistryIncludeHorizon, ObservedPathFrontierError>>;
+type NonregistryIncludeHorizonDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedNonregistryIncludeHorizon, NonregistryPreparationFrontierError>,
+>;
 
 async fn drive_nonregistry_include_horizon(
     ctx: &mut DiceComputations<'_>,
@@ -2583,43 +2591,66 @@ async fn drive_nonregistry_include_horizon(
     observations: PathObservationEpoch,
     mode: HostRepositoryObservationMode,
 ) -> NonregistryIncludeHorizonDriverOutcome {
-    let NonregistryPreparationOwner::Direct(route) = owner else {
-        debug_assert_eq!(mode, HostRepositoryObservationMode::Legacy);
-        return preflight_nonregistry_include_horizon(ctx, owner, requests)
+    match owner {
+        NonregistryPreparationOwner::Direct(route) => {
+            match drive_direct_local_include_package_horizon(
+                ctx,
+                route.clone(),
+                requests,
+                observations,
+                mode,
+            )
             .await
-            .map(|result| {
-                Ok(ObservedNonregistryIncludeHorizon {
-                    result,
-                    observations,
+            {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    SourcePreparationOutcome::Complete(Err(
+                        NonregistryPreparationFrontierError::Path(error),
+                    ))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    SourcePreparationOutcome::Complete(Ok(ObservedNonregistryIncludeHorizon {
+                        result: observed.result.as_ref().as_ref().map_or_else(
+                            |error| {
+                                Err(NonregistryPreparationError::Direct(
+                                    DirectLocalModulePreparationError::Package(error.clone()),
+                                ))
+                            },
+                            |horizon| {
+                                Ok(horizon
+                                    .occurrences
+                                    .iter()
+                                    .map(|occurrence| NonregistryIncludeOccurrence {
+                                        package: occurrence.package.package().clone(),
+                                        target: occurrence.target.clone(),
+                                        raw_label: occurrence.raw_label.clone(),
+                                        location: occurrence.location.clone(),
+                                    })
+                                    .collect())
+                            },
+                        ),
+                        observations: observed.observations,
+                    }))
+                }
+            }
+        }
+        NonregistryPreparationOwner::Host { .. }
+            if mode == HostRepositoryObservationMode::Observed =>
+        {
+            drive_observed_host_nonregistry_include_horizon(ctx, owner, requests, observations)
+                .await
+        }
+        NonregistryPreparationOwner::Host { .. } => {
+            preflight_nonregistry_include_horizon(ctx, owner, requests)
+                .await
+                .map(|result| {
+                    Ok(ObservedNonregistryIncludeHorizon {
+                        result,
+                        observations,
+                    })
                 })
-            });
-    };
-    drive_direct_local_include_package_horizon(ctx, route.clone(), requests, observations, mode)
-        .await
-        .map(|outcome| {
-            outcome.map(|observed| ObservedNonregistryIncludeHorizon {
-                result: observed.result.as_ref().as_ref().map_or_else(
-                    |error| {
-                        Err(NonregistryPreparationError::Direct(
-                            DirectLocalModulePreparationError::Package(error.clone()),
-                        ))
-                    },
-                    |horizon| {
-                        Ok(horizon
-                            .occurrences
-                            .iter()
-                            .map(|occurrence| NonregistryIncludeOccurrence {
-                                package: occurrence.package.package().clone(),
-                                target: occurrence.target.clone(),
-                                raw_label: occurrence.raw_label.clone(),
-                                location: occurrence.location.clone(),
-                            })
-                            .collect())
-                    },
-                ),
-                observations: observed.observations,
-            })
-        })
+        }
+    }
 }
 
 async fn preflight_nonregistry_include_horizon(
@@ -2757,6 +2788,168 @@ async fn preflight_nonregistry_include_horizon(
     SourcePreparationOutcome::Complete(Ok(occurrences))
 }
 
+fn observed_host_horizon_failure(
+    occurrence: &NonregistryIncludeOccurrence,
+    failure: HostNonregistryIncludePackageFailure,
+    observations: PathObservationEpoch,
+) -> NonregistryIncludeHorizonDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedNonregistryIncludeHorizon {
+        result: Err(NonregistryPreparationError::Host(
+            HostNonregistryModuleClosureError::Package {
+                raw_label: occurrence.raw_label.clone(),
+                location: occurrence.location.clone(),
+                package: occurrence.package.clone(),
+                failure,
+            },
+        )),
+        observations,
+    }))
+}
+
+async fn drive_observed_host_nonregistry_include_horizon(
+    ctx: &mut DiceComputations<'_>,
+    owner: &NonregistryPreparationOwner,
+    requests: &[NonrootIncludeRequest],
+    observations: PathObservationEpoch,
+) -> NonregistryIncludeHorizonDriverOutcome {
+    let NonregistryPreparationOwner::Host { workspace, module } = owner else {
+        unreachable!("Host horizon requires a Host owner")
+    };
+    let mut occurrences = Vec::with_capacity(requests.len());
+    for request in requests {
+        let (package, target) = match parse_nonroot_include(request) {
+            Ok(parsed) => parsed,
+            Err(message) => {
+                return SourcePreparationOutcome::Complete(Ok(ObservedNonregistryIncludeHorizon {
+                    result: Err(NonregistryPreparationError::Host(
+                        HostNonregistryModuleClosureError::BadLabel {
+                            raw_label: request.path.clone(),
+                            location: request.location.clone(),
+                            message,
+                        },
+                    )),
+                    observations,
+                }));
+            }
+        };
+        occurrences.push(NonregistryIncludeOccurrence {
+            package,
+            target,
+            raw_label: request.path.clone(),
+            location: request.location.clone(),
+        });
+    }
+
+    let mut unique = SmallSet::with_capacity(occurrences.len());
+    unique.extend(
+        occurrences
+            .iter()
+            .map(|occurrence| occurrence.package.clone()),
+    );
+    let outcomes = ctx
+        .compute_join(unique, |ctx, package| {
+            let key = HostNonregistryPackagePreflightObservationKey(
+                HostNonregistryPackagePreflightKey::new(
+                    workspace.dupe(),
+                    module.clone(),
+                    package.clone(),
+                ),
+            );
+            Box::pin(async move {
+                let value = ctx
+                    .compute(&key)
+                    .await
+                    .map_err(|error| Arc::<str>::from(error.to_string()));
+                (package, value)
+            })
+        })
+        .await
+        .into_iter()
+        .collect::<SmallMap<_, _>>();
+    let all_need = outcomes
+        .values()
+        .fold(None::<SourcePreparationNeeds>, |current, outcome| {
+            let Ok(SourcePreparationOutcome::Need(incoming)) = outcome else {
+                return current;
+            };
+            Some(match current {
+                Some(current) => current
+                    .try_union(incoming)
+                    .expect("one nonregistry package horizon's Needs cannot conflict"),
+                None => incoming.dupe(),
+            })
+        });
+    finish_observed_host_nonregistry_include_horizon(occurrences, &outcomes, all_need, observations)
+}
+
+type ObservedHostPreflightOutcome =
+    Result<<HostNonregistryPackagePreflightObservationKey as Key>::Value, Arc<str>>;
+
+fn finish_observed_host_nonregistry_include_horizon(
+    occurrences: Vec<NonregistryIncludeOccurrence>,
+    outcomes: &SmallMap<PackagePath, ObservedHostPreflightOutcome>,
+    all_need: Option<SourcePreparationNeeds>,
+    mut observations: PathObservationEpoch,
+) -> NonregistryIncludeHorizonDriverOutcome {
+    for occurrence in &occurrences {
+        let outcome = outcomes
+            .get(&occurrence.package)
+            .expect("every package was computed");
+        let result = match outcome {
+            Err(message) => {
+                return observed_host_horizon_failure(
+                    occurrence,
+                    HostNonregistryIncludePackageFailure::Compute(message.dupe()),
+                    observations,
+                );
+            }
+            Ok(SourcePreparationOutcome::Need(_)) => {
+                return SourcePreparationOutcome::Need(
+                    all_need.expect("the current package contributed a Need"),
+                );
+            }
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    NonregistryPreparationFrontierError::Package(error.dupe()),
+                ));
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                observations = match merge_path_observations(&observations, observed.observations())
+                {
+                    Ok(observations) => observations,
+                    Err(error) => {
+                        return SourcePreparationOutcome::Complete(Err(
+                            NonregistryPreparationFrontierError::Path(error),
+                        ));
+                    }
+                };
+                observed.result().as_ref()
+            }
+        };
+        let failure = match result {
+            Ok(HostNonregistryPackagePreflight::BuildDotBazel)
+            | Ok(HostNonregistryPackagePreflight::Build) => continue,
+            Ok(HostNonregistryPackagePreflight::Ignored) => {
+                HostNonregistryIncludePackageFailure::Ignored
+            }
+            Ok(HostNonregistryPackagePreflight::InvalidPackageName { message }) => {
+                HostNonregistryIncludePackageFailure::InvalidPackageName {
+                    message: message.dupe(),
+                }
+            }
+            Ok(HostNonregistryPackagePreflight::NoBuildFile) => {
+                HostNonregistryIncludePackageFailure::NoBuildFile
+            }
+            Err(error) => HostNonregistryIncludePackageFailure::Preflight(error.clone()),
+        };
+        return observed_host_horizon_failure(occurrence, failure, observations);
+    }
+    SourcePreparationOutcome::Complete(Ok(ObservedNonregistryIncludeHorizon {
+        result: Ok(occurrences),
+        observations,
+    }))
+}
+
 async fn drive_nonregistry_module(
     ctx: &mut DiceComputations<'_>,
     owner: NonregistryPreparationOwner,
@@ -2880,13 +3073,17 @@ fn finish_nonregistry_fragment_batch(
                 continue;
             }
             Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error.dupe())));
+                return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+                    NonregistryPreparationFrontierError::Path(error.dupe()),
+                )));
             }
             Ok(SourcePreparationOutcome::Complete(Ok((result, incoming)))) => {
                 observations = match merge_path_observations(&observations, incoming) {
                     Ok(observations) => observations,
                     Err(error) => {
-                        return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error)));
+                        return ControlFlow::Break(SourcePreparationOutcome::Complete(Err(
+                            NonregistryPreparationFrontierError::Path(error),
+                        )));
                     }
                 };
                 match result {
@@ -3028,26 +3225,6 @@ async fn read_nonregistry_frontier_sources(
     (paths, outcomes, all_need)
 }
 
-async fn prepare_nonregistry_module(
-    ctx: &mut DiceComputations<'_>,
-    owner: NonregistryPreparationOwner,
-    root_requests: Arc<[NonrootIncludeRequest]>,
-) -> NonregistryPreparationValue {
-    drive_nonregistry_module(
-        ctx,
-        owner,
-        root_requests,
-        PathObservationEpoch::empty(),
-        HostRepositoryObservationMode::Legacy,
-    )
-    .await
-    .map(|outcome| {
-        outcome
-            .expect("legacy nonregistry preparation cannot produce an observed outer error")
-            .result
-    })
-}
-
 fn nonregistry_preparation_complete(
     result: Result<NonregistryPreparedModule, NonregistryPreparationError>,
     observations: PathObservationEpoch,
@@ -3122,32 +3299,46 @@ async fn read_nonregistry_fragment_sources(
             .collect(),
         NonregistryPreparationOwner::Host { workspace, module } => ctx
             .compute_join(paths, |ctx, path| {
-                debug_assert_eq!(mode, HostRepositoryObservationMode::Legacy);
                 let workspace = workspace.dupe();
                 let module = module.clone();
                 Box::pin(async move {
-                    let value = ctx
-                        .compute(&RepositorySourceFileKey {
-                            workspace: workspace.as_path().to_path_buf(),
-                            module_name: module.name.clone(),
-                            repo_relative_path: path.clone(),
-                        })
-                        .await
-                        .map(|value| {
-                            value.map(|result| {
-                                Ok((
-                                    result.map(|source| match source {
-                                        RepositorySourceFileValue::Absent => None,
-                                        RepositorySourceFileValue::Present(bytes) => Some((
-                                            bytes,
-                                            host_nonregistry_logical_path(&module, &path),
-                                        )),
-                                    }),
-                                    PathObservationEpoch::empty(),
-                                ))
+                    let key = RepositorySourceFileKey {
+                        workspace: workspace.as_path().to_path_buf(),
+                        module_name: module.name.clone(),
+                        repo_relative_path: path.clone(),
+                    };
+                    let project =
+                        |result: Result<RepositorySourceFileValue, RepositorySourceFileError>| {
+                            result.map(|source| match source {
+                                RepositorySourceFileValue::Absent => None,
+                                RepositorySourceFileValue::Present(bytes) => {
+                                    Some((bytes, host_nonregistry_logical_path(&module, &path)))
+                                }
                             })
-                        })
-                        .map_err(|error| Arc::<str>::from(error.to_string()));
+                        };
+                    let value = match mode {
+                        HostRepositoryObservationMode::Legacy => {
+                            ctx.compute(&key).await.map(|value| {
+                                value.map(|result| {
+                                    Ok((project(result), PathObservationEpoch::empty()))
+                                })
+                            })
+                        }
+                        HostRepositoryObservationMode::Observed => ctx
+                            .compute(&RepositorySourceFileObservationKey(key))
+                            .await
+                            .map(|value| {
+                                value.map(|result| {
+                                    result.map(|observed| {
+                                        (
+                                            project(observed.result().as_ref().clone()),
+                                            observed.observations().dupe(),
+                                        )
+                                    })
+                                })
+                            }),
+                    }
+                    .map_err(|error| Arc::<str>::from(error.to_string()));
                     (path, value)
                 })
             })
@@ -6884,12 +7075,362 @@ type HostNonregistryModuleClosureValue = SourcePreparationOutcome<
     Arc<Result<HostNonregistryModuleClosure, HostNonregistryModuleClosureError>>,
 >;
 
-fn host_nonregistry_closure_complete(
-    value: Result<HostNonregistryModuleClosure, HostNonregistryModuleClosureError>,
-) -> HostNonregistryModuleClosureValue {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)] // Private observed sibling is callerless until the selected-graph frontier.
+struct HostNonregistryModuleClosureObservationKey(HostNonregistryModuleClosureKey);
+
+impl fmt::Display for HostNonregistryModuleClosureObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
 }
 
+type HostNonregistryModuleClosureResult =
+    Arc<Result<HostNonregistryModuleClosure, HostNonregistryModuleClosureError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+struct ObservedHostNonregistryModuleClosure {
+    result: HostNonregistryModuleClosureResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)] // Accessed only by the callerless observed sibling and its proof.
+impl ObservedHostNonregistryModuleClosure {
+    fn result(&self) -> &HostNonregistryModuleClosureResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostNonregistryModuleClosureObservationError {
+    EffectiveFrontier(ObservedPathFrontierError),
+    EffectiveCompute(Arc<str>),
+    MaterializationFrontier(ObservedPathFrontierError),
+    RootSourceFrontier(ObservedPathFrontierError),
+    PreparationFrontier(NonregistryPreparationFrontierError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)] // Observed mode remains dormant until an upper owner is accepted.
+enum HostNonregistryModuleClosureMode {
+    Legacy,
+    Observed,
+}
+
+type HostNonregistryModuleClosureDriverOutcome = SourcePreparationOutcome<
+    Result<ObservedHostNonregistryModuleClosure, HostNonregistryModuleClosureObservationError>,
+>;
+
+struct HostNonregistryModuleClosureInput {
+    source_identity: HostNonregistryModuleSourceIdentity,
+    local_path_policy: HostRepositoryLocalPathPolicy,
+    observations: PathObservationEpoch,
+}
+
+fn observed_host_nonregistry_closure_complete(
+    result: Result<HostNonregistryModuleClosure, HostNonregistryModuleClosureError>,
+    observations: PathObservationEpoch,
+) -> HostNonregistryModuleClosureDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok(ObservedHostNonregistryModuleClosure {
+        result: Arc::new(result),
+        observations,
+    }))
+}
+
+fn observed_host_nonregistry_closure_outer(
+    error: HostNonregistryModuleClosureObservationError,
+) -> HostNonregistryModuleClosureDriverOutcome {
+    SourcePreparationOutcome::Complete(Err(error))
+}
+
+fn forward_host_nonregistry_closure_observation<T>(
+    outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
+    frontier: impl FnOnce(ObservedPathFrontierError) -> HostNonregistryModuleClosureObservationError,
+) -> ControlFlow<HostNonregistryModuleClosureDriverOutcome, T> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(observed_host_nonregistry_closure_outer(frontier(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(observed)) => ControlFlow::Continue(observed),
+    }
+}
+
+fn host_nonregistry_closure_compute_error(
+    error: HostNonregistryModuleClosureError,
+    observations: PathObservationEpoch,
+) -> HostNonregistryModuleClosureDriverOutcome {
+    observed_host_nonregistry_closure_complete(Err(error), observations)
+}
+fn finish_host_nonregistry_effective(
+    key: &HostNonregistryModuleClosureKey,
+    effective: &Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>,
+    observations: PathObservationEpoch,
+) -> ControlFlow<HostNonregistryModuleClosureDriverOutcome, HostRepositoryLocalPathPolicy> {
+    let effective = match effective {
+        Ok(effective) => effective,
+        Err(error) => {
+            return ControlFlow::Break(observed_host_nonregistry_closure_complete(
+                Err(HostNonregistryModuleClosureError::RootModuleFiles(
+                    error.to_string().into(),
+                )),
+                observations,
+            ));
+        }
+    };
+    if !matches!(
+        effective.override_(),
+        Some(RootModuleOverride::NonRegistry(_))
+    ) {
+        return ControlFlow::Break(observed_host_nonregistry_closure_complete(
+            Err(
+                HostNonregistryModuleClosureError::NonregistryOverrideRequired(
+                    key.module.name.clone(),
+                ),
+            ),
+            observations,
+        ));
+    }
+    ControlFlow::Continue(local_path_policy(effective))
+}
+fn finish_host_nonregistry_materialization(
+    materialization: &Result<RepositoryMaterialization, RepositoryMaterializationError>,
+    incoming: &PathObservationEpoch,
+    mut observations: PathObservationEpoch,
+    local_path_policy: HostRepositoryLocalPathPolicy,
+) -> ControlFlow<HostNonregistryModuleClosureDriverOutcome, HostNonregistryModuleClosureInput> {
+    observations = match merge_path_observations(&observations, incoming) {
+        Ok(observations) => observations,
+        Err(error) => {
+            return ControlFlow::Break(observed_host_nonregistry_closure_outer(
+                HostNonregistryModuleClosureObservationError::MaterializationFrontier(error),
+            ));
+        }
+    };
+    let source_identity = match materialization {
+        Err(error) => {
+            return ControlFlow::Break(observed_host_nonregistry_closure_complete(
+                Err(HostNonregistryModuleClosureError::Materialization(
+                    error.clone(),
+                )),
+                observations,
+            ));
+        }
+        Ok(RepositoryMaterialization::Local { repo_spec, .. }) => {
+            HostNonregistryModuleSourceIdentity::Local {
+                repo_spec: repo_spec.clone(),
+            }
+        }
+        Ok(RepositoryMaterialization::Immutable {
+            repo_spec,
+            source_identity,
+            ..
+        }) => HostNonregistryModuleSourceIdentity::Immutable {
+            repo_spec: repo_spec.clone(),
+            source_identity: source_identity.dupe(),
+        },
+    };
+    ControlFlow::Continue(HostNonregistryModuleClosureInput {
+        source_identity,
+        local_path_policy,
+        observations,
+    })
+}
+
+fn finish_host_nonregistry_root_source(
+    source: Result<RepositorySourceFileValue, RepositorySourceFileError>,
+    incoming: &PathObservationEpoch,
+    mut input: HostNonregistryModuleClosureInput,
+) -> ControlFlow<
+    HostNonregistryModuleClosureDriverOutcome,
+    (Arc<[u8]>, HostNonregistryModuleClosureInput),
+> {
+    input.observations = match merge_path_observations(&input.observations, incoming) {
+        Ok(observations) => observations,
+        Err(error) => {
+            return ControlFlow::Break(observed_host_nonregistry_closure_outer(
+                HostNonregistryModuleClosureObservationError::RootSourceFrontier(error),
+            ));
+        }
+    };
+    let bytes = match source {
+        Ok(RepositorySourceFileValue::Present(bytes)) => bytes,
+        Ok(RepositorySourceFileValue::Absent) => {
+            return ControlFlow::Break(observed_host_nonregistry_closure_complete(
+                Err(HostNonregistryModuleClosureError::RootAbsent),
+                input.observations,
+            ));
+        }
+        Err(error) => {
+            return ControlFlow::Break(observed_host_nonregistry_closure_complete(
+                Err(HostNonregistryModuleClosureError::RootSource(error)),
+                input.observations,
+            ));
+        }
+    };
+    ControlFlow::Continue((bytes, input))
+}
+
+async fn compute_host_nonregistry_closure_input(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryModuleClosureKey,
+    mode: HostNonregistryModuleClosureMode,
+) -> ControlFlow<HostNonregistryModuleClosureDriverOutcome, HostNonregistryModuleClosureInput> {
+    let (effective, observations) = match mode {
+        HostNonregistryModuleClosureMode::Legacy => (
+            preflight_dice_invariant(
+                ctx.compute(&HostEffectiveModuleOverrideKey::new(
+                    key.workspace.dupe(),
+                    key.module.name.clone(),
+                ))
+                .await,
+            ),
+            PathObservationEpoch::empty(),
+        ),
+        HostNonregistryModuleClosureMode::Observed => match ctx
+            .compute(&HostEffectiveModuleOverrideObservationKey::new(
+                key.workspace.dupe(),
+                key.module.name.clone(),
+            ))
+            .await
+        {
+            Err(error) => {
+                return ControlFlow::Break(observed_host_nonregistry_closure_outer(
+                    HostNonregistryModuleClosureObservationError::EffectiveCompute(
+                        error.to_string().into(),
+                    ),
+                ));
+            }
+            Ok(outcome) => match forward_host_nonregistry_closure_observation(
+                outcome,
+                HostNonregistryModuleClosureObservationError::EffectiveFrontier,
+            ) {
+                ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                ControlFlow::Continue(observed) => {
+                    (observed.result().dupe(), observed.observations().dupe())
+                }
+            },
+        },
+    };
+    let local_path_policy =
+        match finish_host_nonregistry_effective(key, effective.as_ref(), observations.dupe()) {
+            ControlFlow::Continue(policy) => policy,
+            ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+        };
+
+    let materialization_key = RepositoryMaterializationKey {
+        workspace: key.workspace.as_path().to_path_buf(),
+        module_name: key.module.name.clone(),
+    };
+    let (materialization, incoming) = match mode {
+        HostNonregistryModuleClosureMode::Legacy => match ctx.compute(&materialization_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                (result, PathObservationEpoch::empty())
+            }
+            Err(error) => {
+                return ControlFlow::Break(host_nonregistry_closure_compute_error(
+                    HostNonregistryModuleClosureError::MaterializationCompute(
+                        error.to_string().into(),
+                    ),
+                    observations,
+                ));
+            }
+        },
+        HostNonregistryModuleClosureMode::Observed => match ctx
+            .compute(&RepositoryMaterializationObservationKey(
+                materialization_key,
+            ))
+            .await
+        {
+            Ok(outcome) => match forward_host_nonregistry_closure_observation(
+                outcome,
+                HostNonregistryModuleClosureObservationError::MaterializationFrontier,
+            ) {
+                ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                ControlFlow::Continue(observed) => {
+                    (observed.result().dupe(), observed.observations().dupe())
+                }
+            },
+            Err(error) => {
+                return ControlFlow::Break(host_nonregistry_closure_compute_error(
+                    HostNonregistryModuleClosureError::MaterializationCompute(
+                        error.to_string().into(),
+                    ),
+                    observations,
+                ));
+            }
+        },
+    };
+    finish_host_nonregistry_materialization(
+        materialization.as_ref(),
+        &incoming,
+        observations,
+        local_path_policy,
+    )
+}
+
+async fn compute_host_nonregistry_root_source(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryModuleClosureKey,
+    mode: HostNonregistryModuleClosureMode,
+    input: HostNonregistryModuleClosureInput,
+) -> ControlFlow<
+    HostNonregistryModuleClosureDriverOutcome,
+    (Arc<[u8]>, HostNonregistryModuleClosureInput),
+> {
+    let source_key = RepositorySourceFileKey {
+        workspace: key.workspace.as_path().to_path_buf(),
+        module_name: key.module.name.clone(),
+        repo_relative_path: PathBuf::from("MODULE.bazel"),
+    };
+    let (source, incoming) = match mode {
+        HostNonregistryModuleClosureMode::Legacy => match ctx.compute(&source_key).await {
+            Ok(SourcePreparationOutcome::Need(need)) => {
+                return ControlFlow::Break(SourcePreparationOutcome::Need(need));
+            }
+            Ok(SourcePreparationOutcome::Complete(result)) => {
+                (result, PathObservationEpoch::empty())
+            }
+            Err(error) => {
+                return ControlFlow::Break(host_nonregistry_closure_compute_error(
+                    HostNonregistryModuleClosureError::RootSourceCompute(error.to_string().into()),
+                    input.observations,
+                ));
+            }
+        },
+        HostNonregistryModuleClosureMode::Observed => match ctx
+            .compute(&RepositorySourceFileObservationKey(source_key))
+            .await
+        {
+            Ok(outcome) => match forward_host_nonregistry_closure_observation(
+                outcome,
+                HostNonregistryModuleClosureObservationError::RootSourceFrontier,
+            ) {
+                ControlFlow::Break(outcome) => return ControlFlow::Break(outcome),
+                ControlFlow::Continue(observed) => (
+                    observed.result().as_ref().clone(),
+                    observed.observations().dupe(),
+                ),
+            },
+            Err(error) => {
+                return ControlFlow::Break(host_nonregistry_closure_compute_error(
+                    HostNonregistryModuleClosureError::RootSourceCompute(error.to_string().into()),
+                    input.observations,
+                ));
+            }
+        },
+    };
+    finish_host_nonregistry_root_source(source, &incoming, input)
+}
 fn host_nonregistry_logical_path(
     module: &NonrootModuleKey,
     repo_relative_path: &Path,
@@ -6902,170 +7443,127 @@ fn host_nonregistry_logical_path(
     .expect("module identity and normalized repository-relative path form a logical path")
 }
 
-#[async_trait]
-impl Key for HostNonregistryModuleClosureKey {
-    type Value = HostNonregistryModuleClosureValue;
-
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let effective = preflight_dice_invariant(
-            ctx.compute(&HostEffectiveModuleOverrideKey::new(
-                self.workspace.dupe(),
-                self.module.name.clone(),
-            ))
-            .await,
-        );
-        let effective = match effective.as_ref() {
-            Ok(effective) => effective,
-            Err(error) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::RootModuleFiles(error.to_string().into()),
-                ));
-            }
+async fn drive_host_nonregistry_module_closure(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryModuleClosureKey,
+    mode: HostNonregistryModuleClosureMode,
+) -> HostNonregistryModuleClosureDriverOutcome {
+    let input = match compute_host_nonregistry_closure_input(ctx, key, mode).await {
+        ControlFlow::Continue(input) => input,
+        ControlFlow::Break(outcome) => return outcome,
+    };
+    let (root_source, input) =
+        match compute_host_nonregistry_root_source(ctx, key, mode, input).await {
+            ControlFlow::Continue(value) => value,
+            ControlFlow::Break(outcome) => return outcome,
         };
-        if !matches!(
-            effective.override_(),
-            Some(RootModuleOverride::NonRegistry(_))
-        ) {
-            return host_nonregistry_closure_complete(Err(
-                HostNonregistryModuleClosureError::NonregistryOverrideRequired(
-                    self.module.name.clone(),
-                ),
-            ));
+    let root_path = host_nonregistry_logical_path(&key.module, Path::new("MODULE.bazel"));
+    let inspection = match validate_root_module_source(
+        crate::LogicalModuleFileId::new(root_path.as_path().display().to_string()),
+        &root_source,
+    ) {
+        Ok(inspection) => inspection,
+        Err(message) => {
+            return observed_host_nonregistry_closure_complete(
+                Err(HostNonregistryModuleClosureError::RootValidation {
+                    logical_path: root_path,
+                    message,
+                }),
+                input.observations,
+            );
         }
-        let local_path_policy = local_path_policy(effective);
-
-        let materialization = match ctx
-            .compute(&RepositoryMaterializationKey {
-                workspace: self.workspace.as_path().to_path_buf(),
-                module_name: self.module.name.clone(),
-            })
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => value,
-            Err(error) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::MaterializationCompute(Arc::from(
-                        error.to_string(),
-                    )),
-                ));
-            }
-        };
-        let source_identity = match materialization.as_ref() {
-            Err(error) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::Materialization(error.clone()),
-                ));
-            }
-            Ok(RepositoryMaterialization::Local { repo_spec, .. }) => {
-                HostNonregistryModuleSourceIdentity::Local {
-                    repo_spec: repo_spec.clone(),
-                }
-            }
-            Ok(RepositoryMaterialization::Immutable {
-                repo_spec,
-                source_identity,
-                ..
-            }) => HostNonregistryModuleSourceIdentity::Immutable {
-                repo_spec: repo_spec.clone(),
-                source_identity: source_identity.dupe(),
-            },
-        };
-
-        let root_source = match ctx
-            .compute(&RepositorySourceFileKey {
-                workspace: self.workspace.as_path().to_path_buf(),
-                module_name: self.module.name.clone(),
-                repo_relative_path: PathBuf::from("MODULE.bazel"),
-            })
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
-                bytes,
-            )))) => bytes,
-            Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::RootAbsent,
-                ));
-            }
-            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::RootSource(error),
-                ));
-            }
-            Err(error) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::RootSourceCompute(Arc::from(
-                        error.to_string(),
-                    )),
-                ));
-            }
-        };
-        let root_path = host_nonregistry_logical_path(&self.module, Path::new("MODULE.bazel"));
-        let inspection = match validate_root_module_source(
-            crate::LogicalModuleFileId::new(root_path.as_path().display().to_string()),
-            &root_source,
-        ) {
-            Ok(inspection) => inspection,
-            Err(message) => {
-                return host_nonregistry_closure_complete(Err(
-                    HostNonregistryModuleClosureError::RootValidation {
-                        logical_path: root_path,
-                        message,
-                    },
-                ));
-            }
-        };
-        let root = HostNonregistryModuleRoot {
-            logical_path: root_path,
-            bytes: root_source,
-            inspection: inspection.clone(),
-        };
-        let prepared = match prepare_nonregistry_module(
-            ctx,
-            NonregistryPreparationOwner::Host {
-                workspace: self.workspace.dupe(),
-                module: self.module.clone(),
-            },
-            inspection.includes,
-        )
-        .await
-        {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(Ok(prepared)) => prepared,
-            SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Host(error))) => {
-                return host_nonregistry_closure_complete(Err(error));
-            }
-            SourcePreparationOutcome::Complete(Err(NonregistryPreparationError::Direct(_))) => {
-                unreachable!("Host preparation cannot produce a direct-local error");
-            }
-        };
-        let (fragments, capability) = match prepared {
-            NonregistryPreparedModule::Supported(fragments) => (fragments, None),
-            NonregistryPreparedModule::UnsupportedCycle {
-                fragments,
-                capability,
-            } => (fragments, Some(capability)),
-        };
-        let closure = HostNonregistryPreparedClosure {
-            module: self.module.clone(),
-            source_identity,
-            local_path_policy,
-            root,
+    };
+    let root = HostNonregistryModuleRoot {
+        logical_path: root_path,
+        bytes: root_source,
+        inspection: inspection.clone(),
+    };
+    let preparation_mode = match mode {
+        HostNonregistryModuleClosureMode::Legacy => HostRepositoryObservationMode::Legacy,
+        HostNonregistryModuleClosureMode::Observed => HostRepositoryObservationMode::Observed,
+    };
+    let prepared = match drive_nonregistry_module(
+        ctx,
+        NonregistryPreparationOwner::Host {
+            workspace: key.workspace.dupe(),
+            module: key.module.clone(),
+        },
+        inspection.includes,
+        input.observations,
+        preparation_mode,
+    )
+    .await
+    {
+        SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            return observed_host_nonregistry_closure_outer(
+                HostNonregistryModuleClosureObservationError::PreparationFrontier(error),
+            );
+        }
+        SourcePreparationOutcome::Complete(Ok(prepared)) => prepared,
+    };
+    let observations = prepared.observations;
+    let prepared = match prepared.result {
+        Ok(prepared) => prepared,
+        Err(NonregistryPreparationError::Host(error)) => {
+            return observed_host_nonregistry_closure_complete(Err(error), observations);
+        }
+        Err(NonregistryPreparationError::Direct(_)) => {
+            unreachable!("Host preparation cannot produce a direct-local error")
+        }
+    };
+    let (fragments, capability) = match prepared {
+        NonregistryPreparedModule::Supported(fragments) => (fragments, None),
+        NonregistryPreparedModule::UnsupportedCycle {
             fragments,
-        };
-        host_nonregistry_closure_complete(Ok(match capability {
+            capability,
+        } => (fragments, Some(capability)),
+    };
+    let closure = HostNonregistryPreparedClosure {
+        module: key.module.clone(),
+        source_identity: input.source_identity,
+        local_path_policy: input.local_path_policy,
+        root,
+        fragments,
+    };
+    observed_host_nonregistry_closure_complete(
+        Ok(match capability {
             Some(capability) => HostNonregistryModuleClosure::UnsupportedCycle {
                 closure,
                 capability,
             },
             None => HostNonregistryModuleClosure::Supported(closure),
-        }))
+        }),
+        observations,
+    )
+}
+
+fn project_legacy_host_nonregistry_closure(
+    outcome: HostNonregistryModuleClosureDriverOutcome,
+) -> HostNonregistryModuleClosureValue {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            SourcePreparationOutcome::Complete(observed.result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy closure cannot produce an observed outer error")
+        }
+    }
+}
+#[async_trait]
+impl Key for HostNonregistryModuleClosureKey {
+    type Value = HostNonregistryModuleClosureValue;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        project_legacy_host_nonregistry_closure(
+            drive_host_nonregistry_module_closure(
+                ctx,
+                self,
+                HostNonregistryModuleClosureMode::Legacy,
+            )
+            .await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -7077,6 +7575,27 @@ impl Key for HostNonregistryModuleClosureKey {
     }
 }
 
+#[async_trait]
+impl Key for HostNonregistryModuleClosureObservationKey {
+    type Value = HostNonregistryModuleClosureDriverOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_nonregistry_module_closure(
+            ctx,
+            &self.0,
+            HostNonregistryModuleClosureMode::Observed,
+        )
+        .await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::collections::hash_map::DefaultHasher;
@@ -7312,6 +7831,11 @@ mod tests {
                 .is_some()
             {
                 self.repo.lock().unwrap().push(record);
+            } else if key
+                .downcast_ref::<HostNonregistryModuleClosureObservationKey>()
+                .is_some()
+            {
+                self.closure.lock().unwrap().push(activation.kind());
             } else if key.to_string().starts_with("observed-") {
                 self.observed.lock().unwrap().push(key.to_string());
             } else if key.downcast_ref::<HostDiscoveredModuleKey>().is_some() {
