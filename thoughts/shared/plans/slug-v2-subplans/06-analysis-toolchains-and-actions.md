@@ -9556,3 +9556,43 @@ Extensions, broader actions, M8/M7B and identity bytes remain deferred.
 STOP code/tests/oracles, public/caller changes, direct selected-graph activation,
 event/family drift, retained scratch/cache/interner/store/lock/task, direct Host
 reads, unmeasured caps or milestone closure. M7 remains partial.
+
+### Selected-module-graph frontier resumes at registry file (2026-08-19)
+
+Audit `de76a83e` selects only `WP-6-7A-registry-file-observation-design`.
+`RegistryFileKey` owns scheme dispatch and the complete semantic file result and
+is shared below module-source preparation and selected repo-spec parsing.
+Preparation still crosses raw patch path observations; discovery owns MODULE
+evaluation/events; selected graph aggregates discovery. Dormant HostRegistry is
+post-selected-graph policy, not a prerequisite.
+
+Design future authority only in `app/slug_bzlmod_v2/src/registry_dice.rs`, clean
+baseline 2,213 physical/first cfg(test) 905, at <=320 production, <=760 proof,
+<=1,080 aggregate and <=3,400 physical; helpers stay below 200 lines.
+
+Freeze private `RegistryFileObservationKey`/`ObservedRegistryFile`, one local
+Result Arc plus compact epoch, one matching Legacy/Observed driver and exact
+legacy Arc projection. Preserve scheme dispatch. Invalid/unsupported errors are
+empty-prefix. Local legacy is policy -> legacy root -> IO; observed is observed
+policy -> observed root -> IO, merging policy prefix left-first before root
+semantics. Remote observed accepts only observed policy before unchanged
+plan/IO/generation. Need/outer is carrierless; compute and semantic terminals
+retain exact empty/policy/merged prefixes; no Need union.
+
+Parent remains eventless and root descendants retain sole MODULE/lockfile batch
+ownership. Retain no child carrier, IO scratch/handle, collection/cache/interner/
+store/lock/task, Host read, revision, certificate or event state.
+
+Prove identity/equality/legacy Arc, every scheme/policy/root/plan/IO/generation
+terminal, exact prefix/order/ptrs, duplicate/conflict/mismatch, family rows,
+phase-separated child batches/parent silence, warm/cancel/recovery, scripted
+local+remote lifecycles and independent policy URL/mode/MODULE/lockfile A-B-A.
+Assert zero patch/preparation/discovery/selected/HostRegistry/extension/public
+activation.
+
+Write only canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net
+and <=470 aggregate. STOP Rust/tests/oracles/callers during design, a second
+future file/key/export, IO semantic drift, upper activation, extra retained
+state, cap excess or milestone closure. After independent ACCEPT schedule only
+`WP-6-7A-registry-file-observation-implementation`; after implementation return
+to the selected-graph frontier.
