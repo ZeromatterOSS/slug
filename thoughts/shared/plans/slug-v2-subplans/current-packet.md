@@ -1,128 +1,69 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-evaluation-input-requests-observation-design`
+Packet: `WP-6-7A-host-selected-extension-evaluation-input-requests-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: 06-analysis-toolchains-and-actions.md
-Scheduling base: df5e1c5c
+Scheduling base: 1fdf641b
 Rust base: 094ba075
+Accepted design: 1fdf641b
 
-## Owner decision
+## Exact implementation authority
 
-Select `HostSelectedExtensionEvaluationInputRequestsKey` as the uniquely
-smallest complete owner after the accepted definition-request carrier. It
-computes definition requests first, root files second, then performs the
-owner-local input projection. Both mutable children already have matching
-observed siblings in the same bzlmod crate.
-
-Prepared inputs consume this value first and loaded definitions second. Loaded
-definitions is a larger parallel sibling: observing it requires the later
-cross-crate promotion of the currently private request carrier plus per-request
-`HostBzlModuleObservationKey` work. Prepared/pure/instantiated/validated
-extensions are above both siblings. Root mapping, generated repositories and
-public/bootstrap consumers are parallel or downstream, not prerequisites.
-
-## Exact future authority
-
-Future Rust write authority is exactly
+Write authority is exactly
 `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 10,690 physical
 lines with first `#[cfg(test)]` at line 4,198. Caps are <=320 production,
 <=700 proof, <=1,020 aggregate semantic and <=11,800 physical lines. Every
-helper/test remains below 200 lines; the selected-repository pipeline remains
-one cohesive large-file exception.
+helper/test remains below 200 lines.
 
-Every other Rust file, including `lib.rs`, `module_eval.rs`, all loading/core
-files, callers, exports, fixtures and oracles, is read-only. Add no caller or
-public export.
+Every other Rust file, `lib.rs`, `module_eval.rs`, loading/core file, caller,
+export, fixture, oracle and plan document is read-only. Add no caller or public
+export.
 
-## Frozen owner contract
+## Frozen implementation contract
 
-Add private
-`HostSelectedExtensionEvaluationInputRequestsObservationKey` wrapping the
-legacy key and private `ObservedHostSelectedExtensionEvaluationInputRequests`.
-The carrier derives Dupe/Allocative, exposes borrowed accessors and retains
-exactly one local
-`Arc<Result<HostSelectedExtensionEvaluationInputRequests,
-HostSelectedExtensionEvaluationInputRequestsError>>` plus one cumulative
-compact `PathObservationEpoch`.
+Implement only the private evaluation-input observation key/carrier and one
+Legacy/Observed driver. Preserve exact definition requests -> root files ->
+pure input projection order. Legacy selects only legacy children with empty
+epochs; observed selects only the accepted request and root-files siblings.
 
-Use one Legacy/Observed driver with exact order:
+Request Need/outer is carrierless; request compute is empty-prefix semantic;
+request semantic retains the request prefix and suppresses root. Observed-only
+root Need/outer is carrierless; root compute retains the request prefix. Merge
+a Complete root epoch into the request prefix left-first before root semantics,
+preserving request-owned duplicate Arcs. Conflict/operation mismatch is a
+RootFiles-stage typed outer. Root semantic and pure Invalid/success retain the
+full epoch. Legacy moves the exact local Result Arc. There is no Need union.
 
-1. compute the matching definition-load-request child;
-2. after request success, compute the matching root-module-files child; and
-3. run the unchanged pure header/version/tag/input projection.
-
-Legacy selects only legacy children and contributes empty epochs. Observed
-selects only the accepted private request sibling and
-`RootModuleFilesObservationKey`.
-
-Request Need/typed outer is immediate and carrierless. Request DICE-compute
-failure is the existing `LoadRequestsCompute` semantic terminal with an empty
-prefix. A Complete request epoch is accepted before semantic inspection;
-request semantic error retains that prefix and suppresses root files.
-
-Root Need/typed outer is observed-only, immediate and carrierless, discarding
-the provisional request carrier. Root DICE-compute failure retains the request
-prefix as `AfterRequests/RootFilesCompute`. On root Complete, merge the request
-prefix left-first with the root epoch before semantic inspection. Equal
-duplicates preserve the earlier request-owned Result Arc; conflict or operation
-mismatch is a RootFiles-stage typed carrierless outer. Root semantic error and
-every pure Invalid/success terminal retain the full merged prefix. There is no
-Need union. Legacy projection moves the exact local Result Arc.
-
-Need is invalid/self-unequal. Complete semantic values compare by local
-Result+epoch and typed outers structurally. Equal semantics with changed epochs
-remain unequal.
-
-## Events, families and retention
-
-The new parent is eventless. Accepted request/mapping/root/graph/discovery
-children retain their exact batches. The direct root-files computation after
-requests must reuse the root already reached by the request chain without a
-second batch. Observed direct dependencies are exactly observed requests then
-observed root files; legacy dependencies are exactly their legacy siblings.
-Reverse-family isolation, complete batch parity, warm silence and poll-drop
-no-publication/same-DICE recovery are mandatory.
-
-Retain only the local evaluation-input Result Arc plus cumulative epoch. The
-semantic Result may retain its existing load-request Arc and input slice; do
-not retain either child carrier or root Result separately. Merge, tag/input Vec
-and event scratch remain compute-local. Add no cache/interner/store/map/lock/
-task, direct Host read, revision/certificate or retained event state.
+The parent remains eventless. The direct root computation after requests must
+DICE-reuse without replay. Retain only the local evaluation-input Result Arc
+plus cumulative epoch; child carriers/root Result and all merge/input/event
+scratch remain compute-local. Add no retained map/cache/interner/store/lock/
+task or direct Host read.
 
 ## Required proof
 
-Prove key/hash/Display/accessors and Need/Complete/outer equality and validity;
-exact legacy local Result-Arc projection; production-used request/root/merge/
-semantic finishers for every empty/request/full prefix and later suppression;
-exact epoch order/shared Arcs, duplicate first-Arc, conflict and operation
-mismatch; real request and observed-only root Need/semantic terminals; all
-existing exact input values/order/header/version/tags and pure Invalid cases;
-exact observed/legacy dependency vectors and reverse-family isolation; complete
-child owner/batch parity with no direct-root replay, parent/warm silence;
-poll-drop/no publication/recovery; independent request/root/pure-result
+Prove exact identity/equality/Arc and empty/request/full terminal prefixes;
+production-used request/root/merge/semantic finishers; first-Arc duplicate,
+conflict and operation mismatch; observed-only root Need/outer; exact admitted
+header/version/tag/input values and errors; exact observed/legacy direct rows,
+reverse families and complete batch parity with no root replay; parent/warm/
+cancel silence and same-DICE recovery; independent request/root/pure-result
 A -> B -> A with held local Result/epoch and unaffected child Arcs; and zero
 loaded-definition/prepared/pure/instantiated/validated/root-mapping/generated/
-public/bootstrap activation.
-
-Reuse accepted lower proof. Add no invalid-child hook or oracle.
+public/bootstrap activation. Reuse lower proof; add no hook or oracle.
 
 ## Compatibility and terminal
 
-Exact: current admitted evaluation-input values, errors, ordering, root
-metadata, tags and child events. Slug-native: the private carrier, typed outer
-and shared-Arc epoch association. Deferred: request-carrier export,
-loaded-definition observation, prepared/pure/instantiated/validated extensions,
-root mapping, generated/public/bootstrap, M8/M7B and exact identity bytes.
+Exact remains current evaluation-input values/errors/order/root metadata/tags
+and child events. Slug-native is the private typed outer/shared-Arc epoch.
+Carrier export, loaded definitions, prepared/pure/instantiated/validated
+extensions, root mapping, generated/public/bootstrap, M8/M7B and exact identity
+bytes remain deferred.
 
-Design ACCEPT schedules only
-`WP-6-7A-host-selected-extension-evaluation-input-requests-observation-implementation`.
-After implementation ACCEPT return only to the docs-only loaded-definition
-owner frontier.
-
-STOP a second file/key, `lib.rs`/caller/export or upper activation, semantic/
-event/family/memory drift, proof/cap waiver, milestone closure or M8/M7B
-widening. REPLAN before widening. M7 remains partial and
-M7A -> M8 -> M7B remains.
+Implementation ACCEPT returns only to the docs-only loaded-definition owner
+frontier. STOP a second file/key, export/caller/upper activation, semantic/
+event/family/memory drift, proof/cap waiver, milestone closure or M8/M7B.
+REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical frozen implementation authority
 

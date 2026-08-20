@@ -11510,3 +11510,30 @@ After implementation ACCEPT resume only the loaded-definition frontier.
 STOP a second file/key, export/caller/upper work, drift, proof/cap waiver,
 milestone closure or M8/M7B. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Extension evaluation-input observation implementation (2026-08-20)
+
+Accepted design `1fdf641b` activates only
+`WP-6-7A-host-selected-extension-evaluation-input-requests-observation-implementation`
+from Rust base `094ba075`.
+
+Write authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 10,690/cfg 4,198,
+with caps 320 production, 700 proof, 1,020 aggregate and 11,800 physical.
+Every other file, export, caller, fixture and oracle is read-only; helpers/tests
+remain below 200.
+
+Implement only one private Result-Arc+epoch carrier and shared driver. Preserve
+request -> root files -> pure projection, matching families, request-left
+Complete merging before semantics, carrierless Need/outer, empty/request/full
+prefixes, typed RootFiles merge errors and exact legacy Arc projection. The
+parent is eventless and the direct root child after requests must reuse without
+batch replay. Retain no child carrier/root Result or traversal/event state.
+
+Require exact terminal/Arc/equality, family/event/warm/cancel, held lifecycle
+and upper-nonactivation proof from the design. Add no hook or oracle.
+
+STOP a second file/key, export/caller/upper work, semantic/event/family/memory
+drift, proof/cap waiver or milestone widening. Implementation ACCEPT returns
+only to the docs-only loaded-definition owner frontier. REPLAN before widening.
+M7 remains partial and M7A -> M8 -> M7B remains.
