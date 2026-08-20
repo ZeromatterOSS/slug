@@ -9206,3 +9206,89 @@ STOP a caller/export/third file, production/order/event/family/memory drift,
 upper/registry activation, proof deletion, cap excess or milestone closure.
 After independent implementation ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
+
+### Host nonregistry package-preflight observation accepted (2026-08-19)
+
+Implementation `18166691` accepts the private matching-family package-preflight
+carrier from Rust base `754e7619`, design `0c5a1366`, first proof correction
+`ed3a9d05`, and second proof correction `7524cd41`.
+
+Exact accepted accounting is +320 production/+24 colocated proof in
+`source_preparation.rs`, +1,060 external proof, +1,404 aggregate semantic, and
+15,611/4,230/19,841 physical lines. Focused observed-preflight proof is 7/7;
+full bzlmod is 449 plus all integration suites, loading 204, query 121, and core
+245/246 with only the inherited stale generic visibility-message expectation.
+Fmt, diff-check, exact accounting, cleanup/retention and independent final
+review pass.
+
+The accepted owner preserves effective -> invalid name -> deleted policy ->
+ignore -> BUILD.bazel -> BUILD order, exact Complete prefix Arcs, carrierless
+Need/outer, child-only ROOT/REPO batches, compact Result-Arc+epoch retention and
+legacy family/result parity. No horizon, closure, discovery, selected graph,
+registry or extension owner is activated.
+
+Run only `WP-6-7A-host-nonregistry-module-closure-observation-design` from
+scheduling and Rust base `18166691`.
+
+### Host nonregistry module-closure observation design (2026-08-19)
+
+`HostNonregistryModuleClosureKey` is the uniquely smallest complete owner. It
+sequences accepted effective, materialization, root-source and package-preflight
+children, then owns root validation, BFS horizons, fragment batches, cycle and
+final closure semantics. Horizon and fragment reducers have no independent
+consumer; `HostDiscoveredModuleKey` remains inactive.
+
+Freeze private `HostNonregistryModuleClosureObservationKey` and a carrier with
+exactly one local closure Result Arc plus compact cumulative epoch. One
+Legacy/Observed driver preserves effective -> materialization -> root MODULE ->
+validation -> BFS horizon -> fragment order and selects only matching accepted
+families. Merge every Complete child into the earlier prefix left-first before
+semantics. Explicit materialization precedes equal duplicate materialization
+demands reached below it, preserving its exact Arc. Need and typed outer remain
+carrierless; semantic terminals retain the full reached prefix.
+
+Compute polarity is exact: Legacy effective failure remains the invariant panic;
+Observed effective failure is empty-prefix typed outer. Materialization and root
+source compute failures remain semantic with effective-only and
+effective+materialization prefixes. Package and fragment compute failures remain
+semantic at their occurrence with the prefix through earlier successes, unless
+an earlier Need already selects the full compatible Need union. Observed frontier
+errors/conflicts are carrierless outer; Legacy has no sibling frontier outer.
+
+Each horizon parses the whole ordered request slice before child computation,
+deduplicates packages by first occurrence, computes the unique batch and reduces
+in original occurrence order. The first occurrence outer/conflict, Need or
+semantic wins exactly as Legacy; Need returns the precomputed full compatible
+union, and incompatible Need REPLANs. Later computed outcomes are not merged or
+retained. Fragment reduction preserves occurrence order and existing
+precedence: semantic before Need returns semantic; Need before semantic returns
+the full Need union; an outer/conflict before decisive semantic wins, including
+after Need; otherwise outer > Need > success. Preserve duplicate includes, BFS
+order, cycles and the complete epoch.
+
+The closure parent stays eventless; reached ROOT/REPO children retain sole local
+batch ownership. Retain only one local closure Result Arc plus epoch. Child
+carriers, batch results, BFS/frontier/ancestry/cycle/Need/event/union scratch are
+compute-local or dependency-owned. Add no collection/cache/interner/store/lock/
+task/Host read/revision/certificate/event state.
+
+Proof must discriminate identity/equality/legacy Arc projection; every initial,
+horizon and fragment Need/outer/semantic position; exact iteration, per-demand
+Arcs, duplicate-first/conflict/mismatch; full Need union and mixed precedence;
+multi-level BFS/duplicates/cycles; local+immutable A/B/absent/directory/A; held
+carriers; cancel/recovery; exact family rows and ROOT/REPO event order; warm
+silence; and zero discovery/selected/registry/extension/public activation.
+
+Future exact authority is only `source_preparation.rs` from 15,611 physical at
+<=520 production/<=16,250 physical and
+`source_preparation_observation_tests.rs` from 4,230 at <=1,200 proof/<=5,550
+physical; aggregate <=1,800 semantic and <=21,800 physical. Helpers stay below
+200 lines. Exact legacy closure behavior is preserved; sibling/carrier/typed
+outer is Slug-native; discovery/selected graph, registry/extensions, M8/M7B and
+identity bytes remain deferred.
+
+Write only canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net
+lines and <=470 aggregate. STOP Rust/callers/exports/upper activation during
+design. After independent design ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-implementation`; after its
+ACCEPT return only to the docs-only selected-module-graph frontier audit.

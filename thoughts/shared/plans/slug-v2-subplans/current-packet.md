@@ -1,122 +1,162 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`
+Packet: `WP-6-7A-host-nonregistry-module-closure-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base and accepted second proof correction: `7524cd41`
-Rust base: `754e7619`
-Accepted semantic design: `0c5a1366`
-Accepted first proof correction: `ed3a9d05`
+Scheduling and Rust base: `18166691`
 
-## Objective and exact authority
+## Objective and docs-only authority
 
-Complete the corrected exact proof for the accepted private package-preflight
-owner. Production semantics, event ownership and retained state are frozen.
+Freeze the uniquely smallest complete observed owner for nonregistry module
+closure preparation. `HostNonregistryModuleClosureKey` already owns the exact
+effective override -> materialization -> root MODULE source -> validation ->
+repeated package horizon -> fragment-source frontier and final cycle/closure
+semantics. Every mutable child now has an accepted observed carrier; the
+horizon and fragment reducers are private closure mechanisms with no separate
+consumer. Keep `HostDiscoveredModuleKey` and every upper owner inactive.
 
-Against `754e7619`, the focused 7/7 candidate is +319 production/+24 colocated
-proof in `source_preparation.rs`, +949 external proof, +1,292 aggregate
-semantic, and 15,610/4,119/19,729 physical lines. Only 11 external and eight
-aggregate lines remain while exact later-terminal epochs, complete event-owner
-sequence, real upper prefixes and cancellation child silence are still missing.
+Write only canonical/current/Stage 6/routing at <=40/<=220/<=180/<=30 net
+lines and <=470 aggregate. Rust, Cargo, BUILD, fixtures, oracles, callers and
+public files are read-only during design.
 
-Exact write authority is only `source_preparation.rs` and
-`source_preparation_observation_tests.rs`. Keep source <=320 production/15,650 physical.
-Raise only external proof to <=1,120/4,500 physical and aggregate to <=1,470
-semantic/20,150 physical. Touched helpers remain below 200 lines.
+After independent design ACCEPT, future exact Rust authority is only:
 
-## Frozen production contract
+- `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 15,611 physical,
+  <=520 production and <=16,250 physical;
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, baseline
+  4,230 physical, <=1,200 proof and <=5,550 physical.
 
-Add private `HostNonregistryPackagePreflightObservationKey`,
-`ObservedHostNonregistryPackagePreflight`, and stage-aware
-`HostNonregistryPackagePreflightObservationError`. The Key Value is exactly
-`SourcePreparationOutcome<Result<ObservedHostNonregistryPackagePreflight,
-HostNonregistryPackagePreflightObservationError>>`. Its carrier retains one
-local `Arc<Result<HostNonregistryPackagePreflight,
-HostNonregistryPackagePreflightError>>` plus cumulative
-`PathObservationEpoch`. Require `Dupe`/`Allocative`, borrowed accessors, and no
-export or caller activation.
+Aggregate growth is <=1,800 semantic and <=21,800 physical. Touched helpers
+remain below 200 lines; the two large owner/proof files are cohesive exceptions.
 
-Use one Legacy/Observed driver in exact order: effective override,
-invalid-package-name short circuit, neutral deleted-package policy, repository
-ignore, `BUILD.bazel`, then `BUILD`. Legacy selects only legacy effective,
-ignore and marker-source families; observed selects only their accepted
-observed siblings. Both share the neutral deleted-policy projection. Neither
-computes the other family.
+## Frozen owner and carrier
 
-Accept the effective epoch before semantics. Effective failure, missing
-nonregistry override, invalid package name, policy error and nonempty deleted
-policy retain only that prefix. Merge effective left-first with a Complete
-ignore epoch before ignore semantics. Ignored stops both markers. For each
-reached marker, merge the accumulated prefix left-first with its Complete
-source epoch before semantics. `BUILD.bazel` Present stops `BUILD`; the second
-marker and NoBuild retain both marker epochs. Equal duplicates keep the
-earliest exact Arc; conflict/operation mismatch is typed outer.
+Add private `HostNonregistryModuleClosureObservationKey` structurally wrapping
+`HostNonregistryModuleClosureKey`, plus
+`ObservedHostNonregistryModuleClosure`. Its Value is exactly
+`SourcePreparationOutcome<Result<ObservedHostNonregistryModuleClosure,
+HostNonregistryModuleClosureObservationError>>`. The carrier retains one local
+`Arc<Result<HostNonregistryModuleClosure,
+HostNonregistryModuleClosureError>>` plus one cumulative compact
+`PathObservationEpoch`. Require `Dupe`/`Allocative`, borrowed accessors and no
+export or caller activation. Legacy projection moves the exact local Result Arc.
 
-The outer distinguishes effective/ignore/marker child frontier failures and
-stage-specific effective/policy/ignore/marker DICE compute failures. All are
-carrierless and suppress later work. Invalid-name is pure; a semantic deleted-
-policy projection error remains a Complete carrier with the effective prefix.
-Preserve the legacy compute invariant and invent no semantic error. Need applies
-only at effective, ignore and markers. There is no Need union. Need is invalid/
-self-unequal; Complete outer is valid/equal by outer value; Complete carrier is
-valid/equal by semantic Result plus epoch.
+Use one Legacy/Observed closure driver. Preserve exact order: effective
+override, repository materialization, root `MODULE.bazel` source, pure root
+validation, repeated BFS package-horizon batches, fragment-source batches,
+cycle detection and final closure. Legacy selects only legacy effective,
+materialization, source and preflight families. Observed selects only their
+accepted observed siblings. Neither key computes the other family.
 
-The preflight parent stays eventless. Root MODULE and matching REPO descendants
-remain sole batch owners; effective, policy, ignore parent and marker sources
-remain eventless. Legacy moves the exact local Result Arc. Retain no child
-carrier, policy value, matcher, marker bytes, extra collection/state, cache,
-interner, store, lock, task, direct Host read, revision, certificate or event
-state.
+## Prefix and terminal algebra
+
+For every Complete child, merge the accumulated earlier prefix left-first with
+the child's epoch before inspecting semantics. Explicit materialization is
+earlier than duplicate materialization demands reached through the root,
+package and fragment carriers; equal duplicates therefore retain the first
+exact materialization Arc. Conflict or operation mismatch is typed outer.
+
+Effective, materialization and root-source Need or typed outer returns
+immediately carrierless and suppresses later work. DICE compute failures are
+explicit: Legacy effective failure remains the existing invariant panic and
+produces no Value; Observed effective failure is typed outer with empty prefix.
+Materialization compute failure in either mode is semantic
+`MaterializationCompute` with the accepted effective prefix. Root-source compute
+failure is semantic `RootSourceCompute` with effective+materialization prefix.
+At a package occurrence, compute failure is semantic `Package(Compute)` with the
+prefix through earlier successful occurrences unless an earlier occurrence
+already selected the full compatible Need. At a fragment occurrence, source
+compute failure is semantic `Fragment(SourceCompute)` with the prefix through
+earlier successful fragments unless an earlier Need selects the full Need union.
+Observed child frontier errors and epoch conflicts are typed outer and
+carrierless; Legacy has no sibling frontier outer.
+
+Semantic effective, materialization, source, root-validation, absence and cycle
+terminals retain the full prefix reached before the decision. Complete carrier
+equality is semantic Result plus epoch; Complete outer equality is outer by
+value; Need is invalid and self-unequal.
+
+For each package horizon, parse the whole ordered request slice before any
+package compute. The first bad label is semantic with the incoming prefix and
+activates zero package children. Deduplicate packages by first occurrence,
+compute the unique package set as one input-ordered batch, and reduce in original
+occurrence order. Precompute the deterministic full compatible Need union, but
+the first occurrence terminal wins exactly as Legacy: outer/conflict, Need, or
+semantic at that occurrence stops the scan; a Need returns the full union.
+Merge each successful Complete epoch before inspecting its semantic result and
+before advancing. Incompatible Need triggers REPLAN rather than inventing an
+error. Later batch outcomes were computed but are not merged or retained after
+the first terminal.
+
+Preserve `finish_nonregistry_fragment_batch` semantics. Reduce occurrence
+order while merging every Complete epoch. A semantic before any Need returns
+that semantic with its reached prefix. An earlier Need followed by semantic
+returns the full compatible Need union. Typed outer or union conflict before a
+decisive semantic wins, including after an earlier Need. With no semantic,
+outer/conflict wins, then full Need, then ordered success. Preserve duplicate
+includes, BFS order, cycle identity and the complete accumulated epoch. Do not
+invent a second Need algebra or DICE owner.
+
+## Events, families and retention
+
+The closure sibling is eventless. Reached root MODULE and REPO descendants
+remain sole owners of their exact local batches and public order; effective,
+materialization, source, preflight, horizon and fragment orchestration remain
+eventless. Need, typed outer and cancellation publish no parent state. Warm
+reuse emits no new batch. Do not activate `HostDiscoveredModuleKey`, selected
+graph, registry preparation, extensions or public callers.
+
+Retain only the local closure semantic Result Arc and compact epoch. Child
+carrier Arcs, package/fragment outcomes, BFS frontier, ancestry/cycle scratch,
+Need union, temporary labels, event staging and union maps/vectors stay
+compute-local or dependency-owned. Add no extra collection, cache, interner,
+store, lock, task, direct Host read, revision, certificate or event state.
 
 ## Required proof
 
-Discriminate key/hash/Display, accessors, Dupe/Allocative and exact legacy
-Result-Arc/value/error parity. Cover Need/child outer at effective, ignore and
-first/second marker positions; DICE-compute outer at every computed dependency;
-and every semantic terminal with exact prior/merged prefixes and later-child
-suppression. Distinguish semantic deleted-policy projection error from policy
-DICE failure. Assert invalid name precedes policy, deleted policy precedes ignore,
-ignored precedes markers, and `BUILD.bazel` Present precedes `BUILD`.
+Discriminate key identity/hash/Display, accessors, `Dupe`/`Allocative`, outer
+validity/equality, Need invalid/self-unequal, observed result parity and exact
+legacy Result-Arc projection.
 
-Preserve all passing identity, reducer, semantic, family, lifecycle and
-cancellation evidence. Only compact/restructure or add proof and test-only
-tracker glue.
+Cover effective/materialization/root-source Need, typed outer, DICE compute and
+semantic terminals with exact prefixes and later suppression. Assert exact
+cumulative epoch iteration and per-demand `Arc::ptr_eq`, including effective
+and duplicate materialization demands; prove earliest equal Arc, conflict and
+operation mismatch.
 
-Reconstruct and ptr-compare exact effective+ignore and
-effective+ignore+reached-marker epochs for Ignored, repository-ignore error,
-marker source error, fallback BUILD and NoBuildFile. Assert the complete relevant
-ROOT/REPO Some-batch sequence directly, exact legacy parity, warm silence, and
-zero cancelled parent/child row or batch publication. Compare the whole legacy
-row and use exact upper prefixes including module-source-preparation and
-host-selected-extension; keep event checks outside upper-exclusion predicates.
+For every horizon slot, prove whole-slice bad-label prevalidation, first-seen
+deduplication, input-order batch reduction, every-position Need/outer/semantic,
+full compatible Need union, incompatible-Need REPLAN boundary, first semantic,
+later activation without later result retention and exact prefix. For fragments,
+table semantic-before-Need, Need-before-semantic, outer/conflict after Need,
+all-Need union, no-semantic outer precedence, duplicate include and success.
 
-Prove exact epoch iteration and per-demand `Arc::ptr_eq`, first equal Arc,
-conflict and operation mismatch. Assert exact legacy/observed direct dependency
-rows and reverse isolation, with the neutral deleted-policy child shared.
-Assert exact child-owned ROOT/REPO batch order and text, parent/effective/
-policy/ignore/source silence, warm suppression, and poll-drop recovery.
+Exercise multi-level BFS, duplicate includes, complete success, every root,
+package, fragment, absence and cycle semantic failure. Run local and immutable
+A -> B -> absent -> directory -> A lifecycles, retain Result/epoch handles
+through churn, and compare restored semantics and child-parent exact Arcs. Prove
+real poll-drop cancellation and same-DICE recovery.
 
-Exercise local and immutable marker A -> B -> absent -> directory -> A,
-`BUILD.bazel` <-> `BUILD` preference, held Result/epoch readability and restored
-child-parent Arc identity. Prove zero horizon/closure/discovery/selected-graph/
-registry/extension/public activation. Reuse accepted semantic evidence; add no
-Bazel oracle because ordering, values, errors and child events remain exact.
-
-Run focused proof, full bzlmod and affected loading/query/core baselines, fmt,
-diff-check, exact accounting and AI-cleanup/Buck2 retention review.
+Assert exact observed and legacy direct dependency rows and reverse isolation;
+exact child-owned ROOT -> REPO batch text/order, parent silence, warm suppression
+and cancellation silence; zero discovered/selected/registry/extension/public
+activation. Run focused closure proof, full bzlmod and affected loading/query/core
+baselines, fmt, diff-check, exact accounting and AI-cleanup/Buck2 retention review.
 
 ## Compatibility and STOP
 
-Exact: current effective/invalid-name/deleted-policy/ignore/marker ordering,
-`BUILD.bazel` preference, values/errors, legacy Result Arc and child events.
-Slug-native: private sibling, Result-Arc+epoch carrier and typed outer.
-Unsupported/deferred: horizon/closure/discovery/selected graph, registry
-preparation/patches, extension repositories, M8/M7B and identity bytes.
+Exact: current nonregistry closure values/errors, BFS/include/cycle order,
+legacy Result Arc and lower child events. Slug-native: private sibling,
+Result-Arc+epoch carrier and typed outer. Unsupported/deferred: discovered and
+selected module graph publication, registry source preparation/patches,
+extension-generated repositories, M8/M7B and exact identity bytes.
 
-STOP a caller/export/third file,
-legacy/order/event/family drift, semantic compute-error invention, direct Host
-read, extra retained state, upper/registry activation, proof deletion, cap
-excess or milestone closure.
+STOP Rust during design. STOP a third file, export/caller, direct discovery or
+upper activation, legacy/order/event/family drift, incompatible-Need coercion,
+extra retained state, cap excess or milestone closure. If the frozen algebra
+cannot be implemented within caps, REPLAN.
 
-After independent implementation ACCEPT schedule only the docs-only
-`WP-6-7A-host-nonregistry-module-closure-observation-design`.
+After independent design ACCEPT schedule exactly one bounded successor:
+`WP-6-7A-host-nonregistry-module-closure-observation-implementation`. After its
+independent ACCEPT, return only to the docs-only selected-module-graph frontier
+audit; do not activate discovery directly.
