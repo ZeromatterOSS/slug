@@ -95,6 +95,7 @@ use crate::host_package::invalid_package_name;
 use crate::module_eval::DirectNonregistryEvaluationError;
 use crate::module_eval::DirectNonregistryIncludeFile;
 use crate::module_eval::HostEffectiveModuleOverride;
+use crate::module_eval::HostEffectiveModuleOverrideError;
 use crate::module_eval::HostEffectiveModuleOverrideKey;
 use crate::module_eval::HostEffectiveModuleOverrideObservationKey;
 use crate::module_eval::NonrootIncludeRequest;
@@ -109,7 +110,9 @@ use crate::module_version::BazelModuleVersionParseError;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
 use crate::registry_module_file_url;
 use crate::repository_ignore::HostNonregistryRepositoryIgnoreKey;
+use crate::repository_ignore::HostNonregistryRepositoryIgnoreObservationKey;
 use crate::repository_ignore::HostRepositoryIgnoreError;
+use crate::repository_ignore::RepositoryIgnoreMatcher;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
 pub struct RepositoryMaterializationKey {
@@ -5962,19 +5965,405 @@ impl fmt::Display for HostNonregistryPackagePreflightKey {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostNonregistryPackagePreflightObservationKey(
+    pub(crate) HostNonregistryPackagePreflightKey,
+);
+
+impl fmt::Display for HostNonregistryPackagePreflightObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type HostNonregistryPackagePreflightResult =
+    Arc<Result<HostNonregistryPackagePreflight, HostNonregistryPackagePreflightError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostNonregistryPackagePreflight {
+    result: HostNonregistryPackagePreflightResult,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostNonregistryPackagePreflight {
+    pub(crate) fn result(&self) -> &HostNonregistryPackagePreflightResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum HostNonregistryPackagePreflightObservationError {
+    EffectiveFrontier(ObservedPathFrontierError),
+    EffectiveCompute(Arc<str>),
+    PolicyCompute(Arc<str>),
+    IgnoreFrontier(ObservedPathFrontierError),
+    IgnoreCompute(Arc<str>),
+    MarkerFrontier {
+        marker: HostBuildFileName,
+        error: ObservedPathFrontierError,
+    },
+    MarkerCompute {
+        marker: HostBuildFileName,
+        message: Arc<str>,
+    },
+}
+
+impl HostNonregistryPackagePreflightObservationError {
+    fn effective_compute(message: Arc<str>) -> Self {
+        Self::EffectiveCompute(message)
+    }
+    fn policy_compute(message: Arc<str>) -> Self {
+        Self::PolicyCompute(message)
+    }
+    fn ignore_compute(message: Arc<str>) -> Self {
+        Self::IgnoreCompute(message)
+    }
+    fn marker_compute(marker: HostBuildFileName, message: Arc<str>) -> Self {
+        Self::MarkerCompute { marker, message }
+    }
+}
+#[derive(Clone, Copy)]
+enum HostNonregistryPackagePreflightMode {
+    Legacy,
+    Observed,
+}
+
+type HostNonregistryPackagePreflightDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (HostNonregistryPackagePreflightResult, PathObservationEpoch),
+        HostNonregistryPackagePreflightObservationError,
+    >,
+>;
+
+type PreflightComputed<T> =
+    ControlFlow<HostNonregistryPackagePreflightDriverOutcome, (T, PathObservationEpoch)>;
 #[track_caller]
 fn preflight_dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("nonregistry package-preflight DICE invariant: {error:?}"))
 }
 
-type HostNonregistryPackagePreflightValue = SourcePreparationOutcome<
-    Arc<Result<HostNonregistryPackagePreflight, HostNonregistryPackagePreflightError>>,
->;
+type HostNonregistryPackagePreflightValue =
+    SourcePreparationOutcome<HostNonregistryPackagePreflightResult>;
+type HostEffectiveModuleOverrideResult =
+    Arc<Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>>;
+type HostNonregistryRepositoryIgnoreResult =
+    Arc<Result<RepositoryIgnoreMatcher, HostRepositoryIgnoreError>>;
 
 fn preflight_complete(
     value: Result<HostNonregistryPackagePreflight, HostNonregistryPackagePreflightError>,
+    observations: PathObservationEpoch,
+) -> HostNonregistryPackagePreflightDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(value), observations)))
+}
+fn preflight_outer(
+    error: HostNonregistryPackagePreflightObservationError,
+) -> HostNonregistryPackagePreflightDriverOutcome {
+    SourcePreparationOutcome::Complete(Err(error))
+}
+
+fn finish_preflight_child<T, R>(
+    outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
+    complete: impl FnOnce(T) -> R,
+    frontier: impl FnOnce(ObservedPathFrontierError) -> HostNonregistryPackagePreflightObservationError,
+) -> ControlFlow<HostNonregistryPackagePreflightDriverOutcome, R> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            ControlFlow::Break(preflight_outer(frontier(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(value)) => ControlFlow::Continue(complete(value)),
+    }
+}
+
+fn finish_legacy_preflight_child<T>(outcome: SourcePreparationOutcome<T>) -> PreflightComputed<T> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => {
+            ControlFlow::Break(SourcePreparationOutcome::Need(need))
+        }
+        SourcePreparationOutcome::Complete(value) => {
+            ControlFlow::Continue((value, PathObservationEpoch::empty()))
+        }
+    }
+}
+
+async fn compute_preflight_effective(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryPackagePreflightKey,
+    mode: HostNonregistryPackagePreflightMode,
+) -> PreflightComputed<HostEffectiveModuleOverrideResult> {
+    match mode {
+        HostNonregistryPackagePreflightMode::Legacy => ControlFlow::Continue((
+            preflight_dice_invariant(
+                ctx.compute(&HostEffectiveModuleOverrideKey::new(
+                    key.workspace.dupe(),
+                    key.module.name.clone(),
+                ))
+                .await,
+            ),
+            PathObservationEpoch::empty(),
+        )),
+        HostNonregistryPackagePreflightMode::Observed => match ctx
+            .compute(&HostEffectiveModuleOverrideObservationKey::new(
+                key.workspace.dupe(),
+                key.module.name.clone(),
+            ))
+            .await
+        {
+            Err(error) => ControlFlow::Break(preflight_outer(
+                HostNonregistryPackagePreflightObservationError::effective_compute(
+                    error.to_string().into(),
+                ),
+            )),
+            Ok(outcome) => finish_preflight_child(
+                outcome,
+                |value| (value.result().dupe(), value.observations().dupe()),
+                HostNonregistryPackagePreflightObservationError::EffectiveFrontier,
+            ),
+        },
+    }
+}
+
+async fn compute_preflight_ignore(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryPackagePreflightKey,
+    mode: HostNonregistryPackagePreflightMode,
+) -> PreflightComputed<HostNonregistryRepositoryIgnoreResult> {
+    let ignore_key =
+        HostNonregistryRepositoryIgnoreKey::new(key.workspace.dupe(), key.module.clone());
+    match mode {
+        HostNonregistryPackagePreflightMode::Legacy => {
+            finish_legacy_preflight_child(preflight_dice_invariant(ctx.compute(&ignore_key).await))
+        }
+        HostNonregistryPackagePreflightMode::Observed => match ctx
+            .compute(&HostNonregistryRepositoryIgnoreObservationKey(ignore_key))
+            .await
+        {
+            Err(error) => ControlFlow::Break(preflight_outer(
+                HostNonregistryPackagePreflightObservationError::ignore_compute(
+                    error.to_string().into(),
+                ),
+            )),
+            Ok(outcome) => finish_preflight_child(
+                outcome,
+                |value| (value.result().dupe(), value.observations().dupe()),
+                HostNonregistryPackagePreflightObservationError::IgnoreFrontier,
+            ),
+        },
+    }
+}
+
+async fn compute_preflight_marker(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryPackagePreflightKey,
+    marker: HostBuildFileName,
+    path: PathBuf,
+    mode: HostNonregistryPackagePreflightMode,
+) -> PreflightComputed<Result<RepositorySourceFileValue, RepositorySourceFileError>> {
+    let source_key = RepositorySourceFileKey {
+        workspace: key.workspace.as_path().to_owned(),
+        module_name: key.module.name.clone(),
+        repo_relative_path: path,
+    };
+    match mode {
+        HostNonregistryPackagePreflightMode::Legacy => {
+            finish_legacy_preflight_child(preflight_dice_invariant(ctx.compute(&source_key).await))
+        }
+        HostNonregistryPackagePreflightMode::Observed => match ctx
+            .compute(&RepositorySourceFileObservationKey(source_key))
+            .await
+        {
+            Err(error) => ControlFlow::Break(preflight_outer(
+                HostNonregistryPackagePreflightObservationError::marker_compute(
+                    marker,
+                    error.to_string().into(),
+                ),
+            )),
+            Ok(outcome) => finish_preflight_child(
+                outcome,
+                |value| (value.result().as_ref().clone(), value.observations().dupe()),
+                |error| HostNonregistryPackagePreflightObservationError::MarkerFrontier {
+                    marker,
+                    error,
+                },
+            ),
+        },
+    }
+}
+
+async fn drive_host_nonregistry_package_preflight(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostNonregistryPackagePreflightKey,
+    mode: HostNonregistryPackagePreflightMode,
+) -> HostNonregistryPackagePreflightDriverOutcome {
+    let (effective, mut observations) = match compute_preflight_effective(ctx, key, mode).await {
+        ControlFlow::Continue(value) => value,
+        ControlFlow::Break(outcome) => return outcome,
+    };
+    let effective = match effective.as_ref() {
+        Ok(effective) => effective,
+        Err(error) => {
+            return preflight_complete(
+                Err(HostNonregistryPackagePreflightError::RootModuleFiles(
+                    error.to_string().into(),
+                )),
+                observations,
+            );
+        }
+    };
+    if !matches!(
+        effective.override_(),
+        Some(RootModuleOverride::NonRegistry(_))
+    ) {
+        return preflight_complete(
+            Err(
+                HostNonregistryPackagePreflightError::NonregistryOverrideRequired(
+                    key.module.name.clone(),
+                ),
+            ),
+            observations,
+        );
+    }
+    if let Some(message) = invalid_package_name(&key.package) {
+        return preflight_complete(
+            Ok(HostNonregistryPackagePreflight::InvalidPackageName { message }),
+            observations,
+        );
+    }
+    let deleted = match ctx
+        .compute(&CanonicalDeletedPackagesProjectionKey::new(
+            key.workspace.dupe(),
+        ))
+        .await
+    {
+        Ok(value) => value,
+        Err(error) => match mode {
+            HostNonregistryPackagePreflightMode::Legacy => {
+                preflight_dice_invariant::<(), _>(Err(error));
+                unreachable!()
+            }
+            HostNonregistryPackagePreflightMode::Observed => {
+                return preflight_outer(
+                    HostNonregistryPackagePreflightObservationError::policy_compute(Arc::from(
+                        error.to_string(),
+                    )),
+                );
+            }
+        },
+    };
+    let deleted = match deleted {
+        Ok(value) => value,
+        Err(error) => {
+            return preflight_complete(
+                Err(HostNonregistryPackagePreflightError::PolicyInput(error)),
+                observations,
+            );
+        }
+    };
+    if !deleted.is_empty() {
+        return preflight_complete(
+            Err(HostNonregistryPackagePreflightError::UnsupportedDeletedPackages),
+            observations,
+        );
+    }
+    let (ignore, ignore_observations) = match compute_preflight_ignore(ctx, key, mode).await {
+        ControlFlow::Continue(value) => value,
+        ControlFlow::Break(outcome) => return outcome,
+    };
+    observations = match merge_path_observations(&observations, &ignore_observations) {
+        Ok(observations) => observations,
+        Err(error) => {
+            return SourcePreparationOutcome::Complete(Err(
+                HostNonregistryPackagePreflightObservationError::IgnoreFrontier(error),
+            ));
+        }
+    };
+    let ignore = match ignore.as_ref() {
+        Ok(value) => value,
+        Err(error) => {
+            return preflight_complete(
+                Err(HostNonregistryPackagePreflightError::RepositoryIgnore(
+                    error.clone(),
+                )),
+                observations,
+            );
+        }
+    };
+    if ignore.matching_entry(&key.package).is_some() {
+        return preflight_complete(Ok(HostNonregistryPackagePreflight::Ignored), observations);
+    }
+    for marker in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
+        let name = match marker {
+            HostBuildFileName::BuildDotBazel => "BUILD.bazel",
+            HostBuildFileName::Build => "BUILD",
+        };
+        let path = if key.package.as_str().is_empty() {
+            PathBuf::from(name)
+        } else {
+            PathBuf::from(key.package.as_str()).join(name)
+        };
+        let (source, source_observations) =
+            match compute_preflight_marker(ctx, key, marker, path, mode).await {
+                ControlFlow::Continue(value) => value,
+                ControlFlow::Break(outcome) => return outcome,
+            };
+        observations = match merge_path_observations(&observations, &source_observations) {
+            Ok(observations) => observations,
+            Err(error) => {
+                return SourcePreparationOutcome::Complete(Err(
+                    HostNonregistryPackagePreflightObservationError::MarkerFrontier {
+                        marker,
+                        error,
+                    },
+                ));
+            }
+        };
+        match source {
+            Ok(RepositorySourceFileValue::Present(_)) => {
+                let value = match marker {
+                    HostBuildFileName::BuildDotBazel => {
+                        HostNonregistryPackagePreflight::BuildDotBazel
+                    }
+                    HostBuildFileName::Build => HostNonregistryPackagePreflight::Build,
+                };
+                return preflight_complete(Ok(value), observations);
+            }
+            Ok(RepositorySourceFileValue::Absent)
+            | Err(RepositorySourceFileError::WrongKind {
+                actual: PathNodeKind::Directory,
+                ..
+            }) => {}
+            Err(error) => {
+                return preflight_complete(
+                    Err(HostNonregistryPackagePreflightError::RepositorySource { marker, error }),
+                    observations,
+                );
+            }
+        }
+    }
+    preflight_complete(
+        Ok(HostNonregistryPackagePreflight::NoBuildFile),
+        observations,
+    )
+}
+
+fn project_preflight_legacy(
+    outcome: HostNonregistryPackagePreflightDriverOutcome,
 ) -> HostNonregistryPackagePreflightValue {
-    SourcePreparationOutcome::Complete(Arc::new(value))
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy preflight cannot produce an observed outer error")
+        }
+    }
 }
 
 #[async_trait]
@@ -5982,117 +6371,48 @@ impl Key for HostNonregistryPackagePreflightKey {
     type Value = HostNonregistryPackagePreflightValue;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let effective = preflight_dice_invariant(
-            ctx.compute(&HostEffectiveModuleOverrideKey::new(
-                self.workspace.dupe(),
-                self.module.name.clone(),
-            ))
+        project_preflight_legacy(
+            drive_host_nonregistry_package_preflight(
+                ctx,
+                self,
+                HostNonregistryPackagePreflightMode::Legacy,
+            )
             .await,
-        );
-        let effective = match effective.as_ref() {
-            Ok(effective) => effective,
-            Err(error) => {
-                return preflight_complete(Err(
-                    HostNonregistryPackagePreflightError::RootModuleFiles(error.to_string().into()),
-                ));
-            }
-        };
-        if !matches!(
-            effective.override_(),
-            Some(RootModuleOverride::NonRegistry(_))
-        ) {
-            return preflight_complete(Err(
-                HostNonregistryPackagePreflightError::NonregistryOverrideRequired(
-                    self.module.name.clone(),
-                ),
-            ));
-        }
-        if let Some(message) = invalid_package_name(&self.package) {
-            return preflight_complete(Ok(HostNonregistryPackagePreflight::InvalidPackageName {
-                message,
-            }));
-        }
-        let deleted = match preflight_dice_invariant(
-            ctx.compute(&CanonicalDeletedPackagesProjectionKey::new(
-                self.workspace.dupe(),
-            ))
-            .await,
-        ) {
-            Ok(value) => value,
-            Err(error) => {
-                return preflight_complete(Err(HostNonregistryPackagePreflightError::PolicyInput(
-                    error,
-                )));
-            }
-        };
-        if !deleted.is_empty() {
-            return preflight_complete(Err(
-                HostNonregistryPackagePreflightError::UnsupportedDeletedPackages,
-            ));
-        }
-        let ignore = match preflight_dice_invariant(
-            ctx.compute(&HostNonregistryRepositoryIgnoreKey::new(
-                self.workspace.dupe(),
-                self.module.clone(),
-            ))
-            .await,
-        ) {
-            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
-            SourcePreparationOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.dupe(),
-                Err(error) => {
-                    return preflight_complete(Err(
-                        HostNonregistryPackagePreflightError::RepositoryIgnore(error.clone()),
-                    ));
-                }
-            },
-        };
-        if ignore.matching_entry(&self.package).is_some() {
-            return preflight_complete(Ok(HostNonregistryPackagePreflight::Ignored));
-        }
-        for marker in [HostBuildFileName::BuildDotBazel, HostBuildFileName::Build] {
-            let name = match marker {
-                HostBuildFileName::BuildDotBazel => "BUILD.bazel",
-                HostBuildFileName::Build => "BUILD",
-            };
-            let path = if self.package.as_str().is_empty() {
-                PathBuf::from(name)
-            } else {
-                PathBuf::from(self.package.as_str()).join(name)
-            };
-            match preflight_dice_invariant(
-                ctx.compute(&RepositorySourceFileKey {
-                    workspace: self.workspace.as_path().to_owned(),
-                    module_name: self.module.name.clone(),
-                    repo_relative_path: path,
-                })
-                .await,
-            ) {
-                SourcePreparationOutcome::Need(need) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(_))) => {
-                    let value = match marker {
-                        HostBuildFileName::BuildDotBazel => {
-                            HostNonregistryPackagePreflight::BuildDotBazel
-                        }
-                        HostBuildFileName::Build => HostNonregistryPackagePreflight::Build,
-                    };
-                    return preflight_complete(Ok(value));
-                }
-                SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))
-                | SourcePreparationOutcome::Complete(Err(RepositorySourceFileError::WrongKind {
-                    actual: PathNodeKind::Directory,
-                    ..
-                })) => {}
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    return preflight_complete(Err(
-                        HostNonregistryPackagePreflightError::RepositorySource { marker, error },
-                    ));
-                }
-            }
-        }
-        preflight_complete(Ok(HostNonregistryPackagePreflight::NoBuildFile))
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostNonregistryPackagePreflightObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostNonregistryPackagePreflight,
+            HostNonregistryPackagePreflightObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_host_nonregistry_package_preflight(
+            ctx,
+            &self.0,
+            HostNonregistryPackagePreflightMode::Observed,
+        )
+        .await
+        .map(|result| {
+            result.map(
+                |(result, observations)| ObservedHostNonregistryPackagePreflight {
+                    result,
+                    observations,
+                },
+            )
+        })
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -6951,15 +7271,21 @@ mod tests {
         closure: Mutex<Vec<ActivationKind>>,
         discovered: Mutex<Vec<(ActivationKind, bool)>>,
         observed: Mutex<Vec<String>>,
+        rows: Mutex<Vec<(String, Vec<String>)>>,
+        batches: Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>,
     }
 
     impl ActivationTracker for NonregistryPreflightTracker {
         fn key_activated(
             &self,
-            _: &DynKey,
-            _: &mut dyn Iterator<Item = &DynKey>,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
             _: ActivationData,
         ) {
+            self.rows
+                .lock()
+                .unwrap()
+                .push((key.to_string(), deps.map(ToString::to_string).collect()));
         }
 
         fn tracks_rich_activations(&self) -> bool {
@@ -6968,7 +7294,25 @@ mod tests {
 
         fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
             let record = (activation.kind(), activation.evaluation_data().is_none());
-            if key.to_string().starts_with("observed-") {
+            self.batches.lock().unwrap().push((
+                key.to_string(),
+                activation.kind(),
+                activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            ));
+            if key
+                .downcast_ref::<HostNonregistryPackagePreflightObservationKey>()
+                .is_some()
+            {
+                self.preflight.lock().unwrap().push(record);
+            } else if key
+                .downcast_ref::<crate::repo_file::HostNonregistryRepoFileObservationKey>()
+                .is_some()
+            {
+                self.repo.lock().unwrap().push(record);
+            } else if key.to_string().starts_with("observed-") {
                 self.observed.lock().unwrap().push(key.to_string());
             } else if key.downcast_ref::<HostDiscoveredModuleKey>().is_some() {
                 self.discovered.lock().unwrap().push(record);

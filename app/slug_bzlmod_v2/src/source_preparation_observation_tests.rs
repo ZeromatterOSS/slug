@@ -22,11 +22,16 @@ impl HostSourceFamilyTracker {
 }
 
 fn assert_repository_source_eventless(activations: &[HostSourceActivation]) {
-    assert!(activations.iter().filter(|entry| {
-        entry.key.contains("repository-source-file:")
-            || entry.key.contains("resolved-path:")
-            || entry.key.starts_with("path-observation:")
-    }).all(|entry| entry.batch.is_none()));
+    assert!(
+        activations
+            .iter()
+            .filter(|entry| {
+                entry.key.contains("repository-source-file:")
+                    || entry.key.contains("resolved-path:")
+                    || entry.key.starts_with("path-observation:")
+            })
+            .all(|entry| entry.batch.is_none())
+    );
 }
 
 impl ActivationTracker for HostSourceFamilyTracker {
@@ -94,10 +99,8 @@ fn complete_observed_source(
 
 fn assert_exact_epoch(expected: &PathObservationEpoch, actual: &PathObservationEpoch) {
     assert_eq!(actual.observations().len(), expected.observations().len());
-    for ((demand, result), (actual_demand, actual_result)) in expected
-        .observations()
-        .iter()
-        .zip(actual.observations())
+    for ((demand, result), (actual_demand, actual_result)) in
+        expected.observations().iter().zip(actual.observations())
     {
         assert_eq!(actual_demand, demand, "epoch iteration order changed");
         assert!(
@@ -159,8 +162,7 @@ async fn observed_host_source_preserves_exact_symlink_epoch_and_isolates_familie
     let mut transaction =
         observed_source_transaction(&dice, material("dep"), epoch.dupe(), Some(tracker.dupe()))
             .await;
-    let key =
-        HostRepositorySourceFileObservationKey::new(local_route(), PathBuf::from("link"));
+    let key = HostRepositorySourceFileObservationKey::new(local_route(), PathBuf::from("link"));
     assert_ne!(
         key.to_string(),
         HostRepositorySourceFileKey::new(local_route(), PathBuf::from("link")).to_string()
@@ -177,22 +179,29 @@ async fn observed_host_source_preserves_exact_symlink_epoch_and_isolates_familie
     assert_exact_epoch(&epoch, observed.observations());
 
     let warm = transaction.compute(&key).await.unwrap();
-    assert!(HostRepositorySourceFileObservationKey::equality(&cold, &warm));
+    assert!(HostRepositorySourceFileObservationKey::equality(
+        &cold, &warm
+    ));
     let warm_observed = complete_observed_source(&warm);
     assert!(Arc::ptr_eq(observed.result(), warm_observed.result()));
     assert_exact_epoch(&epoch, warm_observed.observations());
 
     let activations = tracker.take();
     assert!(activations.iter().all(|entry| entry.batch.is_none()));
-    assert!(activations
-        .iter()
-        .any(|entry| matches!(entry.kind, ActivationKind::Evaluated | ActivationKind::Reused)));
-    assert!(activations
-        .iter()
-        .any(|entry| entry.key.starts_with("observed-host-repository-path:")));
-    assert!(activations.iter().any(|entry| entry
-        .key
-        .starts_with("observed-host-repository-source-file:")));
+    assert!(activations.iter().any(|entry| matches!(
+        entry.kind,
+        ActivationKind::Evaluated | ActivationKind::Reused
+    )));
+    assert!(
+        activations
+            .iter()
+            .any(|entry| entry.key.starts_with("observed-host-repository-path:"))
+    );
+    assert!(activations.iter().any(|entry| {
+        entry
+            .key
+            .starts_with("observed-host-repository-source-file:")
+    }));
     assert!(!activations.iter().any(|entry| {
         entry.key.starts_with("host-repository-path:")
             || entry.key.starts_with("host-repository-source-file:")
@@ -292,32 +301,22 @@ async fn observed_host_source_retains_semantic_prefixes_and_complete_only_validi
 #[tokio::test]
 async fn observed_host_source_covers_path_need_route_error_and_reverse_isolation() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let mut pending = observed_source_transaction(
-        &dice,
-        material("dep"),
-        PathObservationEpoch::empty(),
-        None,
-    )
-    .await;
+    let mut pending =
+        observed_source_transaction(&dice, material("dep"), PathObservationEpoch::empty(), None)
+            .await;
     let pending = pending
-        .compute(&HostRepositoryPathObservationKey(HostRepositoryPathKey::new(
-            local_route(),
-            PathBuf::from("BUILD.bazel"),
-        )))
+        .compute(&HostRepositoryPathObservationKey(
+            HostRepositoryPathKey::new(local_route(), PathBuf::from("BUILD.bazel")),
+        ))
         .await
         .unwrap();
     assert!(matches!(pending, SourcePreparationOutcome::Need(_)));
 
-    let builtin = RootRepositoryRoute::builtin_for_test(
-        NormalizedAbsolutePath::new("/workspace").unwrap(),
-    );
-    let mut invalid = observed_source_transaction(
-        &dice,
-        material("dep"),
-        PathObservationEpoch::empty(),
-        None,
-    )
-    .await;
+    let builtin =
+        RootRepositoryRoute::builtin_for_test(NormalizedAbsolutePath::new("/workspace").unwrap());
+    let mut invalid =
+        observed_source_transaction(&dice, material("dep"), PathObservationEpoch::empty(), None)
+            .await;
     let invalid = invalid
         .compute(&HostRepositorySourceFileObservationKey::new(
             builtin,
@@ -356,12 +355,16 @@ async fn observed_host_source_covers_path_need_route_error_and_reverse_isolation
         .await
         .unwrap();
     let activations = tracker.take();
-    assert!(activations.iter().any(|entry| entry
-        .key
-        .starts_with("host-repository-source-file:")));
-    assert!(!activations
-        .iter()
-        .any(|entry| entry.key.starts_with("observed-host-repository-")));
+    assert!(
+        activations
+            .iter()
+            .any(|entry| entry.key.starts_with("host-repository-source-file:"))
+    );
+    assert!(
+        !activations
+            .iter()
+            .any(|entry| entry.key.starts_with("observed-host-repository-"))
+    );
 }
 
 #[tokio::test]
@@ -439,8 +442,7 @@ fn observed_host_source_union_is_left_first_and_fail_closed() {
     ));
     let equal = Arc::new(first.as_ref().clone());
     let base = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
-    let merged =
-        append_host_repository_source_observation(&base, demand.dupe(), equal).unwrap();
+    let merged = append_host_repository_source_observation(&base, demand.dupe(), equal).unwrap();
     assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
 
     let conflict = Arc::new(PathObservationResult::FileBytes(
@@ -452,8 +454,7 @@ fn observed_host_source_union_is_left_first_and_fail_closed() {
             slug_workspace_v2::PathObservationEpochError::ConflictingDemand(found)
         )) if found == demand
     ));
-    let wrong_operation =
-        Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+    let wrong_operation = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
     assert!(matches!(
         append_host_repository_source_observation(
             &PathObservationEpoch::empty(),
@@ -470,10 +471,8 @@ fn observed_host_source_union_is_left_first_and_fail_closed() {
 async fn observed_host_source_cancellation_publishes_nothing_and_recovers_aba() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
     let tracker = Arc::new(HostSourceFamilyTracker::default());
-    let key = HostRepositorySourceFileObservationKey::new(
-        local_route(),
-        PathBuf::from("BUILD.bazel"),
-    );
+    let key =
+        HostRepositorySourceFileObservationKey::new(local_route(), PathBuf::from("BUILD.bazel"));
     let epoch = |bytes: &'static [u8]| {
         source_epoch(
             host_path_epoch(
@@ -510,23 +509,20 @@ async fn observed_host_source_cancellation_publishes_nothing_and_recovers_aba() 
     ));
     tracker.take();
 
-    let mut changed =
-        observed_source_transaction(&dice, material("dep"), epoch(b"b"), None).await;
+    let mut changed = observed_source_transaction(&dice, material("dep"), epoch(b"b"), None).await;
     let changed = changed.compute(&key).await.unwrap();
     assert!(matches!(
         complete_observed_source(&changed).result().as_ref(),
         Ok(HostRepositorySourceFileValue::Present { bytes, .. }) if bytes.as_ref() == b"b"
     ));
 
-    let mut restored =
-        observed_source_transaction(&dice, material("dep"), epoch(b"a"), None).await;
+    let mut restored = observed_source_transaction(&dice, material("dep"), epoch(b"a"), None).await;
     let restored = restored.compute(&key).await.unwrap();
     assert_eq!(
         first_observed.result().as_ref(),
         complete_observed_source(&restored).result().as_ref()
     );
 }
-
 
 fn complete_repository_source(
     value: &<RepositorySourceFileObservationKey as Key>::Value,
@@ -610,10 +606,13 @@ async fn repository_source_transaction(
         )])
         .unwrap();
     let mut transaction = updater.commit().await;
-    let materialization = transaction.compute(&RepositoryMaterializationObservationKey::new(
-        PathBuf::from("/workspace"),
-        "dep".into(),
-    )).await.unwrap();
+    let materialization = transaction
+        .compute(&RepositoryMaterializationObservationKey::new(
+            PathBuf::from("/workspace"),
+            "dep".into(),
+        ))
+        .await
+        .unwrap();
     let epoch = extend_repository_source_epoch(
         observed_repository_materialization(&materialization).observations(),
         &source_epoch,
@@ -635,15 +634,9 @@ async fn repository_source_case(
     Vec<(String, Vec<String>)>,
 ) {
     let tracker = Arc::new(HostSourceFamilyTracker::default());
-    let (mut transaction, epoch) = repository_source_transaction(
-        dice,
-        source,
-        variant,
-        result,
-        source_epoch,
-        tracker.dupe(),
-    )
-    .await;
+    let (mut transaction, epoch) =
+        repository_source_transaction(dice, source, variant, result, source_epoch, tracker.dupe())
+            .await;
     let child = tracker.take();
     tracker.take_rows();
     let observed_key = RepositorySourceFileObservationKey(repository_source_key("file"));
@@ -667,7 +660,12 @@ async fn repository_source_case(
         warm,
         legacy,
         epoch,
-        vec![child, cold_activations, warm_activations, legacy_activations],
+        vec![
+            child,
+            cold_activations,
+            warm_activations,
+            legacy_activations,
+        ],
         rows,
     )
 }
@@ -678,11 +676,22 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
     let other = RepositorySourceFileObservationKey(repository_source_key("other"));
     assert_ne!(key, other);
     assert_ne!(test_hash(&key), test_hash(&other));
-    let mut tx = Dice::builder().build(DetectCycles::Enabled).updater().commit().await;
-    let invalid = tx.compute(&RepositorySourceFileObservationKey(repository_source_key("../file"))).await.unwrap();
+    let mut tx = Dice::builder()
+        .build(DetectCycles::Enabled)
+        .updater()
+        .commit()
+        .await;
+    let invalid = tx
+        .compute(&RepositorySourceFileObservationKey(repository_source_key(
+            "../file",
+        )))
+        .await
+        .unwrap();
     let invalid = complete_repository_source(&invalid);
-    assert!(matches!(invalid.result().as_ref(),
-        Err(RepositorySourceFileError::InvalidRepoRelativePath { .. })));
+    assert!(matches!(
+        invalid.result().as_ref(),
+        Err(RepositorySourceFileError::InvalidRepoRelativePath { .. })
+    ));
     assert!(invalid.observations().observations().is_empty());
     let bytes = Arc::<[u8]>::from(b"bytes".as_slice());
     let carrier = repository_source_file_complete(
@@ -693,8 +702,10 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
     assert!(matches!(project_legacy_repository_source_file(carrier),
         SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(found)))
             if Arc::ptr_eq(&bytes, &found)));
-    assert!(matches!(held.as_ref(), Ok(RepositorySourceFileValue::Present(found))
-        if Arc::ptr_eq(&bytes, found)));
+    assert!(
+        matches!(held.as_ref(), Ok(RepositorySourceFileValue::Present(found))
+        if Arc::ptr_eq(&bytes, found))
+    );
     let demand = PathObservationDemand::new(
         PathObservationNamespace::Host,
         NormalizedAbsolutePath::new("/workspace/dep/file").unwrap(),
@@ -704,11 +715,9 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
         PathOperationResult::Present(Arc::from(b"same".as_slice())),
     ));
     let prefix = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
-    let equal = PathObservationEpoch::from_shared([(
-        demand.dupe(),
-        Arc::new(first.as_ref().clone()),
-    )])
-    .unwrap();
+    let equal =
+        PathObservationEpoch::from_shared([(demand.dupe(), Arc::new(first.as_ref().clone()))])
+            .unwrap();
     assert!(Arc::ptr_eq(
         merge_path_observations(&prefix, &equal)
             .unwrap()
@@ -740,9 +749,8 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
         ))
     ));
     let path = Arc::new(PathBuf::from("file"));
-    let materialization = repository_source_materialization_compute_error(
-        path.dupe(), "materialization".into(),
-    );
+    let materialization =
+        repository_source_materialization_compute_error(path.dupe(), "materialization".into());
     let materialization = complete_repository_source(&materialization);
     assert!(matches!(materialization.result().as_ref(),
         Err(RepositorySourceFileError::MaterializationCompute { message, .. })
@@ -751,10 +759,14 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
     let resolution =
         repository_source_resolution_compute_error(path.dupe(), "resolution".into(), prefix.dupe());
     let resolution = complete_repository_source(&resolution);
-    assert!(matches!(resolution.result().as_ref(), Err(RepositorySourceFileError::ResolutionCompute { message, .. }) if message.as_ref() == "resolution"));
+    assert!(
+        matches!(resolution.result().as_ref(), Err(RepositorySourceFileError::ResolutionCompute { message, .. }) if message.as_ref() == "resolution")
+    );
     assert_exact_epoch(&prefix, resolution.observations());
-    let SourcePreparationOutcome::Complete(Ok((Err(RepositorySourceFileError::FileCompute { message, .. }), file_prefix))) =
-        host_repository_source_file_compute_error(path.dupe(), "file".into(), &prefix)
+    let SourcePreparationOutcome::Complete(Ok((
+        Err(RepositorySourceFileError::FileCompute { message, .. }),
+        file_prefix,
+    ))) = host_repository_source_file_compute_error(path.dupe(), "file".into(), &prefix)
     else {
         panic!("FileBytes compute failure must retain its prior prefix")
     };
@@ -770,7 +782,10 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
     let ControlFlow::Break(semantic) = semantic else {
         panic!("materialization semantic must stop")
     };
-    assert_exact_epoch(&prefix, complete_repository_source(&semantic).observations());
+    assert_exact_epoch(
+        &prefix,
+        complete_repository_source(&semantic).observations(),
+    );
     let need = NeedPathObservations::singleton(demand.dupe());
     let outer = ObservedPathFrontierError::Epoch(
         slug_workspace_v2::PathObservationEpochError::OperationMismatch {
@@ -785,13 +800,9 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
         )
         .break_value()
         .unwrap(),
-        finish_observed_repository_source_resolution(
-            PathOutcome::Need(need),
-            &prefix,
-            path.dupe(),
-        )
-        .break_value()
-        .unwrap(),
+        finish_observed_repository_source_resolution(PathOutcome::Need(need), &prefix, path.dupe())
+            .break_value()
+            .unwrap(),
         finish_observed_repository_source_materialization(
             SourcePreparationOutcome::Complete(Err(outer.dupe())),
             path.dupe(),
@@ -806,7 +817,10 @@ async fn observed_repository_source_projection_and_algebra_are_exact() {
         .break_value()
         .unwrap(),
     ] {
-        assert_eq!(RepositorySourceFileObservationKey::validity(&value), value.is_complete());
+        assert_eq!(
+            RepositorySourceFileObservationKey::validity(&value),
+            value.is_complete()
+        );
         assert_eq!(
             RepositorySourceFileObservationKey::equality(&value, &value),
             value.is_complete()
@@ -825,14 +839,8 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
         Some(PathNodeKind::RegularFile),
         Some(b"local-a"),
     );
-    let (cold, warm, legacy, expected, phases, rows) = repository_source_case(
-        &dice,
-        local,
-        301,
-        local_success.clone(),
-        present_epoch,
-    )
-    .await;
+    let (cold, warm, legacy, expected, phases, rows) =
+        repository_source_case(&dice, local, 301, local_success.clone(), present_epoch).await;
     let observed = complete_repository_source(&cold);
     assert!(RepositorySourceFileObservationKey::equality(&cold, &warm));
     assert!(Arc::ptr_eq(
@@ -875,12 +883,17 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
     }
     assert!(phases[0].iter().any(|entry| {
         entry.key.contains("root-module-file:")
-            && entry.batch.as_ref().is_some_and(|batch| !batch.events().is_empty())
+            && entry
+                .batch
+                .as_ref()
+                .is_some_and(|batch| !batch.events().is_empty())
     }));
     assert_repository_source_eventless(&phases[1]);
-    assert!(phases[2]
-        .iter()
-        .all(|entry| entry.kind == ActivationKind::Reused && entry.batch.is_none()));
+    assert!(
+        phases[2]
+            .iter()
+            .all(|entry| entry.kind == ActivationKind::Reused && entry.batch.is_none())
+    );
     let upper = [
         "host-nonregistry-package-preflight:",
         "host-nonregistry-repo-file:",
@@ -893,10 +906,12 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
         "host-selected-module-graph:",
         "registry-file:",
     ];
-    assert!(!phases
-        .iter()
-        .flatten()
-        .any(|entry| upper.iter().any(|p| entry.key.starts_with(p))));
+    assert!(
+        !phases
+            .iter()
+            .flatten()
+            .any(|entry| upper.iter().any(|p| entry.key.starts_with(p)))
+    );
     let path = |kind| {
         host_path_epoch(
             PathObservationNamespace::Host,
@@ -946,10 +961,13 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
                     ..
                 }),
             ) => true,
-            ("resolution", Err(RepositorySourceFileError::Observation {
-                operation: PathObservationOperation::ReadLink,
-                ..
-            })) => true,
+            (
+                "resolution",
+                Err(RepositorySourceFileError::Observation {
+                    operation: PathObservationOperation::ReadLink,
+                    ..
+                }),
+            ) => true,
             ("missing", Err(RepositorySourceFileError::InconsistentState { .. })) => true,
             ("error", Err(RepositorySourceFileError::Observation { .. })) => true,
             _ => false,
@@ -973,13 +991,12 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
     let archive = "module(name='root')\narchive_override(module_name='dep',urls=['https://example.invalid/a.tgz'],integrity='sha256-x')\n";
     let instance = PathObservationInstanceId::new(321);
     let namespace = PathObservationNamespace::Materialization(instance);
-    let immutable = RepositoryMaterializationResult::Success(
-        RepositoryMaterializationSuccess::Immutable {
+    let immutable =
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
             source_identity: Arc::from("sha256-immutable"),
             generation_root: PathBuf::from("/immutable/321"),
             observation_instance: instance,
-        },
-    );
+        });
     let immutable_tail = host_path_epoch(
         namespace,
         "/immutable/321/file",
@@ -1000,8 +1017,7 @@ async fn observed_repository_source_prefixes_families_and_events_are_exact() {
 #[tokio::test]
 async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
-    let local =
-        "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n";
+    let local = "module(name='root')\nlocal_path_override(module_name='dep',path='dep')\n";
     let key = RepositorySourceFileObservationKey(repository_source_key("file"));
 
     let tracker = Arc::new(HostSourceFamilyTracker::default());
@@ -1014,15 +1030,28 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     inject_materialization_request_inputs(&mut updater, local, 401, &[], false);
     let mut transaction = updater.commit().await;
     let materialization_need = transaction.compute(&key).await.unwrap();
-    assert!(matches!(materialization_need, SourcePreparationOutcome::Need(_)));
-    let deps = &tracker.take_rows().into_iter()
-        .find(|(name, _)| name == &key.to_string()).unwrap().1;
-    assert!(deps.iter().any(|dep| dep.starts_with("observed-repository-materialization:")));
-    assert!(!deps.iter().any(|dep| dep.starts_with("observed-resolved-path:")));
+    assert!(matches!(
+        materialization_need,
+        SourcePreparationOutcome::Need(_)
+    ));
+    let deps = &tracker
+        .take_rows()
+        .into_iter()
+        .find(|(name, _)| name == &key.to_string())
+        .unwrap()
+        .1;
+    assert!(
+        deps.iter()
+            .any(|dep| dep.starts_with("observed-repository-materialization:"))
+    );
+    assert!(
+        !deps
+            .iter()
+            .any(|dep| dep.starts_with("observed-resolved-path:"))
+    );
 
     assert_repository_source_eventless(&tracker.take());
-    let result =
-        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local);
+    let result = RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Local);
     let tracker = Arc::new(HostSourceFamilyTracker::default());
     let (mut resolution_need, _) = repository_source_transaction(
         &dice,
@@ -1037,9 +1066,16 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
         resolution_need.compute(&key).await.unwrap(),
         SourcePreparationOutcome::Need(_)
     ));
-    let deps = &tracker.take_rows().into_iter()
-        .find(|(name, _)| name == &key.to_string()).unwrap().1;
-    assert!(deps.iter().any(|dep| dep.starts_with("observed-resolved-path:")));
+    let deps = &tracker
+        .take_rows()
+        .into_iter()
+        .find(|(name, _)| name == &key.to_string())
+        .unwrap()
+        .1;
+    assert!(
+        deps.iter()
+            .any(|dep| dep.starts_with("observed-resolved-path:"))
+    );
     assert!(!deps.iter().any(|dep| dep.contains("FileBytes")));
 
     assert_repository_source_eventless(&tracker.take());
@@ -1050,9 +1086,15 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
         None,
     );
     let tracker = Arc::new(HostSourceFamilyTracker::default());
-    let (mut file_need, _) =
-        repository_source_transaction(&dice, local, 403, result.clone(), lstat_only, tracker.dupe())
-            .await;
+    let (mut file_need, _) = repository_source_transaction(
+        &dice,
+        local,
+        403,
+        result.clone(),
+        lstat_only,
+        tracker.dupe(),
+    )
+    .await;
     assert!(matches!(
         file_need.compute(&key).await.unwrap(),
         SourcePreparationOutcome::Need(_)
@@ -1066,15 +1108,9 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
         Some(b"a"),
     );
     let tracker = Arc::new(HostSourceFamilyTracker::default());
-    let (mut cancelled, _) = repository_source_transaction(
-        &dice,
-        local,
-        404,
-        result.clone(),
-        full,
-        tracker.dupe(),
-    )
-    .await;
+    let (mut cancelled, _) =
+        repository_source_transaction(&dice, local, 404, result.clone(), full, tracker.dupe())
+            .await;
     tracker.take();
     tracker.take_rows();
     let mut future = Box::pin(cancelled.compute(&key));
@@ -1105,9 +1141,12 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     recovery_tracker.take();
     let recovered = recovered.compute(&key).await.unwrap();
     assert!(RepositorySourceFileObservationKey::validity(&recovered));
-    assert!(recovery_tracker.take().iter().all(|entry| {
-        entry.key != key.to_string() || entry.batch.is_none()
-    }));
+    assert!(
+        recovery_tracker
+            .take()
+            .iter()
+            .all(|entry| { entry.key != key.to_string() || entry.batch.is_none() })
+    );
 
     let epoch_for = |kind, bytes| {
         host_path_epoch(
@@ -1126,9 +1165,8 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     ];
     let mut local_values = Vec::new();
     for (kind, bytes) in lifecycle {
-        let case = repository_source_case(
-            &dice, local, 405, result.clone(), epoch_for(kind, bytes),
-        ).await;
+        let case =
+            repository_source_case(&dice, local, 405, result.clone(), epoch_for(kind, bytes)).await;
         local_values.push((case.0, case.3));
     }
     let a_value = complete_repository_source(&local_values[0].0);
@@ -1139,7 +1177,8 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     }));
     let (restored_value, _) = local_values.pop().unwrap();
     assert!(RepositorySourceFileObservationKey::equality(
-        &local_values[0].0, &restored_value
+        &local_values[0].0,
+        &restored_value
     ));
     let restored = complete_repository_source(&restored_value);
     assert_eq!(held_result.as_ref(), restored.result().as_ref());
@@ -1151,13 +1190,11 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
         &dice,
         archive,
         407,
-        RepositoryMaterializationResult::Success(
-            RepositoryMaterializationSuccess::Immutable {
-                source_identity: Arc::from("sha256-invalid-root"),
-                generation_root: PathBuf::from("relative"),
-                observation_instance: instance,
-            },
-        ),
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
+            source_identity: Arc::from("sha256-invalid-root"),
+            generation_root: PathBuf::from("relative"),
+            observation_instance: instance,
+        }),
         PathObservationEpoch::empty(),
     )
     .await;
@@ -1168,13 +1205,12 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     ));
     assert_exact_epoch(&invalid_root.3, invalid.observations());
 
-    let immutable = RepositoryMaterializationResult::Success(
-        RepositoryMaterializationSuccess::Immutable {
+    let immutable =
+        RepositoryMaterializationResult::Success(RepositoryMaterializationSuccess::Immutable {
             source_identity: Arc::from("sha256-lifecycle"),
             generation_root: PathBuf::from("/immutable/406"),
             observation_instance: instance,
-        },
-    );
+        });
     let mut values = Vec::new();
     for (kind, bytes) in lifecycle {
         let case = repository_source_case(
@@ -1195,13 +1231,21 @@ async fn observed_repository_source_need_cancel_and_lifecycle_are_exact() {
     let immutable_a = complete_repository_source(&values[0].0);
     let held_immutable_result = immutable_a.result().dupe();
     let held_immutable_epoch = immutable_a.observations().dupe();
-    assert!(values[1..4].iter().all(|value| {
-        !RepositorySourceFileObservationKey::equality(&values[0].0, &value.0)
-    }));
+    assert!(
+        values[1..4]
+            .iter()
+            .all(|value| { !RepositorySourceFileObservationKey::equality(&values[0].0, &value.0) })
+    );
     let (restored_value, _) = values.pop().unwrap();
-    assert!(RepositorySourceFileObservationKey::equality(&values[0].0, &restored_value));
+    assert!(RepositorySourceFileObservationKey::equality(
+        &values[0].0,
+        &restored_value
+    ));
     let immutable_restored = complete_repository_source(&restored_value);
-    assert_eq!(held_immutable_result.as_ref(), immutable_restored.result().as_ref());
+    assert_eq!(
+        held_immutable_result.as_ref(),
+        immutable_restored.result().as_ref()
+    );
     assert_eq!(held_immutable_epoch, *immutable_restored.observations());
 }
 
@@ -1264,9 +1308,7 @@ async fn direct_local_file_transaction(
             Arc::new(slug_workspace_v2::WorkspaceSnapshot {
                 files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
                     PathBuf::from("/workspace/MODULE.bazel"),
-                    slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
-                        root_source.clone(),
-                    )),
+                    slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(root_source.clone())),
                 )])),
             }),
         )])
@@ -1340,7 +1382,11 @@ async fn observed_direct_local_file_preserves_arcs_events_families_and_lifecycle
     }
 
     let activations = tracker.take();
-    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    let has = |prefix: &str| {
+        activations
+            .iter()
+            .any(|entry| entry.key.starts_with(prefix))
+    };
     assert!(has("observed-direct-local-module-file:"));
     assert!(has("observed-root-repository-route:"));
     assert!(has("observed-host-repository-source-file:"));
@@ -1375,20 +1421,19 @@ async fn observed_direct_local_file_preserves_arcs_events_families_and_lifecycle
         &cold_observed.result,
         &complete_direct_local_file(&warm).result
     ));
-    assert!(tracker
-        .take()
-        .iter()
-        .all(|entry| entry.batch.is_none()));
+    assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
 
     let legacy = cold.compute(&direct_local_file_key("dep")).await.unwrap();
     let SourcePreparationOutcome::Complete(legacy) = legacy else {
         panic!("legacy direct-local file must complete")
     };
     assert_eq!(legacy.as_ref(), cold_observed.result.as_ref());
-    assert!(!tracker
-        .take()
-        .iter()
-        .any(|entry| entry.key.contains("observed-")));
+    assert!(
+        !tracker
+            .take()
+            .iter()
+            .any(|entry| entry.key.contains("observed-"))
+    );
 
     for (path, module, expected, variant) in [
         ("other", Some(&b"b"[..]), Some(&b"b"[..]), 2),
@@ -1418,7 +1463,10 @@ async fn observed_direct_local_file_covers_needs_prefixes_suppression_and_cancel
         direct_local_file_transaction(&dice, "dep", Some(b"a"), None, 10, None).await;
     let mut updater = route_need.into_updater();
     updater
-        .changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::empty(),
+        )])
         .unwrap();
     route_need = updater.commit().await;
     let route_need = route_need.compute(&key).await.unwrap();
@@ -1461,15 +1509,9 @@ async fn observed_direct_local_file_covers_needs_prefixes_suppression_and_cancel
         SourcePreparationOutcome::Need(_)
     ));
 
-    let (mut wrong_kind, _) = direct_local_file_transaction(
-        &dice,
-        "dep",
-        None,
-        Some(PathNodeKind::Directory),
-        13,
-        None,
-    )
-    .await;
+    let (mut wrong_kind, _) =
+        direct_local_file_transaction(&dice, "dep", None, Some(PathNodeKind::Directory), 13, None)
+            .await;
     let wrong_kind = wrong_kind.compute(&key).await.unwrap();
     let wrong_kind = complete_direct_local_file(&wrong_kind);
     assert!(matches!(
@@ -1478,7 +1520,10 @@ async fn observed_direct_local_file_covers_needs_prefixes_suppression_and_cancel
             RepositorySourceFileError::WrongKind { .. }
         ))
     ));
-    assert!(wrong_kind.observations.observations().len() > route_error.observations.observations().len());
+    assert!(
+        wrong_kind.observations.observations().len()
+            > route_error.observations.observations().len()
+    );
 
     let tracker = Arc::new(HostSourceFamilyTracker::default());
     let (mut cancelled, _) =
@@ -1542,9 +1587,17 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
         Err(DirectLocalModuleFileError::SourceCompute("source".into())),
         left.dupe(),
     );
-    assert!(complete_direct_local_file(&route_compute).observations.observations().is_empty());
+    assert!(
+        complete_direct_local_file(&route_compute)
+            .observations
+            .observations()
+            .is_empty()
+    );
     assert!(Arc::ptr_eq(
-        complete_direct_local_file(&source_compute).observations.get(&demand).unwrap(),
+        complete_direct_local_file(&source_compute)
+            .observations
+            .get(&demand)
+            .unwrap(),
         &first
     ));
     for value in [&route_compute, &source_compute] {
@@ -1564,9 +1617,13 @@ fn observed_direct_local_file_union_and_complete_algebra_are_fail_closed() {
         let ControlFlow::Break(value) = child else {
             panic!("typed outer must suppress its next child")
         };
-        assert!(matches!(&value, SourcePreparationOutcome::Complete(Err(error)) if error == &outer));
+        assert!(
+            matches!(&value, SourcePreparationOutcome::Complete(Err(error)) if error == &outer)
+        );
         assert!(DirectLocalModuleFileObservationKey::validity(&value));
-        assert!(DirectLocalModuleFileObservationKey::equality(&value, &value));
+        assert!(DirectLocalModuleFileObservationKey::equality(
+            &value, &value
+        ));
     }
 }
 
@@ -1614,9 +1671,9 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
     ));
 
     let child_value = cold
-        .compute(&DirectLocalModuleFileObservationKey(
-            direct_local_file_key("dep"),
-        ))
+        .compute(&DirectLocalModuleFileObservationKey(direct_local_file_key(
+            "dep",
+        )))
         .await
         .unwrap();
     let child = complete_direct_local_file(&child_value);
@@ -1625,7 +1682,11 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
         assert!(Arc::ptr_eq(child.observations.get(demand).unwrap(), result));
     }
     let activations = tracker.take();
-    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    let has = |prefix: &str| {
+        activations
+            .iter()
+            .any(|entry| entry.key.starts_with(prefix))
+    };
     for expected in [
         "observed-direct-local-module-inspection:",
         "observed-direct-local-module-file:",
@@ -1651,9 +1712,11 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
         .filter(|entry| entry.kind == ActivationKind::Evaluated && entry.batch.is_some())
         .collect::<Vec<_>>();
     assert_eq!(owners.len(), 1);
-    assert!(owners[0]
-        .key
-        .starts_with("bzlmod-observed-host-root-module-file:"));
+    assert!(
+        owners[0]
+            .key
+            .starts_with("bzlmod-observed-host-root-module-file:")
+    );
 
     let warm = cold.compute(&key).await.unwrap();
     assert!(DirectLocalModuleInspectionObservationKey::equality(
@@ -1670,10 +1733,12 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
         panic!("legacy direct-local inspection must complete")
     };
     assert_eq!(legacy.as_ref(), cold_observed.result.as_ref());
-    assert!(!tracker
-        .take()
-        .iter()
-        .any(|entry| entry.key.contains("observed-")));
+    assert!(
+        !tracker
+            .take()
+            .iter()
+            .any(|entry| entry.key.contains("observed-"))
+    );
 
     for (bytes, expected, variant) in [
         (
@@ -1687,7 +1752,10 @@ async fn observed_direct_local_inspection_preserves_arcs_events_families_and_lif
         let (mut transaction, _) =
             direct_local_file_transaction(&dice, "dep", bytes, None, variant, None).await;
         let value = transaction.compute(&key).await.unwrap();
-        let actual = match complete_observed_direct_local_inspection(&value).result.as_ref() {
+        let actual = match complete_observed_direct_local_inspection(&value)
+            .result
+            .as_ref()
+        {
             Ok(DirectLocalModuleInspection(_, inspection)) => inspection
                 .as_ref()
                 .and_then(|inspection| inspection.includes.first())
@@ -1706,12 +1774,17 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
         direct_local_file_transaction(&dice, "dep", Some(b""), None, 40, None).await;
     let mut updater = route_need.into_updater();
     updater
-        .changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::empty(),
+        )])
         .unwrap();
     let mut route_need = updater.commit().await;
     let route_need = route_need.compute(&key).await.unwrap();
     assert!(matches!(route_need, SourcePreparationOutcome::Need(_)));
-    assert!(!DirectLocalModuleInspectionObservationKey::validity(&route_need));
+    assert!(!DirectLocalModuleInspectionObservationKey::validity(
+        &route_need
+    ));
     assert!(!DirectLocalModuleInspectionObservationKey::equality(
         &route_need,
         &route_need
@@ -1728,9 +1801,9 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
     ));
     assert!(!semantic.observations.observations().is_empty());
     let semantic_child = semantic_transaction
-        .compute(&DirectLocalModuleFileObservationKey(
-            direct_local_file_key("missing"),
-        ))
+        .compute(&DirectLocalModuleFileObservationKey(direct_local_file_key(
+            "missing",
+        )))
         .await
         .unwrap();
     assert_eq!(
@@ -1738,15 +1811,8 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
         complete_direct_local_file(&semantic_child).observations
     );
 
-    let (mut invalid, _) = direct_local_file_transaction(
-        &dice,
-        "dep",
-        Some(b"include(\n"),
-        None,
-        42,
-        None,
-    )
-    .await;
+    let (mut invalid, _) =
+        direct_local_file_transaction(&dice, "dep", Some(b"include(\n"), None, 42, None).await;
     let invalid_value = invalid.compute(&key).await.unwrap();
     let invalid_observed = complete_observed_direct_local_inspection(&invalid_value);
     assert!(matches!(
@@ -1754,9 +1820,9 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
         Err(DirectLocalModuleInspectionError::Inspection(_, _))
     ));
     let invalid_child = invalid
-        .compute(&DirectLocalModuleFileObservationKey(
-            direct_local_file_key("dep"),
-        ))
+        .compute(&DirectLocalModuleFileObservationKey(direct_local_file_key(
+            "dep",
+        )))
         .await
         .unwrap();
     assert_eq!(
@@ -1771,10 +1837,12 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
         result: semantic_arc.dupe(),
         observations: PathObservationEpoch::empty(),
     }));
-    assert!(complete_observed_direct_local_inspection(&carrier)
-        .observations
-        .observations()
-        .is_empty());
+    assert!(
+        complete_observed_direct_local_inspection(&carrier)
+            .observations
+            .observations()
+            .is_empty()
+    );
     let SourcePreparationOutcome::Complete(projected) =
         project_legacy_direct_local_inspection(carrier)
     else {
@@ -1798,7 +1866,9 @@ async fn observed_direct_local_inspection_covers_terminals_projection_and_cancel
     ) else {
         panic!("file typed outer must suppress inspection")
     };
-    assert!(matches!(&outer_value, SourcePreparationOutcome::Complete(Err(error)) if error == &outer));
+    assert!(
+        matches!(&outer_value, SourcePreparationOutcome::Complete(Err(error)) if error == &outer)
+    );
     assert!(DirectLocalModuleInspectionObservationKey::validity(
         &outer_value
     ));
@@ -1917,9 +1987,7 @@ fn observed_horizon_epoch(
         NormalizedAbsolutePath::new(format!("/workspace/dep/{name}/BUILD.bazel")).unwrap(),
         PathObservationOperation::Lstat,
     );
-    let result = Arc::new(PathObservationResult::Lstat(
-        PathOperationResult::Missing,
-    ));
+    let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
     let epoch = PathObservationEpoch::from_shared([(demand.dupe(), result.dupe())]).unwrap();
     (demand, result, epoch)
 }
@@ -1942,13 +2010,12 @@ fn observed_horizon_reducer_is_prefix_bounded_left_first_and_complete_only() {
     let packages = vec![p.package.clone(), q.package.clone(), r.package.clone()];
     let (p_demand, p_result, p_epoch) = observed_horizon_epoch("p");
     let (_, _, q_epoch) = observed_horizon_epoch("q");
-    let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
-        PathObservationDemand::new(
+    let path_need =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
             PathObservationNamespace::Host,
             NormalizedAbsolutePath::new("/workspace/dep/p/pending").unwrap(),
             PathObservationOperation::Lstat,
-        ),
-    ));
+        )));
     let outer = ObservedPathFrontierError::Epoch(
         slug_workspace_v2::PathObservationEpochError::OperationMismatch {
             demand: PathObservationDemand::new(
@@ -2045,8 +2112,7 @@ fn observed_horizon_reducer_is_prefix_bounded_left_first_and_complete_only() {
             )
     );
     let equal = Arc::new(p_result.as_ref().clone());
-    let equal_epoch =
-        PathObservationEpoch::from_shared([(p_demand.dupe(), equal)]).unwrap();
+    let equal_epoch = PathObservationEpoch::from_shared([(p_demand.dupe(), equal)]).unwrap();
     let successes = batch(
         observed_horizon_lookup(
             ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
@@ -2063,11 +2129,10 @@ fn observed_horizon_reducer_is_prefix_bounded_left_first_and_complete_only() {
             .unwrap(),
         &p_result
     ));
-    let different = Arc::new(PathObservationResult::Lstat(
-        PathOperationResult::Error(PathObservationError::NotALink),
-    ));
-    let conflict_epoch =
-        PathObservationEpoch::from_shared([(p_demand.dupe(), different)]).unwrap();
+    let different = Arc::new(PathObservationResult::Lstat(PathOperationResult::Error(
+        PathObservationError::NotALink,
+    )));
+    let conflict_epoch = PathObservationEpoch::from_shared([(p_demand.dupe(), different)]).unwrap();
     let conflict = batch(
         observed_horizon_lookup(
             ExternalRepositoryPackageLookup::Package(HostBuildFileName::BuildDotBazel),
@@ -2091,9 +2156,7 @@ fn observed_horizon_reducer_is_prefix_bounded_left_first_and_complete_only() {
         Ok(SourcePreparationOutcome::Need(bootstrap_need)),
         success(),
     );
-    let SourcePreparationOutcome::Need(union) =
-        reduce(needs, PathObservationEpoch::empty())
-    else {
+    let SourcePreparationOutcome::Need(union) = reduce(needs, PathObservationEpoch::empty()) else {
         panic!("full batch Needs must be unioned")
     };
     assert!(union.path_observations().is_some());
@@ -2161,7 +2224,11 @@ async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle
     }
     assert_exact_epoch(&expected, &observed.observations);
     let activations = tracker.take();
-    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    let has = |prefix: &str| {
+        activations
+            .iter()
+            .any(|entry| entry.key.starts_with(prefix))
+    };
     for prefix in [
         "observed-direct-local-include-package-horizon:",
         "observed-direct-local-module-inspection:",
@@ -2187,9 +2254,19 @@ async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle
         .map(|entry| (entry.key.as_str(), entry.batch.as_ref().unwrap()))
         .collect::<Vec<_>>();
     assert_eq!(event_owners.len(), 3, "{event_owners:?}");
-    assert!(event_owners[0].0.starts_with("bzlmod-observed-host-root-module-file:"));
-    assert!(event_owners[1..].iter().all(|(key, _)| key.starts_with("observed-host-route-repo-file:")));
-    assert!(matches!(event_owners[0].1.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "ROOT"));
+    assert!(
+        event_owners[0]
+            .0
+            .starts_with("bzlmod-observed-host-root-module-file:")
+    );
+    assert!(
+        event_owners[1..]
+            .iter()
+            .all(|(key, _)| key.starts_with("observed-host-route-repo-file:"))
+    );
+    assert!(
+        matches!(event_owners[0].1.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "ROOT")
+    );
     assert!(event_owners[1..].iter().all(|(_, batch)| matches!(batch.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "REPO")));
     let warm = cold.compute(&key).await.unwrap();
     assert!(Arc::ptr_eq(
@@ -2197,15 +2274,20 @@ async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle
         &complete_observed_direct_local_horizon(&warm).result
     ));
     assert!(tracker.take().iter().all(|entry| entry.batch.is_none()));
-    let legacy = cold.compute(&direct_local_horizon_key("dep")).await.unwrap();
+    let legacy = cold
+        .compute(&direct_local_horizon_key("dep"))
+        .await
+        .unwrap();
     let SourcePreparationOutcome::Complete(legacy) = legacy else {
         panic!("legacy horizon must complete")
     };
     assert_eq!(legacy.as_ref(), observed.result.as_ref());
-    assert!(!tracker
-        .take()
-        .iter()
-        .any(|entry| entry.key.contains("observed-")));
+    assert!(
+        !tracker
+            .take()
+            .iter()
+            .any(|entry| entry.key.contains("observed-"))
+    );
     let (mut changed, _) =
         direct_local_horizon_transaction(&dice, module, &[("p", true), ("q", false)], 52, None)
             .await;
@@ -2255,9 +2337,11 @@ async fn observed_horizon_preserves_exact_children_events_families_and_lifecycle
         Some(cancelled_tracker.dupe()),
     )
     .await;
-    assert!(complete_observed_direct_local_horizon(&recovered.compute(&key).await.unwrap())
-        .result
-        .is_ok());
+    assert!(
+        complete_observed_direct_local_horizon(&recovered.compute(&key).await.unwrap())
+            .result
+            .is_ok()
+    );
 }
 
 fn direct_local_preparation_key(apparent: &str) -> DirectLocalModulePreparationKey {
@@ -2338,14 +2422,9 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
         key.to_string(),
         "observed-direct-local-module-preparation:\"/workspace\":@dep"
     );
-    let (mut cold, _) = direct_local_preparation_transaction(
-        &dice,
-        module,
-        &fragments,
-        61,
-        Some(tracker.dupe()),
-    )
-    .await;
+    let (mut cold, _) =
+        direct_local_preparation_transaction(&dice, module, &fragments, 61, Some(tracker.dupe()))
+            .await;
     let cold_value = cold.compute(&key).await.unwrap();
     assert!(DirectLocalModulePreparationObservationKey::validity(
         &cold_value
@@ -2391,15 +2470,17 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
             ))
             .await
             .unwrap();
-        expected = merge_path_observations(
-            &expected,
-            complete_observed_source(&source).observations(),
-        )
-        .unwrap();
+        expected =
+            merge_path_observations(&expected, complete_observed_source(&source).observations())
+                .unwrap();
     }
     assert_exact_epoch(&expected, &observed.observations);
     tracker.take();
-    let has = |prefix: &str| activations.iter().any(|entry| entry.key.starts_with(prefix));
+    let has = |prefix: &str| {
+        activations
+            .iter()
+            .any(|entry| entry.key.starts_with(prefix))
+    };
     for expected in [
         "observed-direct-local-module-preparation:",
         "observed-direct-local-module-inspection:",
@@ -2436,13 +2517,19 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
         .filter(|entry| entry.batch.is_some())
         .collect::<Vec<_>>();
     assert_eq!(event_owners.len(), 2, "{event_owners:?}");
-    assert!(event_owners[0]
-        .key
-        .starts_with("bzlmod-observed-host-root-module-file:"));
-    assert!(matches!(event_owners[0].batch.as_ref().unwrap().events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "ROOT"));
-    assert!(event_owners[1..].iter().all(|entry| entry
-        .key
-        .starts_with("observed-host-route-repo-file:")));
+    assert!(
+        event_owners[0]
+            .key
+            .starts_with("bzlmod-observed-host-root-module-file:")
+    );
+    assert!(
+        matches!(event_owners[0].batch.as_ref().unwrap().events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "ROOT")
+    );
+    assert!(
+        event_owners[1..]
+            .iter()
+            .all(|entry| entry.key.starts_with("observed-host-route-repo-file:"))
+    );
     assert!(event_owners[1..].iter().all(|entry| matches!(
         entry.batch.as_ref().unwrap().events(),
         [EvaluationEvent::StarlarkPrint { text, .. }] if text == "REPO"
@@ -2459,7 +2546,12 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
         panic!("legacy preparation must complete")
     };
     assert_eq!(legacy.as_ref(), observed.result.as_ref());
-    assert!(!tracker.take().iter().any(|entry| entry.key.contains("observed-")));
+    assert!(
+        !tracker
+            .take()
+            .iter()
+            .any(|entry| entry.key.contains("observed-"))
+    );
 
     let changed_fragments = [
         ("p/a.MODULE.bazel", Some(p.as_slice())),
@@ -2528,32 +2620,33 @@ async fn observed_preparation_preserves_recursive_arcs_families_events_and_lifec
         Some(cancelled_tracker.dupe()),
     )
     .await;
-    assert!(complete_observed_direct_local_preparation(&recovered.compute(&key).await.unwrap())
-        .result
-        .is_ok());
+    assert!(
+        complete_observed_direct_local_preparation(&recovered.compute(&key).await.unwrap())
+            .result
+            .is_ok()
+    );
 }
 
 #[test]
 fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
-    let slots = [("p", 1), ("q", 2), ("r", 3)]
-        .map(|(package, line)| {
-            let direct = horizon_occurrence(package, line);
-            let occurrence = NonregistryIncludeOccurrence {
-                package: direct.package.package().clone(),
-                target: direct.target.clone(),
-                raw_label: direct.raw_label.clone(),
-                location: direct.location.clone(),
-            };
-            let entry = NonregistryIncludeFrontierEntry {
-                request: NonrootIncludeRequest {
-                    path: occurrence.raw_label.clone(),
-                    location: occurrence.location.clone(),
-                },
-                ancestry: Arc::from([]),
-            };
-            let path = nonregistry_fragment_relative_path(&occurrence);
-            (entry, occurrence, path)
-        });
+    let slots = [("p", 1), ("q", 2), ("r", 3)].map(|(package, line)| {
+        let direct = horizon_occurrence(package, line);
+        let occurrence = NonregistryIncludeOccurrence {
+            package: direct.package.package().clone(),
+            target: direct.target.clone(),
+            raw_label: direct.raw_label.clone(),
+            location: direct.location.clone(),
+        };
+        let entry = NonregistryIncludeFrontierEntry {
+            request: NonrootIncludeRequest {
+                path: occurrence.raw_label.clone(),
+                location: occurrence.location.clone(),
+            },
+            ancestry: Arc::from([]),
+        };
+        let path = nonregistry_fragment_relative_path(&occurrence);
+        (entry, occurrence, path)
+    });
     let frontier = slots
         .iter()
         .map(|(entry, _, _)| entry.clone())
@@ -2567,7 +2660,11 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
         .map(|(_, _, path)| path.clone())
         .collect::<Vec<_>>();
     let (initial_demand, initial_result, initial) = observed_horizon_epoch("initial");
-    let child = [observed_horizon_epoch("p"), observed_horizon_epoch("q"), observed_horizon_epoch("r")];
+    let child = [
+        observed_horizon_epoch("p"),
+        observed_horizon_epoch("q"),
+        observed_horizon_epoch("r"),
+    ];
     let success = |slot: usize| {
         Ok(SourcePreparationOutcome::Complete(Ok((
             Ok(Some((
@@ -2615,10 +2712,7 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
         _ => panic!("expected preparation semantic"),
     };
     for slot in 0..3 {
-        let observed = semantic(reduce(
-            batch(slot, Err("source compute".into())),
-            None,
-        ));
+        let observed = semantic(reduce(batch(slot, Err("source compute".into())), None));
         assert!(matches!(
             observed.result,
             Err(NonregistryPreparationError::Direct(
@@ -2654,22 +2748,21 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
         ));
         assert_eq!(observed.observations.observations().len(), 2 + slot);
         assert!(Arc::ptr_eq(
-            observed
-                .observations
-                .get(&child[slot].0)
-                .unwrap(),
+            observed.observations.get(&child[slot].0).unwrap(),
             &child[slot].1
         ));
     }
-    assert!(Arc::ptr_eq(initial.get(&initial_demand).unwrap(), &initial_result));
+    assert!(Arc::ptr_eq(
+        initial.get(&initial_demand).unwrap(),
+        &initial_result
+    ));
 
-    let path_need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
-        PathObservationDemand::new(
+    let path_need =
+        SourcePreparationNeeds::path(NeedPathObservations::singleton(PathObservationDemand::new(
             PathObservationNamespace::Host,
             NormalizedAbsolutePath::new("/workspace/dep/p/pending").unwrap(),
             PathObservationOperation::Lstat,
-        ),
-    ));
+        )));
     let bootstrap_need =
         SourcePreparationNeeds::root_module_bootstrap(RootModuleBootstrapRequest {
             workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
@@ -2727,14 +2820,11 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
         ));
         assert_eq!(observed.observations.observations().len(), 2 + slot);
 
-        let conflict_result = Arc::new(PathObservationResult::Lstat(
-            PathOperationResult::Error(PathObservationError::NotALink),
-        ));
-        let conflict_epoch = PathObservationEpoch::from_shared([(
-            initial_demand.dupe(),
-            conflict_result,
-        )])
-        .unwrap();
+        let conflict_result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Error(
+            PathObservationError::NotALink,
+        )));
+        let conflict_epoch =
+            PathObservationEpoch::from_shared([(initial_demand.dupe(), conflict_result)]).unwrap();
         let conflict = success(slot).map(|outcome| {
             outcome.map(|result| result.map(|(source, _)| (source, conflict_epoch)))
         });
@@ -2779,16 +2869,12 @@ fn observed_preparation_fragment_reducer_is_prefix_bounded_at_every_slot() {
     ));
 
     let union = path_need.try_union(&bootstrap_need).unwrap();
-    let mut needs = batch(
-        0,
-        Ok(SourcePreparationOutcome::Need(path_need.dupe())),
-    );
+    let mut needs = batch(0, Ok(SourcePreparationOutcome::Need(path_need.dupe())));
     needs.insert(
         paths[1].clone(),
         Ok(SourcePreparationOutcome::Need(bootstrap_need)),
     );
-    let ControlFlow::Break(SourcePreparationOutcome::Need(found)) =
-        reduce(needs, Some(union))
+    let ControlFlow::Break(SourcePreparationOutcome::Need(found)) = reduce(needs, Some(union))
     else {
         panic!("full source Need union")
     };
@@ -2827,14 +2913,9 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         key.to_string(),
         "observed-direct-local-module-evaluation:\"/workspace\":@dep"
     );
-    let (mut cold, _) = direct_local_preparation_transaction(
-        &dice,
-        module,
-        &fragments,
-        71,
-        Some(tracker.dupe()),
-    )
-    .await;
+    let (mut cold, _) =
+        direct_local_preparation_transaction(&dice, module, &fragments, 71, Some(tracker.dupe()))
+            .await;
     let cold_value = cold.compute(&key).await.unwrap();
     let observed = complete_observed_direct_local_evaluation(&cold_value);
     let DirectLocalModuleEvaluation::Supported(evaluated) =
@@ -2852,7 +2933,9 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         "observed-host-repository-source-file:",
     ] {
         assert!(
-            activations.iter().any(|entry| entry.key.starts_with(expected)),
+            activations
+                .iter()
+                .any(|entry| entry.key.starts_with(expected)),
             "missing {expected}"
         );
     }
@@ -2865,7 +2948,9 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         "root-query",
     ] {
         assert!(
-            !activations.iter().any(|entry| entry.key.starts_with(forbidden)),
+            !activations
+                .iter()
+                .any(|entry| entry.key.starts_with(forbidden)),
             "unexpected {forbidden}"
         );
     }
@@ -2874,15 +2959,21 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         .filter(|entry| entry.batch.is_some())
         .collect::<Vec<_>>();
     assert_eq!(event_owners.len(), 3, "{event_owners:?}");
-    assert!(event_owners[0]
-        .key
-        .starts_with("bzlmod-observed-host-root-module-file:"));
-    assert!(event_owners[1]
-        .key
-        .starts_with("observed-host-route-repo-file:"));
-    assert!(event_owners[2]
-        .key
-        .starts_with("observed-direct-local-module-evaluation:"));
+    assert!(
+        event_owners[0]
+            .key
+            .starts_with("bzlmod-observed-host-root-module-file:")
+    );
+    assert!(
+        event_owners[1]
+            .key
+            .starts_with("observed-host-route-repo-file:")
+    );
+    assert!(
+        event_owners[2]
+            .key
+            .starts_with("observed-direct-local-module-evaluation:")
+    );
     let texts = event_owners[2]
         .batch
         .as_ref()
@@ -2935,7 +3026,12 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         panic!("legacy evaluation must complete")
     };
     assert_eq!(legacy.as_ref(), observed.result.as_ref());
-    assert!(!tracker.take().iter().any(|entry| entry.key.contains("observed-")));
+    assert!(
+        !tracker
+            .take()
+            .iter()
+            .any(|entry| entry.key.contains("observed-"))
+    );
 
     let changed_fragments = [(
         "p/a.MODULE.bazel",
@@ -2949,11 +3045,12 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
             .result
             .as_ref()
     );
-    let (mut absent, _) =
-        direct_local_file_transaction(&dice, "dep", None, None, 73, None).await;
+    let (mut absent, _) = direct_local_file_transaction(&dice, "dep", None, None, 73, None).await;
     let absent_value = absent.compute(&key).await.unwrap();
     assert!(matches!(
-        complete_observed_direct_local_evaluation(&absent_value).result.as_ref(),
+        complete_observed_direct_local_evaluation(&absent_value)
+            .result
+            .as_ref(),
         Err(DirectLocalModuleEvaluationError::RootAbsent { .. })
     ));
     let absent_preparation = absent
@@ -3020,7 +3117,9 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         .await
         .unwrap();
     assert!(matches!(
-        complete_observed_direct_local_evaluation(&cycle_value).result.as_ref(),
+        complete_observed_direct_local_evaluation(&cycle_value)
+            .result
+            .as_ref(),
         Ok(DirectLocalModuleEvaluation::Unsupported(_))
     ));
     assert_exact_epoch(
@@ -3055,9 +3154,11 @@ async fn observed_evaluation_forwards_exact_preparation_events_families_and_life
         Some(cancelled_tracker.dupe()),
     )
     .await;
-    assert!(complete_observed_direct_local_evaluation(&recovered.compute(&key).await.unwrap())
-        .result
-        .is_ok());
+    assert!(
+        complete_observed_direct_local_evaluation(&recovered.compute(&key).await.unwrap())
+            .result
+            .is_ok()
+    );
 
     let need_tracker = Arc::new(HostSourceFamilyTracker::default());
     let need_dice = Dice::builder().build(DetectCycles::Enabled);
@@ -3111,9 +3212,8 @@ fn observed_evaluation_projection_prefix_and_outer_algebra_are_exact() {
     ));
     assert!(direct_local_evaluation_publishes_batch(&full));
     let need = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand.dupe()));
-    let need_child = direct_local_evaluation_observed_child(SourcePreparationOutcome::Need(
-        need.dupe(),
-    ));
+    let need_child =
+        direct_local_evaluation_observed_child(SourcePreparationOutcome::Need(need.dupe()));
     assert!(matches!(
         need_child,
         ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == need
@@ -3129,14 +3229,18 @@ fn observed_evaluation_projection_prefix_and_outer_algebra_are_exact() {
     ) else {
         panic!("typed outer must stop evaluation")
     };
-    assert!(DirectLocalModuleEvaluationObservationKey::validity(&outer_value));
+    assert!(DirectLocalModuleEvaluationObservationKey::validity(
+        &outer_value
+    ));
     assert!(DirectLocalModuleEvaluationObservationKey::equality(
         &outer_value,
         &outer_value
     ));
     assert!(!direct_local_evaluation_publishes_batch(&outer_value));
     let need_value = SourcePreparationOutcome::Need(need);
-    assert!(!DirectLocalModuleEvaluationObservationKey::validity(&need_value));
+    assert!(!DirectLocalModuleEvaluationObservationKey::validity(
+        &need_value
+    ));
     assert!(!DirectLocalModuleEvaluationObservationKey::equality(
         &need_value,
         &need_value
@@ -3166,5 +3270,961 @@ fn observed_evaluation_projection_prefix_and_outer_algebra_are_exact() {
             message: "ordinary".into(),
         }),
     );
-    assert!(matches!(ordinary, Err(DirectLocalModuleSupportError { .. })));
+    assert!(matches!(
+        ordinary,
+        Err(DirectLocalModuleSupportError { .. })
+    ));
+}
+
+fn observed_preflight_key(package: &str) -> HostNonregistryPackagePreflightObservationKey {
+    HostNonregistryPackagePreflightObservationKey(nonregistry_preflight(package))
+}
+
+fn complete_observed_preflight(
+    value: &<HostNonregistryPackagePreflightObservationKey as Key>::Value,
+) -> &ObservedHostNonregistryPackagePreflight {
+    let SourcePreparationOutcome::Complete(Ok(value)) = value else {
+        panic!("observed package preflight must complete semantically: {value:?}")
+    };
+    value
+}
+
+fn preflight_marker_key(marker: &str) -> RepositorySourceFileObservationKey {
+    RepositorySourceFileObservationKey(RepositorySourceFileKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        repo_relative_path: PathBuf::from("pkg").join(marker),
+    })
+}
+
+fn preflight_need(name: &str) -> SourcePreparationNeeds {
+    let (demand, _, _) = observed_horizon_epoch(name);
+    SourcePreparationNeeds::path(NeedPathObservations::singleton(demand))
+}
+
+async fn complete_preflight_transaction(
+    mut transaction: dice::DiceTransaction,
+    immutable: bool,
+) -> dice::DiceTransaction {
+    let mut epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+    if immutable {
+        let root =
+            "bazel_dep(name = 'dep', version = '1')\narchive_override(module_name = 'dep')\n";
+        let host = horizon_epoch(
+            root,
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            None,
+            None,
+            None,
+            None,
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            &[],
+            1,
+        );
+        epoch = merge_path_observations(&epoch, &host).unwrap();
+    }
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/MODULE.bazel.lock").unwrap(),
+        PathObservationOperation::Lstat,
+    );
+    let lockfile = PathObservationEpoch::from_shared([(
+        demand,
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+    )])
+    .unwrap();
+    let epoch = merge_path_observations(&epoch, &lockfile).unwrap();
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    updater.commit().await
+}
+
+#[test]
+fn observed_preflight_identity_projection_and_outer_algebra_are_exact() {
+    use std::hash::Hash;
+    use std::hash::Hasher;
+
+    let key = observed_preflight_key("pkg");
+    let other = observed_preflight_key("other");
+    assert_ne!(key, other);
+    assert_eq!(
+        key.to_string(),
+        "observed-host-nonregistry-package-preflight:dep@1//pkg"
+    );
+    let hash = |key: &HostNonregistryPackagePreflightObservationKey| {
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut state);
+        state.finish()
+    };
+    assert_ne!(hash(&key), hash(&other));
+
+    let (_, _, observations) = observed_horizon_epoch("carrier");
+    let semantic = Arc::new(Ok(HostNonregistryPackagePreflight::NoBuildFile));
+    let carrier = ObservedHostNonregistryPackagePreflight {
+        result: semantic.dupe(),
+        observations: observations.dupe(),
+    };
+    let carrier_dupe = carrier.dupe();
+    assert!(Arc::ptr_eq(carrier.result(), carrier_dupe.result()));
+    assert_exact_epoch(carrier.observations(), carrier_dupe.observations());
+    let legacy = project_preflight_legacy(SourcePreparationOutcome::Complete(Ok((
+        semantic.dupe(),
+        observations.dupe(),
+    ))));
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy projection must complete")
+    };
+    assert!(Arc::ptr_eq(&semantic, &legacy));
+
+    let need = SourcePreparationOutcome::Need(preflight_need("need"));
+    assert!(!HostNonregistryPackagePreflightObservationKey::validity(
+        &need
+    ));
+    assert!(!HostNonregistryPackagePreflightObservationKey::equality(
+        &need, &need
+    ));
+    let (demand, _, _) = observed_horizon_epoch("outer");
+    let frontier = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand,
+            result_operation: PathObservationOperation::FileBytes,
+        },
+    );
+    let compute = [
+        (
+            HostNonregistryPackagePreflightObservationError::effective_compute(
+                "effective".into(),
+            ),
+            HostNonregistryPackagePreflightObservationError::EffectiveCompute(
+                "effective".into(),
+            ),
+        ),
+        (
+            HostNonregistryPackagePreflightObservationError::policy_compute("policy".into()),
+            HostNonregistryPackagePreflightObservationError::PolicyCompute("policy".into()),
+        ),
+        (
+            HostNonregistryPackagePreflightObservationError::ignore_compute("ignore".into()),
+            HostNonregistryPackagePreflightObservationError::IgnoreCompute("ignore".into()),
+        ),
+        (
+            HostNonregistryPackagePreflightObservationError::marker_compute(
+                HostBuildFileName::Build,
+                "marker".into(),
+            ),
+            HostNonregistryPackagePreflightObservationError::MarkerCompute {
+                marker: HostBuildFileName::Build,
+                message: "marker".into(),
+            },
+        ),
+    ];
+    let frontiers = [
+        HostNonregistryPackagePreflightObservationError::EffectiveFrontier(frontier.dupe()),
+        HostNonregistryPackagePreflightObservationError::IgnoreFrontier(frontier.dupe()),
+        HostNonregistryPackagePreflightObservationError::MarkerFrontier {
+            marker: HostBuildFileName::BuildDotBazel,
+            error: frontier.dupe(),
+        },
+    ];
+    for outer in frontiers.into_iter().chain(compute.into_iter().map(
+        |(actual, expected)| {
+            assert_eq!(actual, expected);
+            actual
+        },
+    )) {
+        let value = preflight_outer(outer).map(|result| {
+            result.map(
+                |(result, observations)| ObservedHostNonregistryPackagePreflight {
+                    result,
+                    observations,
+                },
+            )
+        });
+        assert!(HostNonregistryPackagePreflightObservationKey::validity(
+            &value
+        ));
+        assert!(HostNonregistryPackagePreflightObservationKey::equality(
+            &value, &value
+        ));
+    }
+
+    let (_, _, semantic_prefix) = observed_horizon_epoch("semantic-prefix");
+    for result in [
+        Err(HostNonregistryPackagePreflightError::RootModuleFiles(
+            "root".into(),
+        )),
+        Err(HostNonregistryPackagePreflightError::NonregistryOverrideRequired("dep".into())),
+        Err(HostNonregistryPackagePreflightError::PolicyInput(
+            crate::RootPackagePolicyProjectionError::MissingInput {
+                workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
+            },
+        )),
+        Err(HostNonregistryPackagePreflightError::UnsupportedDeletedPackages),
+        Ok(HostNonregistryPackagePreflight::InvalidPackageName {
+            message: "invalid".into(),
+        }),
+    ] {
+        let SourcePreparationOutcome::Complete(Ok((projected, observations))) =
+            preflight_complete(result.clone(), semantic_prefix.dupe())
+        else {
+            panic!("semantic terminal must retain a carrier")
+        };
+        assert_eq!(projected.as_ref(), &result);
+        assert_exact_epoch(&semantic_prefix, &observations);
+    }
+
+    let (duplicate, first, left) = observed_horizon_epoch("duplicate");
+    let equal = Arc::new(first.as_ref().clone());
+    let right = PathObservationEpoch::from_shared([(duplicate.dupe(), equal.dupe())]).unwrap();
+    let merged = merge_path_observations(&left, &right).unwrap();
+    assert!(Arc::ptr_eq(merged.get(&duplicate).unwrap(), &first));
+    let conflict = PathObservationEpoch::from_shared([(
+        duplicate.dupe(),
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::Directory, 1, 1, 1, 1, 0o755),
+        ))),
+    )])
+    .unwrap();
+    assert!(merge_path_observations(&left, &conflict).is_err());
+    assert!(matches!(
+        PathObservationEpoch::from_shared([(
+            duplicate,
+            Arc::new(PathObservationResult::FileBytes(
+                PathOperationResult::Missing,
+            )),
+        )]),
+        Err(slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. })
+    ));
+}
+
+#[tokio::test]
+async fn observed_preflight_preserves_prefix_rows_events_and_legacy_parity() {
+    let dice = Dice::builder().build(DetectCycles::Enabled);
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        None,
+        None,
+        &[],
+        &[],
+        501,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    let key = observed_preflight_key("pkg");
+    let cold = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_preflight(&cold);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Ok(HostNonregistryPackagePreflight::BuildDotBazel)
+    ));
+    let cold_batches = std::mem::take(&mut *tracker.batches.lock().unwrap());
+    let held_result = observed.result().dupe();
+    let held_epoch = observed.observations().dupe();
+    let warm = transaction.compute(&key).await.unwrap();
+    assert!(HostNonregistryPackagePreflightObservationKey::equality(
+        &cold, &warm
+    ));
+    assert!(Arc::ptr_eq(
+        &held_result,
+        complete_observed_preflight(&warm).result()
+    ));
+    assert!(
+        std::mem::take(&mut *tracker.batches.lock().unwrap())
+            .iter()
+            .all(|(_, _, batch)| batch.is_none())
+    );
+
+    let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        "dep".into(),
+    );
+    let effective = transaction.compute(&effective_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(Ok(effective)) = effective else {
+        panic!("effective override must complete")
+    };
+    let ignore_key =
+        HostNonregistryRepositoryIgnoreObservationKey(HostNonregistryRepositoryIgnoreKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            NonrootModuleKey::new("dep", "1"),
+        ));
+    let ignore = transaction.compute(&ignore_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(Ok(ignore)) = ignore else {
+        panic!("ignore must complete")
+    };
+    let marker_key = preflight_marker_key("BUILD.bazel");
+    let marker = transaction.compute(&marker_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(Ok(marker)) = marker else {
+        panic!("marker must complete")
+    };
+    let expected =
+        merge_path_observations(effective.observations(), ignore.observations()).unwrap();
+    let expected = merge_path_observations(&expected, marker.observations()).unwrap();
+    assert_exact_epoch(&expected, &held_epoch);
+    assert_selected_epoch(&mut transaction, &expected, &held_epoch).await;
+
+    let policy_key = CanonicalDeletedPackagesProjectionKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let expected_row = vec![
+        effective_key.to_string(),
+        policy_key.to_string(),
+        ignore_key.to_string(),
+        marker_key.to_string(),
+    ];
+    let rows = tracker.rows.lock().unwrap();
+    let observed_row = rows
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .expect("observed preflight dependency row");
+    assert_eq!(observed_row.1, expected_row);
+    drop(rows);
+
+    let preflight = tracker.preflight.lock().unwrap();
+    assert!(
+        preflight
+            .iter()
+            .any(|(kind, eventless)| *kind == ActivationKind::Evaluated && *eventless)
+    );
+    assert!(preflight.iter().all(|(_, eventless)| *eventless));
+    drop(preflight);
+    assert!(
+        tracker
+            .repo
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|(kind, eventless)| *kind == ActivationKind::Evaluated && !*eventless)
+    );
+    let eventful = cold_batches
+        .iter()
+        .filter_map(|(owner, kind, batch)| {
+            (*kind == ActivationKind::Evaluated)
+                .then_some(batch.as_ref().map(|batch| (owner.as_str(), batch.events())))
+                .flatten()
+        })
+        .collect::<Vec<_>>();
+    assert!(matches!(
+        eventful.as_slice(),
+        [(root, []), (repo, [])]
+            if root.starts_with("bzlmod-observed-host-root-module-file:")
+                && repo.starts_with("observed-host-nonregistry-repo-file:")
+    ));
+    for forbidden in [
+        "host-nonregistry-module-closure:",
+        "host-discovered-module:",
+        "host-selected-module-graph:",
+        "module-source-preparation:",
+        "registry-file:",
+        "host-selected-extension-",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, deps)| {
+            !owner.starts_with(forbidden) && deps.iter().all(|dep| !dep.starts_with(forbidden))
+        }));
+    }
+    tracker.batches.lock().unwrap().clear();
+    let mut legacy_tx = host_nonregistry_transaction(
+        &dice,
+        None,
+        None,
+        &[],
+        &[],
+        501,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let legacy = legacy_tx
+        .compute(&nonregistry_preflight("pkg"))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy preflight must complete")
+    };
+    assert_eq!(legacy.as_ref(), held_result.as_ref());
+    let legacy_key = nonregistry_preflight("pkg");
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        legacy_row,
+        vec![
+            effective_key
+                .to_string()
+                .trim_start_matches("observed-")
+                .to_owned(),
+            policy_key.to_string(),
+            ignore_key.to_string().trim_start_matches("observed-").to_owned(),
+            marker_key.to_string().trim_start_matches("observed-").to_owned(),
+        ]
+    );
+    let legacy_batches = std::mem::take(&mut *tracker.batches.lock().unwrap());
+    let legacy_eventful = legacy_batches
+        .iter()
+        .filter_map(|(owner, kind, batch)| {
+            (*kind == ActivationKind::Evaluated)
+                .then_some(batch.as_ref().map(|batch| (owner.as_str(), batch.events())))
+                .flatten()
+        })
+        .collect::<Vec<_>>();
+    assert!(matches!(
+        legacy_eventful.as_slice(),
+        [(root, []), (repo, [])]
+            if root.starts_with("root-module-evaluation:")
+                && repo.starts_with("host-nonregistry-repo-file:")
+    ), "{legacy_eventful:?}");
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PreflightStopStage {
+    Effective,
+    Ignore,
+    BuildDotBazel,
+    Build,
+}
+
+fn project_preflight_frontier(
+    stage: PreflightStopStage,
+    error: ObservedPathFrontierError,
+) -> HostNonregistryPackagePreflightObservationError {
+    match stage {
+        PreflightStopStage::Effective => {
+            HostNonregistryPackagePreflightObservationError::EffectiveFrontier(error)
+        }
+        PreflightStopStage::Ignore => {
+            HostNonregistryPackagePreflightObservationError::IgnoreFrontier(error)
+        }
+        PreflightStopStage::BuildDotBazel => {
+            HostNonregistryPackagePreflightObservationError::MarkerFrontier {
+                marker: HostBuildFileName::BuildDotBazel,
+                error,
+            }
+        }
+        PreflightStopStage::Build => {
+            HostNonregistryPackagePreflightObservationError::MarkerFrontier {
+                marker: HostBuildFileName::Build,
+                error,
+            }
+        }
+    }
+}
+
+#[test]
+fn observed_preflight_child_reducer_stops_need_and_outer_at_every_position() {
+    for stage in [
+        PreflightStopStage::Effective,
+        PreflightStopStage::Ignore,
+        PreflightStopStage::BuildDotBazel,
+        PreflightStopStage::Build,
+    ] {
+        let need = preflight_need(&format!("{stage:?}-need"));
+        let stopped = finish_preflight_child::<(), ()>(
+            SourcePreparationOutcome::Need(need.dupe()),
+            |_| panic!("Need must not continue"),
+            |error| project_preflight_frontier(stage, error),
+        );
+        assert!(matches!(
+            stopped,
+            ControlFlow::Break(SourcePreparationOutcome::Need(found)) if found == need
+        ));
+        let (demand, _, _) = observed_horizon_epoch(&format!("{stage:?}-outer"));
+        let frontier = ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand,
+                result_operation: PathObservationOperation::FileBytes,
+            },
+        );
+        let stopped = finish_preflight_child::<(), ()>(
+            SourcePreparationOutcome::Complete(Err(frontier)),
+            |_| panic!("outer must not continue"),
+            |error| project_preflight_frontier(stage, error),
+        );
+        let ControlFlow::Break(SourcePreparationOutcome::Complete(Err(error))) = stopped else {
+            panic!("{stage:?} outer must be carrierless")
+        };
+        assert_eq!(
+            std::mem::discriminant(&error),
+            std::mem::discriminant(&project_preflight_frontier(
+                stage,
+                ObservedPathFrontierError::Epoch(
+                    slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                        demand: observed_horizon_epoch("comparison").0,
+                        result_operation: PathObservationOperation::FileBytes,
+                    },
+                ),
+            ))
+        );
+    }
+}
+
+async fn observed_preflight_case(
+    dice: &Arc<Dice>,
+    fragments: &[(&str, Option<&[u8]>)],
+    needs: &[&str],
+    variant: i64,
+    immutable: Option<(&str, u64, &str)>,
+    wrong_kind: Option<(&str, PathNodeKind)>,
+    tracker: Option<Arc<NonregistryPreflightTracker>>,
+) -> (
+    dice::DiceTransaction,
+    <HostNonregistryPackagePreflightObservationKey as Key>::Value,
+) {
+    let transaction = host_nonregistry_transaction(
+        dice, None, None, fragments, needs, variant, immutable, tracker, wrong_kind, true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, immutable.is_some()).await;
+    let value = transaction
+        .compute(&observed_preflight_key("pkg"))
+        .await
+        .unwrap();
+    (transaction, value)
+}
+
+fn assert_preflight_value(
+    value: &<HostNonregistryPackagePreflightObservationKey as Key>::Value,
+    expected: HostNonregistryPackagePreflight,
+) -> &ObservedHostNonregistryPackagePreflight {
+    let observed = complete_observed_preflight(value);
+    assert_eq!(observed.result().as_ref(), &Ok(expected));
+    observed
+}
+
+async fn preflight_child_epoch(
+    transaction: &mut dice::DiceTransaction,
+    markers: &[&str],
+) -> PathObservationEpoch {
+    let effective = transaction
+        .compute(&HostEffectiveModuleOverrideObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            "dep".into(),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(effective)) = effective else {
+        panic!("effective override must complete")
+    };
+    let ignore = transaction
+        .compute(&HostNonregistryRepositoryIgnoreObservationKey(
+            HostNonregistryRepositoryIgnoreKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                NonrootModuleKey::new("dep", "1"),
+            ),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(ignore)) = ignore else {
+        panic!("repository ignore must complete")
+    };
+    let mut epoch =
+        merge_path_observations(effective.observations(), ignore.observations()).unwrap();
+    for marker in markers {
+        let marker = transaction.compute(&preflight_marker_key(marker)).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(marker)) = marker else {
+            panic!("marker source must complete")
+        };
+        epoch = merge_path_observations(&epoch, marker.observations()).unwrap();
+    }
+    epoch
+}
+
+#[tokio::test]
+async fn observed_preflight_marker_lifecycle_preference_and_cancellation_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let marker = |bytes: &'static [u8]| vec![("pkg/BUILD.bazel", Some(bytes)), ("pkg/BUILD", None)];
+    let (_, a) = observed_preflight_case(&dice, &marker(b"a"), &[], 520, None, None, None).await;
+    let a_observed = assert_preflight_value(&a, HostNonregistryPackagePreflight::BuildDotBazel);
+    let held_result = a_observed.result().dupe();
+    let held_epoch = a_observed.observations().dupe();
+    let (_, b) = observed_preflight_case(&dice, &marker(b"b"), &[], 521, None, None, None).await;
+    let absent = [("pkg/BUILD.bazel", None), ("pkg/BUILD", None)];
+    let (mut absent_tx, absent_value) =
+        observed_preflight_case(&dice, &absent, &[], 522, None, None, None).await;
+    let absent_observed =
+        assert_preflight_value(&absent_value, HostNonregistryPackagePreflight::NoBuildFile);
+    assert_exact_epoch(
+        &preflight_child_epoch(&mut absent_tx, &["BUILD.bazel", "BUILD"]).await,
+        absent_observed.observations(),
+    );
+    let (_, directory) = observed_preflight_case(
+        &dice,
+        &absent,
+        &[],
+        523,
+        None,
+        Some(("pkg/BUILD.bazel", PathNodeKind::Directory)),
+        None,
+    )
+
+    .await;
+    assert_preflight_value(&directory, HostNonregistryPackagePreflight::NoBuildFile);
+    let fallback = [
+        ("pkg/BUILD.bazel", None),
+        ("pkg/BUILD", Some(&b"fallback"[..])),
+    ];
+    let fallback_tracker = Arc::new(NonregistryPreflightTracker::default());
+    let (mut fallback_tx, fallback_value) = observed_preflight_case(
+        &dice,
+        &fallback,
+        &[],
+        524,
+        None,
+        None,
+        Some(fallback_tracker.dupe()),
+    )
+    .await;
+    let fallback_observed =
+        assert_preflight_value(&fallback_value, HostNonregistryPackagePreflight::Build);
+    assert_exact_epoch(
+        &preflight_child_epoch(&mut fallback_tx, &["BUILD.bazel", "BUILD"]).await,
+        fallback_observed.observations(),
+    );
+    let rows = fallback_tracker.rows.lock().unwrap();
+    let row = rows
+        .iter()
+        .find(|(owner, _)| owner == &observed_preflight_key("pkg").to_string())
+        .unwrap();
+    assert_eq!(row.1.len(), 5);
+    assert_eq!(
+        row.1.last().unwrap(),
+        &preflight_marker_key("BUILD").to_string()
+    );
+    let (mut restored_tx, restored) =
+        observed_preflight_case(&dice, &marker(b"a"), &[], 520, None, None, None).await;
+    assert!(!HostNonregistryPackagePreflightObservationKey::equality(
+        &a, &b
+    ));
+    assert!(HostNonregistryPackagePreflightObservationKey::equality(
+        &a, &restored
+    ));
+    assert_eq!(
+        held_result.as_ref(),
+        complete_observed_preflight(&restored).result().as_ref()
+    );
+    assert_eq!(
+        &held_epoch,
+        complete_observed_preflight(&restored).observations(),
+    );
+    let marker_value = restored_tx
+        .compute(&preflight_marker_key("BUILD.bazel"))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(marker_value)) = marker_value else {
+        panic!("restored marker must complete")
+    };
+    for demand in marker_value.observations().observations().keys() {
+        assert!(Arc::ptr_eq(
+            complete_observed_preflight(&restored)
+                .observations()
+                .get(demand)
+                .unwrap(),
+            marker_value.observations().get(demand).unwrap(),
+        ));
+    }
+
+    let immutable = |generation, instance, fragments, wrong_kind| {
+        observed_preflight_case(
+            &dice,
+            fragments,
+            &[],
+            instance as i64,
+            Some((generation, instance, "stable-source")),
+            wrong_kind,
+            None,
+        )
+    };
+    let immutable_a_fragments = [("pkg/BUILD.bazel", Some(&b"a"[..]))];
+    let (_, immutable_a) = immutable("/generation/a", 530, &immutable_a_fragments, None).await;
+    let held_immutable = complete_observed_preflight(&immutable_a).dupe();
+    let immutable_b_fragments = [("pkg/BUILD.bazel", Some(&b"b"[..]))];
+    let (_, immutable_b) = immutable("/generation/b", 531, &immutable_b_fragments, None).await;
+    let immutable_absent_fragments = [("pkg/BUILD.bazel", None)];
+    let (_, immutable_absent) =
+        immutable("/generation/c", 532, &immutable_absent_fragments, None).await;
+    assert_preflight_value(
+        &immutable_absent,
+        HostNonregistryPackagePreflight::NoBuildFile,
+    );
+    let (_, immutable_directory) = immutable(
+        "/generation/d",
+        533,
+        &immutable_absent_fragments,
+        Some(("pkg/BUILD.bazel", PathNodeKind::Directory)),
+    )
+    .await;
+    assert_preflight_value(
+        &immutable_directory,
+        HostNonregistryPackagePreflight::NoBuildFile,
+    );
+    let (_, immutable_restored) =
+        immutable("/generation/a", 530, &immutable_a_fragments, None).await;
+    assert!(!HostNonregistryPackagePreflightObservationKey::equality(
+        &immutable_a,
+        &immutable_b,
+    ));
+    assert!(HostNonregistryPackagePreflightObservationKey::equality(
+        &immutable_a,
+        &immutable_restored,
+    ));
+    assert_eq!(
+        held_immutable,
+        complete_observed_preflight(&immutable_restored).dupe(),
+    );
+
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let cancelled = host_nonregistry_transaction(
+        &dice,
+        None,
+        None,
+        &marker(b"cancel"),
+        &[],
+        540,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut cancelled = complete_preflight_transaction(cancelled, false).await;
+    tracker.preflight.lock().unwrap().clear();
+    tracker.repo.lock().unwrap().clear();
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let key = observed_preflight_key("pkg");
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    drop(future);
+    drop(cancelled);
+    assert!(tracker.preflight.lock().unwrap().is_empty());
+    assert!(tracker.repo.lock().unwrap().is_empty());
+    assert!(tracker.rows.lock().unwrap().is_empty());
+    assert!(tracker.batches.lock().unwrap().is_empty());
+    let (_, recovered) = observed_preflight_case(
+        &dice,
+        &marker(b"cancel"),
+        &[],
+        540,
+        None,
+        None,
+        Some(tracker.dupe()),
+    )
+    .await;
+    assert_preflight_value(&recovered, HostNonregistryPackagePreflight::BuildDotBazel);
+}
+
+#[tokio::test]
+async fn observed_preflight_semantic_terminals_keep_decisive_prefixes() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        None,
+        None,
+        &[],
+        &[],
+        550,
+        None,
+        Some(tracker.dupe()),
+        None,
+        false,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    let invalid_key = observed_preflight_key("bad:name");
+    let invalid = transaction.compute(&invalid_key).await.unwrap();
+    let invalid = complete_observed_preflight(&invalid);
+    assert!(matches!(
+        invalid.result().as_ref(),
+        Ok(HostNonregistryPackagePreflight::InvalidPackageName { message })
+            if message.contains("Invalid package name")
+    ));
+    let invalid_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &invalid_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(invalid_row.len(), 1);
+    assert!(invalid_row[0].starts_with("observed-host-effective-module-override:"));
+
+    tracker.rows.lock().unwrap().clear();
+    let mut updater = transaction.into_updater();
+    inject_root_package_policy_inputs(
+        &mut updater,
+        RootPackagePolicyInputs::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            [NormalizedAbsolutePath::new("/workspace").unwrap()],
+            ["@dep+//pkg"],
+            None,
+            Some("warning"),
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let mut deleted_tx = updater.commit().await;
+    let deleted = deleted_tx
+        .compute(&observed_preflight_key("pkg"))
+        .await
+        .unwrap();
+    let deleted = complete_observed_preflight(&deleted);
+    assert!(matches!(
+        deleted.result().as_ref(),
+        Err(HostNonregistryPackagePreflightError::UnsupportedDeletedPackages)
+    ));
+    assert_exact_epoch(invalid.observations(), deleted.observations());
+
+    let deleted_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_preflight_key("pkg").to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(deleted_row.len(), 2);
+    assert_eq!(
+        deleted_row[1],
+        CanonicalDeletedPackagesProjectionKey::new(NormalizedAbsolutePath::new("/workspace").unwrap()).to_string()
+    );
+    let cases: [(&[(&str, Option<&[u8]>)], Option<(&str, PathNodeKind)>); 2] = [
+        (
+            &[
+                ("REPO.bazel", Some(&b"ignore_directories(['pkg'])\n"[..])),
+                ("pkg/BUILD.bazel", Some(&b"unused"[..])),
+            ],
+            None,
+        ),
+        (
+            &[
+                ("REPO.bazel", Some(&b"this is invalid("[..])),
+                ("pkg/BUILD.bazel", Some(&b"unused"[..])),
+            ],
+            None,
+        ),
+    ];
+    for (index, (fragments, wrong_kind)) in cases.into_iter().enumerate() {
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        let (mut transaction, value) = observed_preflight_case(
+            &dice,
+            fragments,
+            &[],
+            560 + index as i64,
+            None,
+            wrong_kind,
+            Some(tracker.dupe()),
+        )
+        .await;
+        let observed = complete_observed_preflight(&value);
+        assert_exact_epoch(
+            &preflight_child_epoch(&mut transaction, &[]).await,
+            observed.observations(),
+        );
+        let expected = match (index, observed.result().as_ref()) {
+            (0, Ok(HostNonregistryPackagePreflight::Ignored)) => true,
+            (1, Err(HostNonregistryPackagePreflightError::RepositoryIgnore(_))) => true,
+            _ => false,
+        };
+        assert!(expected, "{index}: {:?}", observed.result());
+        let row = tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &observed_preflight_key("pkg").to_string())
+            .unwrap()
+            .1
+            .clone();
+        assert_eq!(row.len(), 3);
+    }
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let mut transaction = host_nonregistry_transaction(
+        &dice,
+        None,
+        None,
+        &[],
+        &[],
+        570,
+        None,
+        Some(tracker.dupe()),
+        None,
+        false,
+    )
+    .await;
+    let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+    let file_demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/dep/pkg/BUILD.bazel").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let epoch =
+        PathObservationEpoch::from_shared(epoch.observations().iter().map(|(demand, result)| {
+            if demand == &file_demand {
+                (
+                    demand.dupe(),
+                    Arc::new(PathObservationResult::FileBytes(
+                        PathOperationResult::Error(PathObservationError::NotALink),
+                    )),
+                )
+            } else {
+                (demand.dupe(), result.dupe())
+            }
+        }))
+        .unwrap();
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, epoch)])
+        .unwrap();
+    let mut transaction = complete_preflight_transaction(updater.commit().await, false).await;
+    let value = transaction
+        .compute(&observed_preflight_key("pkg"))
+        .await
+        .unwrap();
+    assert!(matches!(
+        complete_observed_preflight(&value).result().as_ref(),
+        Err(HostNonregistryPackagePreflightError::RepositorySource {
+            marker: HostBuildFileName::BuildDotBazel,
+            ..
+        })
+    ));
+    assert_exact_epoch(
+        &preflight_child_epoch(&mut transaction, &["BUILD.bazel"]).await,
+        complete_observed_preflight(&value).observations(),
+    );
+    let row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_preflight_key("pkg").to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(row.len(), 4);
 }
