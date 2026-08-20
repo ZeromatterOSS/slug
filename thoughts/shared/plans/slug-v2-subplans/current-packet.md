@@ -1,99 +1,127 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-extension-definition-evaluation-observation-frontier-audit`
+Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: 06-analysis-toolchains-and-actions.md
-Accepted implementation: 2e0a19ae
-Accepted design: 9cbcbfc5
-Rust base: 9d2f7a7d
+Scheduling base: 5c1f95fa
+Rust base: 2e0a19ae
+Accepted predecessor design: 9cbcbfc5
 
-## Accepted extension-mappings observation completion
+## Formal smaller-prerequisite REPLAN
 
-Implementation 2e0a19ae completes the private selected-extension-mappings
-observation owner in selected_repo_spec.rs. One Legacy/Observed driver
-preserves selected routes first, root module files second and the unchanged
-extension usage, isolation, import, override and repository-mapping projection.
+The extension definition/evaluation frontier audit selects
+HostSelectedExtensionDefinitionLoadRequestsKey as the uniquely smallest
+remaining reusable association. It is a semantic projection owner, not the
+actual .bzl loader: it consumes selected extension mappings and produces the
+ordered definition requests reused independently by
+HostSelectedExtensionEvaluationInputRequestsKey and
+HostLoadedModuleExtensionDefinitionsKey.
 
-Every Complete child epoch merges immediately left-first before semantic
-inspection, preserving the route-carried exact Result Arc for equal duplicate
-root demands. Route and observed-root Need/outers remain carrierless. Route
-compute/semantic, root compute/semantic and pure mapping terminals retain their
-exact empty/route/full prefixes; legacy root files remain Complete-only.
+HostLoadedModuleExtensionDefinitionsKey also computes HostBzlModuleEvalKey for
+each request. The accepted HostBzlModuleObservationKey already owns the complete
+source/recursive-load epoch and local event batch, so no smaller Bzl observation
+producer is missing. Observing the loader first would still lack the reusable
+request association and would duplicate it for evaluation-input construction.
 
-The mapping parent stays eventless. Its direct root-files child is DICE-reused
-after the routes child and does not replay the accepted root batch. Exact
-observed/legacy direct rows, sole matching root-event owner, reverse-family
-isolation, warm silence, cancellation recovery and held-carrier A -> B -> A
-lifecycles are discriminated.
+HostRootRepositoryMappingKey is a parallel public projection consumed by core
+generated-repository mapping lookup. It does not load definitions or join
+extension evaluation inputs. Defer its observed/public propagation rather than
+combining that public boundary with this smaller prerequisite.
 
-The retained DICE value is exactly one local mapping Result Arc plus one compact
-cumulative epoch. Child carriers, SmallMap/SmallSet/Vec, projection, merge and
-event scratch remain compute-local. No cache, interner, store, lock, task,
-direct Host read, revision/certificate or retained event state was added.
+Keep the new request observation key/carrier private and callerless. Do not edit
+lib.rs or export it now. A later independently designed loading-owner packet
+must decide the single cross-crate handoff: promote/re-export this already
+proved carrier and combine it with HostBzlModuleObservationKey. Premature export
+would widen the Rust API before a consumer is authorized.
 
-Accepted accounting against 9d2f7a7d is +297 production/+469 proof/+766
-aggregate at 10,031 physical lines, within every frozen cap. Focused proof
-passes 3 tests; the full bzlmod suite passes 518 unit tests plus every
-integration/doc target. Formatting, diff hygiene, cleanup/retention, security
-and independent terminal review pass.
+## Exact future implementation authority
 
-## Audit authority
+Future Rust write authority is exactly
+app/slug_bzlmod_v2/src/selected_repo_spec.rs, baseline 10,031 physical lines
+with first #[cfg(test)] at line 4,019. Caps are <=180 production, <=420 proof,
+<=600 aggregate semantic and <=10,700 physical lines. Every helper/test remains
+below 200 lines; the existing selected-repository pipeline remains one cohesive
+large-file exception.
 
-This packet is docs-only. Current rollover write authority is exactly
-canonical/current/Stage 6. Routing remains unchanged because this is an
-ordinary implementation ACCEPT. Future audit write authority is exactly
-canonical/current/Stage 6/routing at net caps <=40/<=220/<=180/<=30 and <=470
-aggregate. Rust, tests, fixtures, oracles, exports and callers are read-only.
+Every other Rust file, including app/slug_bzlmod_v2/src/lib.rs and all
+slug_loading_v2/slug_core_v2 files, is read-only. Do not add a caller, export,
+fixture or oracle.
 
-## Frontier question
+## Frozen owner contract
 
-Trace the accepted mapping carrier through its independent consumers,
-HostSelectedExtensionDefinitionLoadRequestsKey and HostRootRepositoryMappingKey,
-then through extension definition loading, evaluation-input ownership,
-module-extension evaluation, generated repository definitions and
-public/bootstrap consumers only far enough to identify the uniquely smallest
-complete remaining mutable frontier.
+Add private HostSelectedExtensionDefinitionLoadRequestsObservationKey wrapping
+the legacy key and private ObservedHostSelectedExtensionDefinitionLoadRequests.
+The carrier derives Dupe/Allocative, provides borrowed accessors and retains
+exactly one local
+Arc<Result<HostSelectedExtensionDefinitionLoadRequests,
+HostSelectedExtensionDefinitionLoadRequestsError>> plus the exact compact
+mapping epoch.
 
-Do not presume definition-load requests, evaluation inputs, root mapping or an
-extension evaluator is the next owner. Check whether one carrierless definition
-file/load, evaluation input, lockfile association, generated-repository
-projection or event-owning evaluation boundary is a strictly smaller reusable
-prerequisite. Do not invent an umbrella owner or reopen accepted graph,
-repository, route, root-files or extension-mapping owners for uniformity.
+Use one Legacy/Observed semantic driver:
 
-For each candidate, identify:
+1. compute the matching selected-extension-mappings child;
+2. for an observed Complete child, accept its exact epoch before inspecting its
+   semantic Result; and
+3. run the unchanged ordered definition-load-request projection.
 
-- the natural DICE semantic owner and all independent production consumers;
-- exact Legacy/Observed child order, terminal precedence and later suppression;
-- every existing semantic Result Arc and complete path epoch versus any
-  carrierless mutable edge;
-- event ownership, complete batch order, warm reuse and cancellation behavior;
-- retained versus compute-local loads, mappings, evaluation inputs, extension
-  state and generated-repository state;
-- Need/typed-outer polarity and independent A -> B -> A held-carrier
-  lifecycles; and
-- whether accepted lower proof composes or one uniquely smaller bounded
-  evidence/association prerequisite is necessary.
+Legacy selects only HostSelectedExtensionMappingsKey and contributes an empty
+epoch. Observed selects only the accepted private mapping observation sibling.
+Mapping Need/typed outer is immediate and carrierless. Mapping DICE-compute
+failure is the existing semantic MappingsCompute terminal with an empty prefix.
+Mapping semantic error and every Unsupported/Invalid/InvalidContext/success
+projection retain the complete mapping prefix. There is no epoch union, Need
+union, Bzl load or root-files/evaluation step. Legacy projection moves the
+exact local Result Arc.
+
+Need is invalid/self-unequal. Complete semantic values compare by local
+Result+epoch; typed outers compare structurally. Equal semantics with changed
+epoch remain unequal.
+
+## Events, families and retention
+
+The request parent remains eventless. The mapping child and its accepted lower
+root/graph/discovery descendants retain exact batch ownership/order. Observed
+direct rows contain only observed mappings; legacy rows contain only legacy
+mappings. Warm reuse is silent and poll-drop publishes no request value/batch.
+
+Retain only the local request Result Arc plus the compact mapping epoch. The
+existing semantic Result may continue to own its predecessor mapping semantic
+Arc, request slice, imports and overrides. Do not retain the child mapping
+carrier Arc separately. Seen/namespace SmallMaps, request Vec, projection and
+event scratch remain compute-local. Add no cache/interner/store/lock/task,
+direct Host read, revision/certificate or retained event state.
+
+## Required proof
+
+Prove distinct key/hash/Display/accessors and Need/Complete equality/validity;
+exact legacy local Result-Arc projection; production-used mapping child
+finisher and compute/semantic projectors for Need, typed outer, empty/full
+prefixes and later suppression; every reachable pure request projection error
+and success with exact mapping epoch Arcs; exact observed/legacy direct rows,
+reverse-family isolation, complete child owner/batch parity, parent silence and
+warm silence; real poll-drop/no publication/same-DICE recovery; independent
+mapping and pure-request A -> B -> A with held Result/epoch handles; and zero
+Bzl loading, evaluation-input, root-mapping, prepared-input, extension
+evaluation, generated-repository and public/bootstrap activation.
+
+Reuse accepted lower proof. Add no invalid-child hook or oracle.
 
 ## Compatibility and terminal
 
-Preserve admitted Bazel 9 extension mapping, definition load, evaluation and
-generated-repository values, errors, order and events as exact. Private
-typed-outers/shared-Arc epoch association is Slug-native. Public/bootstrap
-breadth, broader extension kinds, M8/M7B and exact identity bytes remain
-deferred unless live evidence selects one as the uniquely smaller M7A
-prerequisite.
+Exact: current admitted definition-request values, errors, ordering, namespaces,
+imports/overrides and child events. Slug-native: the private carrier, typed
+outer and shared-Arc mapping epoch association. Deferred: carrier export,
+definition Bzl loading, evaluation-input/root-files joins, root mapping,
+prepared/evaluated extensions, generated repositories, public/bootstrap,
+M8/M7B and exact identity bytes.
 
-Reach exactly one terminal:
-
-1. one independently reviewed smallest-owner design;
-2. one uniquely smaller bounded evidence/association prerequisite; or
-3. formal REPLAN.
-
-A design may name at most one implementation successor. STOP Rust/test/oracle/
-caller/export work, speculative definition/evaluation/generated/public
-activation, umbrella ownership, milestone closure, M8/M7B work or bypassing
-accepted lower carriers. M7 remains partial and M7A -> M8 -> M7B remains.
+Design ACCEPT schedules exactly
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation`.
+STOP a second Rust file/key, lib.rs or caller/export activation, Bzl/evaluation/
+root-mapping/generated/public work, semantic/event/family/memory drift,
+proof/cap waiver, milestone closure or M8/M7B widening. REPLAN before widening.
+Only after implementation ACCEPT resume the extension definition/evaluation
+frontier. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical accepted extension frontier audit
 

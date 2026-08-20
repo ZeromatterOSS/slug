@@ -11253,3 +11253,61 @@ design may name at most one implementation successor. STOP Rust/test/oracle/
 caller/export work, speculative upper activation, umbrella ownership,
 milestone closure, M8/M7B work or bypassing accepted carriers. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Extension definition/evaluation frontier selects request-association prerequisite (2026-08-20)
+
+The audit from 5c1f95fa formally selects only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-design`,
+with Rust base 2e0a19ae.
+
+HostSelectedExtensionDefinitionLoadRequestsKey is the smallest reusable
+association above accepted extension mappings. Its ordered request projection
+is consumed independently by evaluation-input construction and the loading
+owner. HostLoadedModuleExtensionDefinitionsKey additionally evaluates each Bzl
+definition, but accepted HostBzlModuleObservationKey already owns that complete
+source/recursive-load epoch and event batch. Loading first would still omit and
+duplicate the request association.
+
+HostRootRepositoryMappingKey is a parallel public generated-repository
+projection, not an extension load/evaluation prerequisite. Defer its observed
+public propagation.
+
+Future authority is only
+app/slug_bzlmod_v2/src/selected_repo_spec.rs, baseline 10,031 physical/test
+boundary 4,019, with <=180 production, <=420 proof, <=600 aggregate semantic
+and <=10,700 physical lines; helpers/tests stay below 200. lib.rs, loading/core
+crates, callers, exports, fixtures and oracles remain read-only.
+
+Freeze one private callerless request observation key/carrier retaining exactly
+one local request Result Arc plus the accepted mapping epoch. One
+Legacy/Observed driver computes matching mappings, accepts every observed
+Complete epoch before semantics, then runs the unchanged ordered pure request
+projection. Legacy contributes an empty epoch.
+
+Mapping Need/outer is carrierless; mapping compute is empty-prefix semantic;
+mapping semantic and every pure Unsupported/Invalid/InvalidContext/success
+terminal retain the full mapping prefix. There is no union, Bzl load,
+root-files/evaluation join or public activation. Legacy moves the exact local
+Result Arc.
+
+The parent remains eventless and observed/legacy rows use only matching mapping
+families. Child/lower batches remain exact, warm is silent and cancellation
+publishes no parent state. Retain no child carrier separately; existing
+predecessor/request semantic fields remain inside the local Result, while
+SmallMaps/Vec and projection/event scratch remain compute-local.
+
+Require exact identity/equality/Arc/prefix/pure-terminal proof, family rows and
+complete batch parity, parent/warm/cancel silence, held-carrier lifecycles and
+zero loading/evaluation/root-mapping/prepared/evaluated/generated/public
+activation. Add no invalid-child hook or oracle.
+
+Exact compatibility is current request values/errors/order/namespaces/imports/
+overrides and child events. The private typed outer/shared-Arc epoch is
+Slug-native. Export, loading/evaluation, root mapping, generated/public,
+M8/M7B and identity bytes remain deferred.
+
+Design ACCEPT schedules only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation`.
+STOP a second file/key, lib.rs/caller/export, upper activation, drift, cap/proof
+waiver or milestone closure. After implementation ACCEPT resume only the
+definition/evaluation frontier. M7 remains partial and M7A -> M8 -> M7B remains.
