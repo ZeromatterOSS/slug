@@ -5260,3 +5260,1972 @@ async fn observed_host_closure_terminals_lifecycles_need_cycle_and_cancellation_
         Ok(HostNonregistryModuleClosure::Supported(_))
     ));
 }
+
+fn module_source_complete(
+    value: &<ModuleSourcePreparationObservationKey as Key>::Value,
+) -> &ObservedModuleSourcePreparation {
+    let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+        panic!("observed module source must complete semantically")
+    };
+    observed
+}
+
+#[tokio::test]
+async fn observed_module_source_identity_projection_and_empty_prefix_are_exact() {
+    let observed_key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("relative"),
+        "dep".into(),
+        "1.0".into(),
+    );
+    let legacy_key = ModuleSourcePreparationKey {
+        workspace: PathBuf::from("relative"),
+        module_name: "dep".into(),
+        version: "1.0".into(),
+    };
+    let other = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("relative"),
+        "other".into(),
+        "1.0".into(),
+    );
+    assert_ne!(observed_key, other);
+    assert_ne!(test_hash(&observed_key), test_hash(&other));
+    assert_ne!(observed_key.to_string(), legacy_key.to_string());
+
+    let need: <ModuleSourcePreparationObservationKey as Key>::Value =
+        SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+                PathObservationOperation::FileBytes,
+            )),
+        ));
+    assert!(!ModuleSourcePreparationObservationKey::validity(&need));
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &need, &need
+    ));
+    let outer: <ModuleSourcePreparationObservationKey as Key>::Value =
+        SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::DuplicateDemand(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+                    PathObservationOperation::FileBytes,
+                ),
+            ),
+        )));
+    assert!(ModuleSourcePreparationObservationKey::validity(&outer));
+    assert!(ModuleSourcePreparationObservationKey::equality(
+        &outer, &outer
+    ));
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let mut transaction = dice.updater().commit().await;
+    let outcome = transaction.compute(&observed_key).await.unwrap();
+    let observed = module_source_complete(&outcome);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(ModuleSourcePreparationError::RootModuleFiles(_))
+    ));
+    assert!(observed.observations().observations().is_empty());
+
+    let result = Arc::new(Err(ModuleSourcePreparationError::MissingVersion));
+    let projected = project_legacy_module_source(SourcePreparationOutcome::Complete(Ok((
+        result.dupe(),
+        PathObservationEpoch::empty(),
+    ))));
+    let SourcePreparationOutcome::Complete(projected) = projected else {
+        panic!("legacy projection must complete")
+    };
+    assert!(Arc::ptr_eq(&result, &projected));
+}
+
+#[test]
+fn module_source_merge_preserves_first_arcs_and_rejects_conflicts() {
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/patch.diff").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let first_result = Arc::new(PathObservationResult::FileBytes(
+        PathOperationResult::Present(Arc::from(b"patch".as_slice())),
+    ));
+    let equal_result = Arc::new(first_result.as_ref().clone());
+    let first =
+        PathObservationEpoch::from_shared([(demand.dupe(), first_result.dupe())]).unwrap();
+    let equal = PathObservationEpoch::from_shared([(demand.dupe(), equal_result)]).unwrap();
+    let (accepted, merged) = finish_module_source_observed_child(
+        SourcePreparationOutcome::Complete(Ok(equal)),
+        first.dupe(),
+        |epoch| epoch,
+    )
+    .unwrap();
+    assert_eq!(accepted, merged);
+    assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first_result));
+
+    let conflict = PathObservationEpoch::from_shared([(
+        demand.dupe(),
+        Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(b"other".as_slice())),
+        )),
+    )])
+    .unwrap();
+    assert!(matches!(
+        finish_module_source_observed_child(
+            SourcePreparationOutcome::Complete(Ok(conflict)),
+            first.dupe(),
+            |epoch| epoch,
+        ),
+        Err(SourcePreparationOutcome::Complete(Err(
+            ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::ConflictingDemand(_)
+            )
+        )))
+    ));
+    let mismatch = PathObservationEpoch::from_shared([(
+        demand.dupe(),
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+    )]);
+    assert!(matches!(
+        mismatch,
+        Err(slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            ..
+        })
+    ));
+    let need = SourcePreparationNeeds::path(NeedPathObservations::singleton(demand.dupe()));
+    assert!(matches!(
+        finish_module_source_observed_child::<PathObservationEpoch>(
+            SourcePreparationOutcome::Need(need),
+            first.dupe(),
+            |epoch| epoch,
+        ),
+        Err(SourcePreparationOutcome::Need(_))
+    ));
+    let outer = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::DuplicateDemand(demand.dupe()),
+    );
+    assert!(matches!(
+        finish_module_source_observed_child::<PathObservationEpoch>(
+            SourcePreparationOutcome::Complete(Err(outer)),
+            first.dupe(),
+            |epoch| epoch,
+        ),
+        Err(SourcePreparationOutcome::Complete(Err(
+            ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::DuplicateDemand(_)
+            )
+        )))
+    ));
+
+    let a = SourcePreparationOutcome::Complete(Ok(ObservedModuleSourcePreparation {
+        result: Arc::new(Err(ModuleSourcePreparationError::MissingVersion)),
+        observations: first,
+    }));
+    assert!(ModuleSourcePreparationObservationKey::equality(&a, &a));
+    let same_result_new_epoch = SourcePreparationOutcome::Complete(Ok(
+        ObservedModuleSourcePreparation {
+            result: module_source_complete(&a).result().dupe(),
+            observations: PathObservationEpoch::empty(),
+        },
+    ));
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &a,
+        &same_result_new_epoch
+    ));
+}
+
+#[test]
+fn module_source_stage_projectors_preserve_exact_prefixes_and_outer_classes() {
+    let path = NormalizedAbsolutePath::new("/workspace/patch.diff").unwrap();
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        path.dupe(),
+        PathObservationOperation::FileBytes,
+    );
+    let result = Arc::new(PathObservationResult::FileBytes(
+        PathOperationResult::Present(Arc::from(b"patch".as_slice())),
+    ));
+    let prefix = PathObservationEpoch::from_shared([(demand.dupe(), result.dupe())]).unwrap();
+    for error in [
+        ModuleSourcePreparationError::RootModuleFiles("effective".into()),
+        ModuleSourcePreparationError::SourceCompute(Arc::from("source")),
+        ModuleSourcePreparationError::RegistryPolicyCompute("policy".into()),
+        ModuleSourcePreparationError::RegistryFileCompute {
+            url: RegistryFileUrl::new("https://registry/modules/dep/1/MODULE.bazel"),
+            prior_not_found_attempts: Arc::from([]),
+            message: "registry".into(),
+        },
+        ModuleSourcePreparationError::PatchResolutionCompute {
+            logical_path: path.dupe(),
+            message: "resolution".into(),
+        },
+        ModuleSourcePreparationError::PatchFileCompute {
+            demand: demand.dupe(),
+            message: "file".into(),
+        },
+    ] {
+        let SourcePreparationOutcome::Complete(Ok((actual, observations))) =
+            module_source_error(error.clone(), prefix.dupe())
+        else {
+            panic!("compute errors must complete semantically")
+        };
+        assert_eq!(actual.as_ref(), &Err(error));
+        assert_exact_epoch(&prefix, &observations);
+    }
+
+    let mismatch = ObservedPathFrontierError::Epoch(
+        slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+            demand: demand.dupe(),
+            result_operation: PathObservationOperation::Lstat,
+        },
+    );
+    assert!(matches!(
+        finish_module_source_observed_path::<PathObservationEpoch>(
+            PathOutcome::Complete(Err(mismatch)),
+            prefix.dupe(),
+            |epoch| epoch,
+        ),
+        Err(SourcePreparationOutcome::Complete(Err(
+            ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. }
+            )
+        )))
+    ));
+
+    let before = Some(PathLstat::new(
+        PathNodeKind::RegularFile,
+        1,
+        2,
+        3,
+        4,
+        0o644,
+    ));
+    for (result, expected) in [
+        (
+            Arc::new(PathObservationResult::FileBytes(PathOperationResult::Missing)),
+            "missing",
+        ),
+        (
+            Arc::new(PathObservationResult::FileBytes(PathOperationResult::Error(
+                PathObservationError::NotALink,
+            ))),
+            "error",
+        ),
+    ] {
+        let Err(SourcePreparationOutcome::Complete(Ok((actual, observations)))) =
+            finish_module_source_patch_file(
+                demand.dupe(),
+                result.dupe(),
+                before,
+                PathObservationEpoch::empty(),
+                true,
+            )
+        else {
+            panic!("patch terminal must complete semantically")
+        };
+        assert!(matches!(
+            (expected, actual.as_ref()),
+            ("missing", Err(ModuleSourcePreparationError::PatchFileInconsistentState { .. }))
+                | ("error", Err(ModuleSourcePreparationError::PatchFileObservation { .. }))
+        ));
+        assert!(Arc::ptr_eq(observations.get(&demand).unwrap(), &result));
+    }
+    assert!(matches!(
+        finish_module_source_patch_file(
+            demand,
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing)),
+            before,
+            PathObservationEpoch::empty(),
+            true,
+        ),
+        Err(SourcePreparationOutcome::Complete(Err(
+            ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::OperationMismatch { .. }
+            )
+        )))
+    ));
+}
+
+async fn observed_nonregistry_module_source(
+    dice: &Arc<Dice>,
+    tracker: Arc<NonregistryPreflightTracker>,
+    source: &[u8],
+) -> (
+    dice::DiceTransaction,
+    <ModuleSourcePreparationObservationKey as Key>::Value,
+) {
+    let transaction = host_nonregistry_transaction(
+        dice,
+        Some(source),
+        None,
+        &[],
+        &[],
+        701,
+        None,
+        Some(tracker),
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    let value = transaction
+        .compute(&ModuleSourcePreparationObservationKey::new(
+            PathBuf::from("/workspace"),
+            "dep".into(),
+            "1".into(),
+        ))
+        .await
+        .unwrap();
+    (transaction, value)
+}
+
+#[tokio::test]
+async fn observed_module_source_nonregistry_rows_events_parity_and_lifecycle_are_exact() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let source_a = b"module(name='dep',version='1')\n";
+    let (mut transaction, cold) =
+        observed_nonregistry_module_source(&dice, tracker.dupe(), source_a).await;
+    let observed = module_source_complete(&cold);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Ok(ModuleSourcePreparation::NonRegistry { bytes }) if bytes.as_ref() == source_a
+    ));
+    let held_result = observed.result().dupe();
+    let held_epoch = observed.observations().dupe();
+
+    let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        "dep".into(),
+    );
+    let source_key = RepositorySourceFileObservationKey(RepositorySourceFileKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        repo_relative_path: PathBuf::from("MODULE.bazel"),
+    });
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("observed effective carrier")
+    };
+    let SourcePreparationOutcome::Complete(Ok(source)) =
+        transaction.compute(&source_key).await.unwrap()
+    else {
+        panic!("observed source carrier")
+    };
+    let expected =
+        merge_path_observations(effective.observations(), source.observations()).unwrap();
+    assert_exact_epoch(&expected, &held_epoch);
+    assert_eq!(
+        tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner.starts_with("observed-module-source-preparation:"))
+            .unwrap()
+            .1,
+        vec![effective_key.to_string(), source_key.to_string()]
+    );
+    let cold_batches = std::mem::take(&mut *tracker.batches.lock().unwrap());
+    assert!(cold_batches.iter().any(|(owner, kind, batch)| {
+        owner.starts_with("observed-module-source-preparation:")
+            && *kind == ActivationKind::Evaluated
+            && batch.is_none()
+    }));
+    assert!(cold_batches.iter().all(|(owner, _, batch)| {
+        !owner.starts_with("observed-module-source-preparation:") || batch.is_none()
+    }));
+    let eventful = cold_batches
+        .iter()
+        .filter_map(|(owner, kind, batch)| {
+            (*kind == ActivationKind::Evaluated)
+                .then_some(batch.as_ref().map(|batch| (owner.as_str(), batch.events())))
+                .flatten()
+        })
+        .collect::<Vec<_>>();
+    assert!(matches!(
+        eventful.as_slice(),
+        [(owner, events)]
+            if owner.starts_with("bzlmod-observed-host-root-module-file:")
+                && events.is_empty()
+    ));
+
+    let warm = transaction
+        .compute(&ModuleSourcePreparationObservationKey::new(
+            PathBuf::from("/workspace"),
+            "dep".into(),
+            "1".into(),
+        ))
+        .await
+        .unwrap();
+    assert!(ModuleSourcePreparationObservationKey::equality(&cold, &warm));
+    assert!(Arc::ptr_eq(
+        &held_result,
+        module_source_complete(&warm).result()
+    ));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(_, _, batch)| batch.is_none()));
+
+    let legacy_key = ModuleSourcePreparationKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        version: "1".into(),
+    };
+    let SourcePreparationOutcome::Complete(legacy) =
+        transaction.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("legacy preparation must complete")
+    };
+    assert_eq!(legacy.as_ref(), held_result.as_ref());
+    assert_eq!(
+        tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &legacy_key.to_string())
+            .unwrap()
+            .1,
+        vec![
+            HostEffectiveModuleOverrideKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                "dep".into(),
+            )
+            .to_string(),
+            RepositorySourceFileKey {
+                workspace: PathBuf::from("/workspace"),
+                module_name: "dep".into(),
+                repo_relative_path: PathBuf::from("MODULE.bazel"),
+            }
+            .to_string(),
+        ]
+    );
+
+    let (_, changed) =
+        observed_nonregistry_module_source(&dice, tracker.dupe(), b"module(name='changed')\n")
+            .await;
+    let (mut restored_tx, restored) = observed_nonregistry_module_source(&dice, tracker.dupe(), source_a).await;
+    assert!(!ModuleSourcePreparationObservationKey::equality(&cold, &changed));
+    assert!(ModuleSourcePreparationObservationKey::equality(&cold, &restored));
+    assert_eq!(held_result.as_ref(), module_source_complete(&restored).result().as_ref());
+    let restored = module_source_complete(&restored);
+    assert_eq!(&held_epoch, restored.observations());
+    assert!(!held_epoch.observations().is_empty());
+    for forbidden in [
+        "host-discovered-module:",
+        "host-selected-module-graph:",
+        "host-selected-repo",
+        "host-registry-",
+        "host-selected-extension-",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, deps)| {
+            !owner.starts_with(forbidden) && deps.iter().all(|dep| !dep.starts_with(forbidden))
+        }));
+    }
+    assert_selected_epoch(&mut restored_tx, restored.observations(), restored.observations())
+        .await;
+}
+
+#[tokio::test]
+async fn observed_module_source_nonregistry_absent_and_error_retain_source_prefix() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        None,
+        None,
+        &[],
+        &[],
+        702,
+        None,
+        None,
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    let absent = transaction.compute(&key).await.unwrap();
+    let absent = module_source_complete(&absent);
+    assert!(matches!(
+        absent.result().as_ref(),
+        Err(ModuleSourcePreparationError::ModuleNotFound { module_file_attempts })
+            if module_file_attempts.is_empty()
+    ));
+    assert!(!absent.observations().observations().is_empty());
+
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        Some(b"module(name='dep',version='1')\n"),
+        None,
+        &[],
+        &[],
+        703,
+        None,
+        None,
+        None,
+        true,
+    )
+    .await;
+    let mut transaction = complete_preflight_transaction(transaction, false).await;
+    let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+    let demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    let error = Arc::new(PathObservationResult::FileBytes(PathOperationResult::Error(
+        PathObservationError::NotALink,
+    )));
+    let mut entries = epoch
+        .observations()
+        .iter()
+        .filter(|(candidate, _)| candidate != &&demand)
+        .map(|(candidate, result)| (candidate.dupe(), result.dupe()))
+        .collect::<Vec<_>>();
+    entries.push((demand.dupe(), error.dupe()));
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            PathObservationEpoch::from_shared(entries).unwrap(),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let failed = transaction.compute(&key).await.unwrap();
+    let failed = module_source_complete(&failed);
+    assert!(matches!(
+        failed.result().as_ref(),
+        Err(ModuleSourcePreparationError::Source(
+            RepositorySourceFileError::Observation {
+                operation: PathObservationOperation::FileBytes,
+                error: PathObservationError::NotALink,
+                ..
+            }
+        ))
+    ));
+    assert!(Arc::ptr_eq(failed.observations().get(&demand).unwrap(), &error));
+}
+
+#[derive(Clone)]
+enum ModuleSourceRegistryResponse {
+    Found(Arc<[u8]>),
+    NotFound,
+    Error(&'static str),
+}
+
+struct ModuleSourceRegistryIo {
+    responses: Mutex<std::collections::BTreeMap<String, ModuleSourceRegistryResponse>>,
+    calls: Mutex<Vec<String>>,
+}
+
+impl ModuleSourceRegistryIo {
+    fn new(
+        responses: impl IntoIterator<Item = (impl Into<String>, ModuleSourceRegistryResponse)>,
+    ) -> Self {
+        Self {
+            responses: Mutex::new(
+                responses
+                    .into_iter()
+                    .map(|(url, response)| (url.into(), response))
+                    .collect(),
+            ),
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl crate::RegistryIo for ModuleSourceRegistryIo {
+    async fn read_exact(
+        &self,
+        url: &RegistryFileUrl,
+    ) -> Result<crate::RegistryIoOutcome, crate::RegistryTransportError> {
+        self.calls.lock().unwrap().push(url.as_str().to_owned());
+        match self.responses.lock().unwrap().get(url.as_str()).cloned() {
+            Some(ModuleSourceRegistryResponse::Found(bytes)) => {
+                Ok(crate::RegistryIoOutcome::Found(bytes))
+            }
+            Some(ModuleSourceRegistryResponse::NotFound) | None => {
+                Ok(crate::RegistryIoOutcome::NotFound)
+            }
+            Some(ModuleSourceRegistryResponse::Error(message)) => {
+                Err(crate::RegistryTransportError {
+                    message: message.into(),
+                })
+            }
+        }
+    }
+}
+
+async fn module_source_registry_transaction(
+    dice: &Arc<Dice>,
+    tracker: Arc<NonregistryPreflightTracker>,
+    root_source: &str,
+    registries: &[&str],
+    generation: u64,
+    extra: PathObservationEpoch,
+) -> dice::DiceTransaction {
+    let transaction = host_nonregistry_transaction(
+        dice,
+        None,
+        None,
+        &[],
+        &[],
+        711,
+        None,
+        Some(tracker),
+        None,
+        true,
+    )
+    .await;
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            slug_workspace_v2::WorkspaceSnapshotKey {
+                workspace: PathBuf::from("/workspace"),
+            },
+            Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+                files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                    PathBuf::from("/workspace/MODULE.bazel"),
+                    slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(
+                        root_source.to_owned(),
+                    )),
+                )])),
+            }),
+        )])
+        .unwrap();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            merge_path_observations(&horizon_epoch(
+                root_source,
+                PathObservationNamespace::Host,
+                "/workspace/dep",
+                None,
+                None,
+                None,
+                None,
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                &[],
+                711,
+            ), &extra).unwrap(),
+        )])
+        .unwrap();
+    crate::inject_registry_request_inputs(
+        &mut updater,
+        Path::new("/workspace"),
+        crate::RegistryUrls::new(registries.iter().copied()),
+        crate::RegistryRequestGeneration(generation),
+    )
+    .unwrap();
+    complete_preflight_transaction(updater.commit().await, false).await
+}
+
+async fn module_source_lockfile_transaction(
+    mut transaction: dice::DiceTransaction,
+    mode: crate::LockfileMode,
+    bytes: Option<&[u8]>,
+) -> dice::DiceTransaction {
+    let lockfile_path = NormalizedAbsolutePath::new("/workspace/MODULE.bazel.lock").unwrap();
+    let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+    let mut entries = epoch
+        .observations()
+        .iter()
+        .filter(|(demand, _)| demand.path() != &lockfile_path)
+        .map(|(demand, result)| (demand.dupe(), result.dupe()))
+        .collect::<Vec<_>>();
+    entries.push((
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            lockfile_path.dupe(),
+            PathObservationOperation::Lstat,
+        ),
+        Arc::new(PathObservationResult::Lstat(match bytes {
+            Some(_) => PathOperationResult::Present(PathLstat::new(
+                PathNodeKind::RegularFile,
+                1,
+                2,
+                3,
+                4,
+                0o644,
+            )),
+            None => PathOperationResult::Missing,
+        })),
+    ));
+    if let Some(bytes) = bytes {
+        entries.push((
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                lockfile_path,
+                PathObservationOperation::FileBytes,
+            ),
+            Arc::new(PathObservationResult::FileBytes(PathOperationResult::Present(
+                Arc::from(bytes),
+            ))),
+        ));
+    }
+    let mut updater = transaction.into_updater();
+    updater.changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::from_shared(entries).unwrap())]).unwrap();
+    updater.changed_to(vec![(crate::RootModuleLockfileModeKey { workspace: PathBuf::from("/workspace") }, crate::RootModuleLockfileMode::from(mode))]).unwrap();
+    updater.changed_to(vec![(slug_workspace_v2::WorkspaceRawSnapshotKey { workspace: PathBuf::from("/workspace") }, Arc::new(slug_workspace_v2::WorkspaceRawSnapshot { files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(PathBuf::from("/workspace/MODULE.bazel.lock"), bytes.map(|bytes| slug_workspace_v2::WorkspaceRawFileValue::Present(Arc::from(bytes))).unwrap_or(slug_workspace_v2::WorkspaceRawFileValue::Absent))])) }))]).unwrap();
+    updater.commit().await
+}
+
+async fn observed_registry_file_carrier(
+    transaction: &mut dice::DiceTransaction,
+    url: &str,
+) -> crate::registry_dice::ObservedRegistryFile {
+    let value = transaction
+        .compute(&RegistryFileObservationKey::new(
+            PathBuf::from("/workspace"),
+            RegistryFileUrl::new(url),
+        ))
+        .await
+        .unwrap();
+    let SourcePreparationOutcome::Complete(Ok(value)) = value else {
+        panic!("registry file must complete")
+    };
+    value
+}
+
+#[tokio::test]
+async fn observed_module_source_registry_attempts_prefix_rows_and_errors_are_exact() {
+    let first = "https://first.invalid/modules/dep/1/MODULE.bazel";
+    let second = "https://second.invalid/modules/dep/1/MODULE.bazel";
+    let bytes: Arc<[u8]> = Arc::from(b"module(name='dep',version='1')\n".as_slice());
+    let io = Arc::new(ModuleSourceRegistryIo::new([
+        (first, ModuleSourceRegistryResponse::NotFound),
+        (second, ModuleSourceRegistryResponse::Found(bytes.dupe())),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://first.invalid", "https://second.invalid"],
+        1,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let observed_key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let cold = transaction.compute(&observed_key).await.unwrap();
+    let observed = module_source_complete(&cold);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Ok(ModuleSourcePreparation::Registry {
+            bytes: actual,
+            selected_registry,
+            module_file_attempts,
+        }) if actual == &bytes
+            && selected_registry.as_str() == "https://second.invalid"
+            && module_file_attempts.len() == 2
+            && module_file_attempts[0].url.as_str() == first
+            && module_file_attempts[0].sha256.is_none()
+            && module_file_attempts[1].url.as_str() == second
+            && module_file_attempts[1].sha256.is_some()
+    ));
+    assert_eq!(io.calls.lock().unwrap().as_slice(), [first, second]);
+    let observed_events = std::mem::take(&mut *tracker.batches.lock().unwrap())
+        .into_iter()
+        .filter_map(|(_, kind, batch)| {
+            (kind == ActivationKind::Evaluated).then_some(batch).flatten()
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(observed_events.len(), 1);
+    assert!(observed_events[0].events().is_empty());
+    let warm = transaction.compute(&observed_key).await.unwrap();
+    assert!(ModuleSourcePreparationObservationKey::equality(&cold, &warm));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(_, _, batch)| batch.is_none()));
+    tracker.batches.lock().unwrap().clear();
+
+    let effective_key = HostEffectiveModuleOverrideObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+        "dep".into(),
+    );
+    let policy_key = RegistryPolicyObservationKey::new(PathBuf::from("/workspace"));
+    let first_key = RegistryFileObservationKey::new(
+        PathBuf::from("/workspace"),
+        RegistryFileUrl::new(first),
+    );
+    let second_key = RegistryFileObservationKey::new(
+        PathBuf::from("/workspace"),
+        RegistryFileUrl::new(second),
+    );
+    assert_eq!(
+        tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &observed_key.to_string())
+            .unwrap()
+            .1,
+        vec![
+            effective_key.to_string(),
+            policy_key.to_string(),
+            first_key.to_string(),
+            second_key.to_string(),
+        ]
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        transaction.compute(&effective_key).await.unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    let SourcePreparationOutcome::Complete(Ok(policy)) =
+        transaction.compute(&policy_key).await.unwrap()
+    else {
+        panic!("policy carrier")
+    };
+    let first_file = observed_registry_file_carrier(&mut transaction, first).await;
+    let second_file = observed_registry_file_carrier(&mut transaction, second).await;
+    let expected = merge_path_observations(effective.observations(), policy.observations()).unwrap();
+    let expected = merge_path_observations(&expected, first_file.observations()).unwrap();
+    let expected = merge_path_observations(&expected, second_file.observations()).unwrap();
+    assert_exact_epoch(&expected, observed.observations());
+    let legacy_key = ModuleSourcePreparationKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        version: "1".into(),
+    };
+    let SourcePreparationOutcome::Complete(legacy) =
+        transaction.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("legacy registry preparation must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    assert_eq!(
+        tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &legacy_key.to_string())
+            .unwrap()
+            .1,
+        vec![
+            HostEffectiveModuleOverrideKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                "dep".into(),
+            )
+            .to_string(),
+            RegistryPolicyKey { workspace: PathBuf::from("/workspace") }.to_string(),
+            RegistryFileKey { workspace: PathBuf::from("/workspace"), url: RegistryFileUrl::new(first) }.to_string(),
+            RegistryFileKey { workspace: PathBuf::from("/workspace"), url: RegistryFileUrl::new(second) }.to_string(),
+        ]
+    );
+    let legacy_events = std::mem::take(&mut *tracker.batches.lock().unwrap())
+        .into_iter()
+        .filter_map(|(_, kind, batch)| (kind == ActivationKind::Evaluated).then_some(batch).flatten())
+        .collect::<Vec<_>>();
+    assert_eq!(observed_events, legacy_events);
+    assert!(tracker.batches.lock().unwrap().iter().all(|(owner, _, batch)| {
+        !owner.starts_with("observed-module-source-preparation:") || batch.is_none()
+    }));
+}
+
+#[tokio::test]
+async fn observed_module_source_registry_errors_exhaustion_and_override_are_exact() {
+    let first = "https://first.invalid/modules/dep/1/MODULE.bazel";
+    let second = "https://second.invalid/modules/dep/1/MODULE.bazel";
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let observed_key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let error_io = Arc::new(ModuleSourceRegistryIo::new([
+        (first, ModuleSourceRegistryResponse::NotFound),
+        (second, ModuleSourceRegistryResponse::Error("transport")),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, error_io);
+    let error_dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let mut error_tx = module_source_registry_transaction(
+        &error_dice,
+        Arc::new(NonregistryPreflightTracker::default()),
+        root,
+        &["https://first.invalid", "https://second.invalid"],
+        2,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let error = error_tx.compute(&observed_key).await.unwrap();
+    let error = module_source_complete(&error);
+    assert!(matches!(
+        error.result().as_ref(),
+        Err(ModuleSourcePreparationError::RegistryFile {
+            url,
+            prior_not_found_attempts,
+            error: RegistryFileError::Transport { message, .. },
+        }) if url.as_str() == second
+            && prior_not_found_attempts.len() == 1
+            && message.as_str() == "transport"
+    ));
+    assert!(!error.observations().observations().is_empty());
+
+    let missing_io = Arc::new(ModuleSourceRegistryIo::new([
+        (first, ModuleSourceRegistryResponse::NotFound),
+        (second, ModuleSourceRegistryResponse::NotFound),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, missing_io);
+    let missing_dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let mut missing_tx = module_source_registry_transaction(
+        &missing_dice,
+        Arc::new(NonregistryPreflightTracker::default()),
+        root,
+        &["https://first.invalid", "https://second.invalid"],
+        3,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let missing = missing_tx.compute(&observed_key).await.unwrap();
+    let missing = module_source_complete(&missing);
+    assert!(matches!(
+        missing.result().as_ref(),
+        Err(ModuleSourcePreparationError::ModuleNotFound { module_file_attempts })
+            if module_file_attempts.len() == 2
+                && module_file_attempts.iter().all(|attempt| attempt.sha256.is_none())
+    ));
+
+    let override_url = "https://override.invalid/modules/dep/9/MODULE.bazel";
+    let default_url = "https://default.invalid/modules/dep/9/MODULE.bazel";
+    let override_io = Arc::new(ModuleSourceRegistryIo::new([
+        (
+            override_url,
+            ModuleSourceRegistryResponse::Found(Arc::from(b"override".as_slice())),
+        ),
+        (default_url, ModuleSourceRegistryResponse::Error("must not run")),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, override_io.dupe());
+    let override_dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let override_root = "module(name='root')\n\
+        bazel_dep(name='dep',version='1')\n\
+        single_version_override(module_name='dep',version='9',registry='https://override.invalid')\n";
+    let mut override_tx = module_source_registry_transaction(
+        &override_dice,
+        Arc::new(NonregistryPreflightTracker::default()),
+        override_root,
+        &["https://default.invalid"],
+        4,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let override_key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "9".into(),
+    );
+    let override_value = override_tx.compute(&override_key).await.unwrap();
+    assert!(matches!(
+        module_source_complete(&override_value).result().as_ref(),
+        Ok(ModuleSourcePreparation::Registry {
+            bytes,
+            selected_registry,
+            module_file_attempts,
+        }) if bytes.as_ref() == b"override"
+            && selected_registry.as_str() == "https://override.invalid"
+            && module_file_attempts.len() == 1
+            && module_file_attempts[0].url.as_str() == override_url
+    ));
+    assert_eq!(override_io.calls.lock().unwrap().as_slice(), [override_url]);
+}
+
+#[tokio::test]
+async fn observed_module_source_registry_policy_url_restores_a_b_a_with_held_carriers() {
+    let first_base = "https://first.invalid";
+    let second_base = "https://second.invalid";
+    let first = "https://first.invalid/modules/dep/1/MODULE.bazel";
+    let second = "https://second.invalid/modules/dep/1/MODULE.bazel";
+    let bytes: Arc<[u8]> = Arc::from(b"module(name='dep',version='1')\n".as_slice());
+    let io = Arc::new(ModuleSourceRegistryIo::new([
+        (first, ModuleSourceRegistryResponse::Found(bytes.dupe())),
+        (second, ModuleSourceRegistryResponse::Found(bytes)),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let mut values = Vec::new();
+    for (generation, registry) in [(41, first_base), (42, second_base), (43, first_base)] {
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root,
+            &[registry],
+            generation,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = module_source_complete(&value);
+        assert!(matches!(
+            observed.result().as_ref(),
+            Ok(ModuleSourcePreparation::Registry { selected_registry, .. })
+                if selected_registry.as_str() == registry
+        ));
+        assert_selected_epoch(
+            &mut transaction,
+            observed.observations(),
+            observed.observations(),
+        )
+        .await;
+        values.push(value);
+    }
+    assert!(!ModuleSourcePreparationObservationKey::equality(&values[0], &values[1]));
+    assert!(ModuleSourcePreparationObservationKey::equality(&values[0], &values[2]));
+    let held = module_source_complete(&values[0]);
+    let restored = module_source_complete(&values[2]);
+    assert_eq!(held.result().as_ref(), restored.result().as_ref());
+    assert_eq!(held.observations(), restored.observations());
+    assert!(!held.observations().observations().is_empty());
+}
+
+#[tokio::test]
+async fn observed_module_source_registry_bytes_and_module_epoch_restore_independently() {
+    let module_url = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+    let bytes_a: Arc<[u8]> = Arc::from(b"module(name='dep',version='1')\n".as_slice());
+    let bytes_b: Arc<[u8]> = Arc::from(b"module(name='dep_changed',version='1')\n".as_slice());
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        module_url,
+        ModuleSourceRegistryResponse::Found(bytes_a.dupe()),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let root_a = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut values = Vec::new();
+    for (generation, bytes) in [(61, bytes_a.dupe()), (62, bytes_b), (63, bytes_a.dupe())] {
+        io.responses.lock().unwrap().insert(
+            module_url.to_owned(),
+            ModuleSourceRegistryResponse::Found(bytes),
+        );
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root_a,
+            &["https://registry.invalid"],
+            generation,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        values.push(transaction.compute(&key).await.unwrap());
+    }
+    assert!(!ModuleSourcePreparationObservationKey::equality(&values[0], &values[1]));
+    assert!(ModuleSourcePreparationObservationKey::equality(&values[0], &values[2]));
+    let held = module_source_complete(&values[0]);
+    let restored = module_source_complete(&values[2]);
+    assert_eq!(held.result().as_ref(), restored.result().as_ref());
+    assert_eq!(held.observations(), restored.observations());
+
+    io.responses.lock().unwrap().insert(
+        module_url.to_owned(),
+        ModuleSourceRegistryResponse::Found(bytes_a),
+    );
+    let root_b = "module(name='root')\n# changed\nbazel_dep(name='dep',version='1')\n";
+    let mut roots = Vec::new();
+    for (generation, root) in [(64, root_a), (65, root_b), (66, root_a)] {
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root,
+            &["https://registry.invalid"],
+            generation,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        roots.push(transaction.compute(&key).await.unwrap());
+    }
+    assert!(!ModuleSourcePreparationObservationKey::equality(&roots[0], &roots[1]));
+    assert!(ModuleSourcePreparationObservationKey::equality(&roots[0], &roots[2]));
+    let held = module_source_complete(&roots[0]);
+    let restored = module_source_complete(&roots[2]);
+    assert_eq!(held.result().as_ref(), restored.result().as_ref());
+    assert_eq!(held.observations(), restored.observations());
+
+    let lockfile = br#"{"lockFileVersion":28}"#;
+    let mut lockfiles = Vec::new();
+    for (generation, mode, bytes) in [
+        (67, crate::LockfileMode::Update, None),
+        (68, crate::LockfileMode::Error, None),
+        (69, crate::LockfileMode::Update, None),
+        (70, crate::LockfileMode::Update, Some(lockfile.as_slice())),
+        (71, crate::LockfileMode::Update, None),
+    ] {
+        let transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root_a,
+            &["https://registry.invalid"],
+            generation,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let mut transaction = module_source_lockfile_transaction(transaction, mode, bytes).await;
+        lockfiles.push(transaction.compute(&key).await.unwrap());
+    }
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &lockfiles[0], &lockfiles[1]
+    ));
+    assert!(ModuleSourcePreparationObservationKey::equality(
+        &lockfiles[0], &lockfiles[2]
+    ));
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &lockfiles[2], &lockfiles[3]
+    ));
+    assert!(ModuleSourcePreparationObservationKey::equality(
+        &lockfiles[2], &lockfiles[4]
+    ));
+    let held = module_source_complete(&lockfiles[0]);
+    let restored = module_source_complete(&lockfiles[4]);
+    assert_eq!(held.result().as_ref(), restored.result().as_ref());
+    assert_eq!(held.observations(), restored.observations());
+}
+
+#[tokio::test]
+async fn observed_module_source_resolves_all_patches_then_stops_after_decisive_apply_error() {
+    let module_url = "file:///registry/modules/dep/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        module_url,
+        ModuleSourceRegistryResponse::Found(Arc::from(
+            b"module(name='dep',version='1')\n".as_slice(),
+        )),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let first_path = "/workspace/first.patch";
+    let second_path = "/workspace/second.patch";
+    let patch_lstat = || {
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::RegularFile, 1, 2, 3, 4, 0o644,
+        )))
+    };
+    let patch_demand = |path, operation| {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    let extra = PathObservationEpoch::from_shared([
+        (patch_demand(first_path, PathObservationOperation::Lstat), Arc::new(patch_lstat())),
+        (
+            patch_demand(first_path, PathObservationOperation::FileBytes),
+            Arc::new(PathObservationResult::FileBytes(PathOperationResult::Present(
+                Arc::from(b"not a patch".as_slice()),
+            ))),
+        ),
+        (patch_demand(second_path, PathObservationOperation::Lstat), Arc::new(patch_lstat())),
+    ])
+    .unwrap();
+    let root = "module(name='root')\n\
+        bazel_dep(name='dep',version='1')\n\
+        single_version_override(module_name='dep',version='1',registry='file:///registry',patches=['//:first.patch','//:second.patch'],patch_strip=1)\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["file:///registry"],
+        1,
+        extra,
+    )
+    .await;
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let value = transaction.compute(&key).await.unwrap();
+    let observed = module_source_complete(&value);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(ModuleSourcePreparationError::Patch(_))
+    ));
+    let first = NormalizedAbsolutePath::new(first_path).unwrap();
+    let second = NormalizedAbsolutePath::new(second_path).unwrap();
+    let first_resolution = ResolvedPathObservationKey::new(
+        PathObservationNamespace::Host,
+        first.dupe(),
+    );
+    let second_resolution = ResolvedPathObservationKey::new(
+        PathObservationNamespace::Host,
+        second.dupe(),
+    );
+    let first_bytes_demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        first,
+        PathObservationOperation::FileBytes,
+    );
+    let first_bytes = PathObservationKey::new(first_bytes_demand.dupe());
+    let second_bytes = PathObservationKey::new(PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        second,
+        PathObservationOperation::FileBytes,
+    ));
+    let row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    let first_resolution_position = row
+        .iter()
+        .position(|dep| dep == &first_resolution.to_string())
+        .unwrap();
+    let second_resolution_position = row
+        .iter()
+        .position(|dep| dep == &second_resolution.to_string())
+        .unwrap();
+    let first_bytes_position = row
+        .iter()
+        .position(|dep| dep == &first_bytes.to_string())
+        .unwrap();
+    assert!(first_resolution_position < second_resolution_position);
+    assert!(second_resolution_position < first_bytes_position);
+    assert!(!row.contains(&second_bytes.to_string()));
+    assert_eq!(
+        row,
+        vec![
+            HostEffectiveModuleOverrideObservationKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+                "dep".into(),
+            )
+            .to_string(),
+            RegistryPolicyObservationKey::new(PathBuf::from("/workspace")).to_string(),
+            RegistryFileObservationKey::new(
+                PathBuf::from("/workspace"),
+                RegistryFileUrl::new(module_url),
+            )
+            .to_string(),
+            first_resolution.to_string(),
+            second_resolution.to_string(),
+            first_bytes.to_string(),
+        ]
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) = transaction
+        .compute(&HostEffectiveModuleOverrideObservationKey::new(
+            NormalizedAbsolutePath::new("/workspace").unwrap(),
+            "dep".into(),
+        ))
+        .await
+        .unwrap()
+    else {
+        panic!("effective carrier")
+    };
+    let SourcePreparationOutcome::Complete(Ok(policy)) = transaction
+        .compute(&RegistryPolicyObservationKey::new(PathBuf::from("/workspace")))
+        .await
+        .unwrap()
+    else {
+        panic!("policy carrier")
+    };
+    let file = observed_registry_file_carrier(&mut transaction, module_url).await;
+    let PathOutcome::Complete(Ok(first_resolved)) =
+        transaction.compute(&first_resolution).await.unwrap()
+    else {
+        panic!("first resolution carrier")
+    };
+    let PathOutcome::Complete(Ok(second_resolved)) =
+        transaction.compute(&second_resolution).await.unwrap()
+    else {
+        panic!("second resolution carrier")
+    };
+    let PathOutcome::Complete(first_bytes_result) = transaction.compute(&first_bytes).await.unwrap()
+    else {
+        panic!("first bytes must complete")
+    };
+    let expected = merge_path_observations(effective.observations(), policy.observations()).unwrap();
+    let expected = merge_path_observations(&expected, file.observations()).unwrap();
+    let expected = merge_path_observations(&expected, first_resolved.observations()).unwrap();
+    let expected = merge_path_observations(&expected, second_resolved.observations()).unwrap();
+    let expected = append_host_repository_source_observation(
+        &expected, first_bytes_demand.dupe(), first_bytes_result,
+    ).unwrap();
+    assert_exact_epoch(&expected, observed.observations());
+    let legacy_key = ModuleSourcePreparationKey {
+        workspace: PathBuf::from("/workspace"),
+        module_name: "dep".into(),
+        version: "1".into(),
+    };
+    let SourcePreparationOutcome::Complete(legacy) = transaction.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("legacy patch preparation must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert!(legacy_row[0].starts_with("host-effective-module-override:"));
+    assert!(legacy_row[1].starts_with("registry-policy:"));
+    assert!(legacy_row[2].starts_with("registry-file:"));
+    assert!(legacy_row[3].starts_with("resolved-path:"));
+    assert!(legacy_row[4].starts_with("resolved-path:"));
+    assert_eq!(legacy_row[5], first_bytes.to_string());
+    assert!(observed.observations().get(&first_bytes_demand).is_some());
+    assert!(tracker.batches.lock().unwrap().iter().all(|(owner, _, batch)| {
+        owner != &key.to_string() || batch.is_none()
+    }));
+}
+
+#[tokio::test]
+async fn observed_module_source_patch_terminals_stop_at_first_middle_and_last_positions() {
+    let module_url = "file:///registry/modules/dep/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        module_url,
+        ModuleSourceRegistryResponse::Found(Arc::from(
+            b"module(name='dep',version='1')\n".as_slice(),
+        )),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let paths = ["/workspace/a.patch", "/workspace/b.patch", "/workspace/c.patch"];
+    let root = "module(name='root')\n\
+        bazel_dep(name='dep',version='1')\n\
+        single_version_override(module_name='dep',version='1',registry='file:///registry',patches=['//:a.patch','//:b.patch','//:c.patch'],patch_strip=1)\n";
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let demand = |path: &str, operation| {
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new(path).unwrap(),
+            operation,
+        )
+    };
+    let regular = || {
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::RegularFile,
+            1,
+            2,
+            3,
+            4,
+            0o644,
+        )))
+    };
+
+    for (position, terminal) in [
+        PathObservationResult::Lstat(PathOperationResult::Missing),
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            PathNodeKind::Directory,
+            1,
+            2,
+            3,
+            4,
+            0o755,
+        ))),
+        PathObservationResult::Lstat(PathOperationResult::Error(
+            PathObservationError::NotALink,
+        )),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let decisive = Arc::new(terminal);
+        let observations = PathObservationEpoch::from_shared(
+            paths[..=position]
+                .iter()
+                .enumerate()
+                .map(|(index, path)| {
+                    (
+                        demand(path, PathObservationOperation::Lstat),
+                        if index == position {
+                            decisive.dupe()
+                        } else {
+                            Arc::new(regular())
+                        },
+                    )
+                }),
+        )
+        .unwrap();
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["file:///registry"],
+            40 + position as u64,
+            observations,
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = module_source_complete(&value);
+        assert!(matches!(
+            (position, observed.result().as_ref()),
+            (0, Err(ModuleSourcePreparationError::PatchMissing { .. }))
+                | (1, Err(ModuleSourcePreparationError::PatchWrongKind {
+                    actual: PathNodeKind::Directory,
+                    ..
+                }))
+                | (2, Err(ModuleSourcePreparationError::PatchResolution(_)))
+        ));
+        let decisive_demand = demand(paths[position], PathObservationOperation::Lstat);
+        assert!(Arc::ptr_eq(
+            observed.observations().get(&decisive_demand).unwrap(),
+            &decisive
+        ));
+        let row = tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &key.to_string())
+            .unwrap()
+            .1
+            .clone();
+        assert_eq!(
+            row.iter()
+                .filter(|dep| dep.starts_with("observed-resolved-path:"))
+                .count(),
+            position + 1
+        );
+        assert!(row.iter().all(|dep| !dep.starts_with("path-observation:")));
+    }
+
+    for (position, terminal) in [
+        PathObservationResult::FileBytes(PathOperationResult::Missing),
+        PathObservationResult::FileBytes(PathOperationResult::Error(
+            PathObservationError::NotALink,
+        )),
+        PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+            b"not a patch".as_slice(),
+        ))),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let decisive = Arc::new(terminal);
+        let mut entries = paths
+            .iter()
+            .map(|path| {
+                (
+                    demand(path, PathObservationOperation::Lstat),
+                    Arc::new(regular()),
+                )
+            })
+            .collect::<Vec<_>>();
+        entries.extend(paths[..=position].iter().enumerate().map(|(index, path)| {
+            (
+                demand(path, PathObservationOperation::FileBytes),
+                if index == position {
+                    decisive.dupe()
+                } else {
+                    Arc::new(PathObservationResult::FileBytes(
+                        PathOperationResult::Present(Arc::from([])),
+                    ))
+                },
+            )
+        }));
+        let tracker = Arc::new(NonregistryPreflightTracker::default());
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["file:///registry"],
+            50 + position as u64,
+            PathObservationEpoch::from_shared(entries).unwrap(),
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = module_source_complete(&value);
+        assert!(matches!(
+            (position, observed.result().as_ref()),
+            (0, Err(ModuleSourcePreparationError::PatchFileInconsistentState { .. }))
+                | (1, Err(ModuleSourcePreparationError::PatchFileObservation { .. }))
+                | (2, Err(ModuleSourcePreparationError::Patch(_)))
+        ));
+        let decisive_demand = demand(paths[position], PathObservationOperation::FileBytes);
+        assert!(Arc::ptr_eq(
+            observed.observations().get(&decisive_demand).unwrap(),
+            &decisive
+        ));
+        let row = tracker.rows.lock().unwrap().last().unwrap().1.clone();
+        assert_eq!(
+            row.iter()
+                .filter(|dep| dep.starts_with("path-observation:"))
+                .count(),
+            position + 1
+        );
+    }
+}
+
+fn module_source_patch_epoch(bytes: Arc<[u8]>, inode: i64) -> PathObservationEpoch {
+    let path = NormalizedAbsolutePath::new("/workspace/route.patch").unwrap();
+    PathObservationEpoch::from_shared([
+        (
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                path.dupe(),
+                PathObservationOperation::Lstat,
+            ),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, 3, inode, 0o644),
+            ))),
+        ),
+        (
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                path,
+                PathObservationOperation::FileBytes,
+            ),
+            Arc::new(PathObservationResult::FileBytes(PathOperationResult::Present(bytes))),
+        ),
+    ])
+    .unwrap()
+}
+
+fn module_source_patch(leaf: &str) -> Arc<[u8]> {
+    Arc::from(
+        format!(
+            concat!(
+                "--- a/MODULE.bazel\n",
+                "+++ b/MODULE.bazel\n",
+                "@@ -1,2 +1,2 @@\n",
+                " module(name = 'dep', version = '1')\n",
+                "-bazel_dep(name = 'base', version = '1')\n",
+                "+bazel_dep(name = '{}', version = '1')\n",
+            ),
+            leaf,
+        )
+        .into_bytes(),
+    )
+}
+
+#[tokio::test]
+async fn observed_module_source_patch_bytes_restore_a_b_a_with_held_carriers() {
+    let module_url = "file:///registry/modules/dep/1/MODULE.bazel";
+    let original: Arc<[u8]> = Arc::from(
+        b"module(name = 'dep', version = '1')\nbazel_dep(name = 'base', version = '1')\n"
+            .as_slice(),
+    );
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        module_url,
+        ModuleSourceRegistryResponse::Found(original),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let root = "module(name='root')\n\
+        bazel_dep(name='dep',version='1')\n\
+        single_version_override(module_name='dep',version='1',registry='file:///registry',patches=['//:route.patch'],patch_strip=1)\n";
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    let mut values = Vec::new();
+    for (generation, leaf, inode) in [
+        (11, "leaf_a", 4),
+        (12, "leaf_b", 4),
+        (13, "leaf_a", 4),
+        (14, "leaf_a", 9),
+        (15, "leaf_a", 4),
+    ] {
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root,
+            &["file:///registry"],
+            generation,
+            module_source_patch_epoch(module_source_patch(leaf), inode),
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = module_source_complete(&value);
+        assert!(matches!(
+            observed.result().as_ref(),
+            Ok(ModuleSourcePreparation::Registry { bytes, .. })
+                if String::from_utf8_lossy(bytes).contains(leaf)
+        ));
+        assert_selected_epoch(
+            &mut transaction,
+            observed.observations(),
+            observed.observations(),
+        )
+        .await;
+        values.push(value);
+    }
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    assert!(ModuleSourcePreparationObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &values[2], &values[3]
+    ));
+    assert!(ModuleSourcePreparationObservationKey::equality(
+        &values[2], &values[4]
+    ));
+    let held = module_source_complete(&values[0]);
+    let restored = module_source_complete(&values[2]);
+    assert_eq!(held.result().as_ref(), restored.result().as_ref());
+    assert_eq!(held.observations(), restored.observations());
+    assert!(!held.observations().observations().is_empty());
+
+    let mut symlinks = Vec::new();
+    for (generation, target) in [
+        (16, "/workspace/patch-a.diff"),
+        (17, "/workspace/patch-b.diff"),
+        (18, "/workspace/patch-a.diff"),
+    ] {
+        let logical = NormalizedAbsolutePath::new("/workspace/route.patch").unwrap();
+        let target = NormalizedAbsolutePath::new(target).unwrap();
+        let route = symlink_path_epoch(logical.as_path().to_str().unwrap(), target.as_path().to_str().unwrap());
+        let route = PathObservationEpoch::from_shared(
+            route.observations().iter()
+                .filter(|(demand, _)| demand.path() == &logical || demand.path() == &target)
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        let bytes = PathObservationEpoch::from_shared([(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                target,
+                PathObservationOperation::FileBytes,
+            ),
+            Arc::new(PathObservationResult::FileBytes(PathOperationResult::Present(
+                module_source_patch("leaf_a"),
+            ))),
+        )])
+        .unwrap();
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            Arc::new(NonregistryPreflightTracker::default()),
+            root,
+            &["file:///registry"],
+            generation,
+            merge_path_observations(&route, &bytes).unwrap(),
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        assert!(matches!(
+            module_source_complete(&value).result().as_ref(),
+            Ok(ModuleSourcePreparation::Registry { bytes, .. })
+                if String::from_utf8_lossy(bytes).contains("leaf_a")
+        ));
+        symlinks.push(value);
+    }
+    assert!(!ModuleSourcePreparationObservationKey::equality(
+        &symlinks[0], &symlinks[1]
+    ));
+    assert!(ModuleSourcePreparationObservationKey::equality(
+        &symlinks[0], &symlinks[2]
+    ));
+    let held = module_source_complete(&symlinks[0]);
+    let restored = module_source_complete(&symlinks[2]);
+    assert_eq!(held.result().as_ref(), restored.result().as_ref());
+    assert_eq!(held.observations(), restored.observations());
+}
+
+fn assert_module_source_need(value: &<ModuleSourcePreparationObservationKey as Key>::Value) {
+    assert!(matches!(value, SourcePreparationOutcome::Need(_)));
+    assert!(!ModuleSourcePreparationObservationKey::validity(value));
+    assert!(!ModuleSourcePreparationObservationKey::equality(value, value));
+}
+
+fn epoch_without_path(
+    epoch: &PathObservationEpoch,
+    path: &str,
+) -> PathObservationEpoch {
+    let path = NormalizedAbsolutePath::new(path).unwrap();
+    PathObservationEpoch::from_shared(
+        epoch
+            .observations()
+            .iter()
+            .filter(|(demand, _)| demand.path() != &path)
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn observed_module_source_need_positions_are_carrierless_and_suppress_later_children() {
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        Some(b"module(name='dep',version='1')\n"),
+        None,
+        &[],
+        &[],
+        721,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let effective_need = transaction.compute(&key).await.unwrap();
+    assert_module_source_need(&effective_need);
+    let effective_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(effective_row.len(), 1);
+    assert!(effective_row[0].starts_with("observed-host-effective-module-override:"));
+
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let transaction = host_nonregistry_transaction(
+        &dice,
+        Some(b"module(name='dep',version='1')\n"),
+        None,
+        &[],
+        &[],
+        722,
+        None,
+        Some(tracker.dupe()),
+        None,
+        true,
+    )
+    .await;
+    let transaction = complete_preflight_transaction(transaction, false).await;
+    let mut transaction = transaction;
+    let epoch = transaction.compute(&PathObservationEpochKey).await.unwrap();
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(
+            PathObservationEpochKey,
+            epoch_without_path(&epoch, "/workspace/dep/MODULE.bazel"),
+        )])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    let source_need = transaction.compute(&key).await.unwrap();
+    assert_module_source_need(&source_need);
+    let source_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(source_row.len(), 2);
+    assert!(source_row[1].starts_with("observed-repository-source-file:"));
+
+
+    let patch_io = Arc::new(ModuleSourceRegistryIo::new([(
+        "file:///registry/modules/dep/1/MODULE.bazel",
+        ModuleSourceRegistryResponse::Found(Arc::from(b"dep".as_slice())),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, patch_io);
+    let patch_dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='root')\n\
+        bazel_dep(name='dep',version='1')\n\
+        single_version_override(module_name='dep',version='1',registry='file:///registry',patches=['//:route.patch'],patch_strip=1)\n";
+    let mut transaction = module_source_registry_transaction(
+        &patch_dice,
+        tracker.dupe(),
+        root,
+        &["file:///registry"],
+        1,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let resolution_need = transaction.compute(&key).await.unwrap();
+    assert_module_source_need(&resolution_need);
+    let row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert!(row.last().unwrap().starts_with("observed-resolved-path:"));
+    assert!(row.iter().all(|dep| !dep.starts_with("path-observation:")));
+    assert!(tracker.batches.lock().unwrap().iter().all(|(owner, _, batch)| {
+        owner != &key.to_string() || batch.is_none()
+    }));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let patch_path = NormalizedAbsolutePath::new("/workspace/route.patch").unwrap();
+    let lstat_only = PathObservationEpoch::from_shared([(
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            patch_path,
+            PathObservationOperation::Lstat,
+        ),
+        Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+            PathLstat::new(PathNodeKind::RegularFile, 1, 2, 3, 4, 0o644),
+        ))),
+    )])
+    .unwrap();
+    let mut transaction = module_source_registry_transaction(
+        &patch_dice,
+        tracker.dupe(),
+        root,
+        &["file:///registry"],
+        2,
+        lstat_only,
+    )
+    .await;
+    let file_need = transaction.compute(&key).await.unwrap();
+    assert_module_source_need(&file_need);
+    let row = tracker.rows.lock().unwrap().last().unwrap().1.clone();
+    assert!(row.last().unwrap().starts_with("path-observation:"));
+    assert!(tracker.batches.lock().unwrap().iter().all(|(owner, _, batch)| {
+        owner != &key.to_string() || batch.is_none()
+    }));
+}
+
+struct CancelOnceRegistryIo {
+    calls: AtomicUsize,
+    bytes: Arc<[u8]>,
+}
+
+#[async_trait]
+impl crate::RegistryIo for CancelOnceRegistryIo {
+    async fn read_exact(
+        &self,
+        _: &RegistryFileUrl,
+    ) -> Result<crate::RegistryIoOutcome, crate::RegistryTransportError> {
+        if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            std::future::pending::<()>().await;
+        }
+        Ok(crate::RegistryIoOutcome::Found(self.bytes.dupe()))
+    }
+}
+
+#[tokio::test]
+async fn observed_module_source_poll_drop_publishes_no_parent_and_recovers_same_dice() {
+    let io = Arc::new(CancelOnceRegistryIo {
+        calls: AtomicUsize::new(0),
+        bytes: Arc::from(b"module(name='dep',version='1')\n".as_slice()),
+    });
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='root')\nbazel_dep(name='dep',version='1')\n";
+    let mut cancelled = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        31,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let key = ModuleSourcePreparationObservationKey::new(
+        PathBuf::from("/workspace"),
+        "dep".into(),
+        "1".into(),
+    );
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while io.calls.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(io.calls.load(Ordering::SeqCst), 1);
+    drop(future);
+    drop(cancelled);
+    assert!(tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(owner, _)| owner != &key.to_string()));
+    assert!(tracker.batches.lock().unwrap().iter().all(|(owner, _, batch)| {
+        owner != &key.to_string() || batch.is_none()
+    }));
+
+    let mut recovered = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        31,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let recovered = recovered.compute(&key).await.unwrap();
+    assert!(matches!(
+        module_source_complete(&recovered).result().as_ref(),
+        Ok(ModuleSourcePreparation::Registry { bytes, .. })
+            if bytes.as_ref() == b"module(name='dep',version='1')\n"
+    ));
+    assert_eq!(io.calls.load(Ordering::SeqCst), 2);
+    assert!(tracker.batches.lock().unwrap().iter().all(|(owner, _, batch)| {
+        owner != &key.to_string() || batch.is_none()
+    }));
+}

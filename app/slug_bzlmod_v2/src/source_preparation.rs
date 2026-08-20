@@ -108,6 +108,8 @@ use crate::module_eval::validate_root_module_source;
 use crate::module_version::BazelModuleVersion;
 use crate::module_version::BazelModuleVersionParseError;
 use crate::package_policy::CanonicalDeletedPackagesProjectionKey;
+use crate::registry_dice::RegistryFileObservationKey;
+use crate::registry_dice::RegistryPolicyObservationKey;
 use crate::registry_module_file_url;
 use crate::repository_ignore::HostNonregistryRepositoryIgnoreKey;
 use crate::repository_ignore::HostNonregistryRepositoryIgnoreObservationKey;
@@ -441,6 +443,58 @@ impl fmt::Display for ModuleSourcePreparationKey {
             self.module_name, self.version
         )
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct ModuleSourcePreparationObservationKey(ModuleSourcePreparationKey);
+
+#[allow(dead_code)]
+impl ModuleSourcePreparationObservationKey {
+    fn new(workspace: PathBuf, module_name: CompactString, version: CompactString) -> Self {
+        Self(ModuleSourcePreparationKey {
+            workspace,
+            module_name,
+            version,
+        })
+    }
+}
+
+impl fmt::Display for ModuleSourcePreparationObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type ModuleSourcePreparationResult =
+    Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+pub(crate) struct ObservedModuleSourcePreparation {
+    result: ModuleSourcePreparationResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedModuleSourcePreparation {
+    pub(crate) fn result(&self) -> &ModuleSourcePreparationResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type ModuleSourcePreparationDriverOutcome = SourcePreparationOutcome<
+    Result<(ModuleSourcePreparationResult, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ModuleSourcePreparationMode {
+    Legacy,
+    Observed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Allocative)]
@@ -6614,154 +6668,639 @@ impl Key for HostNonregistryPackagePreflightObservationKey {
     }
 }
 
-#[async_trait]
-impl Key for ModuleSourcePreparationKey {
-    type Value = SourcePreparationOutcome<
-        Arc<Result<ModuleSourcePreparation, ModuleSourcePreparationError>>,
-    >;
+fn observed_module_source_complete(
+    result: Result<ModuleSourcePreparation, ModuleSourcePreparationError>,
+    observations: PathObservationEpoch,
+) -> ModuleSourcePreparationDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
 
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let workspace = match NormalizedAbsolutePath::new(self.workspace.clone()) {
-            Ok(workspace) => workspace,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
-                )));
-            }
-        };
-        let effective = match ctx
+fn module_source_error(
+    error: ModuleSourcePreparationError,
+    observations: PathObservationEpoch,
+) -> ModuleSourcePreparationDriverOutcome {
+    observed_module_source_complete(Err(error), observations)
+}
+
+fn observed_module_source_outer(
+    error: ObservedPathFrontierError,
+) -> ModuleSourcePreparationDriverOutcome {
+    SourcePreparationOutcome::Complete(Err(error))
+}
+
+fn merge_module_source_observations(
+    prefix: &PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, ObservedPathFrontierError> {
+    merge_path_observations(prefix, incoming)
+}
+
+fn finish_module_source_observed_child<T>(
+    outcome: SourcePreparationOutcome<Result<T, ObservedPathFrontierError>>,
+    prefix: PathObservationEpoch,
+    observations: impl FnOnce(&T) -> &PathObservationEpoch,
+) -> Result<(T, PathObservationEpoch), ModuleSourcePreparationDriverOutcome> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        SourcePreparationOutcome::Complete(Err(error)) => Err(observed_module_source_outer(error)),
+        SourcePreparationOutcome::Complete(Ok(value)) => {
+            let merged = merge_module_source_observations(&prefix, observations(&value))
+                .map_err(observed_module_source_outer)?;
+            Ok((value, merged))
+        }
+    }
+}
+
+fn finish_module_source_observed_path<T>(
+    outcome: PathOutcome<Result<T, ObservedPathFrontierError>>,
+    prefix: PathObservationEpoch,
+    observations: impl FnOnce(&T) -> &PathObservationEpoch,
+) -> Result<(T, PathObservationEpoch), ModuleSourcePreparationDriverOutcome> {
+    match outcome {
+        PathOutcome::Need(need) => Err(SourcePreparationOutcome::path_need(need)),
+        PathOutcome::Complete(Err(error)) => Err(observed_module_source_outer(error)),
+        PathOutcome::Complete(Ok(value)) => {
+            let merged = merge_module_source_observations(&prefix, observations(&value))
+                .map_err(observed_module_source_outer)?;
+            Ok((value, merged))
+        }
+    }
+}
+
+fn finish_module_source_patch_file(
+    demand: PathObservationDemand,
+    result: Arc<PathObservationResult>,
+    before: Option<PathLstat>,
+    observations: PathObservationEpoch,
+    observed: bool,
+) -> Result<(Arc<[u8]>, PathObservationEpoch), ModuleSourcePreparationDriverOutcome> {
+    let observations = if observed {
+        append_host_repository_source_observation(&observations, demand.dupe(), result.dupe())
+            .map_err(observed_module_source_outer)?
+    } else {
+        observations
+    };
+    match result.as_ref() {
+        PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
+            Ok((bytes.dupe(), observations))
+        }
+        PathObservationResult::FileBytes(PathOperationResult::Missing) => {
+            Err(observed_module_source_complete(
+                Err(ModuleSourcePreparationError::PatchFileInconsistentState {
+                    demand,
+                    before,
+                    after: None,
+                }),
+                observations,
+            ))
+        }
+        PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
+            Err(observed_module_source_complete(
+                Err(ModuleSourcePreparationError::PatchFileObservation {
+                    demand,
+                    error: *error,
+                }),
+                observations,
+            ))
+        }
+        PathObservationResult::Lstat(_)
+        | PathObservationResult::ReadLink(_)
+        | PathObservationResult::DirectoryEntries(_)
+        | PathObservationResult::WindowsLongPath(_)
+        | PathObservationResult::WindowsOptionPathLongName(_) => {
+            unreachable!("FileBytes demand must return FileBytes")
+        }
+    }
+}
+
+async fn module_source_effective(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleSourcePreparationKey,
+    mode: ModuleSourcePreparationMode,
+) -> Result<
+    (
+        Arc<Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>>,
+        PathObservationEpoch,
+    ),
+    ModuleSourcePreparationDriverOutcome,
+> {
+    let workspace = NormalizedAbsolutePath::new(key.workspace.clone()).map_err(|error| {
+        module_source_error(
+            ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
+            PathObservationEpoch::empty(),
+        )
+    })?;
+    if mode == ModuleSourcePreparationMode::Legacy {
+        let result = ctx
             .compute(&HostEffectiveModuleOverrideKey::new(
                 workspace,
-                self.module_name.clone(),
+                key.module_name.clone(),
             ))
             .await
-        {
-            Ok(value) => value,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
+            .map_err(|error| {
+                module_source_error(
                     ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
-                )));
+                    PathObservationEpoch::empty(),
+                )
+            })?;
+        return Ok((result, PathObservationEpoch::empty()));
+    }
+    let outcome = ctx
+        .compute(&HostEffectiveModuleOverrideObservationKey::new(
+            workspace,
+            key.module_name.clone(),
+        ))
+        .await
+        .map_err(|error| {
+            module_source_error(
+                ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
+                PathObservationEpoch::empty(),
+            )
+        })?;
+    let (observed, observations) =
+        finish_module_source_observed_child(outcome, PathObservationEpoch::empty(), |observed| {
+            observed.observations()
+        })?;
+    Ok((observed.result().dupe(), observations))
+}
+
+async fn module_source_nonregistry(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleSourcePreparationKey,
+    mode: ModuleSourcePreparationMode,
+    observations: PathObservationEpoch,
+) -> ModuleSourcePreparationDriverOutcome {
+    let source_key = RepositorySourceFileKey {
+        workspace: key.workspace.clone(),
+        module_name: key.module_name.clone(),
+        repo_relative_path: PathBuf::from("MODULE.bazel"),
+    };
+    let (result, incoming) = if mode == ModuleSourcePreparationMode::Legacy {
+        let outcome = match ctx.compute(&source_key).await {
+            Ok(outcome) => outcome,
+            Err(error) => {
+                return module_source_error(
+                    ModuleSourcePreparationError::SourceCompute(Arc::from(error.to_string())),
+                    observations,
+                );
             }
         };
-        let effective = match effective.as_ref() {
-            Ok(value) => value,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    ModuleSourcePreparationError::RootModuleFiles(error.to_string().into()),
-                )));
+        match outcome {
+            SourcePreparationOutcome::Need(need) => return SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(result) => {
+                (Arc::new(result), PathObservationEpoch::empty())
             }
-        };
-        let override_ = effective.override_().cloned();
-        if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
-            let value = match ctx
-                .compute(&RepositorySourceFileKey {
-                    workspace: self.workspace.clone(),
-                    module_name: self.module_name.clone(),
-                    repo_relative_path: PathBuf::from("MODULE.bazel"),
-                })
-                .await
-            {
-                Ok(SourcePreparationOutcome::Need(need)) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Present(
-                    bytes,
-                )))) => Ok(ModuleSourcePreparation::NonRegistry { bytes }),
-                Ok(SourcePreparationOutcome::Complete(Ok(RepositorySourceFileValue::Absent))) => {
-                    Err(ModuleSourcePreparationError::ModuleNotFound {
-                        module_file_attempts: Arc::from([]),
-                    })
-                }
-                Ok(SourcePreparationOutcome::Complete(Err(error))) => {
-                    Err(ModuleSourcePreparationError::Source(error))
-                }
-                Err(error) => Err(ModuleSourcePreparationError::SourceCompute(Arc::from(
-                    error.to_string(),
-                ))),
-            };
-            return SourcePreparationOutcome::Complete(Arc::new(value));
         }
-        if self.version.is_empty() {
-            return SourcePreparationOutcome::Complete(Arc::new(Err(
-                ModuleSourcePreparationError::MissingVersion,
-            )));
-        }
-        let policy = match ctx
-            .compute(&RegistryPolicyKey {
-                workspace: self.workspace.clone(),
-            })
+    } else {
+        let outcome = match ctx
+            .compute(&RepositorySourceFileObservationKey(source_key))
             .await
         {
-            Ok(value) => value,
+            Ok(outcome) => outcome,
             Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
+                return module_source_error(
+                    ModuleSourcePreparationError::SourceCompute(Arc::from(error.to_string())),
+                    observations,
+                );
+            }
+        };
+        let (observed, incoming) = match finish_module_source_observed_child(
+            outcome,
+            PathObservationEpoch::empty(),
+            |observed| observed.observations(),
+        ) {
+            Ok(value) => value,
+            Err(outcome) => return outcome,
+        };
+        (observed.result().dupe(), incoming)
+    };
+    let observations = match merge_module_source_observations(&observations, &incoming) {
+        Ok(observations) => observations,
+        Err(error) => return observed_module_source_outer(error),
+    };
+    observed_module_source_complete(
+        match result.as_ref() {
+            Ok(RepositorySourceFileValue::Present(bytes)) => {
+                Ok(ModuleSourcePreparation::NonRegistry {
+                    bytes: bytes.dupe(),
+                })
+            }
+            Ok(RepositorySourceFileValue::Absent) => {
+                Err(ModuleSourcePreparationError::ModuleNotFound {
+                    module_file_attempts: Arc::from([]),
+                })
+            }
+            Err(error) => Err(ModuleSourcePreparationError::Source(error.clone())),
+        },
+        observations,
+    )
+}
+
+async fn module_source_policy(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleSourcePreparationKey,
+    mode: ModuleSourcePreparationMode,
+    observations: PathObservationEpoch,
+) -> Result<(crate::RegistryPolicy, PathObservationEpoch), ModuleSourcePreparationDriverOutcome> {
+    if mode == ModuleSourcePreparationMode::Legacy {
+        let result = ctx
+            .compute(&RegistryPolicyKey {
+                workspace: key.workspace.clone(),
+            })
+            .await
+            .map_err(|error| {
+                module_source_error(
                     ModuleSourcePreparationError::RegistryPolicyCompute(error.to_string().into()),
-                )));
-            }
+                    observations.dupe(),
+                )
+            })?;
+        return match result.as_ref() {
+            Ok(policy) => Ok((policy.clone(), observations)),
+            Err(error) => Err(observed_module_source_complete(
+                Err(ModuleSourcePreparationError::RegistryPolicy(error.clone())),
+                observations,
+            )),
         };
-        let policy = match policy.as_ref() {
-            Ok(value) => value,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    ModuleSourcePreparationError::RegistryPolicy(error.clone()),
-                )));
-            }
+    }
+    let outcome = ctx
+        .compute(&RegistryPolicyObservationKey::new(key.workspace.clone()))
+        .await
+        .map_err(|error| {
+            module_source_error(
+                ModuleSourcePreparationError::RegistryPolicyCompute(error.to_string().into()),
+                observations.dupe(),
+            )
+        })?;
+    let (observed, merged) =
+        finish_module_source_observed_child(outcome, observations, |observed| {
+            observed.observations()
+        })?;
+    match observed.result().as_ref() {
+        Ok(policy) => Ok((policy.clone(), merged)),
+        Err(error) => Err(observed_module_source_complete(
+            Err(ModuleSourcePreparationError::RegistryPolicy(error.clone())),
+            merged,
+        )),
+    }
+}
+
+async fn module_source_registry_file(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleSourcePreparationKey,
+    mode: ModuleSourcePreparationMode,
+    url: &RegistryFileUrl,
+    attempts: &[RegistryModuleFileAttempt],
+    observations: PathObservationEpoch,
+) -> Result<
+    (
+        Arc<Result<RegistryFileValue, RegistryFileError>>,
+        PathObservationEpoch,
+    ),
+    ModuleSourcePreparationDriverOutcome,
+> {
+    if mode == ModuleSourcePreparationMode::Legacy {
+        let result = ctx
+            .compute(&RegistryFileKey {
+                workspace: key.workspace.clone(),
+                url: url.dupe(),
+            })
+            .await
+            .map_err(|error| {
+                module_source_error(
+                    ModuleSourcePreparationError::RegistryFileCompute {
+                        url: url.dupe(),
+                        prior_not_found_attempts: Arc::from(attempts),
+                        message: error.to_string().into(),
+                    },
+                    observations.dupe(),
+                )
+            })?;
+        return Ok((result, observations));
+    }
+    let outcome = ctx
+        .compute(&RegistryFileObservationKey::new(
+            key.workspace.clone(),
+            url.dupe(),
+        ))
+        .await
+        .map_err(|error| {
+            module_source_error(
+                ModuleSourcePreparationError::RegistryFileCompute {
+                    url: url.dupe(),
+                    prior_not_found_attempts: Arc::from(attempts),
+                    message: error.to_string().into(),
+                },
+                observations.dupe(),
+            )
+        })?;
+    let (observed, merged) =
+        finish_module_source_observed_child(outcome, observations, |observed| {
+            observed.observations()
+        })?;
+    Ok((observed.result().dupe(), merged))
+}
+
+async fn module_source_patches(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleSourcePreparationKey,
+    mode: ModuleSourcePreparationMode,
+    override_: Option<&RootModuleOverride>,
+    mut bytes: Arc<[u8]>,
+    mut observations: PathObservationEpoch,
+) -> Result<(Arc<[u8]>, PathObservationEpoch), ModuleSourcePreparationDriverOutcome> {
+    let Some(RootModuleOverride::RegistrySingle(override_)) = override_ else {
+        return Ok((bytes, observations));
+    };
+    let mut patches = Vec::new();
+    for label in override_.patches.iter() {
+        let Some(path) = main_repo_patch_path(label) else {
+            continue;
         };
-        let override_registry = match override_.as_ref() {
-            Some(RootModuleOverride::RegistrySingle(value)) if !value.registry.is_empty() => {
-                Some(value.registry.as_str())
-            }
-            Some(RootModuleOverride::RegistryMultiple(value)) if !value.registry.is_empty() => {
-                Some(value.registry.as_str())
-            }
-            _ => None,
-        };
-        let module = ModuleKey::new(self.module_name.as_str(), self.version.as_str());
-        if let Some(registry) = override_registry {
-            let mut attempts = Vec::new();
-            return match self
-                .prepare_from_registry(ctx, override_.as_ref(), registry, &module, &mut attempts)
+        let logical_path =
+            NormalizedAbsolutePath::new(key.workspace.join(path)).map_err(|error| {
+                observed_module_source_complete(
+                    Err(ModuleSourcePreparationError::InvalidPatchPath {
+                        path: error.path().to_owned(),
+                    }),
+                    observations.dupe(),
+                )
+            })?;
+        let (resolved, incoming) = if mode == ModuleSourcePreparationMode::Legacy {
+            let outcome = ctx
+                .compute(&ResolvedPathKey::new(
+                    PathObservationNamespace::Host,
+                    logical_path.dupe(),
+                ))
                 .await
-            {
-                PathOutcome::Need(need) => SourcePreparationOutcome::path_need(need),
-                PathOutcome::Complete(result) => {
-                    SourcePreparationOutcome::Complete(Arc::new(match result {
-                        Ok(Some(value)) => Ok(value),
-                        Ok(None) => Err(ModuleSourcePreparationError::ModuleNotFound {
-                            module_file_attempts: Arc::from(attempts),
-                        }),
-                        Err(error) => Err(error),
-                    }))
+                .map_err(|error| {
+                    module_source_error(
+                        ModuleSourcePreparationError::PatchResolutionCompute {
+                            logical_path: logical_path.dupe(),
+                            message: error.to_string().into(),
+                        },
+                        observations.dupe(),
+                    )
+                })?;
+            match outcome {
+                PathOutcome::Need(need) => {
+                    return Err(SourcePreparationOutcome::path_need(need));
                 }
-            };
+                PathOutcome::Complete(result) => (result, PathObservationEpoch::empty()),
+            }
+        } else {
+            let outcome = ctx
+                .compute(&ResolvedPathObservationKey::new(
+                    PathObservationNamespace::Host,
+                    logical_path.dupe(),
+                ))
+                .await
+                .map_err(|error| {
+                    module_source_error(
+                        ModuleSourcePreparationError::PatchResolutionCompute {
+                            logical_path: logical_path.dupe(),
+                            message: error.to_string().into(),
+                        },
+                        observations.dupe(),
+                    )
+                })?;
+            let (observed, merged) =
+                finish_module_source_observed_path(outcome, observations, |observed| {
+                    observed.observations()
+                })?;
+            observations = merged;
+            (observed.result().clone(), PathObservationEpoch::empty())
+        };
+        observations = merge_module_source_observations(&observations, &incoming)
+            .map_err(observed_module_source_outer)?;
+        let resolved = match resolved {
+            Ok(resolved) => resolved,
+            Err(error) => {
+                return Err(observed_module_source_complete(
+                    Err(ModuleSourcePreparationError::PatchResolution(error)),
+                    observations,
+                ));
+            }
+        };
+        match resolved.state() {
+            ResolvedPathState::Missing => {
+                return Err(observed_module_source_complete(
+                    Err(ModuleSourcePreparationError::PatchMissing { logical_path }),
+                    observations,
+                ));
+            }
+            ResolvedPathState::Present(lstat)
+                if matches!(
+                    lstat.kind(),
+                    PathNodeKind::RegularFile | PathNodeKind::SpecialFile
+                ) =>
+            {
+                patches.push((logical_path, resolved));
+            }
+            ResolvedPathState::Present(lstat) => {
+                return Err(observed_module_source_complete(
+                    Err(ModuleSourcePreparationError::PatchWrongKind {
+                        logical_path,
+                        actual: lstat.kind(),
+                    }),
+                    observations,
+                ));
+            }
         }
-        let mut attempts = Vec::new();
-        for registry in policy.urls().as_slice() {
-            match self
-                .prepare_from_registry(
+    }
+    for (_logical_path, resolved) in patches {
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            resolved.real_path().dupe(),
+            PathObservationOperation::FileBytes,
+        );
+        let outcome = ctx
+            .compute(&PathObservationKey::new(demand.dupe()))
+            .await
+            .map_err(|error| {
+                module_source_error(
+                    ModuleSourcePreparationError::PatchFileCompute {
+                        demand: demand.dupe(),
+                        message: error.to_string().into(),
+                    },
+                    observations.dupe(),
+                )
+            })?;
+        let result = match outcome {
+            PathOutcome::Need(need) => {
+                return Err(SourcePreparationOutcome::path_need(need));
+            }
+            PathOutcome::Complete(result) => result,
+        };
+        let before = match resolved.state() {
+            ResolvedPathState::Present(lstat) => Some(lstat),
+            ResolvedPathState::Missing => None,
+        };
+        let (patch, merged) = finish_module_source_patch_file(
+            demand,
+            result,
+            before,
+            observations,
+            mode == ModuleSourcePreparationMode::Observed,
+        )?;
+        observations = merged;
+        if !patch.is_empty() {
+            bytes = apply_unified_patch(bytes, &patch, override_.patch_strip).map_err(|error| {
+                observed_module_source_complete(
+                    Err(ModuleSourcePreparationError::Patch(error.0)),
+                    observations.dupe(),
+                )
+            })?;
+        }
+    }
+    Ok((bytes, observations))
+}
+
+async fn drive_module_source_preparation(
+    ctx: &mut DiceComputations<'_>,
+    key: &ModuleSourcePreparationKey,
+    mode: ModuleSourcePreparationMode,
+) -> ModuleSourcePreparationDriverOutcome {
+    let (effective, observations) = match module_source_effective(ctx, key, mode).await {
+        Ok(value) => value,
+        Err(outcome) => return outcome,
+    };
+    let effective = match effective.as_ref() {
+        Ok(effective) => effective,
+        Err(error) => {
+            return observed_module_source_complete(
+                Err(ModuleSourcePreparationError::RootModuleFiles(
+                    error.to_string().into(),
+                )),
+                observations,
+            );
+        }
+    };
+    let override_ = effective.override_().cloned();
+    if matches!(override_, Some(RootModuleOverride::NonRegistry(_))) {
+        return module_source_nonregistry(ctx, key, mode, observations).await;
+    }
+    if key.version.is_empty() {
+        return observed_module_source_complete(
+            Err(ModuleSourcePreparationError::MissingVersion),
+            observations,
+        );
+    }
+    let (policy, mut observations) = match module_source_policy(ctx, key, mode, observations).await
+    {
+        Ok(value) => value,
+        Err(outcome) => return outcome,
+    };
+    let override_registry = match override_.as_ref() {
+        Some(RootModuleOverride::RegistrySingle(value)) if !value.registry.is_empty() => {
+            Some(value.registry.as_str())
+        }
+        Some(RootModuleOverride::RegistryMultiple(value)) if !value.registry.is_empty() => {
+            Some(value.registry.as_str())
+        }
+        _ => None,
+    };
+    let module = ModuleKey::new(key.module_name.as_str(), key.version.as_str());
+    let registries = match override_registry {
+        Some(registry) => vec![registry],
+        None => policy
+            .urls()
+            .as_slice()
+            .iter()
+            .map(|url| url.as_str())
+            .collect(),
+    };
+    let mut attempts = Vec::new();
+    for registry in registries {
+        let url = RegistryFileUrl::new(registry_module_file_url(registry, &module));
+        let (file, merged) = match module_source_registry_file(
+            ctx,
+            key,
+            mode,
+            &url,
+            &attempts,
+            observations,
+        )
+        .await
+        {
+            Ok(value) => value,
+            Err(outcome) => return outcome,
+        };
+        observations = merged;
+        match file.as_ref() {
+            Ok(RegistryFileValue::NotFound { .. }) => {
+                attempts.push(RegistryModuleFileAttempt { url, sha256: None });
+            }
+            Ok(RegistryFileValue::Found { bytes, sha256, .. }) => {
+                let selected_registry = RegistryBaseUrl::new(registry);
+                let (bytes, observations) = match module_source_patches(
                     ctx,
+                    key,
+                    mode,
                     override_.as_ref(),
-                    registry.as_str(),
-                    &module,
-                    &mut attempts,
+                    bytes.dupe(),
+                    observations,
                 )
                 .await
-            {
-                PathOutcome::Need(need) => return SourcePreparationOutcome::path_need(need),
-                PathOutcome::Complete(Ok(Some(value))) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Ok(value)));
-                }
-                PathOutcome::Complete(Ok(None)) => {}
-                PathOutcome::Complete(Err(error)) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
-                }
+                {
+                    Ok(value) => value,
+                    Err(outcome) => return outcome,
+                };
+                attempts.push(RegistryModuleFileAttempt {
+                    url,
+                    sha256: Some(*sha256),
+                });
+                return observed_module_source_complete(
+                    Ok(ModuleSourcePreparation::Registry {
+                        bytes,
+                        selected_registry,
+                        module_file_attempts: Arc::from(attempts),
+                    }),
+                    observations,
+                );
+            }
+            Err(error) => {
+                return observed_module_source_complete(
+                    Err(ModuleSourcePreparationError::RegistryFile {
+                        url,
+                        prior_not_found_attempts: Arc::from(attempts),
+                        error: error.clone(),
+                    }),
+                    observations,
+                );
             }
         }
-        SourcePreparationOutcome::Complete(Arc::new(Err(
-            ModuleSourcePreparationError::ModuleNotFound {
-                module_file_attempts: Arc::from(attempts),
-            },
-        )))
+    }
+    observed_module_source_complete(
+        Err(ModuleSourcePreparationError::ModuleNotFound {
+            module_file_attempts: Arc::from(attempts),
+        }),
+        observations,
+    )
+}
+
+fn project_legacy_module_source(
+    outcome: ModuleSourcePreparationDriverOutcome,
+) -> SourcePreparationOutcome<ModuleSourcePreparationResult> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+            debug_assert!(observations.observations().is_empty());
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy module-source preparation cannot produce an observed outer")
+        }
+    }
+}
+
+#[async_trait]
+impl Key for ModuleSourcePreparationKey {
+    type Value = SourcePreparationOutcome<ModuleSourcePreparationResult>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        project_legacy_module_source(
+            drive_module_source_preparation(ctx, self, ModuleSourcePreparationMode::Legacy).await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -6773,201 +7312,29 @@ impl Key for ModuleSourcePreparationKey {
     }
 }
 
-impl ModuleSourcePreparationKey {
-    async fn prepare_from_registry(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-        override_: Option<&RootModuleOverride>,
-        registry: &str,
-        module: &ModuleKey,
-        attempts: &mut Vec<RegistryModuleFileAttempt>,
-    ) -> PathOutcome<Result<Option<ModuleSourcePreparation>, ModuleSourcePreparationError>> {
-        let url = RegistryFileUrl::new(registry_module_file_url(registry, module));
-        let file = match ctx
-            .compute(&RegistryFileKey {
-                workspace: self.workspace.clone(),
-                url: url.clone(),
-            })
+#[async_trait]
+impl Key for ModuleSourcePreparationObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedModuleSourcePreparation, ObservedPathFrontierError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_module_source_preparation(ctx, &self.0, ModuleSourcePreparationMode::Observed)
             .await
-        {
-            Ok(file) => file,
-            Err(error) => {
-                return PathOutcome::Complete(Err(
-                    ModuleSourcePreparationError::RegistryFileCompute {
-                        url: url.clone(),
-                        prior_not_found_attempts: Arc::from(attempts.as_slice()),
-                        message: error.to_string().into(),
-                    },
-                ));
-            }
-        };
-        match file.as_ref() {
-            Ok(RegistryFileValue::NotFound { .. }) => {
-                attempts.push(RegistryModuleFileAttempt { url, sha256: None });
-                PathOutcome::Complete(Ok(None))
-            }
-            Ok(RegistryFileValue::Found { bytes, sha256, .. }) => {
-                let selected_registry = RegistryBaseUrl::new(registry);
-                let bytes = match self.apply_root_patches(ctx, override_, bytes.clone()).await {
-                    PathOutcome::Need(need) => return PathOutcome::Need(need),
-                    PathOutcome::Complete(Ok(bytes)) => bytes,
-                    PathOutcome::Complete(Err(error)) => return PathOutcome::Complete(Err(error)),
-                };
-                attempts.push(RegistryModuleFileAttempt {
-                    url,
-                    sha256: Some(*sha256),
-                });
-                PathOutcome::Complete(Ok(Some(ModuleSourcePreparation::Registry {
-                    bytes,
-                    selected_registry,
-                    module_file_attempts: Arc::from(attempts.as_slice()),
-                })))
-            }
-            Err(error) => PathOutcome::Complete(Err(ModuleSourcePreparationError::RegistryFile {
-                url,
-                prior_not_found_attempts: Arc::from(attempts.as_slice()),
-                error: error.clone(),
-            })),
-        }
+            .map(|result| {
+                result.map(|(result, observations)| ObservedModuleSourcePreparation {
+                    result,
+                    observations,
+                })
+            })
     }
 
-    async fn apply_root_patches(
-        &self,
-        ctx: &mut DiceComputations<'_>,
-        override_: Option<&RootModuleOverride>,
-        mut bytes: Arc<[u8]>,
-    ) -> PathOutcome<Result<Arc<[u8]>, ModuleSourcePreparationError>> {
-        let Some(RootModuleOverride::RegistrySingle(override_)) = override_ else {
-            return PathOutcome::Complete(Ok(bytes));
-        };
-        // PatchUtil filters this list to main-repository labels. `patch_cmds`
-        // are deliberately inactive for module-file patching.
-        let mut patches = Vec::new();
-        for label in override_.patches.iter() {
-            let Some(path) = main_repo_patch_path(label) else {
-                continue;
-            };
-            let logical_path = match NormalizedAbsolutePath::new(self.workspace.join(path)) {
-                Ok(path) => path,
-                Err(error) => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::InvalidPatchPath {
-                            path: error.path().to_owned(),
-                        },
-                    ));
-                }
-            };
-            let resolved = match ctx
-                .compute(&ResolvedPathKey::new(
-                    PathObservationNamespace::Host,
-                    logical_path.dupe(),
-                ))
-                .await
-            {
-                Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-                Ok(PathOutcome::Complete(Err(error))) => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchResolution(error),
-                    ));
-                }
-                Ok(PathOutcome::Complete(Ok(resolved))) => resolved,
-                Err(error) => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchResolutionCompute {
-                            logical_path,
-                            message: error.to_string().into(),
-                        },
-                    ));
-                }
-            };
-            match resolved.state() {
-                ResolvedPathState::Missing => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchMissing { logical_path },
-                    ));
-                }
-                ResolvedPathState::Present(lstat)
-                    if matches!(
-                        lstat.kind(),
-                        PathNodeKind::RegularFile | PathNodeKind::SpecialFile
-                    ) =>
-                {
-                    patches.push((logical_path, resolved));
-                }
-                ResolvedPathState::Present(lstat) => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchWrongKind {
-                            logical_path,
-                            actual: lstat.kind(),
-                        },
-                    ));
-                }
-            }
-        }
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
 
-        for (_logical_path, resolved) in patches {
-            let demand = PathObservationDemand::new(
-                PathObservationNamespace::Host,
-                resolved.real_path().dupe(),
-                PathObservationOperation::FileBytes,
-            );
-            let observed = match ctx.compute(&PathObservationKey::new(demand.dupe())).await {
-                Ok(PathOutcome::Need(need)) => return PathOutcome::Need(need),
-                Ok(PathOutcome::Complete(result)) => result,
-                Err(error) => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchFileCompute {
-                            demand,
-                            message: error.to_string().into(),
-                        },
-                    ));
-                }
-            };
-            let patch = match observed.as_ref() {
-                PathObservationResult::FileBytes(PathOperationResult::Present(bytes)) => {
-                    bytes.dupe()
-                }
-                PathObservationResult::FileBytes(PathOperationResult::Missing) => {
-                    let before = match resolved.state() {
-                        ResolvedPathState::Present(lstat) => Some(lstat),
-                        ResolvedPathState::Missing => None,
-                    };
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchFileInconsistentState {
-                            demand,
-                            before,
-                            after: None,
-                        },
-                    ));
-                }
-                PathObservationResult::FileBytes(PathOperationResult::Error(error)) => {
-                    return PathOutcome::Complete(Err(
-                        ModuleSourcePreparationError::PatchFileObservation {
-                            demand,
-                            error: *error,
-                        },
-                    ));
-                }
-                PathObservationResult::Lstat(_)
-                | PathObservationResult::ReadLink(_)
-                | PathObservationResult::DirectoryEntries(_)
-                | PathObservationResult::WindowsLongPath(_)
-                | PathObservationResult::WindowsOptionPathLongName(_) => {
-                    unreachable!("FileBytes demand must return a FileBytes observation")
-                }
-            };
-            if !patch.is_empty() {
-                bytes = match apply_unified_patch(bytes, &patch, override_.patch_strip) {
-                    Ok(bytes) => bytes,
-                    Err(error) => {
-                        return PathOutcome::Complete(Err(ModuleSourcePreparationError::Patch(
-                            error.0,
-                        )));
-                    }
-                };
-            }
-        }
-        PathOutcome::Complete(Ok(bytes))
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 
