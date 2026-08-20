@@ -3503,15 +3503,14 @@ type DefinitionLoadRequestsResult = Arc<
 >;
 type DefinitionLoadRequestsOutcome = SourcePreparationOutcome<DefinitionLoadRequestsResult>;
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
-#[allow(dead_code)]
-struct HostSelectedExtensionDefinitionLoadRequestsObservationKey(
+pub struct HostSelectedExtensionDefinitionLoadRequestsObservationKey(
     HostSelectedExtensionDefinitionLoadRequestsKey,
 );
 
-#[allow(dead_code)]
 impl HostSelectedExtensionDefinitionLoadRequestsObservationKey {
-    fn new(workspace: NormalizedAbsolutePath) -> Self {
+    pub fn new(workspace: NormalizedAbsolutePath) -> Self {
         Self(HostSelectedExtensionDefinitionLoadRequestsKey::new(
             workspace,
         ))
@@ -3524,20 +3523,26 @@ impl fmt::Display for HostSelectedExtensionDefinitionLoadRequestsObservationKey 
     }
 }
 
+#[doc(hidden)]
 #[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
-#[allow(dead_code)]
-struct ObservedHostSelectedExtensionDefinitionLoadRequests {
+pub struct ObservedHostSelectedExtensionDefinitionLoadRequests {
     result: DefinitionLoadRequestsResult,
     observations: PathObservationEpoch,
 }
 
-#[allow(dead_code)]
 impl ObservedHostSelectedExtensionDefinitionLoadRequests {
-    fn result(&self) -> &DefinitionLoadRequestsResult {
+    pub fn result(
+        &self,
+    ) -> &Arc<
+        Result<
+            HostSelectedExtensionDefinitionLoadRequests,
+            HostSelectedExtensionDefinitionLoadRequestsError,
+        >,
+    > {
         &self.result
     }
 
-    fn observations(&self) -> &PathObservationEpoch {
+    pub fn observations(&self) -> &PathObservationEpoch {
         &self.observations
     }
 }
@@ -3546,6 +3551,12 @@ impl ObservedHostSelectedExtensionDefinitionLoadRequests {
 enum DefinitionLoadRequestsObservationError {
     Mappings(ExtensionMappingsObservationError),
 }
+
+#[doc(hidden)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub struct HostSelectedExtensionDefinitionLoadRequestsObservationError(
+    DefinitionLoadRequestsObservationError,
+);
 
 type DefinitionLoadRequestsDriverOutcome = SourcePreparationOutcome<
     Result<
@@ -3704,7 +3715,7 @@ impl Key for HostSelectedExtensionDefinitionLoadRequestsObservationKey {
     type Value = SourcePreparationOutcome<
         Result<
             ObservedHostSelectedExtensionDefinitionLoadRequests,
-            DefinitionLoadRequestsObservationError,
+            HostSelectedExtensionDefinitionLoadRequestsObservationError,
         >,
     >;
 
@@ -3712,7 +3723,9 @@ impl Key for HostSelectedExtensionDefinitionLoadRequestsObservationKey {
         match drive_definition_load_requests(ctx, &self.0, RoutesMode::Observed).await {
             SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
             SourcePreparationOutcome::Complete(Err(error)) => {
-                SourcePreparationOutcome::Complete(Err(error))
+                SourcePreparationOutcome::Complete(Err(
+                    HostSelectedExtensionDefinitionLoadRequestsObservationError(error),
+                ))
             }
             SourcePreparationOutcome::Complete(Ok((result, observations))) => {
                 SourcePreparationOutcome::Complete(Ok(
@@ -3994,7 +4007,7 @@ async fn evaluation_input_requests_request_child(
 ) -> RepoSpecChild<
     HostSelectedExtensionDefinitionLoadRequests,
     HostSelectedExtensionDefinitionLoadRequestsError,
-    DefinitionLoadRequestsObservationError,
+    HostSelectedExtensionDefinitionLoadRequestsObservationError,
 > {
     match mode {
         RoutesMode::Legacy => match ctx
@@ -4031,7 +4044,7 @@ fn finish_evaluation_input_requests_request_child(
     child: RepoSpecChild<
         HostSelectedExtensionDefinitionLoadRequests,
         HostSelectedExtensionDefinitionLoadRequestsError,
-        DefinitionLoadRequestsObservationError,
+        HostSelectedExtensionDefinitionLoadRequestsObservationError,
     >,
 ) -> Result<
     (DefinitionLoadRequestsResult, PathObservationEpoch),
@@ -4043,7 +4056,9 @@ fn finish_evaluation_input_requests_request_child(
             PathObservationEpoch::empty(),
         )),
         RepoSpecChild::Need(need) => Err(SourcePreparationOutcome::Need(need)),
-        RepoSpecChild::Outer(error) => Err(SourcePreparationOutcome::Complete(Err(
+        RepoSpecChild::Outer(HostSelectedExtensionDefinitionLoadRequestsObservationError(
+            error,
+        )) => Err(SourcePreparationOutcome::Complete(Err(
             EvaluationInputRequestsObservationError::Requests(error),
         ))),
         RepoSpecChild::Complete {
@@ -10777,7 +10792,9 @@ inject_repo(three, injected = "target")
             Err(SourcePreparationOutcome::Need(_))
         ));
         let outer = SourcePreparationOutcome::Complete(Err(
-            DefinitionLoadRequestsObservationError::Mappings(mismatch()),
+            HostSelectedExtensionDefinitionLoadRequestsObservationError(
+                DefinitionLoadRequestsObservationError::Mappings(mismatch()),
+            ),
         ));
         assert!(matches!(
             finish_definition_load_requests_mappings_child(RepoSpecChild::Outer(mismatch())),
@@ -11204,13 +11221,15 @@ inject_repo(three, injected = "target")
             finish_evaluation_input_requests_request_child(RepoSpecChild::Need(need.dupe())),
             Err(SourcePreparationOutcome::Need(_))
         ));
-        let request_outer = DefinitionLoadRequestsObservationError::Mappings(
-            ExtensionMappingsObservationError::RootFiles(ObservedPathFrontierError::from(
-                PathObservationEpochError::OperationMismatch {
-                    demand: request_demand.dupe(),
-                    result_operation: PathObservationOperation::FileBytes,
-                },
-            )),
+        let request_outer = HostSelectedExtensionDefinitionLoadRequestsObservationError(
+            DefinitionLoadRequestsObservationError::Mappings(
+                ExtensionMappingsObservationError::RootFiles(ObservedPathFrontierError::from(
+                    PathObservationEpochError::OperationMismatch {
+                        demand: request_demand.dupe(),
+                        result_operation: PathObservationOperation::FileBytes,
+                    },
+                )),
+            ),
         );
         assert!(matches!(
             finish_evaluation_input_requests_request_child(RepoSpecChild::Outer(request_outer)),

@@ -319,6 +319,10 @@ pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsKey;
 #[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsObservationError;
+#[doc(hidden)]
+pub use selected_repo_spec::HostSelectedExtensionDefinitionLoadRequestsObservationKey;
+#[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionDefinitionOverride;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInput;
@@ -330,6 +334,8 @@ pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequests;
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsError;
 #[doc(hidden)]
 pub use selected_repo_spec::HostSelectedExtensionEvaluationInputRequestsKey;
+#[doc(hidden)]
+pub use selected_repo_spec::ObservedHostSelectedExtensionDefinitionLoadRequests;
 #[doc(hidden)]
 pub use source_preparation::HostRepositoryLocalPathPolicy;
 #[doc(hidden)]
