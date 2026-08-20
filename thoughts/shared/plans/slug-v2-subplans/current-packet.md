@@ -75,9 +75,9 @@ parallelism or Need union.
 
 Freeze exact empty/request/prior-Bzl/current-Bzl prefix behavior for DICE compute
 and semantic terminals. Need and child typed outer publish no provisional parent
-carrier or event batch. Decide explicitly whether an observed Bzl DICE-compute
-failure preserves the prior cumulative prefix as a semantic loaded-definition
-error or is an invariant; do not silently change the legacy error surface.
+carrier or event batch. Preserve request and Bzl child DICE-compute failures as
+`host_dice_invariant` panics in both families; do not convert them into a new
+loaded-definition semantic error or prefix.
 
 ## Families, events and lifetime
 
@@ -86,7 +86,9 @@ only observed request/Bzl keys. One shared driver must exclude mixed families.
 
 The parent emits no events. Each observed Host Bzl child remains the sole owner
 of its exact local batch; successful ordered children replay in request order.
-Warm parent reuse is silent. Direct-child DICE reuse must not replay a batch.
+Warm parent reuse is silent. If parent recomputation reaches an unchanged Host
+Bzl child, DICE reports its existing Reused activation with no batch; it must
+not reevaluate the child or re-emit the cached local batch.
 Cancellation/poll-drop before parent publication leaves no provisional parent
 value or parent batch, and a same-DICE retry recovers.
 
