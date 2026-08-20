@@ -29,6 +29,8 @@ use slug_identity_v2::ApparentRepoName;
 use slug_identity_v2::CanonicalLabel;
 use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -46,18 +48,25 @@ use crate::RepoSpec;
 use crate::RootModuleOverride;
 use crate::host_registry::HostRegistryFunctionError;
 use crate::host_registry::HostRegistryFunctionKey;
+use crate::host_registry::HostRegistryFunctionObservationKey;
+use crate::host_registry::HostRegistryFunctionValue;
 use crate::host_registry::HostRegistryScheme;
 use crate::host_registry::RegistryKnownFileHashesMode;
 use crate::module_eval::HostEffectiveModuleOverride;
 use crate::module_eval::HostEffectiveModuleOverrideError;
 use crate::module_eval::HostEffectiveModuleOverrideKey;
+use crate::module_eval::HostEffectiveModuleOverrideObservationKey;
 use crate::module_eval::RootExtensionUsage;
 use crate::module_eval::RootModuleFilesKey;
+use crate::registry_dice::RegistryFileObservationKey;
 use crate::selected_graph::HostGraphModuleKey;
 use crate::selected_graph::HostGraphModuleSource;
 use crate::selected_graph::HostSelectedModuleEntry;
+use crate::selected_graph::HostSelectedModuleGraph;
 use crate::selected_graph::HostSelectedModuleGraphError;
 use crate::selected_graph::HostSelectedModuleGraphKey;
+use crate::selected_graph::HostSelectedModuleGraphObservationError;
+use crate::selected_graph::HostSelectedModuleGraphObservationKey;
 use crate::source_preparation::HostDiscoveredModuleProvenance;
 use crate::source_preparation::RegistryModuleFileAttempt;
 use crate::source_preparation::SourcePreparationNeeds;
@@ -167,9 +176,109 @@ impl fmt::Display for HostSelectedRegistryRepoSpecsKey {
     }
 }
 
-type RepoSpecsOutcome = SourcePreparationOutcome<
-    Arc<Result<HostSelectedRegistryRepoSpecs, HostSelectedRegistryRepoSpecsError>>,
+type RepoSpecsResult =
+    Arc<Result<HostSelectedRegistryRepoSpecs, HostSelectedRegistryRepoSpecsError>>;
+type RepoSpecsOutcome = SourcePreparationOutcome<RepoSpecsResult>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct HostSelectedRegistryRepoSpecsObservationKey(HostSelectedRegistryRepoSpecsKey);
+
+#[allow(dead_code)]
+impl HostSelectedRegistryRepoSpecsObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostSelectedRegistryRepoSpecsKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostSelectedRegistryRepoSpecsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+pub(crate) struct ObservedHostSelectedRegistryRepoSpecs {
+    result: RepoSpecsResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostSelectedRegistryRepoSpecs {
+    fn new(result: RepoSpecsResult, observations: PathObservationEpoch) -> Self {
+        Self {
+            result,
+            observations,
+        }
+    }
+
+    pub(crate) fn result(&self) -> &RepoSpecsResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum RepoSpecObservationStage {
+    Graph,
+    HostRegistry,
+    SourceRegistryFile,
+    RegistryMetadataFile,
+    EffectiveOverride,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum HostSelectedRegistryRepoSpecsObservationError {
+    Graph(HostSelectedModuleGraphObservationError),
+    HostRegistry {
+        module: Arc<HostGraphModuleKey>,
+        error: ObservedPathFrontierError,
+    },
+    RegistryFile {
+        module: Arc<HostGraphModuleKey>,
+        url: RegistryFileUrl,
+        error: ObservedPathFrontierError,
+    },
+    EffectiveOverride {
+        module: Arc<HostGraphModuleKey>,
+        error: ObservedPathFrontierError,
+    },
+    Merge {
+        module: Option<Arc<HostGraphModuleKey>>,
+        stage: RepoSpecObservationStage,
+        error: ObservedPathFrontierError,
+    },
+}
+
+#[derive(Clone, Copy)]
+enum RepoSpecsMode {
+    Legacy,
+    Observed,
+}
+
+type RepoSpecsDriverOutcome = SourcePreparationOutcome<
+    Result<(RepoSpecsResult, PathObservationEpoch), HostSelectedRegistryRepoSpecsObservationError>,
 >;
+
+enum RepoSpecChild<T, E, O = ObservedPathFrontierError> {
+    Complete {
+        result: Arc<Result<T, E>>,
+        observations: PathObservationEpoch,
+    },
+    Need(SourcePreparationNeeds),
+    Outer(O),
+    Compute(CompactString),
+}
+
+enum RepoSpecEntryTerminal {
+    Complete(Result<Option<HostSelectedRegistryRepoSpec>, HostSelectedRegistryRepoSpecsError>),
+    Need(SourcePreparationNeeds),
+    Outer(HostSelectedRegistryRepoSpecsObservationError),
+}
 
 struct SourceJson {
     source_type: Option<String>,
@@ -386,33 +495,200 @@ fn registry_json_url(registry: &str) -> RegistryFileUrl {
     ))
 }
 
-async fn registry_file(
+fn merge_repo_spec_observations(
+    prefix: &mut PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+    module: Option<&HostGraphModuleKey>,
+    stage: RepoSpecObservationStage,
+) -> Result<(), HostSelectedRegistryRepoSpecsObservationError> {
+    *prefix = PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .chain(incoming.observations())
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .map_err(
+        |error| HostSelectedRegistryRepoSpecsObservationError::Merge {
+            module: module.map(|module| Arc::new(module.clone())),
+            stage,
+            error: ObservedPathFrontierError::from(error),
+        },
+    )?;
+    Ok(())
+}
+
+async fn selected_graph_child(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
-    module: &HostGraphModuleKey,
-    url: RegistryFileUrl,
-) -> Result<RegistryFileObservation, HostSelectedRegistryRepoSpecsError> {
-    let value = ctx
-        .compute(&RegistryFileKey {
-            workspace: workspace.as_path().to_owned(),
-            url: url.clone(),
-        })
+) -> RepoSpecChild<
+    HostSelectedModuleGraph,
+    HostSelectedModuleGraphError,
+    HostSelectedModuleGraphObservationError,
+> {
+    match ctx
+        .compute(&HostSelectedModuleGraphObservationKey::new(
+            workspace.dupe(),
+        ))
         .await
-        .map_err(
-            |error| HostSelectedRegistryRepoSpecsError::RegistryFileCompute {
-                module: module.clone(),
-                url: url.clone(),
-                message: error.to_string().into(),
-            },
-        )?;
-    let value = value.as_ref().clone().map_err(|error| {
-        HostSelectedRegistryRepoSpecsError::RegistryFile {
-            module: module.clone(),
-            url: url.clone(),
-            error,
+    {
+        Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+        Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+        Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+        Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+            result: observed.result().dupe(),
+            observations: observed.observations().dupe(),
+        },
+    }
+}
+
+async fn legacy_graph_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+) -> RepoSpecChild<
+    HostSelectedModuleGraph,
+    HostSelectedModuleGraphError,
+    HostSelectedModuleGraphObservationError,
+> {
+    match ctx
+        .compute(&HostSelectedModuleGraphKey::new(workspace.dupe()))
+        .await
+    {
+        Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+        Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+        Ok(SourcePreparationOutcome::Complete(result)) => RepoSpecChild::Complete {
+            result,
+            observations: PathObservationEpoch::empty(),
+        },
+    }
+}
+
+async fn host_registry_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    registry: &str,
+    mode: RepoSpecsMode,
+) -> RepoSpecChild<HostRegistryFunctionValue, HostRegistryFunctionError> {
+    match mode {
+        RepoSpecsMode::Legacy => {
+            match ctx
+                .compute(&HostRegistryFunctionKey::new(workspace.dupe(), registry))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(PathOutcome::Need(need)) => {
+                    RepoSpecChild::Need(SourcePreparationNeeds::path(need))
+                }
+                Ok(PathOutcome::Complete(result)) => RepoSpecChild::Complete {
+                    result,
+                    observations: PathObservationEpoch::empty(),
+                },
+            }
         }
-    })?;
-    Ok(RegistryFileObservation { url, value })
+        RepoSpecsMode::Observed => {
+            match ctx
+                .compute(&HostRegistryFunctionObservationKey::new(
+                    workspace.dupe(),
+                    registry,
+                ))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(PathOutcome::Need(need)) => {
+                    RepoSpecChild::Need(SourcePreparationNeeds::path(need))
+                }
+                Ok(PathOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+                Ok(PathOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                    result: observed.result().dupe(),
+                    observations: observed.observations().dupe(),
+                },
+            }
+        }
+    }
+}
+
+async fn registry_file_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    url: RegistryFileUrl,
+    mode: RepoSpecsMode,
+) -> RepoSpecChild<RegistryFileValue, RegistryFileError> {
+    match mode {
+        RepoSpecsMode::Legacy => {
+            match ctx
+                .compute(&RegistryFileKey {
+                    workspace: workspace.as_path().to_owned(),
+                    url,
+                })
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(result) => RepoSpecChild::Complete {
+                    result,
+                    observations: PathObservationEpoch::empty(),
+                },
+            }
+        }
+        RepoSpecsMode::Observed => {
+            match ctx
+                .compute(&RegistryFileObservationKey::new(
+                    workspace.as_path().to_owned(),
+                    url,
+                ))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+                Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                    result: observed.result().dupe(),
+                    observations: observed.observations().dupe(),
+                },
+            }
+        }
+    }
+}
+
+async fn effective_override_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    module_name: CompactString,
+    mode: RepoSpecsMode,
+) -> RepoSpecChild<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError> {
+    match mode {
+        RepoSpecsMode::Legacy => {
+            match ctx
+                .compute(&HostEffectiveModuleOverrideKey::new(
+                    workspace.dupe(),
+                    module_name,
+                ))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(result) => RepoSpecChild::Complete {
+                    result,
+                    observations: PathObservationEpoch::empty(),
+                },
+            }
+        }
+        RepoSpecsMode::Observed => {
+            match ctx
+                .compute(&HostEffectiveModuleOverrideObservationKey::new(
+                    workspace.dupe(),
+                    module_name,
+                ))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+                Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                    result: observed.result().dupe(),
+                    observations: observed.observations().dupe(),
+                },
+            }
+        }
+    }
 }
 
 fn found_bytes<'a>(
@@ -747,19 +1023,152 @@ fn augment_override(
     }
 }
 
-async fn compute_entry(
+fn finish_host_registry_child(
+    child: RepoSpecChild<HostRegistryFunctionValue, HostRegistryFunctionError>,
+    module: &HostGraphModuleKey,
+    observations: &mut PathObservationEpoch,
+) -> Result<HostRegistryFunctionValue, RepoSpecEntryTerminal> {
+    match child {
+        RepoSpecChild::Compute(message) => Err(RepoSpecEntryTerminal::Complete(Err(
+            HostSelectedRegistryRepoSpecsError::RegistryPolicyCompute {
+                module: module.clone(),
+                message,
+            },
+        ))),
+        RepoSpecChild::Need(need) => Err(RepoSpecEntryTerminal::Need(need)),
+        RepoSpecChild::Outer(error) => Err(RepoSpecEntryTerminal::Outer(
+            HostSelectedRegistryRepoSpecsObservationError::HostRegistry {
+                module: Arc::new(module.clone()),
+                error,
+            },
+        )),
+        RepoSpecChild::Complete {
+            result,
+            observations: incoming,
+        } => {
+            merge_repo_spec_observations(
+                observations,
+                &incoming,
+                Some(module),
+                RepoSpecObservationStage::HostRegistry,
+            )
+            .map_err(RepoSpecEntryTerminal::Outer)?;
+            result.as_ref().clone().map_err(|error| {
+                RepoSpecEntryTerminal::Complete(Err(
+                    HostSelectedRegistryRepoSpecsError::RegistryPolicy {
+                        module: module.clone(),
+                        error,
+                    },
+                ))
+            })
+        }
+    }
+}
+
+fn finish_registry_file_child(
+    child: RepoSpecChild<RegistryFileValue, RegistryFileError>,
+    module: &HostGraphModuleKey,
+    url: RegistryFileUrl,
+    stage: RepoSpecObservationStage,
+    observations: &mut PathObservationEpoch,
+) -> Result<RegistryFileObservation, RepoSpecEntryTerminal> {
+    match child {
+        RepoSpecChild::Compute(message) => Err(RepoSpecEntryTerminal::Complete(Err(
+            HostSelectedRegistryRepoSpecsError::RegistryFileCompute {
+                module: module.clone(),
+                url,
+                message,
+            },
+        ))),
+        RepoSpecChild::Need(need) => Err(RepoSpecEntryTerminal::Need(need)),
+        RepoSpecChild::Outer(error) => Err(RepoSpecEntryTerminal::Outer(
+            HostSelectedRegistryRepoSpecsObservationError::RegistryFile {
+                module: Arc::new(module.clone()),
+                url,
+                error,
+            },
+        )),
+        RepoSpecChild::Complete {
+            result,
+            observations: incoming,
+        } => {
+            merge_repo_spec_observations(observations, &incoming, Some(module), stage)
+                .map_err(RepoSpecEntryTerminal::Outer)?;
+            result
+                .as_ref()
+                .clone()
+                .map(|value| RegistryFileObservation {
+                    url: url.dupe(),
+                    value,
+                })
+                .map_err(|error| {
+                    RepoSpecEntryTerminal::Complete(Err(
+                        HostSelectedRegistryRepoSpecsError::RegistryFile {
+                            module: module.clone(),
+                            url,
+                            error,
+                        },
+                    ))
+                })
+        }
+    }
+}
+
+fn finish_effective_override_child(
+    child: RepoSpecChild<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>,
+    module: &HostGraphModuleKey,
+    observations: &mut PathObservationEpoch,
+) -> Result<HostEffectiveModuleOverride, RepoSpecEntryTerminal> {
+    match child {
+        RepoSpecChild::Compute(message) => Err(RepoSpecEntryTerminal::Complete(Err(
+            HostSelectedRegistryRepoSpecsError::EffectiveOverrideCompute {
+                module: module.clone(),
+                message,
+            },
+        ))),
+        RepoSpecChild::Need(need) => Err(RepoSpecEntryTerminal::Need(need)),
+        RepoSpecChild::Outer(error) => Err(RepoSpecEntryTerminal::Outer(
+            HostSelectedRegistryRepoSpecsObservationError::EffectiveOverride {
+                module: Arc::new(module.clone()),
+                error,
+            },
+        )),
+        RepoSpecChild::Complete {
+            result,
+            observations: incoming,
+        } => {
+            merge_repo_spec_observations(
+                observations,
+                &incoming,
+                Some(module),
+                RepoSpecObservationStage::EffectiveOverride,
+            )
+            .map_err(RepoSpecEntryTerminal::Outer)?;
+            result.as_ref().clone().map_err(|error| {
+                RepoSpecEntryTerminal::Complete(Err(
+                    HostSelectedRegistryRepoSpecsError::EffectiveOverride {
+                        module: module.clone(),
+                        error,
+                    },
+                ))
+            })
+        }
+    }
+}
+
+async fn drive_repo_spec_entry(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
     entry: &HostSelectedModuleEntry,
-) -> SourcePreparationOutcome<
-    Result<Option<HostSelectedRegistryRepoSpec>, HostSelectedRegistryRepoSpecsError>,
-> {
+    mode: RepoSpecsMode,
+    observations: &mut PathObservationEpoch,
+) -> RepoSpecEntryTerminal {
     let (name, version) = match &entry.key {
-        HostGraphModuleKey::Root => return SourcePreparationOutcome::Complete(Ok(None)),
+        HostGraphModuleKey::Root => return RepoSpecEntryTerminal::Complete(Ok(None)),
         HostGraphModuleKey::Module { name, version } => (name, version),
     };
     let HostGraphModuleSource::Discovered(discovered) = &entry.source else {
-        return SourcePreparationOutcome::Complete(Err(fail(
+        return RepoSpecEntryTerminal::Complete(Err(fail(
             &entry.key,
             "nonroot graph entry has root source",
         )));
@@ -769,37 +1178,15 @@ async fn compute_entry(
         module_file_attempts,
     } = &discovered.provenance
     else {
-        return SourcePreparationOutcome::Complete(Ok(None));
+        return RepoSpecEntryTerminal::Complete(Ok(None));
     };
-    let policy = match ctx
-        .compute(&HostRegistryFunctionKey::new(
-            workspace.dupe(),
-            selected_registry.as_str(),
-        ))
-        .await
-    {
-        Ok(PathOutcome::Need(need)) => {
-            return SourcePreparationOutcome::Need(SourcePreparationNeeds::path(need));
-        }
-        Ok(PathOutcome::Complete(value)) => match value.as_ref().clone() {
-            Ok(value) => value,
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Err(
-                    HostSelectedRegistryRepoSpecsError::RegistryPolicy {
-                        module: entry.key.clone(),
-                        error: error.clone(),
-                    },
-                ));
-            }
-        },
-        Err(error) => {
-            return SourcePreparationOutcome::Complete(Err(
-                HostSelectedRegistryRepoSpecsError::RegistryPolicyCompute {
-                    module: entry.key.clone(),
-                    message: error.to_string().into(),
-                },
-            ));
-        }
+    let policy = match finish_host_registry_child(
+        host_registry_child(ctx, workspace, selected_registry.as_str(), mode).await,
+        &entry.key,
+        observations,
+    ) {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
     };
     let policy_identity = SelectedRegistryPolicyIdentity {
         original_registry: policy.original_registry().into(),
@@ -810,35 +1197,35 @@ async fn compute_entry(
         module_mirrors: policy.module_mirrors().iter().cloned().collect(),
     };
     let version = version.normalized();
-    let source_json = match registry_file(
-        ctx,
-        workspace,
+    let source_url = source_json_url(policy.resolved_registry(), name, version);
+    let source_json = match finish_registry_file_child(
+        registry_file_child(ctx, workspace, source_url.clone(), mode).await,
         &entry.key,
-        source_json_url(policy.resolved_registry(), name, version),
-    )
-    .await
-    {
+        source_url,
+        RepoSpecObservationStage::SourceRegistryFile,
+        observations,
+    ) {
         Ok(value) => value,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        Err(terminal) => return terminal,
     };
     let source = match found_bytes(&entry.key, &source_json)
         .and_then(|bytes| parse_source_json(&entry.key, bytes))
     {
         Ok(value) => value,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        Err(error) => return RepoSpecEntryTerminal::Complete(Err(error)),
     };
     let source_type = source.source_type.as_deref().unwrap_or("archive");
     let registry_json = if matches!(source_type, "archive" | "local_path") {
-        match registry_file(
-            ctx,
-            workspace,
+        let registry_url = registry_json_url(policy.resolved_registry());
+        match finish_registry_file_child(
+            registry_file_child(ctx, workspace, registry_url.clone(), mode).await,
             &entry.key,
-            registry_json_url(policy.resolved_registry()),
-        )
-        .await
-        {
+            registry_url,
+            RepoSpecObservationStage::RegistryMetadataFile,
+            observations,
+        ) {
             Ok(value) => Some(value),
-            Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+            Err(terminal) => return terminal,
         }
     } else {
         None
@@ -849,7 +1236,7 @@ async fn compute_entry(
             RegistryFileValue::Found { bytes, .. } => {
                 match optional_registry_json(&entry.key, bytes) {
                     Ok(value) => value,
-                    Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+                    Err(error) => return RepoSpecEntryTerminal::Complete(Err(error)),
                 }
             }
         },
@@ -857,7 +1244,7 @@ async fn compute_entry(
     };
     let (module_url, module_hash) = match module_file_identity(&entry.key, module_file_attempts) {
         Ok(value) => value,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        Err(error) => return RepoSpecEntryTerminal::Complete(Err(error)),
     };
     let projected = match source_type {
         "archive" => archive_repo_spec(
@@ -889,40 +1276,21 @@ async fn compute_entry(
     };
     let mut repo_spec = match projected {
         Ok(value) => value,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        Err(error) => return RepoSpecEntryTerminal::Complete(Err(error)),
     };
-    let effective = match ctx
-        .compute(&HostEffectiveModuleOverrideKey::new(
-            workspace.dupe(),
-            name.clone(),
-        ))
-        .await
-    {
-        Ok(value) => match value.as_ref() {
-            Ok(value) => value.clone(),
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Err(
-                    HostSelectedRegistryRepoSpecsError::EffectiveOverride {
-                        module: entry.key.clone(),
-                        error: error.clone(),
-                    },
-                ));
-            }
-        },
-        Err(error) => {
-            return SourcePreparationOutcome::Complete(Err(
-                HostSelectedRegistryRepoSpecsError::EffectiveOverrideCompute {
-                    module: entry.key.clone(),
-                    message: error.to_string().into(),
-                },
-            ));
-        }
+    let effective = match finish_effective_override_child(
+        effective_override_child(ctx, workspace, name.clone(), mode).await,
+        &entry.key,
+        observations,
+    ) {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
     };
     repo_spec = match augment_override(&entry.key, repo_spec, &effective) {
         Ok(value) => value,
-        Err(error) => return SourcePreparationOutcome::Complete(Err(error)),
+        Err(error) => return RepoSpecEntryTerminal::Complete(Err(error)),
     };
-    SourcePreparationOutcome::Complete(Ok(Some(HostSelectedRegistryRepoSpec {
+    RepoSpecEntryTerminal::Complete(Ok(Some(HostSelectedRegistryRepoSpec {
         module: entry.key.clone(),
         policy: policy_identity,
         module_file_attempts: module_file_attempts.clone(),
@@ -933,75 +1301,199 @@ async fn compute_entry(
     })))
 }
 
+fn repo_specs_complete(
+    result: Result<HostSelectedRegistryRepoSpecs, HostSelectedRegistryRepoSpecsError>,
+    observations: PathObservationEpoch,
+) -> RepoSpecsDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn finish_selected_graph_child(
+    child: RepoSpecChild<
+        HostSelectedModuleGraph,
+        HostSelectedModuleGraphError,
+        HostSelectedModuleGraphObservationError,
+    >,
+    observations: &mut PathObservationEpoch,
+) -> Result<
+    Arc<Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>>,
+    RepoSpecsDriverOutcome,
+> {
+    match child {
+        RepoSpecChild::Compute(message) => Err(repo_specs_complete(
+            Err(HostSelectedRegistryRepoSpecsError::GraphCompute(message)),
+            observations.dupe(),
+        )),
+        RepoSpecChild::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        RepoSpecChild::Outer(error) => Err(SourcePreparationOutcome::Complete(Err(
+            HostSelectedRegistryRepoSpecsObservationError::Graph(error),
+        ))),
+        RepoSpecChild::Complete {
+            result,
+            observations: incoming,
+        } => {
+            merge_repo_spec_observations(
+                observations,
+                &incoming,
+                None,
+                RepoSpecObservationStage::Graph,
+            )
+            .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+            Ok(result)
+        }
+    }
+}
+
+#[derive(Default)]
+struct RepoSpecsAccumulator {
+    entries: Vec<HostSelectedRegistryRepoSpec>,
+    first_outer: Option<HostSelectedRegistryRepoSpecsObservationError>,
+    first_error: Option<HostSelectedRegistryRepoSpecsError>,
+    needs: Option<SourcePreparationNeeds>,
+    incompatible: Option<SourcePreparationNeedsError>,
+}
+
+impl RepoSpecsAccumulator {
+    fn record(&mut self, terminal: RepoSpecEntryTerminal) {
+        match terminal {
+            RepoSpecEntryTerminal::Complete(Ok(Some(entry))) => self.entries.push(entry),
+            RepoSpecEntryTerminal::Complete(Ok(None)) => {}
+            RepoSpecEntryTerminal::Complete(Err(error)) => {
+                if self.first_error.is_none() {
+                    self.first_error = Some(error);
+                }
+            }
+            RepoSpecEntryTerminal::Need(need) => {
+                self.needs = match self.needs.take() {
+                    None => Some(need),
+                    Some(current) => match current.try_union(&need) {
+                        Ok(union) => Some(union),
+                        Err(error) => {
+                            if self.incompatible.is_none() {
+                                self.incompatible = Some(error);
+                            }
+                            Some(current)
+                        }
+                    },
+                };
+            }
+            RepoSpecEntryTerminal::Outer(error) => {
+                if self.first_outer.is_none() {
+                    self.first_outer = Some(error);
+                }
+            }
+        }
+    }
+
+    fn finish(self, observations: PathObservationEpoch) -> RepoSpecsDriverOutcome {
+        if let Some(error) = self.first_outer {
+            return SourcePreparationOutcome::Complete(Err(error));
+        }
+        if let Some(error) = self.first_error {
+            return repo_specs_complete(Err(error), observations);
+        }
+        if let Some(error) = self.incompatible {
+            return repo_specs_complete(
+                Err(HostSelectedRegistryRepoSpecsError::IncompatibleNeeds(error)),
+                observations,
+            );
+        }
+        if let Some(need) = self.needs {
+            return SourcePreparationOutcome::Need(need);
+        }
+        repo_specs_complete(
+            Ok(HostSelectedRegistryRepoSpecs {
+                entries: self.entries.into(),
+            }),
+            observations,
+        )
+    }
+}
+
+async fn drive_selected_registry_repo_specs(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedRegistryRepoSpecsKey,
+    mode: RepoSpecsMode,
+) -> RepoSpecsDriverOutcome {
+    let graph_child = match mode {
+        RepoSpecsMode::Legacy => legacy_graph_child(ctx, &key.workspace).await,
+        RepoSpecsMode::Observed => selected_graph_child(ctx, &key.workspace).await,
+    };
+    let mut observations = PathObservationEpoch::empty();
+    let graph_result = match finish_selected_graph_child(graph_child, &mut observations) {
+        Ok(result) => result,
+        Err(terminal) => return terminal,
+    };
+    let graph = match graph_result.as_ref() {
+        Ok(value) => value.clone(),
+        Err(error) => {
+            return repo_specs_complete(
+                Err(HostSelectedRegistryRepoSpecsError::Graph(error.clone())),
+                observations,
+            );
+        }
+    };
+    let mut accumulator = RepoSpecsAccumulator::default();
+    for entry in graph.resolved.iter() {
+        accumulator.record(
+            drive_repo_spec_entry(ctx, &key.workspace, entry, mode, &mut observations).await,
+        );
+    }
+    accumulator.finish(observations)
+}
+
+fn project_legacy_repo_specs(outcome: RepoSpecsDriverOutcome) -> RepoSpecsOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy selected repo specs have no observed frontier")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for HostSelectedRegistryRepoSpecsKey {
     type Value = RepoSpecsOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let graph = match ctx
-            .compute(&HostSelectedModuleGraphKey::new(self.workspace.dupe()))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+        project_legacy_repo_specs(
+            drive_selected_registry_repo_specs(ctx, self, RepoSpecsMode::Legacy).await,
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+#[async_trait]
+impl Key for HostSelectedRegistryRepoSpecsObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<
+            ObservedHostSelectedRegistryRepoSpecs,
+            HostSelectedRegistryRepoSpecsObservationError,
+        >,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_selected_registry_repo_specs(ctx, &self.0, RepoSpecsMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref().clone() {
-                Ok(value) => value,
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostSelectedRegistryRepoSpecsError::Graph(error.clone()),
-                    )));
-                }
-            },
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostSelectedRegistryRepoSpecsError::GraphCompute(error.to_string().into()),
-                )));
-            }
-        };
-        let mut entries = Vec::new();
-        let mut first_error = None;
-        let mut needs: Option<SourcePreparationNeeds> = None;
-        let mut incompatible = None;
-        for entry in graph.resolved.iter() {
-            match compute_entry(ctx, &self.workspace, entry).await {
-                SourcePreparationOutcome::Complete(Ok(Some(entry))) => entries.push(entry),
-                SourcePreparationOutcome::Complete(Ok(None)) => {}
-                SourcePreparationOutcome::Complete(Err(error)) => {
-                    if first_error.is_none() {
-                        first_error = Some(error);
-                    }
-                }
-                SourcePreparationOutcome::Need(need) => {
-                    needs = match needs.take() {
-                        None => Some(need),
-                        Some(current) => match current.try_union(&need) {
-                            Ok(union) => Some(union),
-                            Err(error) => {
-                                if incompatible.is_none() {
-                                    incompatible = Some(error);
-                                }
-                                Some(current)
-                            }
-                        },
-                    };
-                }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedRegistryRepoSpecs::new(
+                    result,
+                    observations,
+                )))
             }
         }
-        if let Some(error) = first_error {
-            return SourcePreparationOutcome::Complete(Arc::new(Err(error)));
-        }
-        if let Some(error) = incompatible {
-            return SourcePreparationOutcome::Complete(Arc::new(Err(
-                HostSelectedRegistryRepoSpecsError::IncompatibleNeeds(error),
-            )));
-        }
-        if let Some(need) = needs {
-            return SourcePreparationOutcome::Need(need);
-        }
-        SourcePreparationOutcome::Complete(Arc::new(Ok(HostSelectedRegistryRepoSpecs {
-            entries: entries.into(),
-        })))
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -2978,6 +3470,8 @@ mod tests {
     use std::path::Path;
     use std::sync::Arc;
     use std::sync::Mutex;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
 
     use async_trait::async_trait;
     use compact_str::CompactString;
@@ -2990,6 +3484,9 @@ mod tests {
     use dice::Key;
     use dice::RichActivation;
     use dice::UserComputationData;
+    use dupe::Dupe;
+    use slug_events_v2::CaptureEvaluationEvents;
+    use slug_events_v2::EventBatch;
     use slug_identity_v2::CanonicalLabel;
     use slug_identity_v2::CanonicalRepoName;
     use slug_workspace_v2::NormalizedAbsolutePath;
@@ -2997,6 +3494,7 @@ mod tests {
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
+    use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
@@ -3125,6 +3623,68 @@ mod tests {
         calls: Mutex<Vec<String>>,
     }
 
+    #[derive(Debug, Clone)]
+    struct RepoSpecActivation {
+        key: String,
+        batch: Option<EventBatch>,
+    }
+
+    #[derive(Debug, Default)]
+    struct RepoSpecTracker {
+        activations: Mutex<Vec<RepoSpecActivation>>,
+        rows: Mutex<Vec<(String, Vec<String>)>>,
+    }
+
+    impl RepoSpecTracker {
+        fn take(&self) -> (Vec<RepoSpecActivation>, Vec<(String, Vec<String>)>) {
+            (
+                std::mem::take(&mut *self.activations.lock().unwrap()),
+                std::mem::take(&mut *self.rows.lock().unwrap()),
+            )
+        }
+    }
+
+    impl ActivationTracker for RepoSpecTracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+            self.rows
+                .lock()
+                .unwrap()
+                .push((key.to_string(), deps.map(ToString::to_string).collect()));
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            self.activations.lock().unwrap().push(RepoSpecActivation {
+                key: key.to_string(),
+                batch: activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            });
+        }
+    }
+
+    fn repo_spec_row<'a>(rows: &'a [(String, Vec<String>)], owner: &str) -> &'a [String] {
+        &rows.iter().find(|(key, _)| key == owner).unwrap().1
+    }
+
+    fn assert_no_repo_spec_upper(rows: &[(String, Vec<String>)]) {
+        let forbidden = "host-selected-module-routes: host-selected-extension- host-canonical-selected-module-definition: host-root-repository-mapping: host-generated-repository-definition: slug-command:";
+        assert!(
+            rows.iter()
+                .all(|(owner, deps)| !forbidden.split(' ').any(|prefix| {
+                    owner.starts_with(prefix) || deps.iter().any(|dep| dep.starts_with(prefix))
+                }))
+        );
+    }
     #[derive(Default)]
     struct SelectedDefinitionTracker {
         selected: Mutex<Vec<(ActivationKind, bool)>>,
@@ -3246,6 +3806,35 @@ mod tests {
         }
     }
 
+    struct CancelOnceRegistryIo {
+        calls: AtomicUsize,
+    }
+
+    #[async_trait]
+    impl crate::RegistryIo for CancelOnceRegistryIo {
+        async fn read_exact(
+            &self,
+            url: &RegistryFileUrl,
+        ) -> Result<crate::RegistryIoOutcome, crate::RegistryTransportError> {
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 0 {
+                std::future::pending().await
+            }
+            let bytes: Option<&'static [u8]> = match url.as_str() {
+                "https://registry.invalid/modules/dep/1/MODULE.bazel" => {
+                    Some(b"module(name='dep', version='1')\n")
+                }
+                "https://registry.invalid/modules/dep/1/source.json" => {
+                    Some(br#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a"}"#)
+                }
+                "https://registry.invalid/bazel_registry.json" => Some(br#"{"mirrors":[]}"#),
+                _ => None,
+            };
+            Ok(bytes.map_or(crate::RegistryIoOutcome::NotFound, |bytes| {
+                crate::RegistryIoOutcome::Found(Arc::from(bytes))
+            }))
+        }
+    }
+
     fn observation(path: &str, operation: PathObservationOperation) -> PathObservationDemand {
         PathObservationDemand::new(
             PathObservationNamespace::Host,
@@ -3254,8 +3843,9 @@ mod tests {
         )
     }
 
-    fn host_epoch(local_module: Option<&str>) -> PathObservationEpoch {
+    fn host_epoch(root_module: &str, local_module: Option<&str>) -> PathObservationEpoch {
         let lock = format!("{WORKSPACE}/MODULE.bazel.lock");
+        let module = format!("{WORKSPACE}/MODULE.bazel");
         let lstat = |path: &str, kind, id| {
             (
                 observation(path, PathObservationOperation::Lstat),
@@ -3272,6 +3862,13 @@ mod tests {
         let mut observations = vec![
             lstat("/", PathNodeKind::Directory, 1),
             lstat(WORKSPACE, PathNodeKind::Directory, 2),
+            lstat(&module, PathNodeKind::RegularFile, 4),
+            (
+                observation(&module, PathObservationOperation::FileBytes),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    root_module.as_bytes(),
+                ))),
+            ),
             lstat(&lock, PathNodeKind::RegularFile, 3),
             (
                 observation(&lock, PathObservationOperation::FileBytes),
@@ -3325,15 +3922,21 @@ mod tests {
         PathObservationEpoch::new(observations).unwrap()
     }
 
-    async fn real_transaction(
+    async fn real_transaction_with_tracker(
         dice: &Arc<Dice>,
         root: &str,
         generation: u64,
         mirrors: &[&str],
         include_epoch: bool,
+        tracker: Option<Arc<RepoSpecTracker>>,
     ) -> dice::DiceTransaction {
         let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
-        let mut updater = dice.updater();
+        let mut data = UserComputationData {
+            activation_tracker: tracker.map(|value| value as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        let mut updater = dice.updater_with_data(data);
         updater
             .changed_to(vec![(
                 slug_workspace_v2::WorkspaceSnapshotKey {
@@ -3413,7 +4016,10 @@ mod tests {
                 None
             };
             updater
-                .changed_to(vec![(PathObservationEpochKey, host_epoch(local_module))])
+                .changed_to(vec![(
+                    PathObservationEpochKey,
+                    host_epoch(root, local_module),
+                )])
                 .unwrap();
         } else {
             updater
@@ -3426,7 +4032,7 @@ mod tests {
         updater
             .changed_to(vec![(
                 HostRegistryRefreshTokenKey::new(workspace.dupe()),
-                HostRegistryRefreshToken::new(generation),
+                HostRegistryRefreshToken::new(1),
             )])
             .unwrap();
         let mirror_input = normalize_host_registry_inputs(
@@ -3510,6 +4116,16 @@ mod tests {
         updater.commit().await
     }
 
+    async fn real_transaction(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        mirrors: &[&str],
+        include_epoch: bool,
+    ) -> dice::DiceTransaction {
+        real_transaction_with_tracker(dice, root, generation, mirrors, include_epoch, None).await
+    }
+
     async fn compute_real(
         dice: &Arc<Dice>,
         root: &str,
@@ -3524,6 +4140,42 @@ mod tests {
             ))
             .await
             .unwrap()
+    }
+
+    async fn compute_real_observed(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        mirrors: &[&str],
+        include_epoch: bool,
+        tracker: Option<Arc<RepoSpecTracker>>,
+    ) -> <HostSelectedRegistryRepoSpecsObservationKey as Key>::Value {
+        real_transaction_with_tracker(dice, root, generation, mirrors, include_epoch, tracker)
+            .await
+            .compute(&HostSelectedRegistryRepoSpecsObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    fn complete_observed_repo_specs(
+        value: &<HostSelectedRegistryRepoSpecsObservationKey as Key>::Value,
+    ) -> ObservedHostSelectedRegistryRepoSpecs {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+            panic!("observed repo specs must complete: {value:?}");
+        };
+        observed.dupe()
+    }
+
+    fn assert_exact_repo_epoch(expected: &PathObservationEpoch, actual: &PathObservationEpoch) {
+        assert_eq!(expected.observations().len(), actual.observations().len());
+        for ((demand, result), (actual_demand, actual_result)) in
+            expected.observations().iter().zip(actual.observations())
+        {
+            assert_eq!(demand, actual_demand);
+            assert!(Arc::ptr_eq(result, actual_result), "{demand:?}");
+        }
     }
 
     async fn compute_real_routes(
@@ -5167,6 +5819,18 @@ mod tests {
             SourcePreparationOutcome::Complete(value)
                 if value.as_ref().as_ref().unwrap().entries.is_empty()
         ));
+        let observed = compute_real_observed(&dice, &root, 1, &[], true, None).await;
+        let observed = complete_observed_repo_specs(&observed);
+        assert!(
+            observed
+                .result()
+                .as_ref()
+                .as_ref()
+                .unwrap()
+                .entries
+                .is_empty()
+                && !observed.observations().observations().is_empty()
+        );
         let routes = compute_real_routes(&dice, &root, 1, &[], true).await;
         let SourcePreparationOutcome::Complete(routes) = routes else {
             panic!("selected local routes must complete");
@@ -6736,6 +7400,7 @@ inject_repo(three, injected = "target")
 
     #[tokio::test]
     async fn real_aggregate_need_is_invalid_and_not_self_equal() {
+        const ROOT: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
         let io = Arc::new(TrackingRegistryIo::new([(
             "https://registry.invalid/modules/dep/1/MODULE.bazel",
             b"module(name='dep', version='1')\n" as &[u8],
@@ -6743,25 +7408,34 @@ inject_repo(three, injected = "target")
         let mut builder = Dice::builder();
         crate::install_registry_io(&mut builder, io);
         let dice = Arc::new(builder.build(DetectCycles::Enabled));
-        let need = compute_real(
-            &dice,
-            "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n",
-            1,
-            &[],
-            false,
-        )
-        .await;
+        let need = compute_real(&dice, ROOT, 1, &[], false).await;
         assert!(matches!(need, SourcePreparationOutcome::Need(_)));
         assert!(!HostSelectedRegistryRepoSpecsKey::validity(&need));
         assert!(!HostSelectedRegistryRepoSpecsKey::equality(&need, &need));
-        let route_need = compute_real_routes(
-            &dice,
-            "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n",
-            2,
-            &[],
-            false,
+
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let observed =
+            compute_real_observed(&dice, ROOT, 1, &[], false, Some(tracker.dupe())).await;
+        assert!(matches!(observed, SourcePreparationOutcome::Need(_)));
+        assert!(!HostSelectedRegistryRepoSpecsObservationKey::validity(
+            &observed
+        ));
+        assert!(!HostSelectedRegistryRepoSpecsObservationKey::equality(
+            &observed, &observed
+        ));
+        let (activations, rows) = tracker.take();
+        let owner = HostSelectedRegistryRepoSpecsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
         )
-        .await;
+        .to_string();
+        let parent = activations
+            .iter()
+            .find(|activation| activation.key == owner)
+            .unwrap();
+        assert!(parent.batch.is_none());
+        assert_no_repo_spec_upper(&rows);
+
+        let route_need = compute_real_routes(&dice, ROOT, 2, &[], false).await;
         assert!(matches!(route_need, SourcePreparationOutcome::Need(_)));
         assert!(!HostSelectedModuleRoutesKey::validity(&route_need));
         assert!(!HostSelectedModuleRoutesKey::equality(
@@ -6826,5 +7500,923 @@ inject_repo(three, injected = "target")
                     )) if name == "missing_b"
                 )
         ));
+    }
+
+    #[test]
+    fn observed_repo_specs_identity_merge_and_terminal_projection_are_exact() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedRegistryRepoSpecsObservationKey::new(workspace.dupe());
+        let other = HostSelectedRegistryRepoSpecsObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        assert_eq!(
+            key.to_string(),
+            "observed-host-selected-registry-repo-specs:\"/selected-repo-spec-test\""
+        );
+        assert_ne!(key, other);
+        let hash = |key: &HostSelectedRegistryRepoSpecsObservationKey| {
+            let mut state = std::collections::hash_map::DefaultHasher::new();
+            std::hash::Hash::hash(key, &mut state);
+            std::hash::Hasher::finish(&state)
+        };
+        assert_ne!(hash(&key), hash(&other));
+
+        let demand = observation("/prefix", PathObservationOperation::Lstat);
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let mut prefix =
+            PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let equal =
+            PathObservationEpoch::from_shared([(demand.dupe(), Arc::new(first.as_ref().clone()))])
+                .unwrap();
+        merge_repo_spec_observations(
+            &mut prefix,
+            &equal,
+            Some(&module()),
+            RepoSpecObservationStage::SourceRegistryFile,
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(prefix.get(&demand).unwrap(), &first));
+        let conflict = PathObservationEpoch::from_shared([(
+            demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, 3, 4, 0o644),
+            ))),
+        )])
+        .unwrap();
+        assert!(matches!(
+            merge_repo_spec_observations(
+                &mut prefix,
+                &conflict,
+                Some(&module()),
+                RepoSpecObservationStage::RegistryMetadataFile,
+            ),
+            Err(HostSelectedRegistryRepoSpecsObservationError::Merge {
+                stage: RepoSpecObservationStage::RegistryMetadataFile,
+                ..
+            })
+        ));
+
+        let need = || {
+            SourcePreparationNeeds::path(slug_workspace_v2::NeedPathObservations::singleton(
+                demand.dupe(),
+            ))
+        };
+        let mismatch = || {
+            ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+                demand: demand.dupe(),
+                result_operation: PathObservationOperation::FileBytes,
+            })
+        };
+        let module = module();
+        let mut empty = PathObservationEpoch::empty();
+        assert!(matches!(
+            finish_host_registry_child(RepoSpecChild::Need(need()), &module, &mut empty),
+            Err(RepoSpecEntryTerminal::Need(_))
+        ));
+        assert!(matches!(
+            finish_host_registry_child(RepoSpecChild::Outer(mismatch()), &module, &mut empty),
+            Err(RepoSpecEntryTerminal::Outer(
+                HostSelectedRegistryRepoSpecsObservationError::HostRegistry { .. }
+            ))
+        ));
+        assert!(matches!(
+            finish_registry_file_child(
+                RepoSpecChild::Need(need()),
+                &module,
+                RegistryFileUrl::new("https://registry/source.json"),
+                RepoSpecObservationStage::SourceRegistryFile,
+                &mut empty,
+            ),
+            Err(RepoSpecEntryTerminal::Need(_))
+        ));
+        assert!(matches!(
+            finish_registry_file_child(
+                RepoSpecChild::Outer(mismatch()),
+                &module,
+                RegistryFileUrl::new("https://registry/source.json"),
+                RepoSpecObservationStage::SourceRegistryFile,
+                &mut empty,
+            ),
+            Err(RepoSpecEntryTerminal::Outer(
+                HostSelectedRegistryRepoSpecsObservationError::RegistryFile { .. }
+            ))
+        ));
+        assert!(matches!(
+            finish_effective_override_child(RepoSpecChild::Need(need()), &module, &mut empty),
+            Err(RepoSpecEntryTerminal::Need(_))
+        ));
+        assert!(matches!(
+            finish_effective_override_child(RepoSpecChild::Outer(mismatch()), &module, &mut empty),
+            Err(RepoSpecEntryTerminal::Outer(
+                HostSelectedRegistryRepoSpecsObservationError::EffectiveOverride { .. }
+            ))
+        ));
+
+        let result = Arc::new(Ok(HostSelectedRegistryRepoSpecs {
+            entries: Arc::from([]),
+        }));
+        let observed = ObservedHostSelectedRegistryRepoSpecs::new(result.dupe(), prefix.dupe());
+        let complete: <HostSelectedRegistryRepoSpecsObservationKey as Key>::Value =
+            SourcePreparationOutcome::Complete(Ok(observed));
+        assert!(HostSelectedRegistryRepoSpecsObservationKey::validity(
+            &complete
+        ));
+        assert!(HostSelectedRegistryRepoSpecsObservationKey::equality(
+            &complete, &complete
+        ));
+        let legacy = project_legacy_repo_specs(SourcePreparationOutcome::Complete(Ok((
+            result.dupe(),
+            prefix.dupe(),
+        ))));
+        let SourcePreparationOutcome::Complete(projected) = legacy else {
+            panic!("legacy projection must complete");
+        };
+        assert!(Arc::ptr_eq(&projected, &result));
+        let need_value: <HostSelectedRegistryRepoSpecsObservationKey as Key>::Value =
+            SourcePreparationOutcome::Need(need());
+        assert!(!HostSelectedRegistryRepoSpecsObservationKey::validity(
+            &need_value
+        ));
+        assert!(!HostSelectedRegistryRepoSpecsObservationKey::equality(
+            &need_value,
+            &need_value
+        ));
+    }
+
+    async fn assert_repo_spec_error_scan(
+        engines: (&Arc<Dice>, &Arc<Dice>),
+        ios: (&Arc<TrackingRegistryIo>, &Arc<TrackingRegistryIo>),
+        trackers: (&Arc<RepoSpecTracker>, &Arc<RepoSpecTracker>),
+        keys: (
+            &HostSelectedRegistryRepoSpecsObservationKey,
+            &HostSelectedRegistryRepoSpecsKey,
+        ),
+        rows: (&[String], &[String]),
+        observed: &ObservedHostSelectedRegistryRepoSpecs,
+        urls: (&str, &str),
+        root: &str,
+    ) {
+        let (dice, legacy_dice) = engines;
+        let (io, legacy_io) = ios;
+        let (tracker, legacy_tracker) = trackers;
+        let (observed_key, legacy_key) = keys;
+        let (observed_row, legacy_row) = rows;
+        let (bad_source_url, source_url) = urls;
+        io.replace(bad_source_url, b"{");
+        legacy_io.replace(bad_source_url, b"{");
+        let before = io.calls().len();
+        let error = compute_real_observed(dice, root, 2, &[], true, Some(tracker.dupe())).await;
+        let error = complete_observed_repo_specs(&error);
+        assert!(matches!(
+            error.result().as_ref(),
+            Err(HostSelectedRegistryRepoSpecsError::Json { module, file, .. })
+                if module == &route_key("bad", "1") && file == "source.json"
+        ));
+        assert_exact_repo_epoch(observed.observations(), error.observations());
+        assert!(io.calls()[before..].iter().any(|url| url == source_url));
+        let (error_activations, error_rows) = tracker.take();
+        let error_row = repo_spec_row(&error_rows, &observed_key.to_string());
+        assert_eq!(
+            error_row,
+            [0, 1, 2, 5, 6, 7, 8].map(|index| observed_row[index].clone())
+        );
+        let mut transaction = real_transaction_with_tracker(
+            legacy_dice,
+            root,
+            2,
+            &[],
+            true,
+            Some(legacy_tracker.dupe()),
+        )
+        .await;
+        let legacy_error = transaction.compute(legacy_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy_error) = legacy_error else {
+            panic!("legacy error must complete")
+        };
+        assert_eq!(error.result(), &legacy_error);
+        let (legacy_activations, legacy_rows) = legacy_tracker.take();
+        let legacy_error_row = repo_spec_row(&legacy_rows, &legacy_key.to_string());
+        assert_eq!(
+            legacy_error_row,
+            [0, 1, 2, 5, 6, 7, 8].map(|index| legacy_row[index].clone())
+        );
+        let batches = |activations: &[RepoSpecActivation]| {
+            activations
+                .iter()
+                .filter_map(|entry| entry.batch.dupe())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(batches(&error_activations), batches(&legacy_activations));
+        assert_no_repo_spec_upper(&error_rows);
+        assert_no_repo_spec_upper(&legacy_rows);
+    }
+    #[tokio::test]
+    async fn observed_repo_specs_match_legacy_families_events_and_warm_reuse() {
+        const BAD_MODULE_URL: &str = "https://registry.invalid/modules/bad/1/MODULE.bazel";
+        const BAD_SOURCE_URL: &str = "https://registry.invalid/modules/bad/1/source.json";
+        const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+        const SOURCE_URL: &str = "https://registry.invalid/modules/dep/1/source.json";
+        const REGISTRY_URL: &str = "https://registry.invalid/bazel_registry.json";
+        const ROOT: &str = "module(name='bazel_tools')\n\
+            local_path_override(module_name='local', path='local')\n\
+            bazel_dep(name='local', version='1')\n\
+            bazel_dep(name='bad', version='1')\n\
+            bazel_dep(name='dep', version='1')\n";
+        let files = [
+            (
+                BAD_MODULE_URL,
+                b"module(name='bad', version='1')\n".as_slice(),
+            ),
+            (
+                BAD_SOURCE_URL,
+                br#"{"url":"https://origin.test/bad.tgz","integrity":"sha256-bad"}"#.as_slice(),
+            ),
+            (MODULE_URL, b"module(name='dep', version='1')\n".as_slice()),
+            (
+                SOURCE_URL,
+                br#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a"}"#.as_slice(),
+            ),
+            (REGISTRY_URL, br#"{"mirrors":[]}"#.as_slice()),
+        ];
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let io = Arc::new(TrackingRegistryIo::new(files));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let observed_key = HostSelectedRegistryRepoSpecsObservationKey::new(workspace.dupe());
+        let mut transaction =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        let cold = transaction.compute(&observed_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(Ok(observed)) = &cold else {
+            panic!("observed repo specs must complete: {cold:?}");
+        };
+        assert!(observed.result().as_ref().is_ok());
+        assert!(!observed.observations().observations().is_empty());
+        let (observed_activations, observed_rows) = tracker.take();
+        let observed_row = repo_spec_row(&observed_rows, &observed_key.to_string());
+        let observed_file = |url| {
+            RegistryFileObservationKey::new(
+                workspace.as_path().to_owned(),
+                RegistryFileUrl::new(url),
+            )
+            .to_string()
+        };
+        assert_eq!(
+            observed_row,
+            vec![
+                HostSelectedModuleGraphObservationKey::new(workspace.dupe()).to_string(),
+                HostRegistryFunctionObservationKey::new(workspace.dupe(), REGISTRY).to_string(),
+                observed_file(BAD_SOURCE_URL),
+                observed_file(REGISTRY_URL),
+                HostEffectiveModuleOverrideObservationKey::new(workspace.dupe(), "bad".into(),)
+                    .to_string(),
+                HostRegistryFunctionObservationKey::new(workspace.dupe(), REGISTRY).to_string(),
+                observed_file(SOURCE_URL),
+                observed_file(REGISTRY_URL),
+                HostEffectiveModuleOverrideObservationKey::new(workspace.dupe(), "dep".into(),)
+                    .to_string(),
+            ]
+        );
+        let observed_events = observed_activations
+            .iter()
+            .filter_map(|entry| entry.batch.dupe())
+            .collect::<Vec<_>>();
+        assert!(
+            observed_activations
+                .iter()
+                .any(|entry| { entry.key == observed_key.to_string() && entry.batch.is_none() })
+        );
+
+        let warm = transaction.compute(&observed_key).await.unwrap();
+        assert!(HostSelectedRegistryRepoSpecsObservationKey::equality(
+            &cold, &warm
+        ));
+        assert!(
+            tracker
+                .take()
+                .0
+                .iter()
+                .all(|activation| activation.batch.is_none())
+        );
+
+        let legacy_tracker = Arc::new(RepoSpecTracker::default());
+        let legacy_io = Arc::new(TrackingRegistryIo::new(files));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, legacy_io.dupe());
+        let legacy_dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let legacy_key = HostSelectedRegistryRepoSpecsKey::new(workspace.dupe());
+        let mut legacy_transaction = real_transaction_with_tracker(
+            &legacy_dice,
+            ROOT,
+            1,
+            &[],
+            true,
+            Some(legacy_tracker.dupe()),
+        )
+        .await;
+        let legacy = legacy_transaction.compute(&legacy_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy_result) = &legacy else {
+            panic!("legacy repo specs must complete");
+        };
+        assert_eq!(observed.result(), legacy_result);
+        let (legacy_activations, legacy_rows) = legacy_tracker.take();
+        let legacy_row = repo_spec_row(&legacy_rows, &legacy_key.to_string());
+        let legacy_file = |url| {
+            RegistryFileKey {
+                workspace: workspace.as_path().to_owned(),
+                url: RegistryFileUrl::new(url),
+            }
+            .to_string()
+        };
+        assert_eq!(
+            legacy_row,
+            vec![
+                HostSelectedModuleGraphKey::new(workspace.dupe()).to_string(),
+                HostRegistryFunctionKey::new(workspace.dupe(), REGISTRY).to_string(),
+                legacy_file(BAD_SOURCE_URL),
+                legacy_file(REGISTRY_URL),
+                HostEffectiveModuleOverrideKey::new(workspace.dupe(), "bad".into()).to_string(),
+                HostRegistryFunctionKey::new(workspace.dupe(), REGISTRY).to_string(),
+                legacy_file(SOURCE_URL),
+                legacy_file(REGISTRY_URL),
+                HostEffectiveModuleOverrideKey::new(workspace.dupe(), "dep".into()).to_string(),
+            ]
+        );
+        let legacy_events = legacy_activations
+            .iter()
+            .filter_map(|entry| entry.batch.dupe())
+            .collect::<Vec<_>>();
+        assert_eq!(observed_events, legacy_events);
+        assert!(!observed_events.is_empty());
+
+        assert_repo_spec_error_scan(
+            (&dice, &legacy_dice),
+            (&io, &legacy_io),
+            (&tracker, &legacy_tracker),
+            (&observed_key, &legacy_key),
+            (observed_row, legacy_row),
+            observed,
+            (BAD_SOURCE_URL, SOURCE_URL),
+            ROOT,
+        )
+        .await;
+
+        let git_io = Arc::new(TrackingRegistryIo::new([
+            (MODULE_URL, b"module(name='dep', version='1')\n".as_slice()),
+            (
+                SOURCE_URL,
+                br#"{"type":"git_repository","remote":"https://git.test/repo","commit":"abc"}"#
+                    .as_slice(),
+            ),
+        ]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, git_io.dupe());
+        let git_dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let git_tracker = Arc::new(RepoSpecTracker::default());
+        let git_root = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let git_value =
+            compute_real_observed(&git_dice, git_root, 1, &[], true, Some(git_tracker.dupe()))
+                .await;
+        assert!(
+            complete_observed_repo_specs(&git_value)
+                .result()
+                .as_ref()
+                .is_ok()
+        );
+        assert!(!git_io.calls().iter().any(|url| url == REGISTRY_URL));
+        let git_rows = git_tracker.take().1;
+        let git_row = repo_spec_row(&git_rows, &observed_key.to_string());
+        assert_eq!(git_row.len(), 4);
+        assert!(
+            git_row
+                .iter()
+                .all(|dependency| dependency != &observed_file(REGISTRY_URL))
+        );
+        assert_no_repo_spec_upper(&observed_rows);
+        assert_no_repo_spec_upper(&legacy_rows);
+    }
+
+    #[tokio::test]
+    async fn observed_repo_specs_restore_each_child_input_with_held_carriers() {
+        const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+        const SOURCE_URL: &str = "https://registry.invalid/modules/dep/1/source.json";
+        const REGISTRY_URL: &str = "https://registry.invalid/bazel_registry.json";
+        const MODULE_A: &[u8] = b"module(name='dep', version='1')\n";
+        const MODULE_B: &[u8] = b"module(name='dep', version='1')\n# graph-b\n";
+        const SOURCE_A: &[u8] = br#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a"}"#;
+        const SOURCE_B: &[u8] = br#"{"url":"https://origin.test/b.tgz","integrity":"sha256-b"}"#;
+        const REGISTRY_A: &[u8] = br#"{"mirrors":["https://a.test"]}"#;
+        const REGISTRY_B: &[u8] = br#"{"mirrors":["https://b.test"]}"#;
+        const ROOT: &str = "module(name='bazel_tools')\n\
+            single_version_override(module_name='dep', patch_strip=0)\n\
+            bazel_dep(name='dep', version='1')\n";
+        let io = Arc::new(TrackingRegistryIo::new([
+            (MODULE_URL, MODULE_A),
+            (SOURCE_URL, SOURCE_A),
+            (REGISTRY_URL, REGISTRY_A),
+        ]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let a = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 1, &["https://command-a.test"], true, None).await,
+        );
+        let held_result = a.result().dupe();
+        let held_epoch = a.observations().dupe();
+        let warm = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 1, &["https://command-a.test"], true, None).await,
+        );
+        assert_eq!(warm, a);
+        assert!(Arc::ptr_eq(warm.result(), a.result()));
+        assert_exact_repo_epoch(&held_epoch, warm.observations());
+
+        io.replace(SOURCE_URL, SOURCE_B);
+        let source_b = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 2, &["https://command-a.test"], true, None).await,
+        );
+        assert_ne!(source_b.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, source_b.observations());
+        io.replace(SOURCE_URL, SOURCE_A);
+        let source_a = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 3, &["https://command-a.test"], true, None).await,
+        );
+        assert_eq!(source_a.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, source_a.observations());
+
+        io.replace(REGISTRY_URL, REGISTRY_B);
+        let registry_b = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 4, &["https://command-a.test"], true, None).await,
+        );
+        assert_ne!(registry_b.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, registry_b.observations());
+        io.replace(REGISTRY_URL, REGISTRY_A);
+        let registry_a = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 5, &["https://command-a.test"], true, None).await,
+        );
+        assert_eq!(registry_a.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, registry_a.observations());
+
+        io.replace(MODULE_URL, MODULE_B);
+        let graph_b = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 6, &["https://command-a.test"], true, None).await,
+        );
+        assert_ne!(graph_b.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, graph_b.observations());
+        io.replace(MODULE_URL, MODULE_A);
+        let graph_a = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 7, &["https://command-a.test"], true, None).await,
+        );
+        assert_eq!(graph_a.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, graph_a.observations());
+
+        let policy_b = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 7, &["https://command-b.test"], true, None).await,
+        );
+        assert_ne!(policy_b.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, policy_b.observations());
+        let policy_a = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 7, &["https://command-a.test"], true, None).await,
+        );
+        assert_eq!(policy_a.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, policy_a.observations());
+
+        let override_b = complete_observed_repo_specs(
+            &compute_real_observed(
+                &dice,
+                &ROOT.replace("patch_strip=0", "patch_strip=2"),
+                7,
+                &["https://command-a.test"],
+                true,
+                None,
+            )
+            .await,
+        );
+        assert_ne!(override_b.result(), a.result());
+        assert_ne!(override_b.observations(), a.observations());
+        let restored = complete_observed_repo_specs(
+            &compute_real_observed(&dice, ROOT, 7, &["https://command-a.test"], true, None).await,
+        );
+        assert_eq!(restored.result(), a.result());
+        assert_eq!(restored.observations(), a.observations());
+        let root_module = format!("{WORKSPACE}/MODULE.bazel");
+        for (demand, result) in held_epoch.observations() {
+            assert_eq!(
+                result.as_ref(),
+                restored.observations().get(demand).unwrap().as_ref()
+            );
+            if demand.path().as_path() != Path::new(&root_module) {
+                assert!(Arc::ptr_eq(
+                    result,
+                    restored.observations().get(demand).unwrap()
+                ));
+            }
+        }
+        assert_eq!(held_result.as_ref(), restored.result().as_ref());
+    }
+
+    #[test]
+    fn repo_spec_production_finishers_preserve_exact_terminal_prefixes() {
+        let demand = |path: &str| observation(path, PathObservationOperation::Lstat);
+        let result = |inode| {
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, inode, 4, 0o644),
+            )))
+        };
+        let first_demand = demand("/first");
+        let first_result = result(3);
+        let prefix =
+            PathObservationEpoch::from_shared([(first_demand.dupe(), first_result.dupe())])
+                .unwrap();
+        let second_demand = demand("/second");
+        let second_result = result(4);
+        let incoming =
+            PathObservationEpoch::from_shared([(second_demand.dupe(), second_result.dupe())])
+                .unwrap();
+        let module = module();
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+
+        let mut graph_prefix = PathObservationEpoch::empty();
+        let compute = finish_selected_graph_child(
+            RepoSpecChild::Compute("graph-compute".into()),
+            &mut graph_prefix,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            compute,
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(
+                    result.as_ref(),
+                    Err(HostSelectedRegistryRepoSpecsError::GraphCompute(message))
+                        if message == "graph-compute"
+                ) && observations.observations().is_empty()
+        ));
+        let graph_need = SourcePreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(first_demand.dupe()),
+        );
+        assert!(matches!(
+            finish_selected_graph_child(RepoSpecChild::Need(graph_need), &mut graph_prefix),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        assert!(matches!(
+            finish_selected_graph_child(
+                RepoSpecChild::Outer(HostSelectedModuleGraphObservationError::Merge(
+                    ObservedPathFrontierError::from(PathObservationEpochError::DuplicateDemand(
+                        first_demand.dupe()
+                    ))
+                )),
+                &mut graph_prefix,
+            ),
+            Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedRegistryRepoSpecsObservationError::Graph(_)
+            )))
+        ));
+        let graph_result = Arc::new(Err(HostSelectedModuleGraphError::Input {
+            owner: "graph".into(),
+            message: "semantic".into(),
+        }));
+        let returned = finish_selected_graph_child(
+            RepoSpecChild::Complete {
+                result: graph_result.dupe(),
+                observations: incoming.dupe(),
+            },
+            &mut graph_prefix,
+        )
+        .unwrap();
+        assert!(Arc::ptr_eq(&returned, &graph_result));
+        assert_exact_repo_epoch(&incoming, &graph_prefix);
+
+        let mut policy_prefix = prefix.dupe();
+        assert!(matches!(
+            finish_host_registry_child(
+                RepoSpecChild::Compute("policy-compute".into()),
+                &module,
+                &mut policy_prefix,
+            ),
+            Err(RepoSpecEntryTerminal::Complete(Err(
+                HostSelectedRegistryRepoSpecsError::RegistryPolicyCompute {
+                    message,
+                    ..
+                }
+            ))) if message == "policy-compute"
+        ));
+        assert_exact_repo_epoch(&prefix, &policy_prefix);
+        assert!(matches!(
+            finish_host_registry_child(
+                RepoSpecChild::Complete {
+                    result: Arc::new(Err(HostRegistryFunctionError::LockfileModeInput {
+                        workspace: workspace.dupe(),
+                    })),
+                    observations: incoming.dupe(),
+                },
+                &module,
+                &mut policy_prefix,
+            ),
+            Err(RepoSpecEntryTerminal::Complete(Err(
+                HostSelectedRegistryRepoSpecsError::RegistryPolicy { .. }
+            )))
+        ));
+        assert!(Arc::ptr_eq(
+            policy_prefix.get(&first_demand).unwrap(),
+            &first_result
+        ));
+        assert!(Arc::ptr_eq(
+            policy_prefix.get(&second_demand).unwrap(),
+            &second_result
+        ));
+
+        let mut file_prefix = prefix.dupe();
+        let url = RegistryFileUrl::new("https://registry.invalid/source.json");
+        assert!(matches!(
+            finish_registry_file_child(
+                RepoSpecChild::Compute("file-compute".into()),
+                &module,
+                url.dupe(),
+                RepoSpecObservationStage::SourceRegistryFile,
+                &mut file_prefix,
+            ),
+            Err(RepoSpecEntryTerminal::Complete(Err(
+                HostSelectedRegistryRepoSpecsError::RegistryFileCompute { message, .. }
+            ))) if message == "file-compute"
+        ));
+        assert_exact_repo_epoch(&prefix, &file_prefix);
+        assert!(matches!(
+            finish_registry_file_child(
+                RepoSpecChild::Complete {
+                    result: Arc::new(Err(RegistryFileError::MissingIoCapability)),
+                    observations: incoming.dupe(),
+                },
+                &module,
+                url,
+                RepoSpecObservationStage::SourceRegistryFile,
+                &mut file_prefix,
+            ),
+            Err(RepoSpecEntryTerminal::Complete(Err(
+                HostSelectedRegistryRepoSpecsError::RegistryFile { .. }
+            )))
+        ));
+        assert!(Arc::ptr_eq(
+            file_prefix.get(&first_demand).unwrap(),
+            &first_result
+        ));
+        assert!(Arc::ptr_eq(
+            file_prefix.get(&second_demand).unwrap(),
+            &second_result
+        ));
+
+        let mut effective_prefix = prefix.dupe();
+        assert!(matches!(
+            finish_effective_override_child(
+                RepoSpecChild::Compute("effective-compute".into()),
+                &module,
+                &mut effective_prefix,
+            ),
+            Err(RepoSpecEntryTerminal::Complete(Err(
+                HostSelectedRegistryRepoSpecsError::EffectiveOverrideCompute { message, .. }
+            ))) if message == "effective-compute"
+        ));
+        assert_exact_repo_epoch(&prefix, &effective_prefix);
+        assert!(matches!(
+            finish_effective_override_child(
+                RepoSpecChild::Complete {
+                    result: Arc::new(Err(HostEffectiveModuleOverrideError::CommandPolicy(
+                        "effective".into()
+                    ))),
+                    observations: incoming,
+                },
+                &module,
+                &mut effective_prefix,
+            ),
+            Err(RepoSpecEntryTerminal::Complete(Err(
+                HostSelectedRegistryRepoSpecsError::EffectiveOverride { .. }
+            )))
+        ));
+        assert!(Arc::ptr_eq(
+            effective_prefix.get(&first_demand).unwrap(),
+            &first_result
+        ));
+        assert!(Arc::ptr_eq(
+            effective_prefix.get(&second_demand).unwrap(),
+            &second_result
+        ));
+    }
+
+    #[test]
+    fn repo_spec_accumulator_preserves_full_scan_terminal_precedence() {
+        let demand = |path: &str| {
+            slug_workspace_v2::NeedPathObservations::singleton(observation(
+                path,
+                PathObservationOperation::Lstat,
+            ))
+        };
+        let epoch_demand = observation("/prefix", PathObservationOperation::Lstat);
+        let epoch_result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let epoch = PathObservationEpoch::from_shared([(epoch_demand.dupe(), epoch_result.dupe())])
+            .unwrap();
+        let semantic = || {
+            RepoSpecEntryTerminal::Complete(Err(HostSelectedRegistryRepoSpecsError::Projection {
+                module: module(),
+                message: "first-semantic".into(),
+            }))
+        };
+        for position in 0..3 {
+            let mut accumulator = RepoSpecsAccumulator::default();
+            for index in 0..3 {
+                accumulator.record(if index == position {
+                    semantic()
+                } else {
+                    RepoSpecEntryTerminal::Complete(Ok(None))
+                });
+            }
+            assert!(matches!(
+                accumulator.finish(epoch.dupe()),
+                SourcePreparationOutcome::Complete(Ok((result, observations)))
+                    if matches!(
+                        result.as_ref(),
+                        Err(HostSelectedRegistryRepoSpecsError::Projection {
+                            message,
+                            ..
+                        }) if message == "first-semantic"
+                    ) && Arc::ptr_eq(observations.get(&epoch_demand).unwrap(), &epoch_result)
+            ));
+        }
+
+        let mismatch = || {
+            ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+                demand: epoch_demand.dupe(),
+                result_operation: PathObservationOperation::FileBytes,
+            })
+        };
+        let outer = |merge| {
+            if merge {
+                HostSelectedRegistryRepoSpecsObservationError::Merge {
+                    module: Some(Arc::new(module())),
+                    stage: RepoSpecObservationStage::HostRegistry,
+                    error: mismatch(),
+                }
+            } else {
+                HostSelectedRegistryRepoSpecsObservationError::HostRegistry {
+                    module: Arc::new(module()),
+                    error: mismatch(),
+                }
+            }
+        };
+        let terminal_class = |outcome: &RepoSpecsDriverOutcome| match outcome {
+            SourcePreparationOutcome::Complete(Err(
+                HostSelectedRegistryRepoSpecsObservationError::HostRegistry { .. },
+            )) => 0,
+            SourcePreparationOutcome::Complete(Err(
+                HostSelectedRegistryRepoSpecsObservationError::Merge { .. },
+            )) => 1,
+            SourcePreparationOutcome::Need(_) => 2,
+            _ => 3,
+        };
+        for kind in 0..3 {
+            for position in 0..3 {
+                let mut accumulator = RepoSpecsAccumulator::default();
+                for index in 0..3 {
+                    accumulator.record(if index != position {
+                        RepoSpecEntryTerminal::Complete(Ok(None))
+                    } else if kind == 2 {
+                        RepoSpecEntryTerminal::Need(SourcePreparationNeeds::path(demand("/need")))
+                    } else {
+                        RepoSpecEntryTerminal::Outer(outer(kind == 1))
+                    });
+                }
+                if kind == 2 {
+                    accumulator.record(RepoSpecEntryTerminal::Need(SourcePreparationNeeds::path(
+                        demand("/union"),
+                    )));
+                }
+                let outcome = accumulator.finish(epoch.dupe());
+                assert_eq!(terminal_class(&outcome), kind);
+                assert!(
+                    kind != 2
+                        || matches!(&outcome, SourcePreparationOutcome::Need(needs)
+                    if needs.path_observations().unwrap().demands().len() == 2)
+                );
+            }
+        }
+
+        let mut priority = RepoSpecsAccumulator::default();
+        priority.record(RepoSpecEntryTerminal::Need(SourcePreparationNeeds::path(
+            demand("/a"),
+        )));
+        priority.record(semantic());
+        priority.record(RepoSpecEntryTerminal::Outer(outer(false)));
+        priority.record(RepoSpecEntryTerminal::Outer(outer(true)));
+        assert_eq!(terminal_class(&priority.finish(epoch.dupe())), 0);
+        let mut semantic_first = RepoSpecsAccumulator::default();
+        semantic_first.record(RepoSpecEntryTerminal::Need(SourcePreparationNeeds::path(
+            demand("/a"),
+        )));
+        semantic_first.record(semantic());
+        assert!(
+            matches!(semantic_first.finish(epoch.dupe()), SourcePreparationOutcome::Complete(Ok((result, _)))
+            if matches!(result.as_ref(), Err(HostSelectedRegistryRepoSpecsError::Projection { .. })))
+        );
+
+        let request = |path: &str| crate::RepositoryMaterializationRequest {
+            id: crate::RepositoryMaterializationRequestId {
+                workspace: NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                canonical_repo: CanonicalRepoName::new("dep+").unwrap(),
+            },
+            repo_spec: repo_spec(
+                "@@bazel_tools//tools/build_defs/repo:local.bzl",
+                "local_repository",
+                SmallMap::new(),
+            ),
+            kind: crate::RepositoryMaterializationKind::Local {
+                logical_root: NormalizedAbsolutePath::new(path).unwrap(),
+            },
+        };
+        for (first, second) in [(0, 1), (0, 2), (1, 2)] {
+            let mut incompatible = RepoSpecsAccumulator::default();
+            for index in 0..3 {
+                incompatible.record(if index == first || index == second {
+                    RepoSpecEntryTerminal::Need(SourcePreparationNeeds::repository(request(
+                        if index == first { "/a" } else { "/b" },
+                    )))
+                } else {
+                    RepoSpecEntryTerminal::Complete(Ok(None))
+                });
+            }
+            assert!(matches!(incompatible.finish(epoch.dupe()),
+                SourcePreparationOutcome::Complete(Ok((result, observations)))
+                    if matches!(result.as_ref(), Err(
+                        HostSelectedRegistryRepoSpecsError::IncompatibleNeeds(
+                            SourcePreparationNeedsError::ConflictingRepositoryRequest { .. }
+                        ))) && Arc::ptr_eq(observations.get(&epoch_demand).unwrap(), &epoch_result)
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_repo_specs_poll_drop_publishes_nothing_and_recovers() {
+        const ROOT: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let io = Arc::new(CancelOnceRegistryIo {
+            calls: AtomicUsize::new(0),
+        });
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let key = HostSelectedRegistryRepoSpecsObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        );
+        let mut cancelled =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        tracker.take();
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while io.calls.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(future);
+        drop(cancelled);
+        let (cancelled_activations, cancelled_rows) = tracker.take();
+        assert!(
+            cancelled_rows
+                .iter()
+                .all(|(owner, _)| owner != &key.to_string())
+        );
+        assert!(
+            cancelled_activations
+                .iter()
+                .all(|activation| activation.key != key.to_string())
+        );
+
+        let mut recovered =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        let recovered_value = recovered.compute(&key).await.unwrap();
+        assert!(
+            complete_observed_repo_specs(&recovered_value)
+                .result()
+                .as_ref()
+                .is_ok()
+        );
+        assert!(io.calls.load(Ordering::SeqCst) >= 4);
+        let (recovered_activations, recovered_rows) = tracker.take();
+        assert!(
+            recovered_rows
+                .iter()
+                .any(|(owner, _)| owner == &key.to_string())
+        );
+        assert!(
+            recovered_activations
+                .iter()
+                .filter(|activation| activation.key == key.to_string())
+                .all(|activation| activation.batch.is_none())
+        );
+        assert_no_repo_spec_upper(&cancelled_rows);
+        assert_no_repo_spec_upper(&recovered_rows);
     }
 }
