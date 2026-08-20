@@ -31,6 +31,7 @@ use slug_identity_v2::CanonicalRepoName;
 use slug_workspace_v2::NormalizedAbsolutePath;
 use slug_workspace_v2::ObservedPathFrontierError;
 use slug_workspace_v2::PathObservationEpoch;
+use slug_workspace_v2::PathObservationEpochError;
 use slug_workspace_v2::PathOutcome;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
@@ -1571,8 +1572,77 @@ impl fmt::Display for HostSelectedModuleRoutesKey {
     }
 }
 
-type RoutesOutcome =
-    SourcePreparationOutcome<Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>>;
+type RoutesResult = Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>;
+type RoutesOutcome = SourcePreparationOutcome<RoutesResult>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+struct HostSelectedModuleRoutesObservationKey(HostSelectedModuleRoutesKey);
+
+#[allow(dead_code)]
+impl HostSelectedModuleRoutesObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostSelectedModuleRoutesKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostSelectedModuleRoutesObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+struct ObservedHostSelectedModuleRoutes {
+    result: RoutesResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostSelectedModuleRoutes {
+    fn new(result: RoutesResult, observations: PathObservationEpoch) -> Self {
+        Self {
+            result,
+            observations,
+        }
+    }
+
+    fn result(&self) -> &RoutesResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+enum RouteObservationStage {
+    Graph,
+    RepoSpecs,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum HostSelectedModuleRoutesObservationError {
+    Graph(HostSelectedModuleGraphObservationError),
+    RepoSpecs(HostSelectedRegistryRepoSpecsObservationError),
+    Merge {
+        stage: RouteObservationStage,
+        error: ObservedPathFrontierError,
+    },
+}
+
+#[derive(Clone, Copy)]
+#[allow(dead_code)]
+enum RoutesMode {
+    Legacy,
+    Observed,
+}
+
+type RoutesDriverOutcome = SourcePreparationOutcome<
+    Result<(RoutesResult, PathObservationEpoch), HostSelectedModuleRoutesObservationError>,
+>;
 
 fn route_invalid(
     module: &HostGraphModuleKey,
@@ -1763,56 +1833,242 @@ fn selected_routes_with_canonicals(
     })
 }
 
+fn route_merge_error(
+    stage: RouteObservationStage,
+    error: PathObservationEpochError,
+) -> HostSelectedModuleRoutesObservationError {
+    HostSelectedModuleRoutesObservationError::Merge {
+        stage,
+        error: ObservedPathFrontierError::from(error),
+    }
+}
+
+fn merge_route_observations(
+    prefix: &mut PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+    stage: RouteObservationStage,
+) -> Result<(), HostSelectedModuleRoutesObservationError> {
+    *prefix = PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .chain(incoming.observations())
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .map_err(|error| route_merge_error(stage, error))?;
+    Ok(())
+}
+
+async fn route_repo_specs_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: RoutesMode,
+) -> RepoSpecChild<
+    HostSelectedRegistryRepoSpecs,
+    HostSelectedRegistryRepoSpecsError,
+    HostSelectedRegistryRepoSpecsObservationError,
+> {
+    match mode {
+        RoutesMode::Legacy => {
+            match ctx
+                .compute(&HostSelectedRegistryRepoSpecsKey::new(workspace.dupe()))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+                Ok(SourcePreparationOutcome::Complete(result)) => RepoSpecChild::Complete {
+                    result,
+                    observations: PathObservationEpoch::empty(),
+                },
+            }
+        }
+        RoutesMode::Observed => {
+            match ctx
+                .compute(&HostSelectedRegistryRepoSpecsObservationKey::new(
+                    workspace.dupe(),
+                ))
+                .await
+            {
+                Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+                Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+                Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+                Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                    result: observed.result().dupe(),
+                    observations: observed.observations().dupe(),
+                },
+            }
+        }
+    }
+}
+
+fn routes_complete(
+    result: Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>,
+    observations: PathObservationEpoch,
+) -> RoutesDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn finish_route_graph_child(
+    child: RepoSpecChild<
+        HostSelectedModuleGraph,
+        HostSelectedModuleGraphError,
+        HostSelectedModuleGraphObservationError,
+    >,
+    observations: &mut PathObservationEpoch,
+) -> Result<Arc<Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>>, RoutesDriverOutcome>
+{
+    match child {
+        RepoSpecChild::Compute(message) => Err(routes_complete(
+            Err(HostSelectedModuleRoutesError::GraphCompute(message)),
+            observations.dupe(),
+        )),
+        RepoSpecChild::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        RepoSpecChild::Outer(error) => Err(SourcePreparationOutcome::Complete(Err(
+            HostSelectedModuleRoutesObservationError::Graph(error),
+        ))),
+        RepoSpecChild::Complete {
+            result,
+            observations: incoming,
+        } => {
+            merge_route_observations(observations, &incoming, RouteObservationStage::Graph)
+                .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+            Ok(result)
+        }
+    }
+}
+
+fn finish_route_repo_specs_child(
+    child: RepoSpecChild<
+        HostSelectedRegistryRepoSpecs,
+        HostSelectedRegistryRepoSpecsError,
+        HostSelectedRegistryRepoSpecsObservationError,
+    >,
+    observations: &mut PathObservationEpoch,
+) -> Result<RepoSpecsResult, RoutesDriverOutcome> {
+    match child {
+        RepoSpecChild::Compute(message) => Err(routes_complete(
+            Err(HostSelectedModuleRoutesError::RepoSpecsCompute(message)),
+            observations.dupe(),
+        )),
+        RepoSpecChild::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        RepoSpecChild::Outer(error) => Err(SourcePreparationOutcome::Complete(Err(
+            HostSelectedModuleRoutesObservationError::RepoSpecs(error),
+        ))),
+        RepoSpecChild::Complete {
+            result,
+            observations: incoming,
+        } => {
+            merge_route_observations(observations, &incoming, RouteObservationStage::RepoSpecs)
+                .map_err(|error| SourcePreparationOutcome::Complete(Err(error)))?;
+            Ok(result)
+        }
+    }
+}
+
+fn finish_route_graph_semantic<'a>(
+    result: &'a Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>,
+    observations: PathObservationEpoch,
+) -> Result<&'a HostSelectedModuleGraph, RoutesDriverOutcome> {
+    result.as_ref().map_err(|error| {
+        routes_complete(
+            Err(HostSelectedModuleRoutesError::Graph(error.clone())),
+            observations,
+        )
+    })
+}
+
+fn finish_route_repo_specs_semantic<'a>(
+    result: &'a Result<HostSelectedRegistryRepoSpecs, HostSelectedRegistryRepoSpecsError>,
+    observations: PathObservationEpoch,
+) -> Result<&'a HostSelectedRegistryRepoSpecs, RoutesDriverOutcome> {
+    result.as_ref().map_err(|error| {
+        routes_complete(
+            Err(HostSelectedModuleRoutesError::RepoSpecs(error.clone())),
+            observations,
+        )
+    })
+}
+
+async fn drive_selected_module_routes(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedModuleRoutesKey,
+    mode: RoutesMode,
+) -> RoutesDriverOutcome {
+    let graph_child = match mode {
+        RoutesMode::Legacy => legacy_graph_child(ctx, &key.workspace).await,
+        RoutesMode::Observed => selected_graph_child(ctx, &key.workspace).await,
+    };
+    let mut observations = PathObservationEpoch::empty();
+    let graph_result = match finish_route_graph_child(graph_child, &mut observations) {
+        Ok(result) => result,
+        Err(terminal) => return terminal,
+    };
+    let graph = match finish_route_graph_semantic(&graph_result, observations.dupe()) {
+        Ok(graph) => graph,
+        Err(terminal) => return terminal,
+    };
+    let repo_specs = match finish_route_repo_specs_child(
+        route_repo_specs_child(ctx, &key.workspace, mode).await,
+        &mut observations,
+    ) {
+        Ok(result) => result,
+        Err(terminal) => return terminal,
+    };
+    let repo_specs = match finish_route_repo_specs_semantic(&repo_specs, observations.dupe()) {
+        Ok(repo_specs) => repo_specs,
+        Err(terminal) => return terminal,
+    };
+    routes_complete(selected_routes(graph, repo_specs), observations)
+}
+
+fn project_legacy_routes(outcome: RoutesDriverOutcome) -> RoutesOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy selected routes have no observed frontier")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for HostSelectedModuleRoutesKey {
     type Value = RoutesOutcome;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let graph = match ctx
-            .compute(&HostSelectedModuleGraphKey::new(self.workspace.dupe()))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+        project_legacy_routes(drive_selected_module_routes(ctx, self, RoutesMode::Legacy).await)
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedModuleRoutesObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostSelectedModuleRoutes, HostSelectedModuleRoutesObservationError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match drive_selected_module_routes(ctx, &self.0, RoutesMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(graph) => graph.clone(),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostSelectedModuleRoutesError::Graph(error.clone()),
-                    )));
-                }
-            },
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostSelectedModuleRoutesError::GraphCompute(error.to_string().into()),
-                )));
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedModuleRoutes::new(
+                    result,
+                    observations,
+                )))
             }
-        };
-        let repo_specs = match ctx
-            .compute(&HostSelectedRegistryRepoSpecsKey::new(
-                self.workspace.dupe(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
-            }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(repo_specs) => repo_specs.clone(),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostSelectedModuleRoutesError::RepoSpecs(error.clone()),
-                    )));
-                }
-            },
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostSelectedModuleRoutesError::RepoSpecsCompute(error.to_string().into()),
-                )));
-            }
-        };
-        SourcePreparationOutcome::Complete(Arc::new(selected_routes(&graph, &repo_specs)))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -3494,7 +3750,6 @@ mod tests {
     use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationEpoch;
-    use slug_workspace_v2::PathObservationEpochError;
     use slug_workspace_v2::PathObservationEpochKey;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
@@ -4192,6 +4447,41 @@ mod tests {
             ))
             .await
             .unwrap()
+    }
+
+    async fn compute_real_observed_routes(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        include_epoch: bool,
+        tracker: Option<Arc<RepoSpecTracker>>,
+    ) -> <HostSelectedModuleRoutesObservationKey as Key>::Value {
+        real_transaction_with_tracker(dice, root, generation, &[], include_epoch, tracker)
+            .await
+            .compute(&HostSelectedModuleRoutesObservationKey::new(
+                NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+            ))
+            .await
+            .unwrap()
+    }
+
+    fn complete_observed_routes(
+        value: &<HostSelectedModuleRoutesObservationKey as Key>::Value,
+    ) -> ObservedHostSelectedModuleRoutes {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+            panic!("observed routes must complete: {value:?}");
+        };
+        observed.dupe()
+    }
+
+    fn assert_no_route_upper(rows: &[(String, Vec<String>)]) {
+        let forbidden = "host-canonical-selected-module-definition: host-root-repository-mapping: host-selected-extension- host-generated-repository-definition: slug-command:";
+        assert!(
+            rows.iter()
+                .all(|(owner, deps)| !forbidden.split(' ').any(|prefix| {
+                    owner.starts_with(prefix) || deps.iter().any(|dep| dep.starts_with(prefix))
+                }))
+        );
     }
 
     async fn compute_real_selected_definition(
@@ -7500,6 +7790,559 @@ inject_repo(three, injected = "target")
                     )) if name == "missing_b"
                 )
         ));
+    }
+
+    #[test]
+    fn observed_routes_identity_is_workspace_scoped() {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedModuleRoutesObservationKey::new(workspace.dupe());
+        let other = HostSelectedModuleRoutesObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        assert_eq!(
+            key.to_string(),
+            "observed-host-selected-module-routes:\"/selected-repo-spec-test\""
+        );
+        assert_ne!(key, other);
+        let hash = |value: &HostSelectedModuleRoutesObservationKey| {
+            let mut state = std::collections::hash_map::DefaultHasher::new();
+            std::hash::Hash::hash(value, &mut state);
+            std::hash::Hasher::finish(&state)
+        };
+        assert_ne!(hash(&key), hash(&other));
+    }
+
+    #[test]
+    fn observed_routes_production_terminals_preserve_prefixes() {
+        let demand = observation("/graph", PathObservationOperation::Lstat);
+        let first = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let graph_epoch =
+            PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let repo_demand = observation("/repo-spec", PathObservationOperation::FileBytes);
+        let repo_result = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Present(Arc::from(&b"spec"[..])),
+        ));
+        let repo_epoch =
+            PathObservationEpoch::from_shared([(repo_demand.dupe(), repo_result.dupe())]).unwrap();
+        let need = || {
+            SourcePreparationNeeds::path(slug_workspace_v2::NeedPathObservations::singleton(
+                demand.dupe(),
+            ))
+        };
+        let mismatch = || {
+            ObservedPathFrontierError::from(PathObservationEpochError::OperationMismatch {
+                demand: demand.dupe(),
+                result_operation: PathObservationOperation::FileBytes,
+            })
+        };
+
+        let mut prefix = PathObservationEpoch::empty();
+        assert!(matches!(
+            finish_route_graph_child(RepoSpecChild::Compute("graph-compute".into()), &mut prefix),
+            Err(SourcePreparationOutcome::Complete(Ok((result, observations))))
+                if matches!(result.as_ref(), Err(
+                    HostSelectedModuleRoutesError::GraphCompute(message)
+                ) if message == "graph-compute") && observations.observations().is_empty()
+        ));
+        assert!(matches!(
+            finish_route_graph_child(RepoSpecChild::Need(need()), &mut prefix),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        assert!(matches!(
+            finish_route_graph_child(
+                RepoSpecChild::Outer(HostSelectedModuleGraphObservationError::Merge(mismatch())),
+                &mut prefix,
+            ),
+            Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedModuleRoutesObservationError::Graph(_)
+            )))
+        ));
+        let graph_result = Arc::new(Err(HostSelectedModuleGraphError::Input {
+            owner: "graph".into(),
+            message: "semantic".into(),
+        }));
+        assert!(Arc::ptr_eq(
+            &finish_route_graph_child(
+                RepoSpecChild::Complete {
+                    result: graph_result.dupe(),
+                    observations: graph_epoch.dupe(),
+                },
+                &mut prefix,
+            )
+            .unwrap(),
+            &graph_result
+        ));
+        assert_exact_repo_epoch(&graph_epoch, &prefix);
+        assert!(matches!(
+            finish_route_graph_semantic(graph_result.as_ref(), graph_epoch.dupe()),
+            Err(SourcePreparationOutcome::Complete(Ok((result, observations))))
+                if matches!(result.as_ref(), Err(
+                    HostSelectedModuleRoutesError::Graph(_)
+                )) && observations == graph_epoch
+        ));
+
+        assert!(matches!(
+            finish_route_repo_specs_child(
+                RepoSpecChild::Compute("repo-compute".into()),
+                &mut prefix,
+            ),
+            Err(SourcePreparationOutcome::Complete(Ok((result, observations))))
+                if matches!(result.as_ref(), Err(
+                    HostSelectedModuleRoutesError::RepoSpecsCompute(message)
+                ) if message == "repo-compute")
+                    && observations == graph_epoch
+        ));
+        assert!(matches!(
+            finish_route_repo_specs_child(RepoSpecChild::Need(need()), &mut prefix),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        assert!(matches!(
+            finish_route_repo_specs_child(
+                RepoSpecChild::Outer(HostSelectedRegistryRepoSpecsObservationError::Merge {
+                    module: None,
+                    stage: RepoSpecObservationStage::Graph,
+                    error: mismatch(),
+                }),
+                &mut prefix,
+            ),
+            Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedModuleRoutesObservationError::RepoSpecs(_)
+            )))
+        ));
+        let repo_specs_result = Arc::new(Err(fail(&module(), "semantic")));
+        assert!(Arc::ptr_eq(
+            &finish_route_repo_specs_child(
+                RepoSpecChild::Complete {
+                    result: repo_specs_result.dupe(),
+                    observations: repo_epoch.dupe(),
+                },
+                &mut prefix,
+            )
+            .unwrap(),
+            &repo_specs_result
+        ));
+        let merged = PathObservationEpoch::from_shared(
+            graph_epoch
+                .observations()
+                .iter()
+                .chain(repo_epoch.observations())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        assert_exact_repo_epoch(&merged, &prefix);
+        assert!(matches!(
+            finish_route_repo_specs_semantic(repo_specs_result.as_ref(), merged.dupe()),
+            Err(SourcePreparationOutcome::Complete(Ok((result, observations))))
+                if matches!(result.as_ref(), Err(HostSelectedModuleRoutesError::RepoSpecs(_)))
+                    && observations == merged
+        ));
+        assert!(matches!(
+            routes_complete(Err(route_invalid(&module(), "mapping")), merged.dupe()),
+            SourcePreparationOutcome::Complete(Ok((result, observations)))
+                if matches!(result.as_ref(), Err(HostSelectedModuleRoutesError::Invalid { .. }))
+                    && observations == merged
+        ));
+        let projected_arc = Arc::new(Err(route_invalid(&module(), "legacy")));
+        let projected = project_legacy_routes(SourcePreparationOutcome::Complete(Ok((
+            projected_arc.dupe(),
+            merged.dupe(),
+        ))));
+        assert!(matches!(
+            projected,
+            SourcePreparationOutcome::Complete(result)
+                if Arc::ptr_eq(&result, &projected_arc)
+        ));
+        let outer = SourcePreparationOutcome::Complete(Err(
+            HostSelectedModuleRoutesObservationError::Graph(
+                HostSelectedModuleGraphObservationError::Merge(mismatch()),
+            ),
+        ));
+        assert!(HostSelectedModuleRoutesObservationKey::validity(&outer));
+        assert!(HostSelectedModuleRoutesObservationKey::equality(
+            &outer, &outer
+        ));
+
+        let equal =
+            PathObservationEpoch::from_shared([(demand.dupe(), Arc::new(first.as_ref().clone()))])
+                .unwrap();
+        let mut earliest = graph_epoch.dupe();
+        merge_route_observations(&mut earliest, &equal, RouteObservationStage::RepoSpecs).unwrap();
+        assert!(Arc::ptr_eq(earliest.get(&demand).unwrap(), &first));
+        let conflict = PathObservationEpoch::from_shared([(
+            demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, 3, 4, 0o644),
+            ))),
+        )])
+        .unwrap();
+        assert!(matches!(
+            merge_route_observations(&mut earliest, &conflict, RouteObservationStage::RepoSpecs),
+            Err(HostSelectedModuleRoutesObservationError::Merge {
+                stage: RouteObservationStage::RepoSpecs,
+                ..
+            })
+        ));
+        let mut graph_conflict = graph_epoch.dupe();
+        assert!(matches!(
+            merge_route_observations(&mut graph_conflict, &conflict, RouteObservationStage::Graph),
+            Err(HostSelectedModuleRoutesObservationError::Merge {
+                stage: RouteObservationStage::Graph,
+                ..
+            })
+        ));
+        assert!(matches!(
+            route_merge_error(
+                RouteObservationStage::RepoSpecs,
+                PathObservationEpochError::OperationMismatch {
+                    demand: demand.dupe(),
+                    result_operation: PathObservationOperation::FileBytes,
+                }
+            ),
+            HostSelectedModuleRoutesObservationError::Merge {
+                stage: RouteObservationStage::RepoSpecs,
+                ..
+            }
+        ));
+    }
+
+    #[tokio::test]
+    async fn observed_routes_match_legacy_families_epochs_events_and_warm_reuse() {
+        const ROOT: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+        const SOURCE_URL: &str = "https://registry.invalid/modules/dep/1/source.json";
+        let files = [
+            (MODULE_URL, b"module(name='dep', version='1')\n".as_slice()),
+            (
+                SOURCE_URL,
+                br#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a"}"#.as_slice(),
+            ),
+        ];
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let io = Arc::new(TrackingRegistryIo::new(files));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedModuleRoutesObservationKey::new(workspace.dupe());
+        let mut transaction =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        let cold = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_routes(&cold);
+        assert!(observed.result().as_ref().is_ok());
+        let graph = transaction
+            .compute(&HostSelectedModuleGraphObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(graph)) = graph else {
+            panic!("graph must complete")
+        };
+        let repo_specs = transaction
+            .compute(&HostSelectedRegistryRepoSpecsObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let repo_specs = complete_observed_repo_specs(&repo_specs);
+        let expected = PathObservationEpoch::from_shared(
+            graph
+                .observations()
+                .observations()
+                .iter()
+                .chain(repo_specs.observations().observations())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        assert_exact_repo_epoch(&expected, observed.observations());
+        let (observed_activations, observed_rows) = tracker.take();
+        assert_eq!(
+            repo_spec_row(&observed_rows, &key.to_string()),
+            [
+                HostSelectedModuleGraphObservationKey::new(workspace.dupe()).to_string(),
+                HostSelectedRegistryRepoSpecsObservationKey::new(workspace.dupe()).to_string(),
+            ]
+        );
+        assert!(
+            observed_activations
+                .iter()
+                .any(|entry| { entry.key == key.to_string() && entry.batch.is_none() })
+        );
+        let observed_events = observed_activations
+            .iter()
+            .filter_map(|entry| {
+                entry.batch.dupe().map(|batch| {
+                    (
+                        entry
+                            .key
+                            .strip_prefix("observed-")
+                            .unwrap_or(&entry.key)
+                            .to_owned(),
+                        batch,
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let warm = transaction.compute(&key).await.unwrap();
+        assert!(HostSelectedModuleRoutesObservationKey::equality(
+            &cold, &warm
+        ));
+        assert!(tracker.take().0.iter().all(|entry| entry.batch.is_none()));
+
+        let legacy_tracker = Arc::new(RepoSpecTracker::default());
+        let legacy_io = Arc::new(TrackingRegistryIo::new(files));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, legacy_io);
+        let legacy_dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let legacy_key = HostSelectedModuleRoutesKey::new(workspace.dupe());
+        let mut legacy_transaction = real_transaction_with_tracker(
+            &legacy_dice,
+            ROOT,
+            1,
+            &[],
+            true,
+            Some(legacy_tracker.dupe()),
+        )
+        .await;
+        let legacy = legacy_transaction.compute(&legacy_key).await.unwrap();
+        let SourcePreparationOutcome::Complete(legacy_result) = legacy else {
+            panic!("legacy routes must complete")
+        };
+        assert_eq!(observed.result(), &legacy_result);
+        let (legacy_activations, legacy_rows) = legacy_tracker.take();
+        assert_eq!(
+            repo_spec_row(&legacy_rows, &legacy_key.to_string()),
+            [
+                HostSelectedModuleGraphKey::new(workspace.dupe()).to_string(),
+                HostSelectedRegistryRepoSpecsKey::new(workspace.dupe()).to_string(),
+            ]
+        );
+        let legacy_events = legacy_activations
+            .iter()
+            .filter_map(|entry| entry.batch.dupe().map(|batch| (entry.key.clone(), batch)))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            observed_events
+                .iter()
+                .map(|(_, batch)| batch)
+                .collect::<Vec<_>>(),
+            legacy_events
+                .iter()
+                .map(|(_, batch)| batch)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            observed_events
+                .iter()
+                .map(|(owner, _)| owner.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "bzlmod-observed-host-root-module-file:\"/selected-repo-spec-test\"",
+                "host-discovered-module:\"/selected-repo-spec-test\":dep@1",
+            ]
+        );
+        assert_eq!(
+            legacy_events
+                .iter()
+                .map(|(owner, _)| owner.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "root-module-evaluation:/selected-repo-spec-test",
+                "host-discovered-module:\"/selected-repo-spec-test\":dep@1",
+            ]
+        );
+        assert!(!observed_events.is_empty());
+        assert_no_route_upper(&observed_rows);
+        assert_no_route_upper(&legacy_rows);
+        assert!(observed_rows.iter().all(|(owner, deps)| {
+            let legacy = "host-selected-module-graph: host-selected-registry-repo-specs:";
+            !legacy.split(' ').any(|prefix| {
+                owner.starts_with(prefix) || deps.iter().any(|dep| dep.starts_with(prefix))
+            })
+        }));
+        assert!(legacy_rows.iter().all(|(owner, deps)| {
+            !owner.starts_with("observed-")
+                && deps
+                    .iter()
+                    .all(|dependency| !dependency.starts_with("observed-"))
+        }));
+    }
+
+    #[tokio::test]
+    async fn observed_routes_need_is_carrierless_eventless_and_upper_silent() {
+        const ROOT: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let io = Arc::new(TrackingRegistryIo::new([(
+            "https://registry.invalid/modules/dep/1/MODULE.bazel",
+            b"module(name='dep', version='1')\n" as &[u8],
+        )]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io);
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let value = compute_real_observed_routes(&dice, ROOT, 1, false, Some(tracker.dupe())).await;
+        assert!(matches!(value, SourcePreparationOutcome::Need(_)));
+        assert!(!HostSelectedModuleRoutesObservationKey::validity(&value));
+        assert!(!HostSelectedModuleRoutesObservationKey::equality(
+            &value, &value
+        ));
+        let (activations, rows) = tracker.take();
+        let owner = HostSelectedModuleRoutesObservationKey::new(
+            NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+        )
+        .to_string();
+        assert!(
+            activations
+                .iter()
+                .any(|entry| entry.key == owner && entry.batch.is_none())
+        );
+        assert_no_route_upper(&rows);
+        let error = complete_observed_routes(
+            &compute_real_observed_routes(&dice, ROOT, 2, true, Some(tracker.dupe())).await,
+        );
+        assert!(matches!(
+            error.result().as_ref(),
+            Err(HostSelectedModuleRoutesError::RepoSpecs(_))
+        ));
+        assert!(!error.observations().observations().is_empty());
+        assert_no_route_upper(&tracker.take().1);
+    }
+
+    #[tokio::test]
+    async fn observed_routes_restore_graph_and_repo_specs_with_held_carriers() {
+        const MODULE_URL: &str = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+        const SOURCE_URL: &str = "https://registry.invalid/modules/dep/1/source.json";
+        const ROOT_A: &str =
+            "module(name='bazel_tools', repo_name='root_a')\nbazel_dep(name='dep', version='1')\n";
+        const ROOT_B: &str =
+            "module(name='bazel_tools', repo_name='root_b')\nbazel_dep(name='dep', version='1')\n";
+        const SOURCE_A: &[u8] = br#"{"url":"https://origin.test/a.tgz","integrity":"sha256-a"}"#;
+        const SOURCE_B: &[u8] = br#"{"url":"https://origin.test/b.tgz","integrity":"sha256-b"}"#;
+        let io = Arc::new(TrackingRegistryIo::new([
+            (MODULE_URL, b"module(name='dep', version='1')\n".as_slice()),
+            (SOURCE_URL, SOURCE_A),
+        ]));
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let a = complete_observed_routes(
+            &compute_real_observed_routes(&dice, ROOT_A, 1, true, None).await,
+        );
+        let held_result = a.result().dupe();
+        let held_epoch = a.observations().dupe();
+
+        io.replace(SOURCE_URL, SOURCE_B);
+        let repo_b = complete_observed_routes(
+            &compute_real_observed_routes(&dice, ROOT_A, 2, true, None).await,
+        );
+        assert_ne!(repo_b.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, repo_b.observations());
+        io.replace(SOURCE_URL, SOURCE_A);
+        let repo_a = complete_observed_routes(
+            &compute_real_observed_routes(&dice, ROOT_A, 3, true, None).await,
+        );
+        assert_eq!(repo_a.result(), a.result());
+        assert_exact_repo_epoch(&held_epoch, repo_a.observations());
+
+        let graph_b = complete_observed_routes(
+            &compute_real_observed_routes(&dice, ROOT_B, 3, true, None).await,
+        );
+        assert_ne!(graph_b.result(), a.result());
+        let restored = complete_observed_routes(
+            &compute_real_observed_routes(&dice, ROOT_A, 3, true, None).await,
+        );
+        assert_eq!(restored.result(), a.result());
+        assert_eq!(restored.observations(), a.observations());
+        let module_file = format!("{WORKSPACE}/MODULE.bazel");
+        for (demand, result) in held_epoch.observations() {
+            let restored_result = restored.observations().get(demand).unwrap();
+            assert_eq!(result.as_ref(), restored_result.as_ref());
+            if demand.path().as_path() != Path::new(&module_file) {
+                assert!(Arc::ptr_eq(result, restored_result), "{demand:?}");
+            }
+        }
+        assert_eq!(held_result.as_ref(), restored.result().as_ref());
+    }
+
+    #[tokio::test]
+    async fn observed_routes_poll_drop_publishes_nothing_and_recovers() {
+        const ROOT: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let io = Arc::new(CancelOnceRegistryIo {
+            calls: AtomicUsize::new(0),
+        });
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedModuleRoutesObservationKey::new(workspace.dupe());
+        let mut cancelled =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        tracker.take();
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while io.calls.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(future);
+        drop(cancelled);
+        let (cancelled_activations, cancelled_rows) = tracker.take();
+        assert!(
+            cancelled_rows
+                .iter()
+                .all(|(owner, _)| owner != &key.to_string())
+        );
+        assert!(
+            cancelled_activations
+                .iter()
+                .all(|entry| entry.key != key.to_string())
+        );
+        assert_no_route_upper(&cancelled_rows);
+
+        let mut recovered =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        let recovered_value = recovered.compute(&key).await.unwrap();
+        let recovered_value = complete_observed_routes(&recovered_value);
+        let graph = recovered
+            .compute(&HostSelectedModuleGraphObservationKey::new(
+                workspace.dupe(),
+            ))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(graph)) = graph else {
+            panic!("recovered graph must complete")
+        };
+        let repo_specs = recovered
+            .compute(&HostSelectedRegistryRepoSpecsObservationKey::new(workspace))
+            .await
+            .unwrap();
+        let repo_specs = complete_observed_repo_specs(&repo_specs);
+        let expected = PathObservationEpoch::from_shared(
+            graph
+                .observations()
+                .observations()
+                .iter()
+                .chain(repo_specs.observations().observations())
+                .map(|(demand, result)| (demand.dupe(), result.dupe())),
+        )
+        .unwrap();
+        assert_exact_repo_epoch(&expected, recovered_value.observations());
+        let (recovered_activations, recovered_rows) = tracker.take();
+        assert!(
+            recovered_activations
+                .iter()
+                .filter(|entry| entry.key == key.to_string())
+                .all(|entry| entry.batch.is_none())
+        );
+        assert_no_route_upper(&recovered_rows);
     }
 
     #[test]
