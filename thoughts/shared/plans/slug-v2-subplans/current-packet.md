@@ -1,79 +1,79 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-module-graph-observation-implementation-retry`
+Packet: `WP-6-7A-selected-module-graph-observation-frontier-audit-resume-5`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Rust base: `c6b1e108`
-Accepted semantic design: `09177514`
-Accepted proof correction/scheduling: `19cc508d`
+Accepted implementation: `d5e8f461`
+Semantic design/correction: `09177514` / `19cc508d`
 
-## Exact retry authority
+## Accepted selected-module-graph completion
 
-Write only:
+Implementation `d5e8f461` completes the private observed selected-graph owner
+from Rust base `c6b1e108`. One Legacy/Observed driver preserves root -> policy
+-> ordered effective overrides -> transform -> BFS/fixed-point -> select order.
+Every horizon validates all Complete epochs while retaining the first ordered
+outer; exact legacy error/Need precedence and discovery-child event ownership
+remain unchanged.
 
-- `app/slug_bzlmod_v2/src/selected_graph.rs`, baseline 1,592/test boundary 907,
-  <=520 production, <=480 colocated proof and <=2,650 physical; and
-- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, baseline
-  8,406, <=2,300 proof and <=10,800 physical.
+The carrier retains one exact local Result Arc plus a compact cumulative
+`PathObservationEpoch`; all traversal/frontier/cache/event/merge structures
+remain compute-local. Exact accepted accounting is +418 production/+471
+colocated proof in `selected_graph.rs` and +1,428 external proof, +2,317
+semantic aggregate, at 2,481/9,834/12,315 physical. Focused selected-graph proof
+passes 27/27 and the full bzlmod suite passes 500 unit tests plus every
+integration/doc target. Formatting and diff hygiene pass; independent terminal
+review ACCEPTs ownership, horizon algebra, family/events, Arc association,
+retention and cleanup.
 
-Aggregate authority is <=3,300 semantic and <=13,450 physical. Helpers/tests
-remain below 200. Every third file, fixture, oracle, export, caller and plan
-document is read-only.
+## Exact docs-only frontier audit authority
 
-## Frozen production contract
+This audit is read-only for Rust, tests, fixtures, oracles, exports and callers.
+Write only canonical, current, this Stage and the orchestration routing log, at
+net caps <=40/<=220/<=180/<=30 and <=470 aggregate.
 
-Preserve the accepted private `HostSelectedModuleGraphObservationKey`, carrier
-and one Legacy/Observed driver. Exact order remains root files -> neutral
-command policy -> ordered candidate effective overrides -> root transforms ->
-first-seen BFS horizons -> horizon-ordered raw transforms -> fixed-point rounds
--> select/rewrite. Complete epochs merge left-first before semantic inspection;
-effective epochs append only on first computation and equal duplicates retain
-the earliest Arc.
+Trace the accepted `HostSelectedModuleGraphObservationKey` through every direct
+semantic consumer. Inspect `HostSelectedRegistryRepoSpecsKey`,
+`HostSelectedModuleRoutesKey`, registry/repository-spec interpretation,
+extension-generated repository ownership and public command/bootstrap consumers
+only far enough to identify the uniquely smallest complete remaining mutable
+frontier. Do not reopen accepted root/effective/repository/registry/preparation/
+discovery/selected-graph ownership for structural uniformity.
 
-Every horizon attempts every Complete carrier merge in input order, including
-after the first child/merge outer, while retaining the first horizon-ordered
-outer. Otherwise preserve first compute/semantic error > incompatible Need >
-compatible Need union > ordered success. Need/outer is carrierless; Complete
-semantic errors retain the full valid merged sibling epoch and suppress raw
-conversion, later rounds and selection.
+The audit must establish:
 
-Graph siblings remain eventless and discovery batches stay child-owned in exact
-order. Retain exactly one local semantic Result Arc plus compact epoch; every
-raw/traversal/frontier/cache/outcome/event/merge structure remains compute-local.
-Add no retained map/cache/interner/store/lock/task/direct Host read.
+- the first reusable producer whose semantic Result can own a complete exact
+  shared-Arc epoch without reconstructing selected-graph or child state;
+- exact graph -> policy/spec/route/extension order, Need/typed-outer/error
+  precedence, sibling batch algebra and later-work suppression;
+- matching Legacy/Observed families, selected-graph eventlessness, downstream
+  event ownership/order, warm silence and poll-drop recovery;
+- equality/invalidation and A -> B -> A restoration for registry specs, routes,
+  generated repositories and any command-visible result reached by the
+  candidate; and
+- compact Buck2-shaped retention with parsing/join/frontier/event scratch
+  compute-local and no cache/interner/store/lock/task/direct Host read.
 
-## Required bounded proof
+Preserve current Bazel 9 values/errors/order/events on admitted surfaces as
+exact. Private typed outers and shared-Arc epoch association remain Slug-native.
+Extension breadth, bootstrap actions/input trees/execution, M8/M7B and exact
+identity bytes remain deferred unless live evidence proves one is the uniquely
+smaller prerequisite.
 
-Preserve every accepted production, identity, Arc, prefix, horizon, family,
-event, warm, cancellation, lifecycle and upper-exclusion discriminator. Add
-compact behavioral proof only:
+## Terminal discipline
 
-- production-used stage finishers/projectors must discriminate root, policy,
-  candidate-effective first/middle/last, transform and select compute/semantic/
-  Need/typed-outer prefixes and exact later suppression, without hooks or
-  inconsistent child injection;
-- horizon first/middle/last compute, semantic, real Discovery outer, merge
-  conflict and operation mismatch must prove exact ordering, full Complete
-  sibling epoch reconstruction, earliest-Arc authority, carrierless Need/outer
-  and later-round/select suppression;
-- real observed and legacy implicit-`bazel_tools`, duplicate candidate, diamond,
-  cycle, nodep second-round, recursive and mixed nonregistry+registry topologies
-  must compare exact dependency vectors, cumulative epoch membership, graph
-  parity and complete ordered child EventBatch sequences with no extras; and
-- command policy, effective, nonregistry, registry, recursive and mixed-horizon
-  inputs must independently execute A -> B -> A with held Result/epoch handles,
-  unaffected Arc preservation and zero repo-spec/routes/extension/public
-  activation on success/error/cancel.
+Reach exactly one terminal:
 
-Exact compatibility remains existing graph values/errors/order/events.
-Slug-native remains the private typed outer/shared-Arc epoch association.
-Repo-spec/routes/extensions/public activation, broader M7A, M8/M7B and exact
-identity bytes remain deferred.
+1. schedule one docs-only design for the uniquely smallest complete remaining
+   owner;
+2. schedule one uniquely smaller evidence/association prerequisite if the next
+   aggregate still crosses a carrierless mutable edge; or
+3. record a formal `REPLAN` when no bounded exact/Slug-native owner fits.
 
-STOP production semantic/event/family/memory change, a third file/caller/export,
-upper activation, proof hooks/waiver, cap excess or milestone closure. REPLAN
-before widening. After independent retry ACCEPT return only to the docs-only
-selected frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+Any design requires independent review and may name at most one implementation
+successor. STOP Rust/tests/oracles/caller/export changes, speculative public
+activation, umbrella ownership, milestone closure, M8/M7B work, or bypassing
+the accepted selected-graph carrier. M7 remains partial and M7A -> M8 -> M7B
+remains.
 
 ## Historical selected-module-graph observation design
 

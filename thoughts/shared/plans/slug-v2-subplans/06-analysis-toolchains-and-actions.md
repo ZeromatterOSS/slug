@@ -10407,3 +10407,50 @@ STOP production semantic/event/family/memory drift, third-file/caller/export or
 upper activation, proof hooks/waiver, cap excess or milestone closure. REPLAN
 before widening. After independent retry ACCEPT return only to the docs-only
 selected frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Selected-module-graph observation accepted and frontier resumed (2026-08-20)
+
+Accepted implementation `d5e8f461` from Rust base `c6b1e108`, semantic
+design `09177514` and proof correction `19cc508d` completes the private
+observed selected-graph aggregate. One shared Legacy/Observed driver preserves
+root -> policy -> effective -> transform -> BFS/fixed-point -> select order.
+Every horizon validates all Complete carrier epochs while retaining the first
+ordered outer; graph siblings remain eventless and discovery children retain
+their exact batches.
+
+The DICE value retains one semantic Result Arc plus one compact cumulative
+epoch. Traversal maps/sets, horizons, event and merge scratch remain
+compute-local. Accepted accounting is +418 production/+471 colocated proof in
+`selected_graph.rs`, +1,428 external proof and +2,317 aggregate semantic, at
+2,481/9,834/12,315 physical. Focused selected-graph proof passes 27/27; full
+bzlmod validation passes 500 unit tests plus every integration/doc target.
+Formatting/diff hygiene and independent terminal ownership/retention review
+pass.
+
+Activate only
+`WP-6-7A-selected-module-graph-observation-frontier-audit-resume-5`. Rust,
+tests, fixtures, oracles, exports and callers are read-only. Audit write
+authority is canonical/current/this Stage/routing only, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate.
+
+Trace the accepted selected-graph carrier through
+`HostSelectedRegistryRepoSpecsKey`, `HostSelectedModuleRoutesKey`,
+registry/repository-spec interpretation, generated-repository extension
+ownership and command/bootstrap consumers. Inspect only far enough to select
+the uniquely smallest complete remaining mutable frontier or prove a smaller
+carrierless prerequisite. Do not reopen accepted lower owners.
+
+Require exact Result/Arc/epoch association; graph -> spec/route/extension order
+and complete-batch Need/outer/error precedence; matching families, downstream
+event ownership, warm/cancel behavior; independent lifecycle restoration; and
+compact retention with all parser/join/frontier/event scratch compute-local.
+Preserve admitted Bazel 9 values/errors/order/events as exact, private typed
+outers/shared-Arc association as Slug-native, and extension breadth,
+bootstrap execution, M8/M7B and exact identity bytes as deferred.
+
+Reach exactly one terminal: one independently reviewed smallest-owner design,
+one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor. STOP Rust/test/oracle/
+caller/export work, speculative public activation, umbrella ownership,
+milestone closure, M8/M7B work or bypassing the accepted graph carrier. M7
+remains partial and M7A -> M8 -> M7B remains.
