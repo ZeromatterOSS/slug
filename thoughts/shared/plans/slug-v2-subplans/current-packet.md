@@ -1,87 +1,79 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-selected-registry-repo-specs-observation-implementation`
+Packet: `WP-6-7A-route-extension-observation-frontier-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
+Accepted implementation: `ccf7421e`
 Rust base: `e155d74f`
-Accepted design: `0444dd40`
+Semantic design: `0444dd40`
 
-## Accepted Host-registry-function completion
+## Accepted selected registry repo-spec completion
 
-Implementation `e155d74f` adds the private Host-registry observation owner in
-`host_registry.rs`. One Legacy/Observed driver preserves exact mode -> vendor
-projection -> conditional refresh -> matching visible lockfile -> resolved
-spelling -> mirrors -> primary URI/hash policy -> ordered mirror validation ->
-Result order. The observed child forwards carrierless Need/typed outer and its
-exact shared-Arc epoch; legacy projection moves the exact semantic Result Arc.
+Implementation `ccf7421e` adds the private selected registry repo-spec
+observation owner in `selected_repo_spec.rs`. One Legacy/Observed driver
+preserves selected graph first, graph-occurrence order, owner-local
+root/nonregistry `None`, and registry Host-registry -> source JSON -> optional
+registry metadata -> effective override -> augmentation order. The aggregate
+retains the first typed outer while attempting every later Complete merge and
+preserves outer -> semantic error -> incompatible Need -> compatible Need union
+-> ordered success precedence.
 
-The DICE value retains exactly one local semantic Result Arc plus the compact
-visible-lockfile epoch. No child carrier, parser/URI/mirror scratch,
-collection/cache/interner/store/lock/task/direct Host read, revision,
-certificate or event state is retained. Parent and children remain eventless.
+The DICE value retains exactly one local semantic Result Arc plus one cumulative
+compact epoch. Traversal, per-entry, merge, terminal and event state remains
+compute-local; no child carrier, cache/interner/store/lock/task/direct Host read,
+revision or certificate state is retained. The parent remains eventless and
+accepted child batches retain exact ownership and order.
 
-Accepted accounting against `2a4041bb` is +149 production/+460 proof/+609
-aggregate at 2,145 physical lines, within every frozen cap. Focused Host-
-registry validation passes 13/13; the full bzlmod suite passes 503 unit tests
-plus every integration/doc target. Formatting and diff hygiene pass.
-Independent terminal review ACCEPTs exact order/prefix/family/Arc association,
-neutral-input and visible-lockfile lifecycles, cancellation, compact retention,
-cleanup and security.
+Accepted accounting against `e155d74f` is +492 production/+1,100 proof/+1,592
+aggregate at 8,422 physical lines, within every frozen cap. Focused repo-spec
+validation passes 42 unit and 3 integration tests; the full bzlmod suite passes
+509 unit tests plus every integration/doc target. Formatting, diff hygiene,
+cleanup, retention, security and independent terminal review pass.
 
-## Exact implementation authority
+## Exact docs-only frontier authority
 
-Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 6,830
-physical with first `#[cfg(test)]` at line 2,974. Caps are <=520 production,
-<=1,100 proof, <=1,620 aggregate semantic and <=8,500 physical; helpers/tests
-remain below 200 lines. Every other Rust file, caller, export, fixture and
-oracle is read-only.
+This audit may write only canonical, current, this Stage and the orchestration
+routing log, at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests,
+fixtures, oracles, exports and callers are read-only.
 
-## Frozen implementation contract
+Trace the accepted `HostSelectedRegistryRepoSpecsObservationKey` through
+`HostSelectedModuleRoutesKey`, `HostSelectedExtensionMappingsKey`, extension
+definition/load/evaluation owners, generated-repository definitions and
+public/bootstrap consumers only far enough to identify the uniquely smallest
+complete remaining mutable frontier. Do not presume routes or extension
+mappings are complete and do not reopen accepted lower owners for uniformity.
 
-Add the accepted private `HostSelectedRegistryRepoSpecsObservationKey` and
-`ObservedHostSelectedRegistryRepoSpecs`, retaining exactly one local semantic
-Result Arc plus one cumulative compact epoch. Use one Legacy/Observed semantic
-driver; legacy selects only legacy graph/Host-registry/registry-file/effective
-siblings with empty epochs, while observed selects only their accepted matching
-siblings. Legacy projection moves the exact Result Arc.
+The audit must establish:
 
-Preserve graph first and graph-occurrence order. Root/nonregistry entries remain
-owner-local `None`. Registry entries preserve Host registry -> source JSON
-registry file -> parse/projection -> optional registry JSON file -> module
-projection -> effective override -> augmentation. Per-entry terminals suppress
-later children; the aggregate still completes its full cross-entry scan.
+- whether selected routes are the first reusable semantic owner above the
+  accepted repo-spec carrier or whether one strictly smaller observed edge is
+  still missing;
+- exact repo-spec -> route -> extension mapping/load/evaluation -> generated
+  repository order, Need/typed-outer/error precedence, later suppression and
+  request-local versus reusable ownership;
+- matching Legacy/Observed families, exact child EventBatch ownership/order,
+  eventless parent behavior where applicable, warm silence and poll-drop
+  recovery;
+- independent repo-spec, route, extension definition/input/evaluation and
+  generated-repository A -> B -> A invalidation with held Result/epoch handles;
+  and
+- compact Buck2-shaped retention with mapping/frontier/event/parser scratch
+  compute-local and no cache/interner/store/lock/task/direct Host read.
 
-Merge every Complete epoch immediately, left-first and before semantics, in
-graph/entry/child order. Equal duplicates retain the first exact Arc. Conflict
-or operation mismatch is typed outer. Retain the first stage-aware child/merge
-outer while attempting every later Complete merge. Final precedence is outer,
-first semantic/DICE-compute error, first incompatible Need, compatible Need
-union, ordered success. Final Need/outer is carrierless; Complete error/success
-retains the full valid cumulative prefix.
+Preserve admitted Bazel 9 values/errors/order/events as exact. Private typed
+outers and shared-Arc epoch association remain Slug-native. Extension-generated
+repository/public/bootstrap breadth, M8/M7B and exact identity bytes remain
+deferred unless live evidence proves one is the uniquely smaller prerequisite.
 
-The aggregate remains eventless; existing graph/discovery batches and lower
-child event ownership remain exact. Warm reuse is silent and cancellation
-publishes no aggregate row, value or batch. Retain no graph/child carrier,
-per-entry epoch/list/map, frontier, override cache, parser/event scratch,
-cache/interner/store/lock/task/direct Host read/revision/certificate state.
+## Terminal discipline
 
-Complete the accepted identity/equality/legacy-Arc proof; every graph and
-per-entry terminal/prefix/later suppression; duplicate/conflict/mismatch and
-first/middle/last full-scan outer/error/Need algebra; root/nonregistry and
-optional-file semantics; exact family vectors and complete ordered child batch
-parity; warm/poll-drop recovery; independent graph/Host-registry/source JSON/
-registry JSON/effective held-carrier A -> B -> A lifecycles; and zero route/
-extension/generated/public/bootstrap activation.
-
-Exact compatibility is existing admitted repo-spec values/errors/order/events.
-The private typed outer/shared-Arc epoch is Slug-native. Routes/extensions/
-generated/public/bootstrap, M8/M7B and exact identity bytes remain deferred.
-
-STOP a second file/key, caller/export, changed precedence/event ownership,
-retained traversal state, upper activation, proof waiver, cap excess or
-milestone closure. REPLAN before widening. After independent implementation
-ACCEPT resume only the docs frontier for routes/extensions. M7 remains partial
-and M7A -> M8 -> M7B remains.
+Reach exactly one terminal: one independently reviewed smallest-owner design,
+one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor. STOP Rust/tests/oracles/
+caller/export changes, speculative public activation, umbrella ownership,
+milestone closure, M8/M7B work, or bypassing the accepted selected-graph,
+registry and repo-spec carriers. M7 remains partial and M7A -> M8 -> M7B
+remains.
 
 ## Historical accepted design: owner decision
 

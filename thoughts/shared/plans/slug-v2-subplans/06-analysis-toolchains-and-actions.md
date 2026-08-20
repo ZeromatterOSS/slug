@@ -10893,3 +10893,56 @@ precedence, event or memory drift, wider authority, caller/export, proof waiver,
 cap excess or milestone closure. REPLAN before widening. After implementation
 ACCEPT resume only the docs route/extension frontier. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Selected registry repo-spec observation accepted; route/extension frontier resumed (2026-08-20)
+
+Accepted implementation `ccf7421e` from Rust base `e155d74f` and semantic
+design `0444dd40` completes the private selected registry repo-spec observation
+owner. One Legacy/Observed driver preserves selected graph first,
+graph-occurrence order, root/nonregistry `None`, and registry Host-registry ->
+source JSON -> optional registry metadata -> effective override -> augmentation
+order. It preserves full cross-entry scanning and outer -> semantic error ->
+incompatible Need -> compatible Need union -> ordered success precedence.
+
+The DICE value retains one local semantic Result Arc plus one cumulative compact
+epoch. Traversal, entry, merge, terminal and event scratch remains compute-local
+with no child carrier, cache/interner/store/lock/task/direct Host read, revision
+or certificate state. The aggregate is eventless and accepted child batch
+ownership/order remains exact.
+
+Accepted accounting is +492 production/+1,100 proof/+1,592 aggregate at 8,422
+physical lines. Focused proof passes 42 unit and 3 integration tests; the full
+bzlmod suite passes 509 unit tests plus every integration/doc target. Formatting,
+diff hygiene, cleanup/retention, security and independent terminal review pass.
+
+Activate only `WP-6-7A-route-extension-observation-frontier-audit`. Audit write
+authority is canonical/current/this Stage/routing only, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+exports and callers are read-only.
+
+Trace the accepted repo-spec carrier through `HostSelectedModuleRoutesKey`,
+`HostSelectedExtensionMappingsKey`, extension definition/load/evaluation
+owners, generated-repository definitions and public/bootstrap consumers only
+far enough to identify the uniquely smallest complete remaining mutable
+frontier. Do not presume routes or extension mappings are complete and do not
+reopen accepted lower owners.
+
+Require exact repo-spec -> route -> extension -> generated-repository order,
+terminal precedence and later suppression; reusable versus request-local
+ownership; matching Legacy/Observed families; exact child batches and eventless
+parent behavior where applicable; warm/cancel recovery; independent route,
+extension and generated-repository held-carrier lifecycles; and compact
+Buck2-shaped retention with mapping/frontier/event/parser scratch compute-local.
+
+Preserve admitted Bazel 9 values/errors/order/events as exact, private typed
+outers/shared-Arc association as Slug-native, and extension-generated/public/
+bootstrap breadth, M8/M7B and exact identity bytes as deferred unless live
+evidence proves one is the uniquely smaller prerequisite.
+
+Reach exactly one terminal: one independently reviewed smallest-owner design,
+one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor. STOP Rust/test/oracle/
+caller/export work, speculative public activation, umbrella ownership,
+milestone closure, M8/M7B work or bypassing the accepted selected-graph,
+registry and repo-spec carriers. M7 remains partial and M7A -> M8 -> M7B
+remains.
