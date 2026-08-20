@@ -1,11 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-selected-registry-repo-specs-observation-frontier-audit`
+Packet: `WP-6-7A-selected-registry-repo-specs-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Accepted implementation: `e155d74f`
-Semantic design: `38f40427`
-Rust base: `2a4041bb`
+Scheduling base: `041b4476`
+Rust base: `e155d74f`
 
 ## Accepted Host-registry-function completion
 
@@ -29,51 +28,126 @@ Independent terminal review ACCEPTs exact order/prefix/family/Arc association,
 neutral-input and visible-lockfile lifecycles, cancellation, compact retention,
 cleanup and security.
 
-## Exact docs-only frontier authority
+## Owner decision
 
-This audit may write only canonical, current, this Stage and the orchestration
-routing log, at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests,
-fixtures, oracles, exports and callers are read-only.
+`HostSelectedRegistryRepoSpecsKey` is the uniquely smallest complete remaining
+owner. It computes the accepted selected graph first, scans `graph.resolved` in
+order, and alone owns the registry-only Host-registry -> source JSON registry
+file -> parse -> optional registry JSON file -> module projection -> effective
+override -> augmented repo-spec sequence. Root and nonregistry entries are its
+owner-local `None` terminals.
 
-Trace the accepted `HostSelectedModuleGraphObservationKey`,
-`RegistryFileObservationKey`, effective/discovery/preparation carriers and
-`HostRegistryFunctionObservationKey` through
-`HostSelectedRegistryRepoSpecsKey`, then through selected routes,
-extension-generated repositories and public/bootstrap consumers only far enough
-to identify the uniquely smallest complete remaining mutable frontier. Do not
-presume the selected repo-spec aggregate is complete and do not reopen accepted
-lower owners for structural uniformity.
+The entry computation has no other consumer, so inventing a per-entry DICE key
+would retain an artificial intermediate owner. The sole production consumer is
+`HostSelectedModuleRoutesKey`, which adds separate route semantics; routes,
+extensions and public/bootstrap consumers are later and cannot absorb this
+missing aggregate epoch.
 
-The audit must establish:
+## Exact design authority
 
-- the first reusable semantic producer that can retain one exact Result Arc and
-  complete shared-Arc epoch without reconstructing selected graph, registry
-  file, preparation or Host-registry state;
-- exact selected-graph -> registry-file/effective/Host-registry -> per-entry
-  projection -> aggregate order, Need/typed-outer/error precedence, full-batch
-  terminal algebra and later suppression;
-- matching Legacy/Observed families, exact child EventBatch ownership/order,
-  eventless aggregate behavior where applicable, warm silence and poll-drop
-  recovery;
-- independent graph, registry-file, effective, Host-registry, repo-spec/route/
-  generated-repository A -> B -> A invalidation with held Result/epoch handles;
-  and
-- compact Buck2-shaped retention with join/frontier/event scratch compute-local
-  and no cache/interner/store/lock/task/direct Host read.
+Write only canonical, current, this Stage and the orchestration routing log, at
+net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, exports and callers remain read-only until independent design ACCEPT.
+
+The sole future Rust authority is
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 6,830 physical with
+first `#[cfg(test)]` at line 2,974. Permit <=520 production, <=1,100 proof,
+<=1,620 aggregate semantic and <=8,500 physical lines. Helpers/tests remain
+below 200 lines; no second file, key, export or caller is writable.
+
+Add private crate-visible `HostSelectedRegistryRepoSpecsObservationKey` and
+`ObservedHostSelectedRegistryRepoSpecs`. The carrier derives `Dupe` and
+`Allocative`, has borrowed accessors, and retains exactly one existing
+`Arc<Result<HostSelectedRegistryRepoSpecs,
+HostSelectedRegistryRepoSpecsError>>` plus one cumulative compact
+`PathObservationEpoch`.
+
+Use one Legacy/Observed semantic driver. Legacy selects only the legacy graph,
+Host-registry, registry-file and effective siblings and contributes empty
+epochs. Observed selects only the accepted matching siblings and their exact
+epochs. Both modes share all parse, projection, entry and aggregate semantics
+and legacy projection moves the exact local Result Arc.
+
+## Exact order and aggregate algebra
+
+Compute the selected graph first. Then visit every graph occurrence in order.
+Root and nonregistry occurrences complete locally with `None`; each registry
+occurrence computes, in order, matching Host registry, source JSON registry
+file, its parse/projection, conditional registry JSON registry file, module
+hash/pure projection, matching effective override and final augmentation.
+Within one entry, any terminal suppresses its later children exactly as today.
+
+Merge every observed Complete child epoch immediately, left-first and before
+semantic inspection: graph first, then each entry and each child in the order
+above. Equal duplicate demands preserve the earliest exact Arc. Conflicting
+values or operation mismatch are typed outer. Continue the existing full
+cross-entry scan after an entry semantic error or Need; its valid cumulative
+prefix remains compute-local so a later higher-precedence terminal or the final
+Complete result contains every Complete sibling epoch actually reached.
+
+Use a private stage-aware outer that distinguishes graph, Host registry by
+module, source/registry file by module and URL, effective override by module,
+and merge by module and stage. After the first child or merge outer, continue
+attempting every later Complete merge but retain the first occurrence outer.
+Final precedence is:
+
+1. first typed child/merge outer by graph-entry and child order;
+2. first semantic or DICE-compute error by graph-entry order;
+3. first incompatible Need union;
+4. the compatible Need union; and
+5. ordered success.
+
+Final Need or outer is carrierless and discards all provisional epoch scratch.
+Complete semantic error and success retain the full valid cumulative prefix.
+Graph Need/outer is immediate and suppresses entries; graph semantic failure
+retains the graph epoch and suppresses entries.
+
+The aggregate remains eventless. Selected-graph/discovery descendants retain
+their exact existing batches; Host-registry, registry-file and effective
+parents remain eventless and lower event ownership is unchanged. Observed and
+legacy complete batch sequences stay exact, warm reuse is silent, and poll-drop
+publishes no aggregate row, value or batch.
+
+Retain no graph or child carrier, per-entry epoch/list/map, join frontier,
+override cache, parser/event scratch, cache/interner/store/lock/task/direct Host
+read, revision or certificate state. Existing semantic registry observations,
+attempts, effective override and repo specs remain only inside the one Result;
+all traversal, merge and terminal scratch is compute-local.
+
+## Required proof
+
+- distinct key equality/hash/Display, borrowed accessors, `Dupe`/`Allocative`,
+  Complete Result-Arc projection and Complete/Need/outer equality/validity;
+- production-used graph and per-entry adapters/finishers for every DICE-compute,
+  semantic, Need and typed-outer position, with exact prefixes and later-child
+  suppression;
+- exact first-Arc duplicate handling, conflict and operation mismatch, and a
+  full-scan table for first/middle/last semantic error, compatible/incompatible
+  Need, child outer and merge outer across multiple entries;
+- root/nonregistry `None`, source JSON parse/projection, optional registry JSON
+  suppression and every existing registry-file/effective/augmentation terminal;
+- exact observed/legacy direct dependency vectors, reverse family isolation,
+  complete ordered child EventBatch parity, zero parent batch and warm silence;
+- real poll-drop with no aggregate publication and same-DICE recovery;
+- independent selected-graph, Host-registry, source JSON, registry JSON and
+  effective-override A -> B -> A restoration with held Result/epoch handles and
+  unaffected per-demand Arc preservation; and
+- zero route, selected extension, generated repository, public command or
+  bootstrap activation on success, error, Need, outer and cancellation paths.
 
 Preserve admitted Bazel 9 values/errors/order/events as exact. Private typed
-outers and shared-Arc epoch association remain Slug-native. Route/extension/
-public/bootstrap breadth, M8/M7B and exact identity bytes remain deferred unless
-live evidence proves one is the uniquely smaller prerequisite.
+outers and shared-Arc epoch association are Slug-native. Routes, extensions,
+generated/public/bootstrap breadth, M8/M7B and exact identity bytes remain
+deferred.
 
 ## Terminal discipline
 
-Reach exactly one terminal: one independently reviewed smallest-owner design,
-one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
-design may name at most one implementation successor. STOP Rust/tests/oracles/
-caller/export changes, speculative public activation, umbrella ownership,
-milestone closure, M8/M7B work, or bypassing the accepted selected-graph,
-registry and Host-registry carriers. M7 remains partial and
+STOP a second key/file, caller/export, route/extension/public activation,
+changed legacy precedence or event ownership, retained traversal state, proof
+waiver, cap excess, milestone closure, M8 or M7B work. REPLAN before widening.
+After independent design ACCEPT schedule only
+`WP-6-7A-selected-registry-repo-specs-observation-implementation`; after its
+ACCEPT resume only the route/extension frontier. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
 ## Historical Host-registry-function observation implementation

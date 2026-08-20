@@ -10784,3 +10784,76 @@ STOP Rust/test/oracle/caller/export work, speculative public activation,
 umbrella ownership, milestone closure, M8/M7B work or bypassing the accepted
 selected-graph/registry/Host-registry carriers. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Selected registry repo-spec observation owner design (2026-08-20)
+
+The accepted frontier audit selects only
+`WP-6-7A-selected-registry-repo-specs-observation-design`.
+Scheduling base is `041b4476` and Rust base is the accepted
+`e155d74f`.
+`HostSelectedRegistryRepoSpecsKey` is the smallest complete aggregate above
+the accepted selected-graph, Host-registry, registry-file and effective
+carriers. Its owner-local entry computation has no independent consumer; the
+sole consumer, selected routes, adds separate route semantics.
+
+Design authority is canonical/current/this Stage/routing only, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust/tests/fixtures/oracles/exports/
+callers remain read-only. Future Rust authority is only
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 6,830 physical/test
+boundary 2,974, within <=520 production, <=1,100 proof, <=1,620 aggregate
+semantic and <=8,500 physical. Helpers/tests remain below 200; no second file,
+key, export or caller is writable.
+
+Add one private crate-visible observation key/carrier retaining one exact local
+semantic Result Arc plus one cumulative compact epoch. Derive
+`Dupe`/`Allocative`, provide borrowed accessors and use one Legacy/Observed
+semantic driver with matching graph, Host-registry, registry-file and effective
+families. Legacy contributes empty epochs and moves the exact Result Arc.
+
+Preserve graph first, then graph-occurrence order. Root/nonregistry entries are
+owner-local `None`; registry entries preserve Host registry -> source JSON
+registry file -> parse/projection -> optional registry JSON file -> module
+projection -> effective override -> augmentation. Per-entry terminals suppress
+later children, while the aggregate continues its existing full cross-entry
+scan.
+
+Merge every Complete epoch immediately, left-first and before semantics, in
+graph/entry/child order. Equal duplicates retain the earliest exact Arc.
+Conflicts and operation mismatch are typed outer. A private stage-aware outer
+distinguishes graph, Host registry/module, registry file/module/URL,
+effective/module and merge/module/stage. Continue attempting later Complete
+merges after the first outer but retain that first outer.
+
+Final precedence is first typed child/merge outer, then first semantic or
+DICE-compute error, then first incompatible Need, compatible Need union and
+ordered success. Need/outer is carrierless; Complete error/success retains the
+full valid cumulative prefix. Graph Need/outer suppresses entries and graph
+semantic failure retains only its complete graph prefix.
+
+The aggregate remains eventless. Selected-graph/discovery descendants keep
+their exact batches; other children remain eventless and lower ownership is
+unchanged. Warm reuse is silent and poll-drop publishes no parent state.
+Retain only one Result Arc+epoch; graph/child carriers, entry epochs, traversal,
+merge, terminal and event scratch remain compute-local with no added map/cache/
+interner/store/lock/task/direct Host read/revision/certificate state.
+
+Proof covers identity/accessors/equality/legacy Arc, every graph and per-entry
+terminal/prefix/later suppression, duplicate-first/conflict/mismatch, full-scan
+first/middle/last semantic/Need/outer cases, root/nonregistry and optional-file
+semantics, exact family rows and complete child batch parity, warm/cancel
+recovery, independent graph/Host-registry/source JSON/registry JSON/effective
+A -> B -> A held-carrier lifecycles, and zero route/extension/generated/public/
+bootstrap activation.
+
+Exact compatibility is current admitted repo-spec values/errors/order/events.
+The private typed outer/shared-Arc epoch is Slug-native. Routes/extensions/
+generated/public/bootstrap work, M8/M7B and exact identity bytes remain
+deferred.
+
+STOP a second file/key, caller/export, changed precedence/event ownership,
+retained traversal state, upper activation, proof waiver, cap excess or
+milestone closure. REPLAN before widening. After independent design ACCEPT
+schedule only
+`WP-6-7A-selected-registry-repo-specs-observation-implementation`; after its
+ACCEPT resume only the route/extension frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.
