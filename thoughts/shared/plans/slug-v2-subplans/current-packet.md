@@ -1,19 +1,19 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-registry-file-observation-design`
+Packet: `WP-6-7A-registry-file-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `de76a83e`
+Scheduling base: `b7f66b06`
 Rust base: `d0ebd79d`
+Accepted design: `b7f66b06`
 
 ## Objective and exact authority
 
-Freeze the uniquely smallest shared registry-file observation owner. Write only
-the canonical plan, this manifest, Stage 6 and routing at
-<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust/tests/fixtures/oracles
-and public/caller files are read-only during design.
+Implement the accepted registry-file observation owner. Write only
+`app/slug_bzlmod_v2/src/registry_dice.rs`; every other Rust, test, fixture,
+oracle, public, caller and documentation file is read-only.
 
-Future implementation authority is exactly
+Implementation authority is exactly
 `app/slug_bzlmod_v2/src/registry_dice.rs`, baseline 2,213 physical lines and
 first `#[cfg(test)]` boundary 905. Caps are <=320 production, <=760 proof,
 <=1,080 aggregate semantic and <=3,400 physical; helpers remain below 200 lines.
@@ -75,10 +75,8 @@ boundary associated with the accepted path epoch. Deferred: root patches,
 module-source preparation, discovery evaluation/events, selected graph,
 selected repo specs, extensions, M8/M7B and identity bytes.
 
-STOP Rust during design, a second future file/key/caller/export, IO semantic
+STOP a second file/key/caller/export, IO semantic
 redesign, patch/preparation/discovery/selected activation, event/family drift,
-extra retained state, cap excess or milestone closure. After independent design
-ACCEPT schedule exactly
-`WP-6-7A-registry-file-observation-implementation`; after implementation ACCEPT
-return to the docs-only selected-module-graph frontier. REPLAN if this owner
-cannot preserve exact IO behavior within the frozen scope.
+extra retained state, cap excess or milestone closure. After independent
+implementation ACCEPT return to the docs-only selected-module-graph frontier.
+REPLAN before wider authority if exact IO behavior cannot fit the frozen scope.

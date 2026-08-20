@@ -9596,3 +9596,27 @@ future file/key/export, IO semantic drift, upper activation, extra retained
 state, cap excess or milestone closure. After independent ACCEPT schedule only
 `WP-6-7A-registry-file-observation-implementation`; after implementation return
 to the selected-graph frontier.
+
+### Registry-file observation design accepted (2026-08-19)
+
+Design `b7f66b06` activates only
+`WP-6-7A-registry-file-observation-implementation` from Rust base `d0ebd79d`.
+Write only `app/slug_bzlmod_v2/src/registry_dice.rs`, baseline 2,213/first test
+boundary 905, at <=320 production, <=760 proof, <=1,080 aggregate and <=3,400
+physical; helpers remain below 200 lines.
+
+Preserve private Result-Arc+epoch ownership, scheme-first dispatch, matching
+Legacy/Observed families, exact legacy Arc projection, local policy -> root ->
+IO and remote policy -> IO order, policy-left epoch merge before semantics,
+carrierless Need/outer, exact empty/policy/merged terminal prefixes and no Need
+union. Parent is eventless; child ROOT batches remain child-owned; retention is
+one local Result Arc+compact epoch without child carriers or extra state.
+
+Complete the frozen scheme/policy/root/plan/IO/generation, Arc/order/prefix,
+family/event/cancel/warm and independent local/remote/policy lifecycle proof.
+Activate no patch/preparation/discovery/selected/HostRegistry/extension/public
+consumer.
+
+STOP a second file/key/caller/export, IO semantic/event/family/memory drift,
+upper activation, cap excess or milestone closure. After independent ACCEPT
+return only to the docs-only selected-module-graph frontier.
