@@ -11311,3 +11311,35 @@ Design ACCEPT schedules only
 STOP a second file/key, lib.rs/caller/export, upper activation, drift, cap/proof
 waiver or milestone closure. After implementation ACCEPT resume only the
 definition/evaluation frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension definition-load request observation implementation (2026-08-20)
+
+Accepted design `d86c9a59` activates only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation`
+from Rust base `2e0a19ae`.
+
+Write authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 10,031 physical
+lines with first `#[cfg(test)]` at line 4,019. Caps remain <=180 production,
+<=420 proof, <=600 aggregate semantic and <=10,700 physical lines; every
+helper/test remains below 200 lines. Every other Rust file, lib.rs, loading/core
+crate, caller, export, fixture and oracle remains read-only.
+
+Implement only the private callerless request observation key/carrier and one
+Legacy/Observed driver. Compute matching mappings first, accept an observed
+Complete mapping epoch before semantics, then run the unchanged ordered pure
+request projection. Mapping Need/outer is carrierless; mapping compute is
+empty-prefix semantic; mapping semantic and pure Unsupported/Invalid/
+InvalidContext/success terminals retain the full prefix. Legacy contributes an
+empty epoch and moves the exact local Result Arc.
+
+The parent remains eventless and retains exactly one local request Result Arc
+plus the compact mapping epoch. Matching-family rows, exact child batches, warm
+silence, cancellation recovery, held-carrier lifecycles and zero loading/
+evaluation/root-mapping/generated/public activation are required.
+
+STOP a second file/key, lib.rs/caller/export, upper work, semantic/event/family/
+memory drift, proof/cap waiver or milestone widening. Implementation ACCEPT
+returns only to the docs-only extension
+definition/evaluation frontier. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.

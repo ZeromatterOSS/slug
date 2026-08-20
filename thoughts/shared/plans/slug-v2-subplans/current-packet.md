@@ -1,15 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-design`
+Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: 06-analysis-toolchains-and-actions.md
-Scheduling base: 5c1f95fa
+Scheduling base: d86c9a59
 Rust base: 2e0a19ae
-Accepted predecessor design: 9cbcbfc5
+Accepted design: d86c9a59
 
-## Formal smaller-prerequisite REPLAN
+## Implementation authority
 
-The extension definition/evaluation frontier audit selects
+Accepted design d86c9a59 selects
 HostSelectedExtensionDefinitionLoadRequestsKey as the uniquely smallest
 remaining reusable association. It is a semantic projection owner, not the
 actual .bzl loader: it consumes selected extension mappings and produces the
@@ -34,7 +34,7 @@ must decide the single cross-crate handoff: promote/re-export this already
 proved carrier and combine it with HostBzlModuleObservationKey. Premature export
 would widen the Rust API before a consumer is authorized.
 
-## Exact future implementation authority
+## Exact implementation authority
 
 Future Rust write authority is exactly
 app/slug_bzlmod_v2/src/selected_repo_spec.rs, baseline 10,031 physical lines
@@ -115,13 +115,12 @@ definition Bzl loading, evaluation-input/root-files joins, root mapping,
 prepared/evaluated extensions, generated repositories, public/bootstrap,
 M8/M7B and exact identity bytes.
 
-Design ACCEPT schedules exactly
-`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation`.
+Implementation ACCEPT returns only to the docs-only extension
+definition/evaluation frontier.
 STOP a second Rust file/key, lib.rs or caller/export activation, Bzl/evaluation/
 root-mapping/generated/public work, semantic/event/family/memory drift,
 proof/cap waiver, milestone closure or M8/M7B widening. REPLAN before widening.
-Only after implementation ACCEPT resume the extension definition/evaluation
-frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical accepted extension frontier audit
 
