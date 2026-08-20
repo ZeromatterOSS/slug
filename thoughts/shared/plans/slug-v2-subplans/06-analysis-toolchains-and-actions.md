@@ -10454,3 +10454,97 @@ design may name at most one implementation successor. STOP Rust/test/oracle/
 caller/export work, speculative public activation, umbrella ownership,
 milestone closure, M8/M7B work or bypassing the accepted graph carrier. M7
 remains partial and M7A -> M8 -> M7B remains.
+
+### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
+
+The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
+establish that `HostVisibleLockfileKey` is the uniquely smaller prerequisite
+before `HostRegistryFunctionKey` and selected registry repo-spec ownership.
+`HostVisibleLockfileKey` owns the exact Host sequence
+`HostFileBytesKey -> RootModuleLockfileModeKey -> file semantics/parser`.
+
+The accepted `RootModuleFilesObservationKey` cannot substitute for this owner.
+It reads mode first, returns `VisibleLockfileRead::Ignored` with an empty
+lockfile epoch in `LockfileMode::Off`, includes root MODULE observations and
+projects different errors. The Host-visible owner instead observes and parses
+present bytes even in Off mode and returns an `Arc<BazelLockfile>`. Substitution
+would change exact dependency order, value/error behavior and epoch membership.
+
+Activate only `WP-6-7A-host-visible-lockfile-observation-design`. Design write
+authority is canonical/current/this Stage/routing at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+exports and callers remain read-only pending independent design ACCEPT.
+
+### Visible-lockfile observation design
+
+The sole future Rust authority is
+`app/slug_bzlmod_v2/src/host_lockfile.rs`, baseline 965 physical with first
+`#[cfg(test)]` at line 142. Permit <=140 production, <=280 proof, <=420
+aggregate semantic and <=1,400 physical lines. Helpers/tests remain below 200;
+the cohesive owner file is the only allowed exception to file-size pressure.
+
+Add only private crate-visible
+`HostVisibleLockfileObservationKey(HostVisibleLockfileKey)` and
+`ObservedHostVisibleLockfile`. The latter retains one exact existing
+`Arc<Result<HostVisibleLockfileValue, HostVisibleLockfileError>>` plus the
+exact `PathObservationEpoch` from its Host FileBytes child. Require
+`Dupe`/`Allocative`, borrowed accessors, distinct key identity and no export
+or caller.
+
+One Legacy/Observed driver preserves:
+
+1. form the visible lockfile path;
+2. Legacy computes only `HostFileBytesKey` with an empty epoch while Observed
+   computes only `HostFileBytesObservationKey` and forwards its exact epoch;
+3. after a Complete file child, both compute the neutral
+   `RootModuleLockfileModeKey`; and
+4. both then inspect file semantics and invoke the same Host parser.
+
+File Need or observed typed outer is immediate and carrierless, suppressing mode
+and parse. Preserve the legacy DICE invariant behavior. After a Complete file
+child, missing mode wins over any stored file semantic error and retains the
+file epoch. File error, Missing, Present, `BadLockfile`, `UncaughtParse`,
+unsupported-version and success all retain that same exact epoch. No root-files
+family, epoch union, reconstruction or direct Host read is allowed.
+
+Complete equality uses the local semantic Result plus epoch. Need is invalid and
+self-unequal; typed outer equality is by outer value. Legacy projection moves
+the exact Result Arc. The parent, Host FileBytes semantic child and mode child
+remain eventless; path observations stay lower-owned. Warm reuse is silent and
+poll-drop publishes no parent value or batch.
+
+Retain no child carrier, file bytes/parser scratch, extra collection,
+map/cache/interner/store/lock/task, revision/certificate or event state. The
+DICE value is exactly one semantic Result Arc plus one compact shared-Arc epoch.
+
+Required proof is:
+
+- key equality/hash/Display, accessors, `Dupe`/`Allocative`, and
+  Complete/Need/outer equality and validity;
+- production-used family adapters/finishers, exact file-first observed and
+  legacy dependency rows, reverse-family isolation, file Need/outer, completed
+  file then missing-mode precedence, and later suppression;
+- exact File/BadLockfile/UncaughtParse/unsupported-version/success variants and
+  messages across Missing, Present, WrongKind, read and resolution terminals;
+- exact per-demand/result Arc forwarding and explicit Off+present bytes proving
+  Host parsing with a nonempty epoch rather than root-files Ignored/empty;
+- exact zero semantic batches, warm silence and real poll-drop/no-publication/
+  same-DICE recovery;
+- independent mode and lockfile bytes/symlink A -> B -> A with held Result and
+  epoch handles; and
+- zero RootModuleFiles, HostRegistryFunction, repo-spec, route, extension,
+  public-command and bootstrap activation.
+
+Reuse accepted lower Host FileBytes/path proof and add no oracle. Exact
+compatibility is the current Host-visible values/errors, file -> mode -> parse
+order, parser and eventlessness. The private typed outer/shared-Arc association
+is Slug-native. Host registry function, repo specs/routes/extensions,
+public/bootstrap activation, M8/M7B and identity bytes remain deferred.
+
+STOP a second Rust file/key, caller/export, root-carrier substitution,
+parser/order/error/event drift, extra retained state, upper activation, cap
+excess, proof waiver, milestone closure or M8/M7B work. REPLAN before widening.
+After independent design ACCEPT schedule only
+`WP-6-7A-host-visible-lockfile-observation-implementation`; after its ACCEPT
+resume only the docs frontier for Host registry-function observation, then repo
+specs. M7 remains partial and M7A -> M8 -> M7B remains.
