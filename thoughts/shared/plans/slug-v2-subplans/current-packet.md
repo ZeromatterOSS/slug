@@ -1,14 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: 06-analysis-toolchains-and-actions.md
-Scheduling base: 030f612a
+Scheduling base: 61995c86
 Rust base: 2e0a19ae
 Accepted design: d86c9a59
-Implementation scheduling: 030f612a
+Accepted correction: 61995c86
 
-## Formal proof-cap REPLAN
+## Implementation retry authority
 
 The implementation candidate preserves the accepted private one-child owner,
 shared Legacy/Observed driver, mapping-first order, terminal polarity, event
@@ -20,11 +20,11 @@ candidate measures +179 production/+398 proof/+577 aggregate semantic at 10,608
 physical lines. Only 22 proof lines remain, while the required discriminators
 need compact but real upper-family, equality/lifecycle and pure-terminal cases.
 
-This correction is docs-only. Write authority is exactly canonical/current/
-Stage 6/routing at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. The dirty
-Rust candidate is retained and non-writable during correction.
+Accepted correction 61995c86 authorizes only the same-file proof retry. The
+reviewed production candidate remains frozen; every other Rust file, caller,
+export, fixture, oracle and plan document is read-only.
 
-## Corrected retry authority
+## Exact retry authority
 
 The retry remains limited to
 app/slug_bzlmod_v2/src/selected_repo_spec.rs from Rust base 2e0a19ae and
@@ -64,14 +64,12 @@ Add compact discriminators that:
 
 Do not add invalid-child hooks or oracle evidence.
 
-## Correction terminal
+## Retry terminal
 
-Correction ACCEPT schedules only
-`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`.
+Retry ACCEPT returns only to the docs-only definition/evaluation frontier.
 STOP production semantic/event/family/memory changes, a second file/key,
 lib.rs/caller/export or upper activation, proof waiver/cap excess, milestone
-closure or M8/M7B widening. REPLAN before widening. Only after retry ACCEPT
-resume the docs-only definition/evaluation frontier. M7 remains partial and
+closure or M8/M7B widening. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
 
 

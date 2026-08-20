@@ -11387,3 +11387,27 @@ Correction ACCEPT schedules only
 `WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`.
 After retry ACCEPT resume only the docs-only definition/evaluation frontier.
 REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension definition-request observation implementation retry (2026-08-20)
+
+Accepted correction `61995c86` activates only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`
+from Rust base `2e0a19ae` and semantic design `d86c9a59`.
+
+Write authority is exactly `app/slug_bzlmod_v2/src/selected_repo_spec.rs`.
+Production remains capped at <=180; corrected proof is <=560, aggregate
+semantic <=740 and physical <=10,900 lines; helpers/tests stay below 200. Every
+other file, caller, export, fixture and oracle is read-only.
+
+Freeze the reviewed private one-child driver, mapping-first prefix algebra,
+carrierless Need/outer, exact legacy Result Arc, eventless matching families
+and one local Result Arc+epoch retention. Change proof only: scan the literal
+upper prefixes frozen by the correction; prove same-result/different-epoch
+inequality separately from pure request A -> B -> A; compose reachable pure
+terminals with exact epoch order/shared Arcs; and preserve family/event/warm/
+Need/outer/cancellation proof.
+
+STOP production drift, a second file/key, lib.rs/caller/export or upper work,
+proof waiver/cap excess, milestone closure or M8/M7B widening. Retry ACCEPT
+returns only to the docs-only definition/evaluation frontier. REPLAN before
+widening. M7 remains partial and M7A -> M8 -> M7B remains.
