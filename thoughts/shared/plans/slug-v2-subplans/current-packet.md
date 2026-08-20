@@ -1,13 +1,51 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-source-preparation-observation-implementation`
+Packet: `WP-6-7A-module-source-preparation-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `5436a421`
+Scheduling base: `9aba0214`
 Accepted design: `5436a421`
 Rust base: `0f9a0559`
 
-## Owner decision and exact implementation authority
+## Formal REPLAN and exact docs-only authority
+
+The retained two-file implementation candidate is production-sound: one shared
+Legacy/Observed semantic driver preserves effective -> source or policy ->
+ordered registry attempts -> resolve-all patches -> per-resolution FileBytes
+and immediate apply; all Complete epochs merge left-first before semantics;
+Need/outer is carrierless; the parent is eventless; and retention is exactly
+one local Result Arc plus the compact epoch. Independent review found no owner,
+order, event, family, memory or cleanup defect.
+
+The implementation cannot be accepted under the frozen proof ceiling. Measured
+against Rust base `0f9a0559`, the live candidate is +344 net in
+`source_preparation.rs` at 16,479 physical and +1,332 proof lines in
+`source_preparation_observation_tests.rs` at 6,594 physical: +1,676 semantic and
+23,073 physical aggregate. Only 108 external and 60 colocated proof lines
+remain, but the accepted design still requires production-called compute and
+semantic prefix projectors, operation-mismatch propagation, first/middle/last
+resolution and FileBytes terminals, and independent registry/lockfile/symlink
+lifecycles. Deleting existing exact family, event, cancellation, Arc or
+lifecycle discriminators would make the proof weaker rather than bounded.
+
+This correction may write only canonical/current/Stage 6/routing at <=40,
+<=220, <=180 and <=30 net lines and <=470 aggregate. The two dirty Rust files
+are retained candidate state and are non-writable during this design. Every
+Rust/test/fixture/oracle/caller/public file is read-only.
+
+Correct future retry caps only: keep `source_preparation.rs` at <=700
+production, <=60 colocated proof and <=16,900 physical; raise only the external
+proof file to <=1,800 proof and <=7,150 physical. Aggregate semantic cap becomes
+<=2,560 and aggregate physical cap <=24,050. Production identity, semantics,
+events, families, memory and the two-file authority remain frozen.
+
+After independent correction ACCEPT schedule exactly
+`WP-6-7A-module-source-preparation-observation-implementation-retry`. After
+that implementation ACCEPT return only to the docs-only selected-module-graph
+frontier for discovery. STOP code now, a third file, semantic redesign, proof
+waiver, cap excess, upper activation or milestone closure.
+
+## Retained owner decision and future retry authority
 
 The selected-graph frontier audit selects `ModuleSourcePreparationKey` as the
 uniquely smallest complete next owner. It owns effective selection and the
@@ -20,14 +58,14 @@ consumer. `HostDiscoveredModuleKey` only consumes completed preparation and
 separately owns MODULE evaluation/events; selected graph only joins discovery
 horizons. No smaller prerequisite or upper owner is warranted.
 
-Write authority is exactly:
+Future retry write authority remains exactly:
 
 - `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 16,135 physical:
   <=700 production, <=60 colocated proof and <=16,900 physical; and
 - `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, baseline
-  5,262 physical: <=1,440 proof and <=6,800 physical.
+  5,262 physical: <=1,800 proof and <=7,150 physical.
 
-Aggregate semantic cap is <=2,200 and aggregate physical cap <=23,700. Helpers
+Aggregate semantic cap is <=2,560 and aggregate physical cap <=24,050. Helpers
 and tests remain below 200 lines; the shared owner file is the sole cohesive
 large-file exception. Every third file, export and caller is read-only.
 

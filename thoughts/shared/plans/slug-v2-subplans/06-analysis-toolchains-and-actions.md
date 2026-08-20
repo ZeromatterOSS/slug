@@ -9746,3 +9746,54 @@ STOP a third file/export/caller, reordered IO/patch semantics, event/family/
 memory drift, upper activation, cap excess or milestone closure. REPLAN before
 wider authority. After independent ACCEPT return only to the docs-only
 selected-module-graph frontier for discovery.
+
+### Module-source preparation proof-cap stop (2026-08-20)
+
+Implementation review of the retained candidate from Rust base `0f9a0559`
+accepts its production owner and one-driver structure. Exact order is matching
+effective -> source or policy -> ordered registry files -> resolve every patch
+-> each FileBytes plus immediate apply. Complete epochs merge left-first before
+semantics, Need/outer is carrierless, the parent remains eventless, and retained
+state is exactly the local Result Arc plus compact epoch. No production,
+retention, family, event or cleanup redesign is required.
+
+The proof cap is not sufficient for the accepted matrix. Live measured
+accounting is +344 net at 16,479 physical in `source_preparation.rs`, +1,332
+proof at 6,594 physical in `source_preparation_observation_tests.rs`, and
++1,676/23,073 aggregate. The existing proof discriminates the shared reducer,
+exact registry/nonregistry families and child batches, neutral FileBytes,
+warm/cancellation recovery, URL and patch metadata/bytes restoration and upper
+nonactivation. The remaining 108 external plus 60 colocated proof lines cannot
+also cover production-called compute/semantic projectors, exact mismatch outer,
+every patch terminal at first/middle/last positions, and independent
+registry/lockfile/symlink lifecycles without deleting those accepted
+discriminators.
+
+Formally REPLAN only to
+`WP-6-7A-module-source-preparation-observation-proof-cap-correction-design`.
+During correction, the two dirty Rust files are retained and non-writable.
+Write only canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net
+and <=470 aggregate.
+
+Freeze the same two-file retry authority and production contract. Keep
+`source_preparation.rs` at <=700 production, <=60 colocated proof and <=16,900
+physical. Raise only `source_preparation_observation_tests.rs` to <=1,800 proof
+and <=7,150 physical, making <=2,560 semantic and <=24,050 physical aggregate.
+No third file, export, caller, upper activation, semantic/event/family/memory
+change or milestone closure is permitted.
+
+The retry must use production-called stable finishers/projectors to table exact
+effective/source/policy/registry-file/resolution/FileBytes compute and semantic
+prefixes, carrierless Need/outer, operation-mismatch propagation and later
+suppression. It must cover nonregistry Absent/error; patch skip/invalid/missing/
+wrong-kind/resolution compute+semantic; first/middle/last resolution and
+FileBytes Need/outer/compute/Missing/Error; and exact parse/apply suppression.
+Extend parent lifecycles through registry bytes, URL/mode/MODULE/lockfile and
+patch symlink/path/bytes A-B-A with held Result/epoch handles. Preserve the
+already discriminating family rows, exact child batches, warm, cancellation,
+Arc, ordering and upper exclusions.
+
+After independent correction ACCEPT schedule exactly
+`WP-6-7A-module-source-preparation-observation-implementation-retry`. Only
+after retry ACCEPT return to the docs-only selected-module-graph frontier for
+discovery. M7 stays partial and M7A -> M8 -> M7B remains.
