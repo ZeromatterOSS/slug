@@ -1,27 +1,27 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-registry-policy-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-registry-policy-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `1cd4e65b`
+Scheduling base: `de89907f`
 Rust base: `a4623d6b`
 Accepted design: `8d00d44a`
+Accepted proof correction: `de89907f`
 
 ## Objective and exact authority
 
-Formally correct the measured registry-policy proof authority before retrying
-the same implementation. Write only the canonical plan, this manifest, Stage 6
-and the routing log, at <=40/<=220/<=180/<=30 net lines and <=470 aggregate.
-Retain the dirty `app/slug_bzlmod_v2/src/registry_dice.rs` candidate exactly as
-non-writable evidence during this design packet; every Rust/test/oracle file is
-STOP.
+Complete the accepted registry-policy observation implementation and corrected
+proof under exactly one writable file:
+`app/slug_bzlmod_v2/src/registry_dice.rs`. Every other Rust, test, fixture,
+oracle, public, caller and documentation file is read-only during implementation.
 
 The live candidate measures +166 production/+609 proof/+775 aggregate at 2,188
 physical lines versus `a4623d6b`. Focused proof passes 3/3; full bzlmod 457 plus
 integrations, loading 138 plus integrations and query 53+56+1+11 pass. The
-production owner, algebra and retention are sound; only the frozen proof budget
-and two mechanically impossible discriminator wordings require correction.
-Core retains the inherited 245/246 stale external-visibility wording baseline.
+production owner, algebra and retention are sound. Finish only the corrected
+missing-injected suppression proof and any bounded proof compaction needed by
+the accepted gate. Core retains the inherited 245/246 stale external-visibility
+wording baseline.
 
 ## Frozen implementation contract
 
@@ -75,10 +75,9 @@ child events. Slug-native: private sibling, Result-Arc+epoch and typed outer.
 Deferred: registry I/O/generation, patches, preparation, discovery/selected
 graph, extensions, M8/M7B and identity bytes.
 
-STOP Rust during design, a second implementation file/key/caller/export,
+STOP a second implementation file/key/caller/export,
 registry-file/preparation/discovery/selected activation, test hooks, invalid
 epochs, semantic/event/family/memory drift, cap excess or milestone closure.
-After independent correction ACCEPT schedule exactly
-`WP-6-7A-registry-policy-observation-implementation-retry`; after retry ACCEPT
-return only to the docs-only selected-module-graph frontier audit. REPLAN again
-if the corrected proof cannot fit without weakening discrimination.
+After independent implementation ACCEPT return only to the docs-only selected-
+module-graph frontier audit. REPLAN again before any wider write authority or if
+the corrected proof cannot fit without weakening discrimination.

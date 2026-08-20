@@ -9498,3 +9498,27 @@ key/caller/export, test hook, upper activation or milestone closure. After
 independent design ACCEPT schedule only
 `WP-6-7A-registry-policy-observation-implementation-retry`; after retry ACCEPT
 return only to the selected-module-graph frontier audit.
+
+### Registry-policy proof correction accepted (2026-08-19)
+
+Correction `de89907f` accepts the measured proof authority and activates only
+`WP-6-7A-registry-policy-observation-implementation-retry` from Rust base
+`a4623d6b` and semantic design `8d00d44a`.
+
+Write only `app/slug_bzlmod_v2/src/registry_dice.rs`, baseline 1,413 physical,
+at <=200 production, <=680 proof, <=880 aggregate semantic and <=2,300 physical;
+helpers remain below 200 lines. Preserve the private Result-Arc+epoch carrier,
+URLs -> mode -> matching root order, empty/full terminal prefixes, carrierless
+Need/outer, eventless parent, child-owned batches and compact retention.
+
+Prove exact Result Arc projection, equality, ordered epoch Arcs, independent
+URL/mode/MODULE/lockfile A->B->A, phase-separated exact child batches, exact
+family rows/reverse exclusion, warm/cancel/recovery and upper nonactivation.
+Missing injected URL/mode errors require empty epochs and zero root-files-family
+or later activation, not an impossible failed-key parent row. Typed outer uses
+the production projector plus accepted lower-owner proof; add no invalid epoch
+or test hook.
+
+STOP a second file/key/caller/export, production semantic/event/family/memory
+drift, upper activation, cap excess or milestone closure. After independent
+ACCEPT return only to the docs-only selected-module-graph frontier audit.
