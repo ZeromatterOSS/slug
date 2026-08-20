@@ -11584,3 +11584,48 @@ reviewed owner design, one uniquely smaller prerequisite, or formal `REPLAN`;
 authorize at most one successor. STOP implementation/activation, umbrella
 ownership, reverse crate dependency, proof waiver, milestone closure, M8/M7B
 and exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Loaded-definition frontier audit selects carrier promotion (2026-08-20)
+
+The read-only
+`WP-6-7A-loaded-module-extension-definitions-observation-frontier-audit`
+selects one uniquely smaller prerequisite before loaded-definition design.
+The accepted observed definition-request key, carrier and typed outer remain
+private to `slug_bzlmod_v2`, while the natural loaded-definition owner is in
+`slug_loading_v2`. Loading already depends one way on Bzlmod and imports the
+legacy request surface; reversing that edge or moving loading semantics into
+Bzlmod is forbidden.
+
+The eventual owner remains `HostLoadedModuleExtensionDefinitionsKey`. It alone
+preserves ordered request -> root Bzl label -> Host Bzl module -> named export
+-> module-extension projection semantics, and its sole direct semantic
+consumer is prepared inputs. The accepted loading-crate
+`HostBzlModuleObservationKey` already owns the complete source/recursive-load
+epoch and local Bzl event batch. Prepared/pure/instantiated/validated owners,
+root mapping, generated repositories and public/bootstrap activation are
+therefore later consumers or parallel work, not prerequisites.
+
+Activate only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-carrier-promotion-design`.
+Design the minimum doc-hidden Bzlmod -> loading surface that lets loading
+construct the accepted observed request key, inspect the exact Result Arc and
+epoch, and preserve an opaque typed outer without exposing extension-mapping
+internals. Preserve the existing key identity, carrier equality/validity,
+Need/outer behavior, error/result/epoch Arc identity, eventlessness, retention
+and lifecycle proof exactly; add no adapter key or semantic owner.
+
+The later loaded-definition design must consume requests first and then each
+observed Host Bzl module in request order, merge Complete epochs left-first
+before that request's label/export semantics, preserve earliest duplicate
+Arcs, stop on the first Need/outer/semantic terminal, and leave child Bzl event
+batches at their existing owners. No full scan or Need union is admitted.
+
+The promotion design is docs-only. Write authority is exactly
+canonical/current/this Stage/routing at net caps <=40/<=220/<=180/<=30 and
+<=470 aggregate. Rust, tests, fixtures, oracles, Cargo/BUILD, APIs, exports and
+callers remain read-only. It may authorize at most one bounded visibility-only
+implementation successor. STOP loaded-definition implementation/design,
+mapping-internal export, reverse dependencies, a second key or adapter, upper
+activation, proof waiver, milestone closure, M8/M7B and exact identity bytes.
+REPLAN only if an opaque usable carrier requires a new semantic owner or an
+unbounded transitive API. M7 remains partial and M7A -> M8 -> M7B remains.
