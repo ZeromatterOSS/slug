@@ -1,48 +1,15 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-module-graph-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-host-selected-module-graph-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
 Rust base: `c6b1e108`
-Accepted design/scheduling: `09177514`
-Implementation scheduling base: `c0623a4b`
+Accepted semantic design: `09177514`
+Accepted proof correction/scheduling: `19cc508d`
 
-## Formal proof-cap REPLAN
+## Exact retry authority
 
-The retained two-file Rust candidate is production-sound but non-writable in
-this docs-only correction. Against Rust base `c6b1e108`, it measures +370
-production/+295 colocated proof in `selected_graph.rs`, +807 external proof,
-+1,472 semantic aggregate, and 2,257/9,213/11,470 physical. Focused selected-
-graph proof passes 21/21 and the complete `slug_bzlmod_v2` suite passes 494 unit
-tests plus every integration/doc test; formatting and diff hygiene pass.
-
-Independent terminal review accepts the private owner, shared driver, exact
-root/policy/effective/transform/BFS/fixed-point/select order, left-first Arc
-association, eventless parent, compact Result-Arc+epoch retention and the
-corrected full-horizon reducer. `finish_horizon` now attempts every Complete
-epoch merge in input order while retaining the first horizon-ordered child or
-merge outer. No production redesign or third file is warranted.
-
-The remaining frozen proof cannot honestly fit the 25 colocated and 693
-external proof lines left under the old caps. Synthetic `graph_error` calls do
-not discriminate the live root/policy/effective/transform/select boundaries;
-candidate-effective first/middle/last Need/typed-outer suppression is absent;
-and the horizon table lacks complete semantic positions plus real Discovery-
-outer versus merge ordering. Pure legacy diamond/cycle/nodep tests do not prove
-the observed aggregate's dependency/epoch/event association. Implicit
-`bazel_tools`, duplicate-candidate cache-first behavior, exact complete mixed
-event sequences, and independent command-policy/effective/recursive/mixed-
-horizon held-carrier lifecycles remain undiscriminated. Compressing these into
-the old envelope would replace behavioral proof with inference.
-
-## Exact docs-only correction authority
-
-Write only canonical, current, `06-analysis-toolchains-and-actions.md` and the
-routing log. Net docs caps are canonical <=40, current <=220, Stage <=180 and
-routing <=30, with <=470 aggregate. Rust, tests, fixtures, oracles, callers and
-exports are read-only during this correction.
-
-The same implementation retry may write exactly:
+Write only:
 
 - `app/slug_bzlmod_v2/src/selected_graph.rs`, baseline 1,592/test boundary 907,
   <=520 production, <=480 colocated proof and <=2,650 physical; and
@@ -50,38 +17,53 @@ The same implementation retry may write exactly:
   8,406, <=2,300 proof and <=10,800 physical.
 
 Aggregate authority is <=3,300 semantic and <=13,450 physical. Helpers/tests
-remain below 200; every third file/export/caller stays read-only.
+remain below 200. Every third file, fixture, oracle, export, caller and plan
+document is read-only.
 
-## Frozen correction proof
+## Frozen production contract
+
+Preserve the accepted private `HostSelectedModuleGraphObservationKey`, carrier
+and one Legacy/Observed driver. Exact order remains root files -> neutral
+command policy -> ordered candidate effective overrides -> root transforms ->
+first-seen BFS horizons -> horizon-ordered raw transforms -> fixed-point rounds
+-> select/rewrite. Complete epochs merge left-first before semantic inspection;
+effective epochs append only on first computation and equal duplicates retain
+the earliest Arc.
+
+Every horizon attempts every Complete carrier merge in input order, including
+after the first child/merge outer, while retaining the first horizon-ordered
+outer. Otherwise preserve first compute/semantic error > incompatible Need >
+compatible Need union > ordered success. Need/outer is carrierless; Complete
+semantic errors retain the full valid merged sibling epoch and suppress raw
+conversion, later rounds and selection.
+
+Graph siblings remain eventless and discovery batches stay child-owned in exact
+order. Retain exactly one local semantic Result Arc plus compact epoch; every
+raw/traversal/frontier/cache/outcome/event/merge structure remains compute-local.
+Add no retained map/cache/interner/store/lock/task/direct Host read.
+
+## Required bounded proof
 
 Preserve every accepted production, identity, Arc, prefix, horizon, family,
 event, warm, cancellation, lifecycle and upper-exclusion discriminator. Add
-only compact behavioral proof that:
+compact behavioral proof only:
 
-- production-used stage finishers/projectors discriminate root, command-policy,
+- production-used stage finishers/projectors must discriminate root, policy,
   candidate-effective first/middle/last, transform and select compute/semantic/
   Need/typed-outer prefixes and exact later suppression, without hooks or
   inconsistent child injection;
 - horizon first/middle/last compute, semantic, real Discovery outer, merge
-  conflict and operation mismatch are ordered correctly while every Complete
-  sibling epoch is reconstructed left-first, the earliest Arc remains
-  authoritative, Need/outer is carrierless and later rounds/select are silent;
+  conflict and operation mismatch must prove exact ordering, full Complete
+  sibling epoch reconstruction, earliest-Arc authority, carrierless Need/outer
+  and later-round/select suppression;
 - real observed and legacy implicit-`bazel_tools`, duplicate candidate, diamond,
   cycle, nodep second-round, recursive and mixed nonregistry+registry topologies
-  have exact dependency vectors, cumulative epoch membership, graph parity and
-  complete ordered child EventBatch sequences with no extra parent batch; and
+  must compare exact dependency vectors, cumulative epoch membership, graph
+  parity and complete ordered child EventBatch sequences with no extras; and
 - command policy, effective, nonregistry, registry, recursive and mixed-horizon
-  inputs independently execute A -> B -> A with held Result/epoch handles and
-  unaffected Arc preservation, while success/error/cancel paths activate no
-  repo-spec/routes/extension/public owner.
-
-Freeze the accepted full-horizon production correction: every Complete carrier
-is still merge-validated after the first outer, while the first horizon-ordered
-outer remains terminal. Production semantics, legacy precedence, child event
-ownership, matching families and retention remain unchanged. The carrier keeps
-one local Result Arc plus compact epoch; every traversal/frontier/cache/outcome/
-event/merge structure remains compute-local, with no retained map/cache/
-interner/store/lock/task/direct Host read.
+  inputs must independently execute A -> B -> A with held Result/epoch handles,
+  unaffected Arc preservation and zero repo-spec/routes/extension/public
+  activation on success/error/cancel.
 
 Exact compatibility remains existing graph values/errors/order/events.
 Slug-native remains the private typed outer/shared-Arc epoch association.
@@ -89,11 +71,9 @@ Repo-spec/routes/extensions/public activation, broader M7A, M8/M7B and exact
 identity bytes remain deferred.
 
 STOP production semantic/event/family/memory change, a third file/caller/export,
-upper activation, proof hooks/waiver, cap excess or milestone closure. After
-independent correction ACCEPT schedule only
-`WP-6-7A-host-selected-module-graph-observation-implementation-retry`; after
-retry ACCEPT return only to the docs-only selected frontier. M7 remains partial
-and M7A -> M8 -> M7B remains.
+upper activation, proof hooks/waiver, cap excess or milestone closure. REPLAN
+before widening. After independent retry ACCEPT return only to the docs-only
+selected frontier. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical selected-module-graph observation design
 

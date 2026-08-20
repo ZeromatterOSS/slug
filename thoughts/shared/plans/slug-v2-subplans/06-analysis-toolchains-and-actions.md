@@ -10372,3 +10372,38 @@ independent correction ACCEPT schedule only
 `WP-6-7A-host-selected-module-graph-observation-implementation-retry`; after
 retry ACCEPT return only to the docs-only selected frontier. M7 remains partial
 and M7A -> M8 -> M7B remains.
+
+### Selected-module-graph proof correction accepted (2026-08-20)
+
+Accepted correction `19cc508d` from Rust base `c6b1e108` and semantic design
+`09177514` activates only
+`WP-6-7A-host-selected-module-graph-observation-implementation-retry`.
+
+Write exactly `selected_graph.rs` at baseline 1,592/test boundary 907 with
+<=520 production/+480 colocated proof and <=2,650 physical, plus
+`source_preparation_observation_tests.rs` at baseline 8,406 with <=2,300
+proof/10,800 physical. Aggregate authority is <=3,300 semantic/13,450 physical;
+helpers/tests remain below 200 and no third file/export/caller is writable.
+
+Preserve the private one-Result-Arc+compact-epoch carrier, one Legacy/Observed
+driver and exact root -> policy -> candidate effective -> transform -> BFS/
+fixed-point -> select order. Complete epochs merge left-first before semantics.
+Every horizon attempts every Complete merge after the first outer while
+retaining that first horizon-ordered outer; all other legacy terminal precedence
+and suppression remain exact.
+
+Add only production-used live-stage and full-horizon position proof; exact
+observed/legacy implicit-bazel_tools, duplicate, diamond, cycle, nodep,
+recursive and mixed topology rows/epochs/complete event sequences; and
+independent command-policy/effective/nonregistry/registry/recursive/mixed
+held-carrier A -> B -> A proof with unaffected Arc preservation and zero upper
+activation on success/error/cancel.
+
+Graph siblings remain eventless and discovery batches stay child-owned.
+Traversal/frontier/cache/outcome/event/merge structures stay compute-local; add
+no retained map/cache/interner/store/lock/task/direct Host read.
+
+STOP production semantic/event/family/memory drift, third-file/caller/export or
+upper activation, proof hooks/waiver, cap excess or milestone closure. REPLAN
+before widening. After independent retry ACCEPT return only to the docs-only
+selected frontier. M7 remains partial and M7A -> M8 -> M7B remains.
