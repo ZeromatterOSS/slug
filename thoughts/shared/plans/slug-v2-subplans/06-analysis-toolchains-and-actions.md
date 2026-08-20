@@ -11200,3 +11200,56 @@ semantic/event/family/memory drift, impossible-child injection, wider
 authority, proof waiver, cap excess or milestone closure. REPLAN before
 widening. After implementation ACCEPT return only to the docs extension
 frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension-mappings observation accepted; definition/evaluation frontier resumed (2026-08-20)
+
+Accepted implementation 2e0a19ae from Rust base 9d2f7a7d and design 9cbcbfc5
+completes the private selected-extension-mappings observation owner. One shared
+Legacy/Observed driver preserves routes first, root files second and the
+unchanged pure extension mapping projection. Complete epochs merge immediately
+left-first before semantics, retaining route-carried duplicate Arc authority.
+Need/outers remain carrierless and empty/route/full prefixes stay exact.
+
+The mapping parent is eventless. The later direct root-files compute reuses DICE
+state without replay. Exact family rows, the sole matching root-event owner,
+warm silence, cancellation recovery and held-carrier lifecycles pass. Retained
+state is one local mapping Result Arc plus one compact epoch; every child
+carrier and mapping/merge/event collection remains compute-local.
+
+Accepted accounting is +297 production/+469 proof/+766 aggregate at 10,031
+physical lines. Focused proof passes 3 tests and the full bzlmod suite passes
+518 unit tests plus every integration/doc target. Formatting, diff hygiene,
+cleanup/retention, security and terminal review pass.
+
+Activate only `WP-6-7A-extension-definition-evaluation-observation-frontier-audit`. This
+rollover is docs-only and changes canonical/current/this Stage; routing remains
+unchanged for the ordinary implementation ACCEPT. Future audit authority is
+canonical/current/this Stage/routing at net caps <=40/<=220/<=180/<=30 and
+<=470 aggregate. Rust, tests, fixtures, oracles, exports and callers are
+read-only.
+
+Trace the accepted mapping carrier through definition-load requests, root
+repository mapping, evaluation inputs, extension evaluation, generated
+repository definitions and public/bootstrap consumers only far enough to
+identify the uniquely smallest complete mutable frontier. Do not presume one of
+those higher owners, invent an umbrella owner or reopen accepted lower
+carriers. Check for a strictly smaller definition-file/load, input, lockfile,
+generated-repository or event-owning evaluation association first.
+
+Audit natural ownership/consumers; exact child order and terminal suppression;
+complete Result-Arcs/epochs versus carrierless edges; family and event
+ownership/order; retained versus compute-local loading/evaluation/generated
+state; Need/outer/cancel/warm behavior; held-carrier lifecycles; and whether
+accepted proof composes or one smaller prerequisite is required.
+
+Preserve admitted Bazel 9 mapping/load/evaluation/generated-repository
+values/errors/order/events as exact, private typed-outers/shared-Arc association
+as Slug-native, and public/bootstrap breadth, M8/M7B and identity bytes as
+deferred unless selected as the uniquely smaller M7A prerequisite.
+
+Reach exactly one terminal: one independently reviewed owner design, one
+uniquely smaller bounded evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor. STOP Rust/test/oracle/
+caller/export work, speculative upper activation, umbrella ownership,
+milestone closure, M8/M7B work or bypassing accepted carriers. M7 remains
+partial and M7A -> M8 -> M7B remains.
