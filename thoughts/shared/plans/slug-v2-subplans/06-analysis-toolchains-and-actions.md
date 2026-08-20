@@ -10583,3 +10583,51 @@ substitution, proof waiver, cap excess or milestone closure. REPLAN before
 widening. After independent implementation ACCEPT resume only the docs frontier
 for Host registry-function observation, then repo specs. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Visible-lockfile observation accepted; Host-registry frontier resumed (2026-08-20)
+
+Accepted implementation `2a4041bb` from Rust base `d5e8f461` and semantic
+design `ba21c0e8` completes the private Host-visible-lockfile observation
+owner. One shared Legacy/Observed driver preserves FileBytes -> mode -> file
+semantic/Host-parser order, including present bytes under Off. Missing mode
+retains the completed file epoch and wins over stored file errors; Need/outer
+remains carrierless.
+
+The DICE value retains one semantic Result Arc plus the exact compact Host
+FileBytes epoch. No child carrier, union, parser scratch, collection/cache/
+interner/store/lock/task/direct Host read, revision/certificate or event state
+is retained. Accepted accounting is +114 production/+280 proof/+394 aggregate
+at 1,359 physical lines. Focused proof passes 10/10; the full bzlmod suite passed
+501 unit tests plus all integration/doc targets before the final proof-only
+tracker correction, and focused validation passes afterward. Formatting,
+diff hygiene, cleanup/retention and independent terminal review pass.
+
+Activate only
+`WP-6-7A-host-registry-function-observation-frontier-audit`. Audit write
+authority is canonical/current/this Stage/routing only, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+exports and callers are read-only.
+
+Trace accepted selected-graph and Host-visible-lockfile carriers through
+`HostRegistryFunctionKey`, selected registry repo specs/routes,
+extension-generated repositories and public/bootstrap consumers only far enough
+to identify the uniquely smallest complete remaining mutable frontier. Do not
+presume Host-registry ownership or reopen accepted lower carriers.
+
+Require exact Result-Arc/epoch association; graph -> visible lockfile ->
+registry-function -> repo-spec/route/extension order and Need/outer/error
+precedence; matching families and downstream event ownership; warm/cancel
+behavior; independent lifecycle restoration; and compact retention with all
+parse/join/event scratch compute-local.
+
+Preserve admitted Bazel 9 values/errors/order/events as exact, private typed
+outers/shared-Arc association as Slug-native, and repo-spec/route/extension
+breadth, bootstrap execution, M8/M7B and exact identity bytes as deferred.
+Reach exactly one terminal: one independently reviewed smallest-owner design,
+one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor.
+
+STOP Rust/test/oracle/caller/export work, speculative public activation,
+umbrella ownership, milestone closure, M8/M7B work or bypassing the accepted
+graph/visible-lockfile carriers. M7 remains partial and M7A -> M8 -> M7B
+remains.

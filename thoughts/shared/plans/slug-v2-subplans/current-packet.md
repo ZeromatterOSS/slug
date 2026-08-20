@@ -1,5 +1,77 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-host-registry-function-observation-frontier-audit`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Accepted implementation: `2a4041bb`
+Semantic design: `ba21c0e8`
+Rust base: `d5e8f461`
+
+## Accepted visible-lockfile completion
+
+Implementation `2a4041bb` adds the private Host-visible observation owner in
+`host_lockfile.rs`. One Legacy/Observed driver preserves exact
+FileBytes -> lockfile mode -> file semantic/Host-parser order, including present
+bytes under Off. Missing mode retains the completed file epoch and still wins
+over a stored file error; Need/typed outer remains carrierless.
+
+The observed value retains exactly one local semantic Result Arc plus the exact
+compact Host FileBytes epoch. No union, child carrier, parsing scratch,
+collection/cache/interner/store/lock/task/direct Host read, revision,
+certificate or event state is retained. The owner and children remain
+eventless.
+
+Accepted accounting is +114 production/+280 proof/+394 aggregate at 1,359
+physical lines, within every frozen cap. Focused Host-lockfile validation passes
+10/10; the full bzlmod suite passed 501 unit tests plus all integration/doc
+targets before the bounded proof-only tracker correction, and focused validation
+passes afterward. Formatting and diff hygiene pass. Independent terminal review
+ACCEPTs exact order/errors/Off behavior, family/Arc association, cancellation,
+upper isolation, compact retention and cleanup.
+
+## Exact docs-only frontier authority
+
+This audit may write only canonical, current, this Stage and the orchestration
+routing log, at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests,
+fixtures, oracles, exports and callers are read-only.
+
+Trace the accepted `HostSelectedModuleGraphObservationKey` and
+`HostVisibleLockfileObservationKey` through `HostRegistryFunctionKey`, then
+through selected registry repo specs, routes, extension-generated repositories
+and public/bootstrap consumers only far enough to identify the uniquely smallest
+complete remaining mutable frontier. Do not presume that Host registry function
+is complete merely because its visible-lockfile prerequisite is now observed,
+and do not reopen accepted lower owners for structural uniformity.
+
+The audit must establish:
+
+- the first reusable semantic producer that can retain one exact Result Arc and
+  a complete shared-Arc epoch without reconstructing graph or lockfile state;
+- exact selected-graph -> visible lockfile -> registry function -> repo-spec/
+  route/extension order, Need/typed-outer/error precedence and later suppression;
+- matching Legacy/Observed families, event ownership/order, warm silence and
+  poll-drop recovery;
+- independent graph, visible-lockfile, registry-policy/spec/route/generated-
+  repository A -> B -> A invalidation with held Result/epoch handles; and
+- compact Buck2-shaped retention with parsing/join/event scratch compute-local
+  and no cache/interner/store/lock/task/direct Host read.
+
+Preserve admitted Bazel 9 values/errors/order/events as exact. Private typed
+outers and shared-Arc epoch association remain Slug-native. Repo-spec/route/
+extension breadth, bootstrap execution, M8/M7B and exact identity bytes remain
+deferred unless live evidence proves one is the uniquely smaller prerequisite.
+
+## Terminal discipline
+
+Reach exactly one terminal: one independently reviewed smallest-owner design,
+one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
+design may name at most one implementation successor. STOP Rust/tests/oracles/
+caller/export changes, speculative public activation, umbrella ownership,
+milestone closure, M8/M7B work, or bypassing the accepted graph/visible-lockfile
+carriers. M7 remains partial and M7A -> M8 -> M7B remains.
+
+## Historical visible-lockfile observation implementation
+
 Packet: `WP-6-7A-host-visible-lockfile-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
