@@ -9620,3 +9620,41 @@ consumer.
 STOP a second file/key/caller/export, IO semantic/event/family/memory drift,
 upper activation, cap excess or milestone closure. After independent ACCEPT
 return only to the docs-only selected-module-graph frontier.
+
+### Registry-file observation accepted; frontier resumed again (2026-08-19)
+
+Accepted `0f9a0559` adds the private registry-file Result-Arc+epoch owner from
+Rust base `d0ebd79d` and design `b7f66b06`. Exact accounting is +246
+production/+760 proof/+1,006 aggregate at 3,219 physical lines, within
+320/760/1,080/3,400. Focused observed-registry-file proof is 4/4; full bzlmod,
+fmt/diff, cleanup, compact-retention and independent review pass.
+
+The owner preserves scheme -> matching policy -> local root -> IO/generation,
+or scheme -> matching remote policy -> plan/IO/generation. Policy-left union
+keeps the earliest exact Arc before semantics; Need/typed outer is carrierless;
+the parent is eventless and retains one local Result Arc plus the compact epoch.
+No patch, preparation, discovery, selected, HostRegistry, extension or public
+consumer is activated.
+
+Activate only
+`WP-6-7A-selected-module-graph-observation-frontier-audit-resume-2`. Write only
+canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net lines and
+<=470 aggregate; Rust/tests/fixtures/oracles/public/callers are read-only.
+
+Trace the accepted nonregistry closure, registry policy and registry file
+through module-source preparation, root patch resolution/FileBytes, discovery
+evaluation/events and selected graph. Record each candidate's structural
+identity, semantic Result and complete epoch owner, exact order and terminal
+polarity, event ownership, retained lifetime, family boundary and lifecycle.
+Do not reconstruct epochs, duplicate IO/parser semantics, move child events or
+combine independent owners for convenience.
+
+Return exactly one smallest-owner docs-only design with measured future scope,
+caps and proof; one uniquely smaller prerequisite; or formal REPLAN. After
+independent audit ACCEPT schedule at most one design successor.
+
+Exact registry/nonregistry values/errors/order/events remain exact; private
+carriers/epochs/outers are Slug-native; extensions, broader actions, M8/M7B and
+identity bytes remain deferred. STOP code/oracles, callers/public exports,
+direct selected activation, semantic/event/family/memory drift, unmeasured
+authority or milestone closure. M7 stays partial and M7A -> M8 -> M7B remains.
