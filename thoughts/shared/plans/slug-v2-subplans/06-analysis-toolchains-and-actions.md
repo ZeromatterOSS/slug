@@ -9458,3 +9458,43 @@ STOP a second file/key/caller/export, registry-file/preparation/discovery/
 selected activation, semantic/event/family/memory drift, cap excess or milestone
 closure. After independent ACCEPT return only to the docs-only selected-module-
 graph frontier audit.
+
+
+### Registry-policy observation proof-cap correction (2026-08-19)
+
+The implementation from `1cd4e65b` formally REPLANs to
+`WP-6-7A-registry-policy-observation-proof-cap-correction-design`. Retain the
+one-file Rust candidate from base `a4623d6b` and accepted design `8d00d44a`
+non-writable during correction design.
+
+Measured live accounting is +166 production/+609 proof/+775 aggregate at 2,188
+physical lines. Production ownership, URLs -> mode -> matching root order,
+empty/full prefix algebra, eventlessness and one Result Arc+epoch retention are
+sound. Broad validation retains only the inherited core 245/246 stale visibility
+wording. Exact child batches/family exclusion and independent URL/mode/MODULE/
+lockfile A->B->A evidence cannot fit the former +520 proof ceiling without
+deleting discriminators.
+
+Two proof clauses are corrected to match DICE invariants. A failed injected
+URL/mode key returns before activation tracking, so require its real semantic
+error, empty epoch and zero root-files-family or later activation rather than a
+nonexistent parent row. A naturally
+computed typed outer cannot be injected through `PathObservationEpoch`, which
+rejects invalid duplicate/conflicting/mismatched entries at construction; use
+the production terminal projector plus the accepted lower root-owner outer
+proof, with no test hook or invalid epoch. Real root Need still requires its
+exact parent row and later suppression.
+
+Phase-separate exact observed/legacy cold child `EventBatch` equality from the
+parent dependency-row/event-silence proof because the parent sees the already
+computed child as Reused. Require independent URL, mode, MODULE and lockfile
+A->B->A, exact legacy Arc projection, carrier equality, reverse-family and
+upper/extension/public exclusion, warm/cancel/recovery and held handles.
+
+Retry authority remains only `registry_dice.rs`; correct ceilings to +200
+production/+680 proof/+880 aggregate and 2,300 physical lines from the 1,413
+baseline. STOP production semantic/event/family/memory change, a second file,
+key/caller/export, test hook, upper activation or milestone closure. After
+independent design ACCEPT schedule only
+`WP-6-7A-registry-policy-observation-implementation-retry`; after retry ACCEPT
+return only to the selected-module-graph frontier audit.
