@@ -10455,6 +10455,63 @@ caller/export work, speculative public activation, umbrella ownership,
 milestone closure, M8/M7B work or bypassing the accepted graph carrier. M7
 remains partial and M7A -> M8 -> M7B remains.
 
+### Loaded module-extension definitions observation design (2026-08-20)
+
+The design activated by `900c7b54` and clarified by `99b2bf01` selects one
+private matching-family owner in `slug_loading_v2` over accepted Rust base
+`99c23033`. No carrierless prerequisite remains.
+
+Add an observed sibling for `HostLoadedModuleExtensionDefinitionsKey`, one
+local loaded-definition Result Arc+cumulative-epoch carrier and one typed outer.
+The outer distinguishes request-child failure from per-request Bzl child/merge
+failure and retains request context only after the request carrier completed.
+One Legacy/Observed driver preserves requests -> label parse -> Host Bzl module
+-> export -> downcast -> projection order.
+
+Request DICE compute failure remains the existing semantic `RequestsCompute`
+with an empty epoch. Request Need/outer is carrierless; request semantic failure
+retains the request epoch. Host-Bzl DICE compute failure remains
+`host_dice_invariant` in both families. Each Bzl Complete epoch merges
+left-first before Bzl semantics/export; merge failure is typed outer, while Bzl,
+export and wrong-kind semantic failures retain the merged prefix. No full scan,
+Need union or speculative task is admitted.
+
+The parent stores no event batch. Fresh observed Host-Bzl children retain their
+own ordered batches. Warm parent reuse is silent; an unchanged child reached by
+parent recomputation reports Reused with no batch. Need/outer/cancellation
+publishes no parent carrier/batch. Retain only the local Result Arc, cumulative
+epoch and semantic state reachable from that Result.
+
+Implementation authority is exactly
+`app/slug_loading_v2/src/bzl_module.rs`, baseline 6,882 physical lines with the
+owned test module at 5,164. Caps are <=360 production, <=780 proof and <=1,140
+aggregate at <=8,025 physical lines; every helper/test remains below 200 and the
+shared driver below 150. Every other file, caller, export, fixture and oracle is
+read-only.
+
+The large file remains cohesive for this packet because it already owns the
+legacy key, both Host-Bzl families, event tracker, real loading fixtures and its
+sole direct prepared-input consumer. Splitting one private sibling would add a
+module-visibility seam and duplicate private proof plumbing; the caps and
+single-key stop bound growth. Buck2 DICE is concept/test evidence only; no donor
+scheduler, side store or fallback is admitted.
+
+Require exact family/order/prefix/Arc/terminal proof, fresh/reused/warm/cancel
+event behavior, held request/Bzl/export A -> B -> A lifecycles and an isolated
+upper-nonactivation source/activation check. Reuse pinned Bazel 9.2
+`RegularRunnableExtension.load`/`SingleExtensionEvalFunction` evidence and the
+accepted lower tests; add no oracle.
+
+Exact compatibility remains loaded-definition values/errors/order/manifests/
+projections and child events. The private key/carrier/typed outer/epoch is
+Slug-native. ACCEPT schedules only
+`WP-6-7A-loaded-module-extension-definitions-observation-implementation`; after
+implementation ACCEPT return to the docs-only prepared/evaluation frontier.
+STOP a second file/key/owner, Bzlmod/caller/export changes, upper activation,
+retained evaluator heap, proof/cap waiver, milestone closure, M8/M7B and exact
+identity bytes. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B
+remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`
