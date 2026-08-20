@@ -1,23 +1,32 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry`
+Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-proof-cap-correction-2-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base and accepted proof correction: `ed3a9d05`
+Scheduling base: `2439f1fd`
 Rust base: `754e7619`
 Accepted semantic design: `0c5a1366`
+Accepted first proof correction: `ed3a9d05`
 
 ## Objective and exact authority
 
-Complete the independently accepted private package-preflight observation owner
-under the corrected proof envelope without activating its horizon consumer.
+Correct only the remaining exact-proof envelope for the accepted private
+package-preflight owner. Retain the dirty two-file Rust candidate and make it
+non-writable during this docs-only design.
 
-Write exactly `app/slug_bzlmod_v2/src/source_preparation.rs` from the 15,267-line
-`754e7619` baseline at <=320 production and <=15,650 physical, plus
-`source_preparation_observation_tests.rs` from 3,170 lines at <=960 proof and
-<=4,250 physical. Aggregate is <=1,300 semantic and <=19,900 physical. Every
-other Rust/Cargo/BUILD/fixture/oracle/caller/public file is read-only. Touched
-helpers remain below 200 lines.
+Against `754e7619`, the focused 7/7 candidate is +319 production/+24 colocated
+proof in `source_preparation.rs`, +949 external proof, +1,292 aggregate
+semantic, and 15,610/4,119/19,729 physical lines. Only 11 external and eight
+aggregate lines remain while exact later-terminal epochs, complete event-owner
+sequence, real upper prefixes and cancellation child silence are still missing.
+
+Write only the canonical plan, current manifest, Stage 6 plan and routing log at
+<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
+fixtures, oracles, callers and public files are read-only.
+
+The future retry keeps `source_preparation.rs` <=320 production/15,650 physical.
+Raise only external proof to <=1,120/4,500 physical and aggregate to <=1,470
+semantic/20,150 physical. Touched helpers remain below 200 lines.
 
 ## Frozen production contract
 
@@ -73,10 +82,18 @@ suppression. Distinguish semantic deleted-policy projection error from policy
 DICE failure. Assert invalid name precedes policy, deleted policy precedes ignore,
 ignored precedes markers, and `BUILD.bazel` Present precedes `BUILD`.
 
-Preserve the passing identity, reducer, prefix/family/event, local+immutable
-lifecycle and cancellation proof already in the retained candidate. The retry
-may only compact/restructure or add discriminating proof and test-only tracker
-glue; it may not change production semantics, event ownership or retained state.
+Preserve all passing identity, reducer, semantic, family, lifecycle and
+cancellation evidence. The retry may only compact/restructure or add proof and
+test-only tracker glue; production semantics, event ownership and retained state
+are frozen.
+
+Reconstruct and ptr-compare exact effective+ignore and
+effective+ignore+reached-marker epochs for Ignored, repository-ignore error,
+marker source error, fallback BUILD and NoBuildFile. Assert the complete relevant
+ROOT/REPO Some-batch sequence directly, exact legacy parity, warm silence, and
+zero cancelled parent/child row or batch publication. Compare the whole legacy
+row and use exact upper prefixes including module-source-preparation and
+host-selected-extension; keep event checks outside upper-exclusion predicates.
 
 Prove exact epoch iteration and per-demand `Arc::ptr_eq`, first equal Arc,
 conflict and operation mismatch. Assert exact legacy/observed direct dependency
@@ -101,9 +118,12 @@ Slug-native: private sibling, Result-Arc+epoch carrier and typed outer.
 Unsupported/deferred: horizon/closure/discovery/selected graph, registry
 preparation/patches, extension repositories, M8/M7B and identity bytes.
 
-STOP a caller/export/third file, legacy/order/event/family drift, semantic
-compute-error invention, direct Host read, extra retained state, upper/registry
-activation, proof deletion, cap excess or milestone closure.
+STOP Rust writes during this design and STOP a caller/export/third file,
+legacy/order/event/family drift, semantic compute-error invention, direct Host
+read, extra retained state, upper/registry activation, proof deletion, cap
+excess or milestone closure.
 
-After independent implementation ACCEPT schedule only the docs-only
+After independent correction ACCEPT schedule only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`;
+after retry ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.

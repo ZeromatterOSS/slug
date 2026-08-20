@@ -9124,3 +9124,54 @@ STOP a third file/caller/export, production/order/event/family/memory drift,
 upper/registry activation, proof deletion, cap excess or milestone closure.
 After independent implementation ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
+
+### Host nonregistry package-preflight second proof-cap REPLAN (2026-08-19)
+
+Run only
+`WP-6-7A-host-nonregistry-package-preflight-observation-proof-cap-correction-2-design`
+from scheduling base `2439f1fd`, Rust base `754e7619`, semantic design
+`0c5a1366` and first proof correction `ed3a9d05`. Retain the dirty two-file
+candidate and make it non-writable during this docs-only correction.
+
+The focused observed-preflight proof is 7/7 and production remains sound.
+Against `754e7619`, source is +319 production/+24 colocated proof at 15,610
+physical, external proof is +949 at 4,119, and aggregate growth is +1,292 at
+19,729 physical. The first correction leaves only 11 external and eight
+aggregate lines while exact later-terminal epochs, complete event sequence,
+real upper exclusions and cancellation child silence remain undiscriminated.
+
+Write only canonical/current/this Stage 6 plan/routing at
+<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
+fixtures, oracles, callers and public files are read-only.
+
+The future retry keeps exact authority only over `source_preparation.rs` and
+`source_preparation_observation_tests.rs` from the 15,267/3,170 baselines.
+Keep source <=320 production and <=15,650 physical; raise only external proof to
+<=1,120 and <=4,500 physical, aggregate <=1,470 semantic and <=20,150 physical.
+Helpers remain below 200 lines.
+
+Freeze the private stage-aware one-Result-Arc+compact-epoch carrier and exact
+effective -> invalid-name -> neutral deleted-policy -> ignore -> BUILD.bazel ->
+BUILD matching-family driver. Preserve left-first merges before semantics,
+carrierless Need/outer, earliest equal Arcs, typed conflict/mismatch, no Need
+union, eventless parent, child-only ROOT/REPO batches and compact retention.
+
+Preserve passing key/projection/reducer, semantic, family, lifecycle and
+cancellation proof. Add exact ptr-identical effective+ignore and full reached
+marker epochs for Ignored, ignore error, marker error, fallback BUILD and
+NoBuildFile; the complete relevant ROOT/REPO Some-batch sequence with legacy
+parity and warm silence; whole exact legacy row; exact upper prefix table
+including module-source-preparation and host-selected-extension; and zero
+cancelled parent/child row or batch publication before same-DICE recovery.
+
+Exact current order, values/errors, Result Arc and child events remain unchanged.
+The private sibling/carrier/typed outer is Slug-native. Horizon/closure/discovery/
+selected graph, registry preparation, extensions, M8/M7B and identity bytes stay
+deferred.
+
+STOP Rust during design and STOP a third file/caller/export, production/order/
+event/family/memory drift, upper/registry activation, proof deletion, cap excess
+or milestone closure. After independent correction ACCEPT schedule only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`;
+after retry ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-design`.
