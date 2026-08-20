@@ -9960,3 +9960,87 @@ moving or duplicating child event ownership, weakened Arc/epoch equality,
 retained collection/cache/interner/store/lock/task/Host reads, upper/public
 activation, M7 acceptance, M8/M7B work or exact identity-byte work. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Selected frontier chooses discovered-module owner (2026-08-20)
+
+The read-only frontier audit at `cc95fe3f` and two independent owner reviews
+select `HostDiscoveredModuleKey` as the uniquely smallest complete next owner.
+It always reads effective selection, then chooses immutable builtin content,
+accepted nonregistry closure or accepted registry preparation. It alone
+evaluates the chosen MODULE and owns the local evaluation batch.
+`HostSelectedModuleGraphKey` only compute-joins discovery leaves into
+BFS/fixed-point horizons; observing the graph first would reconstruct child
+epochs and move or duplicate discovery's event authority. Selected repo-spec
+and extension consumers are later. No smaller carrierless prerequisite remains.
+
+Activate only `WP-6-7A-host-discovered-module-observation-design`. During this
+design write only canonical/current/this Stage/routing at <=40/<=220/<=180/
+<=30 net and <=470 aggregate. Rust, tests, fixtures, oracles, callers and public
+exports remain read-only.
+
+After independent design ACCEPT, future authority is exactly:
+
+- `source_preparation.rs`, baseline 16,502, <=360 production/+40 colocated
+  proof and <=16,950 physical; and
+- `source_preparation_observation_tests.rs`, baseline 7,231, <=820 proof and
+  <=8,100 physical.
+
+Aggregate is <=1,220 semantic and <=25,050 physical; helpers/tests remain below
+200 and no third file/export/caller is writable.
+
+Add private crate-visible `HostDiscoveredModuleObservationKey` and
+`ObservedHostDiscoveredModule`. Retain exactly one local semantic Result Arc
+plus one compact epoch with `Dupe`/`Allocative` and borrowed accessors. Use
+one Legacy/Observed driver and a private typed outer that preserves effective,
+closure and preparation frontier classes. Legacy projection moves the exact
+local Result Arc.
+
+Exact order is matching effective first; then builtin validation/neutral
+builtin and immediate termination without discovery evaluation/batch, or
+nonregistry empty-version validation/matching closure, or registry missing-
+version validation/matching preparation. Only nonregistry and registry then run
+owner-local evaluation and the matching discovery batch. Legacy selects only
+legacy children; observed selects only accepted observed siblings. Builtin
+stays neutral.
+
+Merge each observed Complete child epoch left-first before semantics. Equal
+duplicates keep the earliest Arc; conflict/mismatch is typed outer. Any child
+Need/outer is immediate carrierless, suppresses later children/evaluation and
+stores no parent batch. Effective compute has empty prefix. Effective semantics
+and pure/builtin terminals keep effective; closure/preparation compute keeps
+effective; their semantic/evaluation terminals keep effective+child. No Need
+union occurs.
+
+Need is invalid/self-unequal; Complete outer is outer-by-value; Complete carrier
+equality is semantic Result+epoch. For nonregistry/registry each discovery
+sibling remains sole owner of its matching local MODULE batch; evaluation
+success/error stores one batch including empty under capture. Builtin stores no
+discovery-local batch; other pre-evaluation terminals, Need/outer/cancel store
+none. Child batches precede discovery and warm reuse is silent.
+
+Retain no child carrier Arc, included-fragment Vec, logical-id/evaluator/event
+scratch, extra collection, cache/interner/store/lock/task/direct Host read,
+revision or certificate. Existing semantic provenance remains inside the local
+Result and all other scratch is compute-local.
+
+Proof covers identity/hash/Display/accessors/equality/validity and exact legacy
+Result-Arc projection; every effective/builtin/nonregistry/registry validation,
+Need/outer/compute/semantic/evaluation position and prefix; duplicate first Arc,
+conflict/mismatch; real builtin/nonregistry/registry terminals; exact cumulative
+order/shared Arcs; exact dependency rows and reverse family isolation; exact
+child/discovery batches including empty/error, warm and cancellation/recovery;
+independent effective/closure/preparation/evaluated-MODULE A-B-A with held
+Result/epoch; explicit builtin zero discovery batch with neutral child behavior;
+and zero selected/repo-spec/extension/public activation.
+
+Exact compatibility is current branch/value/error/order/legacy Arc and event
+behavior. Slug-native is the private carrier/typed outer/epoch association.
+Selected graph/repo specs/extensions, broader bootstrap work, M8/M7B and exact
+identity bytes remain deferred.
+
+STOP a third file/export/caller, selected activation, event-owner drift,
+semantic/family/order drift, weakened Arc/epoch association, retained-state
+growth, direct Host read, cap excess or milestone closure. REPLAN before
+widening. After independent design ACCEPT schedule exactly
+`WP-6-7A-host-discovered-module-observation-implementation`; only after that
+implementation ACCEPT return to the docs-only selected-module-graph frontier.
