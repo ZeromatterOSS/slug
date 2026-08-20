@@ -1,25 +1,18 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-module-closure-observation-design`
+Packet: `WP-6-7A-host-nonregistry-module-closure-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: `18166691`
+Scheduling and accepted design: `0ffa79cd`
+Rust base: `18166691`
 
-## Objective and docs-only authority
+## Objective and exact authority
 
-Freeze the uniquely smallest complete observed owner for nonregistry module
-closure preparation. `HostNonregistryModuleClosureKey` already owns the exact
-effective override -> materialization -> root MODULE source -> validation ->
-repeated package horizon -> fragment-source frontier and final cycle/closure
-semantics. Every mutable child now has an accepted observed carrier; the
-horizon and fragment reducers are private closure mechanisms with no separate
-consumer. Keep `HostDiscoveredModuleKey` and every upper owner inactive.
+Implement the independently accepted private observed owner for nonregistry
+module closure preparation. Keep `HostDiscoveredModuleKey` and every upper owner
+inactive.
 
-Write only canonical/current/Stage 6/routing at <=40/<=220/<=180/<=30 net
-lines and <=470 aggregate. Rust, Cargo, BUILD, fixtures, oracles, callers and
-public files are read-only during design.
-
-After independent design ACCEPT, future exact Rust authority is only:
+Exact Rust write authority is only:
 
 - `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 15,611 physical,
   <=520 production and <=16,250 physical;
@@ -151,12 +144,9 @@ Result-Arc+epoch carrier and typed outer. Unsupported/deferred: discovered and
 selected module graph publication, registry source preparation/patches,
 extension-generated repositories, M8/M7B and exact identity bytes.
 
-STOP Rust during design. STOP a third file, export/caller, direct discovery or
-upper activation, legacy/order/event/family drift, incompatible-Need coercion,
-extra retained state, cap excess or milestone closure. If the frozen algebra
-cannot be implemented within caps, REPLAN.
-
-After independent design ACCEPT schedule exactly one bounded successor:
-`WP-6-7A-host-nonregistry-module-closure-observation-implementation`. After its
-independent ACCEPT, return only to the docs-only selected-module-graph frontier
-audit; do not activate discovery directly.
+STOP a third file, export/caller, direct discovery or upper activation,
+legacy/order/event/family drift, incompatible-Need coercion, extra retained
+state, cap excess or milestone closure. If the frozen algebra cannot be
+implemented within caps, REPLAN. After independent implementation ACCEPT,
+return only to the docs-only selected-module-graph frontier audit; do not
+activate discovery directly.

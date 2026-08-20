@@ -9292,3 +9292,30 @@ lines and <=470 aggregate. STOP Rust/callers/exports/upper activation during
 design. After independent design ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-implementation`; after its
 ACCEPT return only to the docs-only selected-module-graph frontier audit.
+
+### Host nonregistry module-closure observation design accepted (2026-08-19)
+
+Design `0ffa79cd` accepts `HostNonregistryModuleClosureKey` as the uniquely
+smallest complete owner and activates only
+`WP-6-7A-host-nonregistry-module-closure-observation-implementation` from Rust
+base `18166691`.
+
+Exact authority is only `source_preparation.rs`, <=520 production and <=16,250
+physical from 15,611, plus `source_preparation_observation_tests.rs`, <=1,200
+proof and <=5,550 physical from 4,230. Aggregate is <=1,800 semantic and
+<=21,800 physical; touched helpers stay below 200 lines.
+
+Implement one private one-Result-Arc+epoch sibling and matching-family driver in
+effective -> materialization -> root source -> validation -> BFS horizon ->
+fragment order. Preserve earlier-prefix left-first merges, explicit-first
+materialization Arc, carrierless Need/outer, explicit compute-failure polarity,
+occurrence-order horizon first-terminal behavior with full compatible Need union,
+and existing fragment mixed precedence. Parent remains eventless and compact;
+lower ROOT/REPO children remain sole event owners.
+
+Proof exact identity/Arc/equality, every initial/horizon/fragment terminal,
+full-batch and conflict algebra, BFS/duplicate/cycle/lifecycle/cancellation,
+family rows/events/warm silence and zero upper activation. STOP a third file,
+caller/export, discovery/selected/registry/extension activation, semantic/event/
+memory/family drift, cap excess or milestone closure. After independent ACCEPT
+return only to the docs-only selected-module-graph frontier audit.
