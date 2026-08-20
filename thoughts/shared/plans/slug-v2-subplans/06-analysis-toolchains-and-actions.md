@@ -10303,3 +10303,72 @@ STOP third-file/caller/export work, precedence or child-event drift, retained
 traversal state, weakened Arc association, cap excess or milestone closure.
 REPLAN before widening. After independent implementation ACCEPT return only to
 the docs-only selected frontier. M7 remains partial; preserve M7A -> M8 -> M7B.
+
+### Selected-module-graph observation proof-cap REPLAN (2026-08-20)
+
+Formal correction packet
+`WP-6-7A-host-selected-module-graph-observation-proof-cap-correction-design`
+retains the two-file Rust candidate from implementation scheduling base
+`c0623a4b`, Rust base `c6b1e108` and accepted design `09177514`. Rust is
+non-writable during this docs-only correction.
+
+Measured candidate accounting is +370 production/+295 colocated proof in
+`selected_graph.rs`, +807 external proof, +1,472 semantic aggregate, and
+2,257/9,213/11,470 physical. Focused graph proof passes 21/21; full bzlmod
+validation passes 494 unit tests plus all integration/doc tests; fmt/diff
+hygiene pass.
+
+Independent review accepts production ownership and the corrected horizon fold.
+One private Legacy/Observed graph driver preserves root -> neutral policy ->
+ordered candidate effective overrides -> transforms -> first-seen BFS horizons
+-> fixed point -> select/rewrite. Sequential epochs merge left-first before
+semantics. Every horizon now attempts all Complete epoch merges in input order
+while retaining the first horizon-ordered child or merge outer. Graph siblings
+remain eventless; discovery batches stay child-owned. Retention is exactly one
+local Result Arc plus compact epoch, with traversal/frontier/cache/outcome/event/
+merge state compute-local.
+
+The old proof caps cannot honestly hold the remaining frozen discriminators.
+Synthetic stage errors do not exercise live root/policy/effective/transform/
+select boundaries; candidate first/middle/last Need/outer suppression is absent;
+and semantic/real Discovery outer versus merge horizon ordering is incomplete.
+Pure legacy topology tests do not prove observed dependency/epoch/event
+association for implicit bazel_tools, duplicate-candidate cache-first,
+diamond/cycle/nodep second rounds, recursive or mixed horizons. Complete exact
+event sequences and independent policy/effective/recursive/mixed held-carrier
+restoration also remain.
+
+Correction write authority is canonical/current/this Stage/routing only, at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. The same implementation retry
+may write exactly:
+
+- `selected_graph.rs`, baseline 1,592/test boundary 907, <=520 production,
+  <=480 colocated proof and <=2,650 physical; and
+- `source_preparation_observation_tests.rs`, baseline 8,406, <=2,300 proof and
+  <=10,800 physical.
+
+Aggregate retry authority is <=3,300 semantic and <=13,450 physical. Helpers/
+tests remain below 200; no third file/export/caller is writable.
+
+Add only production-used live-stage and full-horizon terminal proof; real
+observed/legacy implicit-bazel_tools, duplicate, diamond, cycle, nodep,
+recursive and mixed topology rows/epochs/complete ordered EventBatch sequences;
+and independent policy/effective/nonregistry/registry/recursive/mixed A -> B ->
+A held-carrier restoration with unaffected Arc preservation and success/error/
+cancel upper exclusion. Use no hooks or inconsistent child injection.
+
+Preserve the accepted full-horizon correction: validate every Complete carrier
+merge after the first outer without replacing that first horizon-ordered outer.
+Freeze all production semantics, legacy precedence, family/event ownership,
+left-first Arc association and one-Result-Arc+epoch retention. Exact
+compatibility remains graph values/errors/order/events; the private typed outer
+and shared-Arc epoch association remain Slug-native. Repo specs/routes/
+extensions/public owners, broader M7A, M8/M7B and exact identity bytes remain
+deferred.
+
+STOP production semantic/event/family/memory change, a third file/caller/export,
+upper activation, proof hook/waiver, cap excess or milestone closure. After
+independent correction ACCEPT schedule only
+`WP-6-7A-host-selected-module-graph-observation-implementation-retry`; after
+retry ACCEPT return only to the docs-only selected frontier. M7 remains partial
+and M7A -> M8 -> M7B remains.
