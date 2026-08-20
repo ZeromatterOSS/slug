@@ -11046,3 +11046,62 @@ held-lifecycle and upper-nonactivation proof. STOP route/event/memory drift,
 wider authority, caller/export, proof waiver, cap excess or milestone closure.
 REPLAN before widening. After implementation ACCEPT resume only the docs
 extension frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Selected-module-routes observation accepted; extension frontier resumed (2026-08-20)
+
+Accepted implementation `9d2f7a7d` from Rust base `ccf7421e` and design
+`a27eb1b0` completes the private selected-module-routes observation owner.
+One shared Legacy/Observed driver preserves graph first, repo specs second and
+unchanged canonical identity, repository mapping, registry association and
+route projection.
+
+Complete graph and repo-spec epochs merge immediately left-first before
+semantics. The direct graph Arc remains authoritative for equal duplicates;
+child/merge outers remain carrierless. Graph compute/semantic and repo-spec
+compute/semantic terminals retain exact empty/graph/full prefixes, and every
+pure route terminal retains the full prefix.
+
+The retained DICE value is exactly one local route Result Arc plus one compact
+cumulative epoch. Canonical/mapping SmallMaps, traversal, merge, terminal and
+event scratch remain compute-local. The route parent is eventless and accepted
+graph/discovery child batch ownership/order stays exact.
+
+Accepted accounting is +256 production/+587 proof/+843 aggregate at 9,265
+physical lines, within every frozen cap. Focused proof passes 6 route tests; the
+full bzlmod suite passes 514 unit tests plus every integration/doc target.
+Formatting, diff hygiene, cleanup/retention, security and independent terminal
+review pass.
+
+Activate only `WP-6-7A-extension-observation-frontier-audit`. This audit is
+docs-only. Future write authority is canonical/current/this Stage/routing at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+exports and callers are read-only. This ordinary ACCEPT rollover changes only
+canonical/current/this Stage; routing remains unchanged absent a formal REPLAN
+or another reusable routing lesson.
+
+Trace the accepted route carrier through selected extension mappings, root
+extension usages and override/mapping projection, then through definition/load/
+evaluation owners, generated repositories and public/bootstrap consumers only
+far enough to identify the uniquely smallest complete remaining mutable
+frontier. Do not presume extension mappings are complete, invent an umbrella
+owner or reopen accepted lower carriers.
+
+Audit natural DICE ownership and consumers; exact child order, terminal
+precedence and later suppression; complete Result-Arc/epoch association versus
+carrierless edges; matching Legacy/Observed families; event ownership and exact
+batch order; retained versus compute-local mapping/load/evaluation/generated
+state; Need/outer/cancel/warm behavior; independent held-carrier lifecycles; and
+whether accepted lower proof composes or one uniquely smaller prerequisite is
+required.
+
+Preserve admitted Bazel 9 extension values/errors/order/events as exact, private
+typed-outers/shared-Arc association as Slug-native, and generated/public/
+bootstrap breadth, M8/M7B and identity bytes as deferred unless live evidence
+selects one as the uniquely smaller M7A prerequisite.
+
+Reach exactly one terminal: one independently reviewed owner design, one
+uniquely smaller evidence/association prerequisite, or formal REPLAN. A design
+may name at most one implementation successor. STOP Rust/test/oracle/caller/
+export work, speculative upper activation, umbrella ownership, milestone
+closure, M8/M7B work or bypassing accepted carriers. M7 remains partial and
+M7A -> M8 -> M7B remains.

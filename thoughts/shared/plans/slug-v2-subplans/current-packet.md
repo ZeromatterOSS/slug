@@ -1,10 +1,93 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-module-routes-observation-implementation`
+Packet: `WP-6-7A-extension-observation-frontier-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Rust base: `ccf7421e`
-Accepted design: `a27eb1b0`
+Accepted route implementation: `9d2f7a7d`
+Scheduling base: `9d2f7a7d`
+
+## Accepted selected-module-routes completion
+
+Implementation `9d2f7a7d` from Rust base `ccf7421e` and accepted design
+`a27eb1b0` completes the private selected-module-routes observation owner in
+`selected_repo_spec.rs`. One Legacy/Observed driver preserves graph first,
+repo specs second and unchanged canonical identity, repository mapping,
+registry association and route projection.
+
+Complete graph and repo-spec epochs merge immediately left-first before
+semantics, so the direct graph Arc remains authoritative for equal duplicate
+demands. Graph/repo child and merge outers remain typed and carrierless. Graph
+compute/semantic and repo-spec compute/semantic terminals preserve their exact
+empty/graph/full prefixes; every pure route terminal retains the full prefix.
+
+The DICE value retains exactly one local route Result Arc plus one cumulative
+compact epoch. Canonical/mapping SmallMaps, traversal, merge, terminal and event
+scratch remain compute-local. The parent is eventless and accepted child batch
+ownership/order remains exact.
+
+Accepted accounting against `ccf7421e` is +256 production/+587 proof/+843
+aggregate at 9,265 physical lines, within every frozen cap. Focused route proof
+passes 6 tests; the full bzlmod suite passes 514 unit tests plus every
+integration/doc target. Formatting, diff hygiene, cleanup/retention, security
+and independent terminal review pass.
+
+## Audit authority
+
+This packet is docs-only. Write authority is exactly canonical/current/Stage 6/
+routing at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests,
+fixtures, oracles, exports and callers are read-only. The ordinary ACCEPT
+rollover changes canonical/current/Stage only; routing remains unchanged unless
+the audit reaches a formal REPLAN or another reusable routing lesson.
+
+## Frontier question
+
+Trace the accepted route carrier through `HostSelectedExtensionMappingsKey`,
+root extension usages and override/mapping projection, then through extension
+definition/load/evaluation owners, generated-repository definitions and
+public/bootstrap consumers only far enough to identify the uniquely smallest
+complete remaining mutable frontier.
+
+Do not presume extension mappings are the next owner. Check whether any
+carrierless extension-definition load, module-extension evaluation, generated
+repository or lockfile association is a strictly smaller reusable prerequisite.
+Do not invent an umbrella owner or reopen accepted graph, Host-registry,
+repo-spec or route owners for structural uniformity.
+
+For each candidate, identify:
+
+- the natural DICE semantic owner and all production consumers;
+- exact Legacy/Observed child order and terminal precedence;
+- which complete child epochs and Result Arcs exist and which edge remains
+  carrierless;
+- event ownership, exact batch order and whether the candidate parent is
+  eventless;
+- retained versus compute-local maps, mappings, loads, evaluation scratch and
+  generated-repository state;
+- Need/typed-outer/cancellation/warm behavior and A -> B -> A held-carrier
+  lifecycles; and
+- whether accepted lower proof composes or one uniquely smaller evidence/
+  association prerequisite is necessary.
+
+## Compatibility and terminal
+
+Preserve admitted Bazel 9 extension mapping/load/evaluation values, errors,
+order and events as exact. Private typed-outers/shared-Arc epoch association is
+Slug-native. Generated/public/bootstrap breadth, M8/M7B and exact identity bytes
+remain deferred unless live evidence proves one is the uniquely smaller M7A
+prerequisite.
+
+Reach exactly one terminal:
+
+1. one independently reviewed smallest-owner design;
+2. one uniquely smaller bounded evidence/association prerequisite; or
+3. formal REPLAN.
+
+A design may name at most one implementation successor. STOP Rust/test/oracle/
+caller/export work, speculative extension or public activation, umbrella
+ownership, milestone closure, M8/M7B work or bypassing accepted lower carriers.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
+## Historical accepted route implementation packet
 
 ## Accepted selected registry repo-spec completion
 
