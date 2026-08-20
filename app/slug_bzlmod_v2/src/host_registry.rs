@@ -21,6 +21,8 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use slug_workspace_v2::PathOutcome;
 
 use crate::BazelLockfile;
@@ -29,6 +31,9 @@ use crate::RegistryFileExpectation;
 use crate::RootPackagePolicyProjectionError;
 use crate::host_lockfile::HostVisibleLockfileError;
 use crate::host_lockfile::HostVisibleLockfileKey;
+use crate::host_lockfile::HostVisibleLockfileObservationKey;
+use crate::host_lockfile::HostVisibleLockfileValue;
+use crate::host_lockfile::ObservedHostVisibleLockfile;
 use crate::host_registry_inputs::HostModuleMirrorsInputKey;
 use crate::host_registry_inputs::HostRegistryRefreshToken;
 use crate::host_registry_inputs::HostRegistryRefreshTokenKey;
@@ -195,15 +200,238 @@ impl fmt::Display for HostRegistryFunctionKey {
     }
 }
 
-fn terminal_error(
-    error: HostRegistryFunctionError,
-) -> PathOutcome<Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>> {
-    PathOutcome::Complete(Arc::new(Err(error)))
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedHostRegistryFunction {
+    result: Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>,
+    observations: PathObservationEpoch,
+}
+
+impl ObservedHostRegistryFunction {
+    pub(crate) fn result(
+        &self,
+    ) -> &Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>> {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct HostRegistryFunctionObservationKey(HostRegistryFunctionKey);
+
+impl HostRegistryFunctionObservationKey {
+    pub(crate) fn new(
+        workspace: NormalizedAbsolutePath,
+        original_registry: impl Into<CompactString>,
+    ) -> Self {
+        Self(HostRegistryFunctionKey::new(workspace, original_registry))
+    }
+}
+
+impl fmt::Display for HostRegistryFunctionObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum HostRegistryFunctionDriverMode {
+    Legacy,
+    Observed,
+}
+
+type HostRegistryFunctionDriverOutcome =
+    PathOutcome<Result<ObservedHostRegistryFunction, ObservedPathFrontierError>>;
+
+fn observed_complete(
+    result: Result<HostRegistryFunctionValue, HostRegistryFunctionError>,
+    observations: PathObservationEpoch,
+) -> HostRegistryFunctionDriverOutcome {
+    PathOutcome::Complete(Ok(ObservedHostRegistryFunction {
+        result: Arc::new(result),
+        observations,
+    }))
 }
 
 #[track_caller]
 fn dice_invariant<T, E: fmt::Debug>(result: Result<T, E>) -> T {
     result.unwrap_or_else(|error| panic!("Host RegistryFunction DICE invariant failed: {error:?}"))
+}
+
+fn project_legacy_host_registry(
+    value: HostRegistryFunctionDriverOutcome,
+) -> PathOutcome<Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>> {
+    match value {
+        PathOutcome::Need(need) => PathOutcome::Need(need),
+        PathOutcome::Complete(Ok(value)) => PathOutcome::Complete(value.result),
+        PathOutcome::Complete(Err(error)) => {
+            panic!("legacy Host RegistryFunction produced observed outer: {error:?}")
+        }
+    }
+}
+
+fn finish_observed_visible_lockfile(
+    value: PathOutcome<Result<ObservedHostVisibleLockfile, ObservedPathFrontierError>>,
+) -> Result<
+    (
+        Arc<Result<HostVisibleLockfileValue, HostVisibleLockfileError>>,
+        PathObservationEpoch,
+    ),
+    HostRegistryFunctionDriverOutcome,
+> {
+    match value {
+        PathOutcome::Need(need) => Err(PathOutcome::Need(need)),
+        PathOutcome::Complete(Err(error)) => Err(PathOutcome::Complete(Err(error))),
+        PathOutcome::Complete(Ok(value)) => {
+            Ok((value.result().dupe(), value.observations().dupe()))
+        }
+    }
+}
+
+async fn drive_host_registry_function(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostRegistryFunctionKey,
+    mode: HostRegistryFunctionDriverMode,
+) -> HostRegistryFunctionDriverOutcome {
+    let empty = PathObservationEpoch::empty();
+    let lockfile_mode = match ctx
+        .compute(&RootModuleLockfileModeKey {
+            workspace: key.workspace.as_path().to_path_buf(),
+        })
+        .await
+    {
+        Ok(mode) => mode.semantic_mode(),
+        Err(_) => {
+            return observed_complete(
+                Err(HostRegistryFunctionError::LockfileModeInput {
+                    workspace: key.workspace.dupe(),
+                }),
+                empty,
+            );
+        }
+    };
+    let vendor_directory = match dice_invariant(
+        ctx.compute(&RootVendorDirectoryProjectionKey::new(key.workspace.dupe()))
+            .await,
+    ) {
+        Ok(vendor) => vendor,
+        Err(error) => {
+            return observed_complete(
+                Err(HostRegistryFunctionError::VendorDirectoryInput { error }),
+                empty,
+            );
+        }
+    };
+    let refresh_token = if lockfile_mode == LockfileMode::Refresh {
+        match ctx
+            .compute(&HostRegistryRefreshTokenKey::new(key.workspace.dupe()))
+            .await
+        {
+            Ok(token) => Some(token),
+            Err(_) => {
+                return observed_complete(
+                    Err(HostRegistryFunctionError::RefreshTokenInput {
+                        workspace: key.workspace.dupe(),
+                    }),
+                    empty,
+                );
+            }
+        }
+    } else {
+        None
+    };
+    let (visible, observations) = match mode {
+        HostRegistryFunctionDriverMode::Legacy => match dice_invariant(
+            ctx.compute(&HostVisibleLockfileKey::new(key.workspace.dupe()))
+                .await,
+        ) {
+            PathOutcome::Need(need) => return PathOutcome::Need(need),
+            PathOutcome::Complete(value) => (value, empty),
+        },
+        HostRegistryFunctionDriverMode::Observed => {
+            match finish_observed_visible_lockfile(dice_invariant(
+                ctx.compute(&HostVisibleLockfileObservationKey::new(
+                    key.workspace.dupe(),
+                ))
+                .await,
+            )) {
+                Ok(visible) => visible,
+                Err(terminal) => return terminal,
+            }
+        }
+    };
+    let lockfile = match visible.as_ref() {
+        Ok(value) => value.lockfile().dupe(),
+        Err(error) => {
+            return observed_complete(
+                Err(HostRegistryFunctionError::VisibleLockfile {
+                    error: error.clone(),
+                }),
+                observations,
+            );
+        }
+    };
+    let resolved_registry = resolved_registry_spelling(&key.workspace, &key.original_registry);
+    let module_mirrors = match ctx
+        .compute(&HostModuleMirrorsInputKey::new(key.workspace.dupe()))
+        .await
+    {
+        Ok(mirrors) => mirrors,
+        Err(_) => {
+            return observed_complete(
+                Err(HostRegistryFunctionError::ModuleMirrorsInput {
+                    workspace: key.workspace.dupe(),
+                }),
+                observations,
+            );
+        }
+    };
+    let selected_mirrors = module_mirrors
+        .get(&key.original_registry)
+        .map(|mirrors| mirrors.iter().cloned().collect::<Arc<[_]>>())
+        .unwrap_or_else(|| Arc::from([]));
+    let scheme = match parse_primary_registry_uri(&resolved_registry) {
+        Ok(scheme) => scheme,
+        Err(reason) => {
+            return observed_complete(
+                Err(HostRegistryFunctionError::InvalidPrimaryRegistryUri {
+                    original_registry: key.original_registry.clone(),
+                    resolved_registry,
+                    reason,
+                }),
+                observations,
+            );
+        }
+    };
+    let known_file_hashes_mode = known_file_hashes_mode(scheme, &lockfile_mode);
+    for (index, mirror) in selected_mirrors.iter().enumerate() {
+        if validate_module_mirror_uri(mirror).is_err() {
+            return observed_complete(
+                Err(HostRegistryFunctionError::InvalidModuleMirrorUri {
+                    original_registry: key.original_registry.clone(),
+                    mirror: mirror.clone(),
+                    ordinal: u32::try_from(index)
+                        .expect("module mirror count must fit the converter's command vector"),
+                }),
+                observations,
+            );
+        }
+    }
+    observed_complete(
+        Ok(HostRegistryFunctionValue {
+            original_registry: key.original_registry.clone(),
+            resolved_registry,
+            scheme,
+            known_file_hashes_mode,
+            lockfile,
+            vendor_directory,
+            module_mirrors: selected_mirrors,
+            refresh_token,
+        }),
+        observations,
+    )
 }
 
 fn resolved_registry_spelling(
@@ -413,108 +641,9 @@ impl Key for HostRegistryFunctionKey {
         ctx: &mut DiceComputations,
         _cancellations: &CancellationContext,
     ) -> Self::Value {
-        let lockfile_mode = match ctx
-            .compute(&RootModuleLockfileModeKey {
-                workspace: self.workspace.as_path().to_path_buf(),
-            })
-            .await
-        {
-            Ok(mode) => mode.semantic_mode(),
-            Err(_) => {
-                return terminal_error(HostRegistryFunctionError::LockfileModeInput {
-                    workspace: self.workspace.dupe(),
-                });
-            }
-        };
-        let vendor_directory = match dice_invariant(
-            ctx.compute(&RootVendorDirectoryProjectionKey::new(
-                self.workspace.dupe(),
-            ))
-            .await,
-        ) {
-            Ok(vendor) => vendor,
-            Err(error) => {
-                return terminal_error(HostRegistryFunctionError::VendorDirectoryInput { error });
-            }
-        };
-        let refresh_token = if lockfile_mode == LockfileMode::Refresh {
-            match ctx
-                .compute(&HostRegistryRefreshTokenKey::new(self.workspace.dupe()))
-                .await
-            {
-                Ok(token) => Some(token),
-                Err(_) => {
-                    return terminal_error(HostRegistryFunctionError::RefreshTokenInput {
-                        workspace: self.workspace.dupe(),
-                    });
-                }
-            }
-        } else {
-            None
-        };
-        let lockfile = match dice_invariant(
-            ctx.compute(&HostVisibleLockfileKey::new(self.workspace.dupe()))
-                .await,
-        ) {
-            PathOutcome::Need(need) => return PathOutcome::Need(need),
-            PathOutcome::Complete(value) => match value.as_ref() {
-                Ok(value) => value.lockfile().dupe(),
-                Err(error) => {
-                    return terminal_error(HostRegistryFunctionError::VisibleLockfile {
-                        error: error.clone(),
-                    });
-                }
-            },
-        };
-        let resolved_registry =
-            resolved_registry_spelling(&self.workspace, &self.original_registry);
-        let module_mirrors = match ctx
-            .compute(&HostModuleMirrorsInputKey::new(self.workspace.dupe()))
-            .await
-        {
-            Ok(mirrors) => mirrors,
-            Err(_) => {
-                return terminal_error(HostRegistryFunctionError::ModuleMirrorsInput {
-                    workspace: self.workspace.dupe(),
-                });
-            }
-        };
-        let selected_mirrors = module_mirrors
-            .get(&self.original_registry)
-            .map(|mirrors| mirrors.iter().cloned().collect::<Arc<[_]>>())
-            .unwrap_or_else(|| Arc::from([]));
-        let scheme = match parse_primary_registry_uri(&resolved_registry) {
-            Ok(scheme) => scheme,
-            Err(reason) => {
-                return terminal_error(HostRegistryFunctionError::InvalidPrimaryRegistryUri {
-                    original_registry: self.original_registry.clone(),
-                    resolved_registry,
-                    reason,
-                });
-            }
-        };
-        let known_file_hashes_mode = known_file_hashes_mode(scheme, &lockfile_mode);
-        for (index, mirror) in selected_mirrors.iter().enumerate() {
-            if validate_module_mirror_uri(mirror).is_err() {
-                return terminal_error(HostRegistryFunctionError::InvalidModuleMirrorUri {
-                    original_registry: self.original_registry.clone(),
-                    mirror: mirror.clone(),
-                    ordinal: u32::try_from(index)
-                        .expect("module mirror count must fit the converter's command vector"),
-                });
-            }
-        }
-
-        PathOutcome::Complete(Arc::new(Ok(HostRegistryFunctionValue {
-            original_registry: self.original_registry.clone(),
-            resolved_registry,
-            scheme,
-            known_file_hashes_mode,
-            lockfile,
-            vendor_directory,
-            module_mirrors: selected_mirrors,
-            refresh_token,
-        })))
+        project_legacy_host_registry(
+            drive_host_registry_function(ctx, self, HostRegistryFunctionDriverMode::Legacy).await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -526,8 +655,31 @@ impl Key for HostRegistryFunctionKey {
     }
 }
 
+#[async_trait]
+impl Key for HostRegistryFunctionObservationKey {
+    type Value = HostRegistryFunctionDriverOutcome;
+
+    async fn compute(
+        &self,
+        ctx: &mut DiceComputations,
+        _cancellations: &CancellationContext,
+    ) -> Self::Value {
+        drive_host_registry_function(ctx, &self.0, HostRegistryFunctionDriverMode::Observed).await
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
 #[cfg(test)]
 mod tests {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::Hash;
+    use std::hash::Hasher;
     use std::sync::Mutex;
     use std::sync::atomic::AtomicUsize;
     use std::sync::atomic::Ordering;
@@ -540,6 +692,7 @@ mod tests {
     use dice::DiceTransactionUpdater;
     use dice::DynKey;
     use dice::InjectedKey;
+    use dice::RichActivation;
     use dice::UserComputationData;
     use slug_workspace_v2::NeedPathObservations;
     use slug_workspace_v2::PathLstat;
@@ -750,6 +903,12 @@ mod tests {
             .unwrap()
     }
 
+    fn terminal_error(
+        error: HostRegistryFunctionError,
+    ) -> PathOutcome<Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>> {
+        PathOutcome::Complete(Arc::new(Err(error)))
+    }
+
     fn complete_value(
         outcome: &PathOutcome<Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>>,
     ) -> &HostRegistryFunctionValue {
@@ -757,6 +916,49 @@ mod tests {
             panic!("expected a complete Host RegistryFunction value");
         };
         value.as_ref().as_ref().unwrap()
+    }
+
+    async fn observed(
+        transaction: &mut DiceTransaction,
+        key: &HostRegistryFunctionObservationKey,
+    ) -> ObservedHostRegistryFunction {
+        let PathOutcome::Complete(Ok(value)) = transaction.compute(key).await.unwrap() else {
+            panic!("complete observed Host RegistryFunction script must be semantic");
+        };
+        value
+    }
+
+    async fn observed_once(setup: Setup, registry: &str) -> ObservedHostRegistryFunction {
+        let mut transaction = transaction(setup, None).await;
+        observed(
+            &mut transaction,
+            &HostRegistryFunctionObservationKey::new(path(WORKSPACE), registry),
+        )
+        .await
+    }
+
+    fn assert_exact_epoch(actual: &PathObservationEpoch, expected: &PathObservationEpoch) {
+        assert_eq!(actual.observations().len(), expected.observations().len());
+        for ((actual_demand, actual_result), (expected_demand, expected_result)) in
+            actual.observations().iter().zip(expected.observations())
+        {
+            assert_eq!(actual_demand, expected_demand);
+            assert!(Arc::ptr_eq(actual_result, expected_result));
+        }
+    }
+
+    fn assert_no_upper(keys: &[String]) {
+        let prefixes = "host-selected-registry-repo-specs: host-selected-module-routes: host-selected-extension- slug-command:";
+        assert!(
+            keys.iter()
+                .all(|key| !prefixes.split(' ').any(|prefix| key.starts_with(prefix)))
+        );
+    }
+
+    fn hash(value: &impl Hash) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        value.hash(&mut hasher);
+        hasher.finish()
     }
 
     fn complete_error(
@@ -923,6 +1125,74 @@ mod tests {
             unreachable!()
         };
         assert!(!Arc::ptr_eq(left, right));
+
+        let observed_key = HostRegistryFunctionObservationKey::new(path(WORKSPACE), REGISTRY_A);
+        let observed_other = HostRegistryFunctionObservationKey::new(path(WORKSPACE), REGISTRY_B);
+        assert_eq!(
+            observed_key,
+            HostRegistryFunctionObservationKey::new(path(WORKSPACE), REGISTRY_A)
+        );
+        assert_ne!(observed_key, observed_other);
+        assert_ne!(hash(&observed_key), hash(&observed_other));
+        assert_eq!(
+            observed_key.to_string(),
+            "observed-host-registry:\"/workspace\":https://a.example"
+        );
+
+        let child_need =
+            NeedPathObservations::singleton(demand("/need", PathObservationOperation::Lstat));
+        let observed_need: HostRegistryFunctionDriverOutcome = PathOutcome::Need(child_need.dupe());
+        assert!(!HostRegistryFunctionObservationKey::validity(
+            &observed_need
+        ));
+        assert!(!HostRegistryFunctionObservationKey::equality(
+            &observed_need,
+            &observed_need
+        ));
+        let PathOutcome::Need(forwarded_need) =
+            finish_observed_visible_lockfile(PathOutcome::Need(child_need.dupe())).unwrap_err()
+        else {
+            panic!("child Need must remain carrierless");
+        };
+        assert_eq!(forwarded_need, child_need);
+
+        let result = Arc::new(Err(HostRegistryFunctionError::LockfileModeInput {
+            workspace: path(WORKSPACE),
+        }));
+        let observed_complete = PathOutcome::Complete(Ok(ObservedHostRegistryFunction {
+            result: result.dupe(),
+            observations: PathObservationEpoch::empty(),
+        }));
+        assert!(HostRegistryFunctionObservationKey::validity(
+            &observed_complete
+        ));
+        assert!(HostRegistryFunctionObservationKey::equality(
+            &observed_complete,
+            &observed_complete
+        ));
+        let PathOutcome::Complete(projected) =
+            project_legacy_host_registry(observed_complete.clone())
+        else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(&projected, &result));
+
+        let frontier: ObservedPathFrontierError =
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand: demand("/need", PathObservationOperation::Lstat),
+                result_operation: PathObservationOperation::FileBytes,
+            }
+            .into();
+        let outer: HostRegistryFunctionDriverOutcome = PathOutcome::Complete(Err(frontier.dupe()));
+        let PathOutcome::Complete(Err(forwarded_outer)) =
+            finish_observed_visible_lockfile(PathOutcome::Complete(Err(frontier.dupe())))
+                .unwrap_err()
+        else {
+            panic!("child outer must remain carrierless");
+        };
+        assert_eq!(forwarded_outer, frontier);
+        assert!(HostRegistryFunctionObservationKey::validity(&outer));
+        assert!(HostRegistryFunctionObservationKey::equality(&outer, &outer));
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -930,7 +1200,8 @@ mod tests {
         Mode,
         Vendor,
         Refresh,
-        Visible,
+        LegacyVisible,
+        ObservedVisible,
         Mirrors,
         Forbidden,
     }
@@ -943,15 +1214,20 @@ mod tests {
         };
     }
 
-    const OFF_VISIBLE: &[DirectDependency] = &[Mode, Vendor, Visible];
-    const OFF_COMPLETE: &[DirectDependency] = &[Mode, Vendor, Visible, Mirrors];
-    const REFRESH_VISIBLE: &[DirectDependency] = &[Mode, Vendor, Refresh, Visible];
-    const REFRESH_COMPLETE: &[DirectDependency] = &[Mode, Vendor, Refresh, Visible, Mirrors];
+    const OFF_VISIBLE: &[DirectDependency] = &[Mode, Vendor, LegacyVisible];
+    const OFF_COMPLETE: &[DirectDependency] = &[Mode, Vendor, LegacyVisible, Mirrors];
+    const REFRESH_VISIBLE: &[DirectDependency] = &[Mode, Vendor, Refresh, LegacyVisible];
+    const REFRESH_COMPLETE: &[DirectDependency] = &[Mode, Vendor, Refresh, LegacyVisible, Mirrors];
+    const OBSERVED_OFF_COMPLETE: &[DirectDependency] = &[Mode, Vendor, ObservedVisible, Mirrors];
+    const OBSERVED_REFRESH_COMPLETE: &[DirectDependency] =
+        &[Mode, Vendor, Refresh, ObservedVisible, Mirrors];
 
     #[derive(Default)]
     struct RegistryTracker {
         dependencies: Mutex<Vec<Vec<DirectDependency>>>,
         evaluated: AtomicUsize,
+        keys: Mutex<Vec<String>>,
+        batches: AtomicUsize,
     }
 
     impl RegistryTracker {
@@ -962,8 +1238,19 @@ mod tests {
         fn evaluated(&self) -> usize {
             self.evaluated.load(Ordering::SeqCst)
         }
-    }
 
+        fn take_keys(&self) -> Vec<String> {
+            std::mem::take(&mut *self.keys.lock().unwrap())
+        }
+
+        fn batches(&self) -> usize {
+            self.batches.load(Ordering::SeqCst)
+        }
+
+        fn clear_batches(&self) {
+            self.batches.store(0, Ordering::SeqCst);
+        }
+    }
     impl ActivationTracker for RegistryTracker {
         fn key_activated(
             &self,
@@ -971,7 +1258,12 @@ mod tests {
             dependencies: &mut dyn Iterator<Item = &DynKey>,
             activation: ActivationData,
         ) {
-            if key.downcast_ref::<HostRegistryFunctionKey>().is_none() {
+            self.keys.lock().unwrap().push(key.to_string());
+            if key.downcast_ref::<HostRegistryFunctionKey>().is_none()
+                && key
+                    .downcast_ref::<HostRegistryFunctionObservationKey>()
+                    .is_none()
+            {
                 return;
             }
             if matches!(activation, ActivationData::Evaluated(_)) {
@@ -985,15 +1277,25 @@ mod tests {
                             RootModuleLockfileModeKey => Mode,
                             RootVendorDirectoryProjectionKey => Vendor,
                             HostRegistryRefreshTokenKey => Refresh,
-                            HostVisibleLockfileKey => Visible,
+                            HostVisibleLockfileKey => LegacyVisible,
+                            HostVisibleLockfileObservationKey => ObservedVisible,
                             HostModuleMirrorsInputKey => Mirrors,
                         }
                     })
                     .collect(),
             );
         }
-    }
 
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, _key: &DynKey, activation: RichActivation<'_>) {
+            if activation.evaluation_data().is_some() {
+                self.batches.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+    }
     async fn tracked_outcome(
         setup: Setup,
         registry: &str,
@@ -1094,6 +1396,168 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn observed_owner_preserves_prefixes_families_terminals_and_silence() {
+        let observed_key = HostRegistryFunctionObservationKey::new(path(WORKSPACE), REGISTRY_A);
+
+        let tracker = Arc::new(RegistryTracker::default());
+        let mut need_setup = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        need_setup.epoch = PathObservationEpoch::empty();
+        need_setup.mirrors = None;
+        let mut need_transaction = transaction(
+            need_setup,
+            Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+        )
+        .await;
+        let need = need_transaction.compute(&observed_key).await.unwrap();
+        assert!(matches!(need, PathOutcome::Need(_)));
+        assert_eq!(tracker.last(), [Mode, Vendor, ObservedVisible].as_slice());
+        assert_eq!(tracker.batches(), 0);
+        let keys = tracker.take_keys();
+        assert!(
+            !keys
+                .iter()
+                .any(|key| key.starts_with("host-visible-lockfile:"))
+        );
+        assert_no_upper(&keys);
+
+        let setup = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        let selected = setup.epoch.dupe();
+        let mut child_transaction = transaction(setup.clone(), None).await;
+        let child = child_transaction
+            .compute(&HostVisibleLockfileObservationKey::new(path(WORKSPACE)))
+            .await
+            .unwrap();
+        let PathOutcome::Complete(Ok(expected_child)) = &child else {
+            panic!("ready observed visible lockfile must complete");
+        };
+        let expected_result = expected_child.result().dupe();
+        let expected_epoch = expected_child.observations().dupe();
+        let (finished_result, finished_epoch) = finish_observed_visible_lockfile(child).unwrap();
+        assert!(Arc::ptr_eq(&finished_result, &expected_result));
+        assert_exact_epoch(&finished_epoch, &expected_epoch);
+
+        let tracker = Arc::new(RegistryTracker::default());
+        let mut observed_transaction =
+            transaction(setup, Some(tracker.dupe() as Arc<dyn ActivationTracker>)).await;
+        let observed_a = observed(&mut observed_transaction, &observed_key).await;
+        assert_exact_epoch(observed_a.observations(), &selected);
+        assert_eq!(tracker.last(), OBSERVED_OFF_COMPLETE);
+        assert_eq!(tracker.batches(), 0);
+        let keys = tracker.take_keys();
+        assert!(
+            !keys
+                .iter()
+                .any(|key| key.starts_with("host-visible-lockfile:"))
+        );
+        assert_no_upper(&keys);
+
+        let warm = observed(&mut observed_transaction, &observed_key).await;
+        assert_eq!(warm, observed_a);
+        assert_eq!(tracker.batches(), 0);
+        assert_no_upper(&tracker.take_keys());
+
+        let legacy_key = HostRegistryFunctionKey::new(path(WORKSPACE), REGISTRY_A);
+        let legacy = observed_transaction.compute(&legacy_key).await.unwrap();
+        assert_eq!(
+            observed_a.result().as_ref().as_ref().unwrap(),
+            complete_value(&legacy)
+        );
+        assert_eq!(tracker.last(), OFF_COMPLETE);
+        let keys = tracker.take_keys();
+        assert!(
+            !keys
+                .iter()
+                .any(|key| key.starts_with("observed-host-visible-lockfile:"))
+        );
+        assert_eq!(tracker.batches(), 0);
+        assert_no_upper(&keys);
+
+        let tracker = Arc::new(RegistryTracker::default());
+        let mut refresh = transaction(
+            Setup::ready(LockfileMode::Refresh, &[REGISTRY_A]),
+            Some(tracker.dupe() as Arc<dyn ActivationTracker>),
+        )
+        .await;
+        let refresh_value = observed(&mut refresh, &observed_key).await;
+        assert!(!refresh_value.observations().observations().is_empty());
+        assert_eq!(tracker.last(), OBSERVED_REFRESH_COMPLETE);
+        assert_eq!(tracker.batches(), 0);
+        assert_no_upper(&tracker.take_keys());
+
+        let mut missing_mode = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        missing_mode.mode = None;
+        let value = observed_once(missing_mode, REGISTRY_A).await;
+        assert!(value.observations().observations().is_empty());
+        assert!(matches!(
+            value.result().as_ref(),
+            Err(HostRegistryFunctionError::LockfileModeInput { .. })
+        ));
+
+        let mut missing_vendor = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        missing_vendor.vendor = None;
+        let value = observed_once(missing_vendor, REGISTRY_A).await;
+        assert!(value.observations().observations().is_empty());
+        assert!(matches!(
+            value.result().as_ref(),
+            Err(HostRegistryFunctionError::VendorDirectoryInput { .. })
+        ));
+
+        let mut missing_refresh = Setup::ready(LockfileMode::Refresh, &[REGISTRY_A]);
+        missing_refresh.token = None;
+        let value = observed_once(missing_refresh, REGISTRY_A).await;
+        assert!(value.observations().observations().is_empty());
+        assert!(matches!(
+            value.result().as_ref(),
+            Err(HostRegistryFunctionError::RefreshTokenInput { .. })
+        ));
+
+        let mut bad_lockfile = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        bad_lockfile.epoch = complete_epoch(b"{\"lockFileVersion\":28", 21);
+        let mut missing_mirrors = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        missing_mirrors.mirrors = None;
+        let invalid_mirrors = mirrors(&["not-a-uri"], &[("not-a-uri", &["bad path"])]);
+        let mut invalid_primary = Setup::ready(LockfileMode::Off, &["not-a-uri"]);
+        invalid_primary.mirrors = Some(invalid_mirrors);
+        let ordered = mirrors(
+            &[REGISTRY_A],
+            &[(REGISTRY_A, &["relative/ok", "bad path", "later"])],
+        );
+        let mut invalid_mirror = Setup::ready(LockfileMode::Off, &[REGISTRY_A]);
+        invalid_mirror.mirrors = Some(ordered);
+        for (index, setup, registry) in [
+            (0, bad_lockfile, REGISTRY_A),
+            (1, missing_mirrors, REGISTRY_A),
+            (2, invalid_primary, "not-a-uri"),
+            (3, invalid_mirror, REGISTRY_A),
+        ] {
+            let selected = setup.epoch.dupe();
+            let value = observed_once(setup, registry).await;
+            assert_exact_epoch(value.observations(), &selected);
+            match index {
+                0 => assert!(matches!(
+                    value.result().as_ref(),
+                    Err(HostRegistryFunctionError::VisibleLockfile { .. })
+                )),
+                1 => assert!(matches!(
+                    value.result().as_ref(),
+                    Err(HostRegistryFunctionError::ModuleMirrorsInput { .. })
+                )),
+                2 => assert!(matches!(
+                    value.result().as_ref(),
+                    Err(HostRegistryFunctionError::InvalidPrimaryRegistryUri {
+                        reason: HostRegistryUriErrorKind::MissingScheme,
+                        ..
+                    })
+                )),
+                3 => assert!(matches!(
+                    value.result().as_ref(),
+                    Err(HostRegistryFunctionError::InvalidModuleMirrorUri { ordinal: 1, .. })
+                )),
+                _ => unreachable!(),
+            }
+        }
+    }
     #[tokio::test]
     async fn all_mode_scheme_cells_and_direct_dependencies_are_exact() {
         for (registry, scheme) in [
@@ -1515,6 +1979,151 @@ mod tests {
         assert_eq!(current, separately_allocated);
     }
 
+    #[tokio::test]
+    async fn observed_engine_restores_inputs_keys_and_recovers_after_poll_drop() {
+        let workspace = path(WORKSPACE);
+        let observed_key = HostRegistryFunctionObservationKey::new(workspace.dupe(), REGISTRY_A);
+        let mirror_a = mirrors(
+            &[REGISTRY_A, REGISTRY_B],
+            &[(REGISTRY_A, &["https://mirror-a"])],
+        );
+        let mirror_b = mirrors(
+            &[REGISTRY_A, REGISTRY_B],
+            &[(REGISTRY_A, &["https://mirror-b"])],
+        );
+        let mut setup = Setup::ready(LockfileMode::Refresh, &[REGISTRY_A, REGISTRY_B]);
+        setup.mirrors = Some(mirror_a.dupe());
+        let tracker = Arc::new(RegistryTracker::default());
+        let mut transaction =
+            transaction(setup, Some(tracker.dupe() as Arc<dyn ActivationTracker>)).await;
+        let a = observed(&mut transaction, &observed_key).await;
+        let held_result = a.result().dupe();
+        let held_epoch = a.observations().dupe();
+        assert_eq!(tracker.batches(), 0);
+        assert_eq!(observed(&mut transaction, &observed_key).await, a);
+
+        transaction = replace(
+            transaction,
+            RootModuleLockfileModeKey {
+                workspace: workspace.as_path().to_path_buf(),
+            },
+            RootModuleLockfileMode::from(LockfileMode::Error),
+        )
+        .await;
+        let changed = observed(&mut transaction, &observed_key).await;
+        assert_ne!(changed, a);
+        assert_exact_epoch(changed.observations(), &held_epoch);
+        transaction = replace(
+            transaction,
+            RootModuleLockfileModeKey {
+                workspace: workspace.as_path().to_path_buf(),
+            },
+            RootModuleLockfileMode::from(LockfileMode::Refresh),
+        )
+        .await;
+        let restored = observed(&mut transaction, &observed_key).await;
+        assert_eq!(restored, a);
+        assert_exact_epoch(restored.observations(), &held_epoch);
+
+        transaction = replace_policy(transaction, Some("/vendor")).await;
+        let changed = observed(&mut transaction, &observed_key).await;
+        assert_ne!(changed, a);
+        assert_exact_epoch(changed.observations(), &held_epoch);
+        transaction = replace_policy(transaction, None).await;
+        let restored = observed(&mut transaction, &observed_key).await;
+        assert_eq!(restored, a);
+        assert_exact_epoch(restored.observations(), &held_epoch);
+
+        transaction = replace(
+            transaction,
+            HostRegistryRefreshTokenKey::new(workspace.dupe()),
+            HostRegistryRefreshToken::new(2),
+        )
+        .await;
+        let changed = observed(&mut transaction, &observed_key).await;
+        assert_ne!(changed, a);
+        assert_exact_epoch(changed.observations(), &held_epoch);
+        transaction = replace(
+            transaction,
+            HostRegistryRefreshTokenKey::new(workspace.dupe()),
+            HostRegistryRefreshToken::new(1),
+        )
+        .await;
+        let restored = observed(&mut transaction, &observed_key).await;
+        assert_eq!(restored, a);
+        assert_exact_epoch(restored.observations(), &held_epoch);
+
+        transaction = replace(
+            transaction,
+            HostModuleMirrorsInputKey::new(workspace.dupe()),
+            mirror_b,
+        )
+        .await;
+        let changed = observed(&mut transaction, &observed_key).await;
+        assert_ne!(changed, a);
+        assert_exact_epoch(changed.observations(), &held_epoch);
+        transaction = replace(
+            transaction,
+            HostModuleMirrorsInputKey::new(workspace.dupe()),
+            mirror_a,
+        )
+        .await;
+        let restored = observed(&mut transaction, &observed_key).await;
+        assert_eq!(restored, a);
+        assert_exact_epoch(restored.observations(), &held_epoch);
+
+        transaction = replace_lockfile(
+            transaction,
+            &lockfile_source(0xcd, "reason-b", "{}", "{}", "{}"),
+            30,
+        )
+        .await;
+        assert_ne!(observed(&mut transaction, &observed_key).await, a);
+        transaction = replace_lockfile(transaction, &base_lockfile(), 10).await;
+        let restored = observed(&mut transaction, &observed_key).await;
+        assert_eq!(restored, a);
+        assert_eq!(held_result.as_ref(), restored.result().as_ref());
+        assert_eq!(held_epoch, *restored.observations());
+
+        let registry_b = observed(
+            &mut transaction,
+            &HostRegistryFunctionObservationKey::new(workspace.dupe(), REGISTRY_B),
+        )
+        .await;
+        assert_ne!(registry_b, a);
+        assert_eq!(observed(&mut transaction, &observed_key).await, a);
+
+        let cancel_epoch = complete_epoch(&lockfile_source(0xef, "reason-c", "{}", "{}", "{}"), 40);
+        transaction = replace(transaction, PathObservationEpochKey, cancel_epoch).await;
+        tracker.take_keys();
+        tracker.clear_batches();
+        let evaluated = tracker.evaluated();
+        let mut future = Box::pin(transaction.compute(&observed_key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        let cancelled = tracker.take_keys();
+        assert_eq!(tracker.evaluated(), evaluated);
+        assert_eq!(tracker.batches(), 0);
+        assert!(!cancelled.iter().any(|key| key == &observed_key.to_string()));
+        assert_no_upper(&cancelled);
+
+        let recovered = observed(&mut transaction, &observed_key).await;
+        let PathOutcome::Complete(Ok(visible)) = transaction
+            .compute(&HostVisibleLockfileObservationKey::new(workspace))
+            .await
+            .unwrap()
+        else {
+            panic!("recovery must complete the observed visible-lockfile child");
+        };
+        assert_exact_epoch(recovered.observations(), visible.observations());
+        assert_ne!(recovered, a);
+        assert_eq!(tracker.batches(), 0);
+        assert_no_upper(&tracker.take_keys());
+    }
     #[test]
     fn production_owner_names_no_forbidden_key_or_io_surface() {
         let source = include_str!("host_registry.rs");
