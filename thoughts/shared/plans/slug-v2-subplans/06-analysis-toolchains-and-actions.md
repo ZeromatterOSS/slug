@@ -10200,3 +10200,69 @@ STOP direct implementation, speculative selected/public activation, moved or
 duplicated child events, weakened Arc/epoch equality, retained-state growth,
 proof waiver, cap excess, M7 acceptance, M8/M7B or exact identity-byte work.
 Preserve M7A -> M8 -> M7B.
+
+### Selected frontier chooses the selected-module graph (2026-08-20)
+
+The read-only resume-4 audit at `e399cd10` and independent owner review select
+`HostSelectedModuleGraphKey` as the uniquely smallest complete aggregate. It
+alone sequences accepted root files, neutral command policy, candidate
+effective overrides, root/discovered transformations, repeated BFS horizons/
+fixed-point and graph selection. Owner-local raw transformations/cache have no
+other consumer. Every mutable child now has an accepted observed sibling.
+
+`HostSelectedRegistryRepoSpecsKey` and `HostSelectedModuleRoutesKey` consume the
+graph and add later repo-spec/route semantics. They cannot absorb the graph
+without duplicating ownership. No smaller prerequisite remains.
+
+Activate only `WP-6-7A-host-selected-module-graph-observation-design`. Write
+only canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net and
+<=470 aggregate. Rust base `c6b1e108`, tests, fixtures, oracles, callers and
+public exports are read-only until independent design ACCEPT.
+
+Future authority is exactly `selected_graph.rs` baseline 1,592/test boundary
+907 at <=520 production/+320 colocated proof/2,450 physical, plus
+`source_preparation_observation_tests.rs` baseline 8,406 at <=1,500 proof/
+10,000 physical; <=2,340 semantic/12,450 physical aggregate. Helpers/tests stay
+below 200; no third file/export/caller is writable.
+
+Freeze a private graph observation key/carrier with one exact local Result Arc
+plus cumulative compact epoch, `Dupe`/`Allocative`, borrowed accessors and no
+caller. Use one Legacy/Observed driver with matching root-files/effective/
+discovery families and shared pure parse/transform/BFS/fixed-point/select logic.
+Preserve exact root -> policy -> ordered candidate overrides -> root transforms
+-> first-seen BFS horizons -> horizon-ordered raw transforms -> fixed point ->
+select/rewrite order. Append an effective epoch only on its first cached
+computation; repeated equal epochs preserve the earliest Arc.
+
+Merge sequential Complete epochs left-first before semantics. Root compute has
+empty prefix; policy/effective/transform/select failures retain the exact reached
+prefix. Each horizon scans full input order and merges all Complete carrier
+epochs before selection. First horizon-ordered merge conflict/mismatch or child
+outer is carrierless fail-closed; otherwise preserve exact legacy precedence:
+first compute/semantic leaf error > incompatible Need > compatible Need union >
+ordered success. Need/outer discards provisional state; Complete semantic error
+retains the full valid merged sibling epoch and suppresses later work.
+
+Graph siblings remain eventless; discovery children keep sole batch ownership
+and order even on graph Need/error. Warm is silent; cancel publishes no graph
+state. Retain no raw/traversal/frontier/prior-name/seen/cache/outcome/event/child-
+carrier state; graph Arc slices remain existing semantic Result state and all
+join/merge scratch stays compute-local.
+
+Proof covers identity/equality/legacy Result Arc, exact merge errors and prefix
+positions, full-horizon terminal algebra, exact families/rows/events, implicit
+bazel_tools, duplicate candidate, diamond/cycle, nodep second round, mixed
+nonregistry+registry horizons, warm/cancel recovery, independent root/policy/
+effective/discovery/recursive/mixed A-B-A with held Arcs, and zero later-owner/
+public activation.
+
+Exact compatibility is existing graph values/errors/order/events. Slug-native
+is private typed outer/epoch association. Repo specs/routes/extensions/public,
+broader M7A, M8/M7B and exact identity bytes remain deferred.
+
+STOP third-file/caller/export work, legacy precedence or child-event drift,
+retained traversal state, weakened Arc association, cap excess or milestone
+closure. REPLAN before widening. After independent design ACCEPT schedule only
+`WP-6-7A-host-selected-module-graph-observation-implementation`; only after its
+ACCEPT return to the docs-only selected frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.

@@ -1,5 +1,126 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-host-selected-module-graph-observation-design`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling/Rust base: `e399cd10` / `c6b1e108`
+
+## Accepted owner decision
+
+`HostSelectedModuleGraphKey` is the uniquely smallest complete aggregate. It
+alone sequences root MODULE files, neutral command policy, candidate effective
+overrides, root/discovered request transformation, repeated BFS horizons and
+fixed-point rounds, then graph selection/rewrite. `raw_root`, `raw_discovered`,
+`transform_request` and the override cache are owner-local mechanisms with no
+other consumer. Every mutable child now has an accepted observed sibling.
+
+`HostSelectedRegistryRepoSpecsKey` and `HostSelectedModuleRoutesKey` are later
+direct consumers that add repo-spec/route semantics. They must not absorb or
+duplicate graph ownership. No smaller carrierless prerequisite remains.
+
+## Exact docs-only design authority
+
+Write only canonical, current, `06-analysis-toolchains-and-actions.md` and the
+routing log. Rust, tests, fixtures, oracles, callers and public exports are
+read-only. Net docs caps are canonical <=40, current <=220, Stage <=180 and
+routing <=30, with <=470 aggregate.
+
+After independent design ACCEPT, future Rust authority is exactly:
+
+- `app/slug_bzlmod_v2/src/selected_graph.rs`, baseline 1,592 physical and first
+  test boundary 907, <=520 production, <=320 colocated proof and <=2,450
+  physical; and
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, baseline
+  8,406, <=1,500 proof and <=10,000 physical.
+
+Aggregate cap is <=2,340 semantic and <=12,450 physical. Helpers/tests remain
+below 200 lines. `selected_graph.rs` is one cohesive large-file owner; every
+third file, export and caller remains read-only.
+
+## Frozen owner and order
+
+Add private `HostSelectedModuleGraphObservationKey(HostSelectedModuleGraphKey)`
+and `ObservedHostSelectedModuleGraph`. The carrier is `Dupe`/`Allocative`, has
+crate-private constructor/borrowed accessors and no caller, and retains exactly
+one `Arc<Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>>` plus one
+cumulative compact `PathObservationEpoch`.
+
+Use one Legacy/Observed driver. Legacy selects legacy root files, effective
+overrides and discovered leaves with empty epochs; Observed selects exactly
+their accepted observed siblings. Both share parsing, transformation,
+BFS/fixed-point and graph-selection logic and project the identical legacy
+Result Arc.
+
+Preserve exact order: root files; neutral command policy; candidate overrides
+in root-override order followed by new command-override order; root dependency
+transformations including implicit `bazel_tools`; BFS horizons in first-seen
+`next_horizon` order; per-success raw-discovered transformations in horizon
+order; repeated fixed-point rounds; final select/rewrite. Cache each effective
+semantic value once and append its epoch only on first computation. Repeated
+fixed-point/discovery epochs merge as equal duplicates, preserving the earliest
+exact Arc.
+
+## Prefix and full-horizon algebra
+
+Sequential Complete child epochs merge into the cumulative prefix left-first
+before semantic inspection. Root-files DICE compute error has empty prefix;
+command-policy compute retains root prefix; effective compute retains the prior
+prefix; effective semantic retains its merged epoch; pure transform/select
+errors retain the exact reached prefix.
+
+For each compute-join horizon, scan the full input `next` order and merge every
+`Complete(Ok(carrier))` epoch before terminal selection, even when another leaf
+is Need/error. First horizon-ordered merge conflict/operation mismatch or child
+typed outer is a carrierless fail-closed outer. Otherwise preserve current
+`finish_horizon` precedence exactly: first DICE-compute or semantic leaf error
+by horizon order > incompatible Need > compatible Need union > ordered success.
+Need/outer retains no provisional epoch. A Complete semantic error retains the
+full valid merged sibling epoch. Any terminal suppresses raw conversion, later
+horizons/fixed-point rounds and select/rewrite.
+
+Need is invalid/self-unequal. Complete outer equality is outer-by-value;
+Complete carrier equality is local semantic Result plus epoch.
+
+## Events, retention and proof
+
+The graph siblings remain eventless. Full-batch discovery children retain sole
+ownership and exact order of their existing batches even on graph Need/error;
+observed/legacy sequences match. Warm reuse is silent. Poll-drop/cancellation
+publishes no graph row/value/batch; ordinary child DICE reuse remains allowed.
+
+Retain no `RawModule`, dependency/frontier/prior-name/seen set, override cache,
+horizon outcome, event scratch, child carrier Arc, map, cache, interner, store,
+lock, task or direct Host read. Existing graph Arc slices remain semantic Result
+state; every traversal/join/merge structure stays compute-local.
+
+Prove key/hash/Display/accessors/equality/validity and exact legacy Result-Arc
+projection; duplicate first Arc/conflict/operation mismatch; root/policy/
+candidate-effective first/middle/last compute/semantic/Need/outer prefixes; and
+full horizon first/middle/last compute/semantic/outer, compatible/incompatible
+Needs, full epoch reconstruction and later suppression.
+
+Drive exact observed/legacy dependency vectors and reverse family isolation;
+implicit bazel_tools, duplicate candidate, diamond/cycle, nodep second round and
+mixed nonregistry+registry horizons; exact graph parity and child batches with
+zero parent batch/warm silence; poll-drop recovery; independent root-files,
+command-policy, effective, nonregistry, registry, recursive and mixed-horizon
+A-B-A with held Result/epoch and unaffected-Arc preservation; and zero repo-
+spec/routes/extension/public activation.
+
+Exact compatibility is existing graph values/errors/order/events. Slug-native
+is the private carrier, typed outer and shared-Arc epoch association. Repo-spec,
+routes, extensions, public activation, broader M7A, M8/M7B and exact identity
+bytes remain deferred.
+
+STOP a third Rust file, caller/export activation, changed legacy precedence or
+child event ownership, retained traversal state, weakened Arc association, cap
+excess or milestone closure. REPLAN before widening. After independent design
+ACCEPT schedule only `WP-6-7A-host-selected-module-graph-observation-implementation`;
+after implementation ACCEPT return only to the docs-only selected frontier.
+M7 remains partial and M7A -> M8 -> M7B remains.
+
+## Historical selected-module-graph frontier audit resume 4
+
 Packet: `WP-6-7A-selected-module-graph-observation-frontier-audit-resume-4`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
