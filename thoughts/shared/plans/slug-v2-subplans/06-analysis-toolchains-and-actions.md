@@ -10946,3 +10946,71 @@ caller/export work, speculative public activation, umbrella ownership,
 milestone closure, M8/M7B work or bypassing the accepted selected-graph,
 registry and repo-spec carriers. M7 remains partial and M7A -> M8 -> M7B
 remains.
+
+### Selected-module-routes observation owner design (2026-08-20)
+
+The accepted frontier audit selects only
+`WP-6-7A-host-selected-module-routes-observation-design`. Scheduling base is
+`cbd8e285` and Rust base is accepted repo-spec implementation `ccf7421e`.
+
+`HostSelectedModuleRoutesKey` is the smallest complete owner above the accepted
+selected-graph and repo-spec carriers. It alone owns graph -> repo specs ->
+canonical identity/repository mapping/route projection. Repo specs do not retain
+the graph, so both children remain necessary. Routes are independently reused by
+canonical selected definitions and extension mappings; mappings add root usages,
+overrides and extension semantics and cannot absorb route observation.
+
+Design authority is canonical/current/this Stage/routing only, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust/tests/fixtures/oracles/exports/
+callers remain read-only. Future Rust authority is only
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 8,422 physical/test
+boundary 3,466, within <=300 production, <=600 proof, <=900 aggregate semantic
+and <=9,400 physical. Helpers/tests remain below 200; the selected repository
+pipeline is one cohesive large-file exception.
+
+Add one private matching observation key/carrier retaining one exact local route
+Result Arc plus one cumulative compact epoch. Derive `Dupe`/`Allocative`, provide
+borrowed accessors and use one Legacy/Observed driver. Legacy selects legacy graph
+then repo specs with empty epochs; observed selects their accepted matching
+siblings. Both share unchanged pure canonical/mapping/registry association and
+route projection. Legacy moves the exact Result Arc.
+
+Merge every Complete epoch immediately left-first before semantics: direct graph
+first, then repo specs. Equal graph demands inside repo specs retain the direct
+graph Arc. Conflict/operation mismatch is typed outer; distinguish Graph child,
+RepoSpecs child and Graph/RepoSpecs merge stage.
+
+Graph Need/outer is carrierless and suppresses repo specs. Graph compute error has
+empty prefix; graph semantic error retains graph prefix. Repo-spec Need/outer is
+carrierless. Repo-spec compute error retains graph-only prefix; repo-spec semantic
+error retains the full merged prefix. Pure canonical collision, mapping invalid,
+registry mismatch and success retain the full prefix. There is no Need union or
+batch fold.
+
+The parent is eventless. Graph/discovery keep exact batch ownership/order and
+repo specs remain eventless. Warm is silent and cancellation publishes no
+accepted parent state. Retain only the route Result Arc+epoch; canonical/mapping
+SmallMaps, traversal, child carrier, merge, terminal and event state remain
+compute-local with no added collection/cache/interner/store/lock/task/direct Host
+read/revision/certificate/event state.
+
+Proof covers key/accessors/equality/legacy Arc; production finishers/projectors;
+every graph/repo-spec Need/outer/compute/semantic prefix and suppression;
+duplicate-first Arc/conflict/mismatch; exact root/nonregistry/registry values and
+order; canonical collision, mapping invalidity and registry mismatch; exact
+Legacy/Observed rows and complete child event parity; warm/cancel recovery;
+independent graph/repo-spec/pure-route held-carrier lifecycles; and zero canonical
+definition/extension/generated/public/bootstrap activation. Unreachable classes
+use production projectors plus accepted lower proof without hooks or inconsistent
+child injection.
+
+Exact compatibility is current route values/errors/order/events. The private
+typed outer/shared-Arc epoch is Slug-native. Extension/generated/public/bootstrap,
+M8/M7B and identity bytes remain deferred.
+
+STOP a second key/file, caller/export, route/event drift, retained traversal
+state, upper activation, proof waiver, cap excess or milestone closure. REPLAN
+before widening. After independent design ACCEPT schedule only
+`WP-6-7A-host-selected-module-routes-observation-implementation`; after its
+ACCEPT resume only the extension frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.

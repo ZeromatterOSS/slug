@@ -1,11 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-route-extension-observation-frontier-audit`
+Packet: `WP-6-7A-host-selected-module-routes-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Accepted implementation: `ccf7421e`
-Rust base: `e155d74f`
-Semantic design: `0444dd40`
+Scheduling base: `cbd8e285`
+Rust base: `ccf7421e`
 
 ## Accepted selected registry repo-spec completion
 
@@ -30,50 +29,108 @@ validation passes 42 unit and 3 integration tests; the full bzlmod suite passes
 509 unit tests plus every integration/doc target. Formatting, diff hygiene,
 cleanup, retention, security and independent terminal review pass.
 
-## Exact docs-only frontier authority
+## Owner decision
 
-This audit may write only canonical, current, this Stage and the orchestration
-routing log, at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests,
-fixtures, oracles, exports and callers are read-only.
+`HostSelectedModuleRoutesKey` is the uniquely smallest complete remaining owner.
+It alone owns exact selected graph -> selected registry repo specs -> canonical
+identity/repository mapping/route projection. The repo-spec Result deliberately
+does not retain the graph, so routes must compute both accepted children.
 
-Trace the accepted `HostSelectedRegistryRepoSpecsObservationKey` through
-`HostSelectedModuleRoutesKey`, `HostSelectedExtensionMappingsKey`, extension
-definition/load/evaluation owners, generated-repository definitions and
-public/bootstrap consumers only far enough to identify the uniquely smallest
-complete remaining mutable frontier. Do not presume routes or extension
-mappings are complete and do not reopen accepted lower owners for uniformity.
+Routes are independently consumed by `HostCanonicalSelectedModuleDefinitionKey`
+and `HostSelectedExtensionMappingsKey`. The latter adds root extension usages,
+overrides and mapping semantics. Observing extension mappings first would
+duplicate route ownership. Canonical lookup and mapping helpers are pure
+owner-local code with no independent mutable edge or semantic consumer.
 
-The audit must establish:
+## Exact design authority
 
-- whether selected routes are the first reusable semantic owner above the
-  accepted repo-spec carrier or whether one strictly smaller observed edge is
-  still missing;
-- exact repo-spec -> route -> extension mapping/load/evaluation -> generated
-  repository order, Need/typed-outer/error precedence, later suppression and
-  request-local versus reusable ownership;
-- matching Legacy/Observed families, exact child EventBatch ownership/order,
-  eventless parent behavior where applicable, warm silence and poll-drop
-  recovery;
-- independent repo-spec, route, extension definition/input/evaluation and
-  generated-repository A -> B -> A invalidation with held Result/epoch handles;
-  and
-- compact Buck2-shaped retention with mapping/frontier/event/parser scratch
-  compute-local and no cache/interner/store/lock/task/direct Host read.
+Write only canonical, current, this Stage and the orchestration routing log, at
+net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, exports and callers remain read-only until independent design ACCEPT.
 
-Preserve admitted Bazel 9 values/errors/order/events as exact. Private typed
-outers and shared-Arc epoch association remain Slug-native. Extension-generated
-repository/public/bootstrap breadth, M8/M7B and exact identity bytes remain
-deferred unless live evidence proves one is the uniquely smaller prerequisite.
+The sole future Rust authority is
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 8,422 physical with
+first `#[cfg(test)]` at line 3,466. Permit <=300 production, <=600 proof, <=900
+aggregate semantic and <=9,400 physical lines. Every helper/test remains below
+200 lines. The existing large file remains cohesive because it already owns the
+selected repository graph -> repo-spec -> route -> extension projection; do not
+split or add a second file/key merely for size.
 
-## Terminal discipline
+## Frozen route observation design
 
-Reach exactly one terminal: one independently reviewed smallest-owner design,
-one uniquely smaller evidence/association prerequisite, or formal REPLAN. A
-design may name at most one implementation successor. STOP Rust/tests/oracles/
-caller/export changes, speculative public activation, umbrella ownership,
-milestone closure, M8/M7B work, or bypassing the accepted selected-graph,
-registry and repo-spec carriers. M7 remains partial and M7A -> M8 -> M7B
-remains.
+Add private `HostSelectedModuleRoutesObservationKey(HostSelectedModuleRoutesKey)`
+and `ObservedHostSelectedModuleRoutes`. The carrier derives `Dupe`/`Allocative`,
+provides borrowed accessors and retains exactly one existing
+`Arc<Result<HostSelectedModuleRoutes, HostSelectedModuleRoutesError>>` plus one
+cumulative compact `PathObservationEpoch`. Add no caller or export.
+
+Use one Legacy/Observed semantic driver. Legacy selects only legacy graph and
+repo-spec children with empty epochs. Observed selects only
+`HostSelectedModuleGraphObservationKey` followed by
+`HostSelectedRegistryRepoSpecsObservationKey`. Both modes share the unchanged
+canonical lookup, repository mapping, registry association and route projection
+and legacy moves the exact local Result Arc.
+
+Merge every Complete child epoch immediately left-first and before semantic
+inspection. Merge the direct graph prefix before the repo-spec cumulative epoch,
+so equal graph demands already contained in repo specs retain the direct graph's
+exact Arc. Conflict or operation mismatch is typed outer. Use a private outer
+that distinguishes Graph child, RepoSpecs child and Graph/RepoSpecs merge stage.
+
+Graph Need/typed outer is immediate and carrierless and suppresses repo specs.
+Graph DICE-compute failure is semantic with an empty epoch. Graph semantic error
+retains the graph epoch and suppresses repo specs. Repo-spec Need/typed outer is
+immediate and carrierless. Repo-spec DICE-compute failure retains only the
+already-complete graph prefix because no repo-spec carrier exists. Repo-spec
+semantic error retains the merged graph+repo-spec prefix. Canonical collision,
+mapping invalidity, registry mismatch and success retain that same full merged
+prefix. There is no Need union or batch fold at this sequential owner.
+
+Complete equality is local semantic Result+epoch; Need is invalid/self-unequal
+and typed outer compares by value. The parent remains eventless. Graph/discovery
+descendants retain exact event ownership/order and repo specs remain eventless.
+Warm reuse is silent; poll-drop publishes no accepted parent state and recovery
+uses the same DICE.
+
+Retain only the route Result Arc+compact epoch. Canonical/mapping `SmallMap`s,
+route traversal, child carrier, merge, terminal and event scratch remain
+compute-local. Add no retained collection/cache/interner/store/lock/task/direct
+Host read/revision/certificate/event state.
+
+## Required proof
+
+Prove distinct key/hash/Display, accessors, `Dupe`/`Allocative`, Complete/Need/
+outer equality and exact legacy Result-Arc projection. Drive production child
+finishers and compute projectors through every graph/repo-spec Need, typed outer,
+DICE-compute and semantic position with exact empty/graph/full prefixes and
+later suppression.
+
+Prove graph-first duplicate exact-Arc preservation, conflict and operation
+mismatch. Exercise exact root/nonregistry/registry route values and order,
+canonical collision, mapping invalidity and every registry mismatch. Compare
+exact observed/legacy direct dependency vectors, reverse family isolation and
+the complete ordered child EventBatch sequence with zero parent batch, warm
+silence and real poll-drop/no-publication/same-DICE recovery.
+
+Independently vary graph, repo-spec and pure route/mapping inputs through
+A -> B -> A while holding Result/epoch handles and asserting unaffected child
+Arcs remain exact. Prove zero canonical-definition, extension mapping/load/
+evaluation, generated-repository, public and bootstrap activation. Unreachable
+DICE/outer classes use production projectors plus accepted lower proof; do not
+add hooks or inject inconsistent child values.
+
+## Compatibility and terminal
+
+Existing admitted route values/errors/order/events remain exact. The private
+typed outer/shared-Arc epoch association is Slug-native. Extension/generated/
+public/bootstrap breadth, M8/M7B and exact identity bytes remain deferred.
+
+STOP a second key/file, caller/export, changed route/event semantics, retained
+mapping/traversal state, upper activation, proof waiver, cap excess or milestone
+closure. REPLAN before widening. After independent design ACCEPT schedule only
+`WP-6-7A-host-selected-module-routes-observation-implementation`; after its
+ACCEPT resume only the extension frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.
 
 ## Historical accepted design: owner decision
 
