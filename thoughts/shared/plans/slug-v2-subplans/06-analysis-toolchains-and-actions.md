@@ -11105,3 +11105,69 @@ may name at most one implementation successor. STOP Rust/test/oracle/caller/
 export work, speculative upper activation, umbrella ownership, milestone
 closure, M8/M7B work or bypassing accepted carriers. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Extension-mappings observation owner selected (2026-08-20)
+
+The extension frontier audit from `adad16b7` selects only
+`WP-6-7A-host-selected-extension-mappings-observation-design`, with Rust base
+`9d2f7a7d`.
+
+`HostSelectedExtensionMappingsKey` is the first reusable owner above accepted
+routes and root-module files. It alone owns route -> root-files -> pure
+extension usage/isolation/import/override/repository-mapping projection.
+Definition-load requests and root repository mapping independently consume it;
+either higher owner would duplicate this boundary. Root usages already arrive
+through `ObservedRootModuleFiles`; no smaller carrier remains.
+
+Future Rust authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 9,265 physical with
+first `#[cfg(test)]` at 3,722. Caps are <=300 production, <=650 proof, <=950
+aggregate semantic and <=10,300 physical; helpers/tests remain below 200.
+Every other Rust file, child, caller, export, fixture and oracle is read-only.
+
+Freeze one private mapping observation key/carrier and one Legacy/Observed
+driver. Compute matching routes first and matching root files second. Merge
+every Complete epoch immediately left-first before semantic inspection so the
+route-carried duplicate root demands preserve their earliest exact Result Arcs.
+Then run the unchanged pure mapping projection.
+
+Route Need/typed outer is carrierless; route compute is empty-prefix and route
+semantic retains the route prefix. Observed root-files Need/typed outer is
+carrierless; root compute retains route-only and root semantic/pure mapping
+terminals retain the full merged prefix. Legacy root files cannot produce Need
+or typed outer; preserve its DICE invariant and do not inject impossible child
+states. Conflict/mismatch remains a stage-aware outer. There is no Need union or
+batch fold.
+
+Retain exactly one local mapping Result Arc plus one compact epoch. The existing
+semantic Result continues to own its cloned routes/usages/overrides/mappings;
+do not claim it retains the child route Result Arc. Epoch Result Arcs remain
+shared. Child carriers, mapping collections, merge and event scratch stay
+compute-local with no epoch list/map, cache/interner/store/lock/task/direct Host
+read/revision/certificate/event state.
+
+The mapping parent remains eventless. Routes/graph/discovery/root descendants
+keep exact batch ownership and order; direct root-files evaluation after routes
+must be DICE-reused without replay. Observed rows use only observed routes/root
+files and legacy rows only legacy siblings. Warm is silent and cancellation
+publishes no mapping value/batch.
+
+Require discriminating key/Result/equality/legacy-Arc proof; production-used
+finishers/projectors for every reachable route/root terminal and exact
+empty/route/full prefixes; observed-only root Need/outer; route-first
+duplicate/conflict/mismatch; mapping value/error parity; exact family rows,
+complete child owner/batch sequence, root reuse, warm/cancel/recovery;
+route/root-usage/pure-mapping held-carrier lifecycles; and zero load-request,
+root-mapping, evaluation, generated/public/bootstrap activation.
+
+Exact compatibility is current extension mapping values/errors/order/events.
+The private typed outer/shared-Arc epoch is Slug-native. Definition
+load/evaluation, generated repositories, public/bootstrap, M8/M7B and exact
+identity bytes remain deferred.
+
+STOP a second file/key, caller/export activation, semantic/event/family/memory
+drift, impossible-child hooks, proof waiver, cap excess, milestone closure or
+M8/M7B work. REPLAN before widening. Design ACCEPT schedules exactly
+`WP-6-7A-host-selected-extension-mappings-observation-implementation`; only
+after implementation ACCEPT resume the docs extension frontier. M7 remains
+partial and M7A -> M8 -> M7B remains.

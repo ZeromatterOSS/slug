@@ -1,10 +1,147 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-extension-observation-frontier-audit`
+Packet: `WP-6-7A-host-selected-extension-mappings-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Accepted route implementation: `9d2f7a7d`
-Scheduling base: `9d2f7a7d`
+Scheduling base: `adad16b7`
+Rust base: `9d2f7a7d`
+
+## Owner decision
+
+`HostSelectedExtensionMappingsKey` is the uniquely smallest complete next
+owner. It alone owns the complete selected-routes -> root-module-files -> pure
+extension-usage/override/repository-mapping projection in
+`selected_repo_spec.rs`.
+
+Its independent production consumers are
+`HostSelectedExtensionDefinitionLoadRequestsKey` and
+`HostRootRepositoryMappingKey`. Observing either higher key would duplicate
+this reusable semantic boundary. Both mutable children now have accepted
+matching observation siblings. Root extension usages are already carried by
+`ObservedRootModuleFiles`; a separate usage carrier would be artificial.
+
+## Exact future Rust authority
+
+Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 9,265
+physical lines with first `#[cfg(test)]` at line 3,722. Caps are <=300
+production, <=650 proof, <=950 aggregate semantic and <=10,300 physical lines.
+Every helper/test remains below 200 lines. The existing selected-repository
+pipeline remains one cohesive large-file exception.
+
+Do not edit `module_eval.rs`, any caller/consumer, public export, fixture,
+oracle or another Rust file. `RootModuleFilesObservationKey` and
+`HostSelectedModuleRoutesObservationKey` are accepted read-only children.
+
+## Frozen design
+
+Add private `HostSelectedExtensionMappingsObservationKey` wrapping the legacy
+key and private `ObservedHostSelectedExtensionMappings`. The carrier derives
+`Dupe`/`Allocative`, provides borrowed accessors and retains exactly one
+local
+`Arc<Result<HostSelectedExtensionMappings, HostSelectedExtensionMappingsError>>`
+plus one cumulative compact `PathObservationEpoch`. Add no caller or export.
+
+Use one Legacy/Observed semantic driver:
+
+1. compute the matching selected-module-routes child;
+2. merge every Complete route epoch left-first before inspecting route
+   semantics;
+3. after route success, compute the matching root-module-files child;
+4. merge every Complete root-files epoch after the route prefix and before
+   inspecting root semantics; and
+5. run the unchanged pure extension-mapping projection.
+
+Legacy selects only `HostSelectedModuleRoutesKey` and `RootModuleFilesKey`
+with empty epochs. Observed selects only their accepted observation siblings.
+The direct route prefix remains authoritative for equal root demands already
+carried through the graph; preserve its exact `PathObservationResult` Arcs.
+Conflict or operation mismatch is a typed carrierless outer tagged with
+`Routes` or `RootFiles`. Do not claim the semantic mapping value retains the
+child route Result Arc: it continues to own its existing cloned route semantic
+value inside the local mapping Result. Child Result carriers remain
+compute-local.
+
+Terminal algebra is sequential:
+
+- route Need/typed outer is immediate and carrierless;
+- route DICE-compute error is semantic with an empty prefix;
+- route semantic error retains the complete route prefix and suppresses root
+  files;
+- observed root-files Need/typed outer is immediate and carrierless, discarding
+  the compute-local route prefix;
+- legacy root files cannot return Need/typed outer; retain its current
+  DICE-invariant behavior and never inject an impossible child state;
+- root-files DICE-compute error retains the route-only prefix; and
+- root semantic error and every pure mapping error/success retain the full
+  route-plus-root prefix.
+
+There is no Need union or batch fold. Need is invalid/self-unequal; Complete
+semantic and outer values compare structurally by local Result+epoch or typed
+outer.
+
+## Events, families and memory
+
+The mapping parent remains eventless. Routes/graph/discovery/root descendants
+retain their accepted batch ownership, values and order. Because routes already
+reach root files, the parent's later direct root-files compute must reuse DICE
+state without replay in both modes. Warm mapping reuse emits nothing;
+cancellation publishes no mapping value or batch.
+
+Observed direct dependency rows contain only observed routes followed by
+observed root files. Legacy rows contain only their legacy siblings. Pin the
+complete ordered child batch sequence and reverse-family exclusion; do not
+activate definition-load requests, root repository mapping, evaluation inputs,
+generated repositories, routes/extensions above this owner or public/bootstrap
+consumers.
+
+Retain only the local mapping Result Arc and compact epoch. Existing semantic
+routes, usages, overrides and mappings inside that Result remain exact.
+`SmallMap`/`SmallSet`/`Vec`, merge and event scratch, and child carriers
+remain compute-local. Add no epoch list/map, cache/interner/store/lock/task,
+direct Host read, revision/certificate or retained event state.
+
+## Required proof
+
+Add discriminating proof for:
+
+- distinct key identity/hash/Display, accessors, `Dupe`/`Allocative`,
+  Need/Complete equality and exact legacy local Result-Arc projection;
+- production-used child finishers and compute/semantic projectors for every
+  reachable route/root position and exact empty/route/full prefix;
+- observed-only root Need/typed outer plus later suppression, without hooks or
+  impossible legacy child injection;
+- route-first duplicate Arc preservation and direct Routes/RootFiles
+  conflict/operation-mismatch outers;
+- root-only, root/nonroot extension usages, isolation, import, override,
+  generated-name and invalid mapping terminals with exact legacy parity;
+- exact observed/legacy dependency vectors, reverse-family isolation, complete
+  child owner/batch order, root reuse, parent silence and warm silence;
+- real poll-drop with no mapping publication/batch and same-DICE recovery;
+- route, root-usage/root-file and pure mapping A -> B -> A cases with held local
+  Result/epoch handles and unaffected per-demand Arc preservation; and
+- zero load-request/root-mapping/evaluation/generated/public/bootstrap
+  activation on success, error, Need and cancellation paths.
+
+Reuse accepted lower proof; add no oracle or invalid-child hook.
+
+## Compatibility and terminal
+
+Exact: current admitted extension usage, isolation, import/override, generated
+name, repository mapping, value/error/order and child event behavior.
+Slug-native: the private observation sibling, typed outer and shared-Arc epoch
+association. Deferred: definition loading/evaluation, generated repositories,
+public/bootstrap consumers, M8/M7B and exact identity bytes.
+
+STOP a second Rust file/key, caller/export activation, mapping/error/event/family
+drift, retained child or traversal state, cap/proof waiver, milestone closure,
+M8/M7B work or bypassing accepted children. REPLAN before widening.
+
+After independent design ACCEPT schedule exactly
+`WP-6-7A-host-selected-extension-mappings-observation-implementation`. After
+implementation ACCEPT return only to the docs-only extension observation
+frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+
+## Historical accepted extension frontier audit
 
 ## Accepted selected-module-routes completion
 
