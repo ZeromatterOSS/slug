@@ -10700,3 +10700,37 @@ REPLAN before widening. After independent design ACCEPT schedule only
 `WP-6-7A-host-registry-function-observation-implementation`; after its ACCEPT
 resume only the docs frontier for selected registry repo specs. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Host-registry-function observation design accepted (2026-08-20)
+
+Accepted design `38f40427` from Rust base `2a4041bb` activates only
+`WP-6-7A-host-registry-function-observation-implementation`.
+
+Write exactly `app/slug_bzlmod_v2/src/host_registry.rs`, baseline 1,536
+physical/test boundary 529, within <=220 production, <=520 proof, <=740
+aggregate semantic and <=2,300 physical. Helpers/tests remain below 200; no
+second file, export or caller is writable.
+
+Add the private one-Result-Arc+exact-visible-epoch carrier and one
+Legacy/Observed driver. Preserve mode -> vendor -> conditional refresh ->
+matching visible child -> spelling -> mirrors -> URI/hash -> ordered mirror
+validation. Preserve the duplicate neutral mode relationship and legacy
+DICE-invariant behavior.
+
+Pre-visible mode/vendor/refresh failures retain an empty epoch. Visible
+Need/typed outer is carrierless; visible semantic and all later terminals retain
+the exact visible epoch. No union/reconstruction is allowed. Legacy projection
+moves the exact Result Arc.
+
+Retain only the local Result Arc+compact epoch. Parent/children remain eventless;
+all child/parser/mirror scratch is compute-local with no added collection/cache/
+interner/store/lock/task/direct Host read/revision/certificate/event state.
+
+Require the full accepted identity/terminal/prefix/family/Arc/value/error/
+scheme/hash/URI/event/warm/cancel/input-lifecycle/key-identity and upper-
+nonactivation proof.
+
+STOP semantic/order/event/memory drift, wider authority, caller/export, proof
+waiver, cap excess or milestone closure. REPLAN before widening. After
+implementation ACCEPT resume only the docs frontier for selected registry repo
+specs. M7 remains partial and M7A -> M8 -> M7B remains.

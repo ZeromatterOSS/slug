@@ -1,5 +1,67 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-host-registry-function-observation-implementation`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Rust base: `2a4041bb`
+Accepted design: `38f40427`
+
+## Exact implementation authority
+
+Write only `app/slug_bzlmod_v2/src/host_registry.rs`, baseline 1,536 physical
+with first `#[cfg(test)]` at line 529. Caps are <=220 production, <=520 proof,
+<=740 aggregate semantic and <=2,300 physical; every helper/test remains below
+200 lines. Every other Rust file, caller, export, fixture and oracle is
+read-only.
+
+## Frozen implementation contract
+
+Add the accepted private `HostRegistryFunctionObservationKey` and
+`ObservedHostRegistryFunction`, retaining exactly one local semantic Result
+Arc plus the exact visible-lockfile epoch. Use one Legacy/Observed driver and
+preserve mode -> vendor projection -> conditional refresh -> matching visible
+lockfile -> resolved spelling -> mirrors -> primary URI/hash policy -> ordered
+mirror validation -> Result.
+
+Legacy uses `HostVisibleLockfileKey` with an empty epoch; Observed uses only
+`HostVisibleLockfileObservationKey` and forwards its exact epoch/shared Arcs.
+Preserve the duplicated neutral mode dependency inside that child and legacy
+DICE-invariant behavior. Do not reorder the parent.
+
+Mode/vendor/refresh failures complete with an empty epoch. Visible Need/typed
+outer is immediate and carrierless. Visible semantic error and every later
+mirrors/URI/success terminal retain the exact visible epoch. No union or
+reconstruction is permitted. Legacy projection moves the exact Result Arc.
+
+Complete equality is semantic Result+epoch; Need is invalid/self-unequal and
+typed outer compares by value. Parent/children remain eventless; warm reuse is
+silent and cancellation publishes nothing. Retain no child carrier, parser/URI
+or mirror-selection scratch, second collection, map/cache/interner/store/lock/
+task/direct Host read/revision/certificate/event state.
+
+## Proof and terminal
+
+Complete the accepted production-used identity/terminal/prefix proof, exact
+Refresh/non-Refresh rows and reverse family isolation, Need/outer and shared-Arc
+association, exact legacy Result Arc, every current error/scheme/hash-policy/
+primary-and-mirror-URI terminal, zero batches/warm/cancel recovery, independent
+same-key mode/vendor/refresh/visible/mirrors A -> B -> A held-carrier lifecycles,
+workspace/original-registry key-identity reuse and zero repo-spec/route/
+extension/public/bootstrap activation.
+
+Exact compatibility is current Host registry values/errors/order/URI/hash/
+mirror behavior/events. Private typed outer/shared-Arc association is
+Slug-native. Repo specs/routes/extensions/public/bootstrap, M8/M7B and identity
+bytes remain deferred.
+
+STOP a second file/key, caller/export, ordering/error/event/memory drift, upper
+activation, proof waiver, cap excess or milestone closure. REPLAN before
+widening. After independent implementation ACCEPT resume only the docs frontier
+for selected registry repo specs. M7 remains partial and M7A -> M8 -> M7B
+remains.
+
+## Historical Host-registry-function observation design
+
 Packet: `WP-6-7A-host-registry-function-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
