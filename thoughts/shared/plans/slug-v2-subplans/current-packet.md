@@ -1,14 +1,42 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-source-preparation-observation-proof-cap-correction-2-design`
+Packet: `WP-6-7A-module-source-preparation-observation-implementation-retry-2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `3e83a42d`
+Scheduling base: `77904203`
 Accepted design: `5436a421`
 Rust base: `0f9a0559`
 Accepted first proof correction: `2c505e13`
+Accepted second proof correction: `77904203`
 
-## Formal second proof-cap REPLAN
+## Accepted second correction and resumed implementation authority
+
+Correction `77904203` resumes only this same two-file retry from Rust base
+`0f9a0559`, semantic design `5436a421` and first correction `2c505e13`.
+Production is frozen: the shared Legacy/Observed driver keeps effective ->
+source or policy -> ordered registry attempts -> resolve-all patches -> each
+FileBytes and immediate apply; Complete epochs merge left-first before semantic
+inspection; Need/outer is carrierless; children alone own events; and the
+carrier retains exactly one local Result Arc plus the compact epoch.
+
+Write only `source_preparation.rs` at <=700 production/+60 colocated proof and
+<=16,900 physical, plus `source_preparation_observation_tests.rs` at <=2,100
+proof/7,500 physical. Aggregate caps are <=2,860 semantic and <=24,400
+physical. Helpers/tests remain below 200 lines. Every third file, fixture,
+oracle, export, caller and plan document is read-only during implementation.
+
+Add the distinct-key equality/hash discriminator; reconstruct the effective ->
+policy -> decisive registry-file -> reached resolutions -> reached FileBytes
+cumulative epoch with exact order/shared Arcs; drive lockfile mode/content and
+patch symlink-retarget A-B-A with held Result/epoch handles. Preserve every
+accepted prefix, terminal-position, family, event, warm, cancellation,
+lifecycle and upper-exclusion discriminator.
+
+STOP production semantic/event/family/memory drift, wider authority, proof
+waiver, cap excess or milestone closure. After independent retry ACCEPT return
+only to the docs-only selected-module-graph frontier for discovery.
+
+## Historical second proof-cap REPLAN
 
 The retained two-file implementation candidate is production-sound: one shared
 Legacy/Observed semantic driver preserves effective -> source or policy ->

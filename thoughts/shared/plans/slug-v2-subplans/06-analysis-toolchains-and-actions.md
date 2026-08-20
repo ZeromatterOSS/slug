@@ -9871,3 +9871,30 @@ upper activation, proof waiver, cap excess or milestone closure. After
 independent correction ACCEPT schedule exactly
 `WP-6-7A-module-source-preparation-observation-implementation-retry-2`; only
 after retry ACCEPT return to the selected-module-graph frontier for discovery.
+
+### Module-source preparation second proof authority corrected (2026-08-20)
+
+Correction `77904203` activates only
+`WP-6-7A-module-source-preparation-observation-implementation-retry-2` from
+Rust base `0f9a0559`, semantic design `5436a421` and first correction
+`2c505e13`. Write exactly `source_preparation.rs` and
+`source_preparation_observation_tests.rs`.
+
+Keep source authority <=700 production/+60 colocated proof and <=16,900
+physical. External proof is <=2,100/7,500; aggregate is <=2,860 semantic and
+<=24,400 physical. Helpers/tests remain below 200; no third file/export/caller
+is writable.
+
+Preserve the single Legacy/Observed driver, exact effective/source/policy/
+registry/resolution/FileBytes order, resolve-all then per-resolution
+FileBytes->immediate-apply sequencing, left-first exact-Arc merging,
+carrierless Need/outer, child-only events and one Result Arc+compact epoch.
+
+Complete distinct key equality/hash, exact cumulative child epoch order/shared
+Arcs, independent mode+lockfile A-B-A and symlink-retarget A-B-A with held
+handles. Preserve every accepted prefix/terminal-position/family/event/warm/
+cancel/lifecycle/upper discriminator.
+
+STOP production/event/family/memory drift, wider authority, proof waiver, cap
+excess or milestone closure. After retry ACCEPT return only to the docs-only
+selected-module-graph frontier for discovery.
