@@ -10631,3 +10631,72 @@ STOP Rust/test/oracle/caller/export work, speculative public activation,
 umbrella ownership, milestone closure, M8/M7B work or bypassing the accepted
 graph/visible-lockfile carriers. M7 remains partial and M7A -> M8 -> M7B
 remains.
+
+### Host-registry-function observation design (2026-08-20)
+
+The accepted `2a4041bb` visible-lockfile owner closes the last mutable
+prerequisite below `HostRegistryFunctionKey`. This key alone owns exact mode
+-> vendor projection -> conditional refresh -> visible lockfile -> resolved
+spelling -> module mirrors -> primary URI/hash policy -> mirror validation ->
+Result order. Selected repo specs add graph/registry-file/effective/spec work
+and therefore remain later.
+
+Design authority is canonical/current/this Stage/routing only, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust/tests/fixtures/oracles/exports/
+callers remain read-only pending independent design ACCEPT.
+
+Future Rust authority is only `app/slug_bzlmod_v2/src/host_registry.rs`,
+baseline 1,536 physical/test boundary 529, within <=220 production, <=520 proof,
+<=740 aggregate semantic and <=2,300 physical. Helpers/tests remain below 200;
+no second file, export or caller is writable.
+
+Add a private crate-visible observed wrapper key/carrier retaining one exact
+existing semantic Result Arc plus the exact visible-lockfile epoch. Derive
+`Dupe`/`Allocative`, add borrowed accessors and no public caller.
+
+One Legacy/Observed driver preserves:
+
+1. neutral lockfile mode;
+2. neutral vendor projection;
+3. conditional neutral refresh token;
+4. matching legacy-empty versus observed-exact visible-lockfile family;
+5. resolved registry spelling;
+6. neutral module mirrors; and
+7. primary URI parsing, scheme/hash selection, ordered mirror validation and
+   current Result construction.
+
+Preserve the duplicated neutral mode dependency inside the visible child and
+legacy DICE-invariant behavior. Do not reorder the parent. Mode/vendor/refresh
+failures complete with an empty epoch. Visible Need/typed outer is immediate
+and carrierless. Visible semantic failure and every later mirrors/URI/success
+terminal retain the exact visible epoch. No union/reconstruction is needed.
+Legacy projection moves the exact Result Arc.
+
+Complete equality is semantic Result+epoch; Need remains invalid/self-unequal
+and typed outer compares by value. Parent/children remain eventless, warm reuse
+is silent and cancellation publishes no parent value/batch.
+
+Retain only the local Result Arc plus compact epoch. Child carriers, URI/parser
+and mirror-selection scratch remain compute-local; add no collection/cache/
+interner/store/lock/task/direct Host read/revision/certificate/event state.
+
+Proof requires identity/hash/Display/accessors/equality/validity; production-used
+adapters/finishers for every terminal; exact Refresh/non-Refresh dependency rows
+and reverse family isolation; carrierless Need/outer, exact epoch shared Arcs and
+legacy Result-Arc projection; exact current errors, schemes/hash policies and
+primary/mirror URI terminals; exact zero batches,
+warm and poll-drop recovery; independent same-key mode/vendor/refresh/visible/
+mirrors A -> B -> A with held carriers; workspace/original-registry key-identity
+reuse; and zero repo-spec/route/extension/public/bootstrap activation.
+
+Exact compatibility is current Host registry values/errors/order/URI/hash/
+mirror behavior and eventlessness. The private typed outer/shared-Arc
+association is Slug-native. Repo specs/routes/extensions/public/bootstrap,
+M8/M7B and exact identity bytes remain deferred.
+
+STOP a second file/key, caller/export, ordering/error/event drift, retained
+child state, upper activation, proof waiver, cap excess or milestone closure.
+REPLAN before widening. After independent design ACCEPT schedule only
+`WP-6-7A-host-registry-function-observation-implementation`; after its ACCEPT
+resume only the docs frontier for selected registry repo specs. M7 remains
+partial and M7A -> M8 -> M7B remains.

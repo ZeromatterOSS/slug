@@ -1,5 +1,122 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-host-registry-function-observation-design`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Scheduling base: `4ebdf9ea`
+Rust base: `2a4041bb`
+
+## Owner decision
+
+`HostRegistryFunctionKey` is the uniquely smallest complete remaining owner.
+It alone owns exact lockfile mode -> vendor projection -> conditional refresh
+token -> visible lockfile -> resolved registry spelling -> module mirrors ->
+primary URI/hash policy -> mirror validation -> Result order. Its only mutable
+path child is the accepted `HostVisibleLockfileObservationKey`; every other
+child is injected, neutral or a path-free projection.
+
+Its sole production consumer is the per-entry registry projection inside
+`HostSelectedRegistryRepoSpecsKey`. That larger key separately consumes the
+selected graph, registry files, effective overrides and full-batch entry
+algebra. Observing repo specs first would combine and duplicate this reusable
+policy boundary. Routes and extension/public consumers are later still.
+
+## Exact design authority
+
+Write only canonical, current, this Stage and the orchestration routing log, at
+net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures,
+oracles, exports and callers remain read-only until independent design ACCEPT.
+
+The sole future Rust authority is
+`app/slug_bzlmod_v2/src/host_registry.rs`, baseline 1,536 physical with first
+`#[cfg(test)]` at line 529. Permit <=220 production, <=520 proof, <=740
+aggregate semantic and <=2,300 physical lines. Every helper/test remains below
+200 lines; no second file, export or caller is writable.
+
+Add private crate-visible `HostRegistryFunctionObservationKey` and
+`ObservedHostRegistryFunction`. The carrier derives `Dupe`/`Allocative`,
+has borrowed accessors, and retains exactly one existing
+`Arc<Result<HostRegistryFunctionValue, HostRegistryFunctionError>>` plus the
+exact compact `PathObservationEpoch` from the visible-lockfile child.
+
+## Shared driver and exact order
+
+Use one Legacy/Observed semantic driver:
+
+1. compute the neutral lockfile mode;
+2. compute the neutral vendor-directory projection;
+3. only in Refresh mode compute the neutral refresh token;
+4. Legacy computes `HostVisibleLockfileKey` with an empty epoch, while
+   Observed computes `HostVisibleLockfileObservationKey` and forwards its exact
+   epoch/shared Arcs;
+5. form the resolved registry spelling;
+6. compute the neutral module-mirrors input; and
+7. parse the primary URI, select the exact scheme/hash policy, validate mirrors
+   in order and construct the existing Result.
+
+Preserve the existing duplicated neutral mode relationship inside the visible
+child and the current legacy DICE-invariant behavior. Do not reorder the parent
+to match the child's internal file-first order.
+
+Mode, vendor and conditional-refresh semantic failures complete with an empty
+epoch. Visible-lockfile Need or observed typed outer is immediate, carrierless
+and suppresses spelling/mirrors/URI work. Visible-lockfile semantic failure and
+every later mirrors/primary-URI/mirror-URI/success terminal retain the exact
+visible-lockfile epoch. No union or reconstruction exists because no other
+child owns path observations. Legacy projection moves the exact local Result
+Arc.
+
+Complete equality is local semantic Result plus epoch. Need remains invalid and
+self-unequal; typed outer compares by its outer value. The parent and all
+semantic children remain eventless; lower path observations stay lower-owned.
+Warm reuse is silent and cancellation publishes no parent value or batch.
+
+Retain no visible child carrier, URI/parser scratch, second mirror collection,
+map/cache/interner/store/lock/task/direct Host read, revision/certificate or
+event state. Existing semantic lockfile/vendor/mirror/refresh Arcs remain only
+inside the one local Result; all driver scratch is compute-local.
+
+## Required proof
+
+- distinct key equality/hash/Display, accessors, `Dupe`/`Allocative`, and
+  Complete/Need/outer equality and validity;
+- production-used Legacy/Observed child adapters and finishers for every mode,
+  vendor, refresh, visible-lockfile, mirror and URI compute/semantic position,
+  with exact empty/full prefixes and later suppression;
+- exact observed/legacy direct dependency rows in Refresh and non-Refresh modes,
+  including only the matching visible-lockfile family and reverse isolation;
+- carrierless Need/typed outer, exact visible epoch demand order/shared Arcs and
+  exact legacy semantic Result-Arc projection;
+- every current value/error/message, scheme/hash-policy combination, valid and
+  invalid primary URI and ordered mirror validation terminal;
+- zero complete ordered EventBatch sequences, parent/child silence, warm reuse,
+  real poll-drop/no-publication and same-DICE recovery;
+- independent same-key mode, vendor, refresh-token, visible-lockfile and mirrors
+  A -> B -> A restoration with held Result/epoch handles and unaffected Arc
+  preservation; and
+- workspace/original-registry key-identity A -> B -> A reuse plus zero
+  repo-spec/route/extension/public/bootstrap activation.
+
+Workspace and original-registry changes are key-identity reuse, not same-key
+invalidation. Reuse accepted visible-lockfile and injected-input proof; add no
+oracle because this packet associates current exact semantics.
+
+## Compatibility and terminal
+
+Exact: current Host registry values/errors, order, URI/hash/mirror semantics and
+eventlessness. Slug-native: private typed outer and shared-Arc epoch
+association. Deferred: selected repo specs/routes, extensions, public/bootstrap
+activation, M8/M7B and exact identity bytes.
+
+After independent design ACCEPT schedule only
+`WP-6-7A-host-registry-function-observation-implementation`; after
+implementation ACCEPT resume only the docs frontier for selected registry repo
+specs. STOP a second Rust file/key, caller/export, order/error/event drift,
+retained child state, upper activation, proof waiver, cap excess, milestone
+closure, M8/M7B work or bypassing M7A -> M8 -> M7B. REPLAN before widening.
+
+## Historical Host-registry-function frontier audit
+
 Packet: `WP-6-7A-host-registry-function-observation-frontier-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
