@@ -1,39 +1,110 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-discovered-module-observation-implementation`
+Packet: `WP-6-7A-host-discovered-module-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `b8e4cc03`
+Scheduling base: `858e9b8e`
 Rust base: `223c8112`
-Accepted design: `b8e4cc03`
+Accepted semantic design: `b8e4cc03`
 
-## Accepted design and exact implementation authority
+## Formal REPLAN evidence
 
-Implement only the accepted private discovered-module observation owner. Write
-exactly:
+The retained two-file candidate is production-sound. One private
+`HostDiscoveredModuleObservationKey` and one shared Legacy/Observed driver
+preserve effective selection followed by builtin, nonregistry closure or
+registry preparation. Complete child epochs merge left-first before semantic
+inspection; Need/typed outer is immediate and carrierless; builtin terminates
+without discovery evaluation; nonregistry and registry alone own their matching
+local MODULE evaluation batch. The carrier retains exactly one local Result Arc
+plus a compact `PathObservationEpoch`; all evaluation, fragment, event and merge
+scratch remains compute-local.
+
+Independent terminal review found no production, ownership, order, event,
+family, retention or cleanup defect. Against Rust base `223c8112`, the live
+candidate measures +309 net and 16,811 physical in
+`source_preparation.rs`, +809 proof and 8,040 physical in
+`source_preparation_observation_tests.rs`, and +1,118 semantic/24,851 physical
+aggregate. Six focused discovery tests and the complete 481-test bzlmod unit
+suite plus integrations pass; formatting and diff hygiene pass.
+
+The remaining 11 external proof lines cannot honestly discriminate all frozen
+risks. Real branches still need explicit builtin override/compute/semantic,
+nonregistry closure semantic/cycle, and registry missing-version/
+`NonRegistryUnsupported` terminals with exact prefix and later suppression.
+Proof must compare complete ordered child-to-discovery EventBatch sequences for
+builtin, nonregistry and registry in both families, not only the final parent
+batch. Preparation-epoch propagation and evaluated-MODULE changes also require
+independent A-B-A cases with held Result/epoch handles; the effective held
+carrier must be compared with the restored carrier. Compressing these into the
+old ceiling would remove discriminating evidence. This is a proof-cap REPLAN,
+not a semantic redesign or lower-owner prerequisite.
+
+## Docs-only correction authority
+
+During this correction the two dirty Rust files are retained and non-writable.
+Write only canonical, current, this Stage and the orchestration routing log.
+Every Rust/test file, fixture, oracle, caller and public export is read-only.
+Net docs caps are canonical <=40, current <=220, Stage <=180 and routing <=30,
+with <=470 aggregate.
+
+Freeze production and the exact two-file retry authority. Keep:
 
 - `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 16,502 physical,
   <=360 production, <=40 colocated proof and <=16,950 physical; and
 - `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, baseline
-  7,231 physical, <=820 proof and <=8,100 physical.
+  7,231 physical, now <=1,200 proof and <=8,500 physical.
 
-Aggregate cap is <=1,220 semantic and <=25,050 physical. Helpers/tests stay
-below 200 lines. Every third Rust/test file, fixture, oracle, export, caller and
-plan document is read-only during implementation.
+Aggregate cap is now <=1,600 semantic and <=25,450 physical. Helpers/tests stay
+below 200 lines; `source_preparation.rs` remains the sole cohesive large-file
+exception. No third file, export or caller is writable.
+
+## Frozen retry contract
 
 Preserve the frozen private key/carrier/typed outer, one Legacy/Observed driver,
-effective -> builtin/nonregistry/registry order, left-first union-before-
-semantic algebra, carrierless Need/outer, exact legacy Result-Arc projection
-and one Result Arc+compact epoch retention. Only nonregistry/registry branches
-evaluate and own one matching local batch; builtin terminates after its neutral
-child with no discovery-local batch.
+effective -> builtin/nonregistry/registry order, left-first union before
+semantics, first exact Arc on equal duplicates, typed conflict/operation
+mismatch, carrierless Need/outer and exact legacy Result-Arc projection.
+Effective compute has empty prefix; pure/effective/builtin terminals retain
+effective; closure/preparation compute retains effective; and their semantic/
+evaluation terminals retain the full effective+child prefix.
 
-Complete the full identity/prefix/Arc/family/event/warm/cancel/lifecycle/upper
-proof matrix below. STOP a third file/export/caller, selected-graph activation,
-event-owner or branch/order drift, retained-state growth, direct Host read,
-proof waiver, cap excess or milestone closure. REPLAN before widening. After
-independent implementation ACCEPT return only to the docs-only selected-module-
-graph frontier. M7 remains partial.
+Builtin ends after validation plus neutral `BuiltinBazelToolsModuleKey`, with
+no discovery evaluation or discovery-local batch. Only nonregistry/registry
+evaluate MODULE bytes and publish exactly one matching local batch, including
+empty/error under capture. Reached children retain sole ownership of their own
+batches; child batches precede discovery and warm reuse is silent. Need/outer,
+pre-evaluation terminals and cancellation publish no parent batch/state.
+
+Retain only the local semantic Result Arc and compact epoch. Retain no child
+carrier Arc, included-fragment collection, evaluator/event/merge scratch,
+cache, interner, store, lock, task, direct Host read, revision or certificate.
+Selected graph, repo-spec, extension and public callers remain inactive.
+
+Preserve every existing identity, equality, validity, exact Arc, prefix,
+family, event, warm, cancellation, lifecycle and upper-exclusion discriminator.
+The retry adds only real builtin success, explicit-override and invalid-version
+cases; real nonregistry closure-semantic/unsupported-cycle cases; reachable
+registry missing-version and preparation/evaluation terminals; and production-
+called discovery compute/semantic/invariant projector tests plus accepted lower
+typed builtin-error proof for unreachable classes. No hook or inconsistent
+child injection is permitted. It also adds exact complete ordered neutral-child/
+discovery EventBatch sequences, legacy/observed parity, direct rows and reverse-
+family isolation for all three branches including empty/error batches; and
+independent effective, closure, preparation and evaluated-MODULE A-B-A
+restoration with original/restored Result+epoch handles.
+
+Exact compatibility remains current branch selection, values/errors/order,
+legacy Result Arc and child/discovery events. Slug-native remains the private
+carrier, typed outer and epoch association. Selected graph/repo specs/
+extensions, broader bootstrap work, M8/M7B and exact identity bytes remain
+deferred.
+
+STOP any production semantic/event/family/memory change, wider authority, upper
+activation, proof waiver, cap excess or milestone closure. After independent
+correction ACCEPT schedule only
+`WP-6-7A-host-discovered-module-observation-implementation-retry`. Only after
+retry ACCEPT return to the docs-only selected-module-graph frontier. M7 remains
+partial and M7A -> M8 -> M7B remains.
 
 ## Historical owner decision and frozen implementation contract
 

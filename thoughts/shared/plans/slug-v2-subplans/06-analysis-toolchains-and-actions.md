@@ -10074,3 +10074,54 @@ family/event-owner drift, retained-state growth, direct Host read, proof waiver,
 cap excess or milestone closure. REPLAN before widening. After independent
 implementation ACCEPT return only to the docs-only selected-module-graph
 frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+### Discovered-module observation proof-cap REPLAN (2026-08-20)
+
+The retained two-file candidate from design `b8e4cc03` is production-sound.
+One private observed discovery owner and one Legacy/Observed driver preserve
+effective -> builtin/nonregistry/registry order, left-first Complete merging,
+carrierless Need/outer, exact legacy Result-Arc projection, builtin zero-parent-
+batch behavior, nonregistry/registry evaluation ownership and one local Result
+Arc plus compact epoch retention. Independent review found no production,
+ownership, event, family, memory or cleanup defect.
+
+Measured against Rust base `223c8112`, `source_preparation.rs` is +309 at
+16,811 physical and `source_preparation_observation_tests.rs` is +809 at 8,040
+physical: +1,118 semantic and 24,851 physical aggregate. Six focused discovery
+tests and complete bzlmod validation pass. Only 11 external proof lines remain,
+which cannot honestly cover the missing real branch terminals, complete exact
+family/event sequences and separated held-handle lifecycles.
+
+Formally REPLAN only to
+`WP-6-7A-host-discovered-module-observation-proof-cap-correction-design` from
+scheduling base `858e9b8e`. The two dirty Rust files are retained and
+non-writable. Write only canonical/current/this Stage/routing at <=40/<=220/
+<=180/<=30 net and <=470 aggregate.
+
+Freeze production and the same two-file authority. Keep source at <=360
+production/+40 colocated proof and <=16,950 physical. Raise only external proof
+to <=1,200 and <=8,500 physical, making <=1,600 semantic and <=25,450 physical
+aggregate. Helpers/tests remain below 200; no third file/export/caller is
+writable.
+
+The retry must add real builtin success/explicit-override/invalid-version,
+nonregistry closure-semantic/cycle and reachable registry missing-version/
+preparation/evaluation terminals with exact prefixes and later suppression.
+Use production-called discovery compute/semantic/invariant projectors plus
+accepted lower typed builtin-error proof for unreachable classes; forbid hooks
+or inconsistent child injection. Compare the complete ordered neutral-child-to-
+discovery EventBatch sequences, legacy/observed parity, exact rows and reverse-
+family isolation for all three branches, including empty/error batches. Separate
+effective, closure, preparation and evaluated-MODULE A-B-A restoration and
+retain original/restored Result+epoch handles so child-epoch propagation cannot
+be masked by evaluation-semantic changes.
+
+Preserve every accepted key/equality/Arc/prefix/outer/family/event/warm/cancel/
+upper discriminator, exact branch/result/error/order/events, child-owned event
+authority and compact one-Result-Arc+epoch retention. STOP any production
+semantic/event/family/memory change, wider authority, upper activation, proof
+waiver, cap excess or milestone closure.
+
+After independent correction ACCEPT schedule exactly
+`WP-6-7A-host-discovered-module-observation-implementation-retry`; only after
+retry ACCEPT return to the docs-only selected-module-graph frontier. M7 remains
+partial and M7A -> M8 -> M7B remains.
