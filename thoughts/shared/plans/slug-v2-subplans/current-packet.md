@@ -1,12 +1,41 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-discovered-module-observation-design`
+Packet: `WP-6-7A-host-discovered-module-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `cc95fe3f`
+Scheduling base: `b8e4cc03`
 Rust base: `223c8112`
+Accepted design: `b8e4cc03`
 
-## Owner decision and docs-only authority
+## Accepted design and exact implementation authority
+
+Implement only the accepted private discovered-module observation owner. Write
+exactly:
+
+- `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 16,502 physical,
+  <=360 production, <=40 colocated proof and <=16,950 physical; and
+- `app/slug_bzlmod_v2/src/source_preparation_observation_tests.rs`, baseline
+  7,231 physical, <=820 proof and <=8,100 physical.
+
+Aggregate cap is <=1,220 semantic and <=25,050 physical. Helpers/tests stay
+below 200 lines. Every third Rust/test file, fixture, oracle, export, caller and
+plan document is read-only during implementation.
+
+Preserve the frozen private key/carrier/typed outer, one Legacy/Observed driver,
+effective -> builtin/nonregistry/registry order, left-first union-before-
+semantic algebra, carrierless Need/outer, exact legacy Result-Arc projection
+and one Result Arc+compact epoch retention. Only nonregistry/registry branches
+evaluate and own one matching local batch; builtin terminates after its neutral
+child with no discovery-local batch.
+
+Complete the full identity/prefix/Arc/family/event/warm/cancel/lifecycle/upper
+proof matrix below. STOP a third file/export/caller, selected-graph activation,
+event-owner or branch/order drift, retained-state growth, direct Host read,
+proof waiver, cap excess or milestone closure. REPLAN before widening. After
+independent implementation ACCEPT return only to the docs-only selected-module-
+graph frontier. M7 remains partial.
+
+## Historical owner decision and frozen implementation contract
 
 Two independent owner audits select `HostDiscoveredModuleKey` as the uniquely
 smallest complete next owner. It always computes effective selection first,

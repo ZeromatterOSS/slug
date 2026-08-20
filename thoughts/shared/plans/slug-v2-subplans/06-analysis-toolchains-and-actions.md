@@ -10044,3 +10044,33 @@ growth, direct Host read, cap excess or milestone closure. REPLAN before
 widening. After independent design ACCEPT schedule exactly
 `WP-6-7A-host-discovered-module-observation-implementation`; only after that
 implementation ACCEPT return to the docs-only selected-module-graph frontier.
+
+### Discovered-module observation design accepted (2026-08-20)
+
+Design `b8e4cc03` activates only
+`WP-6-7A-host-discovered-module-observation-implementation` from Rust base
+`223c8112`. Write exactly `source_preparation.rs` and
+`source_preparation_observation_tests.rs`.
+
+Keep source authority <=360 production/+40 colocated proof at <=16,950 physical,
+external proof <=820/8,100, and aggregate <=1,220 semantic/25,050 physical.
+Helpers/tests remain below 200; every third file/export/caller is read-only.
+
+Preserve the private discovered key/carrier and typed effective/closure/
+preparation outer, one Legacy/Observed driver, matching-family effective then
+builtin/nonregistry/registry branch order, left-first Complete merging before
+semantics, carrierless Need/outer, exact legacy Result-Arc projection, and one
+local Result Arc+compact epoch retention.
+
+Builtin terminates after neutral `BuiltinBazelToolsModuleKey` and stores no
+discovery-local batch. Only nonregistry/registry proceed to owner-local MODULE
+evaluation and the matching one-batch publication; pre-evaluation terminals,
+Need/outer/cancel store none. Preserve every exact prefix, first-Arc/conflict/
+mismatch, child event, family, warm, cancellation, lifecycle and upper
+nonactivation discriminator.
+
+STOP a third file/export/caller, selected-graph activation, semantic/order/
+family/event-owner drift, retained-state growth, direct Host read, proof waiver,
+cap excess or milestone closure. REPLAN before widening. After independent
+implementation ACCEPT return only to the docs-only selected-module-graph
+frontier. M7 remains partial and M7A -> M8 -> M7B remains.
