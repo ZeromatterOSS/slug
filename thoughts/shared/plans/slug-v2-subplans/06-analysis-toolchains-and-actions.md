@@ -10548,3 +10548,38 @@ After independent design ACCEPT schedule only
 `WP-6-7A-host-visible-lockfile-observation-implementation`; after its ACCEPT
 resume only the docs frontier for Host registry-function observation, then repo
 specs. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Visible-lockfile observation design accepted (2026-08-20)
+
+Accepted design `ba21c0e8` from Rust base `d5e8f461` activates only
+`WP-6-7A-host-visible-lockfile-observation-implementation`.
+
+Write exactly `app/slug_bzlmod_v2/src/host_lockfile.rs`, baseline 965 physical
+and first `#[cfg(test)]` line 142, within <=140 production, <=280 proof,
+<=420 aggregate semantic and <=1,400 physical. Helpers/tests remain below 200;
+no second file, caller, export, fixture or oracle is writable.
+
+Add the private one-Result-Arc+exact-Host-FileBytes-epoch carrier and one
+Legacy/Observed driver. Preserve file -> mode -> file semantic/Host parser,
+matching Host FileBytes families, carrierless Need/typed outer, completed-file
+then missing-mode precedence, exact legacy Result-Arc projection and all current
+terminal values/errors. Off with present bytes must still observe and parse;
+the root-files Ignored/empty carrier is forbidden.
+
+Retain only the local semantic Result Arc plus compact shared epoch. Add no
+union/child carrier/scratch collection/cache/interner/store/lock/task/direct
+Host read/revision/certificate/event state. Parent and children remain
+eventless; warm reuse is silent and poll-drop publishes nothing.
+
+Require the full accepted identity/family/terminal/Arc/Off/event/warm/cancel/
+independent mode+bytes+symlink lifecycle and upper-nonactivation proof. Exact
+compatibility remains current Host-visible values/errors/order/parser/events;
+the private typed outer/shared-Arc epoch is Slug-native; Host registry function,
+repo specs/routes/extensions/public/bootstrap, M8/M7B and identity bytes remain
+deferred.
+
+STOP semantic/order/event/memory drift, wider authority, root-carrier
+substitution, proof waiver, cap excess or milestone closure. REPLAN before
+widening. After independent implementation ACCEPT resume only the docs frontier
+for Host registry-function observation, then repo specs. M7 remains partial and
+M7A -> M8 -> M7B remains.

@@ -1,5 +1,60 @@
 # Current Slug V2 Packet
 
+Packet: `WP-6-7A-host-visible-lockfile-observation-implementation`
+Milestone: M7A bootstrap-critical command/ruleset breadth
+Owner: `06-analysis-toolchains-and-actions.md`
+Rust base: `d5e8f461`
+Accepted design: `ba21c0e8`
+
+## Exact implementation authority
+
+Write only `app/slug_bzlmod_v2/src/host_lockfile.rs`, baseline 965 physical
+with first `#[cfg(test)]` at line 142. Caps are <=140 production, <=280 proof,
+<=420 aggregate semantic and <=1,400 physical; every helper/test remains below
+200 lines. Every other Rust file, caller, export, fixture and oracle is read-only.
+
+## Frozen implementation contract
+
+Implement the accepted private `HostVisibleLockfileObservationKey` and
+`ObservedHostVisibleLockfile` below. One Legacy/Observed driver must preserve
+exact file -> mode -> file semantic/Host-parser order. Legacy uses only
+`HostFileBytesKey` with an empty epoch; Observed uses only
+`HostFileBytesObservationKey` and forwards its exact epoch/shared Arcs; both
+then use the neutral `RootModuleLockfileModeKey`.
+
+File Need/observed typed outer is immediate and carrierless. Once file Complete
+exists, missing mode wins over stored file semantic errors and retains the file
+epoch. Every File/Missing/Present/BadLockfile/UncaughtParse/unsupported-version/
+success terminal retains the same exact epoch. Explicitly preserve Off+present
+Host parsing; do not substitute the mode-first root-files Ignored/empty carrier.
+Legacy projection moves the exact existing Result Arc.
+
+Retain only one local semantic Result Arc plus the compact epoch; derive
+`Dupe`/`Allocative` and add borrowed crate-private accessors. Add no epoch
+union, child carrier, bytes/parser scratch, collection/cache/interner/store/
+lock/task/direct Host read, revision/certificate or event state. Parent and
+children remain eventless; warm reuse is silent and cancellation publishes
+nothing.
+
+## Proof and terminal
+
+Complete the accepted production-used identity/family/terminal proof, exact
+file-first rows and reverse isolation, missing-mode precedence, every exact
+error/success variant, pointer-identical epoch forwarding, Off discriminator,
+zero batches/warm replay, poll-drop recovery, independent mode and
+bytes/symlink A -> B -> A held-carrier lifecycles and zero root-files/Host-
+registry/repo-spec/route/extension/public/bootstrap activation.
+
+Exact compatibility is current Host-visible values/errors/order/parser/events.
+The private outer/shared-Arc association is Slug-native; every upper owner and
+M8/M7B remain deferred. STOP a second file/key, caller/export, root-carrier
+substitution, semantic/order/event/memory drift, proof waiver, cap excess or
+milestone closure. REPLAN before widening. After independent implementation
+ACCEPT resume only the docs frontier for Host registry-function observation,
+then repo specs. M7 remains partial and M7A -> M8 -> M7B remains.
+
+## Historical visible-lockfile observation design
+
 Packet: `WP-6-7A-host-visible-lockfile-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
