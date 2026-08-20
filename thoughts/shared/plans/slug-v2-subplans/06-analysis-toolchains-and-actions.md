@@ -9658,3 +9658,59 @@ carriers/epochs/outers are Slug-native; extensions, broader actions, M8/M7B and
 identity bytes remain deferred. STOP code/oracles, callers/public exports,
 direct selected activation, semantic/event/family/memory drift, unmeasured
 authority or milestone closure. M7 stays partial and M7A -> M8 -> M7B remains.
+
+### Selected-graph frontier stops at module source preparation (2026-08-19)
+
+Audit `79b56e8a` selects only
+`WP-6-7A-module-source-preparation-observation-design`. The preparation key is
+the first complete owner of effective selection, the nonregistry/registry split,
+ordered registry attempts and the two-phase root-patch pipeline. Accepted
+effective/source/policy/registry-file/resolved-path carriers plus neutral
+FileBytes close all lower path edges. Patch processing has no other consumer;
+discovery only evaluates completed bytes and owns its MODULE batch, while
+selected graph only joins discovery horizons.
+
+This design is docs-only. Future Rust authority is exactly
+`source_preparation.rs` at baseline 16,135, <=700 production/+60 colocated
+proof and <=16,900 physical, plus
+`source_preparation_observation_tests.rs` at baseline 5,262, <=1,440 proof and
+<=6,800 physical. Aggregate caps are <=2,200 semantic and <=23,700 physical;
+helpers/tests remain below 200 lines and no third file/export/caller is allowed.
+
+Freeze a private crate-visible preparation observation key/carrier retaining one
+local Result Arc plus the cumulative epoch. One Legacy/Observed driver preserves
+normalize -> matching effective -> nonregistry source, or version/policy ->
+ordered registries -> each registry file -> all patch resolutions in label
+order -> for each retained resolution in order, FileBytes -> immediate
+cumulative patch application. Early FileBytes or patch application failure
+suppresses every later FileBytes. Legacy moves the exact Result Arc.
+
+Merge each Complete child epoch into the existing prefix left-first before
+semantic inspection, and append the exact FileBytes Arc before inspection.
+Equal duplicates retain the earliest Arc; conflict/mismatch is typed outer.
+Need/outer is immediate carrierless with no later activation or Need union.
+Preserve exact empty/effective/policy/registry/resolution/full terminal prefixes,
+including all-miss and patch errors.
+
+Preparation stays eventless; ROOT/MODULE/lockfile children keep their batches
+and discovery remains the later evaluation owner. Retain no child carrier,
+resolved path, patch bytes/list, policy/search scratch, extra collection/cache/
+interner/store/lock/task, Host read, revision, certificate or event state.
+
+Prove identity/equality/exact legacy Arc; every stage and first/middle/last
+attempt/patch terminal; exact prefix/order/ptr/conflict algebra; nonregistry,
+override and multi-registry semantics; patch filtering/two-phase order; exact
+family rows/events/warm/cancel; independent registry/policy/patch A-B-A and held
+handles; and zero discovery/selected/repo-spec/HostRegistry/extension/public
+activation.
+
+Exact values/errors/search/patch order and child events remain exact. The
+private carrier/outer/epoch association is Slug-native. Discovery, selected
+graph/repo specs, extensions, M8/M7B and identity bytes remain deferred.
+
+Write only canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net
+and <=470 aggregate. STOP Rust/tests/oracles during design, a third future file,
+caller/export, reordered IO/patches, event/family/memory drift, upper activation,
+cap excess or milestone closure. After independent design ACCEPT schedule only
+`WP-6-7A-module-source-preparation-observation-implementation`; after its
+acceptance return only to the selected-graph frontier for discovery.
