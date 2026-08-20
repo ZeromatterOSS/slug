@@ -1,10 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-module-routes-observation-design`
+Packet: `WP-6-7A-host-selected-module-routes-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `cbd8e285`
 Rust base: `ccf7421e`
+Accepted design: `a27eb1b0`
 
 ## Accepted selected registry repo-spec completion
 
@@ -42,21 +42,17 @@ overrides and mapping semantics. Observing extension mappings first would
 duplicate route ownership. Canonical lookup and mapping helpers are pure
 owner-local code with no independent mutable edge or semantic consumer.
 
-## Exact design authority
+## Exact implementation authority
 
-Write only canonical, current, this Stage and the orchestration routing log, at
-net caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures,
-oracles, exports and callers remain read-only until independent design ACCEPT.
-
-The sole future Rust authority is
-`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 8,422 physical with
-first `#[cfg(test)]` at line 3,466. Permit <=300 production, <=600 proof, <=900
+Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 8,422
+physical with first `#[cfg(test)]` at line 3,466. Caps are <=300 production,
+<=600 proof, <=900
 aggregate semantic and <=9,400 physical lines. Every helper/test remains below
 200 lines. The existing large file remains cohesive because it already owns the
 selected repository graph -> repo-spec -> route -> extension projection; do not
 split or add a second file/key merely for size.
 
-## Frozen route observation design
+## Frozen implementation contract
 
 Add private `HostSelectedModuleRoutesObservationKey(HostSelectedModuleRoutesKey)`
 and `ObservedHostSelectedModuleRoutes`. The carrier derives `Dupe`/`Allocative`,
@@ -127,10 +123,9 @@ public/bootstrap breadth, M8/M7B and exact identity bytes remain deferred.
 
 STOP a second key/file, caller/export, changed route/event semantics, retained
 mapping/traversal state, upper activation, proof waiver, cap excess or milestone
-closure. REPLAN before widening. After independent design ACCEPT schedule only
-`WP-6-7A-host-selected-module-routes-observation-implementation`; after its
-ACCEPT resume only the extension frontier. M7 remains partial and
-M7A -> M8 -> M7B remains.
+closure. REPLAN before widening. After independent implementation ACCEPT resume
+only the docs extension frontier. M7 remains partial and M7A -> M8 -> M7B
+remains.
 
 ## Historical accepted design: owner decision
 

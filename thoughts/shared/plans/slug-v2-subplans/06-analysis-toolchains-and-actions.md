@@ -11014,3 +11014,35 @@ before widening. After independent design ACCEPT schedule only
 `WP-6-7A-host-selected-module-routes-observation-implementation`; after its
 ACCEPT resume only the extension frontier. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Selected-module-routes observation design accepted (2026-08-20)
+
+Accepted design `a27eb1b0` from Rust base `ccf7421e` activates only
+`WP-6-7A-host-selected-module-routes-observation-implementation`.
+
+Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 8,422
+physical/test boundary 3,466, within <=300 production, <=600 proof, <=900
+aggregate semantic and <=9,400 physical. Helpers/tests remain below 200; no
+second file/key, export or caller is writable.
+
+Add the private one-Result-Arc+cumulative-epoch route carrier and one
+Legacy/Observed driver. Preserve matching graph first, matching repo specs
+second and unchanged pure canonical identity/repository mapping/route
+projection. Merge Complete graph left-first before repo specs so duplicate
+graph demands retain the direct graph Arc; conflict/mismatch is typed outer.
+
+Graph Need/outer is carrierless; graph compute is empty-prefix and graph
+semantic retains graph prefix. Repo-spec Need/outer is carrierless; repo-spec
+compute retains graph-only prefix, while repo-spec semantic and every pure route
+terminal retain the full merged prefix. There is no Need union or batch fold.
+
+Retain only the local route Result Arc+compact epoch. Parent is eventless,
+existing child batches remain exact and all canonical/mapping/traversal/merge/
+terminal/event scratch remains compute-local with no collection/cache/interner/
+store/lock/task/direct Host read/revision/certificate state.
+
+Require the full accepted identity/terminal/prefix/family/Arc/event/warm/cancel/
+held-lifecycle and upper-nonactivation proof. STOP route/event/memory drift,
+wider authority, caller/export, proof waiver, cap excess or milestone closure.
+REPLAN before widening. After implementation ACCEPT resume only the docs
+extension frontier. M7 remains partial and M7A -> M8 -> M7B remains.
