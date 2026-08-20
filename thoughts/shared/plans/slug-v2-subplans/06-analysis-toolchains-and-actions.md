@@ -11455,3 +11455,58 @@ caps <=40/<=220/<=180/<=30 and <=470 aggregate. All Rust, tests, fixtures,
 oracles, APIs and other plans are read-only. STOP implementation, export/caller
 or upper activation, proof waiver, milestone closure and M8/M7B. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Extension evaluation-input observation owner design (2026-08-20)
+
+Activate only
+`WP-6-7A-host-selected-extension-evaluation-input-requests-observation-design`
+from scheduling/Rust base `df5e1c5c`/`094ba075`.
+
+The immediate evaluation-input owner is the uniquely smaller next boundary.
+It consumes accepted definition requests first, then root files, and its value
+is the first child of prepared inputs. Both observed siblings are crate-local.
+Loaded definitions is a larger parallel sibling requiring later cross-crate
+request-carrier promotion plus per-request Host Bzl observation; prepared/pure/
+instantiated/validated, root mapping, generated/public and bootstrap are above
+or parallel to these owners.
+
+Future Rust authority is exactly
+`app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 10,690 physical
+lines with first `#[cfg(test)]` at 4,198. Caps are <=320 production, <=700
+proof, <=1,020 aggregate semantic and <=11,800 physical; helpers/tests remain
+below 200. Every other file, `lib.rs`, caller, export, fixture and oracle is
+read-only.
+
+Freeze one private Result-Arc+cumulative-epoch carrier and one Legacy/Observed
+driver. Preserve exact request -> root-files -> pure input projection order.
+Merge each Complete epoch left-first before semantics, so request-owned
+duplicate Arcs win. Request compute is empty-prefix; request semantic retains
+request prefix and suppresses root. Observed-only root Need/outer is
+carrierless; root compute retains request prefix; root semantic and pure
+Invalid/success retain the full merged prefix. Conflict/operation mismatch is
+a RootFiles-stage typed carrierless outer. Legacy uses only legacy children
+with empty epochs and moves the exact local Result Arc.
+
+The parent remains eventless. Matching child families retain their exact batch
+owners; the direct root child after requests must DICE-reuse without replay.
+Retain only the local evaluation-input Result Arc plus epoch. Child carriers,
+root Result, merge/input Vec and event scratch are compute-local; add no
+retained map/cache/interner/store/lock/task or Host read.
+
+Require exact identity/equality/Arc and empty/request/full terminal proof,
+first-Arc/conflict/mismatch, observed-only root Need/outer, all admitted
+header/version/tag/input values and errors, exact family rows and complete
+batch parity, parent/warm/cancel silence, held-carrier A -> B -> A, and zero
+loaded-definition/prepared/pure/instantiated/validated/root-mapping/generated/
+public activation. Reuse lower proof; add no hook or oracle.
+
+Exact compatibility remains existing evaluation-input values/errors/order/root
+metadata/tags/events. The private typed outer/shared epoch is Slug-native.
+Export, loaded definitions and every upper owner remain deferred.
+
+Design ACCEPT schedules only
+`WP-6-7A-host-selected-extension-evaluation-input-requests-observation-implementation`.
+After implementation ACCEPT resume only the loaded-definition frontier.
+STOP a second file/key, export/caller/upper work, drift, proof/cap waiver,
+milestone closure or M8/M7B. REPLAN before widening. M7 remains partial and
+M7A -> M8 -> M7B remains.
