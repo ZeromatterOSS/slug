@@ -1,117 +1,147 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-carrier-promotion-implementation`
+Packet: `WP-6-7A-loaded-module-extension-definitions-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `f622babe`
-Accepted predecessor: `e82057f2`
+Scheduling base: `99c23033`
+Accepted predecessor: `99c23033`
 
-## Goal
+## Design authority
 
-Expose only the already accepted observed definition-load-request key, carrier
-and opaque typed outer through `slug_bzlmod_v2`'s doc-hidden API so the later
-loading owner can consume them. Change no semantic computation, caller, event,
-DICE dependency, retained state or Bazel-visible behavior.
+This packet is docs-only. Write authority is exactly the canonical plan, this
+manifest, the Stage 6 owner plan and the orchestration routing log, at net caps
+<=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+Cargo/BUILD metadata, APIs, exports and callers are read-only.
 
-## Write authority and caps
+The ordinary terminal rollover changes canonical/current/Stage only. Routing
+remains unchanged unless the design reaches formal `REPLAN` or records a
+reusable routing lesson.
 
-Write exactly:
+## Accepted prerequisites and natural owner
 
-- `app/slug_bzlmod_v2/src/selected_repo_spec.rs`;
-- `app/slug_bzlmod_v2/src/lib.rs`; and
-- new
-  `app/slug_bzlmod_v2/tests/definition_request_observation_api.rs`.
+Accepted `99c23033` exposes the observed definition-request key, carrier and
+opaque outer through Bzlmod's doc-hidden API. Loading already depends one way on
+Bzlmod. The loading-crate `HostBzlModuleObservationKey` already owns each root
+Bzl module's complete source/recursive-load epoch and local evaluation
+`EventBatch`.
 
-Every other file is read-only, including loading, Cargo/BUILD metadata,
-fixtures, oracles and planning documents until terminal rollover.
+The existing `HostLoadedModuleExtensionDefinitionsKey` is the natural owner.
+It consumes ordered definition requests, then for each request parses the root
+Bzl target, computes the Host Bzl module, selects the named export, rejects a
+wrong kind and projects the heap-independent module-extension definition.
+`HostPreparedModuleExtensionInputsKey` is its sole direct semantic consumer
+and independently computes evaluation-input requests first.
 
-Baselines are 11,657 selected-repo-spec lines with first `#[cfg(test)]` at
-4,484 and 403 lib lines. Caps are <=70 production, <=40 colocated proof, <=60
-external proof and <=170 aggregate semantic lines. Physical caps are
-11,730/415/60 for selected-repo-spec/lib/API smoke. Helpers/tests remain below
-100 lines.
+No carrierless prerequisite remains. Prepared/pure/instantiated/validated
+extension evaluation, root mapping, generated repository definitions and
+public/bootstrap consumers are later or parallel work.
 
-## Exact implementation
+## Design objective
 
-In `selected_repo_spec.rs`:
+Freeze one private matching Legacy/Observed loaded-definition owner in
+`slug_loading_v2`. Determine the exact shared driver, carrier, typed outer,
+proof matrix and caps without implementing or activating a caller.
 
-1. Make the existing
-   `HostSelectedExtensionDefinitionLoadRequestsObservationKey` doc-hidden
-   public and make only its existing `new(NormalizedAbsolutePath)` constructor
-   public. Preserve fields, derives, Hash and Display identity.
-2. Make `ObservedHostSelectedExtensionDefinitionLoadRequests` doc-hidden
-   public with private fields. Make only `result()` and `observations()`
-   public. Spell `result()` with the concrete public
-   `Arc<Result<HostSelectedExtensionDefinitionLoadRequests,
-   HostSelectedExtensionDefinitionLoadRequestsError>>` return type; do not
-   expose the private alias.
-3. Keep `DefinitionLoadRequestsObservationError` private and unchanged. Add a
-   doc-hidden public
-   `HostSelectedExtensionDefinitionLoadRequestsObservationError` newtype
-   around it with the same Debug/Clone/PartialEq/Eq/Allocative/Dupe traits.
-   Wrap the private error only when the observation key projects its public
-   `Key::Value`. The driver and mapping error graph remain private.
-4. Update only the existing same-file evaluation-input child and proofs needed
-   to carry/match the opaque wrapper. Do not alter request computation,
-   Complete/Need/outer projection, equality/validity, Result/epoch Arc identity,
-   error precedence or lifecycle behavior.
+Preserve the legacy value, error, request order, `BzlLoadManifest`,
+heap-independent `ModuleExtensionDefinitionProjection` and request association.
+The observed carrier may add only one local Result Arc and cumulative
+`PathObservationEpoch`.
 
-In `lib.rs`, add doc-hidden reexports for exactly the observation key, observed
-carrier and public opaque observation error. Do not reexport the result alias,
-private error kind, evaluation-input observation types or mapping internals.
+## Order and terminal algebra
 
-## Proof and validation
+The shared driver must preserve:
 
-Add one external integration smoke that:
+1. definition requests;
+2. for each request in source order:
+   root Bzl-target parse;
+3. that request's Host Bzl module;
+4. named-export lookup;
+5. `FrozenModuleExtensionDefinition` downcast; and
+6. manifest/projection append.
 
-- imports/names exactly the three new reexports;
-- constructs the observation key from a normalized absolute workspace and pins
-  its existing Display text;
-- type-checks calls to the carrier Result/epoch accessors and names the opaque
-  outer without constructing either value; and
-- contains no DICE compute, semantic caller, private-source scan or test hook.
+Observed mode computes the accepted observed request child first. For each
+request whose label parses, it computes exactly one
+`HostBzlModuleObservationKey`. Merge every Complete epoch strictly left-first
+into the cumulative prefix before inspecting that child's Bzl semantic result
+or performing export/wrong-kind projection. Equal duplicate observations retain
+the earliest/request-side Arc. Conflict or operation mismatch becomes one typed
+outer identifying the Bzl request/stage.
 
-Reuse the existing focused observed-definition-request tests for behavior,
-identity, event, Need/outer, cancellation and A -> B -> A proof. Run serially:
+Stop at the first request compute/semantic, label, Bzl compute/Need/outer/
+semantic, merge, export or wrong-kind terminal. A first terminal suppresses all
+later request work; a middle terminal follows only preceding successes; a last
+terminal follows every prior success. There is no full scan, speculative
+parallelism or Need union.
 
-1. `cargo test -p slug_bzlmod_v2 observed_definition_requests --quiet`;
-2. `cargo test -p slug_bzlmod_v2 --test definition_request_observation_api --quiet`;
-3. `cargo test -p slug_bzlmod_v2 --quiet`;
-4. `cargo check -p slug_loading_v2 --quiet`;
-5. `cargo fmt --all -- --check`; and
-6. `git diff --check`.
+Freeze exact empty/request/prior-Bzl/current-Bzl prefix behavior for DICE compute
+and semantic terminals. Need and child typed outer publish no provisional parent
+carrier or event batch. Decide explicitly whether an observed Bzl DICE-compute
+failure preserves the prior cumulative prefix as a semantic loaded-definition
+error or is an invariant; do not silently change the legacy error surface.
 
-Do not add an oracle: visibility/wrapping changes no admitted Bazel surface.
+## Families, events and lifetime
 
-## Compatibility, lifetime and events
+Legacy computes only legacy request/Bzl keys with empty epochs. Observed computes
+only observed request/Bzl keys. One shared driver must exclude mixed families.
 
-Exact compatibility remains existing request semantic values, errors, order and
-lower child events. The hidden Rust/DICE key/API/carrier—including key identity,
-Result/epoch association, shared Arc and opaque typed outer—is Slug-native and
-must remain unchanged except for visibility and the nominal wrapper.
+The parent emits no events. Each observed Host Bzl child remains the sole owner
+of its exact local batch; successful ordered children replay in request order.
+Warm parent reuse is silent. Direct-child DICE reuse must not replay a batch.
+Cancellation/poll-drop before parent publication leaves no provisional parent
+value or parent batch, and a same-DICE retry recovers.
 
-The observation parent stays eventless and retains exactly one local request
-Result Arc plus its compact epoch. Need/outer/cancellation remains carrierless;
-warm reuse remains silent. No child carrier, mapping result, traversal/event
-scratch, map, cache, interner, store, lock, task, direct Host read, revision or
-certificate state may be added or retained.
+Retain only the owner-local loaded-definition Result Arc, cumulative epoch and
+semantic request/manifest/projection state already reachable from that Result.
+Observed request/Bzl carriers, frozen module handles beyond existing semantic
+ownership, label/export/downcast/merge/event vectors, maps, caches, interners,
+stores, locks, tasks, Host reads, revisions and certificates remain compute-local
+or forbidden. No lock may span a DICE compute.
+
+## Proof and compatibility
+
+Reuse the accepted request and Host-Bzl identity, event, cancellation and
+lifecycle proof. Add discriminators only for the new composition:
+
+- distinct key/hash/Display and Complete-only equality/validity;
+- Legacy/Observed family exclusion and exact child order;
+- first/middle/last Need/outer/compute/semantic/export/wrong-kind suppression;
+- left-first request/each-Bzl epoch merging, earliest duplicate Arc and typed
+  conflict/operation mismatch;
+- exact ordered child batches, parent/warm/cancel silence and direct-child reuse;
+- held Result/epoch handles across independent request, each Bzl definition and
+  pure export-projection A -> B -> A, with unaffected Arcs retained; and
+- zero prepared/pure/instantiated/validated/root-mapping/generated/public
+  activation.
+
+Use existing Bazel 9.2 `RegularRunnableExtension.load` and
+`SingleExtensionEvalFunction` source evidence; add no oracle unless the design
+finds a genuinely missing Bazel-visible discriminator.
+
+Exact compatibility is existing loaded-definition values, errors, order,
+manifests, projections and child Bzl events. The private observed key/carrier,
+typed outer and cumulative epoch association are Slug-native. Upper evaluation,
+root mapping, generated/public/bootstrap work, M8/M7B and exact identity bytes
+remain deferred.
 
 ## Terminal and stops
 
-Implementation ACCEPT records exact accounting and validation, then activates
-only `WP-6-7A-loaded-module-extension-definitions-observation-design`.
-REPLAN before any wider or semantically different change.
+Reach exactly one independently reviewed terminal:
 
-STOP loading changes or imports; a caller or DICE compute; a second key,
-adapter, owner or result alias; public fields; mapping-error or evaluation-input
-observation exports; semantic/error/order/equality/event/lifecycle drift;
-Cargo/BUILD changes; fixture/oracle work; proof/cap waiver; milestone closure;
-M8/M7B or exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B
-remains.
+1. one bounded loaded-definition observation implementation successor; or
+2. formal `REPLAN` naming a contradictory ownership/error/event fact and one
+   next packet.
+
+STOP Rust/test/fixture/oracle/Cargo/BUILD changes; Bzlmod changes or exports; a
+second owner/prerequisite; prepared/evaluation/root-mapping/generated/public
+activation; moved or duplicated Bzl events; retained Starlark evaluator/callable
+heap; full scan/Need union/speculative tasks; direct Host reads or locks across
+DICE; proof/cap waiver; milestone closure; M8/M7B or exact identity-byte work.
+M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Immediate predecessor
 
-Audit/design `f622babe` selects this uniquely smaller visibility prerequisite
-over accepted Rust `e82057f2`. The eventual loaded-definition owner remains in
-loading and its observed Host Bzl child is already crate-local; no loading or
-upper-owner work is part of this packet.
+Implementation `99c23033`, from design `83b5ac7a` and Rust base `e82057f2`,
+promotes only the accepted observed request seam. Accounting is +21 production,
++4 colocated proof, +29 external proof and +54 aggregate at 11,676/409/29
+physical lines. Focused/full Bzlmod, external API, dependent loading, formatting
+and diff gates pass; independent final review returned `ACCEPT`.

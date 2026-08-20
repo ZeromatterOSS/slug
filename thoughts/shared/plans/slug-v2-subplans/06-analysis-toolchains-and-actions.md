@@ -11676,3 +11676,36 @@ changes, a second key/adapter/owner, evaluation-input or mapping-internal
 exports, public fields/result alias, semantic/event/equality drift, Cargo/BUILD,
 proof/cap waiver, milestone closure, M8/M7B and exact identity bytes. REPLAN
 before widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension definition-request observation carrier promotion accepted (2026-08-20)
+
+Implementation `99c23033`, from accepted design `83b5ac7a` and Rust base
+`e82057f2`, exposes only the existing observed definition-request key/carrier
+and one opaque typed outer through Bzlmod's doc-hidden API.
+
+The private request driver and mapping-error graph remain unchanged. The public
+key boundary wraps the private outer; the same-module evaluation-input child
+unwraps it locally. Exactly three hidden reexports, one key constructor and two
+carrier accessors are public. Fields, result alias, mapping internals,
+evaluation-input observations and loading callers remain private or absent.
+
+Accounting is +21 production/+4 colocated proof/+29 external proof/+54
+aggregate at 11,676/409/29 physical lines. Three focused request tests, the
+external API smoke, all 525 Bzlmod unit tests plus every integration/doc target,
+the dependent loading check, formatting and diff hygiene pass. The smoke first
+corrected its expected literal to the existing quoted Display path; production
+was unchanged. Independent API/identity review returned `ACCEPT`.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-observation-design`. The exported
+request carrier and crate-local `HostBzlModuleObservationKey` close the audited
+prerequisites. Design one loading owner without prepared/pure/instantiated/
+validated, root-mapping, generated-repository or public/bootstrap activation.
+
+Design write authority is exactly canonical/current/this Stage/routing at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+Cargo/BUILD, APIs, exports and callers are read-only. It may authorize at most
+one implementation successor. STOP a second prerequisite/owner, Bzlmod changes,
+event movement, retained Starlark heap, upper activation, proof waiver,
+milestone closure, M8/M7B and exact identity bytes. REPLAN before widening. M7
+remains partial and M7A -> M8 -> M7B remains.
