@@ -18,6 +18,8 @@ use dice::Key;
 use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 use starlark_map::small_map::SmallMap;
 use starlark_map::small_set::SmallSet;
 
@@ -25,15 +27,21 @@ use crate::interim_module::NonrootDependency;
 use crate::interim_module::NonrootModuleKey;
 use crate::module_eval::EvaluatedRootModule;
 use crate::module_eval::HostEffectiveModuleOverride;
+use crate::module_eval::HostEffectiveModuleOverrideError;
 use crate::module_eval::HostEffectiveModuleOverrideKey;
+use crate::module_eval::HostEffectiveModuleOverrideObservationKey;
+use crate::module_eval::ObservedHostEffectiveModuleOverride;
 use crate::module_eval::RegistryMultipleOverride;
 use crate::module_eval::RootModuleCommandPolicyKey;
 use crate::module_eval::RootModuleFilesKey;
+use crate::module_eval::RootModuleFilesObservationKey;
 use crate::module_eval::RootModuleOverride;
 use crate::module_version::BazelModuleVersion;
 use crate::source_preparation::HostDiscoveredModule;
 use crate::source_preparation::HostDiscoveredModuleError;
 use crate::source_preparation::HostDiscoveredModuleKey;
+use crate::source_preparation::HostDiscoveredModuleObservationError;
+use crate::source_preparation::HostDiscoveredModuleObservationKey;
 use crate::source_preparation::SourcePreparationNeeds;
 use crate::source_preparation::SourcePreparationOutcome;
 
@@ -149,11 +157,167 @@ impl fmt::Display for HostSelectedModuleGraphKey {
     }
 }
 
-type GraphOutcome =
-    SourcePreparationOutcome<Arc<Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>>>;
+type GraphResult = Arc<Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>>;
+type GraphOutcome = SourcePreparationOutcome<GraphResult>;
 
-fn complete_error(error: HostSelectedModuleGraphError) -> GraphOutcome {
-    SourcePreparationOutcome::Complete(Arc::new(Err(error)))
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+pub(crate) struct HostSelectedModuleGraphObservationKey(HostSelectedModuleGraphKey);
+
+#[allow(dead_code)]
+impl HostSelectedModuleGraphObservationKey {
+    pub(crate) fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostSelectedModuleGraphKey::new(workspace))
+    }
+}
+
+impl fmt::Display for HostSelectedModuleGraphObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+pub(crate) struct ObservedHostSelectedModuleGraph {
+    result: GraphResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostSelectedModuleGraph {
+    pub(crate) fn new(result: GraphResult, observations: PathObservationEpoch) -> Self {
+        Self {
+            result,
+            observations,
+        }
+    }
+
+    pub(crate) fn result(&self) -> &GraphResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) enum HostSelectedModuleGraphObservationError {
+    Root(ObservedPathFrontierError),
+    Effective(ObservedPathFrontierError),
+    Discovery(HostDiscoveredModuleObservationError),
+    Merge(ObservedPathFrontierError),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum HostSelectedModuleGraphMode {
+    Legacy,
+    Observed,
+}
+
+type GraphDriverOutcome = SourcePreparationOutcome<
+    Result<(GraphResult, PathObservationEpoch), HostSelectedModuleGraphObservationError>,
+>;
+
+fn graph_complete(
+    result: Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn graph_error(
+    error: HostSelectedModuleGraphError,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    graph_complete(Err(error), observations)
+}
+
+fn root_compute_error(error: HostSelectedModuleGraphError) -> GraphDriverOutcome {
+    graph_error(error, PathObservationEpoch::empty())
+}
+
+fn root_semantic_error(
+    error: HostSelectedModuleGraphError,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    graph_error(error, observations)
+}
+
+fn policy_compute_error(
+    error: HostSelectedModuleGraphError,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    graph_error(error, observations)
+}
+
+fn effective_stage_error(
+    error: HostSelectedModuleGraphError,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    graph_error(error, observations)
+}
+
+fn transform_stage_error(
+    error: HostSelectedModuleGraphError,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    graph_error(error, observations)
+}
+
+fn finish_select_stage(
+    result: Result<HostSelectedModuleGraph, HostSelectedModuleGraphError>,
+    observations: PathObservationEpoch,
+) -> GraphDriverOutcome {
+    graph_complete(result, observations)
+}
+
+fn graph_frontier(error: HostSelectedModuleGraphObservationError) -> GraphDriverOutcome {
+    SourcePreparationOutcome::Complete(Err(error))
+}
+
+fn merge_graph_prefix(
+    prefix: &PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+) -> Result<PathObservationEpoch, HostSelectedModuleGraphObservationError> {
+    PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .map(|(demand, result)| (demand.dupe(), result.dupe()))
+            .chain(
+                incoming
+                    .observations()
+                    .iter()
+                    .map(|(demand, result)| (demand.dupe(), result.dupe())),
+            ),
+    )
+    .map_err(|error| HostSelectedModuleGraphObservationError::Merge(error.into()))
+}
+fn finish_observed_effective(
+    outcome: SourcePreparationOutcome<
+        Result<ObservedHostEffectiveModuleOverride, ObservedPathFrontierError>,
+    >,
+    prefix: &PathObservationEpoch,
+) -> Result<
+    (
+        Arc<Result<HostEffectiveModuleOverride, HostEffectiveModuleOverrideError>>,
+        PathObservationEpoch,
+    ),
+    GraphDriverOutcome,
+> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        SourcePreparationOutcome::Complete(Err(error)) => Err(graph_frontier(
+            HostSelectedModuleGraphObservationError::Effective(error),
+        )),
+        SourcePreparationOutcome::Complete(Ok(observed)) => Ok((
+            observed.result().dupe(),
+            merge_graph_prefix(prefix, observed.observations()).map_err(graph_frontier)?,
+        )),
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -185,29 +349,57 @@ fn parse_version(
 async fn effective_override(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
+    observations: &mut PathObservationEpoch,
     module_name: &CompactString,
-) -> Result<HostEffectiveModuleOverride, HostSelectedModuleGraphError> {
+) -> Result<HostEffectiveModuleOverride, GraphDriverOutcome> {
     if let Some(value) = cache.get(module_name.as_str()) {
         return Ok(value.clone());
     }
-    let value = ctx
-        .compute(&HostEffectiveModuleOverrideKey::new(
-            workspace.dupe(),
-            module_name.clone(),
-        ))
-        .await
-        .map_err(|error| HostSelectedModuleGraphError::Input {
-            owner: format!("effective override {module_name}").into(),
-            message: error.to_string().into(),
-        })?;
-    let value = value
-        .as_ref()
-        .clone()
-        .map_err(|error| HostSelectedModuleGraphError::Input {
-            owner: format!("effective override {module_name}").into(),
-            message: error.to_string().into(),
-        })?;
+    let key = HostEffectiveModuleOverrideKey::new(workspace.dupe(), module_name.clone());
+    let (result, merged) = match mode {
+        HostSelectedModuleGraphMode::Legacy => match ctx.compute(&key).await {
+            Ok(result) => (result, observations.dupe()),
+            Err(error) => {
+                return Err(effective_stage_error(
+                    HostSelectedModuleGraphError::Input {
+                        owner: format!("effective override {module_name}").into(),
+                        message: error.to_string().into(),
+                    },
+                    observations.dupe(),
+                ));
+            }
+        },
+        HostSelectedModuleGraphMode::Observed => {
+            let outcome = ctx
+                .compute(&HostEffectiveModuleOverrideObservationKey::new(
+                    workspace.dupe(),
+                    module_name.clone(),
+                ))
+                .await
+                .map_err(|error| {
+                    effective_stage_error(
+                        HostSelectedModuleGraphError::Input {
+                            owner: format!("effective override {module_name}").into(),
+                            message: error.to_string().into(),
+                        },
+                        observations.dupe(),
+                    )
+                })?;
+            finish_observed_effective(outcome, observations)?
+        }
+    };
+    *observations = merged;
+    let value = result.as_ref().clone().map_err(|error| {
+        effective_stage_error(
+            HostSelectedModuleGraphError::Input {
+                owner: format!("effective override {module_name}").into(),
+                message: error.to_string().into(),
+            },
+            observations.dupe(),
+        )
+    })?;
     cache.insert(module_name.clone(), value.clone());
     Ok(value)
 }
@@ -215,19 +407,23 @@ async fn effective_override(
 async fn transform_request(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     root_name: Option<&str>,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
+    observations: &mut PathObservationEpoch,
     module_name: CompactString,
     version: BazelModuleVersion,
-) -> Result<HostGraphModuleKey, HostSelectedModuleGraphError> {
+) -> Result<HostGraphModuleKey, GraphDriverOutcome> {
     if root_name == Some(module_name.as_str()) {
         return Ok(HostGraphModuleKey::Root);
     }
-    let effective = effective_override(ctx, workspace, cache, &module_name).await?;
+    let effective =
+        effective_override(ctx, workspace, mode, cache, observations, &module_name).await?;
     let version = match effective.override_() {
         Some(RootModuleOverride::NonRegistry(_)) => BazelModuleVersion::empty(),
         Some(RootModuleOverride::RegistrySingle(single)) if !single.version.is_empty() => {
-            parse_version(&module_name, &single.version)?
+            parse_version(&module_name, &single.version)
+                .map_err(|error| transform_stage_error(error, observations.dupe()))?
         }
         Some(RootModuleOverride::RegistrySingle(_))
         | Some(RootModuleOverride::RegistryMultiple(_)) => version,
@@ -240,18 +436,23 @@ async fn transform_request(
 async fn raw_dependency(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     root_name: Option<&str>,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
+    observations: &mut PathObservationEpoch,
     apparent_name: Option<CompactString>,
     dependency: &NonrootDependency,
-) -> Result<RawDependency, HostSelectedModuleGraphError> {
-    let version = parse_version(&dependency.name, &dependency.version)?;
+) -> Result<RawDependency, GraphDriverOutcome> {
+    let version = parse_version(&dependency.name, &dependency.version)
+        .map_err(|error| transform_stage_error(error, observations.dupe()))?;
     let requested = HostGraphModuleKey::module(dependency.name.clone(), version.clone());
     let transformed = transform_request(
         ctx,
         workspace,
+        mode,
         root_name,
         cache,
+        observations,
         dependency.name.clone(),
         version,
     )
@@ -266,14 +467,26 @@ async fn raw_dependency(
 async fn raw_dependencies(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     root_name: Option<&str>,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
+    observations: &mut PathObservationEpoch,
     dependencies: Vec<(Option<CompactString>, NonrootDependency)>,
-) -> Result<Vec<RawDependency>, HostSelectedModuleGraphError> {
+) -> Result<Vec<RawDependency>, GraphDriverOutcome> {
     let mut result = Vec::new();
     for (apparent_name, dependency) in dependencies {
         result.push(
-            raw_dependency(ctx, workspace, root_name, cache, apparent_name, &dependency).await?,
+            raw_dependency(
+                ctx,
+                workspace,
+                mode,
+                root_name,
+                cache,
+                observations,
+                apparent_name,
+                &dependency,
+            )
+            .await?,
         );
     }
     Ok(result)
@@ -282,20 +495,25 @@ async fn raw_dependencies(
 async fn raw_root(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     module: &EvaluatedRootModule,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
-) -> Result<RawModule, HostSelectedModuleGraphError> {
+    observations: &mut PathObservationEpoch,
+) -> Result<RawModule, GraphDriverOutcome> {
     let root_name = module.header.as_ref().map(|header| header.name.as_str());
     let mut dependencies = Vec::new();
     let mut nodep_dependencies = Vec::new();
     for dependency in module.dependencies.iter() {
-        let version = parse_version(&dependency.name, &dependency.version)?;
+        let version = parse_version(&dependency.name, &dependency.version)
+            .map_err(|error| transform_stage_error(error, observations.dupe()))?;
         let requested = HostGraphModuleKey::module(dependency.name.clone(), version.clone());
         let transformed = transform_request(
             ctx,
             workspace,
+            mode,
             root_name,
             cache,
+            observations,
             dependency.name.clone(),
             version,
         )
@@ -326,8 +544,10 @@ async fn raw_root(
         let transformed = transform_request(
             ctx,
             workspace,
+            mode,
             root_name,
             cache,
+            observations,
             name.clone(),
             BazelModuleVersion::empty(),
         )
@@ -350,17 +570,21 @@ async fn raw_root(
 async fn raw_discovered(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     root_name: Option<&str>,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
+    observations: &mut PathObservationEpoch,
     key: HostGraphModuleKey,
     module: Arc<HostDiscoveredModule>,
-) -> Result<RawModule, HostSelectedModuleGraphError> {
+) -> Result<RawModule, GraphDriverOutcome> {
     let base = &module.module.base;
     let dependencies = raw_dependencies(
         ctx,
         workspace,
+        mode,
         root_name,
         cache,
+        observations,
         base.dependencies
             .iter()
             .map(|(name, dependency)| (Some(name.clone()), dependency.clone()))
@@ -370,8 +594,10 @@ async fn raw_discovered(
     let original_dependencies = raw_dependencies(
         ctx,
         workspace,
+        mode,
         root_name,
         cache,
+        observations,
         base.original_dependencies
             .iter()
             .map(|(name, dependency)| (Some(name.clone()), dependency.clone()))
@@ -381,8 +607,10 @@ async fn raw_discovered(
     let nodep_dependencies = raw_dependencies(
         ctx,
         workspace,
+        mode,
         root_name,
         cache,
+        observations,
         base.nodep_dependencies
             .iter()
             .map(|dependency| (None, dependency.clone()))
@@ -431,18 +659,84 @@ fn next_horizon(
     next
 }
 
+type DiscoveryCarrier = (
+    Arc<Result<HostDiscoveredModule, HostDiscoveredModuleError>>,
+    PathObservationEpoch,
+);
 type LeafOutcome = Result<
-    SourcePreparationOutcome<Arc<Result<HostDiscoveredModule, HostDiscoveredModuleError>>>,
+    SourcePreparationOutcome<Result<DiscoveryCarrier, HostSelectedModuleGraphObservationError>>,
     CompactString,
 >;
+
+async fn discovered_leaf(
+    ctx: &mut DiceComputations<'_>,
+    mode: HostSelectedModuleGraphMode,
+    workspace: NormalizedAbsolutePath,
+    module: &HostGraphModuleKey,
+) -> LeafOutcome {
+    let HostGraphModuleKey::Module { name, version } = module else {
+        unreachable!("root is never a leaf horizon");
+    };
+    let key = HostDiscoveredModuleKey::try_new(
+        workspace.dupe(),
+        NonrootModuleKey::new(name.clone(), version.normalized()),
+    )
+    .expect("typed graph versions construct checked Host keys");
+    match mode {
+        HostSelectedModuleGraphMode::Legacy => {
+            let outcome = ctx
+                .compute(&key)
+                .await
+                .map_err(|error| CompactString::new(error.to_string()))?;
+            Ok(match outcome {
+                SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+                SourcePreparationOutcome::Complete(result) => {
+                    SourcePreparationOutcome::Complete(Ok((result, PathObservationEpoch::empty())))
+                }
+            })
+        }
+        HostSelectedModuleGraphMode::Observed => {
+            match ctx
+                .compute(
+                    &HostDiscoveredModuleObservationKey::try_new(
+                        workspace,
+                        NonrootModuleKey::new(name.clone(), version.normalized()),
+                    )
+                    .expect("typed graph versions construct checked observed Host keys"),
+                )
+                .await
+                .map_err(|error| CompactString::new(error.to_string()))?
+            {
+                SourcePreparationOutcome::Need(need) => Ok(SourcePreparationOutcome::Need(need)),
+                SourcePreparationOutcome::Complete(Err(error)) => {
+                    Ok(SourcePreparationOutcome::Complete(Err(
+                        HostSelectedModuleGraphObservationError::Discovery(error),
+                    )))
+                }
+                SourcePreparationOutcome::Complete(Ok(observed)) => {
+                    Ok(SourcePreparationOutcome::Complete(Ok((
+                        observed.result().dupe(),
+                        observed.observations().dupe(),
+                    ))))
+                }
+            }
+        }
+    }
+}
 
 fn finish_horizon(
     next: &[HostGraphModuleKey],
     outcomes: &SmallMap<HostGraphModuleKey, LeafOutcome>,
+    prefix: &PathObservationEpoch,
 ) -> Result<
-    SourcePreparationOutcome<Vec<(HostGraphModuleKey, Arc<HostDiscoveredModule>)>>,
-    HostSelectedModuleGraphError,
+    (
+        Vec<(HostGraphModuleKey, Arc<HostDiscoveredModule>)>,
+        PathObservationEpoch,
+    ),
+    GraphDriverOutcome,
 > {
+    let mut observations = prefix.dupe();
+    let mut frontier = None;
     let mut needs: Option<SourcePreparationNeeds> = None;
     let mut need_error = None;
     let mut complete = Vec::with_capacity(next.len());
@@ -475,75 +769,89 @@ fn finish_horizon(
                     None => need.clone(),
                 });
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => complete.push((module.clone(), Arc::new(value.clone()))),
-                Err(error) if first_error.is_none() => {
-                    first_error = Some(HostSelectedModuleGraphError::DiscoveryLeaf {
-                        module: module.clone(),
-                        error: error.clone(),
-                    });
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => {
+                if frontier.is_none() {
+                    frontier = Some(error.dupe());
                 }
-                Err(_) => {}
-            },
+            }
+            Ok(SourcePreparationOutcome::Complete(Ok((result, incoming)))) => {
+                match merge_graph_prefix(&observations, incoming) {
+                    Ok(merged) => observations = merged,
+                    Err(error) => {
+                        frontier.get_or_insert(error);
+                    }
+                }
+                match result.as_ref() {
+                    Ok(value) => complete.push((module.clone(), Arc::new(value.clone()))),
+                    Err(error) if first_error.is_none() => {
+                        first_error = Some(HostSelectedModuleGraphError::DiscoveryLeaf {
+                            module: module.clone(),
+                            error: error.clone(),
+                        });
+                    }
+                    Err(_) => {}
+                }
+            }
         }
     }
-    match (first_error, need_error, needs) {
-        (Some(error), _, _) | (None, Some(error), _) => Err(error),
-        (None, None, Some(need)) => Ok(SourcePreparationOutcome::Need(need)),
-        (None, None, None) => Ok(SourcePreparationOutcome::Complete(complete)),
+    if let Some(error) = frontier {
+        return Err(graph_frontier(error));
     }
+    if let Some(error) = first_error.or(need_error) {
+        return Err(graph_error(error, observations));
+    }
+    if let Some(need) = needs {
+        return Err(SourcePreparationOutcome::Need(need));
+    }
+    Ok((complete, observations))
 }
 
 async fn discover_round(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     root: RawModule,
     root_name: Option<&str>,
     prior_names: &SmallSet<CompactString>,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
-) -> Result<SourcePreparationOutcome<Vec<RawModule>>, HostSelectedModuleGraphError> {
+    observations: &mut PathObservationEpoch,
+) -> Result<Vec<RawModule>, GraphDriverOutcome> {
     let mut entries = vec![root];
     let mut seen = SmallSet::from_iter([HostGraphModuleKey::Root]);
     let mut frontier = vec![HostGraphModuleKey::Root];
     loop {
         let next = next_horizon(&entries, &frontier, prior_names, &seen);
         if next.is_empty() {
-            return Ok(SourcePreparationOutcome::Complete(entries));
+            return Ok(entries);
         }
         let computed = ctx
             .compute_join(next.iter().cloned(), |ctx, module| {
                 let workspace = workspace.dupe();
                 Box::pin(async move {
-                    let key = match &module {
-                        HostGraphModuleKey::Module { name, version } => {
-                            HostDiscoveredModuleKey::try_new(
-                                workspace,
-                                NonrootModuleKey::new(name.clone(), version.normalized()),
-                            )
-                            .expect("typed graph versions construct checked Host keys")
-                        }
-                        HostGraphModuleKey::Root => unreachable!("root is never a leaf horizon"),
-                    };
-                    let value = ctx
-                        .compute(&key)
-                        .await
-                        .map_err(|error| CompactString::new(error.to_string()));
+                    let value = discovered_leaf(ctx, mode, workspace, &module).await;
                     (module, value)
                 })
             })
             .await;
         let outcomes = computed.into_iter().collect::<SmallMap<_, _>>();
-        let complete = match finish_horizon(&next, &outcomes)? {
-            SourcePreparationOutcome::Complete(complete) => complete,
-            SourcePreparationOutcome::Need(need) => {
-                return Ok(SourcePreparationOutcome::Need(need));
-            }
-        };
+        let (complete, merged) = finish_horizon(&next, &outcomes, observations)?;
+        *observations = merged;
         frontier.clear();
         for (key, module) in complete {
             seen.insert(key.clone());
-            entries
-                .push(raw_discovered(ctx, workspace, root_name, cache, key.clone(), module).await?);
+            entries.push(
+                raw_discovered(
+                    ctx,
+                    workspace,
+                    mode,
+                    root_name,
+                    cache,
+                    observations,
+                    key.clone(),
+                    module,
+                )
+                .await?,
+            );
             frontier.push(key);
         }
     }
@@ -552,16 +860,19 @@ async fn discover_round(
 async fn discover_fixed_point(
     ctx: &mut DiceComputations<'_>,
     workspace: &NormalizedAbsolutePath,
+    mode: HostSelectedModuleGraphMode,
     root_module: &EvaluatedRootModule,
     cache: &mut SmallMap<CompactString, HostEffectiveModuleOverride>,
-) -> Result<SourcePreparationOutcome<Vec<RawModule>>, HostSelectedModuleGraphError> {
+    observations: &mut PathObservationEpoch,
+) -> Result<Vec<RawModule>, GraphDriverOutcome> {
     let mut prior_names = SmallSet::new();
     let mut previous_keys: Option<SmallSet<HostGraphModuleKey>> = None;
     loop {
-        let root = raw_root(ctx, workspace, root_module, cache).await?;
-        let entries = match discover_round(
+        let root = raw_root(ctx, workspace, mode, root_module, cache, observations).await?;
+        let entries = discover_round(
             ctx,
             workspace,
+            mode,
             root,
             root_module
                 .header
@@ -569,20 +880,15 @@ async fn discover_fixed_point(
                 .map(|header| header.name.as_str()),
             &prior_names,
             cache,
+            observations,
         )
-        .await?
-        {
-            SourcePreparationOutcome::Complete(entries) => entries,
-            SourcePreparationOutcome::Need(need) => {
-                return Ok(SourcePreparationOutcome::Need(need));
-            }
-        };
+        .await?;
         let keys = entries
             .iter()
             .map(|entry| entry.key.clone())
             .collect::<SmallSet<_>>();
         if previous_keys.as_ref() == Some(&keys) {
-            return Ok(SourcePreparationOutcome::Complete(entries));
+            return Ok(entries);
         }
         prior_names = entries
             .iter()
@@ -821,31 +1127,75 @@ fn select_graph(
     })
 }
 
-#[async_trait]
-impl Key for HostSelectedModuleGraphKey {
-    type Value = GraphOutcome;
+impl HostSelectedModuleGraphKey {
+    async fn root_files(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostSelectedModuleGraphMode,
+    ) -> Result<
+        (
+            Arc<Result<crate::module_eval::RootModuleFiles, CompactString>>,
+            PathObservationEpoch,
+        ),
+        GraphDriverOutcome,
+    > {
+        match mode {
+            HostSelectedModuleGraphMode::Legacy => {
+                match ctx
+                    .compute(&RootModuleFilesKey {
+                        workspace: self.workspace.as_path().to_owned(),
+                    })
+                    .await
+                {
+                    Ok(result) => Ok((result, PathObservationEpoch::empty())),
+                    Err(error) => Err(root_compute_error(HostSelectedModuleGraphError::Input {
+                        owner: "root MODULE files".into(),
+                        message: error.to_string().into(),
+                    })),
+                }
+            }
+            HostSelectedModuleGraphMode::Observed => {
+                match ctx
+                    .compute(&RootModuleFilesObservationKey::new(self.workspace.dupe()))
+                    .await
+                {
+                    Err(error) => Err(root_compute_error(HostSelectedModuleGraphError::Input {
+                        owner: "root MODULE files".into(),
+                        message: error.to_string().into(),
+                    })),
+                    Ok(SourcePreparationOutcome::Need(need)) => {
+                        Err(SourcePreparationOutcome::Need(need))
+                    }
+                    Ok(SourcePreparationOutcome::Complete(Err(error))) => Err(graph_frontier(
+                        HostSelectedModuleGraphObservationError::Root(error),
+                    )),
+                    Ok(SourcePreparationOutcome::Complete(Ok(observed))) => {
+                        Ok((observed.result().dupe(), observed.observations().dupe()))
+                    }
+                }
+            }
+        }
+    }
 
-    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let files = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.as_path().to_owned(),
-            })
-            .await
-        {
-            Ok(value) => match value.as_ref() {
-                Ok(files) => files.clone(),
-                Err(error) => {
-                    return complete_error(HostSelectedModuleGraphError::Input {
+    async fn drive(
+        &self,
+        ctx: &mut DiceComputations<'_>,
+        mode: HostSelectedModuleGraphMode,
+    ) -> GraphDriverOutcome {
+        let (files_result, mut observations) = match self.root_files(ctx, mode).await {
+            Ok(complete) => complete,
+            Err(outcome) => return outcome,
+        };
+        let files = match files_result.as_ref() {
+            Ok(files) => files.clone(),
+            Err(error) => {
+                return root_semantic_error(
+                    HostSelectedModuleGraphError::Input {
                         owner: "root MODULE files".into(),
                         message: error.clone(),
-                    });
-                }
-            },
-            Err(error) => {
-                return complete_error(HostSelectedModuleGraphError::Input {
-                    owner: "root MODULE files".into(),
-                    message: error.to_string().into(),
-                });
+                    },
+                    observations,
+                );
             }
         };
         let policy = match ctx
@@ -856,10 +1206,13 @@ impl Key for HostSelectedModuleGraphKey {
         {
             Ok(policy) => policy,
             Err(error) => {
-                return complete_error(HostSelectedModuleGraphError::Input {
-                    owner: "command policy".into(),
-                    message: error.to_string().into(),
-                });
+                return policy_compute_error(
+                    HostSelectedModuleGraphError::Input {
+                        owner: "command policy".into(),
+                        message: error.to_string().into(),
+                    },
+                    observations,
+                );
             }
         };
         let mut candidate_overrides = Vec::new();
@@ -875,24 +1228,89 @@ impl Key for HostSelectedModuleGraphKey {
         }
         let mut overrides = SmallMap::new();
         for name in &candidate_overrides {
-            match effective_override(ctx, &self.workspace, &mut overrides, name).await {
-                Ok(_) => {}
-                Err(error) => return complete_error(error),
+            if let Err(outcome) = effective_override(
+                ctx,
+                &self.workspace,
+                mode,
+                &mut overrides,
+                &mut observations,
+                name,
+            )
+            .await
+            {
+                return outcome;
             }
         }
-        let entries =
-            match discover_fixed_point(ctx, &self.workspace, &files.module, &mut overrides).await {
-                Ok(SourcePreparationOutcome::Complete(entries)) => entries,
-                Ok(SourcePreparationOutcome::Need(need)) => {
-                    return SourcePreparationOutcome::Need(need);
-                }
-                Err(error) => return complete_error(error),
-            };
-        SourcePreparationOutcome::Complete(Arc::new(select_graph(
-            entries,
-            &candidate_overrides,
-            &overrides,
-        )))
+        let entries = match discover_fixed_point(
+            ctx,
+            &self.workspace,
+            mode,
+            &files.module,
+            &mut overrides,
+            &mut observations,
+        )
+        .await
+        {
+            Ok(entries) => entries,
+            Err(outcome) => return outcome,
+        };
+        finish_select_stage(
+            select_graph(entries, &candidate_overrides, &overrides),
+            observations,
+        )
+    }
+}
+
+fn project_legacy_graph(result: GraphResult) -> GraphOutcome {
+    SourcePreparationOutcome::Complete(result)
+}
+
+#[async_trait]
+impl Key for HostSelectedModuleGraphKey {
+    type Value = GraphOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match self.drive(ctx, HostSelectedModuleGraphMode::Legacy).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Ok((result, _))) => project_legacy_graph(result),
+            SourcePreparationOutcome::Complete(Err(_)) => {
+                unreachable!("legacy selected graph has no observed frontier")
+            }
+        }
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedModuleGraphObservationKey {
+    type Value = SourcePreparationOutcome<
+        Result<ObservedHostSelectedModuleGraph, HostSelectedModuleGraphObservationError>,
+    >;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        match self
+            .0
+            .drive(ctx, HostSelectedModuleGraphMode::Observed)
+            .await
+        {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
+            }
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(ObservedHostSelectedModuleGraph::new(
+                    result,
+                    observations,
+                )))
+            }
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -911,16 +1329,23 @@ mod tests {
     use dice::DetectCycles;
     use dice::Dice;
     use slug_workspace_v2::NeedPathObservations;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
     use slug_workspace_v2::PathObservationDemand;
     use slug_workspace_v2::PathObservationNamespace;
     use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
     use slug_workspace_v2::WorkspaceFileValue;
     use slug_workspace_v2::WorkspaceRawFileValue;
     use starlark_map::sorted_map::SortedMap;
 
     use super::*;
+    use crate::interim_module::NonrootModuleBuilder;
     use crate::module_eval::RegistryMultipleOverride;
     use crate::module_eval::RootModuleRegistrations;
+    use crate::registry::RegistryBaseUrl;
+    use crate::source_preparation::HostDiscoveredModuleProvenance;
 
     fn version(value: &str) -> BazelModuleVersion {
         BazelModuleVersion::parse(value).unwrap()
@@ -960,6 +1385,23 @@ mod tests {
         }
     }
 
+    fn discovered(name: &str, value: &str) -> Arc<HostDiscoveredModule> {
+        Arc::new(HostDiscoveredModule {
+            module: NonrootModuleBuilder::new(
+                NonrootModuleKey::new(name, value),
+                name,
+                value,
+                name,
+            )
+            .build()
+            .unwrap(),
+            provenance: HostDiscoveredModuleProvenance::Registry {
+                selected_registry: RegistryBaseUrl::new("https://registry.invalid"),
+                module_file_attempts: Arc::new([]),
+            },
+        })
+    }
+
     #[test]
     fn completed_leaf_errors_remain_structurally_typed() {
         let module = key("dep", "1.0");
@@ -986,6 +1428,439 @@ mod tests {
     }
 
     #[test]
+    fn observed_graph_identity_arc_epoch_and_full_horizon_merge_are_exact() {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::Hash;
+        use std::hash::Hasher;
+
+        let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+        let graph_key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
+        let other = HostSelectedModuleGraphObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        let hash = |value: &HostSelectedModuleGraphObservationKey| {
+            let mut state = DefaultHasher::new();
+            value.hash(&mut state);
+            state.finish()
+        };
+        assert_ne!(graph_key, other);
+        assert_ne!(hash(&graph_key), hash(&other));
+        assert_eq!(
+            graph_key.to_string(),
+            "observed-host-selected-module-graph:\"/workspace\""
+        );
+
+        let epoch = |name: &str, inode: u64| {
+            let demand = PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("/workspace/{name}")).unwrap(),
+                PathObservationOperation::Lstat,
+            );
+            let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, inode as i64, 4, 0o644),
+            )));
+            (
+                demand.dupe(),
+                result.dupe(),
+                PathObservationEpoch::from_shared([(demand, result)]).unwrap(),
+            )
+        };
+        let (demand, first, prefix) = epoch("root", 1);
+        let duplicate = PathObservationEpoch::from_shared([(demand.dupe(), first.dupe())]).unwrap();
+        let merged = merge_graph_prefix(&prefix, &duplicate).unwrap();
+        assert!(Arc::ptr_eq(merged.get(&demand).unwrap(), &first));
+        let (_, _, conflict) = epoch("root", 2);
+        assert!(matches!(
+            merge_graph_prefix(&prefix, &conflict),
+            Err(HostSelectedModuleGraphObservationError::Merge(
+                ObservedPathFrontierError::Epoch(
+                    slug_workspace_v2::PathObservationEpochError::ConflictingDemand(_)
+                )
+            ))
+        ));
+
+        let result = Arc::new(Ok(HostSelectedModuleGraph {
+            resolved: Arc::new([]),
+            unpruned: Arc::new([]),
+        }));
+        let complete = SourcePreparationOutcome::Complete(Ok(
+            ObservedHostSelectedModuleGraph::new(result.dupe(), prefix.dupe()),
+        ));
+        let SourcePreparationOutcome::Complete(Ok(observed)) = &complete else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(observed.result(), &result));
+        assert_eq!(observed.observations(), &prefix);
+        assert!(HostSelectedModuleGraphObservationKey::validity(&complete));
+        assert!(HostSelectedModuleGraphObservationKey::equality(
+            &complete, &complete
+        ));
+        let projected = project_legacy_graph(result.dupe());
+        let SourcePreparationOutcome::Complete(projected) = projected else {
+            unreachable!()
+        };
+        assert!(Arc::ptr_eq(&projected, &result));
+
+        let need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(demand.dupe()),
+        ));
+        assert!(!HostSelectedModuleGraphObservationKey::validity(&need));
+        assert!(!HostSelectedModuleGraphObservationKey::equality(
+            &need, &need
+        ));
+        let outer = SourcePreparationOutcome::Complete(Err(
+            HostSelectedModuleGraphObservationError::Merge(ObservedPathFrontierError::Epoch(
+                slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                    demand,
+                    result_operation: PathObservationOperation::FileBytes,
+                },
+            )),
+        ));
+        assert!(HostSelectedModuleGraphObservationKey::validity(&outer));
+        assert!(HostSelectedModuleGraphObservationKey::equality(
+            &outer, &outer
+        ));
+
+        let modules = [key("a", "1"), key("b", "1"), key("c", "1")];
+        let mut outcomes = SmallMap::new();
+        let mut expected = prefix.dupe();
+        for (index, module) in modules.iter().enumerate() {
+            let (_, _, incoming) = epoch(&format!("leaf-{index}"), index as u64 + 10);
+            expected = merge_graph_prefix(&expected, &incoming).unwrap();
+            outcomes.insert(
+                module.clone(),
+                Ok(SourcePreparationOutcome::Complete(Ok((
+                    Arc::new(Err(HostDiscoveredModuleError::MissingVersion {
+                        module_name: module.name().unwrap().into(),
+                    })),
+                    incoming,
+                )))),
+            );
+        }
+        let Err(SourcePreparationOutcome::Complete(Ok((result, actual)))) =
+            finish_horizon(&modules, &outcomes, &prefix)
+        else {
+            panic!("first semantic leaf error must retain every complete sibling epoch")
+        };
+        assert!(matches!(
+            result.as_ref(),
+            Err(HostSelectedModuleGraphError::DiscoveryLeaf { module, .. })
+                if module == &modules[0]
+        ));
+        assert_eq!(actual, expected);
+    }
+
+    #[test]
+    fn graph_stage_and_horizon_terminals_preserve_full_prefix_and_order() {
+        let epoch = |name: &str, inode: i64| {
+            let demand = PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("/workspace/{name}")).unwrap(),
+                PathObservationOperation::Lstat,
+            );
+            let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, inode, 4, 0o644),
+            )));
+            PathObservationEpoch::from_shared([(demand, result)]).unwrap()
+        };
+        let root = epoch("root", 1);
+        let policy = epoch("policy", 2);
+        let effective = epoch("effective", 3);
+        let root_policy = merge_graph_prefix(&root, &policy).unwrap();
+        let full = merge_graph_prefix(&root_policy, &effective).unwrap();
+        let SourcePreparationOutcome::Complete(Ok((result, actual))) =
+            root_compute_error(HostSelectedModuleGraphError::Input {
+                owner: "root MODULE files compute".into(),
+                message: "compute".into(),
+            })
+        else {
+            panic!("root compute failures are semantic")
+        };
+        assert!(result.is_err());
+        assert_eq!(actual, PathObservationEpoch::empty());
+
+        type StageProjector =
+            fn(HostSelectedModuleGraphError, PathObservationEpoch) -> GraphDriverOutcome;
+        for (project, owner, prefix) in [
+            (
+                root_semantic_error as StageProjector,
+                "root MODULE files semantic",
+                root.dupe(),
+            ),
+            (
+                policy_compute_error as StageProjector,
+                "command policy",
+                root.dupe(),
+            ),
+            (
+                effective_stage_error as StageProjector,
+                "effective override first",
+                root_policy.dupe(),
+            ),
+            (
+                transform_stage_error as StageProjector,
+                "transform",
+                full.dupe(),
+            ),
+            (
+                (|error, observations| finish_select_stage(Err(error), observations))
+                    as StageProjector,
+                "select",
+                full.dupe(),
+            ),
+        ] {
+            let SourcePreparationOutcome::Complete(Ok((result, actual))) = project(
+                HostSelectedModuleGraphError::Input {
+                    owner: owner.into(),
+                    message: "compute".into(),
+                },
+                prefix.dupe(),
+            ) else {
+                panic!("stage compute failures are semantic")
+            };
+            assert!(
+                matches!(result.as_ref(), Err(HostSelectedModuleGraphError::Input { owner: actual, .. }) if actual == owner)
+            );
+            assert_eq!(actual, prefix);
+        }
+        assert!(matches!(
+            merge_graph_prefix(&root, &epoch("root", 99)),
+            Err(HostSelectedModuleGraphObservationError::Merge(_))
+        ));
+
+        let modules = [key("a", "1"), key("b", "1"), key("c", "1")];
+        let incoming = [
+            epoch("leaf-a", 10),
+            epoch("leaf-b", 11),
+            epoch("leaf-c", 12),
+        ];
+        let complete = |module: &HostGraphModuleKey, observations: PathObservationEpoch| {
+            Ok(SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Ok(discovered(module.name().unwrap(), "1").as_ref().clone())),
+                observations,
+            ))))
+        };
+        let expected = incoming.iter().fold(root.dupe(), |prefix, next| {
+            merge_graph_prefix(&prefix, next).unwrap()
+        });
+        for position in 0..modules.len() {
+            let mut outcomes = modules
+                .iter()
+                .zip(incoming.iter())
+                .map(|(module, observations)| {
+                    (module.clone(), complete(module, observations.dupe()))
+                })
+                .collect::<SmallMap<_, _>>();
+            outcomes.insert(modules[position].clone(), Err("compute".into()));
+            let Err(SourcePreparationOutcome::Complete(Ok((result, actual)))) =
+                finish_horizon(&modules, &outcomes, &root)
+            else {
+                panic!("horizon compute failure is semantic")
+            };
+            assert!(
+                matches!(result.as_ref(), Err(HostSelectedModuleGraphError::DiscoveryCompute { module, .. }) if module == &modules[position])
+            );
+            let expected_without = incoming
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| *index != position)
+                .fold(root.dupe(), |prefix, (_, next)| {
+                    merge_graph_prefix(&prefix, next).unwrap()
+                });
+            assert_eq!(actual, expected_without);
+
+            let demand = PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("/workspace/outer-{position}")).unwrap(),
+                PathObservationOperation::Lstat,
+            );
+            let outer =
+                HostSelectedModuleGraphObservationError::Merge(ObservedPathFrontierError::Epoch(
+                    slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                        demand,
+                        result_operation: PathObservationOperation::FileBytes,
+                    },
+                ));
+            outcomes.insert(
+                modules[position].clone(),
+                Ok(SourcePreparationOutcome::Complete(Err(outer.dupe()))),
+            );
+            let Err(SourcePreparationOutcome::Complete(Err(actual))) =
+                finish_horizon(&modules, &outcomes, &root)
+            else {
+                panic!("horizon outer must be carrierless")
+            };
+            assert_eq!(actual, outer);
+        }
+
+        for position in 0..modules.len() {
+            let mut outcomes = modules
+                .iter()
+                .zip(incoming.iter())
+                .map(|(module, observations)| {
+                    (module.clone(), complete(module, observations.dupe()))
+                })
+                .collect::<SmallMap<_, _>>();
+            outcomes.insert(
+                modules[position].clone(),
+                Ok(SourcePreparationOutcome::Complete(Ok((
+                    Arc::new(Err(HostDiscoveredModuleError::MissingVersion {
+                        module_name: modules[position].name().unwrap().into(),
+                    })),
+                    incoming[position].dupe(),
+                )))),
+            );
+            let Err(SourcePreparationOutcome::Complete(Ok((result, actual)))) =
+                finish_horizon(&modules, &outcomes, &root)
+            else {
+                panic!("semantic leaf errors retain every complete epoch")
+            };
+            assert!(
+                matches!(result.as_ref(), Err(HostSelectedModuleGraphError::DiscoveryLeaf { module, .. }) if module == &modules[position])
+            );
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
+    fn production_effective_finisher_preserves_prefix_need_outer_and_first_arc() {
+        let epoch = |name: &str, inode: i64| {
+            let demand = PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new(format!("/workspace/{name}")).unwrap(),
+                PathObservationOperation::Lstat,
+            );
+            let result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, inode, 4, 0o644),
+            )));
+            (
+                demand.dupe(),
+                result.dupe(),
+                PathObservationEpoch::from_shared([(demand, result)]).unwrap(),
+            )
+        };
+        let (root_demand, root_arc, root) = epoch("root", 1);
+        let (_, _, policy) = epoch("policy", 2);
+        let (_, _, effective) = epoch("effective", 3);
+        let prefixes = [
+            root.dupe(),
+            merge_graph_prefix(&root, &policy).unwrap(),
+            merge_graph_prefix(&merge_graph_prefix(&root, &policy).unwrap(), &effective).unwrap(),
+        ];
+        let need = SourcePreparationNeeds::path(NeedPathObservations::singleton(
+            PathObservationDemand::new(
+                PathObservationNamespace::Host,
+                NormalizedAbsolutePath::new("/workspace/need").unwrap(),
+                PathObservationOperation::Lstat,
+            ),
+        ));
+        let mismatch = ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand: root_demand.dupe(),
+                result_operation: PathObservationOperation::FileBytes,
+            },
+        );
+        for prefix in prefixes {
+            assert!(matches!(
+                finish_observed_effective(SourcePreparationOutcome::Need(need.clone()), &prefix,),
+                Err(SourcePreparationOutcome::Need(_))
+            ));
+            assert!(matches!(
+                finish_observed_effective(
+                    SourcePreparationOutcome::Complete(Err(mismatch.dupe())),
+                    &prefix,
+                ),
+                Err(SourcePreparationOutcome::Complete(Err(
+                    HostSelectedModuleGraphObservationError::Effective(actual)
+                ))) if actual == mismatch
+            ));
+            let observed = ObservedHostEffectiveModuleOverride::new(
+                Arc::new(Ok(HostEffectiveModuleOverride::None)),
+                root.dupe(),
+            );
+            let (_, merged) = finish_observed_effective(
+                SourcePreparationOutcome::Complete(Ok(observed)),
+                &prefix,
+            )
+            .unwrap();
+            assert!(Arc::ptr_eq(merged.get(&root_demand).unwrap(), &root_arc));
+        }
+
+        let (_, _, conflict) = epoch("root", 99);
+        assert!(matches!(
+            finish_observed_effective(
+                SourcePreparationOutcome::Complete(Ok(ObservedHostEffectiveModuleOverride::new(
+                    Arc::new(Ok(HostEffectiveModuleOverride::None)),
+                    conflict,
+                ))),
+                &root,
+            ),
+            Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedModuleGraphObservationError::Merge(_)
+            )))
+        ));
+    }
+
+    #[test]
+    fn discovery_outer_and_merge_outer_keep_first_horizon_order() {
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/shared").unwrap(),
+            PathObservationOperation::Lstat,
+        );
+        let result = |inode| {
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::RegularFile, 1, 2, inode, 4, 0o644),
+            )))
+        };
+        let prefix = PathObservationEpoch::from_shared([(demand.dupe(), result(1))]).unwrap();
+        let conflict = PathObservationEpoch::from_shared([(demand.dupe(), result(2))]).unwrap();
+        let mismatch = ObservedPathFrontierError::Epoch(
+            slug_workspace_v2::PathObservationEpochError::OperationMismatch {
+                demand,
+                result_operation: PathObservationOperation::FileBytes,
+            },
+        );
+        let discovery = HostSelectedModuleGraphObservationError::Discovery(
+            HostDiscoveredModuleObservationError::EffectiveFrontier(mismatch),
+        );
+        let modules = [key("a", "1"), key("b", "1"), key("c", "1")];
+        let complete = |module: &HostGraphModuleKey, epoch: PathObservationEpoch| {
+            Ok(SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Ok(discovered(module.name().unwrap(), "1").as_ref().clone())),
+                epoch,
+            ))))
+        };
+
+        let mut child_first = SmallMap::from_iter([
+            (
+                modules[0].clone(),
+                Ok(SourcePreparationOutcome::Complete(Err(discovery.dupe()))),
+            ),
+            (modules[1].clone(), complete(&modules[1], conflict.dupe())),
+            (
+                modules[2].clone(),
+                complete(&modules[2], PathObservationEpoch::empty()),
+            ),
+        ]);
+        assert!(matches!(
+            finish_horizon(&modules, &child_first, &prefix),
+            Err(SourcePreparationOutcome::Complete(Err(actual))) if actual == discovery
+        ));
+
+        child_first.insert(modules[0].clone(), complete(&modules[0], conflict));
+        child_first.insert(
+            modules[1].clone(),
+            Ok(SourcePreparationOutcome::Complete(Err(discovery.dupe()))),
+        );
+        assert!(matches!(
+            finish_horizon(&modules, &child_first, &prefix),
+            Err(SourcePreparationOutcome::Complete(Err(
+                HostSelectedModuleGraphObservationError::Merge(_)
+            )))
+        ));
+    }
+    #[test]
     fn horizon_complete_error_wins_over_need_and_compatible_needs_union() {
         let a = key("a", "1");
         let b = key("b", "1");
@@ -1000,22 +1875,34 @@ mod tests {
             SourcePreparationNeeds::root_module_bootstrap(crate::RootModuleBootstrapRequest {
                 workspace: NormalizedAbsolutePath::new("/workspace").unwrap(),
             });
+        let leaf_error = |name: &str| {
+            Ok(SourcePreparationOutcome::Complete(Ok((
+                Arc::new(Err(HostDiscoveredModuleError::MissingVersion {
+                    module_name: name.into(),
+                })),
+                PathObservationEpoch::empty(),
+            ))))
+        };
+        let semantic = |outcome: Result<_, GraphDriverOutcome>| {
+            let Err(SourcePreparationOutcome::Complete(Ok((result, _)))) = outcome else {
+                panic!("horizon semantic terminal must retain a graph carrier");
+            };
+            result.as_ref().clone().unwrap_err()
+        };
+
         let mut mixed = SmallMap::new();
         mixed.insert(
             a.clone(),
             Ok(SourcePreparationOutcome::Need(path_need.clone())),
         );
-        mixed.insert(
-            b.clone(),
-            Ok(SourcePreparationOutcome::Complete(Arc::new(Err(
-                HostDiscoveredModuleError::MissingVersion {
-                    module_name: "b".into(),
-                },
-            )))),
-        );
+        mixed.insert(b.clone(), leaf_error("b"));
         assert!(matches!(
-            finish_horizon(&[a.clone(), b.clone()], &mixed),
-            Err(HostSelectedModuleGraphError::DiscoveryLeaf { module, .. }) if module == b
+            semantic(finish_horizon(
+                &[a.clone(), b.clone()],
+                &mixed,
+                &PathObservationEpoch::empty()
+            )),
+            HostSelectedModuleGraphError::DiscoveryLeaf { module, .. } if module == b
         ));
 
         let mut compatible = SmallMap::new();
@@ -1024,16 +1911,16 @@ mod tests {
             b.clone(),
             Ok(SourcePreparationOutcome::Need(bootstrap_need)),
         );
-        let outcome = finish_horizon(&[a.clone(), b.clone()], &compatible).unwrap();
-        let SourcePreparationOutcome::Need(needs) = &outcome else {
+        let Err(SourcePreparationOutcome::Need(needs)) = finish_horizon(
+            &[a.clone(), b.clone()],
+            &compatible,
+            &PathObservationEpoch::empty(),
+        ) else {
             panic!("compatible horizon Needs must remain transient");
         };
         assert!(needs.path_observations().is_some());
         assert!(needs.root_module_bootstrap_request().is_some());
-        assert!(!outcome.is_complete());
-        assert!(!outcome.complete_eq(&outcome));
 
-        let c = key("c", "1");
         let incompatible_left =
             SourcePreparationNeeds::root_module_bootstrap(crate::RootModuleBootstrapRequest {
                 workspace: NormalizedAbsolutePath::new("/left").unwrap(),
@@ -1045,27 +1932,29 @@ mod tests {
         let mut incompatible = SmallMap::new();
         incompatible.insert(
             a.clone(),
-            Ok(SourcePreparationOutcome::Need(incompatible_left.clone())),
+            Ok(SourcePreparationOutcome::Need(incompatible_left)),
         );
         incompatible.insert(
             b.clone(),
-            Ok(SourcePreparationOutcome::Need(incompatible_right.clone())),
+            Ok(SourcePreparationOutcome::Need(incompatible_right)),
         );
         assert!(matches!(
-            finish_horizon(&[a.clone(), b.clone()], &incompatible),
-            Err(HostSelectedModuleGraphError::IncompatibleNeeds(_))
+            semantic(finish_horizon(
+                &[a.clone(), b.clone()],
+                &incompatible,
+                &PathObservationEpoch::empty()
+            )),
+            HostSelectedModuleGraphError::IncompatibleNeeds(_)
         ));
-        incompatible.insert(
-            c.clone(),
-            Ok(SourcePreparationOutcome::Complete(Arc::new(Err(
-                HostDiscoveredModuleError::MissingVersion {
-                    module_name: "c".into(),
-                },
-            )))),
-        );
+        let c = key("c", "1");
+        incompatible.insert(c.clone(), leaf_error("c"));
         assert!(matches!(
-            finish_horizon(&[a, b, c.clone()], &incompatible),
-            Err(HostSelectedModuleGraphError::DiscoveryLeaf { module, .. }) if module == c
+            semantic(finish_horizon(
+                &[a, b, c.clone()],
+                &incompatible,
+                &PathObservationEpoch::empty()
+            )),
+            HostSelectedModuleGraphError::DiscoveryLeaf { module, .. } if module == c
         ));
     }
 

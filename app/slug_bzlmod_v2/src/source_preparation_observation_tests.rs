@@ -7272,6 +7272,28 @@ fn discovered_eventful(tracker: &NonregistryPreflightTracker) -> Vec<(String, Ev
 }
 
 fn discovered_event_values(found: &[(String, EventBatch)]) -> Vec<EventBatch> { found.iter().map(|(_, batch)| batch.dupe()).collect() }
+
+fn legacy_dependency_order(observed: &[String]) -> Vec<String> {
+    observed
+        .iter()
+        .map(|dependency| {
+            let dependency = dependency
+                .strip_prefix("observed-")
+                .unwrap_or(dependency);
+            if let Some(path) = dependency
+                .strip_prefix("bzlmod-observed-host-root-module-file:\"")
+                .and_then(|path| path.strip_suffix('"'))
+            { return format!("root-module-evaluation:{path}"); }
+            dependency
+                .strip_prefix("root-module-files:\"")
+                .and_then(|path| path.strip_suffix('"'))
+                .map_or_else(
+                    || dependency.to_owned(),
+                    |path| format!("root-module-files:{path}"),
+                )
+        })
+        .collect()
+}
 #[test]
 fn observed_discovered_identity_projection_and_terminal_algebra_are_exact() {
     use std::hash::Hash;
@@ -8403,4 +8425,1410 @@ async fn observed_discovered_poll_drop_publishes_nothing_and_recovers_same_dice(
                     .all(|dependency| !dependency.starts_with(forbidden))
         }));
     }
+}
+use crate::module_eval::RootModuleCommandPolicyKey;
+use crate::module_eval::RootModuleFilesObservationKey;
+use crate::selected_graph::HostGraphModuleKey;
+use crate::module_eval::RootModuleFilesKey;
+use crate::selected_graph::HostSelectedModuleGraph;
+use crate::selected_graph::HostSelectedModuleGraphKey;
+use crate::selected_graph::HostSelectedModuleGraphObservationKey;
+use crate::selected_graph::ObservedHostSelectedModuleGraph;
+
+fn complete_observed_selected_graph(
+    value: &<HostSelectedModuleGraphObservationKey as Key>::Value,
+) -> &ObservedHostSelectedModuleGraph {
+    let SourcePreparationOutcome::Complete(Ok(value)) = value else {
+        panic!("observed selected graph must complete: {value:?}")
+    };
+    value
+}
+
+fn selected_graph_event_values(tracker: &NonregistryPreflightTracker) -> Vec<EventBatch> {
+    tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|(_, kind, batch)| *kind == ActivationKind::Evaluated && batch.is_some())
+        .map(|(_, _, batch)| batch.dupe().unwrap())
+        .collect()
+}
+
+#[tokio::test]
+async fn observed_selected_graph_matches_legacy_families_events_and_warm_reuse() {
+    let url = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        url,
+        ModuleSourceRegistryResponse::Found(Arc::from(
+            b"module(name='dep',version='1')\nprint('selected')\n".as_slice(),
+        )),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        901,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
+    let cold = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_selected_graph(&cold);
+    let Ok(HostSelectedModuleGraph { resolved, unpruned }) = observed.result().as_ref() else {
+        panic!("selected graph must succeed: {:?}", observed.result())
+    };
+    assert_eq!(resolved.len(), 2);
+    assert_eq!(unpruned.len(), 2);
+    assert!(!observed.observations().observations().is_empty());
+
+    let observed_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        observed_row,
+        vec![
+            RootModuleFilesObservationKey::new(workspace.dupe()).to_string(),
+            RootModuleCommandPolicyKey {
+                workspace: PathBuf::from("/workspace"),
+            }
+            .to_string(),
+            HostEffectiveModuleOverrideObservationKey::new(
+                workspace.dupe(),
+                "dep".into(),
+            )
+            .to_string(),
+            observed_discovered_key("dep", "1").to_string(),
+            observed_discovered_key("dep", "1").to_string(),
+        ]
+    );
+    assert!(tracker.batches.lock().unwrap().iter().all(
+        |(owner, _, batch)| owner != &key.to_string() || batch.is_none()
+    ));
+    let observed_eventful = discovered_eventful(&tracker);
+    assert_eq!(observed_eventful.len(), 2);
+    assert!(observed_eventful[0]
+        .0
+        .starts_with("bzlmod-observed-host-root-module-file:"));
+    assert_eq!(observed_eventful[1].0, observed_discovered_key("dep", "1").to_string());
+    assert!(observed_eventful[0].1.events().is_empty());
+    assert!(matches!(observed_eventful[1].1.events(), [EvaluationEvent::StarlarkPrint { text, .. }] if text == "selected"));
+    let observed_events = selected_graph_event_values(&tracker);
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let warm = transaction.compute(&key).await.unwrap();
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &cold, &warm
+    ));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(_, _, batch)| batch.is_none()));
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let mut legacy_transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        901,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostSelectedModuleGraphKey::new(workspace.dupe());
+    let legacy = legacy_transaction.compute(&legacy_key).await.unwrap();
+    let SourcePreparationOutcome::Complete(legacy) = legacy else {
+        panic!("legacy selected graph must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        legacy_row,
+        vec![
+            RootModuleFilesKey {
+                workspace: PathBuf::from("/workspace"),
+            }
+            .to_string(),
+            RootModuleCommandPolicyKey {
+                workspace: PathBuf::from("/workspace"),
+            }
+            .to_string(),
+            HostEffectiveModuleOverrideKey::new(workspace.dupe(), "dep".into()).to_string(),
+            HostDiscoveredModuleKey::try_new(
+                workspace.dupe(),
+                NonrootModuleKey::new("dep", "1"),
+            )
+            .unwrap()
+            .to_string(),
+            HostDiscoveredModuleKey::try_new(workspace, NonrootModuleKey::new("dep", "1"))
+                .unwrap()
+                .to_string(),
+        ]
+    );
+    let legacy_eventful = discovered_eventful(&tracker);
+    assert_eq!(legacy_eventful.len(), 2);
+    assert!(legacy_eventful[0].0.starts_with("root-module-evaluation:"));
+    assert!(legacy_eventful[1].0.starts_with("host-discovered-module:"));
+    assert_eq!(discovered_event_values(&legacy_eventful), observed_events);
+    assert_eq!(selected_graph_event_values(&tracker), observed_events);
+    for forbidden in [
+        "host-selected-registry-repo",
+        "host-selected-module-routes",
+        "host-selected-extension",
+        "public-",
+        "accepted-",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, dependencies)| {
+            !owner.starts_with(forbidden)
+                && dependencies
+                    .iter()
+                    .all(|dependency| !dependency.starts_with(forbidden))
+        }));
+    }
+}
+
+async fn selected_graph_nonregistry_transaction(
+    dice: &Arc<Dice>,
+    tracker: Arc<NonregistryPreflightTracker>,
+    root: &str,
+    source: &[u8],
+    variant: i64,
+    registries: &[&str],
+) -> dice::DiceTransaction {
+    let transaction = host_nonregistry_transaction(
+        dice,
+        Some(source),
+        None,
+        &[],
+        &[],
+        variant,
+        None,
+        Some(tracker),
+        None,
+        true,
+    )
+    .await;
+    let mut updater = transaction.into_updater();
+    updater.changed_to(vec![(
+        slug_workspace_v2::WorkspaceSnapshotKey { workspace: PathBuf::from("/workspace") },
+        Arc::new(slug_workspace_v2::WorkspaceSnapshot {
+            files: Arc::new(starlark_map::sorted_map::SortedMap::from_iter([(
+                PathBuf::from("/workspace/MODULE.bazel"),
+                slug_workspace_v2::WorkspaceFileValue::Present(Arc::new(root.to_owned())),
+            )])),
+        }),
+    )]).unwrap();
+    updater.changed_to(vec![(
+        PathObservationEpochKey,
+        horizon_epoch(
+            root,
+            PathObservationNamespace::Host,
+            "/workspace/dep",
+            Some(source),
+            None, None, None,
+            &[("pkg", true), ("other", true)],
+            &[], &[],
+            &[("pkg/BUILD.bazel", Some(&b""[..])), ("other/BUILD.bazel", Some(&b""[..]))],
+            &[], &[],
+            variant,
+        ),
+    )]).unwrap();
+    if !registries.is_empty() {
+        crate::inject_registry_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::RegistryUrls::new(registries.iter().copied()),
+            crate::RegistryRequestGeneration(variant as u64),
+        )
+        .unwrap();
+    }
+    complete_preflight_transaction(updater.commit().await, false).await
+}
+
+#[tokio::test]
+async fn observed_selected_graph_mixed_horizon_fixed_point_matches_legacy() {
+    let url = "https://registry.invalid/modules/reg/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        url,
+        ModuleSourceRegistryResponse::Found(Arc::from(
+            b"module(name='reg',version='1')\nprint('registry')\n".as_slice(),
+        )),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let source = b"module(name='dep')\nprint('local')\n";
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep')\nlocal_path_override(module_name='dep',path='dep')\nbazel_dep(name='reg',version='1')\n";
+    let mut transaction = selected_graph_nonregistry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        source,
+        960,
+        &["https://registry.invalid"],
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
+    let value = transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_selected_graph(&value);
+    let graph = observed.result().as_ref().as_ref().unwrap();
+    assert_eq!(graph.resolved.len(), 3);
+    let dep = observed_discovered_key("dep", "").to_string();
+    let reg = observed_discovered_key("reg", "1").to_string();
+    let observed_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        observed_row,
+        vec![
+            RootModuleFilesObservationKey::new(workspace.dupe()).to_string(),
+            RootModuleCommandPolicyKey {
+                workspace: PathBuf::from("/workspace"),
+            }
+            .to_string(),
+            HostEffectiveModuleOverrideObservationKey::new(
+                workspace.dupe(),
+                "dep".into(),
+            )
+            .to_string(),
+            HostEffectiveModuleOverrideObservationKey::new(
+                workspace.dupe(),
+                "reg".into(),
+            )
+            .to_string(),
+            dep.clone(),
+            reg.clone(),
+            dep,
+            reg,
+        ]
+    );
+    let observed_events = discovered_eventful(&tracker);
+    assert_eq!(observed_events.len(), 3);
+    assert!(observed_events[0]
+        .0
+        .starts_with("bzlmod-observed-host-root-module-file:"));
+    assert_eq!(
+        observed_events[1].0,
+        observed_discovered_key("reg", "1").to_string()
+    );
+    assert_eq!(
+        observed_events[2].0,
+        observed_discovered_key("dep", "").to_string()
+    );
+    assert!(observed_events[0].1.events().is_empty());
+    assert!(matches!(
+        observed_events[1].1.events(),
+        [EvaluationEvent::StarlarkPrint { text, .. }] if text == "registry"
+    ));
+    assert!(matches!(
+        observed_events[2].1.events(),
+        [EvaluationEvent::StarlarkPrint { text, .. }] if text == "local"
+    ));
+    assert!(tracker.batches.lock().unwrap().iter().all(
+        |(owner, _, batch)| owner != &key.to_string() || batch.is_none()
+    ));
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostSelectedModuleGraphKey::new(workspace.dupe());
+    let SourcePreparationOutcome::Complete(legacy) = transaction.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("legacy graph must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_dep = HostDiscoveredModuleKey::try_new(
+        workspace.dupe(),
+        NonrootModuleKey::new("dep", ""),
+    )
+    .unwrap()
+    .to_string();
+    let legacy_reg = HostDiscoveredModuleKey::try_new(
+        workspace.dupe(),
+        NonrootModuleKey::new("reg", "1"),
+    )
+    .unwrap()
+    .to_string();
+    assert_eq!(
+        tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &legacy_key.to_string())
+            .unwrap()
+            .1,
+        vec![
+            RootModuleFilesKey {
+                workspace: PathBuf::from("/workspace"),
+            }
+            .to_string(),
+            RootModuleCommandPolicyKey {
+                workspace: PathBuf::from("/workspace"),
+            }
+            .to_string(),
+            HostEffectiveModuleOverrideKey::new(workspace.dupe(), "dep".into()).to_string(),
+            HostEffectiveModuleOverrideKey::new(workspace.dupe(), "reg".into()).to_string(),
+            legacy_dep.clone(),
+            legacy_reg.clone(),
+            legacy_dep.clone(),
+            legacy_reg.clone(),
+        ]
+    );
+    let legacy_events = discovered_eventful(&tracker);
+    assert_eq!(legacy_events.len(), 3);
+    assert!(legacy_events[0].0.starts_with("root-module-evaluation:"));
+    assert_eq!(legacy_events[1].0, legacy_reg);
+    assert_eq!(legacy_events[2].0, legacy_dep);
+    assert_eq!(
+        discovered_event_values(&legacy_events),
+        discovered_event_values(&observed_events)
+    );
+}
+
+#[tokio::test]
+async fn observed_selected_graph_registry_and_root_epochs_restore_independently() {
+    let url = "https://registry.invalid/modules/dep/1/MODULE.bazel";
+    let bytes = |text: &'static [u8]| {
+        ModuleSourceRegistryResponse::Found(Arc::from(text))
+    };
+    let io = Arc::new(ModuleSourceRegistryIo::new([(
+        url,
+        bytes(b"module(name='dep',version='1')\nprint('a')\n"),
+    )]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let key = HostSelectedModuleGraphObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\n";
+    let variants = [
+        b"module(name='dep',version='1')\nprint('a')\n".as_slice(),
+        b"module(name='dep',version='1')\nprint('b')\n".as_slice(),
+        b"module(name='dep',version='1')\nprint('a')\n".as_slice(),
+    ];
+    let mut registry_values = Vec::new();
+    for (index, variant) in variants.iter().enumerate() {
+        io.responses.lock().unwrap().insert(
+            url.to_owned(),
+            ModuleSourceRegistryResponse::Found(Arc::from(*variant)),
+        );
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["https://registry.invalid"],
+            920 + index as u64,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_selected_graph(&value);
+        assert!(observed.result().is_ok());
+        assert_selected_epoch(
+            &mut transaction,
+            observed.observations(),
+            observed.observations(),
+        )
+        .await;
+        registry_values.push(value);
+    }
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &registry_values[0],
+        &registry_values[2],
+    ));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &registry_values[0],
+        &registry_values[1],
+    ));
+    let held_result = complete_observed_selected_graph(&registry_values[0])
+        .result()
+        .dupe();
+    let held_epoch = complete_observed_selected_graph(&registry_values[0])
+        .observations()
+        .dupe();
+    assert!(held_result.is_ok());
+    assert!(!held_epoch.observations().is_empty());
+
+    io.responses.lock().unwrap().insert(
+        url.to_owned(),
+        bytes(b"module(name='dep',version='1')\nprint('a')\n"),
+    );
+    let roots = [
+        "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\n# a\n",
+        "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\n# b\n",
+        "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\n# a\n",
+    ];
+    let mut root_values = Vec::new();
+    for root in roots {
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["https://registry.invalid"],
+            930,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_selected_graph(&value);
+        assert!(observed.result().is_ok());
+        assert_selected_epoch(
+            &mut transaction,
+            observed.observations(),
+            observed.observations(),
+        )
+        .await;
+        root_values.push(value);
+    }
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &root_values[0],
+        &root_values[2],
+    ));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &root_values[0],
+        &root_values[1],
+    ));
+    assert!(held_result.is_ok());
+    assert!(!held_epoch.observations().is_empty());
+}
+
+
+#[tokio::test]
+async fn observed_selected_graph_poll_drop_publishes_nothing_and_recovers_same_dice() {
+    let io = Arc::new(CancelOnceRegistryIo {
+        calls: AtomicUsize::new(0),
+        bytes: Arc::from(
+            b"module(name='dep',version='1')\nprint('graph-recovered')\n".as_slice(),
+        ),
+    });
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\n";
+    let mut cancelled = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://cancel.invalid"],
+        940,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let key = HostSelectedModuleGraphObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let mut future = Box::pin(cancelled.compute(&key));
+    std::future::poll_fn(|context| {
+        assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+        std::task::Poll::Ready(())
+    })
+    .await;
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        while io.calls.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    drop(future);
+    drop(cancelled);
+    assert!(tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(owner, _)| owner != &key.to_string()));
+    assert!(tracker.batches.lock().unwrap().iter().all(
+        |(owner, _, batch)| owner != &key.to_string() || batch.is_none()
+    ));
+
+    let mut recovered = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://cancel.invalid"],
+        940,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let recovered = recovered.compute(&key).await.unwrap();
+    let observed = complete_observed_selected_graph(&recovered);
+    assert!(observed.result().is_ok());
+    assert_eq!(io.calls.load(Ordering::SeqCst), 2);
+    assert!(tracker.batches.lock().unwrap().iter().all(
+        |(owner, _, batch)| owner != &key.to_string() || batch.is_none()
+    ));
+    for forbidden in [
+        "host-selected-registry-repo",
+        "host-selected-module-routes",
+        "host-selected-extension",
+        "public-",
+        "accepted-",
+    ] {
+        assert!(tracker.rows.lock().unwrap().iter().all(|(owner, dependencies)| {
+            !owner.starts_with(forbidden)
+                && dependencies
+                    .iter()
+                    .all(|dependency| !dependency.starts_with(forbidden))
+        }));
+    }
+}
+
+#[tokio::test]
+async fn observed_selected_graph_root_need_and_semantic_error_suppress_later_work() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\n";
+    let transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        950,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let mut updater = transaction.into_updater();
+    updater
+        .changed_to(vec![(PathObservationEpochKey, PathObservationEpoch::empty())])
+        .unwrap();
+    let mut transaction = updater.commit().await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let key = HostSelectedModuleGraphObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let need = transaction.compute(&key).await.unwrap();
+    assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+    assert!(!HostSelectedModuleGraphObservationKey::validity(&need));
+    assert!(tracker.rows.lock().unwrap().iter().all(|(owner, dependencies)| {
+        let keys = std::iter::once(owner).chain(dependencies);
+        keys.into_iter().all(|key| {
+            !key.starts_with("observed-host-effective-module-override:")
+                && !key.starts_with("observed-host-discovered-module:")
+                && !key.starts_with("root-module-command-policy:")
+        })
+    }));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(owner, _, batch)| owner != &key.to_string() || batch.is_none()));
+
+    let mut error_transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        "module(name=\n",
+        &["https://registry.invalid"],
+        951,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let error = error_transaction.compute(&key).await.unwrap();
+    let observed = complete_observed_selected_graph(&error);
+    assert!(matches!(
+        observed.result().as_ref(),
+        Err(crate::selected_graph::HostSelectedModuleGraphError::Input { owner, .. })
+            if owner == "root MODULE files"
+    ));
+    assert!(!observed.observations().observations().is_empty());
+    let row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        row,
+        vec![
+            RootModuleFilesObservationKey::new(
+                NormalizedAbsolutePath::new("/workspace").unwrap(),
+            )
+            .to_string(),
+        ]
+    );
+    assert!(tracker.rows.lock().unwrap().iter().all(|(owner, dependencies)| {
+        let keys = std::iter::once(owner).chain(dependencies);
+        keys.into_iter().all(|key| {
+            !key.starts_with("observed-host-effective-module-override:")
+                && !key.starts_with("observed-host-discovered-module:")
+                && !key.starts_with("root-module-command-policy:")
+        })
+    }));
+    assert!(tracker
+        .batches
+        .lock()
+        .unwrap()
+        .iter()
+        .all(|(owner, _, batch)| owner != &key.to_string() || batch.is_none()));
+}
+
+#[tokio::test]
+async fn observed_selected_graph_command_policy_effective_restores_a_b_a() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\n";
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
+    let variants: [&[&str]; 3] = [&[], &["dep=/workspace/dep"], &[]];
+    let mut values = Vec::new();
+    for overrides in variants {
+        let transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &[],
+            970,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        let mut updater = transaction.into_updater();
+        crate::inject_root_module_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                Path::new("/workspace"),
+                overrides.iter().copied(),
+            )
+            .unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            crate::LockfileMode::Update,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        tracker.rows.lock().unwrap().clear();
+        tracker.batches.lock().unwrap().clear();
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_selected_graph(&value);
+        assert_selected_epoch(&mut transaction, observed.observations(), observed.observations())
+            .await;
+        let row = tracker.rows.lock().unwrap().iter()
+            .find(|(owner, _)| owner == &key.to_string()).unwrap().1.clone();
+        assert_eq!(row[..2], [
+            RootModuleFilesObservationKey::new(workspace.dupe()).to_string(),
+            RootModuleCommandPolicyKey { workspace: PathBuf::from("/workspace") }.to_string(),
+        ]);
+        assert_eq!(row.len(), if overrides.is_empty() { 2 } else { 3 });
+        if !overrides.is_empty() {
+            assert_eq!(
+                row[2],
+                HostEffectiveModuleOverrideObservationKey::new(
+                    workspace.dupe(),
+                    "dep".into(),
+                )
+                .to_string()
+            );
+        }
+        assert!(tracker.batches.lock().unwrap().iter().all(
+            |(owner, _, batch)| owner != &key.to_string() || batch.is_none()
+        ));
+        values.push(value);
+    }
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    let held_result = complete_observed_selected_graph(&values[0]).result().dupe();
+    let held_epoch = complete_observed_selected_graph(&values[0]).observations().dupe();
+    assert!(held_result.is_ok());
+    assert!(!held_epoch.observations().is_empty());
+}
+
+#[tokio::test]
+async fn observed_selected_graph_nonregistry_restores_with_unaffected_root_arc() {
+    let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep')\nlocal_path_override(module_name='dep',path='dep')\n";
+    let key = HostSelectedModuleGraphObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let variants = [
+        (b"module(name='dep')\nprint('a')\n".as_slice(), 981),
+        (b"module(name='dep')\nprint('b')\n".as_slice(), 982),
+        (b"module(name='dep')\nprint('a')\n".as_slice(), 981),
+    ];
+    let mut values = Vec::new();
+    for (source, variant) in variants {
+        let mut transaction = selected_graph_nonregistry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            source,
+            variant,
+            &[],
+        )
+        .await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_selected_graph(&value);
+        assert!(observed.result().is_ok());
+        assert_selected_epoch(&mut transaction, observed.observations(), observed.observations())
+            .await;
+        values.push(value);
+    }
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    let first = complete_observed_selected_graph(&values[0]);
+    let changed = complete_observed_selected_graph(&values[1]);
+    let restored = complete_observed_selected_graph(&values[2]);
+    let root_demand = PathObservationDemand::new(
+        PathObservationNamespace::Host,
+        NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+        PathObservationOperation::FileBytes,
+    );
+    assert!(Arc::ptr_eq(
+        first.observations().get(&root_demand).unwrap(),
+        changed.observations().get(&root_demand).unwrap(),
+    ));
+    assert!(Arc::ptr_eq(
+        first.observations().get(&root_demand).unwrap(),
+        restored.observations().get(&root_demand).unwrap(),
+    ));
+    let held_result = first.result().dupe();
+    let held_epoch = first.observations().dupe();
+    assert!(held_result.is_ok());
+    assert!(!held_epoch.observations().is_empty());
+}
+
+#[tokio::test]
+async fn observed_selected_graph_diamond_cycle_nodep_rounds_are_exact() {
+    let module = |name: &str, body: &str| {
+        Arc::from(format!("module(name='{name}',version='1')\nprint('{name}')\n{body}").into_bytes())
+    };
+    let io = Arc::new(ModuleSourceRegistryIo::new([
+        (
+            "https://registry.invalid/modules/a/1/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(module(
+                "a",
+                "bazel_dep(name='b',version='1')\nbazel_dep(name='b',version='2',repo_name=None)\n",
+            )),
+        ),
+        (
+            "https://registry.invalid/modules/b/1/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(module(
+                "b",
+                "bazel_dep(name='c',version='1')\n",
+            )),
+        ),
+        (
+            "https://registry.invalid/modules/b/2/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='b',version='2')\nprint('b2')\nbazel_dep(name='c',version='1')\n"
+                    .as_slice(),
+            )),
+        ),
+        (
+            "https://registry.invalid/modules/c/1/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(module(
+                "c",
+                "bazel_dep(name='a',version='1')\n",
+            )),
+        ),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\nbazel_dep(name='a',version='1')\n";
+    let mut transaction = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        &["https://registry.invalid"],
+        990,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let observed_key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let observed_value = transaction.compute(&observed_key).await.unwrap();
+    let observed = complete_observed_selected_graph(&observed_value);
+    let graph = observed.result().as_ref().as_ref().unwrap();
+    assert_eq!(
+        graph
+            .unpruned
+            .iter()
+            .map(|entry| match &entry.key {
+                HostGraphModuleKey::Root => None,
+                HostGraphModuleKey::Module { name, .. } => {
+                    Some(name.to_string())
+                }
+            })
+            .collect::<Vec<_>>(),
+        vec![
+            None,
+            Some("a".to_owned()),
+            Some("b".to_owned()),
+            Some("b".to_owned()),
+            Some("c".to_owned()),
+        ]
+    );
+    assert_eq!(
+        graph
+            .resolved
+            .iter()
+            .map(|entry| match &entry.key {
+                HostGraphModuleKey::Root => None,
+                HostGraphModuleKey::Module { name, .. } => {
+                    Some(name.to_string())
+                }
+            })
+            .collect::<Vec<_>>(),
+        vec![
+            None,
+            Some("a".to_owned()),
+            Some("b".to_owned()),
+            Some("c".to_owned()),
+        ]
+    );
+    assert_selected_epoch(
+        &mut transaction,
+        observed.observations(),
+        observed.observations(),
+    )
+    .await;
+    let observed_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    let observed_events = discovered_eventful(&tracker);
+    assert_eq!(
+        discovered_event_values(&observed_events)
+            .iter()
+            .map(|batch| {
+                batch
+                    .events()
+                    .iter()
+                    .map(|event| match event {
+                        EvaluationEvent::StarlarkPrint { text, .. } => text.as_str(),
+                        EvaluationEvent::Diagnostic { .. } => "<diagnostic>",
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>(),
+        vec![
+            Vec::<&str>::new(),
+            vec!["a"],
+            vec!["b"],
+            vec!["c"],
+            vec!["b2"],
+        ]
+    );
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostSelectedModuleGraphKey::new(workspace);
+    let SourcePreparationOutcome::Complete(legacy) =
+        transaction.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("legacy topology must complete")
+    };
+    assert_eq!(legacy.as_ref(), observed.result().as_ref());
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        discovered_eventful(&tracker)
+            .iter()
+            .map(|(owner, _)| owner.clone())
+            .collect::<Vec<_>>(),
+        legacy_dependency_order(&observed_events.iter().map(|(owner, _)| owner.clone()).collect::<Vec<_>>()),
+    );
+    assert_eq!(legacy_row, legacy_dependency_order(&observed_row));
+    assert_eq!(
+        discovered_event_values(&discovered_eventful(&tracker)),
+        discovered_event_values(&observed_events)
+    );
+}
+
+#[tokio::test]
+async fn observed_selected_graph_recursive_mixed_horizon_restores_independently() {
+    let reg_url = "https://registry.invalid/modules/reg/1/MODULE.bazel";
+    let io = Arc::new(ModuleSourceRegistryIo::new([
+        (
+            "https://registry.invalid/modules/side/1/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='side',version='1')\nprint('side')\n".as_slice(),
+            )),
+        ),
+        (
+            reg_url,
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='reg',version='1')\nprint('a')\n".as_slice(),
+            )),
+        ),
+        (
+            "https://registry.invalid/modules/leaf/1/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='leaf',version='1')\n".as_slice(),
+            )),
+        ),
+        (
+            "https://registry.invalid/modules/leaf/2/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='leaf',version='2')\n".as_slice(),
+            )),
+        ),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io.dupe());
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep')\nlocal_path_override(module_name='dep',path='dep')\nbazel_dep(name='side',version='1')\n";
+    let source =
+        b"module(name='dep')\nbazel_dep(name='reg',version='1')\nprint('local')\n";
+    let key = HostSelectedModuleGraphObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let variants = [
+        b"module(name='reg',version='1')\nbazel_dep(name='leaf',version='1')\n".as_slice(),
+        b"module(name='reg',version='1')\nbazel_dep(name='leaf',version='2')\n".as_slice(),
+        b"module(name='reg',version='1')\nbazel_dep(name='leaf',version='1')\n".as_slice(),
+    ];
+    let mut values = Vec::new();
+    for (index, variant) in variants.into_iter().enumerate() {
+        io.responses.lock().unwrap().insert(
+            reg_url.to_owned(),
+            ModuleSourceRegistryResponse::Found(Arc::from(variant)),
+        );
+        let transaction = selected_graph_nonregistry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            source,
+            1000,
+            &["https://registry.invalid"],
+        )
+        .await;
+        let mut updater = transaction.into_updater();
+        crate::inject_registry_request_inputs(
+            &mut updater,
+            Path::new("/workspace"),
+            crate::RegistryUrls::new(["https://registry.invalid"]),
+            crate::RegistryRequestGeneration(1000 + index as u64),
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_selected_graph(&value);
+        let graph = observed.result().as_ref().as_ref().unwrap();
+        assert_eq!(graph.resolved.len(), 5);
+        assert_selected_epoch(
+            &mut transaction,
+            observed.observations(),
+            observed.observations(),
+        )
+        .await;
+        values.push(value);
+    }
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    let first = complete_observed_selected_graph(&values[0]);
+    let changed = complete_observed_selected_graph(&values[1]);
+    let restored = complete_observed_selected_graph(&values[2]);
+    for demand in [
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/MODULE.bazel").unwrap(),
+            PathObservationOperation::FileBytes,
+        ),
+        PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            NormalizedAbsolutePath::new("/workspace/dep/MODULE.bazel").unwrap(),
+            PathObservationOperation::FileBytes,
+        ),
+    ] {
+        assert!(Arc::ptr_eq(
+            first.observations().get(&demand).unwrap(),
+            changed.observations().get(&demand).unwrap(),
+        ));
+        assert!(Arc::ptr_eq(
+            first.observations().get(&demand).unwrap(),
+            restored.observations().get(&demand).unwrap(),
+        ));
+    }
+    let held_result = first.result().dupe();
+    let held_epoch = first.observations().dupe();
+    assert!(held_result.is_ok());
+    assert!(!held_epoch.observations().is_empty());
+}
+
+#[tokio::test]
+async fn observed_selected_graph_implicit_builtin_and_duplicate_candidate_are_exact() {
+    let mut builder = Dice::builder();
+    crate::install_registry_io(
+        &mut builder,
+        Arc::new(ModuleSourceRegistryIo::new(std::iter::empty::<(
+            &'static str,
+            ModuleSourceRegistryResponse,
+        )>())),
+    );
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let workspace = NormalizedAbsolutePath::new("/workspace").unwrap();
+    let observed_key = HostSelectedModuleGraphObservationKey::new(workspace.dupe());
+
+    let root = "module(name='bazel_tools')\nbazel_dep(name='dep')\nlocal_path_override(module_name='dep',path='dep')\n";
+    let transaction = selected_graph_nonregistry_transaction(
+        &dice,
+        tracker.dupe(),
+        root,
+        b"module(name='dep')\n",
+        1010,
+        &[],
+    )
+    .await;
+    let mut updater = transaction.into_updater();
+    crate::inject_root_module_request_inputs(
+        &mut updater,
+        Path::new("/workspace"),
+        crate::BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+            None,
+            false,
+            Path::new("/workspace"),
+            ["dep=/workspace/dep"],
+        )
+        .unwrap(),
+        crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+        crate::LockfileMode::Update,
+    )
+    .unwrap();
+    let mut duplicate =
+        complete_preflight_transaction(updater.commit().await, false).await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let value = duplicate.compute(&observed_key).await.unwrap();
+    assert!(matches!(value, SourcePreparationOutcome::Need(_)), "{value:?}");
+    assert!(!HostSelectedModuleGraphObservationKey::validity(&value));
+    let duplicate_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    let effective_dep =
+        HostEffectiveModuleOverrideObservationKey::new(workspace.dupe(), "dep".into())
+            .to_string();
+    assert_eq!(
+        duplicate_row
+            .iter()
+            .filter(|dependency| dependency == &&effective_dep)
+            .count(),
+        1
+    );
+    let SourcePreparationOutcome::Need(needs) = &value else {
+        unreachable!()
+    };
+    let request = needs
+        .repository_materializations()
+        .iter()
+        .next()
+        .unwrap()
+        .1
+        .dupe();
+    let mut updater = duplicate.into_updater();
+    updater
+        .changed_to(vec![(
+            RepositoryMaterializationResultEpochKey {
+                workspace: workspace.dupe(),
+            },
+            RepositoryMaterializationResultEpoch::new(
+                workspace.dupe(),
+                [RepositoryMaterializationEpochEntry {
+                    request,
+                    result: RepositoryMaterializationResult::Success(
+                        RepositoryMaterializationSuccess::Local,
+                    ),
+                }],
+            )
+            .unwrap(),
+        )])
+        .unwrap();
+    duplicate = updater.commit().await;
+    tracker.rows.lock().unwrap().clear();
+    let completed = duplicate.compute(&observed_key).await.unwrap();
+    let completed = complete_observed_selected_graph(&completed);
+    let observed_complete_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(
+        observed_complete_row.iter().filter(|dependency| dependency == &&effective_dep).count(),
+        1
+    );
+    let SourcePreparationOutcome::Complete(Ok(effective)) =
+        duplicate.compute(&HostEffectiveModuleOverrideObservationKey::new(
+            workspace.dupe(),
+            "dep".into(),
+        )).await.unwrap()
+    else { panic!("effective carrier must complete") };
+    for (demand, result) in effective.observations().observations() {
+        assert!(Arc::ptr_eq(
+            result,
+            completed.observations().get(demand).unwrap()
+        ));
+    }
+    tracker.rows.lock().unwrap().clear();
+    let legacy_duplicate_key = HostSelectedModuleGraphKey::new(workspace.dupe());
+    let SourcePreparationOutcome::Complete(legacy_duplicate) =
+        duplicate.compute(&legacy_duplicate_key).await.unwrap()
+    else { panic!("legacy duplicate graph must complete") };
+    assert_eq!(legacy_duplicate.as_ref(), completed.result().as_ref());
+    let legacy_complete_row = tracker.rows.lock().unwrap().iter()
+        .find(|(owner, _)| owner == &legacy_duplicate_key.to_string()).unwrap().1.clone();
+    assert_eq!(legacy_complete_row, legacy_dependency_order(&observed_complete_row));
+
+    let implicit_root = "module(name='root')\n";
+    let mut implicit = module_source_registry_transaction(
+        &dice,
+        tracker.dupe(),
+        implicit_root,
+        &["https://registry.invalid"],
+        1011,
+        PathObservationEpoch::empty(),
+    )
+    .await;
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let implicit_value = implicit.compute(&observed_key).await.unwrap();
+    let implicit_observed = complete_observed_selected_graph(&implicit_value);
+    assert!(matches!(
+        implicit_observed.result().as_ref(),
+        Err(crate::selected_graph::HostSelectedModuleGraphError::DiscoveryLeaf {
+            module: HostGraphModuleKey::Module { name, .. },
+            ..
+        }) if name == "rules_license"
+    ));
+    let observed_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &observed_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    let effective_tools =
+        HostEffectiveModuleOverrideObservationKey::new(workspace.dupe(), "bazel_tools".into())
+            .to_string();
+    assert_eq!(
+        observed_row
+            .iter()
+            .filter(|dependency| dependency == &&effective_tools)
+            .count(),
+        1
+    );
+    assert!(observed_row.iter().any(|dependency| {
+        dependency == &observed_discovered_key("bazel_tools", "").to_string()
+    }));
+    let observed_events = discovered_eventful(&tracker);
+
+    tracker.rows.lock().unwrap().clear();
+    tracker.batches.lock().unwrap().clear();
+    let legacy_key = HostSelectedModuleGraphKey::new(workspace);
+    let SourcePreparationOutcome::Complete(legacy) =
+        implicit.compute(&legacy_key).await.unwrap()
+    else {
+        panic!("legacy implicit builtin must complete")
+    };
+    assert_eq!(legacy.as_ref(), implicit_observed.result().as_ref());
+    let legacy_row = tracker
+        .rows
+        .lock()
+        .unwrap()
+        .iter()
+        .find(|(owner, _)| owner == &legacy_key.to_string())
+        .unwrap()
+        .1
+        .clone();
+    assert_eq!(legacy_row, legacy_dependency_order(&observed_row));
+    assert_eq!(
+        discovered_event_values(&discovered_eventful(&tracker)),
+        discovered_event_values(&observed_events)
+    );
+    assert_eq!(
+        discovered_eventful(&tracker)
+            .iter()
+            .map(|(owner, _)| owner.clone())
+            .collect::<Vec<_>>(),
+        legacy_dependency_order(
+            &observed_events.iter().map(|(owner, _)| owner.clone()).collect::<Vec<_>>()
+        ),
+    );
+}
+
+#[tokio::test]
+async fn observed_selected_graph_effective_override_restores_with_fixed_policy() {
+    let io = Arc::new(ModuleSourceRegistryIo::new([
+        (
+            "https://registry.invalid/modules/dep/1/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='dep',version='1')\n".as_slice(),
+            )),
+        ),
+        (
+            "https://registry.invalid/modules/dep/2/MODULE.bazel",
+            ModuleSourceRegistryResponse::Found(Arc::from(
+                b"module(name='dep',version='2')\n".as_slice(),
+            )),
+        ),
+    ]));
+    let mut builder = Dice::builder();
+    crate::install_registry_io(&mut builder, io);
+    let dice = Arc::new(builder.build(DetectCycles::Enabled));
+    let tracker = Arc::new(NonregistryPreflightTracker::default());
+    let key = HostSelectedModuleGraphObservationKey::new(
+        NormalizedAbsolutePath::new("/workspace").unwrap(),
+    );
+    let roots = [
+        "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\nsingle_version_override(module_name='dep',version='1')\n",
+        "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\nsingle_version_override(module_name='dep',version='2')\n",
+        "module(name='bazel_tools')\nbazel_dep(name='dep',version='1')\nsingle_version_override(module_name='dep',version='1')\n",
+    ];
+    let mut values = Vec::new();
+    for root in roots {
+        let mut transaction = module_source_registry_transaction(
+            &dice,
+            tracker.dupe(),
+            root,
+            &["https://registry.invalid"],
+            1020,
+            PathObservationEpoch::empty(),
+        )
+        .await;
+        tracker.rows.lock().unwrap().clear();
+        tracker.batches.lock().unwrap().clear();
+        let value = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_selected_graph(&value);
+        assert!(observed.result().is_ok());
+        assert_selected_epoch(
+            &mut transaction,
+            observed.observations(),
+            observed.observations(),
+        )
+        .await;
+        let row = tracker
+            .rows
+            .lock()
+            .unwrap()
+            .iter()
+            .find(|(owner, _)| owner == &key.to_string())
+            .unwrap()
+            .1
+            .clone();
+        assert_eq!(
+            row[..3],
+            [
+                RootModuleFilesObservationKey::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap()
+                )
+                .to_string(),
+                RootModuleCommandPolicyKey {
+                    workspace: PathBuf::from("/workspace")
+                }
+                .to_string(),
+                HostEffectiveModuleOverrideObservationKey::new(
+                    NormalizedAbsolutePath::new("/workspace").unwrap(),
+                    "dep".into(),
+                )
+                .to_string(),
+            ]
+        );
+        values.push(value);
+    }
+    assert!(HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[2]
+    ));
+    assert!(!HostSelectedModuleGraphObservationKey::equality(
+        &values[0], &values[1]
+    ));
+    let held_result = complete_observed_selected_graph(&values[0]).result().dupe();
+    let held_epoch = complete_observed_selected_graph(&values[0])
+        .observations()
+        .dupe();
+    assert!(held_result.is_ok());
+    assert!(!held_epoch.observations().is_empty());
 }
