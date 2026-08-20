@@ -9319,3 +9319,54 @@ family rows/events/warm silence and zero upper activation. STOP a third file,
 caller/export, discovery/selected/registry/extension activation, semantic/event/
 memory/family drift, cap excess or milestone closure. After independent ACCEPT
 return only to the docs-only selected-module-graph frontier audit.
+
+### Host nonregistry module-closure observation accepted (2026-08-19)
+
+Implementation `28fab9b0` accepts the private matching-family
+nonregistry-closure carrier from Rust base `18166691` and design `0ffa79cd`.
+
+Exact accounting is +519 production/+5 colocated proof in
+`source_preparation.rs`, +1,032 external proof, +1,556 aggregate semantic, and
+16,135/5,262/21,397 physical lines. Focused observed-Host proof is 13/13; full
+bzlmod is 454 plus all integration suites, loading 204, query 121, and core
+245/246 with only the inherited stale generic visibility-message expectation.
+Fmt, diff-check, exact accounting, cleanup/retention and independent final
+review pass.
+
+The accepted owner preserves effective -> materialization -> root source ->
+validation -> BFS horizon -> fragment order, exact occurrence/full-batch
+Need/outer precedence, earliest shared Arcs, child-only ROOT/REPO batches, and
+one local Result Arc plus compact epoch. Discovery, selected graph, registry
+preparation, extensions and public callers remain inactive.
+
+Run only `WP-6-7A-selected-module-graph-observation-frontier-audit` from
+scheduling and Rust base `28fab9b0`.
+
+### Selected-module-graph observation frontier audit (2026-08-19)
+
+Audit `HostSelectedModuleGraphKey` from accepted root files and effective
+overrides through fixed-point `HostDiscoveredModuleKey` expansion. Inventory
+each candidate's natural Result owner, ordered DICE children, matching family,
+path epoch, Need/outer/semantic polarity, event batch, retained lifetime and
+proof boundary before selecting anything.
+
+The accepted nonregistry closure must remain the sole closure semantic carrier;
+its ROOT/REPO descendants remain sole batch owners. Separately trace registry
+`ModuleSourcePreparationKey`, policy/registry attempt order, every
+`RegistryFileKey`, root patch label/path resolution and FileBytes observation.
+Do not claim selected graph or discovered module completeness while any mutable
+registry/patch edge remains carrierless.
+
+Return exactly one docs-only result: selected-graph observation design if every
+mutable child already has a reusable carrier; one uniquely smaller producer
+prerequisite design; or formal REPLAN. Freeze future exact Rust files, measured
+baselines, production/proof/aggregate caps, helpers below 200, one local Result
+Arc plus compact epoch, exact event/family/terminal/lifecycle proof and at most
+one successor.
+
+Write only canonical/current/this Stage/routing at <=40/<=200/<=180/<=30 net
+lines and <=430 aggregate. STOP Rust/tests/oracles, callers/exports, direct
+discovery or selected-graph activation, duplicate fetch/patch semantics, moved
+child events, retained graph scratch, compatibility widening, M8/M7B or
+milestone closure. Preserve M7A -> M8 -> M7B; implementation remains separately
+design-gated.
