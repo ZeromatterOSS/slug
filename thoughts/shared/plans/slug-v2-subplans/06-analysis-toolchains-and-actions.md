@@ -10857,3 +10857,39 @@ schedule only
 `WP-6-7A-selected-registry-repo-specs-observation-implementation`; after its
 ACCEPT resume only the route/extension frontier. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Selected registry repo-spec observation design accepted (2026-08-20)
+
+Accepted design `0444dd40` from Rust base `e155d74f` activates only
+`WP-6-7A-selected-registry-repo-specs-observation-implementation`.
+
+Write exactly `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 6,830
+physical/test boundary 2,974, within <=520 production, <=1,100 proof, <=1,620
+aggregate semantic and <=8,500 physical. Helpers/tests remain below 200; no
+second file/key, export or caller is writable.
+
+Add the private one-Result-Arc+cumulative-epoch carrier and one
+Legacy/Observed semantic driver. Preserve graph first, graph-occurrence order,
+owner-local root/nonregistry `None`, and each registry entry's Host registry ->
+source JSON file -> parse/projection -> optional registry JSON file -> module
+projection -> effective override -> augmentation order.
+
+Per-entry terminals suppress later children; the aggregate still scans all
+entries. Merge every Complete epoch immediately, left-first and before
+semantics. Preserve earliest exact Arcs, retain the first stage-aware child or
+merge outer while attempting later Complete merges, and keep final precedence
+outer -> first semantic/DICE error -> incompatible Need -> compatible Need
+union -> ordered success. Need/outer is carrierless; Complete terminals retain
+the full valid cumulative prefix.
+
+Retain only the local Result Arc+compact epoch. Parent is eventless, existing
+child batches/ownership remain exact, all traversal/merge/terminal/event scratch
+is compute-local, and no collection/cache/interner/store/lock/task/direct Host
+read/revision/certificate state is added.
+
+Require the full accepted identity/terminal/prefix/full-scan/family/Arc/event/
+warm/cancel/held-lifecycle and upper-nonactivation proof. STOP semantic,
+precedence, event or memory drift, wider authority, caller/export, proof waiver,
+cap excess or milestone closure. REPLAN before widening. After implementation
+ACCEPT resume only the docs route/extension frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.

@@ -1,10 +1,10 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-selected-registry-repo-specs-observation-design`
+Packet: `WP-6-7A-selected-registry-repo-specs-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `041b4476`
 Rust base: `e155d74f`
+Accepted design: `0444dd40`
 
 ## Accepted Host-registry-function completion
 
@@ -28,7 +28,62 @@ Independent terminal review ACCEPTs exact order/prefix/family/Arc association,
 neutral-input and visible-lockfile lifecycles, cancellation, compact retention,
 cleanup and security.
 
-## Owner decision
+## Exact implementation authority
+
+Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 6,830
+physical with first `#[cfg(test)]` at line 2,974. Caps are <=520 production,
+<=1,100 proof, <=1,620 aggregate semantic and <=8,500 physical; helpers/tests
+remain below 200 lines. Every other Rust file, caller, export, fixture and
+oracle is read-only.
+
+## Frozen implementation contract
+
+Add the accepted private `HostSelectedRegistryRepoSpecsObservationKey` and
+`ObservedHostSelectedRegistryRepoSpecs`, retaining exactly one local semantic
+Result Arc plus one cumulative compact epoch. Use one Legacy/Observed semantic
+driver; legacy selects only legacy graph/Host-registry/registry-file/effective
+siblings with empty epochs, while observed selects only their accepted matching
+siblings. Legacy projection moves the exact Result Arc.
+
+Preserve graph first and graph-occurrence order. Root/nonregistry entries remain
+owner-local `None`. Registry entries preserve Host registry -> source JSON
+registry file -> parse/projection -> optional registry JSON file -> module
+projection -> effective override -> augmentation. Per-entry terminals suppress
+later children; the aggregate still completes its full cross-entry scan.
+
+Merge every Complete epoch immediately, left-first and before semantics, in
+graph/entry/child order. Equal duplicates retain the first exact Arc. Conflict
+or operation mismatch is typed outer. Retain the first stage-aware child/merge
+outer while attempting every later Complete merge. Final precedence is outer,
+first semantic/DICE-compute error, first incompatible Need, compatible Need
+union, ordered success. Final Need/outer is carrierless; Complete error/success
+retains the full valid cumulative prefix.
+
+The aggregate remains eventless; existing graph/discovery batches and lower
+child event ownership remain exact. Warm reuse is silent and cancellation
+publishes no aggregate row, value or batch. Retain no graph/child carrier,
+per-entry epoch/list/map, frontier, override cache, parser/event scratch,
+cache/interner/store/lock/task/direct Host read/revision/certificate state.
+
+Complete the accepted identity/equality/legacy-Arc proof; every graph and
+per-entry terminal/prefix/later suppression; duplicate/conflict/mismatch and
+first/middle/last full-scan outer/error/Need algebra; root/nonregistry and
+optional-file semantics; exact family vectors and complete ordered child batch
+parity; warm/poll-drop recovery; independent graph/Host-registry/source JSON/
+registry JSON/effective held-carrier A -> B -> A lifecycles; and zero route/
+extension/generated/public/bootstrap activation.
+
+Exact compatibility is existing admitted repo-spec values/errors/order/events.
+The private typed outer/shared-Arc epoch is Slug-native. Routes/extensions/
+generated/public/bootstrap, M8/M7B and exact identity bytes remain deferred.
+
+STOP a second file/key, caller/export, changed precedence/event ownership,
+retained traversal state, upper activation, proof waiver, cap excess or
+milestone closure. REPLAN before widening. After independent implementation
+ACCEPT resume only the docs frontier for routes/extensions. M7 remains partial
+and M7A -> M8 -> M7B remains.
+
+## Historical accepted design: owner decision
 
 `HostSelectedRegistryRepoSpecsKey` is the uniquely smallest complete remaining
 owner. It computes the accepted selected graph first, scans `graph.resolved` in
