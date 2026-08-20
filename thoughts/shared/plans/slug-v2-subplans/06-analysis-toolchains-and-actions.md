@@ -9429,3 +9429,32 @@ family/memory drift, cap excess or milestone closure. After independent design
 ACCEPT schedule only `WP-6-7A-registry-policy-observation-implementation`;
 after implementation ACCEPT return only to the selected-module-graph frontier
 audit.
+
+### Registry-policy observation design accepted (2026-08-19)
+
+Design `8d00d44a` accepts `RegistryPolicyKey` as the uniquely smallest
+complete shared registry-prefix owner and activates only
+`WP-6-7A-registry-policy-observation-implementation` from Rust base
+`a4623d6b`.
+
+Exact authority is only `app/slug_bzlmod_v2/src/registry_dice.rs`, baseline
+1,413 physical, <=200 production, <=520 proof, <=720 aggregate semantic and
+<=2,200 physical; helpers remain below 200 lines.
+
+Implement private `RegistryPolicyObservationKey` and `ObservedRegistryPolicy`
+with one exact policy Result Arc plus the root epoch. One shared driver preserves
+neutral registry URLs -> neutral lockfile mode -> matching root-files family.
+URL/mode and root compute errors keep empty semantic prefixes; observed root
+Need/outer is carrierless; Complete root semantic/success forwards the exact
+epoch unchanged. No parent epoch union/conflict class exists.
+
+Parent remains eventless; root descendants retain their batches. Retain no child
+carrier, extra collection/cache/interner/store/lock/task/Host read/revision/
+certificate/event state. Prove exact identity/Arc/equality/terminals, family
+rows/epoch Arcs, events/warm/cancel, URL/mode/MODULE/lockfile lifecycle and zero
+upper/HostRegistry activation.
+
+STOP a second file/key/caller/export, registry-file/preparation/discovery/
+selected activation, semantic/event/family/memory drift, cap excess or milestone
+closure. After independent ACCEPT return only to the docs-only selected-module-
+graph frontier audit.
