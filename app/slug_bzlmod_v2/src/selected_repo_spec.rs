@@ -3908,81 +3908,367 @@ impl fmt::Display for HostSelectedExtensionEvaluationInputRequestsKey {
     }
 }
 
+type EvaluationInputRequestsResult = Arc<
+    Result<
+        HostSelectedExtensionEvaluationInputRequests,
+        HostSelectedExtensionEvaluationInputRequestsError,
+    >,
+>;
+type EvaluationInputRequestsOutcome = SourcePreparationOutcome<EvaluationInputRequestsResult>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Allocative, Dupe)]
+enum EvaluationInputObservationStage {
+    RootFiles,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+enum EvaluationInputRequestsObservationError {
+    Requests(DefinitionLoadRequestsObservationError),
+    RootFiles(ObservedPathFrontierError),
+    Merge {
+        stage: EvaluationInputObservationStage,
+        error: ObservedPathFrontierError,
+    },
+}
+
+type EvaluationInputRequestsDriverOutcome = SourcePreparationOutcome<
+    Result<
+        (EvaluationInputRequestsResult, PathObservationEpoch),
+        EvaluationInputRequestsObservationError,
+    >,
+>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+#[allow(dead_code)]
+struct HostSelectedExtensionEvaluationInputRequestsObservationKey(
+    HostSelectedExtensionEvaluationInputRequestsKey,
+);
+
+#[allow(dead_code)]
+impl HostSelectedExtensionEvaluationInputRequestsObservationKey {
+    fn new(workspace: NormalizedAbsolutePath) -> Self {
+        Self(HostSelectedExtensionEvaluationInputRequestsKey::new(
+            workspace,
+        ))
+    }
+}
+
+impl fmt::Display for HostSelectedExtensionEvaluationInputRequestsObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+#[allow(dead_code)]
+struct ObservedHostSelectedExtensionEvaluationInputRequests {
+    result: EvaluationInputRequestsResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedHostSelectedExtensionEvaluationInputRequests {
+    fn result(&self) -> &EvaluationInputRequestsResult {
+        &self.result
+    }
+
+    fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+fn evaluation_input_requests_complete(
+    result: Result<
+        HostSelectedExtensionEvaluationInputRequests,
+        HostSelectedExtensionEvaluationInputRequestsError,
+    >,
+    observations: PathObservationEpoch,
+) -> EvaluationInputRequestsDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+async fn evaluation_input_requests_request_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: RoutesMode,
+) -> RepoSpecChild<
+    HostSelectedExtensionDefinitionLoadRequests,
+    HostSelectedExtensionDefinitionLoadRequestsError,
+    DefinitionLoadRequestsObservationError,
+> {
+    match mode {
+        RoutesMode::Legacy => match ctx
+            .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
+                workspace.dupe(),
+            ))
+            .await
+        {
+            Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+            Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+            Ok(SourcePreparationOutcome::Complete(result)) => RepoSpecChild::Complete {
+                result,
+                observations: PathObservationEpoch::empty(),
+            },
+        },
+        RoutesMode::Observed => match ctx
+            .compute(
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+        {
+            Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+            Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                result: observed.result().dupe(),
+                observations: observed.observations().dupe(),
+            },
+        },
+    }
+}
+
+fn finish_evaluation_input_requests_request_child(
+    child: RepoSpecChild<
+        HostSelectedExtensionDefinitionLoadRequests,
+        HostSelectedExtensionDefinitionLoadRequestsError,
+        DefinitionLoadRequestsObservationError,
+    >,
+) -> Result<
+    (DefinitionLoadRequestsResult, PathObservationEpoch),
+    EvaluationInputRequestsDriverOutcome,
+> {
+    match child {
+        RepoSpecChild::Compute(message) => Err(evaluation_input_requests_complete(
+            Err(HostSelectedExtensionEvaluationInputRequestsError::LoadRequestsCompute(message)),
+            PathObservationEpoch::empty(),
+        )),
+        RepoSpecChild::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        RepoSpecChild::Outer(error) => Err(SourcePreparationOutcome::Complete(Err(
+            EvaluationInputRequestsObservationError::Requests(error),
+        ))),
+        RepoSpecChild::Complete {
+            result,
+            observations,
+        } => Ok((result, observations)),
+    }
+}
+
+fn finish_evaluation_input_requests_request_semantic(
+    result: &Result<
+        HostSelectedExtensionDefinitionLoadRequests,
+        HostSelectedExtensionDefinitionLoadRequestsError,
+    >,
+    observations: PathObservationEpoch,
+) -> Result<Arc<HostSelectedExtensionDefinitionLoadRequests>, EvaluationInputRequestsDriverOutcome>
+{
+    result
+        .as_ref()
+        .map(|requests| Arc::new(requests.clone()))
+        .map_err(|error| {
+            evaluation_input_requests_complete(
+                Err(HostSelectedExtensionEvaluationInputRequestsError::LoadRequests(error.clone())),
+                observations,
+            )
+        })
+}
+
+async fn evaluation_input_requests_root_child(
+    ctx: &mut DiceComputations<'_>,
+    workspace: &NormalizedAbsolutePath,
+    mode: RoutesMode,
+) -> RepoSpecChild<RootModuleFiles, CompactString, ObservedPathFrontierError> {
+    match mode {
+        RoutesMode::Legacy => match ctx
+            .compute(&RootModuleFilesKey {
+                workspace: workspace.as_path().to_owned(),
+            })
+            .await
+        {
+            Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+            Ok(result) => RepoSpecChild::Complete {
+                result,
+                observations: PathObservationEpoch::empty(),
+            },
+        },
+        RoutesMode::Observed => match ctx
+            .compute(&RootModuleFilesObservationKey::new(workspace.dupe()))
+            .await
+        {
+            Err(error) => RepoSpecChild::Compute(error.to_string().into()),
+            Ok(SourcePreparationOutcome::Need(need)) => RepoSpecChild::Need(need),
+            Ok(SourcePreparationOutcome::Complete(Err(error))) => RepoSpecChild::Outer(error),
+            Ok(SourcePreparationOutcome::Complete(Ok(observed))) => RepoSpecChild::Complete {
+                result: observed.result().dupe(),
+                observations: observed.observations().dupe(),
+            },
+        },
+    }
+}
+
+fn evaluation_input_merge_error(
+    stage: EvaluationInputObservationStage,
+    error: PathObservationEpochError,
+) -> EvaluationInputRequestsObservationError {
+    EvaluationInputRequestsObservationError::Merge {
+        stage,
+        error: error.into(),
+    }
+}
+
+fn merge_evaluation_input_observations(
+    prefix: &mut PathObservationEpoch,
+    incoming: &PathObservationEpoch,
+    stage: EvaluationInputObservationStage,
+) -> Result<(), EvaluationInputRequestsObservationError> {
+    *prefix = PathObservationEpoch::from_shared(
+        prefix
+            .observations()
+            .iter()
+            .chain(incoming.observations())
+            .map(|(demand, result)| (demand.dupe(), result.dupe())),
+    )
+    .map_err(|error| evaluation_input_merge_error(stage, error))?;
+    Ok(())
+}
+
+fn finish_evaluation_input_requests_root_child(
+    child: RepoSpecChild<RootModuleFiles, CompactString, ObservedPathFrontierError>,
+    requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
+    mut observations: PathObservationEpoch,
+) -> Result<(Arc<RootModuleFiles>, PathObservationEpoch), EvaluationInputRequestsDriverOutcome> {
+    let (result, incoming) = match child {
+        RepoSpecChild::Compute(message) => {
+            return Err(evaluation_input_requests_complete(
+                Err(
+                    HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                        load_requests: requests,
+                        request: None,
+                        error: HostSelectedExtensionEvaluationInputError::RootFilesCompute(message),
+                    },
+                ),
+                observations,
+            ));
+        }
+        RepoSpecChild::Need(need) => return Err(SourcePreparationOutcome::Need(need)),
+        RepoSpecChild::Outer(error) => {
+            return Err(SourcePreparationOutcome::Complete(Err(
+                EvaluationInputRequestsObservationError::RootFiles(error),
+            )));
+        }
+        RepoSpecChild::Complete {
+            result,
+            observations,
+        } => (result, observations),
+    };
+    if let Err(error) = merge_evaluation_input_observations(
+        &mut observations,
+        &incoming,
+        EvaluationInputObservationStage::RootFiles,
+    ) {
+        return Err(SourcePreparationOutcome::Complete(Err(error)));
+    }
+    match result.as_ref() {
+        Ok(root) => Ok((Arc::new(root.clone()), observations)),
+        Err(error) => Err(evaluation_input_requests_complete(
+            Err(
+                HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                    load_requests: requests,
+                    request: None,
+                    error: HostSelectedExtensionEvaluationInputError::RootFiles(error.clone()),
+                },
+            ),
+            observations,
+        )),
+    }
+}
+
+async fn drive_evaluation_input_requests(
+    ctx: &mut DiceComputations<'_>,
+    key: &HostSelectedExtensionEvaluationInputRequestsKey,
+    mode: RoutesMode,
+) -> EvaluationInputRequestsDriverOutcome {
+    let (requests, observations) = match finish_evaluation_input_requests_request_child(
+        evaluation_input_requests_request_child(ctx, &key.workspace, mode).await,
+    ) {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
+    };
+    let requests =
+        match finish_evaluation_input_requests_request_semantic(&requests, observations.dupe()) {
+            Ok(value) => value,
+            Err(terminal) => return terminal,
+        };
+    let (root_files, observations) = match finish_evaluation_input_requests_root_child(
+        evaluation_input_requests_root_child(ctx, &key.workspace, mode).await,
+        requests.dupe(),
+        observations,
+    ) {
+        Ok(value) => value,
+        Err(terminal) => return terminal,
+    };
+    evaluation_input_requests_complete(
+        selected_extension_evaluation_input_requests(requests, &root_files),
+        observations,
+    )
+}
+
+fn project_legacy_evaluation_input_requests(
+    outcome: EvaluationInputRequestsDriverOutcome,
+) -> EvaluationInputRequestsOutcome {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+        SourcePreparationOutcome::Complete(Ok((result, _))) => {
+            SourcePreparationOutcome::Complete(result)
+        }
+        SourcePreparationOutcome::Complete(Err(_)) => {
+            unreachable!("legacy evaluation-input requests have no observed frontier")
+        }
+    }
+}
+
 #[async_trait]
 impl Key for HostSelectedExtensionEvaluationInputRequestsKey {
+    type Value = EvaluationInputRequestsOutcome;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        project_legacy_evaluation_input_requests(
+            drive_evaluation_input_requests(ctx, self, RoutesMode::Legacy).await,
+        )
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
+    }
+}
+
+#[async_trait]
+impl Key for HostSelectedExtensionEvaluationInputRequestsObservationKey {
     type Value = SourcePreparationOutcome<
-        Arc<
-            Result<
-                HostSelectedExtensionEvaluationInputRequests,
-                HostSelectedExtensionEvaluationInputRequestsError,
-            >,
+        Result<
+            ObservedHostSelectedExtensionEvaluationInputRequests,
+            EvaluationInputRequestsObservationError,
         >,
     >;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let load_requests = match ctx
-            .compute(&HostSelectedExtensionDefinitionLoadRequestsKey::new(
-                self.workspace.dupe(),
-            ))
-            .await
-        {
-            Ok(SourcePreparationOutcome::Need(need)) => {
-                return SourcePreparationOutcome::Need(need);
+        match drive_evaluation_input_requests(ctx, &self.0, RoutesMode::Observed).await {
+            SourcePreparationOutcome::Need(need) => SourcePreparationOutcome::Need(need),
+            SourcePreparationOutcome::Complete(Err(error)) => {
+                SourcePreparationOutcome::Complete(Err(error))
             }
-            Ok(SourcePreparationOutcome::Complete(value)) => match value.as_ref() {
-                Ok(value) => Arc::new(value.clone()),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostSelectedExtensionEvaluationInputRequestsError::LoadRequests(
-                            error.clone(),
-                        ),
-                    )));
-                }
-            },
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostSelectedExtensionEvaluationInputRequestsError::LoadRequestsCompute(
-                        error.to_string().into(),
-                    ),
-                )));
-            }
-        };
-        let root_files = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.as_path().to_owned(),
-            })
-            .await
-        {
-            Ok(value) => match value.as_ref() {
-                Ok(value) => value.clone(),
-                Err(error) => {
-                    return SourcePreparationOutcome::Complete(Arc::new(Err(
-                        HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
-                            load_requests,
-                            request: None,
-                            error: HostSelectedExtensionEvaluationInputError::RootFiles(
-                                error.clone(),
-                            ),
-                        },
-                    )));
-                }
-            },
-            Err(error) => {
-                return SourcePreparationOutcome::Complete(Arc::new(Err(
-                    HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
-                        load_requests,
-                        request: None,
-                        error: HostSelectedExtensionEvaluationInputError::RootFilesCompute(
-                            error.to_string().into(),
-                        ),
+            SourcePreparationOutcome::Complete(Ok((result, observations))) => {
+                SourcePreparationOutcome::Complete(Ok(
+                    ObservedHostSelectedExtensionEvaluationInputRequests {
+                        result,
+                        observations,
                     },
-                )));
+                ))
             }
-        };
-        SourcePreparationOutcome::Complete(Arc::new(selected_extension_evaluation_input_requests(
-            load_requests,
-            &root_files,
-        )))
+        }
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
@@ -5124,6 +5410,167 @@ mod tests {
             ))
             .await
             .unwrap()
+    }
+
+    async fn compute_real_observed_evaluation_inputs(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        include_epoch: bool,
+        tracker: Option<Arc<RepoSpecTracker>>,
+    ) -> <HostSelectedExtensionEvaluationInputRequestsObservationKey as Key>::Value {
+        real_transaction_with_tracker(dice, root, generation, &[], include_epoch, tracker)
+            .await
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(
+                    NormalizedAbsolutePath::new(WORKSPACE).unwrap(),
+                ),
+            )
+            .await
+            .unwrap()
+    }
+
+    fn complete_observed_evaluation_inputs(
+        value: &<HostSelectedExtensionEvaluationInputRequestsObservationKey as Key>::Value,
+    ) -> ObservedHostSelectedExtensionEvaluationInputRequests {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = value else {
+            panic!("observed evaluation inputs must complete: {value:?}");
+        };
+        observed.dupe()
+    }
+
+    async fn observed_evaluation_state(
+        dice: &Arc<Dice>,
+        root: &str,
+        generation: u64,
+        mode: crate::LockfileMode,
+    ) -> (
+        ObservedHostSelectedExtensionEvaluationInputRequests,
+        ObservedHostSelectedExtensionDefinitionLoadRequests,
+        crate::module_eval::ObservedRootModuleFiles,
+    ) {
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let _ = real_transaction(dice, root, generation, &[], true).await;
+        let mut updater = dice.updater();
+        crate::inject_root_module_request_inputs(
+            &mut updater,
+            workspace.as_path(),
+            crate::BzlmodCommandPolicyKey::from_flags(None, false).unwrap(),
+            crate::BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            mode,
+        )
+        .unwrap();
+        let mut transaction = updater.commit().await;
+        let parent_value = transaction
+            .compute(
+                &HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+            .unwrap();
+        let parent = complete_observed_evaluation_inputs(&parent_value);
+        let requests_value = transaction
+            .compute(
+                &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe()),
+            )
+            .await
+            .unwrap();
+        let requests = complete_observed_definition_requests(&requests_value);
+        let root_value = transaction
+            .compute(&RootModuleFilesObservationKey::new(workspace))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(root)) = root_value else {
+            panic!("observed root files must complete: {root_value:?}");
+        };
+        (parent, requests, root)
+    }
+
+    fn assert_no_evaluation_input_upper(rows: &[(String, Vec<String>)]) {
+        let forbidden = "host-bzl-module: observed-host-bzl-module: host-loaded-module-extension-definitions: host-prepared-module-extension-inputs: host-pure-module-extension-invocations: host-instantiated-module-extension-repositories: host-validated-module-extension-repositories: host-root-repository-mapping: host-canonical-selected-module-definition: host-generated-repository-definition: slug-command:";
+        assert!(rows.iter().all(|(owner, deps)| {
+            !forbidden.split(' ').any(|prefix| {
+                owner.starts_with(prefix) || deps.iter().any(|dep| dep.starts_with(prefix))
+            })
+        }));
+    }
+
+    fn assert_evaluation_input_semantic_failure_prefixes(
+        requests: Arc<HostSelectedExtensionDefinitionLoadRequests>,
+        root: &crate::module_eval::RootModuleFiles,
+        request_epoch: &PathObservationEpoch,
+        root_epoch: &PathObservationEpoch,
+    ) {
+        let root_semantic = finish_evaluation_input_requests_root_child(
+            RepoSpecChild::Complete {
+                result: Arc::new(Err("root semantic".into())),
+                observations: root_epoch.dupe(),
+            },
+            requests.dupe(),
+            request_epoch.dupe(),
+        );
+        let Err(SourcePreparationOutcome::Complete(Ok((result, observations)))) = root_semantic
+        else {
+            panic!("root semantic failure must retain the full epoch");
+        };
+        assert!(matches!(
+            result.as_ref(),
+            Err(HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                error: HostSelectedExtensionEvaluationInputError::RootFiles(message),
+                ..
+            }) if message == "root semantic"
+        ));
+        assert_exact_repo_epoch(root_epoch, &observations);
+
+        let mut invalid_root = root.clone();
+        invalid_root.extension_usages = Arc::from([]);
+        let SourcePreparationOutcome::Complete(Ok((invalid, invalid_observations))) =
+            evaluation_input_requests_complete(
+                selected_extension_evaluation_input_requests(requests, &invalid_root),
+                root_epoch.dupe(),
+            )
+        else {
+            panic!("pure invalid projection must retain the full epoch");
+        };
+        assert!(matches!(
+            invalid.as_ref(),
+            Err(
+                HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                    error: HostSelectedExtensionEvaluationInputError::Invalid(_),
+                    ..
+                }
+            )
+        ));
+        assert_exact_repo_epoch(root_epoch, &invalid_observations);
+    }
+
+    fn assert_evaluation_input_observation_equality(
+        result: EvaluationInputRequestsResult,
+        request_epoch: PathObservationEpoch,
+        root_epoch: PathObservationEpoch,
+        need: SourcePreparationNeeds,
+    ) {
+        let associated = |observations| {
+            SourcePreparationOutcome::Complete(Ok(
+                ObservedHostSelectedExtensionEvaluationInputRequests {
+                    result: result.dupe(),
+                    observations,
+                },
+            ))
+        };
+        assert!(
+            !HostSelectedExtensionEvaluationInputRequestsObservationKey::equality(
+                &associated(request_epoch),
+                &associated(root_epoch),
+            )
+        );
+        let need_value = SourcePreparationOutcome::Need(need);
+        assert!(!HostSelectedExtensionEvaluationInputRequestsObservationKey::validity(&need_value));
+        assert!(
+            !HostSelectedExtensionEvaluationInputRequestsObservationKey::equality(
+                &need_value,
+                &need_value
+            )
+        );
     }
 
     async fn compute_real_root_files(
@@ -10686,5 +11133,525 @@ inject_repo(three, injected = "target")
                 assert!(Arc::ptr_eq(result, current), "{demand:?}");
             }
         }
+    }
+
+    #[tokio::test]
+    async fn observed_evaluation_inputs_identity_and_terminals_are_exact() {
+        const ROOT: &str = "module(name='bazel_tools')\ne=use_extension('//:e.bzl','e')\nuse_repo(e, repo='repo')\n";
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe());
+        let other = HostSelectedExtensionEvaluationInputRequestsObservationKey::new(
+            NormalizedAbsolutePath::new("/other").unwrap(),
+        );
+        let hash = |value: &HostSelectedExtensionEvaluationInputRequestsObservationKey| {
+            let mut state = std::collections::hash_map::DefaultHasher::new();
+            std::hash::Hash::hash(value, &mut state);
+            std::hash::Hasher::finish(&state)
+        };
+        assert_ne!(key, other);
+        assert_ne!(hash(&key), hash(&other));
+        assert_eq!(
+            key.to_string(),
+            "observed-host-selected-extension-evaluation-inputs:\"/selected-repo-spec-test\""
+        );
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut transaction = real_transaction(&dice, ROOT, 1, &[], true).await;
+        let requests_observed = complete_observed_definition_requests(
+            &transaction
+                .compute(
+                    &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(
+                        workspace.dupe(),
+                    ),
+                )
+                .await
+                .unwrap(),
+        );
+        let requests = requests_observed.result().dupe();
+        let root_value = transaction
+            .compute(&RootModuleFilesObservationKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(root_observed)) = root_value else {
+            panic!("observed root files must complete: {root_value:?}");
+        };
+
+        let request_demand = observation("/request", PathObservationOperation::Lstat);
+        let root_demand = observation("/root", PathObservationOperation::FileBytes);
+        let request_result = Arc::new(PathObservationResult::Lstat(PathOperationResult::Missing));
+        let root_result = Arc::new(PathObservationResult::FileBytes(
+            PathOperationResult::Missing,
+        ));
+        let request_epoch =
+            PathObservationEpoch::from_shared([(request_demand.dupe(), request_result.dupe())])
+                .unwrap();
+        let root_epoch = PathObservationEpoch::from_shared([
+            (request_demand.dupe(), request_result.dupe()),
+            (root_demand.dupe(), root_result.dupe()),
+        ])
+        .unwrap();
+        let need = SourcePreparationNeeds::path(
+            slug_workspace_v2::NeedPathObservations::singleton(request_demand.dupe()),
+        );
+        assert!(matches!(
+            finish_evaluation_input_requests_request_child(RepoSpecChild::Compute("request".into())),
+            Err(SourcePreparationOutcome::Complete(Ok((result, observations))))
+                if matches!(result.as_ref(), Err(
+                    HostSelectedExtensionEvaluationInputRequestsError::LoadRequestsCompute(message)
+                ) if message == "request") && observations.observations().is_empty()
+        ));
+        assert!(matches!(
+            finish_evaluation_input_requests_request_child(RepoSpecChild::Need(need.dupe())),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        let request_outer = DefinitionLoadRequestsObservationError::Mappings(
+            ExtensionMappingsObservationError::RootFiles(ObservedPathFrontierError::from(
+                PathObservationEpochError::OperationMismatch {
+                    demand: request_demand.dupe(),
+                    result_operation: PathObservationOperation::FileBytes,
+                },
+            )),
+        );
+        assert!(matches!(
+            finish_evaluation_input_requests_request_child(RepoSpecChild::Outer(request_outer)),
+            Err(SourcePreparationOutcome::Complete(Err(
+                EvaluationInputRequestsObservationError::Requests(_)
+            )))
+        ));
+        let (forwarded, forwarded_epoch) =
+            finish_evaluation_input_requests_request_child(RepoSpecChild::Complete {
+                result: requests.dupe(),
+                observations: request_epoch.dupe(),
+            })
+            .unwrap();
+        assert!(Arc::ptr_eq(&forwarded, &requests));
+        assert_exact_repo_epoch(&request_epoch, &forwarded_epoch);
+
+        let requests_value =
+            finish_evaluation_input_requests_request_semantic(&forwarded, forwarded_epoch.dupe())
+                .unwrap();
+        assert!(matches!(
+            finish_evaluation_input_requests_root_child(
+                RepoSpecChild::Compute("root".into()),
+                requests_value.dupe(),
+                forwarded_epoch.dupe(),
+            ),
+            Err(SourcePreparationOutcome::Complete(Ok((result, observations))))
+                if matches!(result.as_ref(), Err(
+                    HostSelectedExtensionEvaluationInputRequestsError::AfterRequests {
+                        error: HostSelectedExtensionEvaluationInputError::RootFilesCompute(message),
+                        ..
+                    }
+                ) if message == "root") && observations == request_epoch
+        ));
+        assert!(matches!(
+            finish_evaluation_input_requests_root_child(
+                RepoSpecChild::Need(need.dupe()),
+                requests_value.dupe(),
+                forwarded_epoch.dupe(),
+            ),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        assert!(matches!(
+            finish_evaluation_input_requests_root_child(
+                RepoSpecChild::Outer(ObservedPathFrontierError::from(
+                    PathObservationEpochError::OperationMismatch {
+                        demand: root_demand.dupe(),
+                        result_operation: PathObservationOperation::Lstat,
+                    },
+                )),
+                requests_value.dupe(),
+                forwarded_epoch.dupe(),
+            ),
+            Err(SourcePreparationOutcome::Complete(Err(
+                EvaluationInputRequestsObservationError::RootFiles(_)
+            )))
+        ));
+        assert_evaluation_input_semantic_failure_prefixes(
+            requests_value.dupe(),
+            root_observed.result().as_ref().as_ref().unwrap(),
+            &forwarded_epoch,
+            &root_epoch,
+        );
+        let (root, merged) = finish_evaluation_input_requests_root_child(
+            RepoSpecChild::Complete {
+                result: root_observed.result().dupe(),
+                observations: root_epoch.dupe(),
+            },
+            requests_value.dupe(),
+            forwarded_epoch,
+        )
+        .unwrap();
+        assert_eq!(
+            root.as_ref(),
+            root_observed.result().as_ref().as_ref().unwrap()
+        );
+        assert_exact_repo_epoch(&root_epoch, &merged);
+        assert!(Arc::ptr_eq(
+            merged.get(&request_demand).unwrap(),
+            &request_result
+        ));
+
+        let conflict = PathObservationEpoch::from_shared([(
+            request_demand.dupe(),
+            Arc::new(PathObservationResult::Lstat(PathOperationResult::Present(
+                PathLstat::new(PathNodeKind::Directory, 1, 2, 3, 4, 0o755),
+            ))),
+        )])
+        .unwrap();
+        let mut prefix = request_epoch.dupe();
+        assert!(matches!(
+            merge_evaluation_input_observations(
+                &mut prefix,
+                &conflict,
+                EvaluationInputObservationStage::RootFiles,
+            ),
+            Err(EvaluationInputRequestsObservationError::Merge {
+                stage: EvaluationInputObservationStage::RootFiles,
+                ..
+            })
+        ));
+        assert!(matches!(
+            evaluation_input_merge_error(
+                EvaluationInputObservationStage::RootFiles,
+                PathObservationEpochError::OperationMismatch {
+                    demand: root_demand,
+                    result_operation: PathObservationOperation::Lstat,
+                },
+            ),
+            EvaluationInputRequestsObservationError::Merge {
+                stage: EvaluationInputObservationStage::RootFiles,
+                ..
+            }
+        ));
+
+        let pure = Arc::new(selected_extension_evaluation_input_requests(
+            requests_value,
+            &root,
+        ));
+        assert_evaluation_input_observation_equality(pure, request_epoch, root_epoch, need);
+    }
+
+    #[tokio::test]
+    async fn observed_evaluation_inputs_match_families_events_errors_and_warm() {
+        const ROOT: &str = "module(name='bazel_tools')\ne=use_extension('//:e.bzl','e')\nuse_repo(e, repo='repo')\n";
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace.dupe());
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut transaction =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        let cold = transaction.compute(&key).await.unwrap();
+        let observed = complete_observed_evaluation_inputs(&cold);
+        let requests = complete_observed_definition_requests(
+            &transaction
+                .compute(
+                    &HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(
+                        workspace.dupe(),
+                    ),
+                )
+                .await
+                .unwrap(),
+        );
+        let root_value = transaction
+            .compute(&RootModuleFilesObservationKey::new(workspace.dupe()))
+            .await
+            .unwrap();
+        let SourcePreparationOutcome::Complete(Ok(root)) = root_value else {
+            panic!("observed root files must complete: {root_value:?}");
+        };
+        let mut expected = requests.observations().dupe();
+        merge_evaluation_input_observations(
+            &mut expected,
+            root.observations(),
+            EvaluationInputObservationStage::RootFiles,
+        )
+        .unwrap();
+        assert_exact_repo_epoch(&expected, observed.observations());
+        assert_eq!(
+            observed.result().as_ref().as_ref().unwrap().parts().0,
+            requests.result().as_ref().as_ref().unwrap()
+        );
+
+        let (observed_activations, observed_rows) = tracker.take();
+        assert_eq!(
+            repo_spec_row(&observed_rows, &key.to_string()),
+            [
+                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace.dupe())
+                    .to_string(),
+                RootModuleFilesObservationKey::new(workspace.dupe()).to_string(),
+            ]
+        );
+        assert!(
+            observed_activations
+                .iter()
+                .any(|entry| entry.key == key.to_string() && entry.batch.is_none())
+        );
+        assert!(
+            HostSelectedExtensionEvaluationInputRequestsObservationKey::equality(
+                &cold,
+                &transaction.compute(&key).await.unwrap()
+            )
+        );
+        assert!(tracker.take().0.iter().all(|entry| entry.batch.is_none()));
+
+        let legacy_tracker = Arc::new(RepoSpecTracker::default());
+        let legacy_dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let legacy_key = HostSelectedExtensionEvaluationInputRequestsKey::new(workspace.dupe());
+        let mut legacy = real_transaction_with_tracker(
+            &legacy_dice,
+            ROOT,
+            1,
+            &[],
+            true,
+            Some(legacy_tracker.dupe()),
+        )
+        .await;
+        let SourcePreparationOutcome::Complete(legacy_result) =
+            legacy.compute(&legacy_key).await.unwrap()
+        else {
+            panic!("legacy evaluation inputs must complete")
+        };
+        assert_eq!(observed.result(), &legacy_result);
+        let (legacy_activations, legacy_rows) = legacy_tracker.take();
+        assert_eq!(
+            repo_spec_row(&legacy_rows, &legacy_key.to_string()),
+            [
+                HostSelectedExtensionDefinitionLoadRequestsKey::new(workspace.dupe()).to_string(),
+                RootModuleFilesKey {
+                    workspace: workspace.as_path().to_owned(),
+                }
+                .to_string(),
+            ]
+        );
+        let eventful = |entries: &[RepoSpecActivation]| {
+            entries
+                .iter()
+                .filter_map(|entry| entry.batch.dupe().map(|batch| (entry.key.clone(), batch)))
+                .collect::<Vec<_>>()
+        };
+        let observed_events = eventful(&observed_activations);
+        let legacy_events = eventful(&legacy_activations);
+        assert_eq!(
+            observed_events
+                .iter()
+                .map(|(_, batch)| batch)
+                .collect::<Vec<_>>(),
+            legacy_events
+                .iter()
+                .map(|(_, batch)| batch)
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            observed_events
+                .iter()
+                .map(|(owner, _)| owner.as_str())
+                .collect::<Vec<_>>(),
+            ["bzlmod-observed-host-root-module-file:\"/selected-repo-spec-test\""]
+        );
+        assert_eq!(
+            legacy_events
+                .iter()
+                .map(|(owner, _)| owner.as_str())
+                .collect::<Vec<_>>(),
+            ["root-module-evaluation:/selected-repo-spec-test"]
+        );
+        assert!(observed_rows.iter().all(|(owner, deps)| {
+            !owner.starts_with("host-selected-extension-definition-load-requests:")
+                && !owner.starts_with("root-module-files:")
+                && deps.iter().all(|dep| {
+                    !dep.starts_with("host-selected-extension-definition-load-requests:")
+                        && !dep.starts_with("root-module-files:")
+                })
+        }));
+        assert!(legacy_rows.iter().all(|(owner, deps)| {
+            !owner.starts_with("observed-host-selected-extension-definition-load-requests:")
+                && !owner.starts_with("observed-root-module-files:")
+                && deps.iter().all(|dep| {
+                    !dep.starts_with("observed-host-selected-extension-definition-load-requests:")
+                        && !dep.starts_with("observed-root-module-files:")
+                })
+        }));
+        assert_no_evaluation_input_upper(&observed_rows);
+        assert_no_evaluation_input_upper(&legacy_rows);
+
+        let error = complete_observed_evaluation_inputs(
+            &compute_real_observed_evaluation_inputs(
+                &dice,
+                "module(name='bazel_tools')\ne=use_extension('@missing//:e.bzl','e')\n",
+                2,
+                true,
+                Some(tracker.dupe()),
+            )
+            .await,
+        );
+        let request_error = complete_observed_definition_requests(
+            &compute_real_observed_definition_requests(
+                &dice,
+                "module(name='bazel_tools')\ne=use_extension('@missing//:e.bzl','e')\n",
+                2,
+                true,
+                None,
+            )
+            .await,
+        );
+        let request_terminal = finish_evaluation_input_requests_request_semantic(
+            request_error.result().as_ref(),
+            request_error.observations().dupe(),
+        );
+        let Err(SourcePreparationOutcome::Complete(Ok((request_result, request_epoch)))) =
+            request_terminal
+        else {
+            panic!("request semantic failure must retain the request epoch");
+        };
+        assert!(matches!(
+            error.result().as_ref(),
+            Err(HostSelectedExtensionEvaluationInputRequestsError::LoadRequests(_))
+        ));
+        assert!(matches!(
+            request_result.as_ref(),
+            Err(HostSelectedExtensionEvaluationInputRequestsError::LoadRequests(_))
+        ));
+        assert_exact_repo_epoch(request_error.observations(), &request_epoch);
+        assert_exact_repo_epoch(request_error.observations(), error.observations());
+        let error_rows = tracker.take().1;
+        assert_eq!(
+            repo_spec_row(&error_rows, &key.to_string()),
+            [
+                HostSelectedExtensionDefinitionLoadRequestsObservationKey::new(workspace)
+                    .to_string()
+            ]
+        );
+        assert_no_evaluation_input_upper(&error_rows);
+    }
+
+    #[tokio::test]
+    async fn observed_evaluation_inputs_restore_each_revision_family() {
+        const A: &str = "module(name='bazel_tools',repo_name='root',version='1')\na=use_extension('//:a.bzl','a')\na.tag(value='a')\nb=use_extension('//:b.bzl','b')\nb.tag(value='b')\n";
+        const REQUEST_B: &str = "module(name='bazel_tools',repo_name='root',version='1')\nb=use_extension('//:b.bzl','b')\nb.tag(value='b')\na=use_extension('//:a.bzl','a')\na.tag(value='a')\n";
+        const ROOT_B: &str = A;
+        const PURE_B: &str = "module(name='bazel_tools',repo_name='root',version='2')\na=use_extension('//:a.bzl','a')\na.tag(value='a')\nb=use_extension('//:b.bzl','b')\nb.tag(value='b')\n";
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let update = crate::LockfileMode::Update;
+        let (a, requests_a, root_a) = observed_evaluation_state(&dice, A, 1, update.clone()).await;
+        let held_result = a.result().dupe();
+        let held_epoch = a.observations().dupe();
+
+        let (request_b, requests_b, _) =
+            observed_evaluation_state(&dice, REQUEST_B, 2, update.clone()).await;
+        assert_ne!(requests_a.result(), requests_b.result());
+        assert_ne!(a.result(), request_b.result());
+        let (request_restored, requests_restored, _) =
+            observed_evaluation_state(&dice, A, 3, update.clone()).await;
+        assert_eq!(requests_a, requests_restored);
+        assert_eq!(a, request_restored);
+
+        let (root_b, requests_root_b, root_files_b) =
+            observed_evaluation_state(&dice, ROOT_B, 4, crate::LockfileMode::Off).await;
+        assert_eq!(requests_a.result(), requests_root_b.result());
+        assert_ne!(root_a.result(), root_files_b.result());
+        assert_eq!(a.result(), root_b.result());
+        assert_ne!(a.observations(), root_b.observations());
+        let (root_restored, requests_root_restored, root_files_restored) =
+            observed_evaluation_state(&dice, A, 5, update.clone()).await;
+        assert_eq!(requests_a, requests_root_restored);
+        assert_eq!(root_a, root_files_restored);
+        assert_eq!(a, root_restored);
+
+        let (pure_b, _, _) = observed_evaluation_state(&dice, PURE_B, 6, update.clone()).await;
+        assert_ne!(a.result(), pure_b.result());
+        let (restored, requests_final, root_final) =
+            observed_evaluation_state(&dice, A, 7, update).await;
+        assert_eq!(requests_a, requests_final);
+        assert_eq!(root_a, root_final);
+        assert_eq!(a, restored);
+        let fixed_epoch = |result| {
+            SourcePreparationOutcome::Complete(Ok(
+                ObservedHostSelectedExtensionEvaluationInputRequests {
+                    result,
+                    observations: held_epoch.dupe(),
+                },
+            ))
+        };
+        assert!(
+            !HostSelectedExtensionEvaluationInputRequestsObservationKey::equality(
+                &fixed_epoch(a.result().dupe()),
+                &fixed_epoch(pure_b.result().dupe()),
+            )
+        );
+        assert!(
+            HostSelectedExtensionEvaluationInputRequestsObservationKey::equality(
+                &fixed_epoch(a.result().dupe()),
+                &fixed_epoch(restored.result().dupe()),
+            )
+        );
+        assert_eq!(held_result.as_ref(), restored.result().as_ref());
+        let module_file = format!("{WORKSPACE}/MODULE.bazel");
+        for (demand, result) in held_epoch.observations() {
+            let current = restored.observations().get(demand).unwrap();
+            assert_eq!(result.as_ref(), current.as_ref());
+            if demand.path().as_path() != Path::new(&module_file) {
+                assert!(Arc::ptr_eq(result, current), "{demand:?}");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_evaluation_inputs_poll_drop_publishes_nothing_and_recovers() {
+        const ROOT: &str = "module(name='bazel_tools')\nbazel_dep(name='dep', version='1')\n";
+        let io = Arc::new(CancelOnceRegistryIo {
+            calls: AtomicUsize::new(0),
+        });
+        let mut builder = Dice::builder();
+        crate::install_registry_io(&mut builder, io.dupe());
+        let dice = Arc::new(builder.build(DetectCycles::Enabled));
+        let tracker = Arc::new(RepoSpecTracker::default());
+        let workspace = NormalizedAbsolutePath::new(WORKSPACE).unwrap();
+        let key = HostSelectedExtensionEvaluationInputRequestsObservationKey::new(workspace);
+        let mut cancelled =
+            real_transaction_with_tracker(&dice, ROOT, 1, &[], true, Some(tracker.dupe())).await;
+        tracker.take();
+        let mut future = Box::pin(cancelled.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            while io.calls.load(Ordering::SeqCst) == 0 {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .unwrap();
+        drop(future);
+        drop(cancelled);
+        let (cancelled_activations, cancelled_rows) = tracker.take();
+        assert!(
+            cancelled_rows
+                .iter()
+                .all(|(owner, _)| owner != &key.to_string())
+        );
+        assert!(
+            cancelled_activations
+                .iter()
+                .all(|entry| entry.key != key.to_string())
+        );
+        assert_no_evaluation_input_upper(&cancelled_rows);
+
+        let recovered = complete_observed_evaluation_inputs(
+            &compute_real_observed_evaluation_inputs(&dice, ROOT, 1, true, Some(tracker.dupe()))
+                .await,
+        );
+        assert!(recovered.result().as_ref().is_ok());
+        assert!(!recovered.observations().observations().is_empty());
+        let (recovered_activations, recovered_rows) = tracker.take();
+        assert!(
+            recovered_activations
+                .iter()
+                .filter(|entry| entry.key == key.to_string())
+                .all(|entry| entry.batch.is_none())
+        );
+        assert_no_evaluation_input_upper(&recovered_rows);
     }
 }
