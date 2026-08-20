@@ -10125,3 +10125,32 @@ After independent correction ACCEPT schedule exactly
 `WP-6-7A-host-discovered-module-observation-implementation-retry`; only after
 retry ACCEPT return to the docs-only selected-module-graph frontier. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Discovered-module proof authority corrected (2026-08-20)
+
+Correction `b09d5e70` activates only
+`WP-6-7A-host-discovered-module-observation-implementation-retry` from Rust
+base `223c8112` and semantic design `b8e4cc03`. Write exactly
+`source_preparation.rs` and `source_preparation_observation_tests.rs`.
+
+Keep source authority <=360 production/+40 colocated proof and <=16,950
+physical. External proof is <=1,200/8,500; aggregate is <=1,600 semantic and
+<=25,450 physical. Helpers/tests remain below 200; no third file/export/caller
+is writable.
+
+Preserve the one Legacy/Observed driver, exact effective then builtin/
+nonregistry/registry order, left-first Arc/prefix algebra, carrierless Need/
+outer, exact legacy projection, builtin zero-parent-batch behavior,
+nonregistry/registry event ownership and one Result Arc+compact epoch retention.
+
+Complete only real reachable branch terminals, production-called invariant
+projectors plus accepted lower typed proof for unreachable classes without hooks
+or inconsistent child injection, exact complete family/event sequences and
+separated held-handle effective/closure/preparation/evaluation lifecycles.
+Preserve every existing identity/prefix/Arc/family/event/warm/cancel/upper
+discriminator.
+
+STOP production semantic/event/family/memory drift, wider authority, upper
+activation, proof hook/waiver, cap excess or milestone closure. REPLAN before
+widening. After independent implementation ACCEPT return only to the docs-only
+selected-module-graph frontier. M7 remains partial and M7A -> M8 -> M7B remains.

@@ -1,13 +1,13 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-discovered-module-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-host-discovered-module-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `858e9b8e`
+Scheduling/proof correction: `b09d5e70`
 Rust base: `223c8112`
 Accepted semantic design: `b8e4cc03`
 
-## Formal REPLAN evidence
+## Accepted correction and exact retry authority
 
 The retained two-file candidate is production-sound. One private
 `HostDiscoveredModuleObservationKey` and one shared Legacy/Observed driver
@@ -39,13 +39,10 @@ carrier must be compared with the restored carrier. Compressing these into the
 old ceiling would remove discriminating evidence. This is a proof-cap REPLAN,
 not a semantic redesign or lower-owner prerequisite.
 
-## Docs-only correction authority
+## Exact implementation authority
 
-During this correction the two dirty Rust files are retained and non-writable.
-Write only canonical, current, this Stage and the orchestration routing log.
-Every Rust/test file, fixture, oracle, caller and public export is read-only.
-Net docs caps are canonical <=40, current <=220, Stage <=180 and routing <=30,
-with <=470 aggregate.
+Write only the retained two-file Rust candidate. Every third Rust/test file,
+fixture, oracle, plan document, caller and public export is read-only.
 
 Freeze production and the exact two-file retry authority. Keep:
 
@@ -100,11 +97,9 @@ extensions, broader bootstrap work, M8/M7B and exact identity bytes remain
 deferred.
 
 STOP any production semantic/event/family/memory change, wider authority, upper
-activation, proof waiver, cap excess or milestone closure. After independent
-correction ACCEPT schedule only
-`WP-6-7A-host-discovered-module-observation-implementation-retry`. Only after
-retry ACCEPT return to the docs-only selected-module-graph frontier. M7 remains
-partial and M7A -> M8 -> M7B remains.
+activation, proof hook/waiver, cap excess or milestone closure. REPLAN before
+widening. After independent implementation ACCEPT return only to the docs-only
+selected-module-graph frontier. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical owner decision and frozen implementation contract
 
