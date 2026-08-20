@@ -11171,3 +11171,32 @@ M8/M7B work. REPLAN before widening. Design ACCEPT schedules exactly
 `WP-6-7A-host-selected-extension-mappings-observation-implementation`; only
 after implementation ACCEPT resume the docs extension frontier. M7 remains
 partial and M7A -> M8 -> M7B remains.
+
+### Extension-mappings observation design accepted (2026-08-20)
+
+Accepted design `9cbcbfc5` from Rust base `9d2f7a7d` activates only
+`WP-6-7A-host-selected-extension-mappings-observation-implementation`.
+
+Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 9,265
+physical/test boundary 3,722, within <=300 production, <=650 proof, <=950
+aggregate semantic and <=10,300 physical. Helpers/tests remain below 200; no
+second file/key, caller, export or upper consumer is writable.
+
+Add the private mapping Result-Arc+cumulative-epoch sibling and one shared
+Legacy/Observed driver. Preserve matching routes first, matching root files
+second and unchanged pure mapping projection. Merge Complete epochs immediately
+left-first so route-carried duplicate root demands retain their exact earliest
+epoch Arcs.
+
+Preserve empty/route/full semantic prefixes, carrierless route and
+observed-root Need/outers, legacy-root Complete-only invariants and stage-aware
+merge failure. Parent remains eventless; child batch ownership/order and direct
+root reuse remain exact. Retain only the local mapping Result Arc+compact epoch;
+all child carriers and mapping/merge/event scratch remain compute-local.
+
+Require the complete accepted identity, terminal, Arc, family, event, warm,
+cancel/recovery, held-lifecycle and upper-nonactivation proof. STOP
+semantic/event/family/memory drift, impossible-child injection, wider
+authority, proof waiver, cap excess or milestone closure. REPLAN before
+widening. After implementation ACCEPT return only to the docs extension
+frontier. M7 remains partial and M7A -> M8 -> M7B remains.

@@ -1,9 +1,9 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-mappings-observation-design`
+Packet: `WP-6-7A-host-selected-extension-mappings-observation-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `adad16b7`
+Accepted design: `9cbcbfc5`
 Rust base: `9d2f7a7d`
 
 ## Owner decision
@@ -20,7 +20,7 @@ this reusable semantic boundary. Both mutable children now have accepted
 matching observation siblings. Root extension usages are already carried by
 `ObservedRootModuleFiles`; a separate usage carrier would be artificial.
 
-## Exact future Rust authority
+## Exact implementation authority
 
 Write only `app/slug_bzlmod_v2/src/selected_repo_spec.rs`, baseline 9,265
 physical lines with first `#[cfg(test)]` at line 3,722. Caps are <=300
@@ -32,7 +32,7 @@ Do not edit `module_eval.rs`, any caller/consumer, public export, fixture,
 oracle or another Rust file. `RootModuleFilesObservationKey` and
 `HostSelectedModuleRoutesObservationKey` are accepted read-only children.
 
-## Frozen design
+## Frozen implementation contract
 
 Add private `HostSelectedExtensionMappingsObservationKey` wrapping the legacy
 key and private `ObservedHostSelectedExtensionMappings`. The carrier derives
@@ -136,10 +136,8 @@ STOP a second Rust file/key, caller/export activation, mapping/error/event/famil
 drift, retained child or traversal state, cap/proof waiver, milestone closure,
 M8/M7B work or bypassing accepted children. REPLAN before widening.
 
-After independent design ACCEPT schedule exactly
-`WP-6-7A-host-selected-extension-mappings-observation-implementation`. After
-implementation ACCEPT return only to the docs-only extension observation
-frontier. M7 remains partial and M7A -> M8 -> M7B remains.
+Implement only the authority and contract above. After independent implementation
+ACCEPT return only to the docs-only extension observation frontier. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical accepted extension frontier audit
 
