@@ -1,13 +1,14 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-source-preparation-observation-proof-cap-correction-design`
+Packet: `WP-6-7A-module-source-preparation-observation-implementation-retry`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `9aba0214`
+Scheduling base: `2c505e13`
 Accepted design: `5436a421`
 Rust base: `0f9a0559`
+Accepted proof correction: `2c505e13`
 
-## Formal REPLAN and exact docs-only authority
+## Accepted correction and resumed implementation authority
 
 The retained two-file implementation candidate is production-sound: one shared
 Legacy/Observed semantic driver preserves effective -> source or policy ->
@@ -28,24 +29,21 @@ resolution and FileBytes terminals, and independent registry/lockfile/symlink
 lifecycles. Deleting existing exact family, event, cancellation, Arc or
 lifecycle discriminators would make the proof weaker rather than bounded.
 
-This correction may write only canonical/current/Stage 6/routing at <=40,
-<=220, <=180 and <=30 net lines and <=470 aggregate. The two dirty Rust files
-are retained candidate state and are non-writable during this design. Every
-Rust/test/fixture/oracle/caller/public file is read-only.
+This retry may write only the two Rust files listed below under the corrected
+caps. Every third Rust/test file, fixture, oracle, caller, public export and
+plan document is read-only during implementation.
 
-Correct future retry caps only: keep `source_preparation.rs` at <=700
+Corrected caps keep `source_preparation.rs` at <=700
 production, <=60 colocated proof and <=16,900 physical; raise only the external
 proof file to <=1,800 proof and <=7,150 physical. Aggregate semantic cap becomes
 <=2,560 and aggregate physical cap <=24,050. Production identity, semantics,
 events, families, memory and the two-file authority remain frozen.
 
-After independent correction ACCEPT schedule exactly
-`WP-6-7A-module-source-preparation-observation-implementation-retry`. After
-that implementation ACCEPT return only to the docs-only selected-module-graph
-frontier for discovery. STOP code now, a third file, semantic redesign, proof
-waiver, cap excess, upper activation or milestone closure.
+After independent implementation ACCEPT return only to the docs-only
+selected-module-graph frontier for discovery. STOP a third file, semantic
+redesign, proof waiver, cap excess, upper activation or milestone closure.
 
-## Retained owner decision and future retry authority
+## Owner decision and exact implementation authority
 
 The selected-graph frontier audit selects `ModuleSourcePreparationKey` as the
 uniquely smallest complete next owner. It owns effective selection and the
@@ -58,7 +56,7 @@ consumer. `HostDiscoveredModuleKey` only consumes completed preparation and
 separately owns MODULE evaluation/events; selected graph only joins discovery
 horizons. No smaller prerequisite or upper owner is warranted.
 
-Future retry write authority remains exactly:
+Write authority is exactly:
 
 - `app/slug_bzlmod_v2/src/source_preparation.rs`, baseline 16,135 physical:
   <=700 production, <=60 colocated proof and <=16,900 physical; and
