@@ -10512,6 +10512,55 @@ retained evaluator heap, proof/cap waiver, milestone closure, M8/M7B and exact
 identity bytes. REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B
 remains.
 
+### Loaded-definition observation proof correction REPLAN (2026-08-20)
+
+The implementation packet from `0a8e1220` reached formal `REPLAN` after its
+one correction. The uncommitted one-file candidate is 7,334 physical lines and
+`+559/-107`; focused/full loading, direct core check, formatting and diff
+hygiene pass. Independent Sol review accepts the matching-family shared driver,
+request-compute versus Host-Bzl-invariant asymmetry, request child-Arc drop,
+left-first merge, first-terminal return, child-only events, compact retention
+and Complete-only parent equality/validity.
+
+The proof is not accepted. Its direct union assertion does not exercise the
+parent stage/context/carrierless boundary, and its omnibus real test does not
+discriminate terminal positions/order, exact event ownership/reuse, independent
+held-handle lifecycles, parent cancellation, legacy parity or upper
+nonactivation. A focused correction left those material gaps, triggering the
+orchestration second-correction rule. No production semantic defect or wider
+owner was found.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation`.
+Keep the retained candidate non-writable except for at most one
+production-called pure request/Bzl finisher extraction needed to exercise
+otherwise unreachable Bzl outer/merge algebra. An ordinary consistent snapshot
+cannot create conflicting duplicate results, an operation mismatch or an
+invalid Bzlmod label; no fake key, hook or fixture may simulate them.
+
+Replace the two coarse tests with three bounded parent specifications:
+identity/finisher algebra; real three-request order, terminal, event and legacy
+parity; and held-handle lifecycle, parent cancellation and upper
+nonactivation. Extend only the colocated tracker to record key Display,
+activation kind, batch and dependency rows for parent/request/Host-Bzl keys.
+Reuse accepted lower request and recursive Host-Bzl proof without inferring the
+new parent boundary from it.
+
+Correction caps from the retained candidate are <=`+540/-220`, net <=320;
+final caps are <=`+1,099/-327` versus `0a8e1220` and <=7,654 physical. Touch at
+most 110 production lines at net zero preferred, keep the shared driver below
+150, add at most four test helpers and three tests, and keep each below 200.
+Write only `app/slug_loading_v2/src/bzl_module.rs`.
+
+Exact compatibility remains loaded-definition values/errors/order/manifests/
+projections and child events. The private key/carrier/outer/epoch remains
+Slug-native. Prepared/pure/instantiated/validated/root-mapping/generated/public
+activation, M8/M7B and exact identity bytes remain deferred. STOP a semantic
+production correction, second file/key/owner, test hook/fake key, parent batch,
+retention/event drift, cap excess or proof waiver. After implementation ACCEPT
+return only to the prepared/evaluation observation frontier. M7 remains partial
+and M7A -> M8 -> M7B remains.
+
 ### Selected-graph frontier audit: visible-lockfile prerequisite (2026-08-20)
 
 The accepted `d5e8f461` selected-graph owner and frontier packet `98aaf23c`

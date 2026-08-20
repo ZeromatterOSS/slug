@@ -1,192 +1,161 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-loaded-module-extension-definitions-observation-implementation`
+Packet: `WP-6-7A-loaded-module-extension-definitions-observation-proof-correction-implementation`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `99c23033`
+Scheduling base: `0a8e1220`
 Accepted predecessor: `99c23033`
 
 ## Goal and authority
 
-Add one private observed sibling for
-`HostLoadedModuleExtensionDefinitionsKey` in
-`app/slug_loading_v2/src/bzl_module.rs`. Preserve the existing legacy owner
-through one shared driver; activate no caller or upper extension owner.
+Close the parent-specific proof for the uncommitted loaded-definition
+observation candidate after the prior implementation packet reached terminal
+`REPLAN`. Preserve the independently accepted production driver and replace
+the nondiscriminating proof. Activate no caller or upper extension owner.
 
 Write exactly `app/slug_loading_v2/src/bzl_module.rs`. Every other file is
 read-only, including Bzlmod, loading callers/modules, Cargo/BUILD metadata,
 fixtures, oracles and planning documents until terminal rollover.
 
-Baseline is 6,882 physical lines; the owned
-`module_extension_definition_loading_tests` begins at 5,164. Caps are <=360
-production, <=780 proof, <=1,140 aggregate semantic lines and <=8,025 physical
-lines. Every helper/test remains below 200 lines and the shared driver below
-150.
+The retained candidate is 7,334 physical lines and `+559/-107` versus
+`0a8e1220`. Correction authority is <=`+540/-220`, net <=320 from that
+candidate; final caps are <=`+1,099/-327` versus `0a8e1220` and <=7,654
+physical lines. Production is frozen except a production-called pure finisher
+extraction: prefer net zero, touch at most 110 production lines and preserve
+the shared driver below 150. Permit at most four new test helpers and three
+parent tests; every helper/test remains below 200.
 
-## Learned facts and evidence basis
+## REPLAN basis and accepted candidate
 
-Accepted `99c23033` exposes the observed definition-request key, carrier and
-opaque outer. The crate-local `HostBzlModuleObservationKey` already owns each
-root Bzl module's complete recursive epoch and local `EventBatch`. The legacy
-loaded-definition key and its sole direct prepared-input consumer already live
-in this file.
+The prior Terra-high implementation and correction pass compile and pass the
+focused and full loading suites plus the direct core check. Independent Sol
+review accepts its production semantics:
 
-Pinned Bazel 9.2 `RegularRunnableExtension.load` establishes canonical Bzl
-load then exported `ModuleExtension` selection;
-`SingleExtensionEvalFunction` consumes that definition before extension
-evaluation/generated repositories. Reuse this source evidence and accepted
-lower proof; add no oracle.
+- matching Legacy/Observed request and Host-Bzl families;
+- request DICE failure -> existing `RequestsCompute` versus Host-Bzl
+  `host_dice_invariant` asymmetry;
+- one successful request-value clone followed by child Result-Arc drop;
+- left-first Complete Bzl epoch merge before Bzl/export/downcast semantics;
+- first-terminal return, child-owned Bzl batches and no parent batch;
+- bounded typed-outer retention; and
+- Complete-only parent equality/validity.
 
-The DICE contract is `docs/developers/dice.md`: dependencies explain warm
-reuse, Complete-only values cut off by structural equality, and no lock spans a
-DICE compute. Buck2 DICE is concept/test evidence only. There is no bridge,
-fallback, side store, direct Host read or donor scheduler.
+The proof remained material incomplete after its sole correction. Its union
+test exercised `union_host_observations` rather than the parent boundary, and
+its omnibus test did not discriminate stage/context/carrierlessness, terminal
+positions/order, event ownership/reuse, held-handle lifecycles, parent
+cancellation, exact legacy parity or upper nonactivation. The orchestration
+second-correction rule therefore requires this new packet; it does not admit a
+production semantic correction.
 
-The 6,882-line file crosses the complexity trigger but remains the cohesive
-owner for this one-key packet: it already contains the legacy key, both Host-Bzl
-families, event tracker, real loading fixtures and direct consumer. Splitting
-would add a private module-visibility seam and duplicate proof plumbing. The
-single-file allowlist, caps, <150-line driver and one-owner stop bound growth.
+## Lawful proof seam
 
-## Types and natural owner
+An ordinary consistent snapshot cannot produce a genuine parent Bzl outer,
+merge conflict or operation mismatch: equal demands share the snapshot result
+Arc and epoch construction rejects a mismatched demand/result pair. A loaded
+definition label-parse failure is likewise unreachable from the valid Bzlmod
+request constructor.
 
-Keep the existing legacy key/value/error types exact. Add only:
+If needed, extract only production-used pure request/Bzl finishers from the
+accepted driver. They consume the real child outcome/carrier/epoch and existing
+request context, are called by production, and own the same merge/semantic
+projection now inline. They may not add a test-only branch, fake/synthetic DICE
+key, hook, alternate owner or semantic value. Use them to prove unreachable
+boundary algebra; real first/middle/last proof applies to reachable Bzl
+semantic/export/wrong-kind terminals and later-child suppression.
 
-- `HostLoadedModuleExtensionDefinitionsObservationKey`, a private sibling
-  wrapping the legacy key;
-- `ObservedHostLoadedModuleExtensionDefinitions`, retaining one local
-  `Arc<Result<HostLoadedModuleExtensionDefinitions,
-  HostLoadedModuleExtensionDefinitionsError>>` plus one cumulative
-  `PathObservationEpoch`;
-- one small stage enum distinguishing Host-Bzl child outer from epoch merge;
-- one typed observation outer with:
-  - request-child
-    `HostSelectedExtensionDefinitionLoadRequestsObservationError`; and
-  - per-request Bzl context containing the completed request aggregate,
-    decisive request, stage and `ObservedPathFrontierError`; and
-- one Legacy/Observed mode and bounded child adapters/shared driver.
+## Required proof decomposition
 
-The observed key owns the reusable semantic association. The request projection,
-Bzl modules, frozen evaluator/module handles, label/export/downcast scratch and
-event activations remain child-owned or compute-local.
+Replace the two current added tests rather than accumulating another omnibus.
+Add exactly three bounded parent specifications.
 
-## Shared-driver order and terminal algebra
+### Identity and finisher algebra
 
-Preserve exact order:
+`observed_loaded_identity_and_finisher_algebra` proves:
 
-1. definition requests;
-2. for each request in source order, root Bzl-target parse;
-3. that request's Host Bzl module;
-4. named-export lookup;
-5. `FrozenModuleExtensionDefinition` downcast; and
-6. manifest/projection append.
+- distinct key equality/hash/Display;
+- Complete-only equality/validity for semantic carrier, request outer and Bzl
+  outer, with Need invalid and self-unequal;
+- request outer is carrierless;
+- empty/request/prior/current prefix association at the production finisher;
+- equal duplicate retains the left/request-side Arc;
+- conflict and operation mismatch return exact parent
+  `Request { requests, request, stage: Merge, error }` with no carrier; and
+- a child outer returns exact `stage: Bzl` request context with no carrier.
 
-Request child behavior:
+The operation-mismatch discriminator must enter the production finisher as the
+real typed child frontier failure; do not merely assert that epoch construction
+rejects malformed input.
 
-- legacy computes only
-  `HostSelectedExtensionDefinitionLoadRequestsKey` with an empty epoch;
-- observed computes only its accepted observation key;
-- DICE compute failure in either family becomes the existing semantic
-  `RequestsCompute` result with an empty prefix;
-- Need and observed typed outer return carrierless;
-- request semantic error becomes existing `Requests` with the request epoch;
+### Real order, terminals, events and parity
+
+`observed_loaded_real_order_terminals_events_and_parity` uses three ordered
+requests and proves:
+
+- exact legacy/observed semantic Result, request aggregate, definition order,
+  manifest and projection equality;
+- matching request/Bzl family exclusion and exact observed Bzl activation
+  order;
+- reachable first/middle/last Bzl semantic, export and wrong-kind terminals
+  retain the decisive prefix and suppress every later Bzl/export operation;
+- the label parser invariant is recorded through the pure production finisher,
+  not an impossible fixture;
+- fresh evaluated Host-Bzl children alone own nonempty batches in request
+  order, while parent/request activations have no batch;
+- direct warm parent reuse is silent;
+- changed-parent/unchanged-child activation is `Reused` with `batch: None`;
   and
-- the child adapter forwards its exact Result Arc/epoch to semantic finish,
-  which clones a successful inner value once into the existing
-  `Arc<HostSelectedExtensionDefinitionLoadRequests>` representation and drops
-  the child Result Arc before parent publication.
+- a semantic Bzl failure still leaves its decisive child batch at the child.
 
-For request i, let `P_i` be request epoch plus all successful prior Bzl
-epochs. Label failure returns the existing request/Label semantic error with
-`P_i`.
+Extend the existing tracker only as test proof. Record key Display,
+`ActivationKind`, optional batch and dependency rows for the loaded parent,
+request child and Host-Bzl children. Do not introduce production event state or
+weaken existing lower assertions.
 
-Host-Bzl child behavior:
+### Lifecycle, cancellation and nonactivation
 
-- legacy computes only `HostBzlModuleEvalKey` with an empty child epoch;
-- observed computes only `HostBzlModuleObservationKey`;
-- wrap both DICE computes in `host_dice_invariant`; do not invent a semantic
-  compute error;
-- Need and observed typed outer return carrierless;
-- merge each Complete child epoch into `P_i` strictly left-first before
-  inspecting its semantic result;
-- equal duplicate observations retain the earliest/request-side Arc;
-- conflict or operation mismatch returns the typed Bzl/Merge outer with request
-  context and no parent carrier;
-- Bzl semantic error returns the existing request/Bzl semantic error with the
-  merged prefix; and
-- export, wrong-kind and success projection follow only a successful Bzl result
-  and retain that same merged prefix.
+`observed_loaded_lifecycle_cancellation_and_nonactivation` proves:
 
-Stop at the first terminal. First/middle/last terminals suppress every later
-label/Bzl/export operation. Do not full-scan, join, speculate or union Need.
-Legacy projection moves the exact local Result Arc and rejects any impossible
-observed outer; observed projection wraps the same Result Arc+epoch.
+- independent request, each decisive Bzl source/recursive load and pure export
+  A -> B -> A transitions while holding prior parent Result/epoch and child
+  handles;
+- old handles remain valid, unaffected child Result/epoch Arcs remain shared,
+  and parent equality changes/restores exactly;
+- poll-drop before parent publication records no parent value, activation or
+  batch, followed by same-DICE recovery;
+- activation dependencies contain only the observed request/Host-Bzl lineage;
+  and
+- a production-slice plus activation assertion excludes legacy siblings and
+  prepared, pure, instantiated, validated, root-mapping, generated,
+  public/command keys.
 
-## Events, revision behavior and lifetime
+Reuse accepted lower request identity/Need/cancellation/no-upper proof and the
+existing `observed_bzl_*` recursive source/child/cycle/frontier/cancellation
+tests. Parent prefix composition, typed outer mapping, family selection,
+terminal stop order, event ownership, parent held handles/cancellation and
+upper nonactivation must be asserted here rather than inferred.
 
-The parent never captures or stores evaluation data. Fresh observed Host-Bzl
-children remain sole owners of their exact batches and activate in request
-order. Warm parent reuse is silent. If a changed request invalidates the parent
-but reaches an unchanged Bzl child, DICE reports that child Reused with
-`batch: None`; it neither reevaluates nor re-emits the cached batch. Semantic
-Bzl failures may still own the child batch already captured before failure.
-Need and typed outer own no batch.
+## Compatibility, retention and validation
 
-Independent transactions associate each Result with its exact request and Bzl
-epochs. Prove request, each Bzl source/recursive load and pure export projection
-A -> B -> A separately while holding prior Result/epoch handles and unaffected
-Arcs. Poll-drop before parent publication stores no parent value/batch; a
-same-DICE successor recomputes or reuses valid children and recovers.
+Exact remains existing loaded-definition values, semantic errors, request
+order, manifests, projections and child Bzl events. Slug-native remains the
+private observed key/carrier/typed outer/cumulative epoch and Display token.
+Prepared/pure/instantiated/validated evaluation, root mapping, generated
+repositories, public/bootstrap activation, M8/M7B and exact identity bytes stay
+deferred.
 
-Retain only the local loaded-definition Result Arc, cumulative epoch and
-semantic requests/manifests/projections reachable from that Result. Child
-carriers, request/Bzl Result Arcs beyond semantic ownership, frozen module/eval
-heap, merge/label/export/event vectors, maps, caches, interners, stores, locks,
-tasks, revisions and certificates are compute-local or forbidden. No lock spans
-a DICE compute.
-
-A completed typed outer retains only the opaque request-child error, or the
-completed request aggregate plus decisive request/stage/frontier error. It
-retains no epoch, loaded-definition Result, Bzl carrier or frozen module.
-
-## Discriminating proof
-
-Extend only the existing colocated loading tests. Require:
-
-- observation-key distinct hash/Display and Complete-only equality/validity;
-- synthetic empty/request/prior/current prefix terminals, first duplicate Arc,
-  conflict and operation mismatch;
-- real Legacy/Observed family exclusion and exact request/Bzl order;
-- first/middle/last label, Need, outer, Bzl semantic, export and wrong-kind
-  suppression;
-- exact semantic Result/manifest/projection and request context;
-- fresh ordered child batches, warm-parent silence, reused-child no-batch,
-  semantic-failure batch ownership and parent eventlessness;
-- independent held-handle request/Bzl/export A -> B -> A;
-- poll-drop publication silence and same-DICE recovery; and
-- an isolated production-slice/activation assertion excluding
-  prepared/pure/instantiated/validated/root-mapping/generated/public keys.
-
-Reuse accepted lower identity/event/cancellation proof rather than duplicating
-recursive Bzl matrices. Add no test hook or fixture.
-
-## Compatibility and validation
-
-Exact: existing loaded-definition values, semantic errors, request order,
-manifests, projections and child Bzl events.
-
-Slug-native: private observed key/carrier, typed outer, cumulative epoch and
-internal Display token.
-
-Deferred: prepared/pure/instantiated/validated evaluation, root mapping,
-generated repositories, public/bootstrap activation, M8/M7B and exact Bazel
-identity bytes.
+The retained value remains exactly one local semantic Result Arc plus one
+cumulative compact epoch. The typed outer retains only the accepted opaque
+request error, or completed request aggregate plus decisive request/stage/
+frontier error. Add no child carrier, evaluator/module heap, event vector,
+cache/interner/store/lock/task/revision/certificate or second owner. No lock
+spans DICE compute.
 
 Run serially:
 
-1. `CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2
-   module_extension_definition_loading_tests::observed_loaded --quiet`;
-2. the exact focused test names added if the prefix differs;
+1. the exact three `module_extension_definition_loading_tests::observed_loaded`
+   successor tests;
+2. protected `module_extension_definition_loading_tests::observed_bzl_` tests;
 3. `CARGO_BUILD_JOBS=1 cargo test -p slug_loading_v2 --quiet`;
 4. `CARGO_BUILD_JOBS=1 cargo check -p slug_core_v2 --quiet`;
 5. `cargo fmt --all -- --check`; and
@@ -194,20 +163,22 @@ Run serially:
 
 ## Terminal and stops
 
-Implementation ACCEPT records accounting/validation and activates only the
-docs-only prepared/evaluation observation frontier. REPLAN before wider or
-semantically different work.
+ACCEPT commits the retained candidate plus corrected proof, records exact
+accounting/validation and activates only the docs-only prepared/evaluation
+observation frontier.
 
-STOP a second file/key/owner; Bzlmod/API/export/caller changes; prepared/pure/
-instantiated/validated/root-mapping/generated/public activation; moved or
-duplicated child events; retained Starlark evaluator/callable heap; full scan,
-Need union or speculative tasks; direct Host reads; locks across DICE; new
-fixture/oracle/hook; proof/cap waiver; milestone closure; M8/M7B or exact
-identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
+STOP and `REPLAN` a second file/key/owner; a semantic driver/key/carrier/error/
+event/retention correction; a test hook or synthetic DICE key; more than one
+production-called pure finisher family; prepared/pure/instantiated/validated/
+root-mapping/generated/public activation; a parent batch; non-Complete parent
+equality/validity; parent carrier on typed outer; wider caps; milestone closure;
+M8/M7B or exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B
+remains.
 
 ## Immediate predecessor
 
-Carrier promotion `99c23033`, from design `83b5ac7a`, exposes only the
-accepted observed request seam. Scheduling commits `900c7b54` and
-`99b2bf01` select this owner and clarify invariant Host-Bzl DICE errors plus
-Reused/no-batch child behavior. The checkout is otherwise clean.
+Design commit `0a8e1220` activated the first implementation attempt over
+accepted carrier `99c23033`. Its uncommitted candidate is retained read-only
+except for the proof seam above. The first review and focused correction
+rereview returned `REVISE`; the latter triggered this formal `REPLAN` because
+multiple parent-specific proof gaps remained.
