@@ -1,106 +1,116 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-selected-module-graph-observation-frontier-audit`
+Packet: `WP-6-7A-registry-policy-observation-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling and Rust base: `28fab9b0`
+Scheduling and Rust base: `a4623d6b`
 
 ## Objective and exact authority
 
-Resume the selected-module-graph frontier after accepting the complete
-nonregistry closure carrier. Audit the remaining root, discovery, registry,
-patch and selection dependencies far enough to identify the uniquely smallest
-complete next observed owner. Do not presume that selected graph or discovered
-module is ready.
+Freeze the uniquely smallest complete registry-prefix owner: a private observed
+sibling of `RegistryPolicyKey`. Do not implement it or activate registry files,
+module preparation, discovery or selected graph in this packet.
 
 Write authority is exactly:
 
 - `thoughts/shared/plans/2026-06-26-slug-v2-clean-restart.md`, <=40 net lines;
-- this manifest, <=200 net lines;
+- this manifest, <=220 net lines;
 - `thoughts/shared/plans/slug-v2-subplans/06-analysis-toolchains-and-actions.md`,
   <=180 net lines;
 - `.codex/skills/slug-agent-orchestration/references/routing-log.md`, <=30 net
   lines.
 
-Aggregate docs growth is <=430 net lines. Rust, Cargo, BUILD, fixtures, oracles,
+Aggregate docs growth is <=470 net lines. Rust, Cargo, BUILD, fixtures, oracles,
 callers and public files are read-only.
 
-## Accepted completion evidence
+## Owner and carrier
 
-Implementation `28fab9b0` accepts the private matching-family
-`HostNonregistryModuleClosureObservationKey` from Rust base `18166691` and
-design `0ffa79cd`.
+`RegistryPolicyKey` owns the exact injected registry-URL -> injected lockfile-
+mode -> root-MODULE-files policy projection. `RegistryFileKey` consumes it in
+both local and remote branches, while `ModuleSourcePreparationKey` consumes it
+before the ordered registry attempts. Observing either larger owner first would
+duplicate this shared prefix.
 
-Exact accounting is +519 production/+5 colocated proof in
-`source_preparation.rs`, +1,032 external proof, +1,556 aggregate semantic, and
-16,135/5,262/21,397 physical lines. Focused observed-Host proof is 13/13; full
-bzlmod is 454 plus all integration suites, loading is 204, query is 121, and
-core is 245/246 with only the inherited stale generic visibility-message
-expectation. Fmt, diff-check, exact accounting, cleanup/retention and independent
-final review pass.
+Add private crate-visible `RegistryPolicyObservationKey(RegistryPolicyKey)` and
+`ObservedRegistryPolicy`. Its Value is
+`SourcePreparationOutcome<Result<ObservedRegistryPolicy,
+ObservedPathFrontierError>>`. The carrier retains exactly one local
+`Arc<Result<RegistryPolicy, RegistryFileError>>` plus one compact
+`PathObservationEpoch`. Require `Dupe`/`Allocative`, borrowed result/observation
+accessors, no export and no caller activation. Legacy projection moves the exact
+local Result Arc.
 
-The accepted owner preserves effective -> materialization -> root source ->
-validation -> BFS horizon -> fragments, occurrence/full-batch Need and outer
-precedence, exact prefix Arcs, child-only ROOT/REPO batches and one local Result
-Arc plus compact epoch. Discovery, selected graph, registry preparation and
-extensions remain inactive.
+Use one Legacy/Observed driver. Preserve exact order: neutral injected
+`RootModuleRegistryUrlsKey`, neutral injected `RootModuleLockfileModeKey`, then
+matching root-files family. Legacy selects only `RootModuleFilesKey`; Observed
+selects only accepted `RootModuleFilesObservationKey`. Neither sibling computes
+the other family.
 
-## Required audit
+## Terminal, event and retention contract
 
-Trace `HostSelectedModuleGraphKey` from accepted `RootModuleFilesKey` and
-effective overrides through fixed-point discovery. For each direct and recursive
-`HostDiscoveredModuleKey` branch, identify its exact semantic Result owner,
-complete ordered DICE children, path-observation carrier, event owner, equality,
-Need/typed-outer/semantic polarity and retained lifetime.
+Registry-URL and lockfile-mode DICE failures remain the exact semantic
+`MissingRegistryUrls` and `MissingLockfileMode` results with an empty epoch and
+suppress root files. Legacy root-files DICE failure remains semantic
+`RootModuleFiles` with empty epoch.
 
-For nonregistry modules, verify that the accepted closure carrier is sufficient
-without moving its ROOT/REPO child batches into discovery. For registry modules,
-trace `ModuleSourcePreparationKey`, registry policy/order, every
-`RegistryFileKey` attempt, root patch label/path resolution and FileBytes reads
-before claiming a complete preparation or discovery epoch. Inspect only enough
-extension/generated-repository work to prove whether it is downstream of the
-selected graph or another missing prerequisite.
+Observed root Need and typed outer return immediately carrierless. Observed
+root-files DICE compute failure remains semantic `RootModuleFiles` with empty
+epoch. For every Complete observed root terminal, accept its exact epoch before
+semantic inspection. Root semantic failure and successful policy projection
+retain that epoch unchanged. There is only one path-bearing child, so this owner
+performs no epoch union and creates no parent conflict/operation-mismatch class.
 
-For every candidate owner, record:
+Complete carrier equality is semantic Result plus epoch; Complete outer equality
+is outer by value; Need is invalid and self-unequal. The policy parent is
+eventless. Reached root MODULE/lockfile descendants remain sole owners of their
+existing batches; Need, typed outer and cancellation publish no parent state,
+and warm reuse emits nothing new.
 
-- structural identity and whether one natural Result Arc already owns the full
-  semantic terminal;
-- exact child order, matching Legacy/Observed family selection, epoch union
-  order, earliest-equal Arc behavior and conflict/operation-mismatch polarity;
-- Need, typed outer, DICE-compute and semantic prefixes, joined-batch precedence
-  if any, and later-child suppression;
-- local event-batch ownership/order, cancellation and warm-reuse behavior;
-- compute-local versus retained collections, bytes, attempts, patch scratch,
-  closures and graph frontiers, including Buck2 `Dupe`/`Allocative` constraints;
-- exact lifecycle and proof needed for registry ordering/fallback, patches,
-  local/remote files, nonregistry/registry branch isolation and A/B/A recovery.
+Retain only the existing local policy semantic Result Arc—which naturally owns
+its URL list, lockfile mode and visible-lockfile projection—plus the compact
+root epoch. The root carrier Arc, temporary URL/mode/root outcomes and event
+scratch stay compute-local or dependency-owned. Add no collection, cache,
+interner, store, lock, task, direct Host read, request revision, certificate or
+event state.
 
-Prefer an existing complete semantic/event owner. Do not invent a detached path
-carrier with no independent consumer, duplicate registry fetch/patch semantics,
-move child events upward, retain discovery/graph scratch, or activate a public
-caller merely to make an observed key reachable.
+## Future implementation and proof
 
-## Terminal and compatibility
+After independent design ACCEPT, exact future Rust authority is only
+`app/slug_bzlmod_v2/src/registry_dice.rs`, baseline 1,413 physical lines, with
+<=200 production, <=520 proof, <=720 aggregate semantic and <=2,200 physical.
+Touched helpers remain below 200 lines; the owner/proof file is one cohesive
+exception.
 
-Return exactly one result:
+Proof must discriminate:
 
-1. one docs-only selected-module-graph observation design if every mutable child
-   already has a complete reusable carrier;
-2. one docs-only design for the uniquely smaller missing producer prerequisite;
-3. formal `REPLAN` if no bounded natural owner is complete.
+- distinct key identity/hash/Display, accessors, `Dupe`/`Allocative`, Complete
+  equality/validity, Need invalid/self-unequal and outer equality;
+- exact legacy semantic Result-Arc projection and observed result parity;
+- registry-URL, lockfile-mode and root-files DICE-compute failures, root semantic
+  failure and success with exact empty/full prefixes and later suppression;
+- real root Need/typed outer carrier polarity and zero retained carrier;
+- exact observed and legacy direct-dependency rows, neutral URL/mode children,
+  matching root-files family isolation and unchanged epoch iteration/per-demand
+  `Arc::ptr_eq`;
+- cold child-owned MODULE/lockfile batches with parent silence, exact legacy
+  event parity, warm suppression and poll-drop cancellation/same-DICE recovery;
+- URL, lockfile-mode, MODULE and visible-lockfile A -> B -> A lifecycles with
+  held Result/epoch handles and restored semantic equality;
+- zero `RegistryFileKey`, `ModuleSourcePreparationKey`, `HostDiscoveredModuleKey`,
+  `HostSelectedModuleGraphKey`, `HostRegistryFunctionKey`, extension or public
+  activation, exact cap accounting, fmt/diff and cleanup/retention review.
 
-Any design must freeze exact future Rust files, measured physical baselines,
-production/proof/aggregate caps, helpers below 200 lines, one Result-Arc+compact-
-epoch retention, a discriminating proof matrix and exactly one successor.
+## Compatibility, terminal and STOP
 
-Exact: accepted root/nonregistry/registry values, errors, ordering and child
-events. Slug-native: private observed siblings, compact shared-Arc epochs and
-typed outer errors. Unsupported/deferred: caller/public cutover, extension-
-generated repository publication until its lower chain is complete, broader
-rules/actions, M8/M7B and exact identity bytes.
+Exact: current registry URL/mode/root-files order, `RegistryPolicy` values and
+errors, legacy Result Arc and child events. Slug-native: private observed sibling,
+Result-Arc+epoch carrier and typed outer. Unsupported/deferred: registry file
+I/O and generation, root patches, source preparation, discovery/selected graph,
+extension-generated repositories, M8/M7B and exact identity bytes.
 
-STOP Rust/tests/oracles, selected-graph or discovery activation before the
-audit terminal, a second successor, retained cache/interner/store/lock/task or
-direct Host read, compatibility widening, and milestone closure. Preserve
-M7A -> M8 -> M7B. After independent audit ACCEPT, schedule at most the single
-selected design; implementation remains separately design-gated.
+Return exactly one terminal: independent design ACCEPT scheduling only
+`WP-6-7A-registry-policy-observation-implementation`, or formal REPLAN. STOP
+Rust/tests/oracles, a second file/key/caller/export, registry-file/preparation/
+discovery/selected activation, semantic/event/family/memory drift, cap excess,
+compatibility widening or milestone closure. After implementation ACCEPT,
+return only to the docs-only selected-module-graph frontier audit.

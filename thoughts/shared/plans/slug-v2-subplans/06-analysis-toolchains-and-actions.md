@@ -9370,3 +9370,62 @@ discovery or selected-graph activation, duplicate fetch/patch semantics, moved
 child events, retained graph scratch, compatibility widening, M8/M7B or
 milestone closure. Preserve M7A -> M8 -> M7B; implementation remains separately
 design-gated.
+
+### Selected-module-graph frontier registry-policy stop (2026-08-19)
+
+The audit at `a4623d6b` returns formal REPLAN to
+`WP-6-7A-registry-policy-observation-design`.
+
+`RegistryPolicyKey` is the uniquely smallest complete owner. It projects
+injected registry URLs, injected lockfile mode and root MODULE files into one
+policy Result. Both local/remote `RegistryFileKey` branches consume it, and
+`ModuleSourcePreparationKey` consumes it before the ordered registry attempts.
+Its only path-bearing child is root files, whose observed sibling is accepted.
+
+Registry file I/O/generation, root patches, module preparation, recursive
+discovery and selected graph still lack complete carriers. Observing any of
+those larger owners first would duplicate the shared policy prefix.
+`HostRegistryFunctionKey` and `HostVisibleLockfileKey` belong to the separate
+post-selected-graph repository-spec path and do not replace this exact owner.
+
+### Registry-policy observation design (2026-08-19)
+
+Freeze private crate-visible `RegistryPolicyObservationKey` and
+`ObservedRegistryPolicy`. The carrier owns exactly one local policy Result Arc
+plus the compact root-files epoch, with `Dupe`/`Allocative`, borrowed
+accessors and no export/caller.
+
+Use one Legacy/Observed driver in injected registry URLs -> injected lockfile
+mode -> matching root-files order. Legacy selects only `RootModuleFilesKey`;
+Observed selects only accepted `RootModuleFilesObservationKey`. URL/mode DICE
+failures keep exact empty-prefix semantic errors. Legacy root compute failure is
+semantic empty-prefix. Observed root Need/outer is carrierless, observed compute
+failure is semantic empty-prefix, and every Complete root semantic/success
+retains the exact root epoch unchanged.
+
+There is only one path-bearing child, so the policy owner performs no epoch
+union and adds no conflict/mismatch class. Complete carrier equality is semantic
+Result+epoch, outer is by value, and Need is invalid/self-unequal. Parent is
+eventless; root descendants retain sole batch ownership. Retain no child carrier
+Arc, extra collection/cache/interner/store/lock/task/Host read/revision/
+certificate/event state.
+
+Future exact Rust authority after design ACCEPT is only
+`app/slug_bzlmod_v2/src/registry_dice.rs`, baseline 1,413 physical, <=200
+production, <=520 proof, <=720 aggregate semantic and <=2,200 physical; helpers
+stay below 200 lines.
+
+Proof identity/hash/Display/accessors/equality, exact legacy Result Arc, every
+URL/mode/root compute and semantic terminal, root Need/outer and exact epoch
+Arcs, exact family rows/reverse isolation, child-owned cold events/parent
+silence/warm/cancel recovery, URL/mode/MODULE/lockfile A-B-A with held handles,
+and zero registry-file/preparation/discovery/selected/HostRegistry/extension/
+public activation.
+
+Write only canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net
+lines and <=470 aggregate. STOP Rust/tests/oracles, another key/file/caller/
+export, registry-file/preparation/discovery/selected activation, semantic/event/
+family/memory drift, cap excess or milestone closure. After independent design
+ACCEPT schedule only `WP-6-7A-registry-policy-observation-implementation`;
+after implementation ACCEPT return only to the selected-module-graph frontier
+audit.
