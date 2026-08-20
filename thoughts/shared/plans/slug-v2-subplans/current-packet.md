@@ -1,78 +1,83 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`
+Packet: `WP-6-7A-extension-definition-evaluation-observation-frontier-audit`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: 06-analysis-toolchains-and-actions.md
-Scheduling base: 61995c86
-Rust base: 2e0a19ae
-Accepted design: d86c9a59
-Accepted correction: 61995c86
+Scheduling base: 094ba075
 
-## Implementation retry authority
+## Accepted definition-request observation
 
-The implementation candidate preserves the accepted private one-child owner,
-shared Legacy/Observed driver, mapping-first order, terminal polarity, event
-ownership and compact Result-Arc+epoch retention. Independent review found no
-production-semantic or ownership defect.
+Implementation `094ba075`, from Rust base `2e0a19ae`, accepted semantic
+design `d86c9a59` and proof correction `61995c86`, completes the private
+callerless selected-extension definition-load-request observation owner in
+`selected_repo_spec.rs`.
 
-The frozen proof cannot honestly fit the original <=420 proof ceiling. The live
-candidate measures +179 production/+398 proof/+577 aggregate semantic at 10,608
-physical lines. Only 22 proof lines remain, while the required discriminators
-need compact but real upper-family, equality/lifecycle and pure-terminal cases.
+One Legacy/Observed driver computes the matching extension-mappings child
+first. Observed Complete forwards the exact child epoch before semantic
+inspection; Need and typed outer remain carrierless; mapping-compute errors
+have an empty prefix; mapping-semantic and pure request terminals retain the
+full prefix. Legacy moves the exact local Result Arc. The parent is eventless
+and retains only one local request Result Arc plus the compact epoch.
 
-Accepted correction 61995c86 authorizes only the same-file proof retry. The
-reviewed production candidate remains frozen; every other Rust file, caller,
-export, fixture, oracle and plan document is read-only.
+The corrected proof scans every frozen loading/evaluation/generated/public
+upper prefix across success, error, Need, cancellation and recovery. It proves
+same-result/different-epoch inequality, fixed-epoch pure-result A -> B -> A,
+held Result/epoch lifetime and unaffected per-demand Arc identity, and
+production-associated Unsupported/Invalid/InvalidContext terminals with exact
+epoch order and shared Arcs. Family rows, complete child owner/batch parity,
+warm silence and same-DICE poll-drop recovery remain exact.
 
-## Exact retry authority
+Final accounting against `2e0a19ae` is +179 production/+480 proof/+659
+aggregate semantic at 10,690 physical lines, within 180/560/740/10,900. Focused
+proof passes 3 observed tests plus 1 pure-terminal test; the full
+`slug_bzlmod_v2` suite passes 521 unit tests plus every integration and doc
+target. Formatting, diff hygiene, cleanup/retention and independent terminal
+review pass.
 
-The retry remains limited to
-app/slug_bzlmod_v2/src/selected_repo_spec.rs from Rust base 2e0a19ae and
-accepted design d86c9a59. Keep production <=180 unchanged; raise proof only to
-<=560, aggregate semantic to <=740 and physical to <=10,900 lines. Every other
-file remains read-only and every helper/test remains below 200 lines.
+## Frontier audit authority
 
-Freeze production exactly as reviewed: one private callerless request
-observation key/carrier; matching mapping child first; observed Complete epoch
-accepted before semantics; carrierless Need/outer; empty mapping-compute prefix;
-full mapping-semantic and pure-terminal prefix; exact legacy local Result Arc;
-eventless parent; and retention of only the local Result Arc plus compact epoch.
+Audit, read-only, the first reusable owner after the accepted private request
+carrier. Trace:
 
-## Missing proof only
+- `HostLoadedModuleExtensionDefinitionsKey` and its existing
+  `HostBzlModuleObservationKey` source/recursive-load epoch and event owner;
+- `HostSelectedExtensionEvaluationInputRequestsKey`, its root-files and
+  request joins, and the prepared/pure/instantiated/validated extension chain;
+- the cross-crate visibility seam for the currently private request carrier;
+  and
+- parallel root-repository-mapping, generated-repository, public command and
+  bootstrap consumers only far enough to exclude them as prerequisites.
 
-Add compact discriminators that:
+Determine the natural DICE owner, exact Legacy/Observed child order, epoch
+association, Need/outer and semantic terminal algebra, Result-Arc projection,
+event ownership, cancellation/warm behavior, retained lifetime and compatibility
+boundary. Prefer a single reusable owner; do not invent an umbrella aggregate
+or promote/export the carrier without an independently accepted consumer
+design.
 
-- scan the literal `host-bzl-module:`, `observed-host-bzl-module:`,
-  `host-loaded-module-extension-definitions:`,
-  `host-selected-extension-evaluation-inputs:`,
-  `host-prepared-module-extension-inputs:`,
-  `host-pure-module-extension-invocations:`,
-  `host-instantiated-module-extension-repositories:`,
-  `host-validated-module-extension-repositories:`,
-  `host-root-repository-mapping:`,
-  `host-canonical-selected-module-definition:`,
-  `host-generated-repository-definition:` and `slug-command:` prefixes on
-  success, error, Need, cancellation and recovery;
-- prove equal request semantics with a changed mapping epoch compare unequal,
-  separately from a pure request-result A -> B -> A under a held epoch, with
-  held Result/epoch handles and unaffected exact per-demand Arcs;
-- compose accepted reachable Unsupported/Invalid/InvalidContext pure
-  projections through the production completion/driver boundary and prove the
-  complete mapping epoch's exact demand order and shared Result Arcs; and
-- preserve already passing family rows, complete child owner/batch parity,
-  parent/warm silence, Need/outer and poll-drop recovery proof.
+Write authority for this audit is exactly canonical/current/Stage 6/routing at
+net caps <=40/<=220/<=180/<=30 and <=470 aggregate. All Rust, tests, fixtures,
+oracles, public APIs and other plan documents are read-only.
 
-Do not add invalid-child hooks or oracle evidence.
+## Compatibility, terminal and STOP
 
-## Retry terminal
+Exact remains the accepted request values/errors/order/namespaces/imports,
+child events and all previously accepted observed carriers. Slug-native remains
+private typed outers and shared-Arc epoch association. Definition loading,
+evaluation-input joins, prepared/pure/instantiated/validated extensions,
+generated repositories, root mapping, public/bootstrap activation, M8/M7B and
+exact identity bytes remain deferred until independently accepted.
 
-Retry ACCEPT returns only to the docs-only definition/evaluation frontier.
-STOP production semantic/event/family/memory changes, a second file/key,
-lib.rs/caller/export or upper activation, proof waiver/cap excess, milestone
-closure or M8/M7B widening. REPLAN before widening. M7 remains partial and
-M7A -> M8 -> M7B remains.
+Terminate with exactly one of:
 
+1. one bounded owner design with exact future authority and at most one
+   implementation successor;
+2. one uniquely smaller prerequisite or evidence packet; or
+3. formal REPLAN with concrete live evidence.
 
+STOP Rust/test/oracle/API writes, implementation, carrier export, caller or
+upper activation, milestone closure, M8/M7B work, proof waiver or an umbrella
+owner. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical frozen implementation authority
 

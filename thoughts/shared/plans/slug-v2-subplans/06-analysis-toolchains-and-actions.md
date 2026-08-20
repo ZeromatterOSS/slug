@@ -11411,3 +11411,47 @@ STOP production drift, a second file/key, lib.rs/caller/export or upper work,
 proof waiver/cap excess, milestone closure or M8/M7B widening. Retry ACCEPT
 returns only to the docs-only definition/evaluation frontier. REPLAN before
 widening. M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension definition-request observation accepted and frontier resumed (2026-08-20)
+
+Implementation `094ba075`, from Rust base `2e0a19ae`, semantic design
+`d86c9a59` and correction `61995c86`, completes the private callerless
+selected-extension definition-load-request observation owner in
+`selected_repo_spec.rs`.
+
+The matching mappings child is computed first; observed Complete forwards its
+exact epoch before semantics; Need/outer is carrierless; mapping compute has an
+empty prefix; mapping semantic and pure request terminals retain the full
+prefix. Legacy moves the exact local Result Arc. The eventless parent retains
+only one local request Result Arc plus the compact epoch.
+
+Proof scans every frozen loading/evaluation/generated/public upper prefix on
+success, error, Need, cancellation and recovery. It separates changed-epoch
+invalidation from fixed-epoch pure-result A -> B -> A, retains held handles and
+unaffected exact Arcs, and associates all reachable pure errors through the
+production completion boundary.
+
+Accepted accounting is +179 production/+480 proof/+659 aggregate at 10,690
+physical lines. Focused proof passes 3 observed plus 1 pure test; the full
+bzlmod gate passes 521 unit tests and all integration/doc targets. Formatting,
+diff hygiene, cleanup/retention and terminal review pass.
+
+Activate only
+`WP-6-7A-extension-definition-evaluation-observation-frontier-audit`.
+Audit read-only the reusable owner among loaded definition requests, accepted
+Host Bzl-module observation, evaluation-input requests and the prepared/pure/
+instantiated/validated chain. Inspect the cross-crate carrier visibility seam
+and parallel root-mapping/generated/public consumers only to reject false
+prerequisites. Do not combine independent semantics into an umbrella owner.
+
+Require the exact child order, epoch/Arc/Need/outer/error algebra, event owner,
+warm/cancel behavior, retained lifetime and exact/Slug-native/deferred boundary.
+Terminate with exactly one bounded owner design, one uniquely smaller
+prerequisite/evidence packet, or formal REPLAN; authorize at most one design
+successor.
+
+Audit write authority is exactly canonical/current/this Stage/routing at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. All Rust, tests, fixtures,
+oracles, APIs and other plans are read-only. STOP implementation, export/caller
+or upper activation, proof waiver, milestone closure and M8/M7B. M7 remains
+partial and M7A -> M8 -> M7B remains.
