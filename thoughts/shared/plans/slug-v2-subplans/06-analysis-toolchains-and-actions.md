@@ -11343,3 +11343,47 @@ memory drift, proof/cap waiver or milestone widening. Implementation ACCEPT
 returns only to the docs-only extension
 definition/evaluation frontier. REPLAN before widening. M7 remains partial and
 M7A -> M8 -> M7B remains.
+
+### Extension definition-request proof-cap correction (2026-08-20)
+
+Activate only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-proof-cap-correction-design`
+from scheduling base `030f612a`, Rust base `2e0a19ae` and accepted design
+`d86c9a59`.
+
+The reviewed candidate in `selected_repo_spec.rs` is retained and non-writable
+during this docs-only correction. It measures +179 production/+398 proof/+577
+aggregate semantic at 10,608 physical lines. Production ownership, the shared
+mapping-first driver, prefix/Need/outer algebra, exact legacy Result Arc,
+eventless family behavior and one local Result Arc+epoch retention are frozen.
+
+Correct only the proof ceilings for the same one-file retry: production remains
+<=180; proof becomes <=560, aggregate semantic <=740 and physical <=10,900.
+Every other file remains read-only; helpers/tests remain below 200.
+
+The retry must scan `host-bzl-module:`, `observed-host-bzl-module:`,
+`host-loaded-module-extension-definitions:`,
+`host-selected-extension-evaluation-inputs:`,
+`host-prepared-module-extension-inputs:`,
+`host-pure-module-extension-invocations:`,
+`host-instantiated-module-extension-repositories:`,
+`host-validated-module-extension-repositories:`,
+`host-root-repository-mapping:`,
+`host-canonical-selected-module-definition:`,
+`host-generated-repository-definition:` and `slug-command:` on every relevant
+phase. It must separate same-request/different-epoch inequality from pure
+request-result
+A -> B -> A, retain held carriers and exact unaffected per-demand Arcs, and
+compose reachable Unsupported/Invalid/InvalidContext results through the
+production association with exact epoch order and shared Arcs. Preserve the
+passing family/event/warm/Need/outer/cancellation proof.
+
+Correction write authority is exactly canonical/current/this Stage/routing at
+net caps <=40/<=220/<=180/<=30 and <=470 aggregate. STOP Rust writes,
+production drift, a second file/key, lib.rs/caller/export or upper activation,
+proof waiver/cap excess, milestone closure or M8/M7B widening.
+
+Correction ACCEPT schedules only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`.
+After retry ACCEPT resume only the docs-only definition/evaluation frontier.
+REPLAN before widening. M7 remains partial and M7A -> M8 -> M7B remains.

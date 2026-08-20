@@ -1,13 +1,82 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation`
+Packet: `WP-6-7A-host-selected-extension-definition-load-requests-observation-proof-cap-correction-design`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: 06-analysis-toolchains-and-actions.md
-Scheduling base: d86c9a59
+Scheduling base: 030f612a
 Rust base: 2e0a19ae
 Accepted design: d86c9a59
+Implementation scheduling: 030f612a
 
-## Implementation authority
+## Formal proof-cap REPLAN
+
+The implementation candidate preserves the accepted private one-child owner,
+shared Legacy/Observed driver, mapping-first order, terminal polarity, event
+ownership and compact Result-Arc+epoch retention. Independent review found no
+production-semantic or ownership defect.
+
+The frozen proof cannot honestly fit the original <=420 proof ceiling. The live
+candidate measures +179 production/+398 proof/+577 aggregate semantic at 10,608
+physical lines. Only 22 proof lines remain, while the required discriminators
+need compact but real upper-family, equality/lifecycle and pure-terminal cases.
+
+This correction is docs-only. Write authority is exactly canonical/current/
+Stage 6/routing at net caps <=40/<=220/<=180/<=30 and <=470 aggregate. The dirty
+Rust candidate is retained and non-writable during correction.
+
+## Corrected retry authority
+
+The retry remains limited to
+app/slug_bzlmod_v2/src/selected_repo_spec.rs from Rust base 2e0a19ae and
+accepted design d86c9a59. Keep production <=180 unchanged; raise proof only to
+<=560, aggregate semantic to <=740 and physical to <=10,900 lines. Every other
+file remains read-only and every helper/test remains below 200 lines.
+
+Freeze production exactly as reviewed: one private callerless request
+observation key/carrier; matching mapping child first; observed Complete epoch
+accepted before semantics; carrierless Need/outer; empty mapping-compute prefix;
+full mapping-semantic and pure-terminal prefix; exact legacy local Result Arc;
+eventless parent; and retention of only the local Result Arc plus compact epoch.
+
+## Missing proof only
+
+Add compact discriminators that:
+
+- scan the literal `host-bzl-module:`, `observed-host-bzl-module:`,
+  `host-loaded-module-extension-definitions:`,
+  `host-selected-extension-evaluation-inputs:`,
+  `host-prepared-module-extension-inputs:`,
+  `host-pure-module-extension-invocations:`,
+  `host-instantiated-module-extension-repositories:`,
+  `host-validated-module-extension-repositories:`,
+  `host-root-repository-mapping:`,
+  `host-canonical-selected-module-definition:`,
+  `host-generated-repository-definition:` and `slug-command:` prefixes on
+  success, error, Need, cancellation and recovery;
+- prove equal request semantics with a changed mapping epoch compare unequal,
+  separately from a pure request-result A -> B -> A under a held epoch, with
+  held Result/epoch handles and unaffected exact per-demand Arcs;
+- compose accepted reachable Unsupported/Invalid/InvalidContext pure
+  projections through the production completion/driver boundary and prove the
+  complete mapping epoch's exact demand order and shared Result Arcs; and
+- preserve already passing family rows, complete child owner/batch parity,
+  parent/warm silence, Need/outer and poll-drop recovery proof.
+
+Do not add invalid-child hooks or oracle evidence.
+
+## Correction terminal
+
+Correction ACCEPT schedules only
+`WP-6-7A-host-selected-extension-definition-load-requests-observation-implementation-retry`.
+STOP production semantic/event/family/memory changes, a second file/key,
+lib.rs/caller/export or upper activation, proof waiver/cap excess, milestone
+closure or M8/M7B widening. REPLAN before widening. Only after retry ACCEPT
+resume the docs-only definition/evaluation frontier. M7 remains partial and
+M7A -> M8 -> M7B remains.
+
+
+
+## Historical frozen implementation authority
 
 Accepted design d86c9a59 selects
 HostSelectedExtensionDefinitionLoadRequestsKey as the uniquely smallest
