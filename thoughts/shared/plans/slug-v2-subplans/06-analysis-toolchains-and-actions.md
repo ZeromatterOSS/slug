@@ -9825,3 +9825,49 @@ exact child batches, warm/cancel/recovery, Arc/order and upper exclusions.
 STOP semantic/event/family/memory drift, wider authority, proof waiver, cap
 excess or milestone closure. After independent implementation ACCEPT return
 only to the docs-only selected-module-graph frontier for discovery.
+
+### Module-source preparation second proof-cap stop (2026-08-20)
+
+Terminal review of the retained retry from scheduling base `3e83a42d`, Rust
+base `0f9a0559`, semantic design `5436a421` and first correction `2c505e13`
+accepts the production owner, shared driver, exact ordering/prefix algebra,
+event ownership and compact retention. Focused new proof and the complete
+`slug_bzlmod_v2` suite pass.
+
+Measured candidate accounting is +367 net at 16,502 physical in
+`source_preparation.rs`, +1,780 proof at 7,042 physical in
+`source_preparation_observation_tests.rs`, and +2,147 semantic/23,544 physical
+aggregate. The retry closes production-called compute projection,
+OperationMismatch, nonregistry Absent/error, first/middle/last resolution and
+FileBytes terminals, registry-byte and root-MODULE lifecycles while preserving
+the accepted family/event/warm/cancel/upper matrix.
+
+Four frozen discriminators remain: distinct observed-key equality/hash; exact
+multi-patch cumulative epoch reconstruction from effective, policy, decisive
+registry-file, reached resolutions and reached FileBytes carriers; lockfile
+mode/content A-B-A; and patch symlink-retarget A-B-A. Only 20 external proof
+lines remain, so completing these honestly under the first correction would
+replace lifecycle evidence with compressed inference.
+
+Formally REPLAN only to
+`WP-6-7A-module-source-preparation-observation-proof-cap-correction-2-design`.
+The two Rust files remain retained and non-writable. Write only canonical,
+current, this Stage and routing at <=40/<=220/<=180/<=30 net and <=470
+aggregate.
+
+Keep `source_preparation.rs` at <=700 production/+60 colocated proof and
+<=16,900 physical. Raise only external proof to <=2,100/7,500, yielding
+<=2,860 semantic and <=24,400 physical aggregate. Freeze every production,
+event, family, memory and two-file owner term.
+
+The retry must add the exact distinct-key hash proof, reconstruct and compare
+the multi-child cumulative epoch's iteration order and shared Arcs, and drive
+independent mode/lockfile and symlink-retarget A-B-A with held Result/epoch
+handles. Preserve all existing exact prefix, terminal-position, family, event,
+warm, cancellation, lifecycle and upper-exclusion proof.
+
+STOP Rust during correction, a production change, third file/export/caller,
+upper activation, proof waiver, cap excess or milestone closure. After
+independent correction ACCEPT schedule exactly
+`WP-6-7A-module-source-preparation-observation-implementation-retry-2`; only
+after retry ACCEPT return to the selected-module-graph frontier for discovery.
