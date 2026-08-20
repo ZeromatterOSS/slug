@@ -11537,3 +11537,50 @@ STOP a second file/key, export/caller/upper work, semantic/event/family/memory
 drift, proof/cap waiver or milestone widening. Implementation ACCEPT returns
 only to the docs-only loaded-definition owner frontier. REPLAN before widening.
 M7 remains partial and M7A -> M8 -> M7B remains.
+
+### Extension evaluation-input observation accepted; loaded-definition frontier resumed (2026-08-20)
+
+Implementation `e82057f2`, from Rust base `094ba075` and accepted design
+`1fdf641b`, completes the private callerless evaluation-input request
+observation owner in `selected_repo_spec.rs`.
+
+One Legacy/Observed driver preserves definition requests -> root files -> pure
+projection. Complete root observations merge into the request prefix left-first
+before root semantics; equal duplicates retain the request Arc and conflict or
+operation mismatch is a typed RootFiles outer. Need/child outer is carrierless;
+request compute/semantic, root compute/semantic and pure terminals retain the
+exact empty/request/full prefixes. Legacy moves the local Result Arc.
+
+The parent remains eventless. Matching children retain exact batch ownership
+and direct root computation after requests DICE-reuses without replay. The
+carrier retains one local evaluation-input Result Arc plus the compact epoch;
+child carriers, root Result and merge/input/event scratch remain compute-local.
+
+Accepted accounting is +286 production/+681 proof/+967 aggregate at 11,657
+physical lines, within every frozen cap and below the 200-line helper/test
+limit. Four focused tests and the full 525-unit plus integration/doc Bzlmod
+suite pass; formatting and diff hygiene pass. Independent correction rereview
+returned `ACCEPT`. One unrelated mixed-horizon ordering assertion failed once,
+then passed isolated and on a complete replay; retain it only as inherited
+test-order flake risk.
+
+Activate only
+`WP-6-7A-loaded-module-extension-definitions-observation-frontier-audit`.
+Audit the natural owner above the accepted private request carrier and loading-
+crate `HostBzlModuleObservationKey`. Decide whether observed loaded definitions
+are now the smallest complete owner or one narrower cross-crate carrier-
+visibility prerequisite must precede them.
+
+Trace prepared/pure/instantiated/validated extensions, root mapping, generated
+repositories and public/bootstrap consumers only far enough to reject false
+prerequisites. Require exact per-request Bzl load/export order, epoch/Arc/Need/
+outer/error algebra, child event ownership, warm/cancel behavior, retained
+lifetime, one-way crate visibility and exact/Slug-native/deferred classes.
+
+Audit write authority is exactly canonical/current/this Stage/routing at net
+caps <=40/<=220/<=180/<=30 and <=470 aggregate. Rust, tests, fixtures, oracles,
+Cargo/BUILD, APIs, exports and callers are read-only. Reach one independently
+reviewed owner design, one uniquely smaller prerequisite, or formal `REPLAN`;
+authorize at most one successor. STOP implementation/activation, umbrella
+ownership, reverse crate dependency, proof waiver, milestone closure, M8/M7B
+and exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
