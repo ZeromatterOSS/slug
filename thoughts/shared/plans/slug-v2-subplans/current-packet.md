@@ -1,18 +1,17 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-proof-cap-correction-2-design`
+Packet: `WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `2439f1fd`
+Scheduling base and accepted second proof correction: `7524cd41`
 Rust base: `754e7619`
 Accepted semantic design: `0c5a1366`
 Accepted first proof correction: `ed3a9d05`
 
 ## Objective and exact authority
 
-Correct only the remaining exact-proof envelope for the accepted private
-package-preflight owner. Retain the dirty two-file Rust candidate and make it
-non-writable during this docs-only design.
+Complete the corrected exact proof for the accepted private package-preflight
+owner. Production semantics, event ownership and retained state are frozen.
 
 Against `754e7619`, the focused 7/7 candidate is +319 production/+24 colocated
 proof in `source_preparation.rs`, +949 external proof, +1,292 aggregate
@@ -20,11 +19,8 @@ semantic, and 15,610/4,119/19,729 physical lines. Only 11 external and eight
 aggregate lines remain while exact later-terminal epochs, complete event-owner
 sequence, real upper prefixes and cancellation child silence are still missing.
 
-Write only the canonical plan, current manifest, Stage 6 plan and routing log at
-<=40/<=220/<=180/<=30 net lines and <=470 aggregate. Rust, Cargo, BUILD,
-fixtures, oracles, callers and public files are read-only.
-
-The future retry keeps `source_preparation.rs` <=320 production/15,650 physical.
+Exact write authority is only `source_preparation.rs` and
+`source_preparation_observation_tests.rs`. Keep source <=320 production/15,650 physical.
 Raise only external proof to <=1,120/4,500 physical and aggregate to <=1,470
 semantic/20,150 physical. Touched helpers remain below 200 lines.
 
@@ -83,9 +79,8 @@ DICE failure. Assert invalid name precedes policy, deleted policy precedes ignor
 ignored precedes markers, and `BUILD.bazel` Present precedes `BUILD`.
 
 Preserve all passing identity, reducer, semantic, family, lifecycle and
-cancellation evidence. The retry may only compact/restructure or add proof and
-test-only tracker glue; production semantics, event ownership and retained state
-are frozen.
+cancellation evidence. Only compact/restructure or add proof and test-only
+tracker glue.
 
 Reconstruct and ptr-compare exact effective+ignore and
 effective+ignore+reached-marker epochs for Ignored, repository-ignore error,
@@ -118,12 +113,10 @@ Slug-native: private sibling, Result-Arc+epoch carrier and typed outer.
 Unsupported/deferred: horizon/closure/discovery/selected graph, registry
 preparation/patches, extension repositories, M8/M7B and identity bytes.
 
-STOP Rust writes during this design and STOP a caller/export/third file,
+STOP a caller/export/third file,
 legacy/order/event/family drift, semantic compute-error invention, direct Host
 read, extra retained state, upper/registry activation, proof deletion, cap
 excess or milestone closure.
 
-After independent correction ACCEPT schedule only
-`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`;
-after retry ACCEPT schedule only the docs-only
+After independent implementation ACCEPT schedule only the docs-only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.

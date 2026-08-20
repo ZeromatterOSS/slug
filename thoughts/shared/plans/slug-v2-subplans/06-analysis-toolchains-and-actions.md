@@ -9175,3 +9175,34 @@ or milestone closure. After independent correction ACCEPT schedule only
 `WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`;
 after retry ACCEPT schedule only
 `WP-6-7A-host-nonregistry-module-closure-observation-design`.
+
+### Host nonregistry package-preflight second proof correction accepted (2026-08-19)
+
+Correction `7524cd41` accepts the remaining exact-proof envelope for semantic
+design `0c5a1366`, first correction `ed3a9d05`, and Rust base `754e7619`.
+Run only
+`WP-6-7A-host-nonregistry-package-preflight-observation-implementation-retry-2`.
+
+Exact write authority is only
+`app/slug_bzlmod_v2/src/source_preparation.rs`, <=320 production and <=15,650
+physical, plus `source_preparation_observation_tests.rs`, <=1,120 proof and
+<=4,500 physical. Aggregate is <=1,470 semantic and <=20,150 physical; touched
+helpers remain below 200 lines.
+
+Preserve the private one-Result-Arc+compact-epoch carrier and exact effective ->
+invalid-name -> neutral deleted-policy -> ignore -> BUILD.bazel -> BUILD
+matching-family driver. Merge Complete epochs into the earlier prefix
+left-first before semantics; Need/outer stays carrierless, earliest equal Arcs
+survive, typed conflict/mismatch stays outer, the parent stays eventless, and
+ROOT/REPO descendants remain sole batch owners.
+
+Keep all passing proof and add exact later-terminal epochs, the complete
+ROOT/REPO Some-batch sequence with legacy parity and warm silence, whole exact
+legacy row, exact upper prefixes, and zero cancelled parent/child row or batch
+publication before same-DICE recovery. Production semantics, event ownership,
+retained state and compatibility classes are frozen.
+
+STOP a caller/export/third file, production/order/event/family/memory drift,
+upper/registry activation, proof deletion, cap excess or milestone closure.
+After independent implementation ACCEPT schedule only
+`WP-6-7A-host-nonregistry-module-closure-observation-design`.
