@@ -25,12 +25,17 @@ use dice_futures::cancellation::CancellationContext;
 use dupe::Dupe;
 use sha2::Digest;
 use sha2::Sha256;
+use slug_workspace_v2::NormalizedAbsolutePath;
+use slug_workspace_v2::ObservedPathFrontierError;
+use slug_workspace_v2::PathObservationEpoch;
 
 use crate::LockfileMode;
 use crate::RegistryFileExpectation;
+use crate::SourcePreparationOutcome;
 use crate::VisibleLockfileRead;
 use crate::host_registry::RegistryKnownFileHashesMode;
 use crate::module_eval::RootModuleFilesKey;
+use crate::module_eval::RootModuleFilesObservationKey;
 use crate::module_eval::RootModuleLockfileMode;
 use crate::module_eval::RootModuleLockfileModeKey;
 use crate::registry::RegistryUrls;
@@ -119,64 +124,225 @@ impl fmt::Display for RegistryPolicyKey {
     }
 }
 
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Allocative)]
+pub(crate) struct RegistryPolicyObservationKey(RegistryPolicyKey);
+
+#[allow(dead_code)]
+impl RegistryPolicyObservationKey {
+    pub(crate) fn new(workspace: PathBuf) -> Self {
+        Self(RegistryPolicyKey { workspace })
+    }
+}
+
+impl fmt::Display for RegistryPolicyObservationKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "observed-{}", self.0)
+    }
+}
+
+type RegistryPolicyResult = Arc<Result<RegistryPolicy, RegistryFileError>>;
+
+#[allow(dead_code)]
+#[derive(Debug, Clone, PartialEq, Eq, Allocative, Dupe)]
+pub(crate) struct ObservedRegistryPolicy {
+    result: RegistryPolicyResult,
+    observations: PathObservationEpoch,
+}
+
+#[allow(dead_code)]
+impl ObservedRegistryPolicy {
+    pub(crate) fn result(&self) -> &RegistryPolicyResult {
+        &self.result
+    }
+
+    pub(crate) fn observations(&self) -> &PathObservationEpoch {
+        &self.observations
+    }
+}
+
+type RegistryPolicyDriverOutcome = SourcePreparationOutcome<
+    Result<(RegistryPolicyResult, PathObservationEpoch), ObservedPathFrontierError>,
+>;
+
+#[derive(Clone, Copy)]
+enum RegistryPolicyMode {
+    Legacy,
+    Observed,
+}
+
+fn registry_policy_complete(
+    result: Result<RegistryPolicy, RegistryFileError>,
+    observations: PathObservationEpoch,
+) -> RegistryPolicyDriverOutcome {
+    SourcePreparationOutcome::Complete(Ok((Arc::new(result), observations)))
+}
+
+fn registry_policy_error(
+    error: RegistryFileError,
+    observations: PathObservationEpoch,
+) -> RegistryPolicyDriverOutcome {
+    registry_policy_complete(Err(error), observations)
+}
+
+fn finish_observed_registry_policy_root(
+    outcome: <RootModuleFilesObservationKey as Key>::Value,
+) -> Result<
+    (
+        Arc<Result<crate::module_eval::RootModuleFiles, CompactString>>,
+        PathObservationEpoch,
+    ),
+    RegistryPolicyDriverOutcome,
+> {
+    match outcome {
+        SourcePreparationOutcome::Need(need) => Err(SourcePreparationOutcome::Need(need)),
+        SourcePreparationOutcome::Complete(Err(error)) => {
+            Err(SourcePreparationOutcome::Complete(Err(error)))
+        }
+        SourcePreparationOutcome::Complete(Ok(observed)) => {
+            Ok((observed.result().dupe(), observed.observations().dupe()))
+        }
+    }
+}
+fn registry_policy_root_compute_error(message: CompactString) -> RegistryPolicyDriverOutcome {
+    registry_policy_error(
+        RegistryFileError::RootModuleFiles(message),
+        PathObservationEpoch::empty(),
+    )
+}
+fn project_legacy_registry_policy(outcome: RegistryPolicyDriverOutcome) -> RegistryPolicyResult {
+    match outcome {
+        SourcePreparationOutcome::Complete(Ok((result, _))) => result,
+        _ => panic!("legacy registry policy driver returned a nonsemantic outcome"),
+    }
+}
+
+async fn drive_registry_policy(
+    ctx: &mut DiceComputations<'_>,
+    key: &RegistryPolicyKey,
+    mode: RegistryPolicyMode,
+) -> RegistryPolicyDriverOutcome {
+    let urls = match ctx
+        .compute(&RootModuleRegistryUrlsKey {
+            workspace: key.workspace.clone(),
+        })
+        .await
+    {
+        Ok(urls) => urls.urls().dupe(),
+        Err(error) => {
+            return registry_policy_error(
+                RegistryFileError::MissingRegistryUrls(error.to_string().into()),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    let mode_value = match ctx
+        .compute(&RootModuleLockfileModeKey {
+            workspace: key.workspace.clone(),
+        })
+        .await
+    {
+        Ok(mode) => mode,
+        Err(error) => {
+            return registry_policy_error(
+                RegistryFileError::MissingLockfileMode(error.to_string().into()),
+                PathObservationEpoch::empty(),
+            );
+        }
+    };
+    let (files, observations) = match mode {
+        RegistryPolicyMode::Legacy => {
+            let files = match ctx
+                .compute(&RootModuleFilesKey {
+                    workspace: key.workspace.clone(),
+                })
+                .await
+            {
+                Ok(files) => files,
+                Err(error) => {
+                    return registry_policy_root_compute_error(error.to_string().into());
+                }
+            };
+            (files, PathObservationEpoch::empty())
+        }
+        RegistryPolicyMode::Observed => {
+            let workspace = match NormalizedAbsolutePath::new(key.workspace.clone()) {
+                Ok(workspace) => workspace,
+                Err(error) => {
+                    return registry_policy_root_compute_error(error.to_string().into());
+                }
+            };
+            let observed = match ctx
+                .compute(&RootModuleFilesObservationKey::new(workspace))
+                .await
+            {
+                Ok(observed) => observed,
+                Err(error) => {
+                    return registry_policy_root_compute_error(error.to_string().into());
+                }
+            };
+            match finish_observed_registry_policy_root(observed) {
+                Ok(root) => root,
+                Err(outcome) => return outcome,
+            }
+        }
+    };
+    let visible_lockfile = match files.as_ref() {
+        Ok(files) => files.visible_lockfile.clone(),
+        Err(error) => {
+            return registry_policy_error(
+                RegistryFileError::RootModuleFiles(error.clone()),
+                observations,
+            );
+        }
+    };
+    registry_policy_complete(
+        Ok(RegistryPolicy {
+            urls,
+            mode: mode_value,
+            visible_lockfile,
+        }),
+        observations,
+    )
+}
+
 #[async_trait]
 impl Key for RegistryPolicyKey {
-    type Value = Arc<Result<RegistryPolicy, RegistryFileError>>;
+    type Value = RegistryPolicyResult;
 
     async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
-        let urls = match ctx
-            .compute(&RootModuleRegistryUrlsKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(urls) => urls.urls().dupe(),
-            Err(error) => {
-                return Arc::new(Err(RegistryFileError::MissingRegistryUrls(
-                    CompactString::new(error.to_string()),
-                )));
-            }
-        };
-        let mode = match ctx
-            .compute(&RootModuleLockfileModeKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(mode) => mode,
-            Err(error) => {
-                return Arc::new(Err(RegistryFileError::MissingLockfileMode(
-                    CompactString::new(error.to_string()),
-                )));
-            }
-        };
-        let visible_lockfile = match ctx
-            .compute(&RootModuleFilesKey {
-                workspace: self.workspace.clone(),
-            })
-            .await
-        {
-            Ok(files) => match files.as_ref() {
-                Ok(files) => files.visible_lockfile.clone(),
-                Err(error) => {
-                    return Arc::new(Err(RegistryFileError::RootModuleFiles(error.clone())));
-                }
-            },
-            Err(error) => {
-                return Arc::new(Err(RegistryFileError::RootModuleFiles(CompactString::new(
-                    error.to_string(),
-                ))));
-            }
-        };
-        Arc::new(Ok(RegistryPolicy {
-            urls,
-            mode,
-            visible_lockfile,
-        }))
+        project_legacy_registry_policy(
+            drive_registry_policy(ctx, self, RegistryPolicyMode::Legacy).await,
+        )
     }
 
     fn equality(x: &Self::Value, y: &Self::Value) -> bool {
         x == y
+    }
+}
+
+#[async_trait]
+impl Key for RegistryPolicyObservationKey {
+    type Value =
+        SourcePreparationOutcome<Result<ObservedRegistryPolicy, ObservedPathFrontierError>>;
+
+    async fn compute(&self, ctx: &mut DiceComputations, _: &CancellationContext) -> Self::Value {
+        drive_registry_policy(ctx, &self.0, RegistryPolicyMode::Observed)
+            .await
+            .map(|outcome| {
+                outcome.map(|(result, observations)| ObservedRegistryPolicy {
+                    result,
+                    observations,
+                })
+            })
+    }
+
+    fn equality(x: &Self::Value, y: &Self::Value) -> bool {
+        x.complete_eq(y)
+    }
+
+    fn validity(value: &Self::Value) -> bool {
+        value.is_complete()
     }
 }
 
@@ -1409,5 +1575,639 @@ mod bridge_tests {
             io.last_local_call(),
             Some((RegistryFileUrl::new(LOCAL_URL), PathBuf::from(LOCAL_PATH)))
         );
+    }
+}
+
+#[cfg(all(test, unix))]
+mod policy_observation_tests {
+    use std::collections::HashSet;
+    use std::sync::Mutex;
+
+    use dice::ActivationData;
+    use dice::ActivationKind;
+    use dice::ActivationTracker;
+    use dice::DetectCycles;
+    use dice::Dice;
+    use dice::DynKey;
+    use dice::RichActivation;
+    use dice::UserComputationData;
+    use slug_events_v2::CaptureEvaluationEvents;
+    use slug_events_v2::EvaluationEvent;
+    use slug_events_v2::EventBatch;
+    use slug_workspace_v2::NeedPathObservations;
+    use slug_workspace_v2::PathLstat;
+    use slug_workspace_v2::PathNodeKind;
+    use slug_workspace_v2::PathObservationDemand;
+    use slug_workspace_v2::PathObservationEpochError;
+    use slug_workspace_v2::PathObservationEpochKey;
+    use slug_workspace_v2::PathObservationNamespace;
+    use slug_workspace_v2::PathObservationOperation;
+    use slug_workspace_v2::PathObservationResult;
+    use slug_workspace_v2::PathOperationResult;
+    use slug_workspace_v2::WorkspaceFileValue;
+    use slug_workspace_v2::WorkspaceRawFileValue;
+    use slug_workspace_v2::WorkspaceRawSnapshot;
+    use slug_workspace_v2::WorkspaceRawSnapshotKey;
+    use slug_workspace_v2::WorkspaceSnapshot;
+    use slug_workspace_v2::WorkspaceSnapshotKey;
+    use starlark_map::small_map::SmallMap;
+    use starlark_map::sorted_map::SortedMap;
+
+    use super::*;
+    use crate::BzlmodCommandPolicyKey;
+    use crate::BzlmodEnvironmentPolicyKey;
+    use crate::RootPackagePolicyInputs;
+    use crate::SourcePreparationNeeds;
+    use crate::inject_root_module_request_inputs;
+    use crate::inject_root_package_policy_inputs;
+
+    const WORKSPACE: &str = "/policy-observation";
+    const MODULE: &str = "module(name='root')\nprint('policy')";
+    const MODULE_B: &str = "module(name='other')\nprint('policy')";
+    const LOCKFILE_A: &str = r#"{"lockFileVersion":28}"#;
+    const LOCKFILE_B: &str = r#"{"lockFileVersion":28,"moduleExtensions":{}}"#;
+    const REGISTRY_A: &str = "https://registry-a";
+    const REGISTRY_B: &str = "https://registry-b";
+    fn workspace() -> NormalizedAbsolutePath {
+        NormalizedAbsolutePath::new(WORKSPACE).unwrap()
+    }
+
+    fn present(kind: PathNodeKind, variant: i64, permissions: i32) -> PathObservationResult {
+        PathObservationResult::Lstat(PathOperationResult::Present(PathLstat::new(
+            kind,
+            variant,
+            variant,
+            variant,
+            variant,
+            permissions,
+        )))
+    }
+    fn epoch(source: &str, lockfile: &str, variant: i64) -> PathObservationEpoch {
+        let mut entries = SmallMap::new();
+        for path in ["/", WORKSPACE] {
+            entries.insert(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    NormalizedAbsolutePath::new(path).unwrap(),
+                    PathObservationOperation::Lstat,
+                ),
+                present(PathNodeKind::Directory, variant, 0o755),
+            );
+        }
+        for (path, bytes) in [
+            (format!("{WORKSPACE}/MODULE.bazel"), source),
+            (format!("{WORKSPACE}/MODULE.bazel.lock"), lockfile),
+        ] {
+            let path = NormalizedAbsolutePath::new(path).unwrap();
+            entries.insert(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    path.dupe(),
+                    PathObservationOperation::Lstat,
+                ),
+                present(PathNodeKind::RegularFile, variant, 0o644),
+            );
+            entries.insert(
+                PathObservationDemand::new(
+                    PathObservationNamespace::Host,
+                    path,
+                    PathObservationOperation::FileBytes,
+                ),
+                PathObservationResult::FileBytes(PathOperationResult::Present(Arc::from(
+                    bytes.as_bytes(),
+                ))),
+            );
+        }
+        PathObservationEpoch::new(entries).unwrap()
+    }
+
+    fn snapshot(source: &str, lockfile: &str) -> Arc<WorkspaceSnapshot> {
+        Arc::new(WorkspaceSnapshot {
+            files: Arc::new(SortedMap::from_iter([
+                (
+                    PathBuf::from(format!("{WORKSPACE}/MODULE.bazel")),
+                    WorkspaceFileValue::Present(Arc::new(source.to_owned())),
+                ),
+                (
+                    PathBuf::from(format!("{WORKSPACE}/MODULE.bazel.lock")),
+                    WorkspaceFileValue::Present(Arc::new(lockfile.to_owned())),
+                ),
+            ])),
+        })
+    }
+
+    fn inject(
+        updater: &mut DiceTransactionUpdater,
+        source: &str,
+        lockfile: &str,
+        mode: LockfileMode,
+        registry: &str,
+        variant: i64,
+        observe: bool,
+    ) -> PathObservationEpoch {
+        let epoch = epoch(source, lockfile, variant);
+        updater
+            .changed_to(vec![(
+                PathObservationEpochKey,
+                if observe {
+                    epoch.dupe()
+                } else {
+                    PathObservationEpoch::empty()
+                },
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceSnapshotKey {
+                    workspace: PathBuf::from(WORKSPACE),
+                },
+                snapshot(source, lockfile),
+            )])
+            .unwrap();
+        updater
+            .changed_to(vec![(
+                WorkspaceRawSnapshotKey {
+                    workspace: PathBuf::from(WORKSPACE),
+                },
+                Arc::new(WorkspaceRawSnapshot {
+                    files: Arc::new(SortedMap::from_iter([(
+                        PathBuf::from(format!("{WORKSPACE}/MODULE.bazel.lock")),
+                        WorkspaceRawFileValue::Present(Arc::from(lockfile.as_bytes())),
+                    )])),
+                }),
+            )])
+            .unwrap();
+        inject_root_package_policy_inputs(
+            updater,
+            RootPackagePolicyInputs::new(
+                workspace(),
+                [workspace()],
+                std::iter::empty::<&str>(),
+                None,
+                Some("warning"),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        inject_root_module_request_inputs(
+            updater,
+            Path::new(WORKSPACE),
+            BzlmodCommandPolicyKey::from_flags_with_module_overrides(
+                None,
+                false,
+                Path::new(WORKSPACE),
+                std::iter::empty::<&str>(),
+            )
+            .unwrap(),
+            BzlmodEnvironmentPolicyKey::from_bzlmod_allow_yanked_versions(None).unwrap(),
+            mode,
+        )
+        .unwrap();
+        inject_registry_request_inputs(
+            updater,
+            Path::new(WORKSPACE),
+            RegistryUrls::new([registry]),
+            RegistryRequestGeneration(variant as u64),
+        )
+        .unwrap();
+        epoch
+    }
+    fn inject_a(
+        updater: &mut DiceTransactionUpdater,
+        variant: i64,
+        observe: bool,
+    ) -> PathObservationEpoch {
+        inject(
+            updater,
+            MODULE,
+            LOCKFILE_A,
+            LockfileMode::Update,
+            REGISTRY_A,
+            variant,
+            observe,
+        )
+    }
+
+    #[derive(Default)]
+    struct Tracker {
+        rows: Mutex<Vec<(String, Vec<String>)>>,
+        batches: Mutex<Vec<(String, ActivationKind, Option<EventBatch>)>>,
+    }
+
+    impl Tracker {
+        fn take(
+            &self,
+        ) -> (
+            Vec<(String, Vec<String>)>,
+            Vec<(String, ActivationKind, Option<EventBatch>)>,
+        ) {
+            (
+                std::mem::take(&mut *self.rows.lock().unwrap()),
+                std::mem::take(&mut *self.batches.lock().unwrap()),
+            )
+        }
+    }
+
+    impl ActivationTracker for Tracker {
+        fn key_activated(
+            &self,
+            key: &DynKey,
+            deps: &mut dyn Iterator<Item = &DynKey>,
+            _: ActivationData,
+        ) {
+            self.rows
+                .lock()
+                .unwrap()
+                .push((key.to_string(), deps.map(ToString::to_string).collect()));
+        }
+
+        fn tracks_rich_activations(&self) -> bool {
+            true
+        }
+
+        fn key_activated_rich(&self, key: &DynKey, activation: RichActivation<'_>) {
+            self.batches.lock().unwrap().push((
+                key.to_string(),
+                activation.kind(),
+                activation
+                    .evaluation_data()
+                    .and_then(|data| data.downcast_ref::<EventBatch>())
+                    .map(Dupe::dupe),
+            ));
+        }
+    }
+    fn assert_no_root_files_activation(tracker: &Tracker) {
+        let (rows, _) = tracker.take();
+        assert!(rows.iter().all(|(owner, deps)| {
+            [
+                "root-module-files:",
+                "observed-root-module-files:",
+                "registry-file:",
+                "module-source-preparation:",
+                "host-discovered-module:",
+                "host-selected-module-graph:",
+                "host-registry:",
+                "host-pure-module-extension:",
+                "host-instantiated-module-extension:",
+                "host-validated-module-extension:",
+            ]
+            .iter()
+            .all(|prefix| {
+                !owner.starts_with(prefix)
+                    && deps
+                        .iter()
+                        .all(|dependency| !dependency.starts_with(prefix))
+            })
+        }));
+    }
+
+    fn updater(dice: &Arc<Dice>, tracker: Arc<Tracker>) -> DiceTransactionUpdater {
+        let mut data = UserComputationData {
+            activation_tracker: Some(tracker as Arc<dyn ActivationTracker>),
+            ..Default::default()
+        };
+        data.data.set(CaptureEvaluationEvents);
+        dice.updater_with_data(data)
+    }
+
+    fn row<'a>(rows: &'a [(String, Vec<String>)], owner: &str) -> &'a [String] {
+        rows.iter()
+            .find(|(candidate, _)| candidate == owner)
+            .unwrap()
+            .1
+            .as_slice()
+    }
+    fn events<'a>(
+        batches: &'a [(String, ActivationKind, Option<EventBatch>)],
+        prefix: &str,
+    ) -> Vec<&'a EventBatch> {
+        batches
+            .iter()
+            .filter_map(|(owner, kind, batch)| {
+                (owner.starts_with(prefix) && *kind == ActivationKind::Evaluated)
+                    .then(|| batch.as_ref())
+                    .flatten()
+            })
+            .collect()
+    }
+
+    fn complete(outcome: &<RegistryPolicyObservationKey as Key>::Value) -> &ObservedRegistryPolicy {
+        let SourcePreparationOutcome::Complete(Ok(observed)) = outcome else {
+            panic!("observed registry policy did not complete: {outcome:?}");
+        };
+        observed
+    }
+
+    #[test]
+    fn observed_registry_policy_identity_and_root_control_flow_are_exact() {
+        let a = RegistryPolicyObservationKey::new(PathBuf::from(WORKSPACE));
+        let b = RegistryPolicyObservationKey::new(PathBuf::from("/other"));
+        assert_eq!(
+            a.to_string(),
+            format!("observed-registry-policy:{WORKSPACE}")
+        );
+        assert_eq!(HashSet::from([a, b]).len(), 2);
+        let result: RegistryPolicyResult =
+            Arc::new(Err(RegistryFileError::MissingLockfileMode("arc".into())));
+        let projected = project_legacy_registry_policy(SourcePreparationOutcome::Complete(Ok((
+            result.dupe(),
+            PathObservationEpoch::empty(),
+        ))));
+        assert!(Arc::ptr_eq(&result, &projected));
+        let demand = PathObservationDemand::new(
+            PathObservationNamespace::Host,
+            workspace(),
+            PathObservationOperation::Lstat,
+        );
+        let root_need = SourcePreparationOutcome::Need(SourcePreparationNeeds::path(
+            NeedPathObservations::singleton(demand.dupe()),
+        ));
+        assert!(matches!(
+            finish_observed_registry_policy_root(root_need),
+            Err(SourcePreparationOutcome::Need(_))
+        ));
+        let need: <RegistryPolicyObservationKey as Key>::Value = SourcePreparationOutcome::Need(
+            SourcePreparationNeeds::path(NeedPathObservations::singleton(demand.dupe())),
+        );
+        assert!(!RegistryPolicyObservationKey::validity(&need));
+        assert!(!RegistryPolicyObservationKey::equality(&need, &need));
+        let root_outer = SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+            PathObservationEpochError::DuplicateDemand(demand.dupe()),
+        )));
+        assert!(matches!(
+            finish_observed_registry_policy_root(root_outer),
+            Err(SourcePreparationOutcome::Complete(Err(_)))
+        ));
+        let outer: <RegistryPolicyObservationKey as Key>::Value =
+            SourcePreparationOutcome::Complete(Err(ObservedPathFrontierError::from(
+                PathObservationEpochError::DuplicateDemand(demand),
+            )));
+        assert!(RegistryPolicyObservationKey::validity(&outer));
+        assert!(RegistryPolicyObservationKey::equality(&outer, &outer));
+    }
+
+    #[tokio::test]
+    async fn observed_registry_policy_preserves_family_epoch_events_and_lifecycle() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let tracker = Arc::new(Tracker::default());
+        let mut held: Option<(
+            <RegistryPolicyObservationKey as Key>::Value,
+            RegistryPolicyResult,
+            PathObservationEpoch,
+        )> = None;
+        for index in 0..9 {
+            let source = if index == 5 { MODULE_B } else { MODULE };
+            let lockfile = if index == 7 { LOCKFILE_B } else { LOCKFILE_A };
+            let mode = if index == 3 {
+                LockfileMode::Refresh
+            } else {
+                LockfileMode::Update
+            };
+            let registry = if index == 1 { REGISTRY_B } else { REGISTRY_A };
+            let variant = if index == 5 || index == 7 { 2 } else { 1 };
+            let same_as_a = index % 2 == 0;
+            let mut update = updater(&dice, tracker.dupe());
+            let injected = inject(&mut update, source, lockfile, mode, registry, variant, true);
+            let mut tx = update.commit().await;
+            let key = RegistryPolicyObservationKey::new(PathBuf::from(WORKSPACE));
+            let root = tx
+                .compute(&RootModuleFilesObservationKey::new(workspace()))
+                .await
+                .unwrap();
+            let SourcePreparationOutcome::Complete(Ok(root)) = root else {
+                panic!("root observation did not complete");
+            };
+            let (_, root_batches) = tracker.take();
+            let outcome = tx.compute(&key).await.unwrap();
+            let observed = complete(&outcome);
+            assert_eq!(observed.observations(), &injected);
+            let (observed_rows, observed_batches) = tracker.take();
+            for (demand, result) in observed.observations().observations() {
+                assert!(Arc::ptr_eq(
+                    result,
+                    root.observations().observations().get(demand).unwrap()
+                ));
+            }
+            assert_eq!(
+                row(&observed_rows, &key.to_string()),
+                vec![
+                    format!("root-module-registry-urls:{WORKSPACE}"),
+                    format!("root-module-lockfile-mode:{WORKSPACE}"),
+                    format!("observed-root-module-files:\"{WORKSPACE}\""),
+                ]
+            );
+            let parent = |owner: &String, _: &ActivationKind, _: &Option<EventBatch>| {
+                owner == &key.to_string()
+            };
+            assert!(
+                observed_batches
+                    .iter()
+                    .filter(|(o, k, b)| parent(o, k, b))
+                    .all(|(_, _, batch)| batch.is_none())
+            );
+            assert!(
+                index != 0
+                    || observed_batches
+                        .iter()
+                        .any(|(o, k, b)| parent(o, k, b) && *k == ActivationKind::Evaluated)
+            );
+            assert!(observed_rows.iter().all(|(owner, deps)| {
+                std::iter::once(owner).chain(deps).all(|name| {
+                    !name.starts_with("root-module-files:")
+                        && !name.starts_with("registry-file:")
+                        && !name.starts_with("module-source-preparation:")
+                        && !name.starts_with("host-discovered-module:")
+                        && !name.starts_with("host-selected-module-graph:")
+                        && !name.starts_with("host-registry:")
+                        && !name.starts_with("host-pure-module-extension:")
+                        && !name.starts_with("host-instantiated-module-extension:")
+                        && !name.starts_with("host-validated-module-extension:")
+                })
+            }));
+
+            let legacy_key = RegistryPolicyKey {
+                workspace: PathBuf::from(WORKSPACE),
+            };
+            tx.compute(&RootModuleFilesKey {
+                workspace: PathBuf::from(WORKSPACE),
+            })
+            .await
+            .unwrap();
+            let (_, legacy_child_batches) = tracker.take();
+            let legacy = tx.compute(&legacy_key).await.unwrap();
+            assert_eq!(observed.result().as_ref(), legacy.as_ref());
+            let (legacy_rows, legacy_parent_batches) = tracker.take();
+            assert_eq!(
+                row(&legacy_rows, &legacy_key.to_string()),
+                vec![
+                    format!("root-module-registry-urls:{WORKSPACE}"),
+                    format!("root-module-lockfile-mode:{WORKSPACE}"),
+                    format!("root-module-files:{WORKSPACE}"),
+                ]
+            );
+            tx.compute(&key).await.unwrap();
+            let (_, warm_batches) = tracker.take();
+            assert!(
+                legacy_parent_batches
+                    .iter()
+                    .filter(|(owner, _, _)| owner == &legacy_key.to_string())
+                    .all(|(_, _, batch)| batch.is_none())
+            );
+            assert!(
+                index != 0
+                    || legacy_parent_batches
+                        .iter()
+                        .any(|(owner, kind, _)| owner == &legacy_key.to_string()
+                            && *kind == ActivationKind::Evaluated)
+            );
+            if index == 0 {
+                let observed_batches =
+                    events(&root_batches, "bzlmod-observed-host-root-module-file:");
+                let legacy_batches = events(&legacy_child_batches, "root-module-evaluation:");
+                assert_eq!(observed_batches, legacy_batches);
+                assert!(matches!(observed_batches.as_slice(), [batch]
+                    if matches!(batch.events(),
+                        [EvaluationEvent::StarlarkPrint { text, .. }] if text == "policy")));
+            }
+            assert!(warm_batches.iter().all(|(_, _, batch)| batch.is_none()));
+
+            assert!(legacy_rows.iter().all(|(owner, deps)| {
+                std::iter::once(owner).chain(deps).all(|name| {
+                    !name.starts_with("observed-root-module-files:")
+                        && !name.starts_with("bzlmod-observed-host-root-module-file:")
+                })
+            }));
+            if let Some((held_outcome, held_result, held_epoch)) = &held {
+                assert_eq!(
+                    RegistryPolicyObservationKey::equality(held_outcome, &outcome),
+                    same_as_a
+                );
+                if same_as_a {
+                    assert_eq!(held_result.as_ref(), observed.result().as_ref());
+                    assert_eq!(held_epoch, observed.observations());
+                }
+            } else {
+                held = Some((
+                    outcome.clone(),
+                    observed.result().dupe(),
+                    observed.observations().dupe(),
+                ));
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn observed_registry_policy_stops_on_inputs_need_and_cancellation_then_recovers() {
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let key = RegistryPolicyObservationKey::new(PathBuf::from(WORKSPACE));
+        let tracker = Arc::new(Tracker::default());
+        let mut tx = updater(&dice, tracker.dupe()).commit().await;
+        let missing_urls = tx.compute(&key).await.unwrap();
+        let missing_urls = complete(&missing_urls);
+        assert!(matches!(
+            missing_urls.result().as_ref(),
+            Err(RegistryFileError::MissingRegistryUrls(_))
+        ));
+        assert!(missing_urls.observations().observations().is_empty());
+        assert_no_root_files_activation(&tracker);
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut update = updater(&dice, tracker.dupe());
+        update
+            .changed_to(vec![(
+                RootModuleRegistryUrlsKey {
+                    workspace: PathBuf::from(WORKSPACE),
+                },
+                RootModuleRegistryUrls::from(RegistryUrls::new(["https://registry"])),
+            )])
+            .unwrap();
+        let mut tx = update.commit().await;
+        let missing_mode = complete(&tx.compute(&key).await.unwrap()).dupe();
+        assert!(matches!(
+            missing_mode.result().as_ref(),
+            Err(RegistryFileError::MissingLockfileMode(_))
+        ));
+        assert!(missing_mode.observations().observations().is_empty());
+        assert_no_root_files_activation(&tracker);
+
+        let SourcePreparationOutcome::Complete(Ok((result, observations))) =
+            registry_policy_root_compute_error("root compute".into())
+        else {
+            panic!("root compute projection was not semantic");
+        };
+        assert_eq!(
+            result.as_ref(),
+            &Err(RegistryFileError::RootModuleFiles("root compute".into()))
+        );
+        assert!(observations.observations().is_empty());
+
+        let dice = Arc::new(Dice::builder().build(DetectCycles::Enabled));
+        let mut update = updater(&dice, tracker.dupe());
+        inject_a(&mut update, 7, false);
+        let mut tx = update.commit().await;
+        let mut future = Box::pin(tx.compute(&key));
+        std::future::poll_fn(|context| {
+            assert!(std::future::Future::poll(future.as_mut(), context).is_pending());
+            std::task::Poll::Ready(())
+        })
+        .await;
+        drop(future);
+        drop(tx);
+        let (_, cancelled_batches) = tracker.take();
+        assert!(
+            cancelled_batches
+                .iter()
+                .all(|(owner, _, batch)| owner != &key.to_string() || batch.is_none())
+        );
+        let mut update = updater(&dice, tracker.dupe());
+        inject_a(&mut update, 7, false);
+        let mut tx = update.commit().await;
+        let need = tx.compute(&key).await.unwrap();
+        assert!(matches!(need, SourcePreparationOutcome::Need(_)));
+        assert!(!RegistryPolicyObservationKey::validity(&need));
+        let (need_rows, need_batches) = tracker.take();
+        assert_eq!(
+            row(&need_rows, &key.to_string()),
+            [
+                format!("root-module-registry-urls:{WORKSPACE}"),
+                format!("root-module-lockfile-mode:{WORKSPACE}"),
+                format!("observed-root-module-files:\"{WORKSPACE}\""),
+            ]
+        );
+        assert!(
+            need_batches
+                .iter()
+                .all(|(owner, _, batch)| owner != &key.to_string() || batch.is_none())
+        );
+
+        let mut update = updater(&dice, tracker.dupe());
+        let expected = inject_a(&mut update, 7, true);
+        let mut tx = update.commit().await;
+        let recovered = tx.compute(&key).await.unwrap();
+        assert_eq!(complete(&recovered).observations(), &expected);
+
+        let mut update = updater(&dice, tracker);
+        let expected = inject(
+            &mut update,
+            "module(name=",
+            LOCKFILE_A,
+            LockfileMode::Update,
+            "https://registry",
+            8,
+            true,
+        );
+        let mut tx = update.commit().await;
+        let semantic = tx.compute(&key).await.unwrap();
+        let semantic = complete(&semantic);
+        assert!(matches!(
+            semantic.result().as_ref(),
+            Err(RegistryFileError::RootModuleFiles(_))
+        ));
+        let actual = semantic.observations().observations();
+        assert_eq!(actual.len(), 4);
+        assert!(actual.iter().all(|(demand, result)| Arc::ptr_eq(
+            result,
+            expected.observations().get(demand).unwrap()
+        )));
     }
 }
