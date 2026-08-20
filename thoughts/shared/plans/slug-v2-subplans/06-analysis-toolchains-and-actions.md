@@ -9522,3 +9522,37 @@ or test hook.
 STOP a second file/key/caller/export, production semantic/event/family/memory
 drift, upper activation, cap excess or milestone closure. After independent
 ACCEPT return only to the docs-only selected-module-graph frontier audit.
+
+### Registry-policy observation accepted and frontier resumed (2026-08-19)
+
+Accepted `d0ebd79d` adds the private matching-family registry-policy carrier at
++166 production/+634 proof/+800 aggregate and 2,213 physical lines. Focused 3/3,
+full bzlmod 457 plus integrations, loading 138 plus integrations and query
+53+56+1+11 pass; core retains only the inherited 245/246 stale visibility
+wording. Fmt/diff, Buck2 retention, cleanup and independent review pass.
+
+Activate only
+`WP-6-7A-selected-module-graph-observation-frontier-audit-resume`. Write only
+canonical/current/this Stage/routing at <=40/<=220/<=180/<=30 net lines and
+<=470 aggregate; Rust/tests/fixtures/oracles/public/callers are read-only.
+
+Trace accepted nonregistry closure and registry policy through registry source
+preparation, RegistryFile, patch/source preparation, discovery and selected
+graph. For every candidate record structural identity, Result Arc/epoch owner,
+exact dependency order and terminal polarity, child event authority, retained
+lifetime and lifecycle evidence. Locate the first complete reusable producer;
+do not reconstruct epochs or combine independent owners for convenience.
+
+Return exactly one of: one smallest-owner docs-only design with measured future
+scope/caps/proof; one uniquely smaller evidence/producer prerequisite; or formal
+REPLAN. Do not preselect registry file/preparation, discovery or selected graph,
+and authorize no implementation. After independent audit ACCEPT schedule at
+most one design successor.
+
+Exact compatibility remains current registry/nonregistry values/errors/order
+and child events. Private observed carriers/epochs/outers are Slug-native.
+Extensions, broader actions, M8/M7B and identity bytes remain deferred.
+
+STOP code/tests/oracles, public/caller changes, direct selected-graph activation,
+event/family drift, retained scratch/cache/interner/store/lock/task, direct Host
+reads, unmeasured caps or milestone closure. M7 remains partial.
