@@ -1,40 +1,87 @@
 # Current Slug V2 Packet
 
-Packet: `WP-6-7A-module-source-preparation-observation-implementation-retry-2`
+Packet: `WP-6-7A-selected-module-graph-observation-frontier-audit-resume-3`
 Milestone: M7A bootstrap-critical command/ruleset breadth
 Owner: `06-analysis-toolchains-and-actions.md`
-Scheduling base: `77904203`
-Accepted design: `5436a421`
-Rust base: `0f9a0559`
-Accepted first proof correction: `2c505e13`
-Accepted second proof correction: `77904203`
+Scheduling base: `223c8112`
 
-## Accepted second correction and resumed implementation authority
+## Accepted predecessor
 
-Correction `77904203` resumes only this same two-file retry from Rust base
-`0f9a0559`, semantic design `5436a421` and first correction `2c505e13`.
-Production is frozen: the shared Legacy/Observed driver keeps effective ->
-source or policy -> ordered registry attempts -> resolve-all patches -> each
-FileBytes and immediate apply; Complete epochs merge left-first before semantic
-inspection; Need/outer is carrierless; children alone own events; and the
-carrier retains exactly one local Result Arc plus the compact epoch.
+Implementation `223c8112` completes the private module-source-preparation
+observation owner accepted by design `5436a421` and proof corrections
+`2c505e13` and `77904203`. The exact two-file delta against Rust base
+`0f9a0559` is +367 net at 16,502 physical in `source_preparation.rs` and
++1,969 proof lines at 7,231 physical in
+`source_preparation_observation_tests.rs`: +2,336 semantic and 23,733 physical
+aggregate, within every corrected cap.
 
-Write only `source_preparation.rs` at <=700 production/+60 colocated proof and
-<=16,900 physical, plus `source_preparation_observation_tests.rs` at <=2,100
-proof/7,500 physical. Aggregate caps are <=2,860 semantic and <=24,400
-physical. Helpers/tests remain below 200 lines. Every third file, fixture,
-oracle, export, caller and plan document is read-only during implementation.
+The accepted implementation has one shared Legacy/Observed driver and exact
+effective -> nonregistry source or registry policy -> ordered registry-file
+attempts -> resolve-all patches -> per-resolution FileBytes/immediate-apply
+order. Complete epochs merge left-first before semantic inspection; Need and
+typed outer remain carrierless; children alone own events; and the parent
+retains exactly one local Result Arc plus the compact epoch. Distinct key
+identity, exact cumulative child order/shared Arcs, independent mode/lockfile
+and symlink-retarget A-B-A, every prior prefix/terminal/family/event/warm/
+cancellation/lifecycle/upper discriminator, and helpers/tests below 200 lines
+received two independent terminal ACCEPTs.
 
-Add the distinct-key equality/hash discriminator; reconstruct the effective ->
-policy -> decisive registry-file -> reached resolutions -> reached FileBytes
-cumulative epoch with exact order/shared Arcs; drive lockfile mode/content and
-patch symlink-retarget A-B-A with held Result/epoch handles. Preserve every
-accepted prefix, terminal-position, family, event, warm, cancellation,
-lifecycle and upper-exclusion discriminator.
+Validation is current: focused `observed_module_source` proof is 12/12,
+`cargo test -p slug_bzlmod_v2 --no-fail-fast` passes 475 unit tests plus every
+integration/doc target, `cargo fmt --all -- --check` passes, and
+`git diff --check 0f9a0559 --` is clean.
 
-STOP production semantic/event/family/memory drift, wider authority, proof
-waiver, cap excess or milestone closure. After independent retry ACCEPT return
-only to the docs-only selected-module-graph frontier for discovery.
+## Objective and exact docs-only authority
+
+Resume the neutral selected-module-graph observation frontier. Determine the
+uniquely smallest complete remaining producer between completed source
+preparation, discovery evaluation, registry/nonregistry horizons and
+`HostSelectedModuleGraphKey`; do not presume discovery or selected-graph
+ownership before tracing the live graph.
+
+This packet is read-only for Rust, tests, fixtures, oracles, public APIs and
+callers. Write only canonical, this manifest, this Stage and the orchestration
+routing log.
+
+Net docs caps are canonical <=40, current <=220, Stage <=180 and routing <=30,
+with <=470 aggregate.
+
+Use the accepted module-preparation carrier rather than reopening its search,
+patch or epoch ownership. Inspect only enough live code to trace:
+
+1. the nonregistry closure and registry preparation inputs reaching discovery;
+2. `HostDiscoveredModuleKey` evaluation, local Result ownership, event batch,
+   Need/outer/error order and recursive dependency horizon;
+3. the selected-graph join, root/registry ordering and every still-carrierless
+   mutable/path edge;
+4. selected repo-spec, extension and public consumers only far enough to prove
+   whether they are later owners; and
+5. exact retained Result/Arc/epoch, event, family, cancellation, lifecycle and
+   memory boundaries for the smallest candidate.
+
+Classify preserved Bazel 9 behavior as exact, private epoch association and
+typed outer behavior as Slug-native, and selected repo specs/extensions,
+broader bootstrap work, M8/M7B and exact identity bytes as deferred unless the
+live trace proves they are required by the bounded next owner.
+
+## Required terminal
+
+End with exactly one of:
+
+- one docs-only frozen design for the uniquely smallest complete owner, with
+  exact Rust allowlist, measured baselines/caps, algebra, retention, proof,
+  compatibility and one implementation successor;
+- one uniquely smaller docs-only prerequisite design when a carrierless shared
+  edge still prevents that owner; or
+- formal `REPLAN` with contradictory live evidence and one smallest next
+  docs-only audit/design.
+
+At most one successor may be scheduled, and it must receive independent design
+review before Rust authority. STOP direct implementation, a speculative
+discovery/selected-graph carrier, moving or duplicating child event ownership,
+weakening exact Arc/epoch equality, adding retained collections/cache/interner/
+store/lock/task/Host reads, upper/public activation, M7 acceptance, M8/M7B work,
+or exact identity-byte work. M7 remains partial and M7A -> M8 -> M7B remains.
 
 ## Historical second proof-cap REPLAN
 

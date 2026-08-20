@@ -9898,3 +9898,65 @@ cancel/lifecycle/upper discriminator.
 STOP production/event/family/memory drift, wider authority, proof waiver, cap
 excess or milestone closure. After retry ACCEPT return only to the docs-only
 selected-module-graph frontier for discovery.
+
+### Module-source preparation observation accepted (2026-08-20)
+
+Implementation `223c8112` completes the owner designed in `5436a421` and
+corrected by `2c505e13` and `77904203`. Against Rust base `0f9a0559`, the
+accepted two-file delta is +367 net at 16,502 physical in
+`source_preparation.rs` and +1,969 proof lines at 7,231 physical in
+`source_preparation_observation_tests.rs`: +2,336 semantic and 23,733 physical
+aggregate, within every corrected cap.
+
+The accepted shared driver preserves effective -> nonregistry source or
+registry policy -> ordered registry-file attempts -> resolve-all patches ->
+per-resolution FileBytes/immediate-apply order. Complete epochs merge
+left-first before semantics; Need/outer is carrierless; child keys retain sole
+event ownership; and the carrier retains exactly one Result Arc plus a compact
+epoch. Final proof discriminates distinct key/hash identity, exact cumulative
+child order/shared Arcs, independent mode/lockfile restoration and symlink
+retarget restoration while preserving every accepted prefix, family, event,
+warm, cancellation, lifecycle and upper exclusion.
+
+Focused proof is 12/12. The full `slug_bzlmod_v2` suite passes 475 unit tests
+plus all integrations/docs; fmt and diff-check pass. Two independent terminal
+reviews accept production, proof, compact retention, helpers/tests below 200
+lines and the exact two-file scope.
+
+### Selected-module-graph observation frontier audit resumed (2026-08-20)
+
+Activate only
+`WP-6-7A-selected-module-graph-observation-frontier-audit-resume-3`.
+This is a docs-only, read-only-Rust audit. Write exactly canonical, current,
+this Stage and the orchestration routing log.
+
+Net docs caps are canonical <=40, current <=220, Stage <=180 and routing <=30,
+with <=470 aggregate.
+
+Trace the accepted nonregistry closure and module-source preparation into
+`HostDiscoveredModuleKey`, then into the selected-graph join. Inspect discovery
+evaluation/Result/event ownership, recursive dependency horizon and every
+remaining carrierless mutable/path edge. Inspect selected repo-spec, extension
+and public consumers only enough to prove that they are later owners or a
+necessary part of the smallest candidate. Do not reopen accepted source search,
+patch or epoch ownership.
+
+The audit must establish exact key/Result/Arc/epoch association, sequential or
+joined Need/outer/error precedence, event ownership/order, matching families,
+cancellation/warm behavior, lifecycle restoration, retained-state lifetime and
+Buck2 memory shape. Preserve current Bazel 9 behavior as exact; private typed
+outer/epoch association is Slug-native; selected repo specs/extensions, broader
+bootstrap work, M8/M7B and exact identity bytes remain deferred unless live
+owner evidence requires them.
+
+Terminate with exactly one independently reviewable docs-only frozen design for
+the uniquely smallest complete owner, one uniquely smaller prerequisite design,
+or formal REPLAN with contradictory evidence and one smallest next audit/design.
+At most one successor may be scheduled, and no Rust authority exists before
+independent design ACCEPT.
+
+STOP direct implementation, a speculative discovery/selected-graph carrier,
+moving or duplicating child event ownership, weakened Arc/epoch equality,
+retained collection/cache/interner/store/lock/task/Host reads, upper/public
+activation, M7 acceptance, M8/M7B work or exact identity-byte work. M7 remains
+partial and M7A -> M8 -> M7B remains.
